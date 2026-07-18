@@ -1662,8 +1662,18 @@ describe('Tab - Destruction', () => {
 
 describe('Tab - Service Callbacks', () => {
   describe('setupServiceCallbacks', () => {
-    function setupAutoTurnTest() {
-      const plugin = createMockPlugin();
+    function setupAutoTurnTest(settings: Record<string, unknown> = {}) {
+      const basePlugin = createMockPlugin();
+      const plugin = createMockPlugin({
+        settings: {
+          ...basePlugin.settings,
+          ...settings,
+          providerConfigs: {
+            ...basePlugin.settings.providerConfigs,
+            ...((settings.providerConfigs as Record<string, unknown> | undefined) ?? {}),
+          },
+        },
+      });
       const tab = createTab(createMockOptions({ plugin }));
       const addMessageSpy = jest.spyOn(tab.state, 'addMessage');
       const addMessage = jest.fn(() => {
@@ -1704,6 +1714,9 @@ describe('Tab - Service Callbacks', () => {
         hasRunningSubagents: jest.fn().mockReturnValue(false),
         resetStreamingState: jest.fn(),
       } as any;
+      tab.ui.permissionToggle = {
+        updateDisplay: jest.fn(),
+      } as any;
 
       const service = {
         setApprovalCallback: jest.fn(),
@@ -1719,8 +1732,72 @@ describe('Tab - Service Callbacks', () => {
       setupServiceCallbacks(tab, plugin);
 
       const autoTurnCallback = service.setAutoTurnCallback.mock.calls[0][0];
-      return { tab, addMessageSpy, addMessage, handleStreamChunk, scrollToBottom, autoTurnCallback };
+      const permissionModeSyncCallback = service.setPermissionModeSyncCallback.mock.calls[0][0];
+      return {
+        tab,
+        plugin,
+        addMessageSpy,
+        addMessage,
+        handleStreamChunk,
+        scrollToBottom,
+        autoTurnCallback,
+        permissionModeSyncCallback,
+      };
     }
+
+    it('keeps shared full_access mode when providers sync Auto-approve', () => {
+      const { plugin, permissionModeSyncCallback } = setupAutoTurnTest({
+        permissionMode: 'full_access',
+        settingsProvider: 'grok',
+        providerConfigs: {
+          grok: {
+            selectedMode: 'grimoire-full-access',
+          },
+        },
+      });
+
+      // Grok/OpenCode emit already-normalized shared modes. Mapping full_access
+      // to Safe was the Auto-approve flip-back bug.
+      permissionModeSyncCallback('full_access');
+
+      expect(plugin.settings.permissionMode).toBe('full_access');
+    });
+
+    it('does not let a session report downgrade Auto-approve back to Safe', () => {
+      const { plugin, permissionModeSyncCallback } = setupAutoTurnTest({
+        permissionMode: 'full_access',
+        settingsProvider: 'grok',
+        providerConfigs: {
+          grok: {
+            selectedMode: 'grimoire-full-access',
+          },
+        },
+      });
+
+      permissionModeSyncCallback('normal');
+      permissionModeSyncCallback('default');
+      permissionModeSyncCallback('ask');
+
+      expect(plugin.settings.permissionMode).toBe('full_access');
+    });
+
+    it('maps Claude bypassPermissions to full_access', () => {
+      const { plugin, permissionModeSyncCallback } = setupAutoTurnTest({
+        permissionMode: 'normal',
+      });
+
+      permissionModeSyncCallback('bypassPermissions');
+      expect(plugin.settings.permissionMode).toBe('full_access');
+    });
+
+    it('maps default/ask session modes to Safe when the toolbar is not Auto-approve', () => {
+      const { plugin, permissionModeSyncCallback } = setupAutoTurnTest({
+        permissionMode: 'plan',
+      });
+
+      permissionModeSyncCallback('default');
+      expect(plugin.settings.permissionMode).toBe('normal');
+    });
 
     it('renders tool-only auto-triggered turns with a placeholder assistant message', async () => {
       const { addMessageSpy, addMessage, handleStreamChunk, scrollToBottom, autoTurnCallback } = setupAutoTurnTest();

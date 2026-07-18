@@ -75,6 +75,14 @@ describe('Grok Build mode settings', () => {
     expect(resolvePermissionModeForManagedGrokMode('plan')).toBe('plan');
     expect(resolvePermissionModeForManagedGrokMode('summary')).toBeNull();
   });
+
+  it('maps native Grok / Claude-compatible permission mode ids', () => {
+    expect(resolvePermissionModeForManagedGrokMode('always-approve')).toBe('full_access');
+    expect(resolvePermissionModeForManagedGrokMode('bypassPermissions')).toBe('full_access');
+    expect(resolvePermissionModeForManagedGrokMode('ask')).toBe('normal');
+    expect(resolvePermissionModeForManagedGrokMode('default')).toBe('normal');
+    expect(resolvePermissionModeForManagedGrokMode('normal')).toBe('normal');
+  });
 });
 
 describe('grokChatUIConfig permission mode wiring', () => {

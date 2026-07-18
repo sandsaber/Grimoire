@@ -35,7 +35,10 @@ import {
   type UsageInfo,
   VIEW_TYPE_GRIMOIRE,
 } from '../../../core/types';
-import { LEGACY_YOLO_PERMISSION_MODE } from '../../../core/types/settings';
+import {
+  coercePermissionMode,
+  LEGACY_YOLO_PERMISSION_MODE,
+} from '../../../core/types/settings';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
 import { SlashCommandDropdown } from '../../../shared/components/SlashCommandDropdown';
@@ -2983,12 +2986,14 @@ export function setupServiceCallbacks(tab: TabData, plugin: GrimoirePlugin): voi
     );
     tab.service.setAutoTurnCallback((result: AutoTurnResult) => renderAutoTriggeredTurn(tab, plugin, result));
     tab.service.setPermissionModeSyncCallback((sdkMode) => {
-      const mode = sdkMode === 'bypassPermissions' || sdkMode === LEGACY_YOLO_PERMISSION_MODE
-        ? 'full_access'
-        : sdkMode === 'plan'
-        ? 'plan'
-        : 'normal';
+      const mode = normalizePermissionModeSyncValue(sdkMode);
       const currentMode = getTabPermissionMode(tab, plugin);
+
+      // Never let a live session report silently downgrade Auto-approve → Safe.
+      // Plan entry/exit and explicit user toggles still update the toolbar.
+      if (mode === 'normal' && currentMode === 'full_access') {
+        return;
+      }
 
       if (currentMode !== mode) {
         // Save pre-plan mode when entering plan (for Shift+Tab toggle restore)
@@ -2999,6 +3004,32 @@ export function setupServiceCallbacks(tab: TabData, plugin: GrimoirePlugin): voi
       }
     });
   }
+}
+
+/**
+ * Providers emit either shared PermissionMode values (Grok/OpenCode/etc:
+ * full_access | normal | plan) or Claude SDK modes (bypassPermissions, plan,
+ * default, ...). Map both families onto Grimoire's shared toolbar modes.
+ */
+export function normalizePermissionModeSyncValue(sdkMode: string): string {
+  const sharedMode = coercePermissionMode(sdkMode);
+  if (sharedMode) {
+    return sharedMode;
+  }
+  if (
+    sdkMode === 'bypassPermissions'
+    || sdkMode === LEGACY_YOLO_PERMISSION_MODE
+    || sdkMode === 'always-approve'
+  ) {
+    return 'full_access';
+  }
+  if (sdkMode === 'plan') {
+    return 'plan';
+  }
+  if (sdkMode === 'ask' || sdkMode === 'default') {
+    return 'normal';
+  }
+  return 'normal';
 }
 
 function generateMessageId(): string {

@@ -311,8 +311,13 @@ export class GrokChatRuntime implements ChatRuntime {
     const targetSessionId = this.sessionId;
     const resolvedCliPath = this.plugin.getResolvedProviderCliPath('grok') ?? 'grok';
     const promptSettings = this.getSystemPromptSettings(cwd);
+    // Use the Grok-projected snapshot, not the global settings.permissionMode.
+    // When another provider owns settingsProvider, the toolbar Auto-approve choice
+    // lives in savedProviderPermissionMode.grok / selectedMode and would otherwise
+    // be ignored — leaving managed_config on ask and snapping the session to Safe.
+    const providerSettings = this.getProviderSettings();
     const permissionMode = resolveGrokPermissionModeForSettings(
-      (this.plugin.settings as Record<string, unknown>).permissionMode,
+      providerSettings.permissionMode,
     );
     const artifacts = await prepareGrokLaunchArtifacts({
       permissionMode,
@@ -325,7 +330,6 @@ export class GrokChatRuntime implements ChatRuntime {
     );
     const grokAuthPath = resolveGrokProviderAuthPath(this.plugin.settings, runtimeEnv);
 
-    const providerSettings = this.getProviderSettings();
     const reasoningEffort = typeof providerSettings.effortLevel === 'string'
       ? providerSettings.effortLevel
       : null;
@@ -927,14 +931,40 @@ export class GrokChatRuntime implements ChatRuntime {
     return availableModes[0]?.id || null;
   }
 
-  private async applySelectedMode(_sessionId: string): Promise<void> {
+  private async applySelectedMode(sessionId: string): Promise<void> {
+    if (!this.connection) {
+      return;
+    }
+
     const selectedModeId = this.resolveSelectedModeId();
     if (!selectedModeId || selectedModeId === this.currentSessionModeId) {
       return;
     }
 
+    // Prefer native session/set_mode (parallel to session/set_model). Fall back
+    // to the mode config select used by some ACP agents when set_mode is missing.
+    try {
+      await this.connection.setMode({
+        modeId: selectedModeId,
+        sessionId,
+      });
+      this.currentSessionModeId = selectedModeId;
+      this.emitPermissionModeSync(selectedModeId);
+      return;
+    } catch {
+      // Continue with setConfigOption below.
+    }
+
+    const response = await this.connection.setConfigOption({
+      configId: 'mode',
+      sessionId,
+      type: 'select',
+      value: selectedModeId,
+    });
     this.currentSessionModeId = selectedModeId;
-    this.emitPermissionModeSync(selectedModeId);
+    await this.syncSessionModeState({
+      configOptions: response.configOptions,
+    });
   }
 
   private async applySelectedModel(
@@ -1179,13 +1209,23 @@ export class GrokChatRuntime implements ChatRuntime {
     configOptions?: AcpSessionConfigOption[] | null;
     currentModeId?: string | null;
     modes?: AcpSessionModeState | null;
-  }): Promise<void> {
+  }, options: {
+    /**
+     * When false, track session mode / discover available modes without writing
+     * the shared permission toggle. Session create/load use this so a default
+     * safe session mode cannot clobber Auto-approve before applySelectedMode.
+     */
+    syncPermissionToggle?: boolean;
+  } = {}): Promise<void> {
+    const syncPermissionToggle = options.syncPermissionToggle !== false;
     const acpState = extractAcpSessionModeState(params);
     const availableModes = normalizeGrokAvailableModes(acpState.availableModes);
     const currentModeId = params.currentModeId ?? acpState.currentModeId;
     if (currentModeId) {
       this.currentSessionModeId = currentModeId;
-      this.emitPermissionModeSync(currentModeId);
+      if (syncPermissionToggle && this.shouldEmitPermissionModeSync(currentModeId)) {
+        this.emitPermissionModeSync(currentModeId);
+      }
     }
 
     const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
@@ -1212,6 +1252,49 @@ export class GrokChatRuntime implements ChatRuntime {
     for (const view of this.plugin.getAllViews()) {
       view.refreshModelSelector();
     }
+  }
+
+  /**
+   * Avoid overwriting an explicit Auto-approve/Plan toolbar choice with a
+   * default safe session mode. Still mirror agent-driven plan entry and
+   * intentional mode upgrades (e.g. /always-approve).
+   */
+  private shouldEmitPermissionModeSync(sessionModeId: string): boolean {
+    const providerSettings = this.getProviderSettings();
+    const grokSettings = getGrokProviderSettings(providerSettings);
+    const explicitPermission = coercePermissionMode(providerSettings.permissionMode);
+    const hasExplicitSelectedMode = Boolean(grokSettings.selectedMode?.trim());
+
+    if (!hasExplicitSelectedMode && !explicitPermission) {
+      return true;
+    }
+
+    const desiredModeId = this.resolveSelectedModeId();
+    if (!desiredModeId || desiredModeId === sessionModeId) {
+      return true;
+    }
+
+    const sessionPermission = resolvePermissionModeForManagedGrokMode(sessionModeId);
+    if (sessionPermission === 'plan') {
+      return true;
+    }
+
+    if (
+      sessionPermission === 'normal'
+      && (explicitPermission === 'full_access' || explicitPermission === 'plan')
+    ) {
+      return false;
+    }
+
+    const desiredPermission = resolvePermissionModeForManagedGrokMode(desiredModeId);
+    if (
+      sessionPermission === 'normal'
+      && (desiredPermission === 'full_access' || desiredPermission === 'plan')
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   private emitPermissionModeSync(modeId: string): void {
@@ -1247,9 +1330,13 @@ export class GrokChatRuntime implements ChatRuntime {
         configOptions: response.configOptions ?? null,
         models: normalizeGrokAcpSessionModels(response.models ?? null),
       });
+      // Do not push the session's default mode into the toolbar here. The next
+      // applySelectedMode call reconciles the live session to the user's choice.
       await this.syncSessionModeState({
         configOptions: response.configOptions ?? null,
         modes: response.modes ?? null,
+      }, {
+        syncPermissionToggle: false,
       });
       const normalizedModels = normalizeGrokAcpSessionModels(response.models ?? null);
       logGrokDebug(this.plugin, 'session.create.succeeded', {
@@ -1291,9 +1378,12 @@ export class GrokChatRuntime implements ChatRuntime {
         configOptions: response.configOptions ?? null,
         models: normalizeGrokAcpSessionModels(response.models ?? null),
       });
+      // Same as createSession: discover modes without clobbering the toolbar.
       await this.syncSessionModeState({
         configOptions: response.configOptions ?? null,
         modes: response.modes ?? null,
+      }, {
+        syncPermissionToggle: false,
       });
       const normalizedModels = normalizeGrokAcpSessionModels(response.models ?? null);
       logGrokDebug(this.plugin, 'session.load.succeeded', {
