@@ -1,5 +1,5 @@
 import type { Component } from 'obsidian';
-import { Notice, setIcon, TFile } from 'obsidian';
+import { Notice, setIcon } from 'obsidian';
 
 import { ProjectWorkspaceStore } from '../../../core/context/ProjectWorkspaceStore';
 import { RelevantNotesService } from '../../../core/context/RelevantNotesService';
@@ -15,8 +15,6 @@ import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorks
 import type {
   ProviderChatUIConfig,
   ProviderId,
-  ProviderPlanUsage,
-  ProviderPlanUsageWindow,
 } from '../../../core/providers/types';
 import {
   DEFAULT_CHAT_PROVIDER_ID,
@@ -36,11 +34,9 @@ import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
 import { SlashCommandDropdown } from '../../../shared/components/SlashCommandDropdown';
 import { getEnhancedPath } from '../../../utils/env';
-import { validateContextPath } from '../../../utils/externalContext';
 import { getVaultPath } from '../../../utils/path';
 import { BrowserSelectionController } from '../controllers/BrowserSelectionController';
 import { CanvasSelectionController } from '../controllers/CanvasSelectionController';
-import { updateContextRowHasContent } from '../controllers/contextRowVisibility';
 import { ConversationController } from '../controllers/ConversationController';
 import { InputController } from '../controllers/InputController';
 import { NavigationController } from '../controllers/NavigationController';
@@ -54,16 +50,13 @@ import { SubagentManager } from '../services/SubagentManager';
 import { ChatState } from '../state/ChatState';
 import { BangBashModeManager as BangBashModeManagerClass } from '../ui/BangBashModeManager';
 import { RuntimeContextActivityView } from '../ui/context/RuntimeContextActivity';
-import { FileContextManager } from '../ui/FileContext';
-import { ImageContextManager } from '../ui/ImageContext';
 import { createInputToolbar } from '../ui/InputToolbar';
 import { InstructionModeManager as InstructionModeManagerClass } from '../ui/InstructionModeManager';
 import { NavigationSidebar } from '../ui/NavigationSidebar';
-import { type RelevantNotesCurrentSource, RelevantNotesView } from '../ui/RelevantNotesView';
+import { RelevantNotesView } from '../ui/RelevantNotesView';
 import { StatusPanel } from '../ui/StatusPanel';
 import { autoResizeTextarea } from '../ui/textareaResize';
 import { buildAssistantResponseMetadata } from '../utils/assistantResponseMetadata';
-import { localizeReasoningLevel } from '../utils/reasoningDisplay';
 import { recalculateUsageForModel } from '../utils/usageInfo';
 import { getTabProviderId } from './providerResolution';
 import { attachInputResizeHandle, buildTabDOM } from './tabDOM';
@@ -76,13 +69,11 @@ import {
 } from './tabScroll';
 import {
   cloneSerializableRecord,
-  type ContextEngineRelevantSettings,
   createDraftSettingsSnapshot,
   enqueueProviderModelPersistence,
   getBlankTabModelOptions,
   getProviderMcpManager,
   getProviderModelPersistenceQueue,
-  getRegistryProviderCatalogInfo,
   getTabCapabilities,
   getTabChatUIConfig,
   getTabHiddenCommands,
@@ -104,6 +95,38 @@ export {
   getTabSettingsSnapshot,
   resolveTabModel,
 } from './tabSettings';
+
+import {
+  initializeContextManagers,
+  openRelevantVaultPath,
+  renderExternalFileChips,
+  syncBoundStatus,
+  syncComposerStopButton,
+  syncContextSummary,
+  updateRelevantNotes,
+} from './tabContextUI';
+import {
+  applyBlankDraftSettings,
+  applyProviderUIGating,
+  cleanupTabRuntime,
+  ensureTitleGenerationService,
+  getProviderUsageSnapshot,
+  prepareModelMetadataInBackground,
+  recordProviderLaunchArtifacts,
+  refreshPlanUsageUI,
+  refreshProviderUsageSnapshot,
+  refreshRuntimeContextUI,
+  refreshTabProviderUI,
+  runProviderChangedInBackground,
+  syncSlashCommandDropdownForProvider,
+  syncTabProviderServices,
+  updateTabProviderSettings,
+} from './tabProviderUI';
+
+export {
+  onProviderAvailabilityChanged,
+  refreshRuntimeContextUI,
+} from './tabProviderUI';
 
 export interface TabCreateOptions {
   plugin: GrimoirePlugin;
@@ -128,653 +151,9 @@ export interface TabCreateOptions {
 
 
 
-function getBasename(filePath: string): string {
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  return normalizedPath.split('/').pop() || filePath;
-}
 
-function getOrCreateExternalFileIndicator(tab: TabData): HTMLElement {
-  const existing = tab.dom.contextRowEl.querySelector('.grimoire-external-file-indicator');
-  if (existing) {
-    return existing as HTMLElement;
-  }
-  return tab.dom.contextRowEl.createDiv({ cls: 'grimoire-external-file-indicator grimoire-hidden' });
-}
 
-function isExternalFilePath(contextPath: string): boolean {
-  return validateContextPath(contextPath).type === 'file';
-}
 
-function getSelectedExternalFilePaths(tab: TabData): string[] {
-  return (tab.ui.externalContextSelector?.getExternalContexts() ?? []).filter(isExternalFilePath);
-}
-
-function renderExternalFileChips(tab: TabData, selectedFilePath?: string): void {
-  const indicatorEl = getOrCreateExternalFileIndicator(tab);
-  const filePaths = getSelectedExternalFilePaths(tab);
-  const selectedPaths = selectedFilePath && !filePaths.includes(selectedFilePath)
-    ? [...filePaths, selectedFilePath]
-    : filePaths;
-
-  indicatorEl.empty();
-
-  if (selectedPaths.length === 0) {
-    indicatorEl.removeClass('grimoire-visible-flex');
-    indicatorEl.addClass('grimoire-hidden');
-    updateContextRowHasContent(tab.dom.contextRowEl);
-    return;
-  }
-
-  indicatorEl.addClass('grimoire-visible-flex');
-  indicatorEl.removeClass('grimoire-hidden');
-
-  for (const filePath of selectedPaths) {
-    const chipEl = indicatorEl.createSpan({ cls: 'grimoire-external-file-chip' });
-    chipEl.setAttribute('title', filePath);
-    const iconEl = chipEl.createSpan({ cls: 'grimoire-external-file-chip-icon' });
-    setIcon(iconEl, 'file');
-    chipEl.createSpan({
-      cls: 'grimoire-external-file-chip-name',
-      text: getBasename(filePath),
-    });
-    const removeEl = chipEl.createSpan({
-      cls: 'grimoire-external-file-chip-remove',
-      text: '\u00D7',
-      attr: { 'aria-label': t('chat.ui.externalContext.removeFile') },
-    });
-    removeEl.addEventListener('click', (event) => {
-      event.stopPropagation();
-      tab.ui.externalContextSelector?.removePath(filePath);
-      renderExternalFileChips(tab);
-    });
-  }
-
-  updateContextRowHasContent(tab.dom.contextRowEl);
-}
-
-function getProviderUsageSnapshot(plugin: GrimoirePlugin, providerId: ProviderId): ProviderPlanUsage | null {
-  const usageProvider = ProviderWorkspaceRegistry.getUsageProvider(providerId);
-  if (!usageProvider || usageProvider.isAvailable?.(plugin.settings) === false) {
-    return null;
-  }
-
-  return usageProvider.getCachedUsage({
-    plugin,
-    providerId,
-    settings: plugin.settings,
-  });
-}
-
-function summarizeUsageWindow(window: ProviderPlanUsageWindow): Record<string, unknown> {
-  return {
-    label: window.label,
-    pct: window.pct,
-    ...(window.pctKnown === false ? { pctKnown: false } : {}),
-    reset: window.reset,
-  };
-}
-
-function summarizePlanUsage(usage: ProviderPlanUsage | null): Record<string, unknown> {
-  if (!usage) {
-    return { usageKind: 'none' };
-  }
-
-  return {
-    hasSpend: typeof usage.spend === 'string' && usage.spend.trim().length > 0,
-    plan: usage.plan,
-    usageKind: usage.windows?.length && usage.spend ? 'hybrid' : usage.windows?.length ? 'quota' : 'spend',
-    ...(usage.windows?.length ? {
-      windowCount: usage.windows.length,
-      windows: usage.windows.map(summarizeUsageWindow),
-    } : {}),
-  };
-}
-
-async function refreshProviderUsageSnapshot(plugin: GrimoirePlugin, providerId: ProviderId): Promise<ProviderPlanUsage | null> {
-  const usageProvider = ProviderWorkspaceRegistry.getUsageProvider(providerId);
-  if (!usageProvider) {
-    plugin.recordDebugLog?.({
-      data: {
-        providerId,
-        reason: 'missing_usage_provider',
-      },
-      event: 'refresh.skipped',
-      level: 'debug',
-      scope: 'usage',
-    });
-    return getProviderUsageSnapshot(plugin, providerId);
-  }
-
-  if (usageProvider.isAvailable?.(plugin.settings) === false) {
-    plugin.recordDebugLog?.({
-      data: {
-        providerId,
-        reason: 'provider_unavailable',
-      },
-      event: 'refresh.skipped',
-      level: 'debug',
-      scope: 'usage',
-    });
-    return getProviderUsageSnapshot(plugin, providerId);
-  }
-
-  plugin.recordDebugLog?.({
-    data: { providerId },
-    event: 'refresh.started',
-    level: 'debug',
-    scope: 'usage',
-  });
-
-  try {
-    const usage = await usageProvider.refreshUsage({
-      plugin,
-      providerId,
-      settings: plugin.settings,
-    });
-    plugin.recordDebugLog?.({
-      data: {
-        providerId,
-        ...summarizePlanUsage(usage),
-      },
-      event: usage ? 'refresh.succeeded' : 'refresh.empty',
-      level: usage ? 'info' : 'debug',
-      scope: 'usage',
-    });
-    return usage;
-  } catch (error) {
-    plugin.recordDebugLog?.({
-      data: { providerId },
-      error,
-      event: 'refresh.failed',
-      level: 'warn',
-      scope: 'usage',
-    });
-    throw error;
-  }
-}
-
-function refreshPlanUsageUI(tab: TabData): void {
-  tab.ui.planUsageBadge?.updateDisplay();
-  tab.ui.planUsageBadge?.refreshInBackground();
-  tab.ui.modelSelector?.renderOptions();
-}
-
-export function refreshRuntimeContextUI(tab: TabData, plugin: GrimoirePlugin): void {
-  if (!tab.ui.runtimeContextActivity || !tab.state) {
-    return;
-  }
-
-  const providerId = getTabProviderId(tab, plugin);
-  tab.ui.runtimeContextActivity.hydrateFromMessages(providerId, tab.state.messages);
-  recordProviderLaunchArtifacts(tab, plugin);
-}
-
-function recordProviderLaunchArtifacts(tab: TabData, plugin: GrimoirePlugin): void {
-  const providerId = getTabProviderId(tab, plugin);
-  for (const path of ProviderRegistry.getPreloadedContextFiles(providerId)) {
-    tab.ui.runtimeContextActivity?.recordPreloadedFile(providerId, path);
-  }
-}
-
-function syncSlashCommandDropdownForProvider(
-  tab: TabData,
-  plugin: GrimoirePlugin,
-  getProviderCatalogConfig?: () => ProviderCatalogInfo,
-  conversation?: Conversation | null,
-): void {
-  const dropdown = tab.ui.slashCommandDropdown;
-  if (!dropdown) {
-    return;
-  }
-
-  const catalogInfo = getProviderCatalogConfig?.()
-    ?? getRegistryProviderCatalogInfo(getTabProviderId(tab, plugin, conversation));
-
-  if (catalogInfo) {
-    dropdown.setProviderCatalog?.(catalogInfo.config, catalogInfo.getEntries);
-  } else {
-    dropdown.resetSdkSkillsCache();
-  }
-
-  dropdown.setHiddenCommands(getTabHiddenCommands(tab, plugin, conversation));
-}
-
-async function updateTabProviderSettings(
-  tab: TabData,
-  plugin: GrimoirePlugin,
-  update: (settings: TabProviderSettings) => void,
-  onBlankDraftSettingsChanged?: (
-    providerId: ProviderId,
-    settings: Record<string, unknown>,
-  ) => void | Promise<void>,
-): Promise<TabProviderSettings> {
-  const providerId = getTabProviderId(tab, plugin);
-  const snapshot = getTabSettingsSnapshot(tab, plugin);
-  update(snapshot);
-  if (tab.lifecycleState === 'blank') {
-    tab.draftSettings = createDraftSettingsSnapshot(snapshot, providerId);
-    plugin.settings.settingsProvider = providerId;
-    snapshot.settingsProvider = providerId;
-  }
-  ProviderSettingsCoordinator.commitProviderSettingsSnapshot(
-    plugin.settings,
-    providerId,
-    snapshot,
-  );
-  await plugin.saveSettings();
-  if (tab.lifecycleState === 'blank' && tab.draftSettings) {
-    runDraftSettingsChangedInBackground(
-      onBlankDraftSettingsChanged,
-      providerId,
-      tab.draftSettings,
-    );
-  }
-  return snapshot;
-}
-
-async function applyBlankDraftSettings(
-  tab: TabData,
-  plugin: GrimoirePlugin,
-  providerId: ProviderId,
-): Promise<void> {
-  if (tab.lifecycleState !== 'blank' || !tab.draftSettings) {
-    return;
-  }
-
-  const snapshot = getTabSettingsSnapshot(tab, plugin);
-  plugin.settings.settingsProvider = providerId;
-  snapshot.settingsProvider = providerId;
-  ProviderSettingsCoordinator.commitProviderSettingsSnapshot(
-    plugin.settings,
-    providerId,
-    snapshot,
-  );
-  await plugin.saveSettings();
-}
-
-function runProviderChangedInBackground(
-  callback: ((providerId: ProviderId) => void | Promise<void>) | undefined,
-  providerId: ProviderId,
-): void {
-  if (!callback) {
-    return;
-  }
-
-  try {
-    void Promise.resolve(callback(providerId)).catch(() => {});
-  } catch {
-    // Provider warmup is opportunistic; model selection must stay responsive.
-  }
-}
-
-function runDraftSettingsChangedInBackground(
-  callback: ((providerId: ProviderId, settings: Record<string, unknown>) => void | Promise<void>) | undefined,
-  providerId: ProviderId,
-  settings: Record<string, unknown>,
-): void {
-  if (!callback) {
-    return;
-  }
-
-  try {
-    void Promise.resolve(callback(providerId, settings)).catch(() => {});
-  } catch {
-    // Draft persistence must never block model selection.
-  }
-}
-
-function refreshTabProviderUI(tab: TabData, plugin: GrimoirePlugin): void {
-  const capabilities = getTabCapabilities(tab, plugin);
-  const permissionMode = getTabPermissionMode(tab, plugin);
-  tab.ui.modelSelector?.updateDisplay();
-  tab.ui.modelSelector?.renderOptions();
-  tab.ui.planUsageBadge?.updateDisplay();
-  tab.ui.planUsageBadge?.refreshInBackground();
-  tab.ui.modeSelector?.updateDisplay();
-  tab.ui.modeSelector?.renderOptions();
-  tab.ui.thinkingBudgetSelector?.updateDisplay();
-  tab.ui.permissionToggle?.updateDisplay();
-  tab.ui.serviceTierToggle?.updateDisplay();
-  tab.dom.inputWrapper.toggleClass(
-    'grimoire-input-plan-mode',
-    permissionMode === 'plan' && capabilities.supportsPlanMode,
-  );
-  syncContextSummary(tab, plugin);
-  syncBoundStatus(tab, plugin);
-}
-
-function prepareModelMetadataInBackground(
-  tab: TabData,
-  plugin: GrimoirePlugin,
-  providerId: ProviderId,
-  model: string,
-  uiConfig: ProviderChatUIConfig,
-): void {
-  let metadataWarmup: Promise<void> | void;
-  try {
-    metadataWarmup = uiConfig.prepareModelMetadata?.(model, plugin.settings, { plugin });
-  } catch {
-    return;
-  }
-
-  if (!metadataWarmup) {
-    return;
-  }
-
-  void Promise.resolve(metadataWarmup)
-    .then(() => {
-      if (getTabProviderId(tab, plugin) !== providerId) {
-        return;
-      }
-      if (getTabSettingsSnapshot(tab, plugin).model !== model) {
-        return;
-      }
-      refreshTabProviderUI(tab, plugin);
-    })
-    .catch(() => {});
-}
-
-function syncContextSummary(tab: TabData, plugin: GrimoirePlugin): void {
-  const { contextSummaryEl } = tab.dom;
-  contextSummaryEl.empty();
-
-  const providerId = getTabProviderId(tab, plugin);
-  const settings = getTabSettingsSnapshot(tab, plugin);
-  const providerName = ProviderRegistry.getProviderDisplayName(providerId);
-  const reasoningLabel = getReasoningLabel(settings);
-  const currentPath = tab.ui.fileContextManager?.getCurrentNotePath() ?? '';
-
-  appendContextSummaryRow(
-    contextSummaryEl,
-    currentPath ? getPathTitle(currentPath) : t('chat.ui.context.noNoteSelected'),
-    currentPath ? t('chat.ui.context.boundToTab') : t('chat.ui.context.openNoteToBind'),
-    currentPath ? t('chat.ui.context.active') : t('chat.ui.context.idle'),
-    Boolean(currentPath),
-  );
-
-  const selectedExternalFiles = getSelectedExternalFilePaths(tab);
-  if (selectedExternalFiles.length > 0) {
-    appendContextSummaryRow(
-      contextSummaryEl,
-      selectedExternalFiles.length === 1
-        ? t('chat.ui.context.selectedFile')
-        : t('chat.ui.context.selectedFiles'),
-      selectedExternalFiles.map(getBasename).join(', '),
-      t('chat.ui.context.filesBadge'),
-      true,
-    );
-  }
-
-  appendContextSummaryRow(
-    contextSummaryEl,
-    getModelSummaryLabel(providerId, settings),
-    t('chat.ui.context.modelDetail', {
-      provider: providerName,
-      reasoning: reasoningLabel ? ` · ${reasoningLabel}` : '',
-    }),
-    t('chat.ui.context.modelBadge'),
-    false,
-  );
-
-  const permissionMode = getTabPermissionMode(tab, plugin);
-  appendContextSummaryRow(
-    contextSummaryEl,
-    getPermissionTitle(providerId, permissionMode),
-    getPermissionSummary(providerId, permissionMode),
-    getPermissionTitle(providerId, permissionMode),
-    permissionMode !== 'full_access',
-  );
-}
-
-function getModelSummaryLabel(providerId: ProviderId, settings: TabProviderSettings): string {
-  const model = settings.model || '';
-  const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
-  const modelInfo = uiConfig.getModelOptions(settings).find(option => option.value === model);
-  return modelInfo?.label ?? formatModelFallbackLabel(model);
-}
-
-function formatModelFallbackLabel(model: string): string {
-  const trimmed = model.trim();
-  if (!trimmed) {
-    return t('chat.ui.model.unknown');
-  }
-  if (/^gpt-/i.test(trimmed)) {
-    return trimmed
-      .replace(/^gpt-/i, 'GPT-')
-      .replace(/-([a-z])/gi, (_, letter: string) => ` ${letter.toUpperCase()}`);
-  }
-  const readable = trimmed
-    .replace(/^claude[-_/]/i, '')
-    .replace(/-(\d+)-(\d+)/g, ' $1.$2')
-    .replace(/[-_]+/g, ' ')
-    .replace(/\b\w/g, letter => letter.toUpperCase());
-  return readable;
-}
-
-function syncBoundStatus(tab: TabData, plugin: GrimoirePlugin): void {
-  const fileContextManager = tab.ui.fileContextManager;
-  const currentPath = fileContextManager?.getCurrentNotePath() ?? '';
-  const attachedFiles = typeof fileContextManager?.getAttachedFiles === 'function'
-    ? fileContextManager.getAttachedFiles()
-    : new Set<string>();
-  const hasContext = Boolean(currentPath) || attachedFiles.size > 0;
-
-  tab.dom.boundStatusEl.toggleClass('grimoire-hidden', !hasContext);
-  tab.dom.boundStatusDotEl.toggleClass('busy', tab.state.isStreaming);
-
-  if (!hasContext) {
-    tab.dom.boundStatusNoteEl.setText('');
-    tab.dom.boundStatusMetaEl.setText('');
-    return;
-  }
-
-  const permissionMode = getTabPermissionMode(tab, plugin);
-  const safeLabel = getPermissionInlineLabel(getTabProviderId(tab, plugin), permissionMode);
-  const linkedCount = attachedFiles.size;
-
-  tab.dom.boundStatusNoteEl.setText(currentPath ? getPathTitle(currentPath) : t('chat.ui.context.attached'));
-  tab.dom.boundStatusMetaEl.setText(t('chat.ui.context.linkedNotes', {
-    count: linkedCount,
-    permission: safeLabel,
-  }));
-}
-
-function syncComposerStopButton(tab: TabData, hasSubagentActivity = false): void {
-  const shouldShow = tab.state.isStreaming && hasSubagentActivity;
-  tab.dom.stopButtonEl?.toggleClass('grimoire-hidden', !shouldShow);
-}
-
-function appendContextSummaryRow(
-  parentEl: HTMLElement,
-  title: string,
-  detail: string,
-  badge: string,
-  accent: boolean,
-): void {
-  const rowEl = parentEl.createDiv({ cls: 'grimoire-context-summary-row' });
-  const copyEl = rowEl.createDiv({ cls: 'grimoire-context-summary-copy' });
-  copyEl.createEl('strong', { cls: 'grimoire-context-summary-title', text: title });
-  copyEl.createSpan({ cls: 'grimoire-context-summary-detail', text: detail });
-  rowEl.createSpan({
-    cls: `grimoire-context-summary-badge${accent ? ' is-active' : ''}`,
-    text: badge,
-  });
-}
-
-function getReasoningLabel(settings: TabProviderSettings): string {
-  if (settings.effortLevel) {
-    return t('chat.ui.context.reasoningEffort', {
-      value: localizeReasoningLevel(settings.effortLevel),
-    });
-  }
-  if (settings.thinkingBudget && settings.thinkingBudget !== 'off') {
-    return t('chat.ui.context.reasoningThinking', {
-      value: localizeReasoningLevel(settings.thinkingBudget),
-    });
-  }
-  return '';
-}
-
-function getPermissionSummary(providerId: ProviderId, permissionMode: string): string {
-  const toggle = ProviderRegistry.getChatUIConfig(providerId).getPermissionModeToggle?.() ?? null;
-  if (toggle) {
-    if (permissionMode === toggle.activeValue) {
-      return t('chat.ui.context.autoApprove');
-    }
-    if (permissionMode === toggle.inactiveValue) {
-      return toggle.inactiveLabel === 'Blocked'
-        ? toggle.inactiveDescription ?? t('chat.ui.context.permissionSafeDescription')
-        : t('chat.ui.context.permissionSafeDescription');
-    }
-    if (permissionMode === toggle.planValue) {
-      return t('chat.ui.context.permissionPlanDescription');
-    }
-  }
-  if (permissionMode === 'plan') {
-    return t('chat.ui.context.permissionPlanDescription');
-  }
-  if (permissionMode === 'full_access') {
-    return t('chat.ui.context.autoApprove');
-  }
-  return t('chat.ui.context.permissionSafeDescription');
-}
-
-function getPermissionTitle(providerId: ProviderId, permissionMode: string): string {
-  const toggle = ProviderRegistry.getChatUIConfig(providerId).getPermissionModeToggle?.() ?? null;
-  if (toggle) {
-    if (permissionMode === toggle.activeValue) {
-      return t('chat.ui.toolbar.permissionAuto');
-    }
-    if (permissionMode === toggle.inactiveValue) {
-      return toggle.inactiveLabel === 'Blocked'
-        ? t('chat.ui.status.blocked')
-        : t('chat.ui.toolbar.permissionSafe');
-    }
-    if (permissionMode === toggle.planValue) {
-      return t('chat.ui.toolbar.permissionPlan');
-    }
-  }
-  if (permissionMode === 'plan') {
-    return t('chat.ui.toolbar.permissionPlan');
-  }
-  if (permissionMode === 'full_access') {
-    return t('chat.ui.toolbar.permissionAuto');
-  }
-  return t('chat.ui.toolbar.permissionSafe');
-}
-
-function getPermissionInlineLabel(providerId: ProviderId, permissionMode: string): string {
-  const title = getPermissionTitle(providerId, permissionMode);
-  return title.toLowerCase();
-}
-
-/**
- * Hides or disables UI elements that the active provider does not support.
- * Called after toolbar initialization and on provider switches.
- */
-function applyProviderUIGating(tab: TabData, plugin: GrimoirePlugin): void {
-  const capabilities = getTabCapabilities(tab, plugin);
-  const uiConfig = getTabChatUIConfig(tab, plugin);
-  const mcpManager = capabilities.supportsMcpTools
-    ? getProviderMcpManager(capabilities.providerId)
-    : null;
-  const hasPermissionToggle = Boolean(uiConfig.getPermissionModeToggle?.());
-
-  if (!capabilities.supportsMcpTools) {
-    tab.ui.mcpServerSelector?.clearEnabled();
-  }
-  tab.ui.mcpServerSelector?.setVisible(capabilities.supportsMcpTools);
-  tab.ui.permissionToggle?.setVisible(hasPermissionToggle);
-  tab.ui.fileContextManager?.setMcpManager(mcpManager);
-
-  tab.ui.fileContextManager?.setAgentService(
-    ProviderWorkspaceRegistry.getAgentMentionProvider(capabilities.providerId),
-  );
-
-  tab.ui.imageContextManager?.setEnabled(capabilities.supportsImageAttachments);
-  tab.ui.contextUsageMeter?.update(tab.state.usage);
-}
-
-function syncTabProviderServices(
-  tab: TabData,
-  plugin: GrimoirePlugin,
-): void {
-  tab.services.instructionRefineService?.cancel();
-  tab.services.instructionRefineService?.resetConversation();
-  tab.services.instructionRefineService = ProviderRegistry.createInstructionRefineService(plugin, tab.providerId);
-  tab.services.subagentManager.setTaskResultInterpreter?.(
-    ProviderRegistry.getTaskResultInterpreter(tab.providerId)
-  );
-}
-
-function ensureTitleGenerationService(tab: TabData, plugin: GrimoirePlugin): void {
-  if (!tab.services.titleGenerationService) {
-    tab.services.titleGenerationService = ProviderRegistry.createTitleGenerationService(plugin);
-  }
-}
-
-function cleanupTabRuntime(tab: TabData): void {
-  if (tab.service && typeof tab.service.cleanup === 'function') {
-    tab.service.cleanup();
-  }
-  tab.service = null;
-  tab.serviceInitialized = false;
-}
-
-/**
- * Called when provider availability changes. If a blank tab targets a provider
- * that is now disabled, it falls back to the first enabled provider's default
- * blank-tab model. Refreshes model selector options for all blank tabs.
- */
-export function onProviderAvailabilityChanged(tab: TabData, plugin: GrimoirePlugin): void {
-  if (tab.lifecycleState !== 'blank') return;
-
-  const settingsSnapshot = plugin.settings as unknown as Record<string, unknown>;
-  const enabledProviderIds = ProviderRegistry.getEnabledProviderIds(settingsSnapshot);
-  if (enabledProviderIds.length === 0) {
-    cleanupTabRuntime(tab);
-    tab.ui.modelSelector?.updateDisplay();
-    tab.ui.modelSelector?.renderOptions();
-    tab.ui.planUsageBadge?.updateDisplay();
-    return;
-  }
-
-  let nextProviderId = tab.providerId;
-
-  if (tab.draftModel) {
-    const draftProvider = getEnabledProviderForModel(tab.draftModel, settingsSnapshot);
-    const draftProviderOwnsModel = ProviderRegistry
-      .getChatUIConfig(draftProvider)
-      .ownsModel(tab.draftModel, settingsSnapshot);
-    if (!enabledProviderIds.includes(draftProvider) || !draftProviderOwnsModel) {
-      const fallbackProviderId = enabledProviderIds[0] ?? DEFAULT_CHAT_PROVIDER_ID;
-      const fallbackModels = ProviderRegistry.getChatUIConfig(fallbackProviderId)
-        .getModelOptions(settingsSnapshot);
-      tab.draftModel = fallbackModels[0]?.value ?? tab.draftModel;
-      nextProviderId = fallbackProviderId;
-    } else {
-      nextProviderId = draftProvider;
-    }
-  }
-
-  tab.providerId = nextProviderId;
-
-  // Clean up stale service if provider changed
-  if (
-    tab.service
-    && tab.service.providerId !== nextProviderId
-  ) {
-    tab.service.cleanup();
-    tab.service = null;
-    tab.serviceInitialized = false;
-  }
-
-  syncTabProviderServices(tab, plugin);
-  tab.ui.slashCommandDropdown?.setHiddenCommands(getTabHiddenCommands(tab, plugin));
-  tab.ui.slashCommandDropdown?.resetSdkSkillsCache();
-  refreshTabProviderUI(tab, plugin);
-  applyProviderUIGating(tab, plugin);
-}
 
 /**
  * Creates a new Tab instance with all required state.
@@ -1044,168 +423,6 @@ function isConversationLike(value: unknown): value is Conversation {
     && Array.isArray((value as Conversation).messages);
 }
 
-function initializeContextManagers(tab: TabData, plugin: GrimoirePlugin): void {
-  const { dom } = tab;
-  const app = plugin.app;
-
-  // File context manager - chips in contextRowEl, dropdown in inputContainerEl
-  tab.ui.fileContextManager = new FileContextManager(
-    app,
-    dom.contextRowEl,
-    dom.inputEl,
-    {
-      getExcludedTags: () => plugin.settings.excludedTags,
-      getExcludedFolders: () => plugin.settings.excludedFolders,
-      onChipsChanged: () => {
-        void updateRelevantNotes(tab, plugin);
-        syncContextSummary(tab, plugin);
-        syncBoundStatus(tab, plugin);
-        tab.controllers.selectionController?.updateContextRowVisibility();
-        tab.controllers.browserSelectionController?.updateContextRowVisibility();
-        tab.controllers.canvasSelectionController?.updateContextRowVisibility();
-        autoResizeTextarea(dom.inputEl);
-        tab.renderer?.scrollToBottomIfNeeded();
-      },
-      getExternalContexts: () => tab.ui.externalContextSelector?.getExternalContexts() || [],
-    },
-    dom.inputContainerEl,
-    dom.contextMemoryEl
-  );
-  tab.ui.fileContextManager.setMcpManager(getProviderMcpManager(getTabProviderId(tab, plugin)));
-
-  const markVaultSearchDirty = (file: unknown): void => {
-    if (file instanceof TFile) {
-      tab.services.vaultTextIndex?.markDirty(file.path);
-    }
-  };
-  const markVaultSearchRenameDirty = (file: unknown, oldPath: string): void => {
-    if (file instanceof TFile) {
-      tab.services.vaultTextIndex?.markDirty(oldPath);
-      tab.services.vaultTextIndex?.markDirty(file.path);
-    }
-  };
-  const modifyRef = app.vault.on('modify', markVaultSearchDirty);
-  const deleteRef = app.vault.on('delete', markVaultSearchDirty);
-  const renameRef = app.vault.on('rename', markVaultSearchRenameDirty);
-  dom.eventCleanups.push(() => {
-    app.vault.offref(modifyRef);
-    app.vault.offref(deleteRef);
-    app.vault.offref(renameRef);
-  });
-
-  // Image context manager - drag/drop uses inputContainerEl, preview in contextRowEl
-  tab.ui.imageContextManager = new ImageContextManager(
-    dom.inputContainerEl,
-    dom.inputEl,
-    {
-      onImagesChanged: () => {
-        tab.controllers.selectionController?.updateContextRowVisibility();
-        tab.controllers.browserSelectionController?.updateContextRowVisibility();
-        tab.controllers.canvasSelectionController?.updateContextRowVisibility();
-        autoResizeTextarea(dom.inputEl);
-        tab.renderer?.scrollToBottomIfNeeded();
-      },
-    },
-    dom.contextRowEl
-  );
-}
-
-async function updateRelevantNotes(tab: TabData, plugin: GrimoirePlugin): Promise<void> {
-  syncBoundStatus(tab, plugin);
-  const view = tab.ui.relevantNotesView;
-  if (!view) {
-    return;
-  }
-
-  const currentSources = getCurrentSourceRows(tab);
-  const settings = plugin.settings as ContextEngineRelevantSettings;
-  if (settings.contextEngine?.relevantNotesEnabled === false) {
-    view.render([], currentSources);
-    return;
-  }
-
-  const currentPath = tab.ui.fileContextManager?.getCurrentNotePath();
-  if (!currentPath) {
-    view.render([], currentSources);
-    return;
-  }
-
-  const maxResults = settings.contextEngine?.relevantNotesMaxResults ?? 6;
-  if (maxResults <= 0) {
-    view.render([], currentSources);
-    return;
-  }
-
-  try {
-    await tab.services.vaultTextIndex?.refresh({
-      excludedTags: settings.excludedTags,
-      excludedFolders: settings.excludedFolders,
-    });
-    const notes = tab.services.relevantNotesService?.findRelevantNotes(currentPath, { maxResults }) ?? [];
-    view.render(notes, currentSources);
-  } catch (error) {
-    view.render([], currentSources);
-    new Notice(t('chat.ui.errors.relevantNotesFailed', {
-      error: error instanceof Error ? error.message : String(error),
-    }));
-  }
-}
-
-function getCurrentSourceRows(tab: TabData): RelevantNotesCurrentSource[] {
-  const fileContextManager = tab.ui.fileContextManager;
-  if (!fileContextManager) {
-    return [];
-  }
-
-  const currentNotePath = fileContextManager.getCurrentNotePath();
-  const sources: RelevantNotesCurrentSource[] = [];
-  if (currentNotePath) {
-    sources.push({
-      path: currentNotePath,
-      title: getPathTitle(currentNotePath),
-      detail: 'current note',
-      badge: 'live',
-    });
-  }
-
-  const attachedFiles = typeof fileContextManager.getAttachedFiles === 'function'
-    ? fileContextManager.getAttachedFiles()
-    : new Set<string>();
-  for (const filePath of attachedFiles) {
-    if (filePath === currentNotePath) {
-      continue;
-    }
-    sources.push({
-      path: filePath,
-      title: getPathTitle(filePath),
-      detail: 'attached file',
-      badge: 'file',
-    });
-  }
-  return sources;
-}
-
-function getPathTitle(path: string): string {
-  return path.replace(/\\/g, '/').split('/').pop() || path;
-}
-
-function openRelevantVaultPath(plugin: GrimoirePlugin, path: string): void {
-  const file = plugin.app.vault.getAbstractFileByPath(path);
-  if (!(file instanceof TFile)) {
-    new Notice(t('chat.ui.errors.couldNotOpenFile', { path }));
-    return;
-  }
-
-  void (async (): Promise<void> => {
-    try {
-      await plugin.app.workspace.getLeaf().openFile(file);
-    } catch (error) {
-      new Notice(t('chat.ui.errors.openFileFailed', {
-        error: error instanceof Error ? error.message : String(error),
-      }));
-    }
-  })();
-}
 
 function initializeSlashCommands(
   tab: TabData,
