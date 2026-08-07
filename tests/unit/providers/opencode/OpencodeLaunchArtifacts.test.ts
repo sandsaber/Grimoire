@@ -245,6 +245,31 @@ describe('prepareOpencodeLaunchArtifacts', () => {
     expect(first.launchKey).toBe(second.launchKey);
   });
 
+  it('writes target-mapped prompt references into the managed config when provided', async () => {
+    const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'grimoire-opencode-artifacts-'));
+
+    const result = await prepareOpencodeLaunchArtifacts({
+      runtimeEnv: {
+        HOME: tmpRoot,
+      },
+      settings: {
+        customPrompt: '',
+        mediaFolder: '',
+        userName: 'Test User',
+        vaultPath: tmpRoot,
+      },
+      targetPathMapper: () => '/mnt/c/repo/.grimoire/opencode/system.md',
+      workspaceRoot: tmpRoot,
+    });
+
+    const generatedConfig = JSON.parse(await fs.readFile(result.configPath, 'utf8'));
+    expect(result.systemPromptPath).toBe(path.join(tmpRoot, '.grimoire', 'opencode', 'system.md'));
+    expect(generatedConfig.agent.build.prompt).toBe('{file:/mnt/c/repo/.grimoire/opencode/system.md}');
+    expect(generatedConfig.agent[OPENCODE_FULL_ACCESS_MODE_ID].prompt).toBe(
+      '{file:/mnt/c/repo/.grimoire/opencode/system.md}',
+    );
+  });
+
   it('creates the resolved OpenCode database directory before launch', async () => {
     const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'grimoire-opencode-artifacts-'));
     const xdgDataHome = path.join(tmpRoot, 'xdg-data');

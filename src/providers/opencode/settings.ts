@@ -27,17 +27,28 @@ import {
   type OpencodeMode,
 } from './modes';
 
+export type OpencodeInstallationMethod = 'native-windows' | 'wsl';
+export type HostnameInstallationMethods = Record<string, OpencodeInstallationMethod>;
+
+function normalizeOpencodeInstallationMethod(value: unknown): OpencodeInstallationMethod {
+  return value === 'wsl' ? 'wsl' : 'native-windows';
+}
+
 export interface PersistedOpencodeProviderSettings {
   cliPath: string;
   cliPathsByHost: HostnameCliPaths;
   enabled: boolean;
   environmentHash: string;
   environmentVariables: string;
+  installationMethod: OpencodeInstallationMethod;
+  installationMethodsByHost: HostnameInstallationMethods;
   modelAliases: Record<string, string>;
   preferredThinkingByModel: Record<string, string>;
   selectedMode: string;
   thinkingOptionsByModel: OpencodeThinkingOptionsByModel;
   visibleModels: string[];
+  wslDistroOverride: string;
+  wslDistroOverridesByHost: HostnameCliPaths;
 }
 
 export interface OpencodeProviderSettings extends PersistedOpencodeProviderSettings {
@@ -53,11 +64,15 @@ export const DEFAULT_OPENCODE_PROVIDER_SETTINGS: Readonly<PersistedOpencodeProvi
   enabled: false,
   environmentHash: '',
   environmentVariables: OPENCODE_DEFAULT_ENVIRONMENT_VARIABLES,
+  installationMethod: 'native-windows',
+  installationMethodsByHost: {},
   modelAliases: {},
   preferredThinkingByModel: {},
   selectedMode: '',
   thinkingOptionsByModel: {},
   visibleModels: [],
+  wslDistroOverride: '',
+  wslDistroOverridesByHost: {},
 });
 
 function normalizeHostnameCliPaths(value: unknown): HostnameCliPaths {
@@ -69,6 +84,20 @@ function normalizeHostnameCliPaths(value: unknown): HostnameCliPaths {
   for (const [key, entry] of Object.entries(value)) {
     if (typeof entry === 'string' && entry.trim()) {
       result[key] = entry.trim();
+    }
+  }
+  return result;
+}
+
+function normalizeInstallationMethodsByHost(value: unknown): HostnameInstallationMethods {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  const result: HostnameInstallationMethods = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof key === 'string' && key.trim()) {
+      result[key] = normalizeOpencodeInstallationMethod(entry);
     }
   }
   return result;
@@ -157,14 +186,41 @@ export function getOpencodeProviderSettings(
   settings: Record<string, unknown>,
 ): OpencodeProviderSettings {
   const config = getProviderConfig(settings, 'opencode');
+  const hostnameKey = getHostnameKey();
   const normalizedCliPathsByHost = normalizeHostnameCliPaths(config.cliPathsByHost);
-  const cliPathsByHost = Object.keys(normalizedCliPathsByHost).length > 0
-    ? migrateLegacyHostnameKeyedMap(
-      normalizedCliPathsByHost,
-      getHostnameKey(),
-      getLegacyHostnameKey(),
-    )
+  const normalizedInstallationMethodsByHost = normalizeInstallationMethodsByHost(
+    config.installationMethodsByHost,
+  );
+  const normalizedWslDistroOverridesByHost = normalizeHostnameCliPaths(
+    config.wslDistroOverridesByHost,
+  );
+  const hasLegacyHostnameKeyedSettings = Object.keys(normalizedCliPathsByHost).length > 0
+    || Object.keys(normalizedInstallationMethodsByHost).length > 0
+    || Object.keys(normalizedWslDistroOverridesByHost).length > 0;
+  const legacyHostnameKey = hasLegacyHostnameKeyedSettings ? getLegacyHostnameKey() : '';
+  const cliPathsByHost = hasLegacyHostnameKeyedSettings
+    ? migrateLegacyHostnameKeyedMap(normalizedCliPathsByHost, hostnameKey, legacyHostnameKey)
     : normalizedCliPathsByHost;
+  const installationMethodsByHost = hasLegacyHostnameKeyedSettings
+    ? migrateLegacyHostnameKeyedMap(
+      normalizedInstallationMethodsByHost,
+      hostnameKey,
+      legacyHostnameKey,
+    )
+    : normalizedInstallationMethodsByHost;
+  const wslDistroOverridesByHost = hasLegacyHostnameKeyedSettings
+    ? migrateLegacyHostnameKeyedMap(
+      normalizedWslDistroOverridesByHost,
+      hostnameKey,
+      legacyHostnameKey,
+    )
+    : normalizedWslDistroOverridesByHost;
+  const hasHostScopedInstallationMethods = Object.keys(installationMethodsByHost).length > 0;
+  const hasHostScopedWslDistroOverrides = Object.keys(wslDistroOverridesByHost).length > 0;
+  const legacyInstallationMethod = normalizeOpencodeInstallationMethod(config.installationMethod);
+  const legacyWslDistroOverride = typeof config.wslDistroOverride === 'string'
+    ? config.wslDistroOverride.trim()
+    : '';
   seedOpencodeDiscoveryStateFromLegacyConfig(settings, config);
   const discoveryState = getOpencodeDiscoveryState(settings);
   const availableModes = discoveryState.availableModes;
@@ -191,6 +247,13 @@ export function getOpencodeProviderSettings(
     environmentVariables: (config.environmentVariables as string | undefined)
       ?? getProviderEnvironmentVariables(settings, 'opencode')
       ?? DEFAULT_OPENCODE_PROVIDER_SETTINGS.environmentVariables,
+    installationMethod: installationMethodsByHost[hostnameKey]
+      ?? (
+        hasHostScopedInstallationMethods
+          ? DEFAULT_OPENCODE_PROVIDER_SETTINGS.installationMethod
+          : legacyInstallationMethod
+      ),
+    installationMethodsByHost,
     modelAliases: normalizeOpencodeModelAliases(config.modelAliases, discoveredModels),
     preferredThinkingByModel: normalizeOpencodePreferredThinkingByModel(
       config.preferredThinkingByModel,
@@ -199,6 +262,13 @@ export function getOpencodeProviderSettings(
     selectedMode: normalizeManagedOpencodeSelectedMode(config.selectedMode, availableModes),
     thinkingOptionsByModel,
     visibleModels: normalizeOpencodeVisibleModels(config.visibleModels, discoveredModels),
+    wslDistroOverride: wslDistroOverridesByHost[hostnameKey]
+      ?? (
+        hasHostScopedWslDistroOverrides
+          ? DEFAULT_OPENCODE_PROVIDER_SETTINGS.wslDistroOverride
+          : legacyWslDistroOverride
+      ),
+    wslDistroOverridesByHost,
   };
 }
 
@@ -244,6 +314,27 @@ export function updateOpencodeProviderSettings(
   const nextCliPathsByHost = 'cliPathsByHost' in updates
     ? normalizeHostnameCliPaths(updates.cliPathsByHost)
     : { ...current.cliPathsByHost };
+  const nextInstallationMethodsByHost = 'installationMethodsByHost' in updates
+    ? normalizeInstallationMethodsByHost(updates.installationMethodsByHost)
+    : { ...current.installationMethodsByHost };
+  const nextWslDistroOverridesByHost = 'wslDistroOverridesByHost' in updates
+    ? normalizeHostnameCliPaths(updates.wslDistroOverridesByHost)
+    : { ...current.wslDistroOverridesByHost };
+
+  if (
+    Object.keys(nextInstallationMethodsByHost).length === 0
+    && current.installationMethod !== DEFAULT_OPENCODE_PROVIDER_SETTINGS.installationMethod
+  ) {
+    nextInstallationMethodsByHost[hostnameKey] = current.installationMethod;
+  }
+
+  if (
+    Object.keys(nextWslDistroOverridesByHost).length === 0
+    && current.wslDistroOverride
+  ) {
+    nextWslDistroOverridesByHost[hostnameKey] = current.wslDistroOverride;
+  }
+
   let nextCliPath = 'cliPathsByHost' in updates
     ? (
       typeof updates.cliPath === 'string'
@@ -262,6 +353,23 @@ export function updateOpencodeProviderSettings(
     nextCliPath = DEFAULT_OPENCODE_PROVIDER_SETTINGS.cliPath;
   }
 
+  if ('installationMethod' in updates) {
+    nextInstallationMethodsByHost[hostnameKey] = normalizeOpencodeInstallationMethod(
+      updates.installationMethod,
+    );
+  }
+
+  if ('wslDistroOverride' in updates) {
+    const normalizedDistroOverride = typeof updates.wslDistroOverride === 'string'
+      ? updates.wslDistroOverride.trim()
+      : '';
+    if (normalizedDistroOverride) {
+      nextWslDistroOverridesByHost[hostnameKey] = normalizedDistroOverride;
+    } else {
+      delete nextWslDistroOverridesByHost[hostnameKey];
+    }
+  }
+
   const next: OpencodeProviderSettings = {
     ...current,
     ...updates,
@@ -269,6 +377,9 @@ export function updateOpencodeProviderSettings(
     cliPath: nextCliPath,
     cliPathsByHost: nextCliPathsByHost,
     discoveredModels: nextDiscoveredModels,
+    installationMethod: nextInstallationMethodsByHost[hostnameKey]
+      ?? DEFAULT_OPENCODE_PROVIDER_SETTINGS.installationMethod,
+    installationMethodsByHost: nextInstallationMethodsByHost,
     modelAliases: nextModelAliases,
     preferredThinkingByModel: normalizeOpencodePreferredThinkingByModel(
       updates.preferredThinkingByModel ?? current.preferredThinkingByModel,
@@ -277,6 +388,9 @@ export function updateOpencodeProviderSettings(
     selectedMode: nextSelectedMode,
     thinkingOptionsByModel: nextThinkingOptionsByModel,
     visibleModels: nextVisibleModels,
+    wslDistroOverride: nextWslDistroOverridesByHost[hostnameKey]
+      ?? DEFAULT_OPENCODE_PROVIDER_SETTINGS.wslDistroOverride,
+    wslDistroOverridesByHost: nextWslDistroOverridesByHost,
   };
 
   if (updates.visibleModels !== undefined) {
@@ -294,11 +408,13 @@ export function updateOpencodeProviderSettings(
     enabled: next.enabled,
     environmentHash: next.environmentHash,
     environmentVariables: next.environmentVariables,
+    installationMethodsByHost: next.installationMethodsByHost,
     modelAliases: next.modelAliases,
     preferredThinkingByModel: next.preferredThinkingByModel,
     selectedMode: next.selectedMode,
     thinkingOptionsByModel: persistedThinkingOptionsByModel,
     visibleModels: next.visibleModels,
+    wslDistroOverridesByHost: next.wslDistroOverridesByHost,
   });
 
   return next;

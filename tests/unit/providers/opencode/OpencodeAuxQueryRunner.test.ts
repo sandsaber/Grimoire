@@ -4,6 +4,12 @@ import { AcpClientConnection, AcpJsonRpcTransport, AcpSubprocess } from '@/provi
 import { OpencodeAuxQueryRunner } from '@/providers/opencode/runtime/OpencodeAuxQueryRunner';
 import { prepareOpencodeLaunchArtifacts } from '@/providers/opencode/runtime/OpencodeLaunchArtifacts';
 
+jest.mock('@/utils/env', () => ({
+  ...jest.requireActual('@/utils/env'),
+  getHostnameKey: () => 'host-a',
+  getLegacyHostnameKey: () => 'legacy-host',
+}));
+
 jest.mock('@/providers/acp', () => {
   const actual = jest.requireActual('@/providers/acp');
   return {
@@ -195,26 +201,73 @@ describe('OpencodeAuxQueryRunner', () => {
   });
 
   it('does not pass the workspace path through auxiliary OpenCode CLI arguments', async () => {
-    const plugin = createMockPlugin();
-    const vaultPath = 'C:\\Users\\Name\\OneDrive - 公司\\Vault 中文 (test)';
-    plugin.app.vault.adapter.basePath = vaultPath;
-    const runner = new OpencodeAuxQueryRunner(plugin, {
-      agentProfile: 'passive',
-      artifactPurpose: 'title-gen',
-    });
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    try {
+      const plugin = createMockPlugin();
+      const vaultPath = 'C:\\Users\\Name\\OneDrive - 公司\\Vault 中文 (test)';
+      plugin.app.vault.adapter.basePath = vaultPath;
+      const runner = new OpencodeAuxQueryRunner(plugin, {
+        agentProfile: 'passive',
+        artifactPurpose: 'title-gen',
+      });
 
-    await expect(runner.query({
-      systemPrompt: 'Use this custom system prompt.',
-    }, 'Generate a title')).resolves.toBe('Fix title now');
+      await expect(runner.query({
+        systemPrompt: 'Use this custom system prompt.',
+      }, 'Generate a title')).resolves.toBe('Fix title now');
 
-    expect(MockAcpSubprocess).toHaveBeenCalledWith(expect.objectContaining({
-      args: ['acp'],
-      cwd: vaultPath,
-    }));
-    expect(mockConnection.newSession).toHaveBeenCalledWith({
-      cwd: vaultPath,
-      mcpServers: [],
-    });
+      expect(MockAcpSubprocess).toHaveBeenCalledWith(expect.objectContaining({
+        args: ['acp'],
+        cwd: vaultPath,
+      }));
+      expect(mockConnection.newSession).toHaveBeenCalledWith({
+        cwd: vaultPath,
+        mcpServers: [],
+      });
+    } finally {
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    }
+  });
+
+  it('spawns auxiliary WSL launches from the host vault cwd while keeping the session cwd in WSL form', async () => {
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    try {
+      const vaultPath = 'C:\\Users\\Name\\OneDrive - 公司\\Vault 中文 (test)';
+      const plugin = createMockPlugin({
+        providerConfigs: {
+          opencode: {
+            enabled: true,
+            installationMethodsByHost: { 'host-a': 'wsl' },
+            wslDistroOverridesByHost: { 'host-a': 'Ubuntu' },
+          },
+        },
+      });
+      plugin.app.vault.adapter.basePath = vaultPath;
+      plugin.getResolvedProviderCliPath.mockReturnValue('opencode');
+      const runner = new OpencodeAuxQueryRunner(plugin, {
+        agentProfile: 'passive',
+        artifactPurpose: 'title-gen',
+      });
+
+      await expect(runner.query({
+        systemPrompt: 'Use this custom system prompt.',
+      }, 'Generate a title')).resolves.toBe('Fix title now');
+
+      expect(MockAcpSubprocess).toHaveBeenCalledWith(expect.objectContaining({
+        args: ['--distribution', 'Ubuntu', '--cd', '/mnt/c/Users/Name/OneDrive - 公司/Vault 中文 (test)', 'opencode', 'acp'],
+        command: expect.stringMatching(/wsl\.exe$/i),
+        cwd: vaultPath,
+        shell: false,
+      }));
+      expect(mockConnection.newSession).toHaveBeenCalledWith({
+        cwd: '/mnt/c/Users/Name/OneDrive - 公司/Vault 中文 (test)',
+        mcpServers: [],
+      });
+      expect(MockAcpSubprocess.mock.calls.at(-1)?.[0].env.PATH).toBeUndefined();
+    } finally {
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    }
   });
 
   it('restarts the auxiliary ACP subprocess when the cached transport closed', async () => {

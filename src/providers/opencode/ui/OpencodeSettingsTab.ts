@@ -42,6 +42,8 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
     const settingsBag = context.plugin.settings as unknown as Record<string, unknown>;
     const opencodeSettings = getOpencodeProviderSettings(settingsBag);
     const hostnameKey = getHostnameKey();
+    const isWindowsHost = process.platform === 'win32';
+    let installationMethod = opencodeSettings.installationMethod;
 
     if (!opencodeSettings.enabled) {
       renderProviderDisabledNotice(container, 'OpenCode');
@@ -49,17 +51,69 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
 
     new Setting(container).setName('Setup').setHeading();
 
+    if (isWindowsHost) {
+      new Setting(container)
+        .setName(t('settings.providerTabs.codex.installationMethod.name'))
+        .setDesc(t('settings.providerTabs.codex.installationMethod.desc').replace('Codex', 'OpenCode'))
+        .addDropdown((dropdown) => {
+          dropdown
+            .addOption('native-windows', t('settings.providerTabs.codex.installationMethod.nativeWindows'))
+            .addOption('wsl', 'WSL')
+            .setValue(installationMethod)
+            .onChange(async (value) => {
+              installationMethod = value === 'wsl' ? 'wsl' : 'native-windows';
+              updateOpencodeProviderSettings(settingsBag, { installationMethod });
+              refreshInstallationMethodUI();
+              await context.plugin.saveSettings();
+              await recycleOpencodeRuntime();
+            });
+        });
+    }
+
+    const getCliPathCopy = (): { desc: string; placeholder: string } => {
+      if (!isWindowsHost) {
+        return {
+          desc: t('settings.providerTabs.acp.cliPath.desc', {
+            command: 'opencode',
+            provider: 'OpenCode',
+          }),
+          placeholder: '/usr/local/bin/opencode',
+        };
+      }
+
+      if (installationMethod === 'wsl') {
+        return {
+          desc: t('settings.providerTabs.codex.cliPath.descWsl').replace('Codex', 'OpenCode').replace('codex', 'opencode'),
+          placeholder: 'opencode',
+        };
+      }
+
+      return {
+        desc: t('settings.providerTabs.codex.cliPath.descWindows').replace('Codex', 'OpenCode').replace('codex.exe', 'opencode.cmd'),
+        placeholder: 'C:\\Users\\you\\AppData\\Roaming\\npm\\opencode.cmd',
+      };
+    };
+
     const cliPathSetting = new Setting(container)
-      .setName('CLI path')
-      .setDesc('Optional absolute path to the OpenCode CLI for this computer. Leave empty to use `opencode` from PATH.');
+      .setName(t('settings.providerTabs.acp.cliPath.name', { provider: 'OpenCode' }))
+      .setDesc(getCliPathCopy().desc);
 
     const validationEl = container.createDiv({
       cls: 'grimoire-cli-path-validation grimoire-setting-validation grimoire-setting-validation-error grimoire-hidden',
     });
 
+    const shouldValidateCliPathAsFile = (): boolean => !isWindowsHost || installationMethod !== 'wsl';
+
     const validatePath = (value: string): string | null => {
       const trimmed = value.trim();
       if (!trimmed) {
+        return null;
+      }
+
+      if (!shouldValidateCliPathAsFile()) {
+        if (isWindowsStyleCliReference(trimmed)) {
+          return t('settings.providerTabs.codex.cliPath.wslValidation');
+        }
         return null;
       }
 
@@ -97,6 +151,23 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
     const cliPathsByHost = { ...opencodeSettings.cliPathsByHost };
     const currentValue = opencodeSettings.cliPathsByHost[hostnameKey] || '';
     let cliPathInputEl: HTMLInputElement | null = null;
+    let wslDistroSettingEl: HTMLElement | null = null;
+    let wslDistroInputEl: HTMLInputElement | null = null;
+
+    const refreshInstallationMethodUI = (): void => {
+      const cliCopy = getCliPathCopy();
+      cliPathSetting.setDesc(cliCopy.desc);
+      if (cliPathInputEl) {
+        cliPathInputEl.placeholder = cliCopy.placeholder;
+        updateCliPathValidation(cliPathInputEl.value, cliPathInputEl);
+      }
+      if (wslDistroSettingEl) {
+        wslDistroSettingEl.toggleClass('grimoire-hidden', installationMethod !== 'wsl');
+      }
+      if (wslDistroInputEl) {
+        wslDistroInputEl.disabled = installationMethod !== 'wsl';
+      }
+    };
 
     const persistCliPath = async (value: string): Promise<boolean> => {
       const isValid = updateCliPathValidation(value, cliPathInputEl ?? undefined);
@@ -136,9 +207,7 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
 
     cliPathSetting.addText((text) => {
       text
-        .setPlaceholder(process.platform === 'win32'
-          ? 'C:\\Users\\you\\AppData\\Roaming\\npm\\opencode.cmd'
-          : '/usr/local/bin/opencode')
+        .setPlaceholder(getCliPathCopy().placeholder)
         .setValue(currentValue)
         .onChange(async (value) => {
           await persistCliPath(value);
@@ -149,6 +218,30 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
 
       updateCliPathValidation(currentValue, text.inputEl);
     });
+
+    if (isWindowsHost) {
+      const wslDistroSetting = new Setting(container)
+        .setName(t('settings.providerTabs.codex.wslDistro.name'))
+        .setDesc(t('settings.providerTabs.codex.wslDistro.desc'));
+
+      wslDistroSettingEl = wslDistroSetting.settingEl;
+      wslDistroSetting.addText((text) => {
+        text
+          .setPlaceholder('Ubuntu')
+          .setValue(opencodeSettings.wslDistroOverride)
+          .onChange(async (value) => {
+            updateOpencodeProviderSettings(settingsBag, { wslDistroOverride: value });
+            await context.plugin.saveSettings();
+            await recycleOpencodeRuntime();
+          });
+
+        text.inputEl.addClass('grimoire-settings-cli-path-input');
+        text.inputEl.disabled = installationMethod !== 'wsl';
+        wslDistroInputEl = text.inputEl;
+      });
+    }
+
+    refreshInstallationMethodUI();
 
     new Setting(container).setName('Models').setHeading();
 
@@ -623,6 +716,17 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
     });
   },
 };
+
+function isWindowsStyleCliReference(value: string | null | undefined): boolean {
+  const trimmed = (value ?? '').trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  return /^[A-Za-z]:[\\/]/.test(trimmed)
+    || trimmed.startsWith('\\\\')
+    || /\.(?:exe|cmd|bat|ps1)$/i.test(trimmed);
+}
 
 function buildEnrichedModels(
   discoveredModels: OpencodeDiscoveredModel[],

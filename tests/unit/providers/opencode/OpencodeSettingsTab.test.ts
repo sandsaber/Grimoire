@@ -30,7 +30,14 @@ jest.mock('obsidian', () => {
     public desc = '';
     public heading = false;
     public textComponents: MockTextComponent[] = [];
+    public dropdownComponents: MockDropdownComponent[] = [];
     public toggleComponents: MockToggleComponent[] = [];
+    public settingEl = {
+      style: {},
+      toggleClass: jest.fn(),
+      addClass: jest.fn(),
+      removeClass: jest.fn(),
+    };
 
     constructor(_container: unknown) {
       createdSettings.push(this);
@@ -54,6 +61,13 @@ jest.mock('obsidian', () => {
     addText(callback: (text: MockTextComponent) => void) {
       const component = createTextComponent();
       this.textComponents.push(component);
+      callback(component);
+      return this;
+    }
+
+    addDropdown(callback: (dropdown: MockDropdownComponent) => void) {
+      const component = createDropdownComponent();
+      this.dropdownComponents.push(component);
       callback(component);
       return this;
     }
@@ -152,11 +166,21 @@ interface MockToggleComponent {
   onChange: jest.MockedFunction<(callback: (value: boolean) => Promise<void> | void) => MockToggleComponent>;
 }
 
+interface MockDropdownComponent {
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChangeCallback: ((value: string) => Promise<void> | void) | null;
+  addOption: jest.MockedFunction<(value: string, label: string) => MockDropdownComponent>;
+  setValue: jest.MockedFunction<(value: string) => MockDropdownComponent>;
+  onChange: jest.MockedFunction<(callback: (value: string) => Promise<void> | void) => MockDropdownComponent>;
+}
+
 type MockSettingRecord = {
   name: string;
   desc: string;
   heading: boolean;
   textComponents: MockTextComponent[];
+  dropdownComponents: MockDropdownComponent[];
   toggleComponents: MockToggleComponent[];
 };
 
@@ -206,6 +230,26 @@ function createToggleComponent(): MockToggleComponent {
     return component;
   });
   component.onChange = jest.fn((callback: (value: boolean) => Promise<void> | void) => {
+    component.onChangeCallback = callback;
+    return component;
+  });
+  return component;
+}
+
+function createDropdownComponent(): MockDropdownComponent {
+  const component = {} as MockDropdownComponent;
+  component.value = '';
+  component.options = [];
+  component.onChangeCallback = null;
+  component.addOption = jest.fn((value: string, label: string) => {
+    component.options.push({ value, label });
+    return component;
+  });
+  component.setValue = jest.fn((value: string) => {
+    component.value = value;
+    return component;
+  });
+  component.onChange = jest.fn((callback: (value: string) => Promise<void> | void) => {
     component.onChangeCallback = callback;
     return component;
   });
@@ -411,6 +455,10 @@ function findSetting(name: string): MockSettingRecord {
   return setting;
 }
 
+function findOptionalSetting(name: string): MockSettingRecord | undefined {
+  return createdSettings.find((candidate) => candidate.name === name);
+}
+
 function findElement(tag: string, cls: string): any {
   const element = createdDomElements.find((candidate) => candidate.tag === tag && candidate.cls === cls);
   if (!element) {
@@ -422,6 +470,11 @@ function findElement(tag: string, cls: string): any {
 describe('OpencodeSettingsTab', () => {
   const mockedExistsSync = fs.existsSync as jest.MockedFunction<typeof fs.existsSync>;
   const mockedStatSync = fs.statSync as jest.MockedFunction<typeof fs.statSync>;
+  const originalPlatform = process.platform;
+
+  afterAll(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform });
+  });
 
   beforeEach(() => {
     createdSettings.length = 0;
@@ -646,5 +699,127 @@ describe('OpencodeSettingsTab', () => {
       'opencode:deepseek/deepseek-v4-pro',
     );
     expect(context.refreshModelSelectors).toHaveBeenCalled();
+  });
+
+  it('renders installation method and WSL distro override controls on Windows', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    const plugin = createPlugin();
+
+    opencodeSettingsTabRenderer.render(createContainer(), createContext(plugin));
+
+    expect(findSetting(t('settings.providerTabs.codex.installationMethod.name')).dropdownComponents).toHaveLength(1);
+    expect(findSetting(t('settings.providerTabs.codex.wslDistro.name')).textComponents).toHaveLength(1);
+  });
+
+  it('hides Windows-only installation controls on non-Windows platforms', () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    const plugin = createPlugin();
+
+    opencodeSettingsTabRenderer.render(createContainer(), createContext(plugin));
+
+    expect(findOptionalSetting(t('settings.providerTabs.codex.installationMethod.name'))).toBeUndefined();
+    expect(findOptionalSetting(t('settings.providerTabs.codex.wslDistro.name'))).toBeUndefined();
+  });
+
+  it('uses host-native CLI path behavior on non-Windows even when WSL is saved', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    const plugin = createPlugin({
+      providerConfigs: {
+        opencode: {
+          enabled: true,
+          cliPath: '',
+          cliPathsByHost: {},
+          installationMethod: 'wsl',
+          installationMethodsByHost: {
+            'host-a': 'wsl',
+          },
+          wslDistroOverride: 'Ubuntu',
+          wslDistroOverridesByHost: {
+            'host-a': 'Ubuntu',
+          },
+        },
+      },
+    });
+
+    opencodeSettingsTabRenderer.render(createContainer(), createContext(plugin));
+
+    const cliPathSetting = findSetting(t('settings.providerTabs.acp.cliPath.name', {
+      provider: 'OpenCode',
+    }));
+    expect(cliPathSetting.desc).toBe(t('settings.providerTabs.acp.cliPath.desc', {
+      command: 'opencode',
+      provider: 'OpenCode',
+    }));
+    expect(cliPathSetting.textComponents[0].placeholder).toBe('/usr/local/bin/opencode');
+
+    await cliPathSetting.textComponents[0].onChangeCallback?.('codex');
+
+    expect(plugin.settings.providerConfigs.opencode.cliPathsByHost['host-a']).toBeUndefined();
+    expect(mockSaveSettings).toHaveBeenCalledTimes(0);
+    expect(mockBroadcastToProviderTabs).toHaveBeenCalledTimes(0);
+  });
+
+  it('accepts a Linux-side CLI command when installation method is WSL', async () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    const plugin = createPlugin();
+
+    opencodeSettingsTabRenderer.render(createContainer(), createContext(plugin));
+
+    const installationMethodSetting = findSetting(t('settings.providerTabs.codex.installationMethod.name'));
+    await installationMethodSetting.dropdownComponents[0].onChangeCallback?.('wsl');
+
+    const cliPathSetting = findSetting(t('settings.providerTabs.acp.cliPath.name', {
+      provider: 'OpenCode',
+    }));
+    await cliPathSetting.textComponents[0].onChangeCallback?.('opencode');
+
+    expect(plugin.settings.providerConfigs.opencode.installationMethodsByHost).toEqual({
+      'host-a': 'wsl',
+    });
+    expect(plugin.settings.providerConfigs.opencode.cliPathsByHost['host-a']).toBe('opencode');
+    expect(mockSaveSettings).toHaveBeenCalled();
+    expect(mockBroadcastToProviderTabs).toHaveBeenCalled();
+  });
+
+  it('rejects a Windows-native CLI path when installation method is WSL', async () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    const plugin = createPlugin({
+      providerConfigs: {
+        opencode: {
+          enabled: true,
+          cliPath: '',
+          cliPathsByHost: {
+            'host-a': 'C:\\Users\\me\\AppData\\Roaming\\npm\\opencode.cmd',
+          },
+          installationMethod: 'wsl',
+          installationMethodsByHost: {
+            'host-a': 'wsl',
+          },
+          wslDistroOverride: 'Ubuntu',
+          wslDistroOverridesByHost: {
+            'host-a': 'Ubuntu',
+          },
+        },
+      },
+    });
+
+    opencodeSettingsTabRenderer.render(createContainer(), createContext(plugin));
+
+    const installationMethodSetting = findSetting(t('settings.providerTabs.codex.installationMethod.name'));
+    await installationMethodSetting.dropdownComponents[0].onChangeCallback?.('wsl');
+
+    const cliPathSetting = findSetting(t('settings.providerTabs.acp.cliPath.name', {
+      provider: 'OpenCode',
+    }));
+    await cliPathSetting.textComponents[0].onChangeCallback?.('C:\\Users\\me\\AppData\\Roaming\\npm\\opencode.cmd');
+
+    expect(plugin.settings.providerConfigs.opencode.installationMethodsByHost).toEqual({
+      'host-a': 'wsl',
+    });
+    expect(plugin.settings.providerConfigs.opencode.cliPathsByHost['host-a']).toBe(
+      'C:\\Users\\me\\AppData\\Roaming\\npm\\opencode.cmd',
+    );
+    expect(mockSaveSettings).toHaveBeenCalledTimes(1);
+    expect(mockBroadcastToProviderTabs).toHaveBeenCalledTimes(2);
   });
 });

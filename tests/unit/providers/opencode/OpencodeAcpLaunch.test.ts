@@ -17,6 +17,12 @@ import { prepareOpencodeLaunchArtifacts } from '@/providers/opencode/runtime/Ope
 
 import { AcpClientConnection, AcpJsonRpcTransport, AcpSubprocess } from '../../../../src/providers/acp';
 
+jest.mock('@/utils/env', () => ({
+  ...jest.requireActual('@/utils/env'),
+  getHostnameKey: () => 'host-a',
+  getLegacyHostnameKey: () => 'legacy-host',
+}));
+
 jest.mock('../../../../src/providers/acp', () => {
   const actual = jest.requireActual('../../../../src/providers/acp');
   return {
@@ -45,6 +51,12 @@ describe('OpenCode ACP launch', () => {
   let mockProcess: AcpLaunchMockProcess;
   let mockTransport: AcpLaunchMockTransport;
 
+  const originalPlatform = process.platform;
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform });
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockConnection = createAcpMockConnection();
@@ -69,6 +81,7 @@ describe('OpenCode ACP launch', () => {
   });
 
   it('does not pass the workspace path through OpenCode CLI arguments', async () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
     const runtime = new OpencodeChatRuntime(createAcpLaunchMockPlugin({
       cliPath: 'C:\\Tools\\opencode.exe',
       providerId: 'opencode',
@@ -85,5 +98,76 @@ describe('OpenCode ACP launch', () => {
       cwd: WINDOWS_UNICODE_VAULT,
       mcpServers: [],
     });
+  });
+
+  it('spawns WSL launches from the host vault cwd while keeping the session cwd in WSL form', async () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    const plugin = createAcpLaunchMockPlugin({
+      cliPath: 'opencode',
+      providerId: 'opencode',
+    });
+    plugin.settings.providerConfigs.opencode = {
+      enabled: true,
+      installationMethodsByHost: { 'host-a': 'wsl' },
+      wslDistroOverridesByHost: { 'host-a': 'Ubuntu' },
+    };
+    const runtime = new OpencodeChatRuntime(plugin);
+
+    await expect(runtime.ensureReady()).resolves.toBe(true);
+
+    expect(MockAcpSubprocess).toHaveBeenCalledWith(expect.objectContaining({
+      args: ['--distribution', 'Ubuntu', '--cd', '/mnt/c/Users/Name/OneDrive - 公司/Vault 中文 (test)', 'opencode', 'acp'],
+      command: expect.stringMatching(/wsl\.exe$/i),
+      cwd: WINDOWS_UNICODE_VAULT,
+      shell: false,
+    }));
+    expect(mockConnection.newSession).toHaveBeenCalledWith({
+      cwd: '/mnt/c/Users/Name/OneDrive - 公司/Vault 中文 (test)',
+      mcpServers: [],
+    });
+    expect(MockAcpSubprocess.mock.calls.at(-1)?.[0].env.PATH).toBeUndefined();
+  });
+
+  it('preserves a \\wsl.localhost workspace path when mapping WSL session paths back to the host', async () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    const wslLocalhostVault = '\\\\wsl.localhost\\Ubuntu\\home\\user\\Vault';
+    const plugin = createAcpLaunchMockPlugin({
+      cliPath: 'opencode',
+      providerId: 'opencode',
+      vaultPath: wslLocalhostVault,
+    });
+    plugin.settings.providerConfigs.opencode = {
+      enabled: true,
+      installationMethodsByHost: { 'host-a': 'wsl' },
+      wslDistroOverridesByHost: { 'host-a': 'Ubuntu' },
+    };
+    mockPrepareOpencodeLaunchArtifacts.mockResolvedValue({
+      configPath: `${wslLocalhostVault}\\.grimoire\\opencode\\config.json`,
+      configContent: '{}\n',
+      databasePath: null,
+      launchKey: 'launch-key',
+      systemPromptPath: `${wslLocalhostVault}\\.grimoire\\opencode\\system.md`,
+    });
+    const runtime = new OpencodeChatRuntime(plugin);
+
+    await expect(runtime.ensureReady()).resolves.toBe(true);
+
+    expect(MockAcpSubprocess).toHaveBeenCalledWith(expect.objectContaining({
+      args: ['--distribution', 'Ubuntu', '--cd', '/home/user/Vault', 'opencode', 'acp'],
+      command: expect.stringMatching(/wsl\.exe$/i),
+      cwd: wslLocalhostVault,
+      shell: false,
+    }));
+    expect(mockConnection.newSession).toHaveBeenCalledWith({
+      cwd: '/home/user/Vault',
+      mcpServers: [],
+    });
+    expect(MockAcpSubprocess.mock.calls.at(-1)?.[0].env.OPENCODE_CONFIG).toBe(
+      '/home/user/Vault/.grimoire/opencode/config.json',
+    );
+
+    expect((runtime as any).launchSpec?.pathMapper.toHostPath('/home/user/Vault/notes/file.md')).toBe(
+      '\\\\wsl.localhost\\Ubuntu\\home\\user\\Vault\\notes\\file.md',
+    );
   });
 });

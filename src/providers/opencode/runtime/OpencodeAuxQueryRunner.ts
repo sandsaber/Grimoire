@@ -22,6 +22,8 @@ import {
   type OpencodeManagedAgentConfig,
   prepareOpencodeLaunchArtifacts,
 } from './OpencodeLaunchArtifacts';
+import { buildOpencodeLaunchSpec } from './OpencodeLaunchSpecBuilder';
+import type { OpencodeLaunchSpec } from './opencodeLaunchTypes';
 import { buildOpencodeRuntimeEnv } from './OpencodeRuntimeEnvironment';
 
 type OpencodeAuxAgentProfile = 'passive' | 'readonly';
@@ -50,6 +52,7 @@ export class OpencodeAuxQueryRunner implements AuxQueryRunner {
   private connection: AcpClientConnection | null = null;
   private currentModelId: string | null = null;
   private currentLaunchKey: string | null = null;
+  private launchSpec: OpencodeLaunchSpec | null = null;
   private process: AcpSubprocess | null = null;
   private readonly sessionCwds = new Map<string, string>();
   private sessionId: string | null = null;
@@ -154,6 +157,7 @@ export class OpencodeAuxQueryRunner implements AuxQueryRunner {
     this.sessionCwds.clear();
     this.currentModelId = null;
     this.currentLaunchKey = null;
+    this.launchSpec = null;
     this.connection?.dispose();
     this.connection = null;
     this.transport?.dispose();
@@ -170,6 +174,12 @@ export class OpencodeAuxQueryRunner implements AuxQueryRunner {
 
     const settings = this.plugin.settings as unknown as Record<string, unknown>;
     const runtimeEnv = buildOpencodeRuntimeEnv(settings, resolvedCliPath);
+    const artifactLaunchSpec = buildOpencodeLaunchSpec({
+      settings: this.plugin.settings,
+      resolvedCliCommand: resolvedCliPath,
+      hostVaultPath: cwd,
+      env: runtimeEnv,
+    });
     const auxAgentId = OPENCODE_AUX_AGENT_IDS[this.options.agentProfile];
     const artifacts = await prepareOpencodeLaunchArtifacts({
       artifactsSubdir: `opencode/auxiliary/${this.options.artifactPurpose}`,
@@ -178,13 +188,24 @@ export class OpencodeAuxQueryRunner implements AuxQueryRunner {
       runtimeEnv,
       systemPromptKey: systemPrompt,
       systemPromptText: systemPrompt,
+      targetPathMapper: (hostPath) => artifactLaunchSpec.pathMapper.toTargetPath(hostPath),
       userName: typeof settings.userName === 'string' ? settings.userName : undefined,
       workspaceRoot: cwd,
     });
+    const launchRuntimeEnv = buildOpencodeRuntimeEnv(settings, resolvedCliPath, artifacts.databasePath);
+    const launchSpec = buildOpencodeLaunchSpec({
+      settings: this.plugin.settings,
+      resolvedCliCommand: resolvedCliPath,
+      hostVaultPath: cwd,
+      env: launchRuntimeEnv,
+    });
     const nextLaunchKey = JSON.stringify({
       artifactKey: artifacts.launchKey,
-      command: resolvedCliPath,
-      configPath: artifacts.configPath,
+      command: launchSpec.command,
+      args: launchSpec.args,
+      spawnCwd: launchSpec.spawnCwd,
+      targetCwd: launchSpec.targetCwd,
+      target: launchSpec.target,
       envText: getRuntimeEnvironmentText(settings, 'opencode'),
     });
 
@@ -201,11 +222,9 @@ export class OpencodeAuxQueryRunner implements AuxQueryRunner {
 
     this.reset();
     await this.startProcess({
-      command: resolvedCliPath,
+      launchSpec,
       configPath: artifacts.configPath,
       configContent: artifacts.configContent,
-      cwd,
-      runtimeEnv,
     });
     this.currentLaunchKey = nextLaunchKey;
   }
@@ -217,7 +236,7 @@ export class OpencodeAuxQueryRunner implements AuxQueryRunner {
 
     try {
       const response = await this.connection.newSession({
-        cwd,
+        cwd: this.launchSpec?.targetCwd ?? cwd,
         mcpServers: [],
       });
       this.syncSessionModelState({
@@ -239,25 +258,32 @@ export class OpencodeAuxQueryRunner implements AuxQueryRunner {
   }
 
   private async startProcess(params: {
-    command: string;
+    launchSpec: OpencodeLaunchSpec;
     configPath: string;
     configContent: string;
-    cwd: string;
-    runtimeEnv: NodeJS.ProcessEnv;
   }): Promise<void> {
+    const { launchSpec } = params;
+    const targetConfigPath = launchSpec.pathMapper.toTargetPath(params.configPath) ?? params.configPath;
     const processEnv: NodeJS.ProcessEnv = {
       ...process.env,
-      ...params.runtimeEnv,
-      OPENCODE_CONFIG: params.configPath,
+      ...launchSpec.env,
+      OPENCODE_CONFIG: targetConfigPath,
       OPENCODE_CONFIG_CONTENT: params.configContent,
-      PATH: params.runtimeEnv.PATH,
     };
 
+    if (launchSpec.target.method === 'wsl') {
+      delete processEnv.PATH;
+    } else {
+      processEnv.PATH = launchSpec.env.PATH;
+    }
+    this.launchSpec = launchSpec;
+
     this.process = new AcpSubprocess({
-      args: ['acp'],
-      command: params.command,
-      cwd: params.cwd,
+      args: [...launchSpec.args],
+      command: launchSpec.command,
+      cwd: launchSpec.spawnCwd,
       env: processEnv,
+      shell: launchSpec.shell,
     });
     this.process.start();
 
@@ -365,7 +391,8 @@ export class OpencodeAuxQueryRunner implements AuxQueryRunner {
     const cwd = this.sessionCwds.get(sessionId)
       ?? getVaultPath(this.plugin.app)
       ?? process.cwd();
-    return resolveWorkspacePath(cwd, rawPath, {
+    const hostPath = this.launchSpec?.pathMapper.toHostPath(rawPath) ?? rawPath;
+    return resolveWorkspacePath(cwd, hostPath, {
       containmentMessage: 'OpenCode aux read access is limited to the current workspace.',
     });
   }

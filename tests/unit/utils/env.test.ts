@@ -17,6 +17,7 @@ const {
   migrateLegacyHostnameKeyedMap,
   parseContextLimit,
   parseEnvironmentVariables,
+  resolveWslExecutablePath,
 } = env;
 
 const isWindows = process.platform === 'win32';
@@ -639,6 +640,58 @@ describe('getEnhancedPath', () => {
       expect(segments[0]).toBe(userPath);
       expect(segments[1]).toBe(nvmBinDir);
     });
+  });
+});
+
+describe('resolveWslExecutablePath', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('resolves wsl.exe under System32 from SystemRoot', () => {
+    expect(resolveWslExecutablePath({ SystemRoot: 'C:\\WINDOWS' })).toBe(
+      'C:\\WINDOWS\\System32\\wsl.exe',
+    );
+  });
+
+  it('falls back to WINDIR when SystemRoot is absent', () => {
+    expect(resolveWslExecutablePath({ WINDIR: 'C:\\Windows' })).toBe(
+      'C:\\Windows\\System32\\wsl.exe',
+    );
+  });
+
+  it('matches Windows env keys case-insensitively', () => {
+    jest.spyOn(fs, 'existsSync').mockReturnValue(false);
+
+    expect(resolveWslExecutablePath({ systemroot: 'C:\\WINDOWS' })).toBe(
+      'C:\\WINDOWS\\System32\\wsl.exe',
+    );
+  });
+
+  it('prefers Sysnative when it is available', () => {
+    jest.spyOn(fs, 'existsSync').mockImplementation((candidate: fsType.PathLike) => String(candidate).includes('\\Sysnative\\'));
+
+    expect(resolveWslExecutablePath({ SystemRoot: 'C:\\WINDOWS' })).toBe(
+      'C:\\WINDOWS\\Sysnative\\wsl.exe',
+    );
+  });
+
+  it('returns bare wsl.exe when no Windows root is present', () => {
+    expect(resolveWslExecutablePath({})).toBe('wsl.exe');
+  });
+
+  it('defaults to process.env', () => {
+    const previous = process.env.SystemRoot;
+    process.env.SystemRoot = 'C:\\WINDOWS';
+    try {
+      expect(resolveWslExecutablePath()).toBe('C:\\WINDOWS\\System32\\wsl.exe');
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SystemRoot;
+      } else {
+        process.env.SystemRoot = previous;
+      }
+    }
   });
 });
 

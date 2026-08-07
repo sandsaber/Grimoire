@@ -97,6 +97,8 @@ import { getOpencodeProviderSettings, updateOpencodeProviderSettings } from '../
 import { getOpencodeState, type OpencodeProviderState } from '../types';
 import { buildOpencodePromptBlocks, buildOpencodePromptText } from './buildOpencodePrompt';
 import { prepareOpencodeLaunchArtifacts } from './OpencodeLaunchArtifacts';
+import { buildOpencodeLaunchSpec } from './OpencodeLaunchSpecBuilder';
+import type { OpencodeLaunchSpec } from './opencodeLaunchTypes';
 import { buildOpencodeRuntimeEnv } from './OpencodeRuntimeEnvironment';
 
 interface ActiveTurn {
@@ -170,6 +172,7 @@ export class OpencodeChatRuntime implements ChatRuntime {
   private currentTurnSawAcpCost = false;
   private currentTurnMetadata: ChatTurnMetadata = {};
   private cleanupPromise: Promise<void> | null = null;
+  private launchSpec: OpencodeLaunchSpec | null = null;
   private lifecycleGeneration = 0;
   private loadedSessionId: string | null = null;
   private permissionModeSyncCallback: ((mode: string) => void) | null = null;
@@ -228,7 +231,7 @@ export class OpencodeChatRuntime implements ChatRuntime {
       this.currentSessionEffortValues = new Set<string>();
       this.currentSessionModelId = null;
       this.currentSessionModeId = null;
-      this.sessionInvalidated = false;
+      this.launchSpec = null;
       this.setSupportedCommands([]);
     }
     this.sessionId = nextSessionId;
@@ -301,10 +304,17 @@ export class OpencodeChatRuntime implements ChatRuntime {
       resolvedCliPath,
       this.currentDatabasePath,
     );
+    const artifactLaunchSpec = buildOpencodeLaunchSpec({
+      settings: this.plugin.settings,
+      resolvedCliCommand: resolvedCliPath,
+      hostVaultPath: cwd,
+      env: runtimeEnv,
+    });
     const promptSettings = this.getSystemPromptSettings(cwd);
     const artifacts = await prepareOpencodeLaunchArtifacts({
       runtimeEnv,
       settings: promptSettings,
+      targetPathMapper: (hostPath) => artifactLaunchSpec.pathMapper.toTargetPath(hostPath),
       workspaceRoot: cwd,
     });
     if (lifecycleGeneration !== this.lifecycleGeneration) {
@@ -312,12 +322,26 @@ export class OpencodeChatRuntime implements ChatRuntime {
     }
     this.currentDatabasePath = artifacts.databasePath;
 
+    const launchRuntimeEnv = this.buildRuntimeEnv(
+      resolvedCliPath,
+      artifacts.databasePath,
+    );
+    const launchSpec = buildOpencodeLaunchSpec({
+      settings: this.plugin.settings,
+      resolvedCliCommand: resolvedCliPath,
+      hostVaultPath: cwd,
+      env: launchRuntimeEnv,
+    });
+
     const nextLaunchKey = JSON.stringify({
-      command: resolvedCliPath,
-      configPath: artifacts.configPath,
+      artifactKey: artifacts.launchKey,
+      command: launchSpec.command,
+      args: launchSpec.args,
+      spawnCwd: launchSpec.spawnCwd,
+      targetCwd: launchSpec.targetCwd,
+      target: launchSpec.target,
       envText: getRuntimeEnvironmentText(this.plugin.settings, 'opencode'),
       promptKey: computeSystemPromptKey(promptSettings),
-      artifactKey: artifacts.launchKey,
     });
 
     const shouldRestart = !this.process
@@ -334,10 +358,8 @@ export class OpencodeChatRuntime implements ChatRuntime {
         return false;
       }
       await this.startProcess({
-        command: resolvedCliPath,
+        launchSpec,
         configPath: artifacts.configPath,
-        cwd,
-        runtimeEnv,
       });
       if (lifecycleGeneration !== this.lifecycleGeneration) {
         await this.cleanupPromise;
@@ -345,6 +367,8 @@ export class OpencodeChatRuntime implements ChatRuntime {
       }
       this.currentLaunchKey = nextLaunchKey;
       this.loadedSessionId = null;
+    } else {
+      this.launchSpec = launchSpec;
     }
 
     if (targetSessionId) {
@@ -380,7 +404,13 @@ export class OpencodeChatRuntime implements ChatRuntime {
 
     const lifecycleGeneration = this.lifecycleGeneration;
     if (!(await this.ensureReadyForQuery(lifecycleGeneration))) {
-      yield { type: 'error', content: 'Failed to start OpenCode. Check the CLI path and login state.' };
+      const stderr = this.process?.getStderrSnapshot();
+      yield {
+        type: 'error',
+        content: stderr
+          ? `${t('chat.ui.errors.provider.startFailed', { provider: ProviderRegistry.getProviderDisplayNameOrId('opencode') })}\n\n${stderr}`
+          : t('chat.ui.errors.provider.startFailed', { provider: ProviderRegistry.getProviderDisplayNameOrId('opencode') }),
+      };
       yield { type: 'done' };
       return;
     }
@@ -663,26 +693,33 @@ export class OpencodeChatRuntime implements ChatRuntime {
   }
 
   private async startProcess(params: {
-    command: string;
+    launchSpec: OpencodeLaunchSpec;
     configPath: string;
-    cwd: string;
-    runtimeEnv: NodeJS.ProcessEnv;
   }): Promise<void> {
+    const { launchSpec } = params;
+    const targetConfigPath = launchSpec.pathMapper.toTargetPath(params.configPath) ?? params.configPath;
     const processEnv: NodeJS.ProcessEnv = {
       ...process.env,
-      ...params.runtimeEnv,
-      OPENCODE_CONFIG: params.configPath,
-      PATH: getEnhancedPath(
-        params.runtimeEnv.PATH,
-        path.isAbsolute(params.command) ? params.command : undefined,
-      ),
+      ...launchSpec.env,
+      OPENCODE_CONFIG: targetConfigPath,
     };
 
+    if (launchSpec.target.method === 'wsl') {
+      delete processEnv.PATH;
+    } else {
+      processEnv.PATH = getEnhancedPath(
+        launchSpec.env.PATH,
+        path.isAbsolute(launchSpec.command) ? launchSpec.command : undefined,
+      );
+    }
+    this.launchSpec = launchSpec;
+
     this.process = new AcpSubprocess({
-      args: ['acp'],
-      command: params.command,
-      cwd: params.cwd,
+      args: [...launchSpec.args],
+      command: launchSpec.command,
+      cwd: launchSpec.spawnCwd,
       env: processEnv,
+      shell: launchSpec.shell,
     });
     this.process.start();
 
@@ -1175,7 +1212,7 @@ export class OpencodeChatRuntime implements ChatRuntime {
     try {
       this.setSupportedCommands([]);
       const response = await this.connection.newSession({
-        cwd,
+        cwd: this.launchSpec?.targetCwd ?? cwd,
         mcpServers: [],
       });
       this.sessionInvalidated = false;
@@ -1204,7 +1241,7 @@ export class OpencodeChatRuntime implements ChatRuntime {
     try {
       this.setSupportedCommands([]);
       const response = await this.connection.loadSession({
-        cwd,
+        cwd: this.launchSpec?.targetCwd ?? cwd,
         mcpServers: [],
         sessionId,
       });
@@ -1425,11 +1462,12 @@ export class OpencodeChatRuntime implements ChatRuntime {
     const cwd = this.sessionCwds.get(sessionId)
       ?? getVaultPath(this.plugin.app)
       ?? process.cwd();
+    const hostPath = this.launchSpec?.pathMapper.toHostPath(rawPath) ?? rawPath;
     // Active (full-access) mode opts into unrestricted file access; safe and
     // plan modes confine ACP-delegated reads/writes to the session workspace.
     const allowOutsideWorkspace =
       coercePermissionMode(this.getProviderSettings().permissionMode) === 'full_access';
-    return resolveWorkspacePath(cwd, rawPath, { allowOutsideWorkspace });
+    return resolveWorkspacePath(cwd, hostPath, { allowOutsideWorkspace });
   }
 
   private formatRuntimeError(error: unknown): string {

@@ -82,6 +82,23 @@ describe('AcpSubprocess', () => {
     }));
   });
 
+  it('spawns relative Windows executables directly when the launch spec opts out of a shell', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    const mockProc = createMockProcess();
+    spawnMock.mockReturnValue(mockProc);
+
+    new AcpSubprocess({
+      ...createLaunchSpec(),
+      command: 'wsl.exe',
+      shell: false,
+    }).start();
+
+    expect(spawnMock).toHaveBeenCalledWith('wsl.exe', ['acp'], expect.objectContaining({
+      shell: false,
+      windowsHide: true,
+    }));
+  });
+
   it('keeps a hostile workspace path out of the .cmd command line and routes it via the cwd option', () => {
     Object.defineProperty(process, 'platform', { value: 'win32' });
     const mockProc = createMockProcess();

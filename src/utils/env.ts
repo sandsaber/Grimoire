@@ -321,6 +321,49 @@ export function getEnhancedPath(additionalPaths?: string, cliPath?: string): str
   return unique.join(PATH_SEPARATOR);
 }
 
+function getEnvValueCaseInsensitive(
+  env: NodeJS.ProcessEnv,
+  ...names: string[]
+): string | undefined {
+  for (const name of names) {
+    const directValue = env[name];
+    if (directValue) {
+      return directValue;
+    }
+
+    const loweredName = name.toLowerCase();
+    for (const [key, value] of Object.entries(env)) {
+      if (value && key.toLowerCase() === loweredName) {
+        return value;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+export function resolveWslExecutablePath(env: NodeJS.ProcessEnv = process.env): string {
+  const systemRoot = getEnvValueCaseInsensitive(env, 'SystemRoot', 'WINDIR');
+  if (systemRoot) {
+    const candidates = [
+      `${systemRoot}\\Sysnative\\wsl.exe`,
+      `${systemRoot}\\System32\\wsl.exe`,
+    ];
+    for (const candidate of candidates) {
+      try {
+        if (fs.existsSync(candidate)) {
+          return candidate;
+        }
+      } catch {
+        // Fall through to the next candidate or the deterministic fallback.
+      }
+    }
+
+    return candidates[1];
+  }
+  return 'wsl.exe';
+}
+
 export function parseEnvironmentVariables(input: string): Record<string, string> {
   const result: Record<string, string> = {};
   for (const line of input.split(/\r?\n/)) {

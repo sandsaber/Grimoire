@@ -110,6 +110,159 @@ describe('OpenCode settings normalization', () => {
     });
   });
 
+  it('defaults installation method to native-windows and leaves WSL override empty', () => {
+    const settings = getOpencodeProviderSettings({});
+
+    expect(settings.installationMethod).toBe('native-windows');
+    expect(settings.wslDistroOverride).toBe('');
+    expect(settings.installationMethod).toBe(DEFAULT_OPENCODE_PROVIDER_SETTINGS.installationMethod);
+    expect(settings.wslDistroOverride).toBe(DEFAULT_OPENCODE_PROVIDER_SETTINGS.wslDistroOverride);
+  });
+
+  it('normalizes invalid installationMethod and wslDistroOverride values', () => {
+    const settings = getOpencodeProviderSettings({
+      providerConfigs: {
+        opencode: {
+          installationMethod: 'auto',
+          wslDistroOverride: 123,
+        },
+      },
+    });
+
+    expect(settings.installationMethod).toBe('native-windows');
+    expect(settings.wslDistroOverride).toBe('');
+  });
+
+  it('does not inherit another host installation method once host-scoped values exist', () => {
+    const settings = getOpencodeProviderSettings({
+      providerConfigs: {
+        opencode: {
+          installationMethodsByHost: {
+            'host-b': 'wsl',
+          },
+          wslDistroOverridesByHost: {
+            'host-b': 'Ubuntu',
+          },
+          installationMethod: 'wsl',
+          wslDistroOverride: 'Ubuntu',
+        },
+      },
+    });
+
+    expect(settings.installationMethod).toBe('native-windows');
+    expect(settings.wslDistroOverride).toBe('');
+  });
+
+  it('migrates current legacy hostname-scoped installation settings to the opaque device key', () => {
+    mockGetHostnameKey.mockReturnValue('device:current');
+    mockGetLegacyHostnameKey.mockReturnValue('host-a');
+
+    const settings = getOpencodeProviderSettings({
+      providerConfigs: {
+        opencode: {
+          installationMethodsByHost: {
+            'host-a': 'wsl',
+            'host-b': 'native-windows',
+          },
+          wslDistroOverridesByHost: {
+            'host-a': 'Ubuntu',
+            'host-b': 'Debian',
+          },
+        },
+      },
+    });
+
+    expect(settings.installationMethod).toBe('wsl');
+    expect(settings.installationMethodsByHost).toEqual({
+      'device:current': 'wsl',
+      'host-b': 'native-windows',
+    });
+    expect(settings.wslDistroOverride).toBe('Ubuntu');
+    expect(settings.wslDistroOverridesByHost).toEqual({
+      'device:current': 'Ubuntu',
+      'host-b': 'Debian',
+    });
+  });
+
+  it('round-trips installationMethod and trims wslDistroOverride on update for the current host', () => {
+    const settingsBag: Record<string, unknown> = {
+      providerConfigs: {
+        opencode: {},
+      },
+    };
+
+    const next = updateOpencodeProviderSettings(settingsBag, {
+      installationMethod: 'wsl',
+      wslDistroOverride: '  Ubuntu-24.04  ',
+    });
+
+    expect(next.installationMethod).toBe('wsl');
+    expect(next.wslDistroOverride).toBe('Ubuntu-24.04');
+    expect(getOpencodeProviderSettings(settingsBag)).toMatchObject({
+      installationMethod: 'wsl',
+      wslDistroOverride: 'Ubuntu-24.04',
+      installationMethodsByHost: {
+        'host-a': 'wsl',
+      },
+      wslDistroOverridesByHost: {
+        'host-a': 'Ubuntu-24.04',
+      },
+    });
+  });
+
+  it('preserves another host installation settings when updating the current host', () => {
+    const settingsBag: Record<string, unknown> = {
+      providerConfigs: {
+        opencode: {
+          installationMethodsByHost: {
+            'host-b': 'wsl',
+          },
+          wslDistroOverridesByHost: {
+            'host-b': 'Debian',
+          },
+        },
+      },
+    };
+
+    const next = updateOpencodeProviderSettings(settingsBag, {
+      installationMethod: 'native-windows',
+      wslDistroOverride: '  ',
+    });
+
+    expect(next.installationMethodsByHost).toEqual({
+      'host-b': 'wsl',
+      'host-a': 'native-windows',
+    });
+    expect(next.wslDistroOverridesByHost).toEqual({
+      'host-b': 'Debian',
+    });
+  });
+
+  it('preserves legacy installation settings when applying a full settings snapshot', () => {
+    const settings: Record<string, unknown> = {
+      providerConfigs: {
+        opencode: {
+          installationMethod: 'wsl',
+          wslDistroOverride: 'Ubuntu',
+        },
+      },
+    };
+
+    const snapshot = getOpencodeProviderSettings(settings);
+    const next = updateOpencodeProviderSettings(settings, snapshot);
+
+    expect(next.installationMethod).toBe('wsl');
+    expect(next.wslDistroOverride).toBe('Ubuntu');
+    expect((settings.providerConfigs as Record<string, any>).opencode).toMatchObject({
+      installationMethodsByHost: {
+        'host-a': 'wsl',
+      },
+      wslDistroOverridesByHost: {
+        'host-a': 'Ubuntu',
+      },
+    });
+  });
+
   it('normalizes model aliases to base model ids and trims values', () => {
     expect(normalizeOpencodeModelAliases({
       'anthropic/claude-sonnet-4/high': '  Sonnet  ',

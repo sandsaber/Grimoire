@@ -63,4 +63,42 @@ describe('OpencodeCliResolver', () => {
 
     expect(resolved).toBeNull();
   });
+
+  it('uses a Linux-side command in Windows WSL mode', () => {
+    mockedExists.mockReturnValue(false);
+
+    const resolver = new OpencodeCliResolver();
+    const resolved = resolver.resolve(
+      {
+        'current-host': '/home/user/bin/opencode',
+      },
+      'C:\\Users\\user\\AppData\\Roaming\\npm\\opencode.cmd',
+      '',
+      {
+        hostPlatform: 'win32',
+        installationMethod: 'wsl',
+      },
+    );
+
+    expect(resolved).toBe('/home/user/bin/opencode');
+  });
+
+  it('falls back to PATH lookup inside WSL when only Windows-style references are configured', () => {
+    mockedExists.mockReturnValue(false);
+
+    const resolver = new OpencodeCliResolver();
+    const resolved = resolver.resolve(
+      {
+        'current-host': 'C:\\Users\\user\\AppData\\Roaming\\npm\\opencode.cmd',
+      },
+      'C:\\legacy\\opencode.cmd',
+      '',
+      {
+        hostPlatform: 'win32',
+        installationMethod: 'wsl',
+      },
+    );
+
+    expect(resolved).toBe('opencode');
+  });
 });

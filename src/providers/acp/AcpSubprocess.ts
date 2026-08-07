@@ -10,6 +10,9 @@ export interface AcpSubprocessLaunchSpec {
   command: string;
   cwd: string;
   env: NodeJS.ProcessEnv;
+  /** Explicit shell requirement. When set, overrides the Windows relative-command
+   * heuristic so native executables (e.g. wsl.exe) can be spawned directly. */
+  shell?: boolean;
 }
 
 type CloseListener = (error?: Error) => void;
@@ -50,7 +53,7 @@ export class AcpSubprocess {
     const proc = spawn(this.launchSpec.command, this.launchSpec.args, {
       cwd: this.launchSpec.cwd,
       env: this.launchSpec.env,
-      shell: shouldUseShell(this.launchSpec.command),
+      shell: this.launchSpec.shell ?? shouldUseShell(this.launchSpec.command),
       stdio: 'pipe',
       windowsHide: true,
     });

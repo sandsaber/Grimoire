@@ -65,6 +65,7 @@ export interface PrepareOpencodeLaunchArtifactsParams {
   settings?: SystemPromptSettings;
   systemPromptKey?: string;
   systemPromptText?: string;
+  targetPathMapper?: (hostPath: string) => string | null;
   userName?: string;
   workspaceRoot: string;
 }
@@ -79,6 +80,7 @@ export async function prepareOpencodeLaunchArtifacts(
   );
   const systemPromptPath = path.join(artifactsDir, 'system.md');
   const configPath = path.join(artifactsDir, 'config.json');
+  const targetSystemPromptPath = params.targetPathMapper?.(systemPromptPath) ?? systemPromptPath;
   const systemPrompt = normalizeSystemPrompt(
     params.systemPromptText ?? buildSystemPrompt(requireSettings(params)),
   );
@@ -93,7 +95,7 @@ export async function prepareOpencodeLaunchArtifacts(
   const configContent = `${JSON.stringify(
     buildOpencodeManagedConfig(
       baseConfig,
-      systemPromptPath,
+      targetSystemPromptPath,
       params.userName ?? params.settings?.userName,
       params.managedAgents,
       params.defaultAgentId,
