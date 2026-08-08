@@ -4,7 +4,14 @@ import * as os from 'os';
 import * as path from 'path';
 
 export function getVaultPath(app: App): string | null {
-  const basePath = (app.vault.adapter as { basePath?: unknown } | undefined)?.basePath;
+  const adapter = app.vault.adapter;
+  if (!adapter || typeof adapter !== 'object') {
+    return null;
+  }
+
+  // Use Reflect.get (not `in`) so Electron/Obsidian adapter proxies that hide
+  // the property from `has` still expose basePath.
+  const basePath: unknown = Reflect.get(adapter, 'basePath');
   return typeof basePath === 'string' ? basePath : null;
 }
 

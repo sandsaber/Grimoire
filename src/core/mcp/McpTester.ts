@@ -7,7 +7,13 @@ import * as https from 'https';
 
 import { getEnhancedPath } from '../../utils/env';
 import { parseCommand } from '../../utils/mcp';
-import type { ManagedMcpServer } from '../types';
+import type {
+  ManagedMcpServer,
+  McpHttpServerConfig,
+  McpServerConfig,
+  McpSSEServerConfig,
+  McpStdioServerConfig,
+} from '../types';
 import { getMcpServerType } from '../types';
 
 export interface McpTool {
@@ -24,21 +30,13 @@ export interface McpTestResult {
   error?: string;
 }
 
-interface UrlServerConfig {
-  url: string;
-  headers?: Record<string, string>;
-}
-
 type StreamableHttpTransportOptions = ConstructorParameters<typeof StreamableHTTPClientTransport>[1];
-type LegacySseTransportConstructor = new (
-  url: URL,
-  options?: StreamableHttpTransportOptions,
-) => Transport;
 
 function createLegacySseTransport(url: URL, options: StreamableHttpTransportOptions): Transport {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Legacy SSE MCP servers still need the SDK's deprecated compatibility transport.
+  // Legacy SSE MCP servers still need the SDK's optional deprecated transport export.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-type-assertion -- dynamic optional SDK export
   const module = require('@modelcontextprotocol/sdk/client/sse') as {
-    SSEClientTransport: LegacySseTransportConstructor;
+    SSEClientTransport: new (endpoint: URL, opts?: StreamableHttpTransportOptions) => Transport;
   };
   return new module.SSEClientTransport(url, options);
 }
@@ -89,7 +87,7 @@ export function createNodeFetch(): (input: string | URL | Request, init?: Reques
           if (settled) return;
           settled = true;
           signal?.removeEventListener('abort', onAbort);
-          resolve(createFetchResponse(res) as Response);
+          resolve(createFetchResponse(res));
         },
       );
 
@@ -112,17 +110,7 @@ export function createNodeFetch(): (input: string | URL | Request, init?: Reques
   };
 }
 
-interface MinimalFetchResponse {
-  ok: boolean;
-  status: number;
-  statusText: string;
-  headers: Headers;
-  body: ReadableStream<Uint8Array> | null;
-  text: () => Promise<string>;
-  json: () => Promise<unknown>;
-}
-
-function createFetchResponse(res: http.IncomingMessage): MinimalFetchResponse {
+function createFetchResponse(res: http.IncomingMessage): Response {
   const responseHeaders = new Headers();
   for (const [key, value] of Object.entries(res.headers)) {
     if (value === undefined) continue;
@@ -149,51 +137,11 @@ function createFetchResponse(res: http.IncomingMessage): MinimalFetchResponse {
     },
   });
 
-  let bodyUsed = false;
-  const readAsText = async (): Promise<string> => {
-    if (bodyUsed) {
-      throw new TypeError('Body has already been consumed');
-    }
-    bodyUsed = true;
-    const reader = body.getReader();
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    let done = false;
-    try {
-      while (!done) {
-        const { value, done: streamDone } = await reader.read();
-        done = streamDone;
-        if (done) break;
-        if (value) {
-          chunks.push(value);
-          total += value.byteLength;
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-
-    const merged = new Uint8Array(total);
-    let offset = 0;
-    for (const chunk of chunks) {
-      merged.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return new TextDecoder().decode(merged);
-  };
-
-  return {
-    ok: (res.statusCode ?? 500) >= 200 && (res.statusCode ?? 500) < 300,
+  return new Response(body, {
     status: res.statusCode ?? 500,
     statusText: res.statusMessage ?? '',
     headers: responseHeaders,
-    body,
-    text: readAsText,
-    json: async () => {
-      const parsed: unknown = JSON.parse(await readAsText());
-      return parsed;
-    },
-  };
+  });
 }
 
 function getRequestUrl(input: string | URL | Request): URL {
@@ -228,13 +176,26 @@ async function getRequestBody(body: BodyInit | null | undefined): Promise<Buffer
 
 const nodeFetch = createNodeFetch();
 
+function isStdioServerConfig(config: McpServerConfig): config is McpStdioServerConfig {
+  return 'command' in config && typeof config.command === 'string';
+}
+
+function isUrlServerConfig(
+  config: McpServerConfig,
+): config is McpSSEServerConfig | McpHttpServerConfig {
+  return 'url' in config && typeof config.url === 'string';
+}
+
 export async function testMcpServer(server: ManagedMcpServer): Promise<McpTestResult> {
   const type = getMcpServerType(server.config);
 
   let transport: Transport;
   try {
     if (type === 'stdio') {
-      const config = server.config as { command: string; args?: string[]; env?: Record<string, string> };
+      if (!isStdioServerConfig(server.config)) {
+        return { success: false, tools: [], error: 'Missing command' };
+      }
+      const config = server.config;
       const { cmd, args } = parseCommand(config.command, config.args);
       if (!cmd) {
         return { success: false, tools: [], error: 'Missing command' };
@@ -246,7 +207,10 @@ export async function testMcpServer(server: ManagedMcpServer): Promise<McpTestRe
         stderr: 'ignore',
       });
     } else {
-      const config = server.config as UrlServerConfig;
+      if (!isUrlServerConfig(server.config)) {
+        return { success: false, tools: [], error: 'Invalid server configuration' };
+      }
+      const config = server.config;
       const url = new URL(config.url);
       const options = {
         fetch: nodeFetch,
@@ -275,11 +239,16 @@ export async function testMcpServer(server: ManagedMcpServer): Promise<McpTestRe
     let tools: McpTool[] = [];
     try {
       const result = await client.listTools(undefined, { signal: controller.signal });
-      tools = result.tools.map((t: { name: string; description?: string; inputSchema?: Record<string, unknown> }) => ({
-        name: t.name,
-        description: t.description,
-        inputSchema: t.inputSchema as Record<string, unknown>,
-      }));
+      tools = result.tools.map((tool) => {
+        const inputSchema = tool.inputSchema;
+        return {
+          name: tool.name,
+          description: tool.description,
+          ...(inputSchema && typeof inputSchema === 'object' && !Array.isArray(inputSchema)
+            ? { inputSchema: { ...inputSchema } }
+            : {}),
+        };
+      });
     } catch {
       // listTools failure after successful connect = partial success
     }

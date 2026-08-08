@@ -81,6 +81,9 @@ export class SharedStorageService implements SharedAppStorage {
   }
 
   async saveGrimoireSettings(settings: Record<string, unknown>): Promise<void> {
+    // Live plugin settings are always a GrimoireSettings object; storage persists
+    // them as JSON without a full structural re-parse on every save.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- settings is the live GrimoireSettings instance.
     await this.grimoireSettings.save(settings as StoredGrimoireSettings);
   }
 
@@ -118,22 +121,22 @@ export class SharedStorageService implements SharedAppStorage {
   }
 
   private validateTabManagerState(data: unknown): PersistedTabManagerState | null {
-    if (!data || typeof data !== 'object') {
+    if (!isRecord(data)) {
       return null;
     }
 
-    const state = data as Record<string, unknown>;
+    const state = data;
     if (!Array.isArray(state.openTabs)) {
       return null;
     }
 
     const validatedTabs: PersistedTabState[] = [];
     for (const tab of state.openTabs) {
-      if (!tab || typeof tab !== 'object') {
+      if (!isRecord(tab)) {
         continue;
       }
 
-      const tabObj = tab as Record<string, unknown>;
+      const tabObj = tab;
       if (typeof tabObj.tabId !== 'string') {
         continue;
       }

@@ -50,7 +50,9 @@ export class HomeFileAdapter implements Pick<VaultFileAdapter,
     try {
       await fs.promises.unlink(this.resolve(p));
     } catch (err: unknown) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+      if (!isErrnoException(err) || err.code !== 'ENOENT') {
+        throw err;
+      }
     }
   }
 
@@ -77,4 +79,17 @@ export class HomeFileAdapter implements Pick<VaultFileAdapter,
   async ensureFolder(p: string): Promise<void> {
     await fs.promises.mkdir(this.resolve(p), { recursive: true });
   }
+}
+
+function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+
+  if (!('code' in error)) {
+    return true;
+  }
+
+  const code = Reflect.get(error, 'code');
+  return code === undefined || typeof code === 'string';
 }

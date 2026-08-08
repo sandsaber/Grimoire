@@ -143,17 +143,34 @@ provider.
 
 ## Obsidian Community Review Gates
 
-Obsidian community plugin review scores CSS and dependency graphs and affects
-how the plugin is rated. Local release checks mirror the durable parts of that
-process:
+Obsidian community plugin review scores CSS, source, and dependency graphs and
+affects how the plugin is rated. Local release checks mirror the durable parts of
+that process:
 
 | Gate | Command | Catches |
 |------|---------|---------|
-| Source | `npm run review:source` | Stricter type-aware ESLint used for review |
+| Source | `npm run review:source` | Type-aware ESLint: no-deprecated, no-explicit-any, no-unsafe-* |
 | CSS | `npm run review:css` | `!important` and CSS features only partially supported by Obsidian's review baseline |
 | Dependencies | `npm run review:deps` | Known advisory floors in the lockfile |
 
 `npm run build:release` runs all three via `prebuild:release`.
+
+### Source / unsafe typing
+
+Local `review:source` already fails the build on `@typescript-eslint/no-unsafe-assignment`
+(and call/return/member/argument) plus `no-explicit-any`. Keep that gate green.
+
+Obsidian’s hosted scanner can still report large `no-unsafe-assignment` lists when
+its TypeScript/`obsidian` type resolution differs from ours. Treat that as a
+scoring signal, not as “local lint is off.” When their report names specific
+files:
+
+1. Prefer type guards and `unknown` over `as` casts.
+2. For storage/MCP/context/path helpers, also keep
+   `@typescript-eslint/no-unsafe-type-assertion` green (enforced for those paths).
+3. Expand path coverage wave-by-wave rather than one giant diff.
+
+### CSS
 
 CSS review is stricter than “works in current Obsidian.” The community lint
 baseline is historically Electron / app **1.11.4**, while Grimoire's

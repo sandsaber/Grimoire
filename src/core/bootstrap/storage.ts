@@ -12,6 +12,7 @@ import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
  */
 export interface SharedAppStorage {
   initialize(): Promise<{ grimoire: Record<string, unknown> }>;
+  /** Callers pass the live plugin settings object (JSON-serializable). */
   saveGrimoireSettings(settings: Record<string, unknown>): Promise<void>;
   setTabManagerState(state: AppTabManagerState): Promise<void>;
   getTabManagerState(): Promise<AppTabManagerState | null>;

@@ -1,4 +1,4 @@
-import type { App } from 'obsidian';
+import type { App, CachedMetadata } from 'obsidian';
 
 import { isPathInExcludedFolder } from './exclusions';
 import { tokenizeSearchText } from './text';
@@ -71,16 +71,12 @@ export class VaultTextIndex {
   }
 }
 
-function extractTags(cache: unknown): Set<string> {
+function extractTags(cache: CachedMetadata | null): Set<string> {
   const tags = new Set<string>();
-  const fileCache = cache as {
-    frontmatter?: { tags?: unknown };
-    tags?: Array<{ tag?: unknown }>;
-  } | null;
 
-  addFrontmatterTags(tags, fileCache?.frontmatter?.tags);
+  addFrontmatterTags(tags, cache?.frontmatter?.tags);
 
-  for (const tag of fileCache?.tags ?? []) {
+  for (const tag of cache?.tags ?? []) {
     if (typeof tag.tag === 'string') {
       tags.add(normalizeTag(tag.tag));
     }
@@ -104,11 +100,10 @@ function addFrontmatterTags(tags: Set<string>, value: unknown): void {
   }
 }
 
-function extractLinks(cache: unknown): Set<string> {
+function extractLinks(cache: CachedMetadata | null): Set<string> {
   const links = new Set<string>();
-  const fileCache = cache as { links?: Array<{ link?: unknown }> } | null;
 
-  for (const link of fileCache?.links ?? []) {
+  for (const link of cache?.links ?? []) {
     if (typeof link.link === 'string') {
       links.add(link.link);
     }

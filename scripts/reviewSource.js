@@ -1,5 +1,6 @@
 const REVIEW_SOURCE_RULES = [
   '@typescript-eslint/no-deprecated:error',
+  '@typescript-eslint/no-explicit-any:error',
   '@typescript-eslint/no-unsafe-assignment:error',
   '@typescript-eslint/no-unsafe-return:error',
   '@typescript-eslint/no-unsafe-call:error',

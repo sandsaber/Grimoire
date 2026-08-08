@@ -61,7 +61,8 @@ export default defineConfig([
         'error',
         { args: 'none', ignoreRestSiblings: true },
       ],
-      '@typescript-eslint/no-explicit-any': 'off',
+      // Obsidian recommended enables no-explicit-any; keep it enforced for src/tests.
+      '@typescript-eslint/no-explicit-any': 'error',
       'simple-import-sort/imports': 'error',
       'simple-import-sort/exports': 'error',
     },
@@ -71,6 +72,21 @@ export default defineConfig([
     rules: {
       ...projectObsidianRuleOverrides,
       'no-console': 'error',
+    },
+  },
+  // Wave-1 Obsidian source-review hardening: ban unsafe assertions in storage /
+  // MCP / context paths that the community scanner lists first.
+  {
+    files: [
+      'src/app/**/*.ts',
+      'src/core/storage/**/*.ts',
+      'src/core/mcp/**/*.ts',
+      'src/core/context/**/*.ts',
+      'src/utils/path.ts',
+      'src/utils/env.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-unsafe-type-assertion': 'error',
     },
   },
   {

@@ -41,6 +41,10 @@ export { GRIMOIRE_SETTINGS_PATH };
 
 export type StoredGrimoireSettings = GrimoireSettings;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 const LEGACY_TOP_LEVEL_PROVIDER_FIELDS = [
   'claudeCliPath',
   'claudeCliPathsByHost',
@@ -171,14 +175,15 @@ function shouldPersistTabLayoutNormalization(
 }
 
 function normalizeProviderConfigs(value: unknown): ProviderConfigMap {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!isRecord(value)) {
     return {};
   }
 
   const result: ProviderConfigMap = {};
-  for (const [providerId, config] of Object.entries(value as Record<string, unknown>)) {
-    if (config && typeof config === 'object' && !Array.isArray(config)) {
-      result[providerId] = { ...(config as Record<string, unknown>) };
+  for (const providerId of Object.keys(value)) {
+    const config = value[providerId];
+    if (isRecord(config)) {
+      result[providerId] = { ...config };
     }
   }
   return result;
@@ -280,11 +285,11 @@ function normalizeEnvSnippets(value: unknown): EnvSnippet[] {
 
   const snippets: EnvSnippet[] = [];
   for (const item of value) {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    if (!isRecord(item)) {
       continue;
     }
 
-    const candidate = item as Record<string, unknown>;
+    const candidate = item;
     if (
       typeof candidate.id !== 'string'
       || typeof candidate.name !== 'string'
@@ -481,7 +486,8 @@ export class GrimoireSettingsStorage {
   private async readStoredSettings(settingsPath: string): Promise<Record<string, unknown> | null> {
     const content = await this.adapter.read(settingsPath);
     try {
-      return JSON.parse(content) as Record<string, unknown>;
+      const parsed: unknown = JSON.parse(content);
+      return isRecord(parsed) ? parsed : null;
     } catch (error) {
       if (!(error instanceof SyntaxError)) {
         throw error;
