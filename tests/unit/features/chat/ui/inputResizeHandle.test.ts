@@ -66,6 +66,20 @@ describe('inputResizeHandle', () => {
       .toBe(`${INPUT_WRAPPER_MIN_HEIGHT}px`);
   });
 
+  it('does not shrink below the intrinsic height of a wrapped toolbar', () => {
+    Object.defineProperty(inputWrapper, 'scrollHeight', {
+      configurable: true,
+      value: 138,
+    });
+    cleanup = createInputResizeHandle({ inputWrapper, viewport });
+    const handle = inputWrapper.querySelector('.grimoire-input-resize-handle')!;
+
+    handle.dispatchEvent(new MouseEvent('mousedown', { clientY: 300, bubbles: true }));
+    document.dispatchEvent(new MouseEvent('mousemove', { clientY: 500, bubbles: true }));
+
+    expect(inputWrapper.style.getPropertyValue('--grimoire-input-wrapper-height')).toBe('138px');
+  });
+
   it('toggles the body drag class during drag', () => {
     cleanup = createInputResizeHandle({ inputWrapper, viewport });
     const handle = inputWrapper.querySelector('.grimoire-input-resize-handle')!;

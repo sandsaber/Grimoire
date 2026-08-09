@@ -130,6 +130,21 @@ describe('AntigravityChatRuntime', () => {
     }));
   });
 
+  it('repairs a tab-separated model selection saved by older discovery code', async () => {
+    const runtime = new AntigravityChatRuntime(createMockPlugin());
+    const runPrint = jest.spyOn(runtime as any, 'runPrint').mockResolvedValue('Hi\n');
+
+    await collect(runtime.query(
+      runtime.prepareTurn({ text: 'Hello' }),
+      undefined,
+      { model: 'antigravity:gemini-3.6-flash-high\tGemini 3.6 Flash (High)' },
+    ));
+
+    expect(runPrint).toHaveBeenCalledWith(expect.objectContaining({
+      model: 'Gemini 3.6 Flash (High)',
+    }));
+  });
+
   it('emits a startup status before waiting for agy print output', async () => {
     const runtime = new AntigravityChatRuntime(createMockPlugin());
     jest.spyOn(runtime as any, 'runPrint').mockResolvedValue('Hi from Antigravity\n');

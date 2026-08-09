@@ -5,7 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 
-import { discoverAntigravityModels } from '@/providers/antigravity/runtime/AntigravityModelDiscovery';
+import {
+  discoverAntigravityModels,
+  parseAntigravityModels,
+} from '@/providers/antigravity/runtime/AntigravityModelDiscovery';
 import { updateAntigravityProviderSettings } from '@/providers/antigravity/settings';
 
 jest.mock('node:child_process', () => ({
@@ -54,6 +57,23 @@ describe('AntigravityModelDiscovery', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     mockedSpawn.mockReset();
+  });
+
+  it('uses the CLI display name from tab-separated model output', () => {
+    expect(parseAntigravityModels([
+      'gemini-3.6-flash-high\tGemini 3.6 Flash (High)',
+      'claude-sonnet-4-6\tClaude Sonnet 4.6 (Thinking)',
+      'Gemini 3.6 Flash (High)',
+    ].join('\r\n'))).toEqual([
+      {
+        label: 'Gemini 3.6 Flash (High)',
+        rawId: 'Gemini 3.6 Flash (High)',
+      },
+      {
+        label: 'Claude Sonnet 4.6 (Thinking)',
+        rawId: 'Claude Sonnet 4.6 (Thinking)',
+      },
+    ]);
   });
 
   it('recovers models from Antigravity settings when agy models stdout is empty', async () => {

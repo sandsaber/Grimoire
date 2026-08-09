@@ -95,6 +95,7 @@ dev
 
 .claude/
 .codex/
+.zcode/
 
 # Agent planning artifacts
 docs/superpowers/

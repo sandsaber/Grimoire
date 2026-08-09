@@ -46,8 +46,16 @@ export const ANTIGRAVITY_FALLBACK_DISCOVERED_MODELS: ReadonlyArray<AntigravityDi
   },
 ]);
 
+export function normalizeAntigravityModelSelector(value: string): string {
+  const columns = value
+    .split('\t')
+    .map((column) => column.trim())
+    .filter(Boolean);
+  return columns.at(-1) ?? '';
+}
+
 export function encodeAntigravityModelId(rawModelId: string): string {
-  const normalized = rawModelId.trim();
+  const normalized = normalizeAntigravityModelSelector(rawModelId);
   return normalized ? `${ANTIGRAVITY_MODEL_PREFIX}${normalized}` : ANTIGRAVITY_SYNTHETIC_MODEL_ID;
 }
 
@@ -56,7 +64,7 @@ export function decodeAntigravityModelId(model: string): string | null {
     return model === ANTIGRAVITY_SYNTHETIC_MODEL_ID ? null : null;
   }
 
-  const rawModelId = model.slice(ANTIGRAVITY_MODEL_PREFIX.length).trim();
+  const rawModelId = normalizeAntigravityModelSelector(model.slice(ANTIGRAVITY_MODEL_PREFIX.length));
   return rawModelId || null;
 }
 

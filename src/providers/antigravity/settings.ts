@@ -6,6 +6,7 @@ import {
   getLegacyHostnameKey,
   migrateLegacyHostnameKeyedMap,
 } from '../../utils/env';
+import { normalizeAntigravityModelSelector } from './models';
 
 export interface AntigravityDiscoveredModel {
   description?: string | null;
@@ -65,13 +66,13 @@ export function normalizeAntigravityVisibleModels(value: unknown): string[] {
       continue;
     }
 
-    const trimmed = entry.trim();
-    if (!trimmed || seen.has(trimmed)) {
+    const normalizedEntry = normalizeAntigravityModelSelector(entry);
+    if (!normalizedEntry || seen.has(normalizedEntry)) {
       continue;
     }
 
-    seen.add(trimmed);
-    normalized.push(trimmed);
+    seen.add(normalizedEntry);
+    normalized.push(normalizedEntry);
   }
 
   return normalized;
@@ -103,7 +104,7 @@ export function normalizeAntigravityModelAliases(value: unknown): Record<string,
 
   const normalized: Record<string, string> = {};
   for (const [rawId, alias] of Object.entries(value as Record<string, unknown>)) {
-    const normalizedRawId = rawId.trim();
+    const normalizedRawId = normalizeAntigravityModelSelector(rawId);
     const normalizedAlias = typeof alias === 'string' ? alias.trim() : '';
     if (!normalizedRawId || !normalizedAlias) {
       continue;
@@ -126,8 +127,12 @@ function normalizeAntigravityDiscoveredModels(value: unknown): AntigravityDiscov
     }
 
     const record = entry as Record<string, unknown>;
-    const rawId = typeof record.rawId === 'string' ? record.rawId.trim() : '';
-    const label = typeof record.label === 'string' ? record.label.trim() : rawId;
+    const rawId = typeof record.rawId === 'string'
+      ? normalizeAntigravityModelSelector(record.rawId)
+      : '';
+    const label = typeof record.label === 'string'
+      ? normalizeAntigravityModelSelector(record.label) || rawId
+      : rawId;
     if (!rawId || seen.has(rawId)) {
       continue;
     }

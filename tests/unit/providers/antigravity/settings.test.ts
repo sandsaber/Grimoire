@@ -42,4 +42,40 @@ describe('Antigravity provider settings', () => {
       'Claude Sonnet 4.6 (Thinking)': 'Sonnet Thinking',
     });
   });
+
+  it('repairs tab-separated model values persisted by older discovery code', () => {
+    const root: Record<string, unknown> = {};
+    updateAntigravityProviderSettings(root, {
+      discoveredModels: [
+        {
+          label: 'gemini-3.6-flash-high\tGemini 3.6 Flash (High)',
+          rawId: 'gemini-3.6-flash-high\tGemini 3.6 Flash (High)',
+        },
+        {
+          label: 'Gemini 3.6 Flash (High)',
+          rawId: 'Gemini 3.6 Flash (High)',
+        },
+      ],
+      modelAliases: {
+        'gemini-3.6-flash-high\tGemini 3.6 Flash (High)': 'Flash High',
+      },
+      visibleModels: [
+        'gemini-3.6-flash-high\tGemini 3.6 Flash (High)',
+        'Gemini 3.6 Flash (High)',
+      ],
+    });
+
+    expect(getAntigravityProviderSettings(root)).toEqual(expect.objectContaining({
+      discoveredModels: [
+        {
+          label: 'Gemini 3.6 Flash (High)',
+          rawId: 'Gemini 3.6 Flash (High)',
+        },
+      ],
+      modelAliases: {
+        'Gemini 3.6 Flash (High)': 'Flash High',
+      },
+      visibleModels: ['Gemini 3.6 Flash (High)'],
+    }));
+  });
 });

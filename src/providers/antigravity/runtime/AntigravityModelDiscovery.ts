@@ -5,7 +5,10 @@ import path from 'node:path';
 
 import type GrimoirePlugin from '../../../main';
 import { getVaultPath } from '../../../utils/path';
-import { ANTIGRAVITY_FALLBACK_DISCOVERED_MODELS } from '../models';
+import {
+  ANTIGRAVITY_FALLBACK_DISCOVERED_MODELS,
+  normalizeAntigravityModelSelector,
+} from '../models';
 import type { AntigravityDiscoveredModel } from '../settings';
 import { buildAntigravityProcessLaunch } from './AntigravityProcessLaunch';
 import { buildAntigravityRuntimeEnv } from './AntigravityRuntimeEnvironment';
@@ -65,7 +68,7 @@ export function parseAntigravityModels(output: string): AntigravityDiscoveredMod
   const models: AntigravityDiscoveredModel[] = [];
   const seen = new Set<string>();
   for (const line of output.split(/\r?\n/)) {
-    const rawId = line.trim();
+    const rawId = normalizeAntigravityModelSelector(line);
     if (!rawId || seen.has(rawId)) {
       continue;
     }

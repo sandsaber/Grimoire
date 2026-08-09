@@ -2,6 +2,7 @@ import { t } from '../../../i18n/i18n';
 
 export const INPUT_WRAPPER_MIN_HEIGHT = 106;
 export const INPUT_WRAPPER_MAX_HEIGHT_RATIO = 0.7;
+const INPUT_WRAPPER_HEIGHT_PROPERTY = '--grimoire-input-wrapper-height';
 
 export interface InputResizeHandleOptions {
   inputWrapper: HTMLElement;
@@ -20,6 +21,7 @@ export function createInputResizeHandle({
   let isDragging = false;
   let startY = 0;
   let startHeight = 0;
+  let minimumHeight = INPUT_WRAPPER_MIN_HEIGHT;
 
   const clearDragState = () => {
     isDragging = false;
@@ -30,15 +32,15 @@ export function createInputResizeHandle({
     if (!isDragging) return;
 
     const maxHeight = Math.max(
-      INPUT_WRAPPER_MIN_HEIGHT,
+      minimumHeight,
       viewport.clientHeight * INPUT_WRAPPER_MAX_HEIGHT_RATIO,
     );
     const nextHeight = Math.max(
-      INPUT_WRAPPER_MIN_HEIGHT,
+      minimumHeight,
       Math.min(maxHeight, startHeight + startY - event.clientY),
     );
 
-    inputWrapper.style.setProperty('--grimoire-input-wrapper-height', `${nextHeight}px`);
+    inputWrapper.style.setProperty(INPUT_WRAPPER_HEIGHT_PROPERTY, `${nextHeight}px`);
   };
 
   const onMouseUp = () => {
@@ -52,6 +54,7 @@ export function createInputResizeHandle({
     isDragging = true;
     startY = event.clientY;
     startHeight = inputWrapper.offsetHeight;
+    minimumHeight = measureInputWrapperMinimumHeight(inputWrapper);
     doc.body?.classList.add('grimoire-dragging-ns');
     doc.addEventListener('mousemove', onMouseMove);
     doc.addEventListener('mouseup', onMouseUp);
@@ -66,4 +69,25 @@ export function createInputResizeHandle({
     clearDragState();
     handle.remove();
   };
+}
+
+function measureInputWrapperMinimumHeight(inputWrapper: HTMLElement): number {
+  const explicitHeight = inputWrapper.style.getPropertyValue(INPUT_WRAPPER_HEIGHT_PROPERTY);
+  const explicitHeightPriority = inputWrapper.style.getPropertyPriority(INPUT_WRAPPER_HEIGHT_PROPERTY);
+  inputWrapper.style.removeProperty(INPUT_WRAPPER_HEIGHT_PROPERTY);
+
+  const computedMinHeight = Number.parseFloat(
+    inputWrapper.ownerDocument.defaultView?.getComputedStyle(inputWrapper).minHeight ?? '',
+  );
+  const minimumHeight = Math.max(
+    INPUT_WRAPPER_MIN_HEIGHT,
+    Number.isFinite(computedMinHeight) ? computedMinHeight : 0,
+    inputWrapper.scrollHeight,
+  );
+
+  if (explicitHeight) {
+    inputWrapper.style.setProperty(INPUT_WRAPPER_HEIGHT_PROPERTY, explicitHeight, explicitHeightPriority);
+  }
+
+  return Math.ceil(minimumHeight);
 }
