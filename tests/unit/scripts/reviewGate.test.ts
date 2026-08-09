@@ -57,6 +57,12 @@ describe('Obsidian review gate', () => {
     }
   });
 
+  it('allows the community scanner to install with its npm version', () => {
+    const npmConfig = readFileSync('.npmrc', 'utf8');
+
+    expect(npmConfig).not.toContain('engine-strict=true');
+  });
+
   it('tracks the current Hono, Fast URI, and brace-expansion advisory floors', () => {
     const dependencyGate = readFileSync('scripts/check-review-dependencies.mjs', 'utf8');
 
