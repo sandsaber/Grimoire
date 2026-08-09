@@ -96,7 +96,7 @@ describe('ClaudePlanUsageStore', () => {
   it('keeps separate Claude weekly rate limit windows when present', () => {
     const store = new ClaudePlanUsageStore();
 
-    store.recordSdkMessage({
+    const opusMessage: Record<string, unknown> = {
       type: 'rate_limit_event',
       rate_limit_info: {
         status: 'allowed',
@@ -104,8 +104,9 @@ describe('ClaudePlanUsageStore', () => {
         resetsAt: 'Mon',
         utilization: 71,
       },
-    });
-    store.recordSdkMessage({
+    };
+    store.recordSdkMessage(opusMessage);
+    const sonnetMessage: Record<string, unknown> = {
       type: 'rate_limit_event',
       rate_limit_info: {
         status: 'allowed',
@@ -113,7 +114,8 @@ describe('ClaudePlanUsageStore', () => {
         resetsAt: 'Tue',
         utilization: 12,
       },
-    });
+    };
+    store.recordSdkMessage(sonnetMessage);
 
     expect(store.getCachedUsage({
       plugin: {} as any,
@@ -145,7 +147,7 @@ describe('ClaudePlanUsageStore', () => {
         },
       },
     });
-    store.recordSdkMessage({
+    const fiveHourMessage: Record<string, unknown> = {
       type: 'rate_limit_event',
       rate_limit_info: {
         status: 'allowed',
@@ -153,7 +155,8 @@ describe('ClaudePlanUsageStore', () => {
         resetsAt: '5:00 PM',
         utilization: 9,
       },
-    });
+    };
+    store.recordSdkMessage(fiveHourMessage);
 
     expect(store.getCachedUsage({
       plugin: {} as any,
@@ -172,14 +175,15 @@ describe('ClaudePlanUsageStore', () => {
   it('accepts Claude reset-only rate limit events when utilization is omitted', () => {
     const store = new ClaudePlanUsageStore();
 
-    const changed = store.recordSdkMessage({
-      type: 'rate_limit_event',
-      rate_limit_info: {
-        status: 'allowed',
-        rateLimitType: 'five_hour',
-        resetsAt: '5:50 PM',
-      },
-    });
+  const fiveHourMessage: Record<string, unknown> = {
+    type: 'rate_limit_event',
+    rate_limit_info: {
+      status: 'allowed',
+      rateLimitType: 'five_hour',
+      resetsAt: '5:50 PM',
+    },
+  };
+  const changed = store.recordSdkMessage(fiveHourMessage);
 
     expect(changed).toBe(true);
     expect(store.getCachedUsage({

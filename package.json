@@ -55,7 +55,6 @@
     "@types/node": "^25.9.5",
     "@typescript-eslint/eslint-plugin": "^8.66.0",
     "@typescript-eslint/parser": "^8.66.0",
-    "@typescript/native": "npm:typescript@^7.0.2",
     "esbuild": "^0.28.1",
     "eslint": "^10.8.0",
     "eslint-plugin-jest": "^29.16.0",
@@ -66,7 +65,7 @@
     "obsidian": "^1.13.1",
     "ts-jest": "^29.4.12",
     "tsx": "^4.23.5",
-    "typescript": "npm:@typescript/typescript6@^6.0.2"
+    "typescript": "^5.8.3"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.221",
