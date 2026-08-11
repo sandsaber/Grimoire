@@ -5,6 +5,7 @@ import type {
   ProviderUIOption,
 } from '../../../core/providers/types';
 import { ANTIGRAVITY_PROVIDER_ICON } from '../../../shared/icons';
+import { resolveAntigravityModelChoices } from '../AntigravityModelSelection';
 import {
   ANTIGRAVITY_DEFAULT_REASONING_LEVEL,
   ANTIGRAVITY_SYNTHETIC_MODEL_ID,
@@ -14,13 +15,6 @@ import {
 } from '../models';
 import { getAntigravityProviderSettings } from '../settings';
 
-const ANTIGRAVITY_MODELS: ProviderUIOption[] = [
-  {
-    description: 'Antigravity CLI default model',
-    label: 'Antigravity',
-    value: ANTIGRAVITY_SYNTHETIC_MODEL_ID,
-  },
-];
 const ANTIGRAVITY_REASONING_OPTIONS: ProviderReasoningOption[] = [
   { value: ANTIGRAVITY_DEFAULT_REASONING_LEVEL, label: 'Default' },
   { value: 'low', label: 'Low' },
@@ -39,56 +33,11 @@ const ANTIGRAVITY_PERMISSION_MODE_TOGGLE: ProviderPermissionModeToggleConfig = {
 
 function getAntigravityModelOptions(settings: Record<string, unknown>): ProviderUIOption[] {
   const antigravitySettings = getAntigravityProviderSettings(settings);
-  const discoveredModels = new Map(antigravitySettings.discoveredModels.map((model) => [
-    model.rawId,
-    model,
-  ]));
-  const visibleModels = antigravitySettings.discoveredModels.length > 0
-    ? antigravitySettings.discoveredModels.map((model) => model.rawId)
-    : antigravitySettings.visibleModels;
-
-  const optionRawIds = mergeAntigravityModelIds(visibleModels, parseAntigravityCustomModels(antigravitySettings.customModels));
-  const customModelIds = new Set(parseAntigravityCustomModels(antigravitySettings.customModels));
-  const options: ProviderUIOption[] = [];
-  for (const rawId of optionRawIds) {
-    const discovered = discoveredModels.get(rawId);
-    options.push({
-      description: discovered
-        ? discovered.description ?? 'Antigravity CLI model'
-        : customModelIds.has(rawId) ? 'Custom Antigravity CLI model' : 'Antigravity CLI model',
-      label: antigravitySettings.modelAliases[rawId] ?? discovered?.label ?? rawId,
-      value: encodeAntigravityModelId(rawId),
-    });
-  }
-
-  return options.length > 0 ? options : [...ANTIGRAVITY_MODELS];
-}
-
-function parseAntigravityCustomModels(value: string): string[] {
-  const normalized: string[] = [];
-  const seen = new Set<string>();
-  for (const line of value.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || seen.has(trimmed)) {
-      continue;
-    }
-    seen.add(trimmed);
-    normalized.push(trimmed);
-  }
-  return normalized;
-}
-
-function mergeAntigravityModelIds(primary: string[], extra: string[]): string[] {
-  const merged: string[] = [];
-  const seen = new Set<string>();
-  for (const rawId of [...primary, ...extra]) {
-    if (!rawId || seen.has(rawId)) {
-      continue;
-    }
-    seen.add(rawId);
-    merged.push(rawId);
-  }
-  return merged;
+  return resolveAntigravityModelChoices(antigravitySettings).map(choice => ({
+    description: choice.description,
+    label: choice.label,
+    value: choice.selectionId,
+  }));
 }
 
 export const antigravityChatUIConfig: ProviderChatUIConfig = {

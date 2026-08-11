@@ -5,6 +5,7 @@ import {
   NodeLocalShellProcessAdapter,
   type SpawnedLocalProcess,
   windowsCommandArguments,
+  windowsDirectProcessArguments,
 } from '@/app/execution/local/NodeLocalShellProcessAdapter';
 import type { LocalShellLaunchSpec } from '@/core/execution/local/LocalShellBackend';
 
@@ -39,6 +40,16 @@ describe('NodeLocalShellProcessAdapter', () => {
       arguments: ['/d', '/s', '/c', 'echo safe', 'unexpected'],
       terminationKind: 'windows-process-tree',
     })).toThrow('one raw command');
+  });
+
+  it('uses Windows direct-process quoting without changing cmd.exe raw-tail semantics', () => {
+    expect(windowsDirectProcessArguments([
+      '--model',
+      'Gemini 3.5 Flash (High)',
+      '--print',
+      'say "hello" & continue',
+      'C:\\trailing\\',
+    ])).toBe('--model "Gemini 3.5 Flash (High)" --print "say \\"hello\\" & continue" C:\\trailing\\');
   });
 
   it('launches an isolated process and returns ownership before readiness', () => {

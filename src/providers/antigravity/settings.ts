@@ -40,7 +40,7 @@ export const DEFAULT_ANTIGRAVITY_PROVIDER_SETTINGS: Readonly<PersistedAntigravit
   visibleModels: [],
 });
 
-function normalizeHostnameCliPaths(value: unknown): HostnameCliPaths {
+export function normalizeAntigravityHostnameCliPaths(value: unknown): HostnameCliPaths {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
   }
@@ -78,7 +78,7 @@ export function normalizeAntigravityVisibleModels(value: unknown): string[] {
   return normalized;
 }
 
-function normalizeAntigravityCustomModels(value: unknown): string {
+export function normalizeAntigravityCustomModels(value: unknown): string {
   if (typeof value !== 'string') {
     return '';
   }
@@ -114,7 +114,7 @@ export function normalizeAntigravityModelAliases(value: unknown): Record<string,
   return normalized;
 }
 
-function normalizeAntigravityDiscoveredModels(value: unknown): AntigravityDiscoveredModel[] {
+export function normalizeAntigravityDiscoveredModels(value: unknown): AntigravityDiscoveredModel[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -149,7 +149,7 @@ function normalizeAntigravityDiscoveredModels(value: unknown): AntigravityDiscov
 
 export function getAntigravityProviderSettings(settings: Record<string, unknown>): AntigravityProviderSettings {
   const config = getProviderConfig(settings, 'antigravity');
-  const normalizedCliPathsByHost = normalizeHostnameCliPaths(config.cliPathsByHost);
+  const normalizedCliPathsByHost = normalizeAntigravityHostnameCliPaths(config.cliPathsByHost);
   const cliPathsByHost = Object.keys(normalizedCliPathsByHost).length > 0
     ? migrateLegacyHostnameKeyedMap(
       normalizedCliPathsByHost,
@@ -191,7 +191,7 @@ export function updateAntigravityProviderSettings(
     updates.customModels ?? current.customModels,
   );
   const nextCliPathsByHost = 'cliPathsByHost' in updates
-    ? normalizeHostnameCliPaths(updates.cliPathsByHost)
+    ? normalizeAntigravityHostnameCliPaths(updates.cliPathsByHost)
     : { ...current.cliPathsByHost };
   let nextCliPath = 'cliPathsByHost' in updates
     ? (

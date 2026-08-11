@@ -1,7 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 
 import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
 
@@ -45,8 +43,18 @@ import { getVaultPath } from '../../../utils/path';
 import { ANTIGRAVITY_PROVIDER_CAPABILITIES } from '../capabilities';
 import { decodeAntigravityModelId } from '../models';
 import { getAntigravityProviderSettings } from '../settings';
+import { buildAntigravityPrintArgs } from './AntigravityPrintProtocol';
 import { buildAntigravityProcessLaunch } from './AntigravityProcessLaunch';
 import { buildAntigravityRuntimeEnv } from './AntigravityRuntimeEnvironment';
+import {
+  createAntigravityPrintLogPath,
+  recoverAntigravityPrintOutputFromTranscript,
+} from './AntigravityTranscriptRecovery';
+
+export {
+  type AntigravityPrintArgsSpec,
+  buildAntigravityPrintArgs,
+} from './AntigravityPrintProtocol';
 
 const OUTPUT_BUFFER_LIMIT = 64_000;
 const PRINT_TIMEOUT_MS = 5 * 60 * 1000;
@@ -58,13 +66,6 @@ interface AntigravityPrintSpec {
   permissionMode: string;
   prompt: string;
   runtimeEnv: NodeJS.ProcessEnv;
-}
-
-export interface AntigravityPrintArgsSpec {
-  logFilePath?: string;
-  model: string | null;
-  permissionMode: string;
-  prompt: string;
 }
 
 export class AntigravityChatRuntime implements ChatRuntime {
@@ -522,23 +523,6 @@ export class AntigravityChatRuntime implements ChatRuntime {
   }
 }
 
-export function buildAntigravityPrintArgs(spec: AntigravityPrintArgsSpec): string[] {
-  const args: string[] = [];
-  if (spec.permissionMode === 'full_access') {
-    args.push('--dangerously-skip-permissions');
-  } else {
-    args.push('--sandbox');
-  }
-  if (spec.logFilePath) {
-    args.push('--log-file', spec.logFilePath);
-  }
-  if (spec.model) {
-    args.push('--model', spec.model);
-  }
-  args.push('--print', spec.prompt);
-  return args;
-}
-
 function buildAntigravityPromptText(request: ChatTurnRequest): string {
   let prompt = request.text;
 
@@ -604,86 +588,6 @@ function formatAntigravityHistoryMessage(message: ChatMessage): string {
   }
 
   return `${role}: ${content}`;
-}
-
-function createAntigravityPrintLogPath(): string {
-  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return path.join(os.tmpdir(), `grimoire-antigravity-print-${suffix}.log`);
-}
-
-async function recoverAntigravityPrintOutputFromTranscript(
-  logFilePath: string,
-  runtimeEnv: NodeJS.ProcessEnv,
-): Promise<string> {
-  const logText = await fs.readFile(logFilePath, 'utf-8').catch(() => '');
-  if (!logText) {
-    return '';
-  }
-
-  const conversationId = extractAntigravityConversationId(logText);
-  if (!conversationId) {
-    return '';
-  }
-
-  const appDataDir = extractAntigravityAppDataDir(logText)
-    ?? getDefaultAntigravityAppDataDir(runtimeEnv);
-  if (!appDataDir) {
-    return '';
-  }
-
-  const transcriptPaths = [
-    path.join(appDataDir, 'brain', conversationId, '.system_generated', 'logs', 'transcript.jsonl'),
-    path.join(appDataDir, 'brain', conversationId, '.system_generated', 'logs', 'transcript_full.jsonl'),
-  ];
-  for (const transcriptPath of transcriptPaths) {
-    const transcriptText = await fs.readFile(transcriptPath, 'utf-8').catch(() => '');
-    const content = extractLastAntigravityModelContent(transcriptText);
-    if (content) {
-      return content;
-    }
-  }
-  return '';
-}
-
-function extractAntigravityConversationId(logText: string): string | null {
-  const match = logText.match(/\b(?:conversation=|Created conversation )([0-9a-f-]{36})\b/i);
-  return match?.[1] ?? null;
-}
-
-function extractAntigravityAppDataDir(logText: string): string | null {
-  const match = logText.match(/CLI app data directory:\s*(.+)$/mi);
-  return match?.[1]?.trim() || null;
-}
-
-function getDefaultAntigravityAppDataDir(runtimeEnv: NodeJS.ProcessEnv): string | null {
-  const home = runtimeEnv.USERPROFILE
-    ?? (runtimeEnv.HOMEDRIVE && runtimeEnv.HOMEPATH ? `${runtimeEnv.HOMEDRIVE}${runtimeEnv.HOMEPATH}` : undefined)
-    ?? runtimeEnv.HOME;
-  return home ? path.join(home, '.gemini', 'antigravity-cli') : null;
-}
-
-function extractLastAntigravityModelContent(transcriptText: string): string {
-  let lastContent = '';
-  for (const line of transcriptText.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      continue;
-    }
-    try {
-      const record = JSON.parse(trimmed) as Record<string, unknown>;
-      if (
-        record.source === 'MODEL'
-        && record.status === 'DONE'
-        && typeof record.content === 'string'
-        && record.content.trim()
-      ) {
-        lastContent = record.content;
-      }
-    } catch {
-      // Ignore malformed transcript lines from partial writes.
-    }
-  }
-  return lastContent;
 }
 
 function appendLimited(current: string, chunk: Buffer | string): string {

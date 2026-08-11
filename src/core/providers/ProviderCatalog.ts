@@ -6,6 +6,8 @@ import type {
   SecurityEnforcement,
 } from './ProviderModule';
 
+type CatalogProviderModule = ProviderModule<object>;
+
 const CAPABILITY_SUPPORT_VALUES = new Set<CapabilitySupport>([
   'native',
   'grimoire',
@@ -63,10 +65,10 @@ const SECURITY_SURFACES = [
 ] as const;
 
 export class ProviderCatalog {
-  private readonly modules: readonly ProviderModule[];
-  private readonly modulesById: ReadonlyMap<ProviderId, ProviderModule>;
+  private readonly modules: readonly CatalogProviderModule[];
+  private readonly modulesById: ReadonlyMap<ProviderId, CatalogProviderModule>;
 
-  constructor(modules: readonly ProviderModule[]) {
+  constructor(modules: readonly CatalogProviderModule[]) {
     const validated = validateModules(modules).map(snapshotModule);
     this.modules = Object.freeze([...validated].sort(
       (left, right) => left.manifest.order - right.manifest.order,
@@ -76,15 +78,15 @@ export class ProviderCatalog {
     );
   }
 
-  list(): readonly ProviderModule[] {
+  list(): readonly CatalogProviderModule[] {
     return this.modules;
   }
 
-  get(providerId: ProviderId): ProviderModule | null {
+  get(providerId: ProviderId): CatalogProviderModule | null {
     return this.modulesById.get(providerId) ?? null;
   }
 
-  require(providerId: ProviderId): ProviderModule {
+  require(providerId: ProviderId): CatalogProviderModule {
     const module = this.get(providerId);
     if (!module) {
       throw new Error(`Provider "${providerId}" is not present in the catalog.`);
@@ -93,7 +95,7 @@ export class ProviderCatalog {
   }
 }
 
-function validateModules(modules: readonly ProviderModule[]): ProviderModule[] {
+function validateModules(modules: readonly CatalogProviderModule[]): CatalogProviderModule[] {
   const providerIds = new Set<ProviderId>();
   const backendIds = new Set<string>();
   const orders = new Set<number>();
@@ -268,7 +270,7 @@ function validateCapabilities(
   }
 }
 
-function snapshotModule(module: ProviderModule): ProviderModule {
+function snapshotModule(module: CatalogProviderModule): CatalogProviderModule {
   const association = module.execution.descriptor.association;
   const descriptor = Object.freeze({
     backendId: module.execution.descriptor.backendId,
@@ -317,7 +319,7 @@ function snapshotModule(module: ProviderModule): ProviderModule {
 }
 
 function requireContribution<
-  TModule extends ProviderModule,
+  TModule extends CatalogProviderModule,
   TKey extends keyof TModule,
 >(module: TModule, key: TKey): NonNullable<TModule[TKey]> {
   const value = module[key];

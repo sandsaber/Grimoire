@@ -91,7 +91,7 @@ jobs:
         run: npm ci
 
       - name: Verify execution contracts
-        run: npm run test -- --selectProjects unit --runInBand tests/unit/core/execution/local/LocalShellBackend.test.ts tests/unit/app/execution/local/NodeLocalShellProcessAdapter.test.ts
+        run: npm run test -- --selectProjects unit --runInBand tests/unit/core/execution/local/LocalShellBackend.test.ts tests/unit/app/execution/local/NodeLocalShellProcessAdapter.test.ts tests/unit/providers/antigravity/AntigravityExecutionBackend.test.ts tests/unit/providers/antigravity/AntigravityExecutionConformance.test.ts tests/unit/providers/antigravity/AntigravityExecutionLifecycle.test.ts tests/unit/providers/antigravity/AntigravityPrintProcessRunner.test.ts tests/unit/app/execution/antigravity/NodeAntigravityProcessTransport.test.ts
 
       - name: Verify host process ownership
-        run: npm run test -- --selectProjects integration --runInBand tests/integration/app/execution/local/LocalShellProcessOwnership.integration.test.ts
+        run: npm run test -- --selectProjects integration --runInBand tests/integration/app/execution/local/LocalShellProcessOwnership.integration.test.ts tests/integration/app/execution/antigravity/NodeAntigravityProcessTransport.integration.test.ts
