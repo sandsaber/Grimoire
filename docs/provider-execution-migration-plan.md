@@ -1,6 +1,9 @@
 # Full Execution Architecture Migration Plan
 
-Status: approved implementation plan; code migration has not started.
+Status: approved implementation plan; implementation is in progress through Phase 4D.
+
+Checkpoint status and verification evidence are recorded in
+[`provider-execution-migration-progress.md`](provider-execution-migration-progress.md).
 
 This document is the operational source of truth for replacing Grimoire's current provider, chat-execution, tab, and subagent lifecycle architecture in this branch. The architectural reasoning and lifecycle semantics are defined in
 [`provider-architecture-research.md`](provider-architecture-research.md).

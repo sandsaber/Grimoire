@@ -103,6 +103,7 @@ function findCoreBoundaryViolations(files: SourceFile[]): string[] {
     const normalizedTarget = target === null ? null : withoutTypeScriptExtension(target);
     const normalizedLegacyContext = withoutTypeScriptExtension(legacyContextPath);
     const isCoreFile = isAtOrBelow(file.path, join(sourceRoot, 'core'));
+    const isProviderBackend = isProviderBackendFile(file.path);
     const forbiddenInternalTarget = isCoreFile && normalizedTarget !== null && (
       normalizedTarget === join(sourceRoot, 'main')
       || isAtOrBelow(normalizedTarget, join(sourceRoot, 'features'))
@@ -118,8 +119,19 @@ function findCoreBoundaryViolations(files: SourceFile[]): string[] {
         (isCoreFile && !legacyCoreAllowlist.has(file.path))
         || isProviderBackendFile(file.path)
       );
+    const forbiddenProviderShellDependency = isProviderBackend && (
+      reference.specifier === 'obsidian'
+      || normalizedTarget === join(sourceRoot, 'main')
+      || (normalizedTarget !== null && (
+        isAtOrBelow(normalizedTarget, join(sourceRoot, 'features'))
+        || isAtOrBelow(normalizedTarget, join(sourceRoot, 'shared'))
+      ))
+    );
 
-    return forbiddenInternalTarget || forbiddenTargetDependency || forbiddenLegacyDependency
+    return forbiddenInternalTarget
+      || forbiddenTargetDependency
+      || forbiddenLegacyDependency
+      || forbiddenProviderShellDependency
       ? [`${relative(sourceRoot, file.path)} -> ${reference.specifier}`]
       : [];
   }));
@@ -199,6 +211,10 @@ describe('provider execution architecture boundaries', () => {
       {
         path: join(sourceRoot, 'providers/fake/execution/FakeBackend.ts'),
         source: "import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';",
+      },
+      {
+        path: join(sourceRoot, 'providers/fake/execution/FakeBackend.ts'),
+        source: "import { Notice } from 'obsidian';",
       },
       {
         path: join(sourceRoot, 'core/example.ts'),
