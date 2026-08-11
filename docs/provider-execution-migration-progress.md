@@ -25,7 +25,7 @@ this file records what has actually landed and what remains open.
 | Phase 4C — persistent Claude SDK topology | Complete | `9dda0ebc` |
 | Phase 4D — managed ACP/OpenCode topology | Complete | `cb631f53` |
 | Semantic freeze review | Complete | `892eec78` |
-| Phase 5 — remaining provider modules/backends | In progress | MiMoCode/Kimi Code managed-ACP family ready for checkpoint |
+| Phase 5 — remaining provider modules/backends | In progress | MiMoCode/Kimi Code `6c4700cf`; Grok ready for checkpoint |
 | Phase 6 — durable agents and work graphs | Pending | — |
 | Phase 7 — application runtime and auxiliary work | Pending | — |
 | Phase 8 — catalog and provider-neutral feature ports | Pending | — |
@@ -152,6 +152,48 @@ classification. It also verified stable identity, transient-session preservation
 result/cancellation arbitration, quarantined process ownership, native history, honest agent
 capabilities, and the three-platform CI matrix.
 
+## Phase 5 Grok implementation
+
+- Added a Grok-owned managed-ACP execution backend and provider module without importing
+  `ChatRuntime` or inheriting another provider lifecycle. The adapter retains the frozen execution
+  contract while keeping provider extensions local to Grok.
+- Extended the protocol-generic managed ACP client only with optional direct-question and opaque
+  extension notification/request hooks. The shared layer does not interpret billing, mirrored
+  notifications, or native agents.
+- Added standard/extension notification deduplication before lifecycle processing. Thinking, tool,
+  usage, and agent activity prevent unsafe redispatch but do not satisfy a required assistant
+  result; a completed prompt without final assistant text terminates as `missing-required-result`.
+- Added durable direct-question interactions with the same bounded preparation, idempotent
+  resolution, cancellation, and fail-closed behavior as approvals.
+- Added provider-owned usage projection and the `x.ai/billing` request bridge. Usage failures stay
+  outside execution ownership, while provider-native JSONL remains the authoritative history and
+  fallback source.
+- Added provider-native subagent adoption from stable spawn IDs, polling results, and asynchronous
+  completion notifications. Mirrored or repeated evidence is applied once; child results receive a
+  separate persisted `ResultRef`, status, and native key before the parent terminal is published.
+- Added Grok-owned dynamic mode/model/effort ordering, filesystem containment and approved writes,
+  normalized settings, configured-model and native-history ports, sanitized traces, registry
+  identity coverage, and the frozen common lifecycle conformance suite.
+- Added all Grok execution suites to the macOS, Linux, and Windows CI execution-contract matrix.
+  Managed process ownership continues to use the already verified cross-platform launcher: POSIX
+  process groups on macOS/Linux and Windows Job Objects.
+- Production composition remains unchanged and continues to use the legacy runtime path until
+  Phase 9.
+
+The independent Grok architecture and lifecycle review is approved with no material blockers. Its
+findings added four permanent constraints:
+
+1. Agent evidence admitted during parent result commit or reconciliation is drained before the
+   parent terminal.
+2. Admission closes synchronously before unload drains already-admitted bounded work, preventing an
+   unbounded provider stream from blocking shutdown.
+3. Closing admission does not discard child results that were already queued behind another commit;
+   reentrant post-fence evidence is rejected.
+4. Native terminal status and result extraction are deduplicated separately, so an asynchronous
+   completion without output can be enriched once by a later polling result.
+
+Qwen and Gemini work has not started.
+
 ## Verification evidence
 
 - Phase 4C checkpoint gate: 432 unit suites / 7,218 tests; 7 integration suites / 222 tests;
@@ -178,11 +220,18 @@ capabilities, and the three-platform CI matrix.
 - Release artifacts remain byte-identical across repository root, `dist/grimoire`, and the configured
   test vault after the checkpoint build: `main.js` `4d9c3680…`, `styles.css` `c079364c…`, and
   `manifest.json` `5058df46…`.
+- Final Grok focused gate: 8 execution/architecture suites / 68 tests pass; all existing Grok unit
+  coverage passes 36 suites / 298 tests. The full checkpoint gate passes 461 unit suites / 7,455
+  tests and 7 integration suites / 222 tests, plus typecheck, full lint, release build, and
+  `git diff --check`. Independent review approved the slice with no remaining material blocker.
+- Release artifacts remain byte-identical across repository root, `dist/grimoire`, and the configured
+  test vault after the Grok checkpoint build: `main.js` `4d9c3680…`, `styles.css` `c079364c…`, and
+  `manifest.json` `5058df46…`.
 
 ## Next steps
 
-1. Close independent review and checkpoint the MiMoCode/Kimi Code managed-ACP family slice.
-2. Continue Phase 5 with Grok, Qwen, and Gemini while preserving provider-specific ACP semantics.
+1. Close independent review and checkpoint the Grok slice.
+2. Continue Phase 5 with Qwen and Gemini while preserving provider-specific ACP semantics.
 3. Complete the immutable nine-provider catalog inventory and run the full Phase 5 exit gate.
 4. Implement durable agents/work graphs after every current provider module/backend is constructible
    through the new catalog.

@@ -1,5 +1,7 @@
 import type { Unsubscribe } from '@/core/execution/ExecutionContracts';
 import type {
+  AcpAskUserQuestionRequest,
+  AcpAskUserQuestionResponse,
   AcpLoadSessionRequest,
   AcpLoadSessionResponse,
   AcpNewSessionRequest,
@@ -24,6 +26,11 @@ export interface ManagedAcpClient {
   ): Promise<AcpSetSessionConfigOptionResponse>;
   cancel(sessionId: string): void;
   onSessionNotification(listener: (notification: AcpSessionNotification) => void): Unsubscribe;
+  onExtensionNotification?(
+    methods: readonly string[],
+    listener: (method: string, params: unknown) => void,
+  ): Unsubscribe;
+  requestExtension?(method: string, params: unknown): Promise<unknown>;
   onConnectionLost(listener: (error?: Error) => void): Unsubscribe;
   close(): Promise<'confirmed' | 'unconfirmed'>;
 }
@@ -34,6 +41,9 @@ export interface ManagedAcpClientFactoryInput {
   readonly requestPermission: (
     request: AcpRequestPermissionRequest,
   ) => Promise<AcpRequestPermissionResponse>;
+  readonly askUserQuestion?: (
+    request: AcpAskUserQuestionRequest,
+  ) => Promise<AcpAskUserQuestionResponse>;
 }
 
 export interface ManagedAcpClientFactory {

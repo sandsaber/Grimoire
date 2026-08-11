@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "providerId": "grok",
+  "backendId": "provider-grok",
+  "topology": "managed-subprocess",
+  "concurrency": "serial-runs",
+  "sessionIdentity": "acp-session",
+  "runIdentity": "prompt-message-id",
+  "historyOwnership": "provider-native",
+  "resultExpectation": "required",
+  "agentObservation": "aggregate",
+  "agentEvidence": {
+    "definitionInventory": "provider-files",
+    "spawnOrigins": ["provider-native"],
+    "stableIdentity": true,
+    "observation": "aggregate",
+    "resultExtraction": "native",
+    "cancellation": "unsupported",
+    "statusQuery": "unsupported",
+    "reattachment": "unsupported",
+    "source": "parent-collaboration-events",
+    "eventCase": "nativeAgentLifecycle",
+    "cancellationCase": null,
+    "statusQueryCase": null,
+    "reattachmentCase": null
+  },
+  "identity": {
+    "backendGeneration": 1,
+    "executionSessionId": "es-dddddddddddddddddddddddddddddddd",
+    "sessionInstanceId": "si-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "runId": "run-11111111111111111111111111111111",
+    "nativeSessionId": "native-session",
+    "nativeRunId": "message-1"
+  },
+  "cases": {
+    "initializeNewPrompt": [
+      "client/launch",
+      "initialize",
+      "session/new:native-session",
+      "session/prompt:message-1",
+      "result:projection"
+    ],
+    "resumeLoad": [
+      "initialize",
+      "session/load:saved-session",
+      "session/prompt:message-1"
+    ],
+    "missingSessionReplacement": [
+      "session/load:deleted-session",
+      "session/new:native-session"
+    ],
+    "transientLoadFailure": [
+      "session/load:saved-session",
+      "terminal:invalidated:pre-dispatch-rejected"
+    ],
+    "retryBeforeOutput": [
+      "client/launch",
+      "session/prompt:message-1",
+      "client/close",
+      "client/launch",
+      "session/load:native-session",
+      "session/prompt:message-1"
+    ],
+    "restartConfiguration": [
+      "client/close",
+      "client/launch",
+      "session/load:native-session",
+      "session/prompt:message-2"
+    ],
+    "dynamicConfiguration": [
+      "set-config:mode:plan",
+      "set-config:model:provider/model",
+      "set-config:variant:high"
+    ],
+    "approval": [
+      "interaction-opened:approval",
+      "interaction-resolved:allow-once"
+    ],
+    "question": [
+      "interaction-opened:question",
+      "interaction-resolved:answer"
+    ],
+    "notificationDeduplication": [
+      "standard:agent_message_chunk",
+      "extension:agent_message_chunk",
+      "result:one-copy"
+    ],
+    "usageBilling": [
+      "usage:notification",
+      "billing:x.ai/billing",
+      "usage:turn-projection"
+    ],
+    "nativeAgentLifecycle": [
+      "native-agent-observed:agent-1",
+      "native-agent-status:agent-1:running",
+      "native-agent-activity:agent-1:wait-observed",
+      "native-agent-result:agent-1:projection",
+      "native-agent-status:agent-1:completed"
+    ],
+    "filesystemContainment": [
+      "write:contained:approved",
+      "read:contained",
+      "escape:rejected-before-approval"
+    ],
+    "databaseHydration": [
+      "history/load:provider-native"
+    ],
+    "isolatedAuxiliary": [
+      "client/launch:cold",
+      "session/new:aux-session",
+      "session/prompt",
+      "client/close"
+    ]
+  },
+  "eventCases": {
+    "success": [
+      "run-started",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ],
+    "recoveryAfterOutput": [
+      "run-started",
+      "connection-lost",
+      "recovery-started",
+      "result:provider-native",
+      "terminal:succeeded:completed"
+    ],
+    "missingFinalText": [
+      "run-started",
+      "thinking-activity",
+      "tool-activity:tool-1",
+      "terminal:failed:missing-required-result"
+    ],
+    "nativeAgentLifecycle": [
+      "native-agent-observed:agent-1",
+      "native-agent-status:agent-1:running",
+      "native-agent-activity:agent-1:wait-observed",
+      "native-agent-result:agent-1:projection",
+      "native-agent-status:agent-1:completed"
+    ]
+  }
+}

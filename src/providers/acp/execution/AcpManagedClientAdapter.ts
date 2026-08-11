@@ -52,6 +52,7 @@ export class AcpManagedClientAdapterFactory implements ManagedAcpClientFactory {
         clientInfo: this.options.clientInfo,
         delegate: {
           ...this.options.delegate,
+          ...(input.askUserQuestion ? { askUserQuestion: input.askUserQuestion } : {}),
           requestPermission: input.requestPermission,
         },
         transport,
@@ -104,6 +105,21 @@ class AcpManagedClientAdapter implements ManagedAcpClient {
 
   onSessionNotification(listener: Parameters<ManagedAcpClient['onSessionNotification']>[0]) {
     return this.connection.onSessionNotification(listener);
+  }
+
+  onExtensionNotification(
+    methods: readonly string[],
+    listener: (method: string, params: unknown) => void,
+  ) {
+    const unsubscribe = methods.map(method => this.transport.onNotification(
+      method,
+      params => listener(method, params),
+    ));
+    return () => unsubscribe.splice(0).forEach(remove => remove());
+  }
+
+  requestExtension(method: string, params: unknown): Promise<unknown> {
+    return this.transport.request(method, params);
   }
 
   onConnectionLost(listener: Parameters<ManagedAcpClient['onConnectionLost']>[0]) {

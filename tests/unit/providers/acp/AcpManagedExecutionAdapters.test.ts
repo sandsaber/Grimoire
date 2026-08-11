@@ -86,6 +86,55 @@ describe('managed ACP execution adapters', () => {
     await client.close();
   });
 
+  it('routes provider extension requests, notifications, and direct questions without core coupling', async () => {
+    const process = new WireProcess();
+    const questions: unknown[] = [];
+    const factory = new AcpManagedClientAdapterFactory({
+      clientInfo: { name: 'grimoire-tests', version: '1.0.0' },
+      processLauncher: { launch: async () => process },
+    });
+    const client = await factory.create({
+      startupRef: 'opaque-startup',
+      signal: new AbortController().signal,
+      requestPermission: async () => ({ outcome: { outcome: 'cancelled' } }),
+      askUserQuestion: async request => {
+        questions.push(request);
+        return { outcome: 'skip_interview' };
+      },
+    });
+    const notifications: Array<{ method: string; params: unknown }> = [];
+    const unsubscribe = client.onExtensionNotification?.(
+      ['x.ai/session/update'],
+      (method, params) => notifications.push({ method, params }),
+    );
+    process.notification('x.ai/session/update', { sessionId: 'session-1', update: {} });
+    process.request(98, '_x.ai/ask_user_question', {
+      sessionId: 'session-1',
+      questions: [],
+    });
+
+    await expect(process.nextRequest()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 98,
+      result: { outcome: 'skip_interview' },
+    });
+    expect(questions).toEqual([{ sessionId: 'session-1', questions: [] }]);
+    expect(notifications).toEqual([{
+      method: 'x.ai/session/update',
+      params: { sessionId: 'session-1', update: {} },
+    }]);
+
+    const billing = client.requestExtension?.('x.ai/billing', {});
+    const billingRequest = await process.nextRequest() as { id: number };
+    expect(billingRequest).toEqual(expect.objectContaining({ method: 'x.ai/billing' }));
+    process.respond(billingRequest.id, { plan: 'developer' });
+    await expect(billing).resolves.toEqual({ plan: 'developer' });
+    unsubscribe?.();
+    process.notification('x.ai/session/update', { sessionId: 'session-2', update: {} });
+    expect(notifications).toHaveLength(1);
+    await client.close();
+  });
+
   it('runs an auxiliary operation in a cold session and closes its owned client', async () => {
     const client = new AuxiliaryClient();
     const scheduler = new TestScheduler();
@@ -209,6 +258,9 @@ class WireProcess implements AcpManagedOwnedProcess {
   }
   request(id: number, method: string, params: unknown): void {
     this.input.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+  }
+  notification(method: string, params: unknown): void {
+    this.input.write(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`);
   }
 }
 
