@@ -196,13 +196,14 @@ export class VersionedRepository<TPayload> {
     expectedRaw: string | null,
   ): Promise<VersionedRecord<TPayload>> {
     requireRecordId(recordId);
-    this.validatePayload?.(payload);
+    const canonicalPayload = this.schema.decode(payload);
+    this.validatePayload?.(canonicalPayload);
     const envelope: VersionedRecord<TPayload> = {
       schemaVersion: this.schema.currentVersion,
       recordId,
       revision,
       updatedAt: this.now(),
-      payload,
+      payload: canonicalPayload,
     };
     assertJsonValue(envelope, '$', new Set<object>());
     const serialized = JSON.stringify(envelope);

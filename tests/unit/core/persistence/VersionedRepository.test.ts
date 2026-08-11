@@ -261,4 +261,26 @@ describe('VersionedRepository', () => {
       stdout: 'not allowed',
     }, null)).rejects.toBeInstanceOf(ControlRecordPayloadError);
   });
+
+  it('validates and canonicalizes the schema before durable replacement', async () => {
+    const storage = new TestDurableStorage();
+    const repository = new VersionedRepository({
+      storage,
+      namespace: 'records',
+      schema,
+    });
+
+    await expect(repository.save('invalid', {
+      count: 'not-a-number',
+    } as unknown as ExampleRecord, null)).rejects.toThrow('count is required');
+    expect(storage.get(getVersionedRecordPath('records', 'invalid'))).toBeNull();
+    await expect(repository.save('canonical', {
+      count: 1,
+      ignored: 'not in decoded schema',
+    } as ExampleRecord, null)).resolves.toMatchObject({
+      payload: { count: 1 },
+    });
+    expect(storage.get(getVersionedRecordPath('records', 'canonical')))
+      .not.toContain('ignored');
+  });
 });

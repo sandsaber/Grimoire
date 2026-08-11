@@ -19,6 +19,7 @@ The final system will have:
 - one validated provider catalog instead of separately maintained registries and defaults;
 - versioned, privacy-bounded control persistence and serialized conversation mutations;
 - provider-native protocols, history, session behavior, files, and security semantics preserved behind adapters;
+- equivalent lifecycle, cancellation, cleanup, and recovery guarantees on macOS, Linux, and Windows;
 - no production `ChatRuntime`, tab-owned execution, UI-owned subagent lifecycle, or direct process launch from features.
 
 This is not a public provider SDK. Internal TypeScript contracts may change while the topology proofs are being completed. Persisted vault schemas and provider-native data receive the compatibility guarantees.
@@ -58,6 +59,7 @@ There is no planned provider-by-provider runtime flag and no planned old-runtime
 - cold blank tabs and lazy first conversation creation;
 - image and persisted-content cleanup rules;
 - current local-shell product enablement policy during the architecture migration.
+- supported desktop execution on macOS, Linux, and Windows; platform-specific adapters may differ, but ownership and terminal semantics may not.
 
 ### Intentionally changed
 
@@ -498,6 +500,7 @@ Exit gate:
 - projection reduction is idempotent;
 - later evidence augments but never rewrites an indeterminate terminal;
 - local shell never requires a provider ID and cannot leave an uncontrolled child process in tests;
+- macOS and Linux process groups and Windows process trees pass the same ownership, cancellation, unload, and terminal conformance cases;
 - core execution has no provider, feature, Obsidian, plugin, or DOM imports.
 
 Checkpoint: `feat: establish execution lifecycle kernel`

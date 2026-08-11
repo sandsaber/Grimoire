@@ -30,6 +30,8 @@ and a durable `WorkGraph` for dependencies, parent-child relationships, result p
 
 The platform should normalize identity, ownership, state transitions, cancellation, recovery, result delivery, and UI-safe projections. It must not normalize provider protocols, transcript formats, process topology, security guarantees, or native features that are genuinely different.
 
+Lifecycle guarantees are platform-independent. macOS and Linux may use POSIX process groups while Windows uses process-tree supervision, but every supported desktop platform must retain ownership through startup, cancellation, root-process exit, and application unload, and must classify unconfirmed cleanup as indeterminate.
+
 This decision is driven primarily by lifecycle correctness and feature cost, not API aesthetics. Correct background agents, restart recovery, concurrent work, structured results, targeted cancellation, provider settings transitions, and reusable auxiliary runs all need ownership that outlives a tab and is narrower than the whole plugin.
 
 ## Why the current center will not scale

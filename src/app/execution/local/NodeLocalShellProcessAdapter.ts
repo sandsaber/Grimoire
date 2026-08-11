@@ -1,0 +1,501 @@
+import {
+  type ChildProcess,
+  type ChildProcessByStdio,
+  spawn,
+} from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { PassThrough, type Readable } from 'node:stream';
+import { clearTimeout as clearNodeTimeout, setTimeout as setNodeTimeout } from 'node:timers';
+
+import type {
+  LocalShellChildProcess,
+  LocalShellExit,
+  LocalShellLaunchSpec,
+  LocalShellPlatform,
+  LocalShellProcessLauncher,
+  LocalShellProcessSupervisor,
+  LocalShellTerminationTarget,
+} from '@/core/execution/local/LocalShellBackend';
+
+export interface SpawnedLocalProcess {
+  readonly termination: LocalShellTerminationTarget;
+  readonly stdout: AsyncIterable<Uint8Array>;
+  readonly stderr: AsyncIterable<Uint8Array>;
+  readonly started: Promise<void>;
+  readonly exited: Promise<LocalShellExit>;
+}
+
+export interface LocalProcessSystem {
+  spawn(spec: LocalShellLaunchSpec): SpawnedLocalProcess;
+  processGroupExists(pid: number): boolean;
+  signalProcessGroup(pid: number, signal: 'SIGTERM' | 'SIGKILL'): void;
+  windowsJobTerminated(ownershipId: string): boolean;
+  terminateWindowsJob(ownershipId: string, forced: boolean): Promise<boolean>;
+}
+
+export class NodeLocalShellProcessAdapter implements
+LocalShellProcessLauncher,
+LocalShellProcessSupervisor {
+  constructor(private readonly system: LocalProcessSystem = new NodeLocalProcessSystem()) {}
+
+  launch(spec: LocalShellLaunchSpec): LocalShellChildProcess {
+    const child = this.system.spawn(spec);
+    try {
+      requireTerminationTarget(child.termination);
+    } catch (error) {
+      void child.started.catch(() => undefined);
+      throw error;
+    }
+    return child;
+  }
+
+  async confirmTerminated(target: LocalShellTerminationTarget): Promise<boolean> {
+    requireTerminationTarget(target);
+    return target.kind === 'windows-process-tree'
+      ? this.system.windowsJobTerminated(target.ownershipId)
+      : !this.system.processGroupExists(target.pid);
+  }
+
+  async terminate(
+    target: LocalShellTerminationTarget,
+    mode: 'graceful' | 'forced',
+  ): Promise<'confirmed' | 'unconfirmed'> {
+    requireTerminationTarget(target);
+    if (target.kind === 'windows-process-tree') {
+      return await this.system.terminateWindowsJob(
+        target.ownershipId,
+        mode === 'forced',
+      ) ? 'confirmed' : 'unconfirmed';
+    }
+    if (!this.system.processGroupExists(target.pid)) {
+      return 'confirmed';
+    }
+    try {
+      this.system.signalProcessGroup(
+        target.pid,
+        mode === 'forced' ? 'SIGKILL' : 'SIGTERM',
+      );
+    } catch {
+      return this.system.processGroupExists(target.pid) ? 'unconfirmed' : 'confirmed';
+    }
+    return this.system.processGroupExists(target.pid) ? 'unconfirmed' : 'confirmed';
+  }
+}
+
+interface WindowsJobRecord {
+  readonly child: ChildProcess;
+  readonly exited: Promise<void>;
+  didExit: boolean;
+}
+
+export class NodeLocalProcessSystem implements LocalProcessSystem {
+  private readonly windowsJobs = new Map<string, WindowsJobRecord>();
+  private readonly completedWindowsJobs = new Set<string>();
+
+  spawn(spec: LocalShellLaunchSpec): SpawnedLocalProcess {
+    return spec.terminationKind === 'windows-process-tree'
+      ? this.spawnWindowsJob(spec)
+      : this.spawnPosixGroup(spec);
+  }
+
+  processGroupExists(pid: number): boolean {
+    try {
+      process.kill(-pid, 0);
+      return true;
+    } catch (error) {
+      return !isNoSuchProcess(error);
+    }
+  }
+
+  signalProcessGroup(pid: number, signal: 'SIGTERM' | 'SIGKILL'): void {
+    process.kill(-pid, signal);
+  }
+
+  windowsJobTerminated(ownershipId: string): boolean {
+    const record = this.windowsJobs.get(ownershipId);
+    if (!record) {
+      return this.completedWindowsJobs.has(ownershipId);
+    }
+    if (!record.didExit) {
+      return false;
+    }
+    this.rememberCompletedWindowsJob(ownershipId);
+    this.windowsJobs.delete(ownershipId);
+    return true;
+  }
+
+  async terminateWindowsJob(ownershipId: string, forced: boolean): Promise<boolean> {
+    const record = this.windowsJobs.get(ownershipId);
+    if (!record) {
+      return this.completedWindowsJobs.has(ownershipId);
+    }
+    if (record.didExit) {
+      return this.windowsJobTerminated(ownershipId);
+    }
+    if (!forced) {
+      // Console applications have no general safe graceful signal on Windows.
+      return false;
+    }
+    try {
+      record.child.kill();
+    } catch {
+      return this.windowsJobTerminated(ownershipId);
+    }
+    const exited = await settleWithin(record.exited, 1_000);
+    return exited && this.windowsJobTerminated(ownershipId);
+  }
+
+  private spawnPosixGroup(spec: LocalShellLaunchSpec): SpawnedLocalProcess {
+    const child = spawn(spec.executable, [...spec.arguments], {
+      cwd: spec.cwd,
+      env: spec.environment ? { ...spec.environment } : undefined,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const started = new Promise<void>((resolve, reject) => {
+      child.once('spawn', resolve);
+      child.once('error', reject);
+    });
+    const exited = observeExit(child);
+    return {
+      termination: { pid: child.pid ?? 0, kind: 'posix-process-group' },
+      stdout: child.stdout,
+      stderr: child.stderr,
+      started,
+      exited,
+    };
+  }
+
+  private spawnWindowsJob(spec: LocalShellLaunchSpec): SpawnedLocalProcess {
+    const ownershipId = `windows-job-${randomUUID()}`;
+    const guardian = spawnWindowsGuardian(spec, ownershipId);
+    const stderr = new PassThrough();
+    const started = filterGuardianReadiness(guardian, stderr);
+    let resolveExited!: () => void;
+    const ownershipExited = new Promise<void>(resolve => { resolveExited = resolve; });
+    const record: WindowsJobRecord = {
+      child: guardian,
+      exited: ownershipExited,
+      didExit: false,
+    };
+    this.windowsJobs.set(ownershipId, record);
+    const exited = new Promise<LocalShellExit>(resolve => {
+      let settled = false;
+      const finish = (exit: LocalShellExit) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        record.didExit = true;
+        resolveExited();
+        stderr.end();
+        resolve(exit);
+      };
+      guardian.once('exit', code => finish({ code }));
+      guardian.once('error', () => finish({ code: null }));
+    });
+    return {
+      termination: {
+        pid: guardian.pid ?? 0,
+        kind: 'windows-process-tree',
+        ownershipId,
+      },
+      stdout: guardian.stdout,
+      stderr,
+      started,
+      exited,
+    };
+  }
+
+  private rememberCompletedWindowsJob(ownershipId: string): void {
+    this.completedWindowsJobs.add(ownershipId);
+    while (this.completedWindowsJobs.size > 256) {
+      const oldest = this.completedWindowsJobs.values().next().value;
+      if (!oldest) {
+        return;
+      }
+      this.completedWindowsJobs.delete(oldest);
+    }
+  }
+}
+
+export function localShellPlatformForNode(platform: NodeJS.Platform): LocalShellPlatform {
+  if (platform === 'darwin' || platform === 'linux') {
+    return 'posix';
+  }
+  if (platform === 'win32') {
+    return 'windows';
+  }
+  throw new Error(`Local shell execution does not support Node platform "${platform}".`);
+}
+
+function spawnWindowsGuardian(
+  spec: LocalShellLaunchSpec,
+  ownershipId: string,
+): ChildProcessByStdio<null, Readable, Readable> {
+  const suffix = ownershipId.replaceAll('-', '_');
+  const executableVariable = `GRIMOIRE_JOB_EXECUTABLE_${suffix}`;
+  const argumentsVariable = `GRIMOIRE_JOB_ARGUMENTS_${suffix}`;
+  const command = [
+    `$source=@'\r\n${WINDOWS_JOB_GUARDIAN_SOURCE}\r\n'@`,
+    'Add-Type -TypeDefinition $source -Language CSharp',
+    `$exe=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:${executableVariable}))`,
+    `$arguments=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:${argumentsVariable}))`,
+    `[Environment]::SetEnvironmentVariable('${executableVariable}',$null,'Process')`,
+    `[Environment]::SetEnvironmentVariable('${argumentsVariable}',$null,'Process')`,
+    '$exitCode=[GrimoireJobGuardian]::Run($exe,$arguments)',
+    'exit $exitCode',
+  ].join('\r\n');
+  return spawn('powershell.exe', [
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-EncodedCommand',
+    Buffer.from(command, 'utf16le').toString('base64'),
+  ], {
+    cwd: spec.cwd,
+    env: {
+      ...(spec.environment ? { ...spec.environment } : process.env),
+      [executableVariable]: encodeBase64(spec.executable),
+      [argumentsVariable]: encodeBase64(windowsCommandArguments(spec)),
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+}
+
+function filterGuardianReadiness(
+  guardian: ChildProcess,
+  output: PassThrough,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let pending = Buffer.alloc(0);
+    let ready = false;
+    let settled = false;
+    const finishError = (error: Error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+    };
+    guardian.stderr?.on('data', (chunk: unknown) => {
+      if (!(chunk instanceof Uint8Array)) {
+        return;
+      }
+      if (ready) {
+        output.write(chunk);
+        return;
+      }
+      pending = Buffer.concat([pending, chunk]);
+      const markerIndex = pending.indexOf(WINDOWS_JOB_READY_MARKER);
+      if (markerIndex < 0) {
+        if (pending.byteLength > 65_536) {
+          finishError(new Error('Windows Job Object guardian readiness output exceeded its bound.'));
+          guardian.kill();
+        }
+        return;
+      }
+      ready = true;
+      settled = true;
+      const remainder = pending.subarray(markerIndex + WINDOWS_JOB_READY_MARKER.length);
+      if (remainder.byteLength > 0) {
+        output.write(remainder);
+      }
+      pending = Buffer.alloc(0);
+      resolve();
+    });
+    guardian.once('error', () => {
+      finishError(new Error('Windows Job Object guardian failed to start.'));
+    });
+    guardian.once('exit', () => {
+      if (!ready) {
+        finishError(new Error('Windows Job Object guardian exited before acquiring ownership.'));
+      }
+    });
+  });
+}
+
+function observeExit(child: ChildProcess): Promise<LocalShellExit> {
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = (exit: LocalShellExit) => {
+      if (!settled) {
+        settled = true;
+        resolve(exit);
+      }
+    };
+    child.once('exit', code => finish({ code }));
+    child.once('error', () => finish({ code: null }));
+  });
+}
+
+function settleWithin(task: Promise<void>, timeoutMs: number): Promise<boolean> {
+  return new Promise(resolve => {
+    const timeout = setNodeTimeout(() => resolve(false), timeoutMs);
+    void task.then(() => {
+      clearNodeTimeout(timeout);
+      resolve(true);
+    });
+  });
+}
+
+function encodeBase64(value: string): string {
+  return Buffer.from(value, 'utf8').toString('base64');
+}
+
+export function windowsCommandArguments(spec: LocalShellLaunchSpec): string {
+  const [disableAutoRun, stripQuotes, execute, command, ...extra] = spec.arguments;
+  if (spec.executable.toLowerCase() !== 'cmd.exe'
+    || spec.terminationKind !== 'windows-process-tree'
+    || disableAutoRun !== '/d'
+    || stripQuotes !== '/s'
+    || execute !== '/c'
+    || command === undefined
+    || extra.length > 0) {
+    throw new Error('Windows local shell launch must use cmd.exe /d /s /c with one raw command.');
+  }
+  return `/d /s /c ${command}`;
+}
+
+function isNoSuchProcess(error: unknown): boolean {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && (error as NodeJS.ErrnoException).code === 'ESRCH';
+}
+
+function requireTerminationTarget(target: LocalShellTerminationTarget): void {
+  if (!Number.isSafeInteger(target.pid) || target.pid < 1) {
+    throw new Error('Local shell child pid must be a positive safe integer.');
+  }
+  if (target.kind === 'windows-process-tree'
+    && !/^windows-job-[0-9a-f-]{36}$/.test(target.ownershipId)) {
+    throw new Error('Windows local shell ownership id is invalid.');
+  }
+}
+
+const WINDOWS_JOB_READY_MARKER = Buffer.from('__GRIMOIRE_JOB_READY__\r\n', 'utf8');
+
+const WINDOWS_JOB_GUARDIAN_SOURCE = String.raw`
+using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+
+public static class GrimoireJobGuardian
+{
+    private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JOBOBJECT_BASIC_LIMIT_INFORMATION
+    {
+        public long PerProcessUserTimeLimit;
+        public long PerJobUserTimeLimit;
+        public uint LimitFlags;
+        public UIntPtr MinimumWorkingSetSize;
+        public UIntPtr MaximumWorkingSetSize;
+        public uint ActiveProcessLimit;
+        public UIntPtr Affinity;
+        public uint PriorityClass;
+        public uint SchedulingClass;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IO_COUNTERS
+    {
+        public ulong ReadOperationCount;
+        public ulong WriteOperationCount;
+        public ulong OtherOperationCount;
+        public ulong ReadTransferCount;
+        public ulong WriteTransferCount;
+        public ulong OtherTransferCount;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+    {
+        public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+        public IO_COUNTERS IoInfo;
+        public UIntPtr ProcessMemoryLimit;
+        public UIntPtr JobMemoryLimit;
+        public UIntPtr PeakProcessMemoryUsed;
+        public UIntPtr PeakJobMemoryUsed;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr CreateJobObject(IntPtr securityAttributes, string name);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetInformationJobObject(
+        IntPtr job,
+        int informationClass,
+        IntPtr information,
+        uint informationLength);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetCurrentProcess();
+
+    [DllImport("kernel32.dll")]
+    private static extern bool CloseHandle(IntPtr handle);
+
+    public static int Run(string executable, string arguments)
+    {
+        IntPtr job = CreateJobObject(IntPtr.Zero, null);
+        if (job == IntPtr.Zero)
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+
+        try
+        {
+            var limits = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
+            limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            int size = Marshal.SizeOf(typeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
+            IntPtr limitsPointer = Marshal.AllocHGlobal(size);
+            try
+            {
+                Marshal.StructureToPtr(limits, limitsPointer, false);
+                if (!SetInformationJobObject(job, 9, limitsPointer, (uint)size))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(limitsPointer);
+            }
+
+            if (!AssignProcessToJobObject(job, GetCurrentProcess()))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+
+            var start = new ProcessStartInfo();
+            start.FileName = executable;
+            start.Arguments = arguments;
+            start.UseShellExecute = false;
+            start.CreateNoWindow = true;
+            start.RedirectStandardOutput = true;
+            start.RedirectStandardError = true;
+
+            using (Process process = Process.Start(start))
+            {
+                if (process == null)
+                    throw new InvalidOperationException("The guarded process did not start.");
+                Console.Error.WriteLine("__GRIMOIRE_JOB_READY__");
+                Console.Error.Flush();
+                Task stdout = process.StandardOutput.BaseStream.CopyToAsync(Console.OpenStandardOutput());
+                Task stderr = process.StandardError.BaseStream.CopyToAsync(Console.OpenStandardError());
+                process.WaitForExit();
+                try { Task.WaitAll(new Task[] { stdout, stderr }, 250); }
+                catch (AggregateException) { }
+                Environment.Exit(process.ExitCode);
+                return process.ExitCode;
+            }
+        }
+        finally
+        {
+            CloseHandle(job);
+        }
+    }
+}
+`;

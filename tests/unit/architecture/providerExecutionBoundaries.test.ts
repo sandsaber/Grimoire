@@ -134,6 +134,37 @@ function findFeatureProcessImports(files: SourceFile[]): string[] {
     .map(() => relative(sourceRoot, file.path)));
 }
 
+function findCoreExecutionDomGlobals(files: SourceFile[]): string[] {
+  const forbidden = new Set([
+    'window',
+    'document',
+    'HTMLElement',
+    'HTMLInputElement',
+    'Element',
+    'MutationObserver',
+  ]);
+  return files.flatMap(file => {
+    const parsed = ts.createSourceFile(
+      file.path,
+      file.source,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    );
+    const matches = new Set<string>();
+    function visit(node: ts.Node): void {
+      if (ts.isIdentifier(node) && forbidden.has(node.text)) {
+        matches.add(node.text);
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(parsed);
+    return [...matches].map(identifier => (
+      `${relative(sourceRoot, file.path)} -> ${identifier}`
+    ));
+  });
+}
+
 describe('provider execution architecture boundaries', () => {
   it('keeps core independent from the plugin shell, features, and providers', () => {
     const coreSources = readTypeScriptSources(join(sourceRoot, 'core'));
@@ -185,6 +216,31 @@ describe('provider execution architecture boundaries', () => {
 
     expect(processImports).toEqual([
       'features/chat/services/BangBashService.ts',
+    ]);
+  });
+
+  it('keeps the execution kernel independent from DOM ownership', () => {
+    const executionSources = readTypeScriptSources(join(sourceRoot, 'core/execution'));
+
+    expect(findCoreExecutionDomGlobals(executionSources)).toEqual([]);
+  });
+
+  it('detects direct DOM ownership in the execution kernel', () => {
+    const fixtures: SourceFile[] = [
+      {
+        path: join(sourceRoot, 'core/execution/window-owner.ts'),
+        source: 'window.addEventListener("unload", () => undefined);',
+      },
+      {
+        path: join(sourceRoot, 'core/execution/view-owner.ts'),
+        source: 'const root: HTMLElement = document.body;',
+      },
+    ];
+
+    expect(findCoreExecutionDomGlobals(fixtures)).toEqual([
+      'core/execution/window-owner.ts -> window',
+      'core/execution/view-owner.ts -> HTMLElement',
+      'core/execution/view-owner.ts -> document',
     ]);
   });
 });

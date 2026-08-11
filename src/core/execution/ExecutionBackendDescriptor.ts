@@ -33,8 +33,8 @@ export function internalExecutionServiceId(value: string): InternalExecutionServ
 
 function requireIdentifier(value: string, label: string): string {
   const normalized = value.trim();
-  if (!normalized) {
-    throw new Error(`${label} must not be empty.`);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(normalized)) {
+    throw new Error(`${label} must be a constrained identifier.`);
   }
   return normalized;
 }
