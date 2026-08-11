@@ -113,7 +113,7 @@ ClaudeExecutionBackendContext
 > = {
   manifest: {
     id: 'claude',
-    displayName: 'Claude Code',
+    displayName: 'Claude',
     order: 10,
   },
   settings: {

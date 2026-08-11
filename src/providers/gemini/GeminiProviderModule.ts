@@ -68,7 +68,7 @@ GeminiExecutionBackend,
 GeminiWorkspaceModuleContext,
 GeminiExecutionBackendContext
 > = {
-  manifest: { id: 'gemini', displayName: 'Gemini CLI', order: 90 },
+  manifest: { id: 'gemini', displayName: 'Gemini CLI (Legacy)', order: 80 },
   settings: {
     providerId: 'gemini',
     schemaVersion: 1,

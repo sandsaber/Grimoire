@@ -25,7 +25,7 @@ this file records what has actually landed and what remains open.
 | Phase 4C — persistent Claude SDK topology | Complete | `9dda0ebc` |
 | Phase 4D — managed ACP/OpenCode topology | Complete | `cb631f53` |
 | Semantic freeze review | Complete | `892eec78` |
-| Phase 5 — remaining provider modules/backends | In progress | MiMoCode/Kimi Code `6c4700cf`; Grok `104c88dd`; Qwen `d5042ec5`; Gemini complete in this checkpoint |
+| Phase 5 — remaining provider modules/backends | Complete | MiMoCode/Kimi Code `6c4700cf`; Grok `104c88dd`; Qwen `d5042ec5`; Gemini `593b38d0`; immutable catalog pending checkpoint SHA |
 | Phase 6 — durable agents and work graphs | Pending | — |
 | Phase 7 — application runtime and auxiliary work | Pending | — |
 | Phase 8 — catalog and provider-neutral feature ports | Pending | — |
@@ -270,6 +270,31 @@ material blocker. The Qwen slice is committed as `d5042ec5`.
 The independent Gemini architecture and lifecycle review approved the checkpoint with no remaining
 material blocker.
 
+## Phase 5 immutable provider catalog
+
+- Added one provider-owned composition entry point containing the private frozen inventory of all
+  nine validated modules. The core catalog still imports no provider or application code, and the
+  unchanged production registries remain the live path until Phase 9.
+- Added catalog fitness coverage for exact provider, display, order, backend, settings, workspace,
+  capability, and feature identities; frozen publication; one module file per built-in provider;
+  and exactly one production catalog construction site.
+- Added temporary parity checks against the unchanged production provider/default inventories. The
+  gate exposed and corrected manifest drift before cutover: current Claude and legacy Gemini labels
+  remain unchanged, and Gemini remains ahead of Qwen while the new catalog retains unique ordering
+  slots.
+- The new catalog is not derived from either legacy registry or the legacy default table. Those old
+  sources can neither contribute to nor override the new inventory and remain scheduled for removal
+  after the hard cutover.
+- Added catalog, Antigravity module, and Codex module suites to the existing macOS/Linux/Windows
+  execution matrix so every built-in module and sanitized provider trace participates in the Phase 5
+  cross-platform gate.
+
+The independent catalog review is approved with no material blockers. It confirmed that the
+inventory contains exactly nine explicit modules, public snapshots are immutable, contribution
+identities and ordering remain aligned, top-level import performs no process launch or I/O, the
+legacy production composition remains unchanged, and every module suite participates in the
+macOS/Linux/Windows execution matrix.
+
 ## Verification evidence
 
 - Phase 4C checkpoint gate: 432 unit suites / 7,218 tests; 7 integration suites / 222 tests;
@@ -330,11 +355,17 @@ material blocker.
   approvals, usage metadata, and active-command notifications. The new capability descriptor keeps
   active commands unsupported to preserve current product behavior. No live provider request or
   quota-consuming probe was used.
+- Final Phase 5 gate: 477 unit suites / 7,581 tests and 7 integration suites / 222 tests pass;
+  typecheck, full ESLint, release build, Obsidian source/CSS/dependency review, isolated bundle-load
+  smoke, view-open smoke, and `git diff --check` pass.
+- Root, `dist/grimoire`, and the configured test-vault copies are byte-identical after the Phase 5
+  release build: `main.js` SHA-256 `4d9c36808986ef196a859b6e819570a0e6b8debd9759f4e5cff5a3cd0d774d67`,
+  `styles.css` `c079364c4f85717134955ce46b4c8a20ccfe403b4d1531675fa1a433e23c13eb`, and
+  `manifest.json` `5058df46417fc0ec4debcc9eda1552c2fda654904132ab20b90d2bb1cbc63758`.
 
 ## Next steps
 
-1. Complete the immutable nine-provider catalog inventory and run the full Phase 5 exit gate.
-2. Implement durable agents/work graphs after every current provider module/backend is constructible
+1. Implement durable agents/work graphs after every current provider module/backend is constructible
    through the new catalog.
-3. Continue with the application runtime and provider-neutral feature ports only after the durable
+2. Continue with the application runtime and provider-neutral feature ports only after the durable
    work model is proven.

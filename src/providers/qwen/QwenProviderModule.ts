@@ -72,7 +72,7 @@ QwenExecutionBackend,
 QwenWorkspaceModuleContext,
 QwenExecutionBackendContext
 > = {
-  manifest: { id: 'qwen', displayName: 'Qwen Code', order: 80 },
+  manifest: { id: 'qwen', displayName: 'Qwen Code', order: 90 },
   settings: {
     providerId: 'qwen',
     schemaVersion: 1,
