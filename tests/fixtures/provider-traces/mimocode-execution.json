@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "providerId": "mimocode",
+  "backendId": "provider-mimocode",
+  "topology": "managed-subprocess",
+  "concurrency": "serial-runs",
+  "sessionIdentity": "acp-session",
+  "runIdentity": "prompt-message-id",
+  "historyOwnership": "provider-native",
+  "resultExpectation": "required",
+  "agentObservation": "none",
+  "agentEvidence": {
+    "definitionInventory": "provider-files",
+    "spawnOrigins": [],
+    "stableIdentity": false,
+    "observation": "none",
+    "resultExtraction": "unsupported",
+    "cancellation": "unsupported",
+    "statusQuery": "unsupported",
+    "reattachment": "unsupported",
+    "source": "none",
+    "eventCase": null,
+    "cancellationCase": null,
+    "statusQueryCase": null,
+    "reattachmentCase": null
+  },
+  "identity": {
+    "backendGeneration": 1,
+    "executionSessionId": "es-dddddddddddddddddddddddddddddddd",
+    "sessionInstanceId": "si-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "runId": "run-11111111111111111111111111111111",
+    "nativeSessionId": "native-session",
+    "nativeRunId": "message-1"
+  },
+  "cases": {
+    "initializeNewPrompt": [
+      "client/launch",
+      "initialize",
+      "session/new:native-session",
+      "session/prompt:message-1",
+      "result:projection"
+    ],
+    "resumeLoad": [
+      "initialize",
+      "session/load:saved-session",
+      "session/prompt:message-1"
+    ],
+    "missingSessionReplacement": [
+      "session/load:deleted-session",
+      "session/new:native-session"
+    ],
+    "transientLoadFailure": [
+      "session/load:saved-session",
+      "terminal:invalidated:pre-dispatch-rejected"
+    ],
+    "retryBeforeOutput": [
+      "client/launch",
+      "session/prompt:message-1",
+      "client/close",
+      "client/launch",
+      "session/load:native-session",
+      "session/prompt:message-1"
+    ],
+    "restartConfiguration": [
+      "client/close",
+      "client/launch",
+      "session/load:native-session",
+      "session/prompt:message-2"
+    ],
+    "dynamicConfiguration": [
+      "set-config:mode:plan",
+      "set-config:model:provider/model",
+      "set-config:variant:high"
+    ],
+    "approval": [
+      "interaction-opened:approval",
+      "interaction-resolved:allow-once"
+    ],
+    "filesystemContainment": [
+      "write:contained:approved",
+      "read:contained",
+      "escape:rejected-before-approval"
+    ],
+    "databaseHydration": [
+      "history/load:provider-native"
+    ],
+    "isolatedAuxiliary": [
+      "client/launch:cold",
+      "session/new:aux-session",
+      "session/prompt",
+      "client/close"
+    ],
+    "storedSessionError": [
+      "empty-result/inspect:native-session:message-1",
+      "terminal:failed:provider-failure"
+    ],
+    "unsupportedModelFallback": [
+      "empty-result/inspect:native-session:message-1",
+      "settings/fallback:provider/model",
+      "terminal:failed:provider-failure"
+    ]
+  },
+  "eventCases": {
+    "success": [
+      "run-started",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ],
+    "recoveryAfterOutput": [
+      "run-started",
+      "connection-lost",
+      "recovery-started",
+      "result:provider-native",
+      "terminal:succeeded:completed"
+    ]
+  }
+}

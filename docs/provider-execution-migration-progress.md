@@ -24,8 +24,8 @@ this file records what has actually landed and what remains open.
 | Phase 4B — multiplexed Codex topology | Complete | `309f1558` |
 | Phase 4C — persistent Claude SDK topology | Complete | `9dda0ebc` |
 | Phase 4D — managed ACP/OpenCode topology | Complete | `cb631f53` |
-| Semantic freeze review | Complete | `test: freeze execution topology semantics` |
-| Phase 5 — remaining provider modules/backends | Pending | — |
+| Semantic freeze review | Complete | `892eec78` |
+| Phase 5 — remaining provider modules/backends | In progress | MiMoCode/Kimi Code managed-ACP family ready for checkpoint |
 | Phase 6 — durable agents and work graphs | Pending | — |
 | Phase 7 — application runtime and auxiliary work | Pending | — |
 | Phase 8 — catalog and provider-neutral feature ports | Pending | — |
@@ -118,6 +118,40 @@ Freeze decision: lifecycle semantic changes must now record their reason in this
 fake plus all four topology proofs. The freeze is internal and does not promise public source or
 binary compatibility.
 
+## Phase 5 managed-ACP family implementation
+
+- Added separate MiMoCode-owned and Kimi Code-owned execution backends. Each adapter owns its
+  lifecycle and provider policy; neither inherits another provider backend or imports `ChatRuntime`.
+  Shared ACP code remains limited to the managed client, protocol types, session-error
+  classification, process composition, and filesystem path containment primitives.
+- Added one provider module per adapter with normalized settings codecs, immutable capability
+  descriptors, workspace contributions, configured-model ports, and provider-native SQLite history
+  ports. The module order remains aligned with the existing provider inventory.
+- Added provider-owned dynamic mode/model/effort ordering and filesystem delegates for both
+  providers, including explicit containment and approved-write behavior.
+- Added MiMoCode's provider-specific empty-result policy. It reads the native database only after a
+  prompt completes without output, correlates the stored error to the stable native session/run,
+  classifies ordinary provider failures, and persists a supported base-model fallback through an
+  injected settings port. Applying a fallback does not redispatch the failed turn; the user must
+  explicitly retry, so a potentially side-effecting prompt is never duplicated.
+- Kept Kimi Code's empty-result semantics provider-local without inventing MiMoCode's stored-error or
+  fallback behavior.
+- Added sanitized provider traces, backend-to-registry identity tests, the frozen 11-case conformance
+  suite, dynamic configuration, filesystem containment, module/history, and MiMoCode fallback-policy
+  tests for the family.
+- Added every new managed-ACP family suite to the macOS, Linux, and Windows execution-contract CI
+  matrix. The shared process launcher and termination ownership remain covered by the existing host
+  matrix.
+- Production composition remains unchanged and continues to use the legacy runtime path until
+  Phase 9.
+
+The independent managed-ACP family review is approved with no material blockers. It confirmed that
+Kimi Code's normalized lifecycle diff against the approved OpenCode adapter is empty, while MiMoCode
+adds only provider-owned database/error/fallback inputs and bounded one-flight empty-result
+classification. It also verified stable identity, transient-session preservation, safe retry,
+result/cancellation arbitration, quarantined process ownership, native history, honest agent
+capabilities, and the three-platform CI matrix.
+
 ## Verification evidence
 
 - Phase 4C checkpoint gate: 432 unit suites / 7,218 tests; 7 integration suites / 222 tests;
@@ -136,11 +170,19 @@ binary compatibility.
   architecture review approved the boundary with no remaining material blocker.
 - Release artifacts match exactly across repository root, `dist/grimoire`, and the configured test
   vault: `main.js` `4d9c3680…`, `styles.css` `c079364c…`, `manifest.json` `5058df46…`.
+- Current Phase 5 managed-ACP family gate: 13 new provider suites / 92 tests and 6 architecture/shared
+  family suites / 50 tests pass; typecheck, focused ESLint, and `git diff --check` pass. Independent
+  review approved the slice with no material blocker.
+- Final managed-ACP family checkpoint gate: 455 unit suites / 7,398 tests and 7 integration suites /
+  222 tests pass; typecheck, full lint, release build, and `git diff --check` pass.
+- Release artifacts remain byte-identical across repository root, `dist/grimoire`, and the configured
+  test vault after the checkpoint build: `main.js` `4d9c3680…`, `styles.css` `c079364c…`, and
+  `manifest.json` `5058df46…`.
 
 ## Next steps
 
-1. Continue Phase 5 in managed-ACP family order: MiMoCode, Kimi Code, then Grok, Qwen, and Gemini.
-2. Preserve the common semantic freeze while adding only provider-specific extensions backed by
-   traces and capability evidence.
-3. Implement durable agents/work graphs after every current provider module/backend is constructible
+1. Close independent review and checkpoint the MiMoCode/Kimi Code managed-ACP family slice.
+2. Continue Phase 5 with Grok, Qwen, and Gemini while preserving provider-specific ACP semantics.
+3. Complete the immutable nine-provider catalog inventory and run the full Phase 5 exit gate.
+4. Implement durable agents/work graphs after every current provider module/backend is constructible
    through the new catalog.
