@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "providerId": "claude",
+  "backendId": "provider-claude",
+  "topology": "persistent-sdk",
+  "concurrency": "serial-runs",
+  "sessionIdentity": "sdk-session",
+  "runIdentity": "user-message-uuid",
+  "resultExpectation": "required",
+  "agentObservation": "full",
+  "identity": {
+    "backendGeneration": 1,
+    "executionSessionId": "es-dddddddddddddddddddddddddddddddd",
+    "sessionInstanceId": "si-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "runId": "run-11111111111111111111111111111111",
+    "nativeSessionId": "native-session",
+    "nativeRunId": "message-1"
+  },
+  "cases": {
+    "persistentTurns": [
+      "query/start",
+      "message/enqueue:message-1",
+      "result:first result",
+      "message/enqueue:message-2",
+      "result:second result"
+    ],
+    "dynamicWithoutRestart": [
+      "setModel",
+      "setPermissionMode",
+      "applyFlagSettings",
+      "setMcpServers",
+      "setModel",
+      "setPermissionMode",
+      "applyFlagSettings",
+      "setMcpServers"
+    ],
+    "restartConfiguration": [
+      "query/close",
+      "query/start:resume"
+    ],
+    "resumeForkRewind": [
+      "resume:native-session",
+      "fork:source-session:assistant-checkpoint",
+      "rewindFiles:dry-run",
+      "rewindFiles:apply",
+      "resumeAt:assistant-checkpoint"
+    ],
+    "interactions": [
+      "interaction-opened:approval",
+      "interaction-opened:question",
+      "interaction-opened:plan-decision",
+      "interaction-resolved:allow-once",
+      "interaction-resolved:allow-once",
+      "interaction-resolved:allow-once"
+    ],
+    "interruptCancellation": [
+      "run-started",
+      "interrupt",
+      "cancellation-acknowledged",
+      "terminal:cancelled:cancellation-confirmed"
+    ],
+    "backgroundAgentLateResult": [
+      "native-agent-observed:task-1",
+      "native-agent-status:task-1:running",
+      "tool-activity:native-tool-1",
+      "result:parent",
+      "terminal:succeeded:completed",
+      "sidecar:hydrate:task-1",
+      "native-agent-result:task-1:projection",
+      "native-agent-status:task-1:completed"
+    ],
+    "isolatedAuxiliary": [
+      "auxiliary-query/start",
+      "auxiliary-query/result",
+      "auxiliary-query/close"
+    ],
+    "sessionRecovery": [
+      "run-started",
+      "connection-lost",
+      "recovery-started",
+      "terminal:indeterminate:effects-unknown"
+    ]
+  },
+  "eventCases": {
+    "persistentTurn": [
+      "run-started",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ],
+    "backgroundAgentLateResult": [
+      "agent:observed:task-1",
+      "agent:status:task-1:running",
+      "agent:tool:native-tool-1",
+      "agent:result:task-1:projection",
+      "agent:status:task-1:completed"
+    ],
+    "interruptCancellation": [
+      "run-started",
+      "cancellation-acknowledged",
+      "terminal:cancelled:cancellation-confirmed"
+    ],
+    "sessionRecovery": [
+      "run-started",
+      "connection-lost",
+      "recovery-started",
+      "terminal:indeterminate:effects-unknown"
+    ]
+  }
+}
