@@ -57,7 +57,7 @@ export function normalizeQwenEffortLevel(value: unknown): QwenEffortLevel {
     : DEFAULT_QWEN_PROVIDER_SETTINGS.effortLevel;
 }
 
-function normalizeHostnameCliPaths(value: unknown): HostnameCliPaths {
+export function normalizeQwenHostnameCliPaths(value: unknown): HostnameCliPaths {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
   }
@@ -112,7 +112,7 @@ export function normalizeQwenModelAliases(value: unknown): Record<string, string
   return normalized;
 }
 
-function normalizeQwenDiscoveredModels(value: unknown): QwenDiscoveredModel[] {
+export function normalizeQwenDiscoveredModels(value: unknown): QwenDiscoveredModel[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -141,7 +141,7 @@ function normalizeQwenDiscoveredModels(value: unknown): QwenDiscoveredModel[] {
   return result;
 }
 
-function normalizeQwenModes(value: unknown): QwenMode[] {
+export function normalizeQwenModes(value: unknown): QwenMode[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -172,7 +172,7 @@ function normalizeQwenModes(value: unknown): QwenMode[] {
 
 export function getQwenProviderSettings(settings: Record<string, unknown>): QwenProviderSettings {
   const config = getProviderConfig(settings, 'qwen');
-  const normalizedCliPathsByHost = normalizeHostnameCliPaths(config.cliPathsByHost);
+  const normalizedCliPathsByHost = normalizeQwenHostnameCliPaths(config.cliPathsByHost);
   const cliPathsByHost = Object.keys(normalizedCliPathsByHost).length > 0
     ? migrateLegacyHostnameKeyedMap(
       normalizedCliPathsByHost,
@@ -212,7 +212,7 @@ export function updateQwenProviderSettings(
     updates.visibleModels ?? current.visibleModels,
   );
   const nextCliPathsByHost = 'cliPathsByHost' in updates
-    ? normalizeHostnameCliPaths(updates.cliPathsByHost)
+      ? normalizeQwenHostnameCliPaths(updates.cliPathsByHost)
     : { ...current.cliPathsByHost };
   let nextCliPath = 'cliPathsByHost' in updates
     ? (

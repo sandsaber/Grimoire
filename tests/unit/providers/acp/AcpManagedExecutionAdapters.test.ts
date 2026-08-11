@@ -135,6 +135,38 @@ describe('managed ACP execution adapters', () => {
     await client.close();
   });
 
+  it('forwards native ACP model and mode selection without provider policy', async () => {
+    const process = new WireProcess();
+    const factory = new AcpManagedClientAdapterFactory({
+      clientInfo: { name: 'grimoire-tests', version: '1.0.0' },
+      processLauncher: { launch: async () => process },
+    });
+    const client = await factory.create({
+      startupRef: 'opaque-startup',
+      signal: new AbortController().signal,
+      requestPermission: async () => ({ outcome: { outcome: 'cancelled' } }),
+    });
+
+    const model = client.setModel?.({ sessionId: 'session-1', modelId: 'model-1' });
+    const modelRequest = await process.nextRequest() as { id: number };
+    expect(modelRequest).toEqual(expect.objectContaining({
+      method: 'session/set_model',
+      params: { sessionId: 'session-1', modelId: 'model-1' },
+    }));
+    process.respond(modelRequest.id, {});
+    await expect(model).resolves.toEqual({});
+
+    const mode = client.setMode?.({ sessionId: 'session-1', modeId: 'plan' });
+    const modeRequest = await process.nextRequest() as { id: number };
+    expect(modeRequest).toEqual(expect.objectContaining({
+      method: 'session/set_mode',
+      params: { sessionId: 'session-1', modeId: 'plan' },
+    }));
+    process.respond(modeRequest.id, {});
+    await expect(mode).resolves.toEqual({});
+    await client.close();
+  });
+
   it('runs an auxiliary operation in a cold session and closes its owned client', async () => {
     const client = new AuxiliaryClient();
     const scheduler = new TestScheduler();

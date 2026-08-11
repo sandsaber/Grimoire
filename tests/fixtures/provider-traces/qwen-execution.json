@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "providerId": "qwen",
+  "backendId": "provider-qwen",
+  "topology": "managed-subprocess",
+  "concurrency": "serial-runs",
+  "sessionIdentity": "acp-session",
+  "runIdentity": "prompt-message-id",
+  "historyOwnership": "grimoire-projection",
+  "resultExpectation": "required",
+  "agentObservation": "opaque",
+  "agentEvidence": {
+    "definitionInventory": "provider-files",
+    "spawnOrigins": ["provider-native"],
+    "stableIdentity": false,
+    "observation": "opaque",
+    "resultExtraction": "unsupported",
+    "cancellation": "unsupported",
+    "statusQuery": "unsupported",
+    "reattachment": "unsupported",
+    "source": "opaque-nested-evidence",
+    "eventCase": "opaqueAgentEvidence",
+    "cancellationCase": null,
+    "statusQueryCase": null,
+    "reattachmentCase": null
+  },
+  "identity": {
+    "backendGeneration": 1,
+    "executionSessionId": "es-dddddddddddddddddddddddddddddddd",
+    "sessionInstanceId": "si-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "runId": "run-11111111111111111111111111111111",
+    "nativeSessionId": "native-session",
+    "nativeRunId": "message-1"
+  },
+  "cases": {
+    "initializeNewPrompt": [
+      "client/launch",
+      "initialize",
+      "session/new:native-session",
+      "session/prompt:message-1",
+      "result:projection"
+    ],
+    "resumeLoadWithoutResponseIdentity": [
+      "initialize",
+      "session/load:saved-session",
+      "session/prompt:message-1"
+    ],
+    "missingSessionReplacement": [
+      "session/load:deleted-session",
+      "session/new:native-session",
+      "prompt:Rebuilt hidden context\n\nDo the work"
+    ],
+    "transientLoadFailure": [
+      "session/load:saved-session",
+      "terminal:invalidated:pre-dispatch-rejected"
+    ],
+    "retryBeforeOutput": [
+      "client/launch",
+      "session/prompt:message-1",
+      "client/close",
+      "client/launch",
+      "session/load:native-session",
+      "session/prompt:message-1"
+    ],
+    "restartConfiguration": [
+      "client/close",
+      "client/launch",
+      "session/load:native-session",
+      "session/prompt:message-2"
+    ],
+    "dynamicConfiguration": [
+      "set-model:qwen3-coder",
+      "set-mode:plan",
+      "control-prompt:/effort xhigh"
+    ],
+    "approval": [
+      "interaction-opened:approval",
+      "interaction-resolved:allow-once"
+    ],
+    "question": [
+      "interaction-opened:question",
+      "interaction-resolved:submit"
+    ],
+    "activeSessionCommands": [
+      "commands:native-session:review",
+      "commands:native-session:clear"
+    ],
+    "usageContext": [
+      "usage:notification",
+      "context:qwen/status/session/context_usage",
+      "usage:turn-projection"
+    ],
+    "opaqueAgentEvidence": [
+      "tool-activity:agent-call-1",
+      "parent-result:projection"
+    ],
+    "filesystemContainment": [
+      "write:contained:approved",
+      "read:contained",
+      "escape:rejected-before-approval"
+    ],
+    "visibleHistoryHydration": [
+      "history/visible:no-op"
+    ]
+  },
+  "eventCases": {
+    "success": [
+      "run-started",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ],
+    "recoveryAfterOutput": [
+      "run-started",
+      "connection-lost",
+      "recovery-started",
+      "result:provider-native",
+      "terminal:succeeded:completed"
+    ],
+    "opaqueAgentEvidence": [
+      "run-started",
+      "tool-activity:agent-call-1",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ]
+  }
+}

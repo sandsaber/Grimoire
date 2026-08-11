@@ -25,7 +25,7 @@ this file records what has actually landed and what remains open.
 | Phase 4C — persistent Claude SDK topology | Complete | `9dda0ebc` |
 | Phase 4D — managed ACP/OpenCode topology | Complete | `cb631f53` |
 | Semantic freeze review | Complete | `892eec78` |
-| Phase 5 — remaining provider modules/backends | In progress | MiMoCode/Kimi Code `6c4700cf`; Grok ready for checkpoint |
+| Phase 5 — remaining provider modules/backends | In progress | MiMoCode/Kimi Code `6c4700cf`; Grok `104c88dd`; Qwen complete in this checkpoint |
 | Phase 6 — durable agents and work graphs | Pending | — |
 | Phase 7 — application runtime and auxiliary work | Pending | — |
 | Phase 8 — catalog and provider-neutral feature ports | Pending | — |
@@ -192,7 +192,49 @@ findings added four permanent constraints:
 4. Native terminal status and result extraction are deduplicated separately, so an asynchronous
    completion without output can be enriched once by a later polling result.
 
-Qwen and Gemini work has not started.
+## Phase 5 Qwen implementation
+
+- Added a Qwen-owned managed-ACP execution backend and provider module without importing
+  `ChatRuntime` or inheriting another provider lifecycle. Shared ACP code gained only typed native
+  model/mode forwarding; Qwen alone owns ordering, effort control, question metadata, commands,
+  usage, and nested-agent interpretation.
+- Added the exact model → mode → effort → user-prompt transition. Effort remains a Qwen-native
+  `/effort <level>` control turn, is cached per owned client/session only after confirmed success,
+  and cannot leak its notifications into the user's result. Rejection or timeout prevents user
+  prompt dispatch and closes the owned client before another run is admitted.
+- Preserved Qwen's native session boundary: `session/load` may confirm the requested session without
+  repeating its ID; an explicit conflicting ID is rejected; only a positively classified missing
+  session permits replacement. A provider-owned replacement prompt may carry the existing Grimoire
+  projection once into that new native session; normal resume never injects it again. Visible
+  provider transcript hydration remains unsupported and no duplicate visible history is synthesized.
+- Added provider-owned structured-question normalization on top of Qwen's question-shaped ACP
+  permission metadata. Questions and approvals use the same durable, bounded, idempotent
+  interaction lifecycle while preserving Qwen's indexed native answer response.
+- Added session-keyed runtime command projection from `available_commands_update`. Command state is
+  never treated as static provider inventory and is cleared when the owning client closes.
+- Added authoritative usage inputs from standard ACP usage notifications, prompt response usage,
+  and the optional `qwen/status/session/context_usage` extension. Projection failure remains outside
+  execution ownership and no quota or context value is inferred.
+- Added opaque nested-agent evidence from Qwen's parent-tool/subagent metadata. It prevents unsafe
+  redispatch and produces parent tool activity, but does not fabricate a child identity, result,
+  cancellation, status query, or reattachment capability. Nested child text is excluded from the
+  parent result.
+- Fenced connection loss during initialize/load/model/mode/effort as side-effect-free preparation
+  failure. Recovery events are admitted only after the user prompt is dispatched, so a control-turn
+  disconnect cannot leave the durable session in a recovering state without a started run.
+- Reject malformed structured-question arrays as a whole so native answer indexes cannot shift.
+  Usage and active-command projection cleanup are failure-isolated, so one optional projection
+  cannot retain stale state owned by another.
+- Bound Qwen's topology and opaque-agent declaration into the semantic fitness suite. Qwen auxiliary
+  workflows remain unsupported and no trace or backend surface claims an auxiliary runner.
+- Added Qwen-owned settings, model, no-visible-history, active-command, filesystem, lifecycle,
+  registry-ingestion, structured-question, conformance, and sanitized trace coverage. The Qwen
+  suites and the shared cross-platform managed-process owner now run on macOS, Linux, and Windows.
+- Production composition remains unchanged and continues to use the legacy runtime path until
+  Phase 9.
+
+The independent Qwen architecture and lifecycle review approved the checkpoint with no remaining
+material blocker. Gemini work has not started.
 
 ## Verification evidence
 
@@ -227,11 +269,25 @@ Qwen and Gemini work has not started.
 - Release artifacts remain byte-identical across repository root, `dist/grimoire`, and the configured
   test vault after the Grok checkpoint build: `main.js` `4d9c3680…`, `styles.css` `c079364c…`, and
   `manifest.json` `5058df46…`.
+- Current Qwen gate: all Qwen plus shared managed-ACP adapter coverage passes 17 suites / 123 tests;
+  the focused execution and semantic-fitness selection passes 9 suites / 64 tests; typecheck,
+  focused ESLint, and `git diff --check` pass.
+- Final Qwen checkpoint gate: 468 unit suites / 7,507 tests and 7 integration suites / 222 tests pass
+  outside the restricted sandbox; typecheck, full lint, release build, and `git diff --check` pass.
+  Independent review approved the slice with no remaining material blocker. The restricted run's
+  only failures were the existing home-directory temporary-path and loopback-bind tests; the same
+  suites passed unrestricted.
+- Release artifacts remain byte-identical across repository root, `dist/grimoire`, and the configured
+  test vault after the Qwen checkpoint build: `main.js` `4d9c3680…`, `styles.css` `c079364c…`, and
+  `manifest.json` `5058df46…`.
+- Read-only inspection of the installed Qwen Code 0.21.7 package confirms ACP support for
+  `session/set_model`, `session/set_mode`, `/effort` levels `low` through `max`, typed active-session
+  command updates, structured-question metadata, the context-usage extension, and nested
+  parent-tool/subagent metadata. No live provider request or quota-consuming probe was used.
 
 ## Next steps
 
-1. Close independent review and checkpoint the Grok slice.
-2. Continue Phase 5 with Qwen and Gemini while preserving provider-specific ACP semantics.
-3. Complete the immutable nine-provider catalog inventory and run the full Phase 5 exit gate.
-4. Implement durable agents/work graphs after every current provider module/backend is constructible
+1. Continue Phase 5 with Gemini while preserving provider-specific ACP semantics.
+2. Complete the immutable nine-provider catalog inventory and run the full Phase 5 exit gate.
+3. Implement durable agents/work graphs after every current provider module/backend is constructible
    through the new catalog.

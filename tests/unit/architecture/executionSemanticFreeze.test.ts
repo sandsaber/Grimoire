@@ -2,6 +2,7 @@ import antigravityTrace from '@test/fixtures/provider-traces/antigravity-executi
 import claudeTrace from '@test/fixtures/provider-traces/claude-execution.json';
 import codexTrace from '@test/fixtures/provider-traces/codex-execution.json';
 import opencodeTrace from '@test/fixtures/provider-traces/opencode-execution.json';
+import qwenTrace from '@test/fixtures/provider-traces/qwen-execution.json';
 
 import type { ExecutionBackendDescriptor } from '@/core/execution/ExecutionBackendDescriptor';
 import type {
@@ -12,6 +13,7 @@ import { antigravityProviderModule } from '@/providers/antigravity/AntigravityPr
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
 import { opencodeProviderModule } from '@/providers/opencode/OpencodeProviderModule';
+import { qwenProviderModule } from '@/providers/qwen/QwenProviderModule';
 
 interface TopologyTrace {
   readonly providerId: string;
@@ -66,8 +68,13 @@ const topologyProofs: ReadonlyArray<{
   { module: opencodeProviderModule, trace: opencodeTrace },
 ];
 
+const providerProofs: typeof topologyProofs = [
+  ...topologyProofs,
+  { module: qwenProviderModule, trace: qwenTrace },
+];
+
 describe('execution semantic freeze', () => {
-  it.each(topologyProofs)(
+  it.each(providerProofs)(
     'binds $trace.providerId topology, history, identity, and agent fidelity to its module',
     ({ module, trace }) => {
       expect(module.manifest.id).toBe(trace.providerId);

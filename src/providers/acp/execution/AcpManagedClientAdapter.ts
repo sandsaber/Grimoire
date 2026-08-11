@@ -95,6 +95,14 @@ class AcpManagedClientAdapter implements ManagedAcpClient {
     return this.connection.prompt(request);
   }
 
+  setMode(request: Parameters<NonNullable<ManagedAcpClient['setMode']>>[0]) {
+    return this.connection.setMode(request);
+  }
+
+  setModel(request: Parameters<NonNullable<ManagedAcpClient['setModel']>>[0]) {
+    return this.connection.setModel(request);
+  }
+
   setConfigOption(request: Parameters<ManagedAcpClient['setConfigOption']>[0]) {
     return this.connection.setConfigOption(request);
   }
