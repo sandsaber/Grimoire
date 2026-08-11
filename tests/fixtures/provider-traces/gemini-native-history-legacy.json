@@ -1,0 +1,18 @@
+{
+  "sessionId": "12345678-1234-4234-8234-123456789abc",
+  "projectHash": "fixture-project",
+  "lastUpdated": "2026-08-12T10:02:00.000Z",
+  "messages": [
+    {
+      "id": "legacy-user",
+      "type": "user",
+      "content": "Legacy question"
+    },
+    {
+      "id": "legacy-gemini",
+      "type": "gemini",
+      "content": [{ "text": "Legacy answer" }],
+      "toolCalls": [{ "id": "legacy-tool", "name": "read_file", "status": "success" }]
+    }
+  ]
+}

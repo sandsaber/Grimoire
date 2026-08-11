@@ -46,7 +46,7 @@ export const DEFAULT_GEMINI_PROVIDER_SETTINGS: Readonly<PersistedGeminiProviderS
   visibleModels: [],
 });
 
-function normalizeHostnameCliPaths(value: unknown): HostnameCliPaths {
+export function normalizeGeminiHostnameCliPaths(value: unknown): HostnameCliPaths {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
   }
@@ -101,7 +101,7 @@ export function normalizeGeminiModelAliases(value: unknown): Record<string, stri
   return normalized;
 }
 
-function normalizeGeminiDiscoveredModels(value: unknown): GeminiDiscoveredModel[] {
+export function normalizeGeminiDiscoveredModels(value: unknown): GeminiDiscoveredModel[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -130,7 +130,7 @@ function normalizeGeminiDiscoveredModels(value: unknown): GeminiDiscoveredModel[
   return result;
 }
 
-function normalizeGeminiModes(value: unknown): GeminiMode[] {
+export function normalizeGeminiModes(value: unknown): GeminiMode[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -161,7 +161,7 @@ function normalizeGeminiModes(value: unknown): GeminiMode[] {
 
 export function getGeminiProviderSettings(settings: Record<string, unknown>): GeminiProviderSettings {
   const config = getProviderConfig(settings, 'gemini');
-  const normalizedCliPathsByHost = normalizeHostnameCliPaths(config.cliPathsByHost);
+  const normalizedCliPathsByHost = normalizeGeminiHostnameCliPaths(config.cliPathsByHost);
   const cliPathsByHost = Object.keys(normalizedCliPathsByHost).length > 0
     ? migrateLegacyHostnameKeyedMap(
       normalizedCliPathsByHost,
@@ -200,7 +200,7 @@ export function updateGeminiProviderSettings(
     updates.visibleModels ?? current.visibleModels,
   );
   const nextCliPathsByHost = 'cliPathsByHost' in updates
-    ? normalizeHostnameCliPaths(updates.cliPathsByHost)
+    ? normalizeGeminiHostnameCliPaths(updates.cliPathsByHost)
     : { ...current.cliPathsByHost };
   let nextCliPath = 'cliPathsByHost' in updates
     ? (

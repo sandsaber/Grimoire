@@ -25,7 +25,7 @@ this file records what has actually landed and what remains open.
 | Phase 4C — persistent Claude SDK topology | Complete | `9dda0ebc` |
 | Phase 4D — managed ACP/OpenCode topology | Complete | `cb631f53` |
 | Semantic freeze review | Complete | `892eec78` |
-| Phase 5 — remaining provider modules/backends | In progress | MiMoCode/Kimi Code `6c4700cf`; Grok `104c88dd`; Qwen complete in this checkpoint |
+| Phase 5 — remaining provider modules/backends | In progress | MiMoCode/Kimi Code `6c4700cf`; Grok `104c88dd`; Qwen `d5042ec5`; Gemini complete in this checkpoint |
 | Phase 6 — durable agents and work graphs | Pending | — |
 | Phase 7 — application runtime and auxiliary work | Pending | — |
 | Phase 8 — catalog and provider-neutral feature ports | Pending | — |
@@ -234,7 +234,41 @@ findings added four permanent constraints:
   Phase 9.
 
 The independent Qwen architecture and lifecycle review approved the checkpoint with no remaining
-material blocker. Gemini work has not started.
+material blocker. The Qwen slice is committed as `d5042ec5`.
+
+## Phase 5 Gemini implementation
+
+- Added a Gemini-owned managed-ACP backend and provider module without importing `ChatRuntime`,
+  `LegacyProviderContext`, or another provider backend. Shared ACP code remains limited to transport,
+  client, and process ownership primitives.
+- Preserved native resume while handling Gemini's actual `session/load` contract: a successful load
+  may omit `sessionId`, an explicit conflicting ID is rejected, and only a positively classified
+  missing session permits replacement with one hidden Grimoire-context bootstrap prompt.
+- Added a provider-owned history replay fence. Gemini CLI streams restored native transcript entries
+  as ACP notifications around `session/load` without a replay-complete marker. A bounded native
+  JSON/JSONL resolver mirrors Gemini's emission rule and supplies the exact expected count; the
+  fence consumes exactly that inventory, rejects missing or additional entries, and closes the
+  managed client before a user turn if native history or load cannot be bounded. The resolver
+  understands the current project registry, ownership-marker, and legacy hash layouts, while raw
+  restored transcript bytes never become the new run's output or durable result. File reads use a
+  descriptor-scoped `limit + 1` buffer and directory iteration stops at its configured cap, including
+  when a live native file grows after its initial metadata read.
+- Added exact model → mode → user-prompt ordering through Gemini's native ACP controls. Confirmed
+  state is cached only per owned client/session, failures prevent dispatch, and mode-update output is
+  fenced from the user result.
+- Kept capabilities conservative: provider-file command and agent definitions are inventory only;
+  there is no runtime agent observation, child identity, result, cancellation, status query, or
+  reattachment claim. Runtime questions, auxiliary work, transcript hydration, fork, rewind,
+  steering, and compaction remain unsupported.
+- Added durable approval bridging, bounded result commit/recovery/cancellation, native usage input,
+  provider-owned filesystem containment, conformance, registry-ingestion, sanitized trace, settings,
+  module, and replay-fence coverage. Gemini suites are included in the macOS/Linux/Windows execution
+  matrix and reuse the already-proven POSIX process-group and Windows Job Object owner.
+- Production composition remains unchanged and continues to use the legacy runtime path until
+  Phase 9.
+
+The independent Gemini architecture and lifecycle review approved the checkpoint with no remaining
+material blocker.
 
 ## Verification evidence
 
@@ -284,10 +318,23 @@ material blocker. Gemini work has not started.
   `session/set_model`, `session/set_mode`, `/effort` levels `low` through `max`, typed active-session
   command updates, structured-question metadata, the context-usage extension, and nested
   parent-tool/subagent metadata. No live provider request or quota-consuming probe was used.
+- Final Gemini checkpoint gate: 476 unit suites / 7,575 tests and 7 integration suites / 222 tests
+  pass outside the restricted sandbox; typecheck, full lint, release build, and `git diff --check`
+  pass. Independent review approved the slice with no remaining material blocker. Gemini execution,
+  provider, shared managed-ACP, and semantic-fitness coverage passes 18 suites / 122 tests.
+- Release artifacts remain byte-identical across repository root, `dist/grimoire`, and the configured
+  test vault after the Gemini checkpoint build: `main.js` `4d9c3680…`, `styles.css` `c079364c…`, and
+  `manifest.json` `5058df46…`.
+- Read-only inspection of the installed Gemini CLI 0.54.4 package confirms native `session/load`,
+  omitted load-response session identity, streamed history notifications, native model/mode control,
+  approvals, usage metadata, and active-command notifications. The new capability descriptor keeps
+  active commands unsupported to preserve current product behavior. No live provider request or
+  quota-consuming probe was used.
 
 ## Next steps
 
-1. Continue Phase 5 with Gemini while preserving provider-specific ACP semantics.
-2. Complete the immutable nine-provider catalog inventory and run the full Phase 5 exit gate.
-3. Implement durable agents/work graphs after every current provider module/backend is constructible
+1. Complete the immutable nine-provider catalog inventory and run the full Phase 5 exit gate.
+2. Implement durable agents/work graphs after every current provider module/backend is constructible
    through the new catalog.
+3. Continue with the application runtime and provider-neutral feature ports only after the durable
+   work model is proven.

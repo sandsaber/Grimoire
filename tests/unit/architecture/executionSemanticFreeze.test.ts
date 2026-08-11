@@ -1,6 +1,7 @@
 import antigravityTrace from '@test/fixtures/provider-traces/antigravity-execution.json';
 import claudeTrace from '@test/fixtures/provider-traces/claude-execution.json';
 import codexTrace from '@test/fixtures/provider-traces/codex-execution.json';
+import geminiTrace from '@test/fixtures/provider-traces/gemini-execution.json';
 import opencodeTrace from '@test/fixtures/provider-traces/opencode-execution.json';
 import qwenTrace from '@test/fixtures/provider-traces/qwen-execution.json';
 
@@ -12,6 +13,7 @@ import type {
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
+import { geminiProviderModule } from '@/providers/gemini/GeminiProviderModule';
 import { opencodeProviderModule } from '@/providers/opencode/OpencodeProviderModule';
 import { qwenProviderModule } from '@/providers/qwen/QwenProviderModule';
 
@@ -71,6 +73,7 @@ const topologyProofs: ReadonlyArray<{
 const providerProofs: typeof topologyProofs = [
   ...topologyProofs,
   { module: qwenProviderModule, trace: qwenTrace },
+  { module: geminiProviderModule, trace: geminiTrace },
 ];
 
 describe('execution semantic freeze', () => {

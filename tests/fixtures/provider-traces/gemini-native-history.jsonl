@@ -1,0 +1,5 @@
+{"sessionId":"12345678-1234-4234-8234-123456789abc","projectHash":"fixture-project","startTime":"2026-08-12T10:00:00.000Z","lastUpdated":"2026-08-12T10:01:00.000Z"}
+{"id":"user-1","type":"user","content":[{"text":"Restore this turn"}]}
+{"id":"gemini-1","type":"gemini","content":[{"text":"Restored answer"}],"thoughts":[{"subject":"First","description":"One"},{"subject":"Second","description":"Two"}],"toolCalls":[{"id":"tool-1","name":"read_file","status":"success"},{"id":"tool-2","name":"write_file","status":"success"}]}
+{"id":"user-empty","type":"user","content":"   "}
+{"id":"info-1","type":"info","content":"not replayed"}

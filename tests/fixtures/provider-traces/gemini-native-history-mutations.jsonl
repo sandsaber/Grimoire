@@ -1,0 +1,6 @@
+{"sessionId":"12345678-1234-4234-8234-123456789abc","projectHash":"fixture-project","lastUpdated":"2026-08-12T10:03:00.000Z"}
+{"id":"discarded-user","type":"user","content":"Discarded question"}
+{"id":"discarded-answer","type":"gemini","content":"Discarded answer"}
+{"$rewindTo":"discarded-user"}
+{"id":"after-rewind","type":"user","content":"Temporary question"}
+{"$set":{"messages":[{"id":"reset-user","type":"user","content":"Final question"},{"id":"reset-answer","type":"gemini","content":"Final answer","thoughts":[{"subject":"Plan","description":"Think"}]}],"lastUpdated":"2026-08-12T10:04:00.000Z"}}

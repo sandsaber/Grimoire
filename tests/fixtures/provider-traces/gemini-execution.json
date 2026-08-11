@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "providerId": "gemini",
+  "backendId": "provider-gemini",
+  "topology": "managed-subprocess",
+  "concurrency": "serial-runs",
+  "sessionIdentity": "acp-session",
+  "runIdentity": "prompt-message-id",
+  "historyOwnership": "grimoire-projection",
+  "resultExpectation": "required",
+  "agentObservation": "none",
+  "agentEvidence": {
+    "definitionInventory": "provider-files",
+    "spawnOrigins": [],
+    "stableIdentity": false,
+    "observation": "none",
+    "resultExtraction": "unsupported",
+    "cancellation": "unsupported",
+    "statusQuery": "unsupported",
+    "reattachment": "unsupported",
+    "source": "none",
+    "eventCase": null,
+    "cancellationCase": null,
+    "statusQueryCase": null,
+    "reattachmentCase": null
+  },
+  "identity": {
+    "backendGeneration": 1,
+    "executionSessionId": "es-dddddddddddddddddddddddddddddddd",
+    "sessionInstanceId": "si-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "runId": "run-11111111111111111111111111111111",
+    "nativeSessionId": "native-session",
+    "nativeRunId": "message-1"
+  },
+  "cases": {
+    "initializeNewPrompt": [
+      "client/launch",
+      "initialize",
+      "session/new:native-session",
+      "session/prompt:message-1",
+      "result:projection"
+    ],
+    "resumeReplayFence": [
+      "session/load:saved-session",
+      "history:replay-consumed",
+      "session/prompt:message-1"
+    ],
+    "missingSessionReplacement": [
+      "session/load:deleted-session",
+      "session/new:native-session",
+      "prompt:Rebuilt hidden context\n\nDo the work"
+    ],
+    "transientLoadFailure": [
+      "session/load:saved-session",
+      "terminal:invalidated:pre-dispatch-rejected"
+    ],
+    "retryBeforeOutput": [
+      "client/launch",
+      "session/prompt:message-1",
+      "client/close",
+      "client/launch",
+      "session/load:native-session",
+      "session/prompt:message-1"
+    ],
+    "restartConfiguration": [
+      "client/close",
+      "client/launch",
+      "session/load:native-session",
+      "session/prompt:message-2"
+    ],
+    "dynamicConfiguration": [
+      "set-model:gemini-2.5-flash",
+      "set-mode:plan"
+    ],
+    "approval": [
+      "interaction-opened:approval",
+      "interaction-resolved:allow-once"
+    ],
+    "usage": [
+      "usage:notification",
+      "usage:turn-projection"
+    ],
+    "filesystemContainment": [
+      "write:contained:approved",
+      "read:contained",
+      "escape:rejected-before-approval"
+    ],
+    "visibleHistoryHydration": [
+      "history/visible:no-op"
+    ]
+  },
+  "eventCases": {
+    "success": [
+      "run-started",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ],
+    "recoveryAfterOutput": [
+      "run-started",
+      "connection-lost",
+      "recovery-started",
+      "result:provider-native",
+      "terminal:succeeded:completed"
+    ]
+  }
+}
