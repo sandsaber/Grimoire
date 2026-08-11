@@ -1,6 +1,6 @@
 # Provider Execution and Agent Lifecycle Architecture
 
-Status: recommended strategic direction; implementation has not started.
+Status: architecture decision complete; the implementation plan is ready and code migration has not started.
 
 Scope:
 
@@ -9,13 +9,16 @@ Scope:
 - A staged transition that preserves provider-native behavior while replacing lifecycle ownership.
 - No production behavior changes in this research phase.
 
+The executable migration sequence, checkpoints, deletion gates, and provider waves are defined in
+[`provider-execution-migration-plan.md`](provider-execution-migration-plan.md).
+
 ## Decision
 
 Grimoire should adopt a lifecycle-centered execution platform as its target architecture.
 
 The long-term ownership model should be:
 
-`ProviderModule -> ExecutionBackend -> ExecutionSession -> ExecutionRun`
+`ExecutionBackend -> ExecutionSession -> ExecutionRun`
 
 with a first-class agent domain beside it:
 
@@ -23,7 +26,7 @@ with a first-class agent domain beside it:
 
 and a durable `WorkGraph` for dependencies, parent-child relationships, result provenance, and synthesis.
 
-`ChatRuntime` should become a temporary compatibility boundary, not the contract that future provider and agent features continue to expand. The transition should be large in architectural scope but incremental in delivery: existing providers remain usable through a legacy backend while feature code and then provider adapters move to the new lifecycle contracts.
+`ChatRuntime` must not remain a compatibility boundary inside the new lifecycle core. The transition is large in architectural scope but incremental inside this branch: new backends, repositories, coordinators, and projections are built and verified alongside the existing application path, then the composition root switches once and the old runtime architecture is deleted before the branch is ready to merge.
 
 The platform should normalize identity, ownership, state transitions, cancellation, recovery, result delivery, and UI-safe projections. It must not normalize provider protocols, transcript formats, process topology, security guarantees, or native features that are genuinely different.
 
@@ -90,6 +93,8 @@ Warm runtime eviction currently protects the active tab and streaming tabs, then
 
 All provider workspaces are also initialized sequentially on plugin load ([workspace initialization](../src/core/providers/ProviderWorkspaceRegistry.ts#L44-L58), [startup call](../src/main.ts#L100-L104)). Workspace services expose initialization but no matching asynchronous disposal contract. Lifecycle and failure isolation therefore vary across providers and callers.
 
+The feature layer also contains a second execution path outside provider runtimes. [`BangBashService`](../src/features/chat/services/BangBashService.ts) starts a local side-effecting process, and [`Tab`](../src/features/chat/tabs/Tab.ts#L472) owns that service directly. It has no durable run identity, recovery state, or application-scoped cancellation owner. A provider-only lifecycle would therefore leave an existing executor behind. The shared execution identity must be a generic backend identity, with provider association as one backend kind and local shell execution as an internal kind.
+
 Provider registration also has fragmented ownership. Runtime and workspace entries are paired manually in [`src/providers/index.ts`](../src/providers/index.ts#L22-L50), while default settings are assembled separately in [`src/providers/defaultProviderConfigs.ts`](../src/providers/defaultProviderConfigs.ts#L1-L23). There is no single atomic definition or parity invariant for all provider contributions.
 
 ### Conversation persistence cannot support multiple lifecycle owners
@@ -107,9 +112,9 @@ Provider history hydration is also a side-effect-only contract, so callers canno
 | Continue expanding `ChatRuntime` | Low | High and increasing | Remains tab/stream-centered | Special cases accumulate | Reject |
 | Add execution sessions but leave agents in UI state | Medium | Medium to high | Restart, ownership, and results remain unresolved | Better execution correlation only | Reject |
 | Adopt execution lifecycle plus first-class agents and projections | High | Lowest sustainable cost | Durable and explicit | Preserved behind adapters and capability ports | Adopt |
-| Replace every provider in one cutover | Very high | Potentially low after completion | Can be correct | Highest regression risk | Reject as a delivery strategy |
+| Switch production providers one by one behind long-lived flags | High | High while both systems remain | Split authority during transition | Parity becomes difficult to prove | Reject |
 
-The selected target is the third option. The selected delivery strategy is a staged cutover through compatibility adapters, not a permanent dual architecture.
+The selected target is the third option. The selected delivery strategy is staged construction and verification followed by one composition-root cutover. It is not a provider-by-provider production rollout and not a permanent dual architecture.
 
 ## Target architecture
 
@@ -117,6 +122,7 @@ The selected target is the third option. The selected delivery strategy is a sta
 flowchart TB
     catalog["Validated provider catalog"] --> module["Provider module"]
     module --> backend["Execution backend"]
+    internal["Internal execution services"] --> backend
     backend --> session["Execution session"]
     session --> run["Execution run"]
 
@@ -136,13 +142,13 @@ flowchart TB
     projections --> views["Tabs, panels, and history views"]
 ```
 
-The architecture has four primary layers and two cross-cutting concerns.
+The architecture has four primary layers and three cross-cutting concerns.
 
 1. The provider control plane defines providers, settings, workspace services, capabilities, and backend creation.
 2. The execution plane owns backend, session, run, interaction, and terminal-outcome lifecycles.
 3. The work and agent plane owns definitions, instances, attempts, dependencies, cancellation policy, results, and synthesis.
 4. The projection plane reduces lifecycle events into UI state. Tabs render and control projections but do not own the underlying work.
-5. A lifecycle registry owns leases, provider generations, quiescence, and disposal across all layers.
+5. A lifecycle registry owns leases, backend generations, quiescence, and disposal across all layers.
 6. Revisioned conversation persistence serializes durable mutations without replacing provider-native transcripts.
 7. A small durable control store supports restart and reattachment without turning the UI into an event database.
 
@@ -157,7 +163,8 @@ interface ProviderModule {
   manifest: ProviderManifest;
   settings: ProviderSettingsCodec;
   workspace: ProviderWorkspaceContribution;
-  execution: ProviderExecutionBackendFactory;
+  execution: ExecutionBackendFactory;
+  capabilities: ProviderCapabilityDescriptor;
   features: ProviderFeatureContributions;
 }
 ```
@@ -171,7 +178,7 @@ The catalog validates before publishing any projection:
 - workspace initialization and disposal ownership;
 - explicit feature and security declarations.
 
-The existing runtime and workspace registries may remain temporarily as derived compatibility views. They must not remain separately maintained inventories.
+The existing runtime and workspace registries remain part of the unchanged production path while the new catalog is tested separately. The hard cutover replaces them once; they are not rebuilt as adapters over the new catalog and do not survive as separately maintained inventories.
 
 This is a compile-time catalog for built-in providers. It is not a public third-party plugin ABI and should not take on compatibility promises that Grimoire does not need yet.
 
@@ -220,24 +227,31 @@ Unsupported capabilities are absent or explicitly reported. They are not provide
 The conceptual contracts are:
 
 ```ts
-interface ProviderExecutionBackend {
-  readonly providerId: ProviderId;
-  createSession(config: ExecutionSessionConfig): Promise<ProviderExecutionSession>;
+interface ExecutionBackendDescriptor {
+  backendId: ExecutionBackendId;
+  association:
+    | { kind: 'provider'; providerId: ProviderId }
+    | { kind: 'internal'; service: InternalExecutionServiceId };
+}
+
+interface ExecutionBackend {
+  readonly descriptor: ExecutionBackendDescriptor;
+  createSession(config: ExecutionSessionConfig): Promise<ExecutionSession>;
   dispose(): Promise<void>;
 }
 
-interface ProviderExecutionSession {
+interface ExecutionSession {
   readonly executionSessionId: ExecutionSessionId;
   readonly sessionInstanceId: SessionInstanceId;
-  createRun(request: ExecutionRequest): ProviderExecutionRun;
-  getSnapshot(): ProviderSessionSnapshot;
-  subscribe(listener: ProviderExecutionEventListener): Unsubscribe;
+  createRun(request: ExecutionRequest): ExecutionRun;
+  getSnapshot(): ExecutionSessionSnapshot;
+  subscribe(listener: ExecutionIngressEventListener): Unsubscribe;
   dispose(): Promise<void>;
 }
 
-interface ProviderExecutionRun {
+interface ExecutionRun {
   readonly runId: RunId;
-  readonly events: AsyncIterable<ProviderExecutionEvent>;
+  readonly events: AsyncIterable<ExecutionIngressEvent>;
   cancel(reason?: CancellationReason): Promise<void>;
 }
 ```
@@ -249,7 +263,7 @@ These contracts describe logical ownership, not process topology.
 - An ACP provider may own a subprocess and protocol connection.
 - A stateless provider may launch one process per run.
 
-Core code must not require one process per backend or one process per session. Provider adapters retain process, transport, reconnect, auth, and protocol responsibilities.
+Core code must not require one process per backend or one process per session. Provider adapters retain process, transport, reconnect, auth, and protocol responsibilities. Provider association is immutable backend metadata, not the identity of execution itself. `InternalExecutionServiceId` is a branded identifier validated by application composition, not a closed capability enum. This also brings Grimoire-owned executors such as local shell commands under the same cancellation, terminal-outcome, unload, and projection rules without pretending that they are providers.
 
 ### Explicit owners
 
@@ -272,8 +286,8 @@ Every normalized provider event accepted into the core journal receives an immut
 ```ts
 interface ExecutionEventEnvelopeBase {
   schemaVersion: number;
-  providerId: ProviderId;
-  providerGeneration: number;
+  backendId: ExecutionBackendId;
+  backendGeneration: number;
   executionSessionId: ExecutionSessionId;
   sessionInstanceId: SessionInstanceId;
   eventId: string;
@@ -297,9 +311,9 @@ type ExecutionEventEnvelope = ExecutionEventEnvelopeBase & {
 
 Agent events additionally carry `agentInstanceId` and `agentRunId`. Provider-native session, thread, turn, task, and agent IDs remain opaque references owned by the adapter.
 
-`executionSessionId` is Grimoire's durable logical session identity. `sessionInstanceId` identifies one live incarnation; process recycling may retain the incarnation, while restart or reattachment creates a new one linked to the same logical session. Neither value is a provider-native resumable session ID. `providerGeneration` fences every event emitted before a settings transition, and the instance ID rejects a late emitter from an older incarnation. `runId` targets cancellation and result ownership.
+`executionSessionId` is Grimoire's durable logical session identity. `sessionInstanceId` identifies one live incarnation; process recycling may retain the incarnation, while restart or reattachment creates a new one linked to the same logical session. Neither value is a provider-native resumable session ID. `backendGeneration` fences every event emitted before a settings transition or internal-backend replacement, and the instance ID rejects a late emitter from an older incarnation. `runId` targets cancellation and result ownership. Provider identity, when present, is resolved from the immutable backend descriptor rather than duplicated in every event.
 
-One logical-session ingestor is the sequencing authority for both provider run streams and the session subscription. It deduplicates by `(providerGeneration, executionSessionId, eventId)` and then assigns the next Grimoire `sequence` for that logical session. An adapter ingress event must supply a stable delivery key derived from a native event ID, cursor, or stable native scope and ordinal when one exists; the ingestor uses that key as `eventId`. A new random ID on redelivery is not sufficient. A provider without stable replay identity must reconcile from status or snapshot after reconnect instead of replaying raw events as if they were deduplicable.
+One logical-session ingestor is the sequencing authority for both backend run streams and the session subscription. It deduplicates by `(backendGeneration, executionSessionId, eventId)` and then assigns the next Grimoire `sequence` for that logical session. An adapter ingress event must supply a stable delivery key derived from a native event ID, cursor, or stable native scope and ordinal when one exists; the ingestor uses that key as `eventId`. A new random ID on redelivery is not sufficient. A backend without stable replay identity must reconcile from status or snapshot after reconnect instead of replaying raw events as if they were deduplicable.
 
 If a provider exposes causal ordering, its adapter buffers a bounded out-of-order window before ingestion. A missing predecessor that does not arrive triggers a typed gap diagnostic and provider snapshot/status reconciliation. The reducer does not silently skip the gap or apply a terminal event across it. If reconciliation cannot establish a safe state, the affected run enters recovery and may eventually become `indeterminate`.
 
@@ -373,7 +387,7 @@ An `indeterminate` side-effecting run is never retried automatically. The UI mus
 interface ReconciliationRecord {
   runId: RunId;
   originalTerminal: 'indeterminate';
-  observedOutcome: 'succeeded' | 'failed' | 'cancelled';
+  observedOutcome: 'succeeded' | 'failed' | 'cancelled' | 'interrupted';
   observedResult?: ResultRef;
   evidence: ReconciliationEvidence;
   recordedAt: number;
@@ -423,12 +437,14 @@ An interaction remains visible after a tab detaches and may be answered from any
 
 Retry always creates a new `AgentRun`. It never rewrites the failed, cancelled, or indeterminate attempt.
 
-Agent dispatch is a durable two-step transition:
+Grimoire-requested agent dispatch is a durable two-step transition:
 
 1. Persist the new attempt, effective policy, stable dispatch token, and `dispatching` state before calling the provider.
 2. Persist the accepted native identity or explicit rejection before marking the attempt `running`.
 
 The adapter uses the dispatch token as an idempotency key only when the provider has a real idempotent launch contract. After a crash between provider acceptance and native-identity persistence, recovery first queries or adopts the native run through provider-supported correlation. If acceptance cannot be proven, the attempt becomes `indeterminate` with reason `dispatch_unknown`, and automatic relaunch is blocked. A retry is a visible new attempt because silently launching twice is worse than requiring a decision.
+
+A provider may also spawn a native child inside an already-running parent without a prior Grimoire dispatch call. That child is adopted idempotently from a stable native identity and records `observed-native` origin; the platform does not invent a pre-dispatch intent after the fact. Restart recovery uses provider status, history, or sidecar evidence to adopt missed children. If the provider exposes no stable child identity, the adapter must use aggregate or opaque fidelity rather than create a falsely durable instance.
 
 ### Parent-child hierarchy and dependency graph
 
@@ -472,11 +488,13 @@ A provider-native agent adapter may expose:
 - cancellation and status query;
 - reattach or resume.
 
-It must also declare event fidelity:
+These capabilities are declared independently. A provider that exposes results but not cancellation or reattachment must not receive a single optimistic `supportsAgents` flag. It also declares observation fidelity:
 
 - `full`: identity, progress, interactions, and terminal result are observable;
 - `aggregate`: useful progress and terminal result are observable, but some internal steps are not;
 - `terminal-only`: only completion or failure can be represented reliably.
+- `opaque`: nested work is known to exist, but stable child lifecycle cannot be represented;
+- `none`: the provider exposes neither native execution nor reliable native-agent evidence.
 
 The core never invents detailed events that a provider does not emit.
 
@@ -573,7 +591,7 @@ A resource cannot cool or dispose while it has:
 
 Logical session and agent identities survive process cooling. Residency policy may recycle a process without deleting durable ownership.
 
-### Provider generations and settings transitions
+### Backend generations and settings transitions
 
 Runtime-affecting settings use an explicit transition:
 
@@ -588,7 +606,7 @@ During the transition:
 - unconfirmed cancellation or dispatch becomes `indeterminate`, never `invalidated`;
 - persistence reaches a quiescent barrier;
 - settings and fingerprints are written with a durable transaction intent;
-- affected provider sessions are invalidated and initialized resources recycled;
+- affected provider-associated sessions are invalidated and initialized resources recycled;
 - the generation advances only after every accepted run is terminal or explicitly classified;
 - late ordinary events from generation `g` after the advance are ignored and counted diagnostically; an explicit reconciliation path may still attach evidence to an indeterminate run.
 
@@ -670,96 +688,25 @@ The platform deliberately avoids a least-common-denominator provider API. Lifecy
 
 ## Migration strategy
 
-Large architectural scope does not require a single destructive cutover. Each phase has a deletion goal and a go/no-go gate. The legacy adapter receives compatibility fixes only; new product capabilities target the new platform.
+The migration is incremental in implementation and atomic at the application composition boundary. New core contracts, persistence, backends, agents, work graphs, and projections are built and directly tested alongside the current path. The application does not route production providers through a wrapper around `ChatRuntime`, and it does not switch providers one at a time behind long-lived flags.
 
-### Phase 0: characterization and architecture decision record
+This avoids importing the old generator-end, callback, cancellation, tab-ownership, and persistence semantics into the new core. Provider adapters may share extracted low-level process, transport, session, and history primitives with their existing runtimes while both implementations exist. They must not build the new execution lifecycle on top of `ChatRuntime`.
 
-- Capture sanitized traces for new, resume, cancel, crash, approval, question, background work, and result delivery for every provider.
-- Classify each provider's backend, session, process, and concurrency topology.
-- Record native-history, message-ID, MCP, model, fork, rewind, and permission behavior.
-- Specify execution, interaction, agent, work-graph, and settings state machines.
-- Define privacy, retention, and schema-version requirements for the lifecycle store.
+The contract is proven before cutover with a deterministic fake plus four materially different real topologies:
 
-Go when Codex, Claude, an ACP provider, and stateless Antigravity fit the contracts without false capabilities or protocol-private types in core.
+1. a deterministic fake backend for failure and recovery states;
+2. Antigravity for stateless per-run processes;
+3. Codex for a multiplexed app-server and native agents;
+4. Claude for a persistent SDK stream and asynchronous native work;
+5. OpenCode for a managed ACP subprocess and provider-native database history.
 
-Stop and revise if an adapter must duplicate provider-native state or shared code must parse raw provider protocol payloads.
+Only after all four real topology families pass conformance and sanitized trace parity may the internal lifecycle contract reach its first semantic freeze. Grok, Qwen, Gemini, MiMoCode, and Kimi Code then exercise provider-specific extensions without widening the common core to their protocol details.
 
-### Phase 1: platform foundation, fake backend, and legacy adapter
+The feature layer, durable agents, work graphs, result UI, auxiliary work, local shell execution, provider catalog, and application lifecycle are built against the new contracts before the composition root changes. The final switch happens once in `ApplicationRuntime`; startup recovery completes before views accept work, and every execution surface uses the new platform from that point onward.
 
-- Add the validated provider catalog, settings codecs, and versioned runtime fingerprints.
-- Add execution identities, event envelopes, terminal outcomes, interactions, and lifecycle registry.
-- Add the single-writer event ingestor, stable dedupe keys, gap recovery, and reconciliation records.
-- Add agent instance/run aggregates, crash-safe dispatch intents, work graphs, result contracts, and durable-store interfaces.
-- Add a revisioned conversation repository contract and typed history-hydration outcomes.
-- Add shutdown acceptance fencing, checkpoints, bounded disposal, and restart reconciliation.
-- Build a deterministic fake backend with controllable delays, duplicates, reordering, crashes, and reconnect outcomes.
-- Wrap the current `ChatRuntime` behind `LegacyExecutionBackend` without changing provider behavior.
-- Add conformance suites for backend, session, run, interaction, agent, result, and recovery contracts.
+The same branch then deletes `ChatRuntime`, the split provider registries, UI-owned subagent lifecycle, tab-owned execution, old worker-tab orchestration, direct process launch from features, and any temporary bridge or flag. The branch is not ready to merge while either architecture remains reachable.
 
-The fake backend must prove the complete execution and agent lifecycle: exactly one terminal outcome, disconnect recovery, targeted cancellation, stable cross-stream deduplication, gap handling, stale-event fencing, idempotent projection, crash-safe agent dispatch, restart reconciliation, and tab-independent agent ownership.
-
-The legacy backend gate is narrower: it must prove current execution, cancellation, result, and terminal trace parity without importing tab or DOM types into the core. Existing provider-agent presentation remains an explicit compatibility limitation until Phase 2 wires those signals into durable projections.
-
-Stop and revise if the adapter needs a tab, DOM node, feature controller, or concrete plugin view inside the core lifecycle layer.
-
-### Phase 2: feature-layer cutover through compatibility
-
-- Introduce a `ChatExecutionCoordinator` that owns requests and projection subscriptions.
-- Move turn completion, persistence barriers, interactions, and queued-input release out of `InputController`.
-- Reduce execution events into chat and agent projections before rendering.
-- Route conversation mutations through the revisioned repository rather than shared mutable objects.
-- Make tabs attach and detach from projections rather than own runtimes.
-- Replace warm-tab protection with lifecycle leases and explicit `canSuspend()` reasons.
-- Feed current provider subagent signals into agent projections as a compatibility source.
-- Keep all providers working through `LegacyExecutionBackend` while this cutover lands.
-
-Go when current unit and integration tests pass, native behavior has trace parity, real provider agents observed through the compatibility path survive tab detach, tab close cannot destroy background work, and `src/features/**` no longer imports `ChatRuntime`.
-
-Stop and revise if native history, message IDs, approvals, fork, rewind, or MCP behavior changes.
-
-### Phase 3: Codex vertical slice
-
-- Implement a native Codex backend, session, run, event, and interaction adapter.
-- Map native agent identity, progress, tool activity, status, cancellation, and results.
-- Exercise detached agents, restart reattachment, structured results, and explicit synthesis.
-- Route title, refine, inline edit, and probes through isolated lifecycle-owned runs.
-- Apply provider-generation fencing to Codex settings transitions.
-
-Go when new, resume, cancel, steer, background agent, tab close, restart, and result display match real runtime traces and never cross session boundaries.
-
-Do not freeze the shared API yet. A single provider is not sufficient evidence.
-
-### Phase 4: Claude as the second full proof
-
-- Implement persistent-query and native-session ownership without assuming Codex topology.
-- Preserve approvals, questions, plan mode, auto/background turns, resume, fork, rewind, and native history.
-- Map native agents with declared event fidelity.
-- Run Grimoire-managed child agents and synthesis through ordinary execution sessions.
-- Prove attached and detached cancellation and restart behavior.
-
-Go when native and managed agents survive tab close and supported restarts, results are neither lost nor duplicated, and the abstraction still contains no provider-private protocol types.
-
-Only after Codex and Claude pass should the shared lifecycle API reach version 1.
-
-### Phase 5: ACP family, stateless proof, and managed orchestration
-
-- Characterize and extract only the truly shared OpenCode, MiMoCode, and Kimi Code ACP kernel.
-- Keep Grok, Qwen, and Gemini adapters separate where launch, history, commands, permissions, or metadata differ.
-- Use Antigravity to prove that a stateless per-run process fits without fake session behavior.
-- Route command and model probes through ephemeral lifecycle leases.
-- Replace tab-based parallel workers with persisted work graphs, dependencies, result collection, retry, and synthesis.
-
-Go provider by provider on trace parity. A shared ACP transport does not by itself justify shared provider semantics.
-
-### Phase 6: retire the compatibility layer
-
-- Migrate remaining providers and auxiliary services.
-- Delete direct runtime constructors outside provider adapters and tests.
-- Delete `ChatRuntime`, provider-local no-op services, and tab-owned execution lifecycle.
-- Remove compatibility registries after every provider is supplied by the validated catalog.
-- Migrate or delete old subagent presentation state after durable projections cover restored conversations.
-
-The transition is complete only when no feature-layer code owns provider execution or agent lifetime.
+The complete phase graph, checkpoint commits, preservation rules, provider matrix, test requirements, stop conditions, and deletion searches live in [`provider-execution-migration-plan.md`](provider-execution-migration-plan.md). That file is the operational source of truth for the transition.
 
 ## Contract and acceptance tests
 
@@ -806,7 +753,7 @@ The platform needs deterministic tests beyond provider happy paths.
 - dependency cycles and missing nodes fail before launch;
 - a node starts only after dependency policy is satisfied;
 - partial and successful sibling results remain visible when another child or synthesis fails;
-- native `full`, `aggregate`, and `terminal-only` fidelity produce honest projections;
+- native `full`, `aggregate`, `terminal-only`, `opaque`, and `none` fidelity produce honest projections;
 - synthesis references exact child result IDs and does not duplicate native parent output.
 
 ### Provider compatibility
@@ -834,11 +781,11 @@ Provider adapters also require sanitized real-runtime trace comparison. OpenCode
 
 ### Overfitting the first provider
 
-Codex is the first vertical slice, not the architecture template. Claude must prove the contract before version 1, followed by one ACP provider and stateless Antigravity.
+Antigravity is the first real vertical slice because it exposes the smallest stateless topology, not because it defines the architecture. Codex, Claude, and OpenCode must then prove multiplexed app-server, persistent SDK, and managed ACP topologies before the first semantic freeze.
 
 ### A permanent dual stack
 
-Every migration phase has an import/deletion criterion. `LegacyExecutionBackend` receives no new product features and is removed after the last provider cutover.
+Every migration phase has an import/deletion criterion. The old and new implementations may coexist only while the new path is directly tested; there is no old-runtime-to-new-lifecycle adapter. One composition-root switch is followed immediately by deletion of the old path in the same branch.
 
 ### A giant new core abstraction
 
@@ -846,7 +793,7 @@ Keep execution lifecycle small and move optional behavior into capability ports.
 
 ### Loss of native behavior
 
-Provider-owned history, transcripts, session state, model semantics, MCP files, and security remain authoritative. Each migration requires trace parity before the provider becomes default on the new path.
+Provider-owned history, transcripts, session state, model semantics, MCP files, and security remain authoritative. Each backend requires trace parity before it is admitted to the complete catalog used by the hard cutover.
 
 ### Privacy expansion from durable agents
 
@@ -854,7 +801,7 @@ Persist a whitelisted control projection and result references only. Do not stor
 
 ### Crash consistency and late events
 
-Use atomic snapshots, append-only deduplicated events where needed, monotonic revisions, provider generations, and idempotent recovery. Close acceptance gates synchronously during unload; cleanup and late completion remain safe to repeat.
+Use atomic snapshots, append-only deduplicated events where needed, monotonic revisions, backend generations, and idempotent recovery. Close acceptance gates synchronously during unload; cleanup and late completion remain safe to repeat.
 
 ### UI overload
 
@@ -864,7 +811,7 @@ Default to a compact aggregate card and progressive disclosure. Preserve success
 
 ### Keep adding lifecycle methods to `ChatRuntime`
 
-This postpones the ownership decision and makes every new agent, auxiliary feature, and provider settings transition more expensive. The existing interface should be adapted and retired.
+This postpones the ownership decision and makes every new agent, auxiliary feature, and provider settings transition more expensive. The existing interface is replaced and retired; only low-level provider primitives are extracted for reuse.
 
 ### Make tabs the durable unit of background work
 
@@ -872,7 +819,7 @@ Tabs are views. They can be closed, restored, reordered, or evicted for memory. 
 
 ### Force every provider through one transport or session topology
 
-Shared lifecycle does not require a shared protocol. SDK, app-server, ACP, legacy, and stateless providers keep their native adapters and resource topology.
+Shared lifecycle does not require a shared protocol. SDK, app-server, ACP, print-mode, and internal executors keep their native adapters and resource topology.
 
 ### Persist every raw event for replay
 
@@ -882,18 +829,12 @@ This would duplicate transcripts, enlarge the privacy surface, and bind Grimoire
 
 Tools may already have changed files or external state before a connection disappeared. An indeterminate result requires inspection or deliberate user action.
 
-### Move all providers in one release
+### Switch production providers incrementally
 
-The target architecture is broad, but a single cutover would hide regressions across nine distinct runtimes. Compatibility adapters and per-provider trace gates provide a safer route to the same final architecture.
+A provider-by-provider production switch would split lifecycle authority and make cross-provider UI, agents, persistence, and shutdown behavior depend on two systems. Provider backends are implemented and trace-verified in waves, but the application switches to the complete catalog once.
 
 ## Recommended first implementation series
 
-The first series should establish the foundation, not ship a provider rewrite:
+Implementation follows the checkpoints in [`provider-execution-migration-plan.md`](provider-execution-migration-plan.md). The first code series characterizes real behavior, establishes dependency boundaries and versioned repositories, and proves the generic lifecycle kernel with a deterministic fake backend. It then proves stateless, app-server, persistent SDK, and managed ACP topologies before the contract is treated as stable.
 
-1. Land the architecture decision, state machines, event/result schemas, and provider topology characterization.
-2. Add the deterministic fake backend, lifecycle registry, agent aggregates, result-store interfaces, and conformance tests.
-3. Add the validated provider catalog, settings codecs, runtime fingerprints, and `LegacyExecutionBackend` behind an internal feature flag.
-4. Cut the feature layer over to projections while every real provider still uses the compatibility backend.
-5. Begin the Codex vertical slice only after the compatibility path proves trace parity.
-
-This sequence makes the new lifecycle model testable before it controls real sessions. It also creates the agent ownership and result contracts early enough that they shape execution, rather than being added later as another stream-chunk convention.
+Agents, work graphs, projections, auxiliary work, internal shell execution, and the complete provider catalog are finished before the hard composition-root cutover. The last series removes the old architecture and runs the final structural, migration, trace-parity, test-vault, and release-build gates.
