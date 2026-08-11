@@ -78,6 +78,7 @@ function resolveImport(reference: ImportReference): string | null {
 
 function isTargetCoreFile(path: string): boolean {
   return path.startsWith(join(sourceRoot, 'core/execution/'))
+    || path.startsWith(join(sourceRoot, 'core/persistence/'))
     || path === join(sourceRoot, 'core/providers/ProviderModule.ts')
     || path === join(sourceRoot, 'core/providers/ProviderCatalog.ts');
 }

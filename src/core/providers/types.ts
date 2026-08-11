@@ -94,6 +94,7 @@ export interface AppTabManagerState {
     conversationId: string | null;
     draftModel?: string | null;
     draftSettings?: Record<string, unknown> | null;
+    titleOverride?: string | null;
     orchestratorMode?: boolean;
   }>;
   activeTabId: string | null;

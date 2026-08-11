@@ -312,6 +312,7 @@ describe('StorageService convenience methods', () => {
             effortLevel: 'high',
             permissionMode: 'plan',
           },
+          titleOverride: 'Research',
           orchestratorMode: true,
         }],
         activeTabId: 'tab-1',

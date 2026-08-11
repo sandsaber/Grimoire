@@ -8,9 +8,12 @@
 import type { App } from 'obsidian';
 
 export class VaultFileAdapter {
+  readonly coordinationKey: object;
   private writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(private app: App) {}
+  constructor(private app: App) {
+    this.coordinationKey = app.vault.adapter;
+  }
 
   async exists(path: string): Promise<boolean> {
     return this.app.vault.adapter.exists(path);

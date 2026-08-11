@@ -108,6 +108,8 @@ The project requires Obsidian 1.13.0 or newer and uses the declarative settings 
 |------|-------|
 | `.grimoire/grimoire-settings.json` | Shared Grimoire app settings plus provider-specific configuration |
 | `.grimoire/sessions/*.meta.json` | Provider-neutral session metadata |
+| `.grimoire/control/conversations/*.json` | Revisioned provider-neutral conversation records used by the new application runtime |
+| `.grimoire/control/transaction-intents/*.json` | Recoverable multi-record mutation intents and completion markers |
 | `.grimoire/logs/YYYY-MM-DD.jsonl` | Optional sanitized debug logs, written only when Advanced debug logging is enabled |
 | `.grimoire/mcp/<provider>.json` | Grimoire-owned MCP servers injected into ACP sessions for OpenCode, Grok Build, MiMoCode, Kimi Code, Qwen Code, and Gemini CLI |
 | `.grimoire/claude/statusline-usage.json` | Claude Code status-line usage snapshot used to hydrate plan-limit indicators |

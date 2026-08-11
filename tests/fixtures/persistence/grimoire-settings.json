@@ -1,0 +1,24 @@
+{
+  "userName": "Vault User",
+  "permissionMode": "normal",
+  "model": "gpt-5-codex",
+  "effortLevel": "high",
+  "systemPrompt": "Use vault context carefully.",
+  "envSnippets": [],
+  "settingsProvider": "codex",
+  "savedProviderModel": {
+    "codex": "gpt-5-codex"
+  },
+  "savedProviderEffort": {
+    "codex": "high"
+  },
+  "providerConfigs": {
+    "codex": {
+      "enabled": true,
+      "reasoningSummary": "detailed"
+    },
+    "opencode": {
+      "enabled": false
+    }
+  }
+}

@@ -194,6 +194,9 @@ export class StorageService {
           ? { draftModel: tabObj.draftModel }
           : {}),
         ...(draftSettings ? { draftSettings } : {}),
+        ...(typeof tabObj.titleOverride === 'string'
+          ? { titleOverride: tabObj.titleOverride }
+          : {}),
         ...(tabObj.orchestratorMode === true ? { orchestratorMode: true } : {}),
       });
     }
@@ -225,6 +228,7 @@ export interface TabManagerPersistedState {
     conversationId: string | null;
     draftModel?: string | null;
     draftSettings?: Record<string, unknown> | null;
+    titleOverride?: string | null;
     orchestratorMode?: boolean;
   }>;
   activeTabId: string | null;

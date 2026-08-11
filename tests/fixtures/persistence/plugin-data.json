@@ -1,0 +1,17 @@
+{
+  "tabManagerState": {
+    "openTabs": [
+      {
+        "tabId": "tab-1",
+        "conversationId": "fixture-conversation",
+        "draftModel": "gpt-5-codex",
+        "draftSettings": {
+          "effortLevel": "high"
+        },
+        "titleOverride": "Pinned fixture",
+        "orchestratorMode": true
+      }
+    ],
+    "activeTabId": "tab-1"
+  }
+}

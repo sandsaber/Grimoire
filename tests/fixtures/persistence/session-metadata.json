@@ -1,0 +1,32 @@
+{
+  "id": "fixture-conversation",
+  "providerId": "codex",
+  "title": "Persisted fixture",
+  "titleGenerationStatus": "success",
+  "createdAt": 1750000000000,
+  "updatedAt": 1750000001000,
+  "lastResponseAt": 1750000001000,
+  "sessionId": "native-thread-1",
+  "model": "gpt-5-codex",
+  "providerState": {
+    "threadId": "native-thread-1",
+    "sessionFilePath": "/vault/.codex/sessions/native-thread-1.jsonl",
+    "futureNativeField": {
+      "ordinal": 7,
+      "flags": [true, false]
+    }
+  },
+  "messages": [
+    {
+      "id": "message-1",
+      "role": "user",
+      "content": "Fixture question",
+      "timestamp": 1750000000000
+    }
+  ],
+  "currentNote": "Notes/Architecture.md",
+  "externalContextPaths": ["Notes", "Projects/Grimoire"],
+  "enabledMcpServers": ["vault-search"],
+  "orchestratorMode": true,
+  "resumeAtMessageId": "turn-7"
+}

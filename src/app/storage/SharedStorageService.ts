@@ -17,6 +17,7 @@ type PersistedTabState = {
   conversationId: string | null;
   draftModel?: string | null;
   draftSettings?: Record<string, unknown> | null;
+  titleOverride?: string | null;
   orchestratorMode?: boolean;
 };
 
@@ -146,6 +147,9 @@ export class SharedStorageService implements SharedAppStorage {
           ? { draftModel: tabObj.draftModel }
           : {}),
         ...(draftSettings ? { draftSettings } : {}),
+        ...(typeof tabObj.titleOverride === 'string'
+          ? { titleOverride: tabObj.titleOverride }
+          : {}),
         ...(tabObj.orchestratorMode === true
           ? { orchestratorMode: true }
           : {}),
