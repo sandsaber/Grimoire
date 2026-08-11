@@ -54,7 +54,7 @@ describe('OpencodeExecutionBackend', () => {
       sessionInstanceId: trace.identity.sessionInstanceId,
       scope: expect.objectContaining({
         runId: trace.identity.runId,
-        turnId: trace.identity.nativeRunId,
+        nativeRunRef: trace.identity.nativeRunId,
       }),
     }));
     const resultEvent = captured.find(event => event.event.kind === 'result');
@@ -209,7 +209,7 @@ describe('OpencodeExecutionBackend', () => {
     const captured = await events;
     expectTerminal(captured, 'indeterminate', 'effects-unknown');
     expect(new Set(captured.map(event => (
-      event.scope.kind === 'run' ? event.scope.turnId : undefined
+      event.scope.kind === 'run' ? event.scope.nativeRunRef : undefined
     )))).toEqual(new Set(['message-1']));
     expect(fixture.stored).toHaveLength(0);
   });

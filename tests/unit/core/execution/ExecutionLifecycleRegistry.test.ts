@@ -351,7 +351,7 @@ describe('ExecutionLifecycleRegistry', () => {
     await startDefaultRun(fixture);
     fixture.backend.emit(RUN_ID, { kind: 'run-started' }, {
       deliveryId: 'native-turn-started',
-      scope: { kind: 'run', runId: RUN_ID, turnId: 'native-turn-1' },
+      scope: { kind: 'run', runId: RUN_ID, nativeRunRef: 'native-turn-1' },
     });
     await settle(fixture.registry);
 
@@ -362,7 +362,7 @@ describe('ExecutionLifecycleRegistry', () => {
     }
     const mismatched = fixture.backend.createDelivery(
       nativeSession,
-      { kind: 'run', runId: RUN_ID, turnId: 'native-turn-2' },
+      { kind: 'run', runId: RUN_ID, nativeRunRef: 'native-turn-2' },
       { kind: 'thinking-activity' },
       { deliveryId: 'mismatched-native-turn' },
     );
@@ -377,7 +377,7 @@ describe('ExecutionLifecycleRegistry', () => {
     });
     fixture.backend.emit(RUN_ID, { kind: 'connection-lost' }, {
       deliveryId: 'native-turn-disconnected',
-      scope: { kind: 'run', runId: RUN_ID, turnId: 'native-turn-1' },
+      scope: { kind: 'run', runId: RUN_ID, nativeRunRef: 'native-turn-1' },
     });
     await settle(fixture.registry, 12);
 

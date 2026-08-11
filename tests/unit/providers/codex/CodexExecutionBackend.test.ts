@@ -105,7 +105,7 @@ describe('CodexExecutionBackend', () => {
       backendGeneration: trace.identity.backendGeneration,
       executionSessionId: trace.identity.executionSessionId,
       sessionInstanceId: trace.identity.sessionInstanceId,
-      scope: { runId: trace.identity.runId, turnId: trace.identity.nativeTurnId },
+      scope: { runId: trace.identity.runId, nativeRunRef: trace.identity.nativeTurnId },
     });
     expect(firstSession.getSnapshot()).toMatchObject({
       nativeSessionRef: trace.identity.nativeThreadId,
@@ -299,7 +299,7 @@ describe('CodexExecutionBackend', () => {
     const settled = await compactEvents;
     expectTerminal(settled, 'succeeded', 'completed');
     expect(settled.filter(event => event.event.kind === 'run-started')).toEqual([
-      expect.objectContaining({ scope: expect.objectContaining({ turnId: 'turn-compact' }) }),
+      expect.objectContaining({ scope: expect.objectContaining({ nativeRunRef: 'turn-compact' }) }),
     ]);
   });
 
@@ -709,7 +709,7 @@ describe('CodexExecutionBackend', () => {
       ['native-agent', 'Child result'],
       ['assistant', 'Parent synthesis'],
     ]);
-    expect(summarizeEvents(settled)).toEqual(trace.cases.nativeAgentResult);
+    expect(summarizeEvents(settled)).toEqual(trace.eventCases.nativeAgentResult);
     expect(settled.filter(event => event.event.kind === 'terminal')).toHaveLength(1);
   });
 

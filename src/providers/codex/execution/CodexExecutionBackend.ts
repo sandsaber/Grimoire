@@ -1483,7 +1483,7 @@ class CodexExecutionRun implements ExecutionRun {
       scope: {
         kind: 'run',
         runId: this.request.runId,
-        ...(this.turnId ? { turnId: this.turnId } : {}),
+        ...(this.turnId ? { nativeRunRef: this.turnId } : {}),
       },
       event,
     };

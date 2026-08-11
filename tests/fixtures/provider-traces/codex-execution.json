@@ -6,8 +6,24 @@
   "concurrency": "multiplexed-sessions",
   "sessionIdentity": "native-thread",
   "runIdentity": "native-turn",
+  "historyOwnership": "provider-native",
   "resultExpectation": "required",
   "agentObservation": "aggregate",
+  "agentEvidence": {
+    "definitionInventory": "provider-files",
+    "spawnOrigins": ["provider-native"],
+    "stableIdentity": true,
+    "observation": "aggregate",
+    "resultExtraction": "native",
+    "cancellation": "unsupported",
+    "statusQuery": "unsupported",
+    "reattachment": "unsupported",
+    "source": "parent-collaboration-events",
+    "eventCase": "nativeAgentResult",
+    "cancellationCase": null,
+    "statusQueryCase": null,
+    "reattachmentCase": null
+  },
   "identity": {
     "backendGeneration": 1,
     "executionSessionId": "es-00000000000000000000000000000001",
@@ -15,6 +31,21 @@
     "runId": "run-11111111111111111111111111111111",
     "nativeThreadId": "thread-1",
     "nativeTurnId": "turn-thread-1"
+  },
+  "eventCases": {
+    "nativeAgentResult": [
+      "run-started",
+      "native-agent-observed:native-agent-7",
+      "native-agent-status:native-agent-7:running",
+      "native-agent-activity:native-agent-7:input-sent",
+      "native-agent-activity:native-agent-7:wait-observed",
+      "native-agent-result:native-agent-7:projection",
+      "native-agent-status:native-agent-7:completed",
+      "native-agent-activity:native-agent-7:close-observed",
+      "native-agent-status:native-agent-7:closed",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ]
   },
   "cases": {
     "initializationAndNewThread": [
@@ -65,19 +96,6 @@
     "missingCompletionRecovery": [
       "run-started",
       "recovery-started",
-      "result:projection",
-      "terminal:succeeded:completed"
-    ],
-    "nativeAgentResult": [
-      "run-started",
-      "native-agent-observed:native-agent-7",
-      "native-agent-status:native-agent-7:running",
-      "native-agent-activity:native-agent-7:input-sent",
-      "native-agent-activity:native-agent-7:wait-observed",
-      "native-agent-result:native-agent-7:projection",
-      "native-agent-status:native-agent-7:completed",
-      "native-agent-activity:native-agent-7:close-observed",
-      "native-agent-status:native-agent-7:closed",
       "result:projection",
       "terminal:succeeded:completed"
     ]

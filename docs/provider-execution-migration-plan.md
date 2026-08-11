@@ -548,11 +548,22 @@ Checkpoint: `feat(opencode): add managed ACP execution backend`
 
 Semantic freeze gate:
 
-- all four real topology families and the fake backend pass the same lifecycle conformance suite;
+- all four real topology families and the fake backend pass the same common-semantics lifecycle
+  conformance suite;
 - no provider needs protocol-private fields in core;
 - provider-native histories and IDs retain trace parity;
 - agent fidelity can be expressed honestly without fabricating events;
 - an independent architecture review approves the boundary.
+
+The conformance contract is layered by ownership and only freezes semantics that are genuinely
+common. Every backend runs the same adapter-edge cases and the same registry-integrated cases.
+Ordering, deduplication, stale delivery, settings-transition, interaction, persistence, and recovery
+rules that only the core registry may decide are tested once against the deterministic registry
+harness. Initialization sharing, reconnect, reattachment, and restart recovery are topology-specific:
+they remain mandatory in each provider's sanitized trace suite, but are not given fabricated uniform
+behavior. Provider-specific interaction and agent capabilities are checked against each provider's
+declared capability and actual backend event trace. Repeating core policy inside every adapter would
+create five competing lifecycle implementations instead of one platform.
 
 After this gate, changes to lifecycle semantics require a recorded reason and conformance updates across all four topology proofs. This is an internal semantic freeze, not a public binary or source compatibility promise.
 
@@ -828,19 +839,24 @@ Every accepted trace records test-safe backend generation, backend/session incar
 
 ### Conformance suites
 
-Every backend runs the same deterministic tests for:
+Every backend runs the same deterministic adapter-edge and registry-integration tests for the common
+contract:
 
-- initialization sharing and disposal;
-- owner/session/run identity;
+- disposal and unload ownership;
+- owner/session/run identity at the registry boundary;
 - cancellation targeting and idempotency;
 - exactly-one-terminal behavior;
 - required, optional, and absent result expectations;
-- duplicate, reordered, missing, stale, wrong-session, and post-terminal events;
-- disconnect, reattach, status reconciliation, interruption, and indeterminate outcomes;
-- settings generation fencing;
-- interaction ownership and idempotent resolution;
-- unload acceptance fencing and restart recovery;
-- privacy-bounded persistence.
+- timeout, output-limit, and indeterminate cancellation outcomes;
+- duplicate ingress, stale generation/incarnation, wrong-session, post-terminal rejection, and
+  settings generation fencing at the registry boundary;
+- persistence of bounded result references rather than provider output.
+
+The provider-neutral registry suite owns reordered and missing delivery, causal gaps, durable
+deduplication, interaction ownership and idempotent resolution, settings-transition recovery, and
+crash-boundary behavior. These rules are not adapter extension points. Provider trace suites cover
+only capabilities the provider actually declares, including initialization sharing, reconnect,
+reattachment, restart recovery, native interactions, agent fidelity, and provider-native history.
 
 Agent-capable backends also run conformance for native identity, fidelity, status, result, cancellation, and recovery. A provider is not required to pass a capability it honestly declares absent.
 

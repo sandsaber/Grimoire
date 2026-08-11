@@ -77,7 +77,7 @@ describe('ClaudeExecutionBackend', () => {
       sessionInstanceId: trace.identity.sessionInstanceId,
       scope: expect.objectContaining({
         runId: trace.identity.runId,
-        turnId: trace.identity.nativeRunId,
+        nativeRunRef: trace.identity.nativeRunId,
       }),
     }));
     expect(session.getSnapshot().nativeSessionRef).toBe('native-session');
@@ -766,6 +766,14 @@ describe('ClaudeExecutionBackend', () => {
         status: 'closed',
       }),
     }));
+    expect([
+      ...fixture.query.stopTask.mock.calls.map(([taskId]) => `stopTask:${taskId}`),
+      ...observed.flatMap(event => event.event.kind === 'native-agent-status'
+        && event.event.nativeAgentKey === 'task-1'
+        && event.event.status === 'closed'
+        ? [`native-agent-status:${event.event.nativeAgentKey}:${event.event.status}`]
+        : []),
+    ]).toEqual(trace.agentEvidence.cancellationCase);
     await expect(fixture.backend.cancelNativeTask({
       executionSessionId: String(session.executionSessionId),
       taskId: 'task-1',

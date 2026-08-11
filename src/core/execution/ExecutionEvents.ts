@@ -18,7 +18,7 @@ export interface CausalDeliveryPosition {
 
 export type ExecutionEventScope =
   | { readonly kind: 'session' }
-  | { readonly kind: 'run'; readonly runId: RunId; readonly turnId?: string }
+  | { readonly kind: 'run'; readonly runId: RunId; readonly nativeRunRef?: string }
   | {
     readonly kind: 'agent';
     readonly runId: RunId;

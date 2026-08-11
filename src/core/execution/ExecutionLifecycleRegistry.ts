@@ -1173,7 +1173,7 @@ export class ExecutionLifecycleRegistry {
       return { kind: 'ignored-post-terminal' };
     }
     const nativeRunRef = envelope.scope.kind === 'run'
-      ? envelope.scope.turnId
+      ? envelope.scope.nativeRunRef
       : undefined;
     if (nativeRunRef
       && run.record.nativeRunRef

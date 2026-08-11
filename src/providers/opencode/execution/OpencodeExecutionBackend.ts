@@ -1000,7 +1000,7 @@ class OpencodeExecutionRun implements ExecutionRun {
       scope: {
         kind: 'run',
         runId: this.request.runId,
-        ...(this.nativeRunRef ? { turnId: this.nativeRunRef } : {}),
+        ...(this.nativeRunRef ? { nativeRunRef: this.nativeRunRef } : {}),
       },
       event,
     };

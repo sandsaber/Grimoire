@@ -64,6 +64,12 @@ describe('AntigravityExecutionBackend', () => {
       source: 'stdout',
     }]);
     expect(summarizeEvents(await events)).toEqual(trace.cases.stdoutSuccess);
+    expect((await events)[0]).toEqual(expect.objectContaining({
+      backendGeneration: trace.identity.backendGeneration,
+      executionSessionId: trace.identity.executionSessionId,
+      sessionInstanceId: trace.identity.sessionInstanceId,
+      scope: expect.objectContaining({ runId: trace.identity.runId }),
+    }));
     expect((await events).filter(event => event.event.kind === 'terminal')).toHaveLength(1);
   });
 

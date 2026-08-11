@@ -1923,7 +1923,7 @@ class ClaudeExecutionRun implements ExecutionRun {
       scope: scope ?? {
         kind: 'run',
         runId: this.request.runId,
-        ...(this.nativeUserMessageId ? { turnId: this.nativeUserMessageId } : {}),
+        ...(this.nativeUserMessageId ? { nativeRunRef: this.nativeUserMessageId } : {}),
       },
       event,
     };

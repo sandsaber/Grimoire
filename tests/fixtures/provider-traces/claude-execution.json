@@ -6,8 +6,27 @@
   "concurrency": "serial-runs",
   "sessionIdentity": "sdk-session",
   "runIdentity": "user-message-uuid",
+  "historyOwnership": "provider-native",
   "resultExpectation": "required",
   "agentObservation": "full",
+  "agentEvidence": {
+    "definitionInventory": "native",
+    "spawnOrigins": ["provider-native"],
+    "stableIdentity": true,
+    "observation": "full",
+    "resultExtraction": "native",
+    "cancellation": "native",
+    "statusQuery": "unsupported",
+    "reattachment": "unsupported",
+    "source": "native-task-notifications",
+    "eventCase": "backgroundAgentLateResult",
+    "cancellationCase": [
+      "stopTask:task-1",
+      "native-agent-status:task-1:closed"
+    ],
+    "statusQueryCase": null,
+    "reattachmentCase": null
+  },
   "identity": {
     "backendGeneration": 1,
     "executionSessionId": "es-dddddddddddddddddddddddddddddddd",
