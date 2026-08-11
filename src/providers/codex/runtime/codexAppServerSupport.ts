@@ -1,5 +1,6 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import type { ProviderId } from '../../../core/providers/types';
-import type GrimoirePlugin from '../../../main';
 import { getEnhancedPath, parseEnvironmentVariables } from '../../../utils/env';
 import { getVaultPath } from '../../../utils/path';
 import type { InitializeResult } from './codexAppServerTypes';
@@ -12,12 +13,12 @@ const CODEX_APP_SERVER_CLIENT_INFO = Object.freeze({
   version: '1.0.0',
 });
 
-export function getCodexAppServerWorkingDirectory(plugin: GrimoirePlugin): string {
+export function getCodexAppServerWorkingDirectory(plugin: LegacyProviderContext): string {
   return getVaultPath(plugin.app) ?? process.cwd();
 }
 
 export function buildCodexAppServerEnvironment(
-  plugin: GrimoirePlugin,
+  plugin: LegacyProviderContext,
   providerId: ProviderId = 'codex',
 ): Record<string, string> {
   const customEnv = parseEnvironmentVariables(plugin.getActiveEnvironmentVariables(providerId));
@@ -34,7 +35,7 @@ export function buildCodexAppServerEnvironment(
 }
 
 export function resolveCodexAppServerLaunchSpec(
-  plugin: GrimoirePlugin,
+  plugin: LegacyProviderContext,
   providerId: ProviderId = 'codex',
 ): CodexLaunchSpec {
   return buildCodexLaunchSpec({

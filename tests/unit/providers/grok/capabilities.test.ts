@@ -17,12 +17,12 @@ describe('GROK_PROVIDER_CAPABILITIES', () => {
     expect(GROK_PROVIDER_CAPABILITIES.supportsPlanMode).toBe(true);
   });
 
-  it('should support rewind', () => {
-    expect(GROK_PROVIDER_CAPABILITIES.supportsRewind).toBe(true);
+  it('should not advertise rewind while the runtime cannot perform it', () => {
+    expect(GROK_PROVIDER_CAPABILITIES.supportsRewind).toBe(false);
   });
 
-  it('should support fork', () => {
-    expect(GROK_PROVIDER_CAPABILITIES.supportsFork).toBe(true);
+  it('should not advertise fork while history cannot construct fork state', () => {
+    expect(GROK_PROVIDER_CAPABILITIES.supportsFork).toBe(false);
   });
 
   it('should support provider commands', () => {

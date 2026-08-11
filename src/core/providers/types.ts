@@ -1,4 +1,3 @@
-import type GrimoirePlugin from '../../main';
 import type { CursorContext } from '../../utils/editor';
 import type { SharedAppStorage } from '../bootstrap/storage';
 import type { McpServerManager } from '../mcp/McpServerManager';
@@ -18,6 +17,7 @@ import type {
 } from '../types';
 import type { ProviderId } from '../types/provider';
 import type { ProviderCommandCatalog } from './commands/ProviderCommandCatalog';
+import type { LegacyProviderContext } from './LegacyProviderContext';
 
 export type { ProviderId } from '../types/provider';
 
@@ -41,7 +41,7 @@ export interface ProviderCapabilities {
 export const DEFAULT_CHAT_PROVIDER_ID = 'codex' as const satisfies ProviderId;
 
 export interface CreateChatRuntimeOptions {
-  plugin: GrimoirePlugin;
+  plugin: LegacyProviderContext;
   providerId?: ProviderId;
 }
 
@@ -64,9 +64,9 @@ export interface ProviderRegistration {
   chatUIConfig: ProviderChatUIConfig;
   settingsReconciler: ProviderSettingsReconciler;
   createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => ChatRuntime;
-  createTitleGenerationService: (plugin: GrimoirePlugin) => TitleGenerationService;
-  createInstructionRefineService: (plugin: GrimoirePlugin) => InstructionRefineService;
-  createInlineEditService: (plugin: GrimoirePlugin) => InlineEditService;
+  createTitleGenerationService: (plugin: LegacyProviderContext) => TitleGenerationService;
+  createInstructionRefineService: (plugin: LegacyProviderContext) => InstructionRefineService;
+  createInlineEditService: (plugin: LegacyProviderContext) => InlineEditService;
   historyService: ProviderConversationHistoryService;
   taskResultInterpreter: ProviderTaskResultInterpreter;
   subagentLifecycleAdapter?: ProviderSubagentLifecycleAdapter;
@@ -304,7 +304,7 @@ export interface ProviderChatUIConfig {
   prepareModelMetadata?(
     model: string,
     settings: Record<string, unknown>,
-    context: { plugin: GrimoirePlugin },
+    context: { plugin: LegacyProviderContext },
   ): Promise<void>;
 
   /** Optional hook when the toolbar changes a reasoning selection. */
@@ -356,7 +356,7 @@ export interface ProviderRuntimeCommandLoaderContext {
   allowSessionCreation?: boolean;
   conversation: Conversation | null;
   externalContextPaths: string[];
-  plugin: GrimoirePlugin;
+  plugin: LegacyProviderContext;
   runtime: ChatRuntime | null;
 }
 
@@ -366,7 +366,7 @@ export interface ProviderRuntimeCommandLoader {
 }
 
 export interface ProviderModelCatalogRefreshContext {
-  plugin: GrimoirePlugin;
+  plugin: LegacyProviderContext;
   settings: Record<string, unknown>;
 }
 
@@ -376,7 +376,7 @@ export interface ProviderModelCatalog {
 }
 
 export interface ProviderPlanUsageContext {
-  plugin: GrimoirePlugin;
+  plugin: LegacyProviderContext;
   providerId: ProviderId;
   settings: Record<string, unknown>;
 }
@@ -396,7 +396,7 @@ export type ProviderTabWarmupLifecycleState = 'blank' | 'bound_cold' | 'bound_ac
 export interface ProviderTabWarmupContext {
   conversation: Conversation | null;
   externalContextPaths: string[];
-  plugin: GrimoirePlugin;
+  plugin: LegacyProviderContext;
   runtime: ChatRuntime | null;
   tab: {
     conversationId: string | null;
@@ -448,7 +448,7 @@ export interface ProviderWorkspaceServices {
 }
 
 export interface ProviderSettingsTabRendererContext {
-  plugin: GrimoirePlugin;
+  plugin: LegacyProviderContext;
   suppressAutomaticDiscovery: boolean;
   createWorkspaceSection(
     container: HTMLElement,
@@ -472,7 +472,7 @@ export interface ProviderSettingsTabRenderer {
 }
 
 export interface ProviderWorkspaceInitContext {
-  plugin: GrimoirePlugin;
+  plugin: LegacyProviderContext;
   storage: SharedAppStorage;
   vaultAdapter: VaultFileAdapter;
   homeAdapter: HomeFileAdapter;

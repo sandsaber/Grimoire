@@ -1,3 +1,5 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
@@ -9,7 +11,6 @@ import type {
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
-import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { OpencodeAgentMentionProvider } from '../agents/OpencodeAgentMentionProvider';
 import { OpencodeCommandCatalog } from '../commands/OpencodeCommandCatalog';
@@ -40,7 +41,7 @@ const opencodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
-function createOpencodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
+function createOpencodeModelCatalog(plugin: LegacyProviderContext): ProviderModelCatalog {
   const initialSettings = getOpencodeProviderSettings(plugin.settings ?? {});
   const refreshCache = new ProviderModelCatalogRefreshCache(MODEL_CATALOG_CACHE_TTL_MS);
   if (initialSettings.discoveredModels.length > 0) {
@@ -102,7 +103,7 @@ function buildOpencodeModelCatalogCacheKey(settings: ReturnType<typeof getOpenco
 }
 
 export async function createOpencodeWorkspaceServices(
-  plugin: GrimoirePlugin,
+  plugin: LegacyProviderContext,
   vaultAdapter: VaultFileAdapter,
 ): Promise<OpencodeWorkspaceServices> {
   const mcpStorage = new AcpMcpStorage(vaultAdapter, 'opencode');

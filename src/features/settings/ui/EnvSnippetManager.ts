@@ -1,6 +1,7 @@
 import type { App } from 'obsidian';
 import { Modal, Notice, setIcon, Setting } from 'obsidian';
 
+import type { LegacyProviderContext } from '../../../core/providers/LegacyProviderContext';
 import {
   getEnvironmentScopeUpdates,
   resolveEnvironmentSnippetScope,
@@ -9,20 +10,19 @@ import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import type { EnvironmentScope, EnvSnippet } from '../../../core/types';
 import { VIEW_TYPE_GRIMOIRE } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
-import type GrimoirePlugin from '../../../main';
 import { confirmDelete } from '../../../shared/modals/ConfirmModal';
 import { formatContextLimit, parseContextLimit, parseEnvironmentVariables } from '../../../utils/env';
 import type { GrimoireView } from '../../chat/GrimoireView';
 
 export class EnvSnippetModal extends Modal {
-  plugin: GrimoirePlugin;
+  plugin: LegacyProviderContext;
   snippet: EnvSnippet | null;
   snippetScope: EnvironmentScope;
   onSave: (snippet: EnvSnippet) => void;
 
   constructor(
     app: App,
-    plugin: GrimoirePlugin,
+    plugin: LegacyProviderContext,
     snippet: EnvSnippet | null,
     scope: EnvironmentScope,
     onSave: (snippet: EnvSnippet) => void,
@@ -215,13 +215,13 @@ export class EnvSnippetModal extends Modal {
 
 export class EnvSnippetManager {
   private containerEl: HTMLElement;
-  private plugin: GrimoirePlugin;
+  private plugin: LegacyProviderContext;
   private scope: EnvironmentScope;
   private onContextLimitsChange?: () => void;
 
   constructor(
     containerEl: HTMLElement,
-    plugin: GrimoirePlugin,
+    plugin: LegacyProviderContext,
     scope: EnvironmentScope,
     onContextLimitsChange?: () => void,
   ) {

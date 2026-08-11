@@ -1,3 +1,5 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
@@ -12,7 +14,6 @@ import type {
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
-import type GrimoirePlugin from '../../../main';
 import { parseEnvironmentVariables } from '../../../utils/env';
 import { getVaultPath } from '../../../utils/path';
 import { AgentManager } from '../agents/AgentManager';
@@ -41,7 +42,7 @@ export interface ClaudeWorkspaceServices extends ProviderWorkspaceServices {
 }
 
 export async function createClaudeWorkspaceServices(
-  plugin: GrimoirePlugin,
+  plugin: LegacyProviderContext,
   adapter: VaultFileAdapter,
 ): Promise<ClaudeWorkspaceServices> {
   const claudeStorage = new StorageService(plugin, adapter);

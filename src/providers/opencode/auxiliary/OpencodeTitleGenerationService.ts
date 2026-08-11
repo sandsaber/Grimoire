@@ -1,11 +1,12 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { QueryBackedTitleGenerationService } from '../../../core/auxiliary/QueryBackedTitleGenerationService';
-import type GrimoirePlugin from '../../../main';
 import { decodeOpencodeModelId } from '../models';
 import { OpencodeAuxQueryRunner } from '../runtime/OpencodeAuxQueryRunner';
 import { opencodeChatUIConfig } from '../ui/OpencodeChatUIConfig';
 
 export class OpencodeTitleGenerationService extends QueryBackedTitleGenerationService {
-  constructor(plugin: GrimoirePlugin) {
+  constructor(plugin: LegacyProviderContext) {
     super({
       createRunner: () => new OpencodeAuxQueryRunner(plugin, {
         agentProfile: 'passive',

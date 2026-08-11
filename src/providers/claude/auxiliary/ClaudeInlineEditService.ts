@@ -1,5 +1,7 @@
 import type { HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk';
 
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import {
   buildInlineEditPrompt,
   getInlineEditSystemPrompt,
@@ -14,7 +16,6 @@ import {
   isReadOnlyTool,
   READ_ONLY_TOOLS,
 } from '../../../core/tools/toolNames';
-import type GrimoirePlugin from '../../../main';
 import { appendContextFiles } from '../../../utils/context';
 import { runColdStartQuery } from '../runtime/claudeColdStartQuery';
 
@@ -48,11 +49,11 @@ export function createReadOnlyHook(): HookCallbackMatcher {
 }
 
 export class InlineEditService {
-  private plugin: GrimoirePlugin;
+  private plugin: LegacyProviderContext;
   private abortController: AbortController | null = null;
   private sessionId: string | null = null;
 
-  constructor(plugin: GrimoirePlugin) {
+  constructor(plugin: LegacyProviderContext) {
     this.plugin = plugin;
   }
 

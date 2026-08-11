@@ -7,6 +7,7 @@ import './providers';
 import type { Command, Editor, WorkspaceLeaf } from 'obsidian';
 import { addIcon, MarkdownView, Notice, Plugin, setTooltip } from 'obsidian';
 
+import { createApplicationServices } from './app/ApplicationServices';
 import { shouldShowWhatsNew } from './app/changelog/display';
 import { parseChangelogRelease } from './app/changelog/parser';
 import { readBundledChangelog } from './app/changelog/source';
@@ -100,7 +101,7 @@ export default class GrimoirePlugin extends Plugin {
   async onload() {
     try {
       await this.loadSettings();
-      await ProviderWorkspaceRegistry.initializeAll(this);
+      await ProviderWorkspaceRegistry.initializeAll(createApplicationServices(this));
       await this.writeDebugLog({
         data: {
           providerCount: ProviderRegistry.getRegisteredProviderIds().length,

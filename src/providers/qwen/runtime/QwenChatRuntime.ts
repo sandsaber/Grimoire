@@ -1,6 +1,8 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { applyOrchestratorModeInstructions } from '../../../core/prompt/mainAgent';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
@@ -31,7 +33,6 @@ import type {
   ToolCallInfo,
 } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
-import type GrimoirePlugin from '../../../main';
 import { appendBrowserContext } from '../../../utils/browser';
 import { appendCanvasContext } from '../../../utils/canvas';
 import {
@@ -168,7 +169,7 @@ export class QwenChatRuntime implements ChatRuntime {
   private transport: AcpJsonRpcTransport | null = null;
   private unregisterTransportClose: (() => void) | null = null;
 
-  constructor(private readonly plugin: GrimoirePlugin) {}
+  constructor(private readonly plugin: LegacyProviderContext) {}
 
   getCapabilities(): Readonly<ProviderCapabilities> {
     return QWEN_PROVIDER_CAPABILITIES;

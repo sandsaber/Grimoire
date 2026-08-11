@@ -1,14 +1,14 @@
 import { Setting } from 'obsidian';
 
+import type { LegacyProviderContext } from '../../../core/providers/LegacyProviderContext';
 import { getEnvironmentReviewKeysForScope } from '../../../core/providers/providerEnvironment';
 import type { EnvironmentScope } from '../../../core/types/settings';
 import { t } from '../../../i18n/i18n';
-import type GrimoirePlugin from '../../../main';
 import { EnvSnippetManager } from './EnvSnippetManager';
 
 interface EnvironmentSettingsSectionOptions {
   container: HTMLElement;
-  plugin: GrimoirePlugin;
+  plugin: LegacyProviderContext;
   scope: EnvironmentScope;
   heading?: string;
   name: string;

@@ -1,3 +1,5 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
@@ -10,7 +12,6 @@ import type {
 } from '../../../core/providers/types';
 import type { HomeFileAdapter } from '../../../core/storage/HomeFileAdapter';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
-import type GrimoirePlugin from '../../../main';
 import { getVaultPath } from '../../../utils/path';
 import { CodexAgentMentionProvider } from '../agents/CodexAgentMentionProvider';
 import { CodexSkillCatalog } from '../commands/CodexSkillCatalog';
@@ -44,7 +45,7 @@ const codexTabWarmupPolicy: ProviderTabWarmupPolicy = {
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
-function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
+function createCodexModelCatalog(plugin: LegacyProviderContext): ProviderModelCatalog {
   const modelListingService = new CodexModelListingService(plugin);
   const initialSettings = getCodexProviderSettings(plugin.settings ?? {});
   const refreshCache = new ProviderModelCatalogRefreshCache(MODEL_CATALOG_CACHE_TTL_MS);
@@ -132,7 +133,7 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
 }
 
 function buildCodexModelCatalogFingerprint(
-  plugin: GrimoirePlugin,
+  plugin: LegacyProviderContext,
   settings: ReturnType<typeof getCodexProviderSettings>,
 ): string {
   return JSON.stringify({
@@ -145,7 +146,7 @@ function buildCodexModelCatalogFingerprint(
 }
 
 export async function createCodexWorkspaceServices(
-  plugin: GrimoirePlugin,
+  plugin: LegacyProviderContext,
   vaultAdapter: VaultFileAdapter,
   homeAdapter: HomeFileAdapter,
 ): Promise<CodexWorkspaceServices> {

@@ -3,7 +3,8 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import type GrimoirePlugin from '../../../main';
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { getVaultPath } from '../../../utils/path';
 import {
   ANTIGRAVITY_FALLBACK_DISCOVERED_MODELS,
@@ -21,7 +22,7 @@ type AntigravityWindowState = Window & {
   [ACTIVE_MODELS_PROCESS_KEY]?: ChildProcess;
 };
 
-export async function discoverAntigravityModels(plugin: GrimoirePlugin): Promise<AntigravityDiscoveredModel[]> {
+export async function discoverAntigravityModels(plugin: LegacyProviderContext): Promise<AntigravityDiscoveredModel[]> {
   const command = plugin.getResolvedProviderCliPath('antigravity') ?? 'agy';
   const cwd = getVaultPath(plugin.app) ?? process.cwd();
   plugin.recordDebugLog?.({
@@ -84,7 +85,7 @@ export function parseAntigravityModels(output: string): AntigravityDiscoveredMod
 function runAgyModels(spec: {
   command: string;
   cwd: string;
-  plugin: GrimoirePlugin;
+  plugin: LegacyProviderContext;
   runtimeEnv: NodeJS.ProcessEnv;
 }): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -384,7 +385,7 @@ function appendLimited(current: string, chunk: Buffer | string): string {
   return `${current}${text}`.slice(-MODEL_LIST_BUFFER_LIMIT);
 }
 
-function getCwdLabel(plugin: GrimoirePlugin, cwd: string): string {
+function getCwdLabel(plugin: LegacyProviderContext, cwd: string): string {
   return cwd === getVaultPath(plugin.app) ? 'vault' : 'process';
 }
 

@@ -1,4 +1,5 @@
-import type GrimoirePlugin from '../../../main';
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import type { CodexDiscoveredModel } from '../modelDiscoveryState';
 import { formatCodexModelLabel } from '../types/models';
 import { CodexAppServerProcess } from './CodexAppServerProcess';
@@ -39,7 +40,7 @@ export class CodexModelListingService {
   private readonly now: () => number;
 
   constructor(
-    private readonly plugin: GrimoirePlugin,
+    private readonly plugin: LegacyProviderContext,
     options: CodexModelListServiceOptions = {},
   ) {
     this.ttlMs = options.ttlMs ?? DEFAULT_MODEL_LIST_TTL_MS;

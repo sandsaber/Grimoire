@@ -1,3 +1,5 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
@@ -9,7 +11,6 @@ import type {
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
-import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { MimocodeAgentMentionProvider } from '../agents/MimocodeAgentMentionProvider';
 import { MimocodeCommandCatalog } from '../commands/MimocodeCommandCatalog';
@@ -40,7 +41,7 @@ const mimocodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
-function createMimocodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
+function createMimocodeModelCatalog(plugin: LegacyProviderContext): ProviderModelCatalog {
   const initialSettings = getMimocodeProviderSettings(plugin.settings ?? {});
   const refreshCache = new ProviderModelCatalogRefreshCache(MODEL_CATALOG_CACHE_TTL_MS);
   if (initialSettings.discoveredModels.length > 0) {
@@ -102,7 +103,7 @@ function buildMimocodeModelCatalogCacheKey(settings: ReturnType<typeof getMimoco
 }
 
 export async function createMimocodeWorkspaceServices(
-  plugin: GrimoirePlugin,
+  plugin: LegacyProviderContext,
   vaultAdapter: VaultFileAdapter,
 ): Promise<MimocodeWorkspaceServices> {
   const mcpStorage = new AcpMcpStorage(vaultAdapter, 'mimocode');

@@ -1,3 +1,5 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
@@ -8,7 +10,6 @@ import type {
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
-import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { GrokAgentMentionProvider } from '../agents/GrokAgentMentionProvider';
 import { GrokCommandCatalog } from '../commands/GrokCommandCatalog';
@@ -37,7 +38,7 @@ const grokTabWarmupPolicy: ProviderTabWarmupPolicy = {
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
-function createGrokModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
+function createGrokModelCatalog(plugin: LegacyProviderContext): ProviderModelCatalog {
   const initialSettings = getGrokProviderSettings(plugin.settings ?? {});
   let lastRefreshAt = initialSettings.discoveredModels.length > 0 ? Date.now() : 0;
   let lastRefreshCacheKey = buildGrokModelCatalogCacheKey(initialSettings);
@@ -125,7 +126,7 @@ function buildGrokModelCatalogCacheKey(settings: ReturnType<typeof getGrokProvid
 }
 
 export async function createGrokWorkspaceServices(
-  plugin: GrimoirePlugin,
+  plugin: LegacyProviderContext,
   vaultAdapter: VaultFileAdapter,
 ): Promise<GrokWorkspaceServices> {
   const mcpStorage = new AcpMcpStorage(vaultAdapter, 'grok');

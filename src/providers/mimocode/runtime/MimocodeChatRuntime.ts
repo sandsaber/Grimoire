@@ -1,6 +1,8 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import {
   computeSystemPromptKey,
   type SystemPromptSettings,
@@ -39,7 +41,6 @@ import type {
 } from '../../../core/types';
 import { coercePermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n/i18n';
-import type GrimoirePlugin from '../../../main';
 import {
   sameDiscoveredModels,
   sameModes,
@@ -204,7 +205,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
   private unregisterTransportClose: (() => void) | null = null;
 
   constructor(
-    private readonly plugin: GrimoirePlugin,
+    private readonly plugin: LegacyProviderContext,
   ) {}
 
   getCapabilities(): Readonly<ProviderCapabilities> {

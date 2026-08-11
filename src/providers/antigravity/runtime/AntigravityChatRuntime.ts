@@ -3,6 +3,8 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import type { ProviderCapabilities } from '../../../core/providers/types';
 import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
@@ -28,7 +30,6 @@ import type {
   ToolCallInfo,
 } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
-import type GrimoirePlugin from '../../../main';
 import { appendBrowserContext } from '../../../utils/browser';
 import { appendCanvasContext } from '../../../utils/canvas';
 import {
@@ -74,7 +75,7 @@ export class AntigravityChatRuntime implements ChatRuntime {
   private readonly readyListeners: Array<(ready: boolean) => void> = [];
   private ready = false;
 
-  constructor(private readonly plugin: GrimoirePlugin) {}
+  constructor(private readonly plugin: LegacyProviderContext) {}
 
   getCapabilities(): Readonly<ProviderCapabilities> {
     return ANTIGRAVITY_PROVIDER_CAPABILITIES;
@@ -690,7 +691,7 @@ function appendLimited(current: string, chunk: Buffer | string): string {
   return `${current}${text}`.slice(-OUTPUT_BUFFER_LIMIT);
 }
 
-function getCwdLabel(plugin: GrimoirePlugin, cwd: string): string {
+function getCwdLabel(plugin: LegacyProviderContext, cwd: string): string {
   return cwd === getVaultPath(plugin.app) ? 'vault' : 'process';
 }
 

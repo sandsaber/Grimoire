@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import {
   buildSystemPrompt,
   computeSystemPromptKey,
@@ -28,7 +30,6 @@ import type {
   SubagentRuntimeState,
 } from '../../../core/runtime/types';
 import type { ChatMessage, Conversation, ForkSource, SlashCommand, StreamChunk } from '../../../core/types';
-import type GrimoirePlugin from '../../../main';
 import { getVaultPath } from '../../../utils/path';
 import { buildContextFromHistory } from '../../../utils/session';
 import { codexPlanUsageStore } from '../app/CodexPlanUsageStore';
@@ -110,7 +111,7 @@ const COMPLETION_RECOVERY_MAX_ATTEMPTS = 3;
 export class CodexChatRuntime implements ChatRuntime {
   readonly providerId: ProviderId = 'codex';
 
-  private plugin: GrimoirePlugin;
+  private plugin: LegacyProviderContext;
   private session = new CodexSessionManager();
   private process: CodexAppServerProcess | null = null;
   private transport: CodexRpcTransport | null = null;
@@ -146,7 +147,7 @@ export class CodexChatRuntime implements ChatRuntime {
   private canceled = false;
   private turnMetadata: ChatTurnMetadata = {};
 
-  constructor(plugin: GrimoirePlugin) {
+  constructor(plugin: LegacyProviderContext) {
     this.plugin = plugin;
   }
 

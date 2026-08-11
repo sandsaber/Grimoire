@@ -1,9 +1,10 @@
-import type { App, Plugin } from 'obsidian';
+import type { App } from 'obsidian';
 import { Notice } from 'obsidian';
 
 import { GrimoireSettingsStorage, type StoredGrimoireSettings } from '../../../app/settings/GrimoireSettingsStorage';
 import { SESSIONS_PATH, SessionStorage } from '../../../core/bootstrap/SessionStorage';
 import { GRIMOIRE_STORAGE_PATH } from '../../../core/bootstrap/StoragePaths';
+import type { LegacyProviderContext } from '../../../core/providers/LegacyProviderContext';
 import { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type {
   SlashCommand,
@@ -76,10 +77,10 @@ export class StorageService {
   readonly agents: AgentVaultStorage;
 
   private adapter: VaultFileAdapter;
-  private plugin: Plugin;
+  private plugin: Pick<LegacyProviderContext, 'app' | 'loadData' | 'saveData'>;
   private app: App;
 
-  constructor(plugin: Plugin, adapter?: VaultFileAdapter) {
+  constructor(plugin: Pick<LegacyProviderContext, 'app' | 'loadData' | 'saveData'>, adapter?: VaultFileAdapter) {
     this.plugin = plugin;
     this.app = plugin.app;
     this.adapter = adapter ?? new VaultFileAdapter(this.app);

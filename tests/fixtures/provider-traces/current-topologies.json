@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2000-01-01T00:00:00.000Z",
+  "providers": [
+    {
+      "providerId": "antigravity",
+      "processTopology": "process-per-run",
+      "backendOwnership": "runtime-instance",
+      "sessionTopology": "reconstructed-context",
+      "runTopology": "single-process",
+      "concurrency": "one-active-run-per-session",
+      "recovery": "restart-only-before-dispatch",
+      "historyHydration": "grimoire-projection",
+      "agentObservation": "none",
+      "evidence": [
+        "src/providers/antigravity/runtime/AntigravityChatRuntime.ts",
+        "tests/unit/providers/antigravity/AntigravityChatRuntime.test.ts"
+      ]
+    },
+    {
+      "providerId": "codex",
+      "processTopology": "app-server-per-runtime",
+      "backendOwnership": "runtime-instance",
+      "sessionTopology": "native-thread",
+      "runTopology": "native-turn",
+      "concurrency": "one-active-run-per-session",
+      "recovery": "native-resume-and-status",
+      "historyHydration": "provider-native",
+      "agentObservation": "full",
+      "evidence": [
+        "src/providers/codex/runtime/CodexChatRuntime.ts",
+        "tests/unit/providers/codex/runtime/CodexChatRuntime.test.ts",
+        "tests/unit/providers/codex/fixtures/codex-session-agent-lifecycle.jsonl"
+      ]
+    },
+    {
+      "providerId": "claude",
+      "processTopology": "persistent-sdk-stream",
+      "backendOwnership": "runtime-instance",
+      "sessionTopology": "native-session",
+      "runTopology": "sdk-query",
+      "concurrency": "one-active-run-per-session",
+      "recovery": "native-session-resume",
+      "historyHydration": "provider-native",
+      "agentObservation": "full",
+      "evidence": [
+        "src/providers/claude/runtime/ClaudeChatRuntime.ts",
+        "tests/unit/providers/claude/runtime/ClaudeChatRuntime.test.ts"
+      ]
+    },
+    {
+      "providerId": "opencode",
+      "processTopology": "managed-acp-subprocess",
+      "backendOwnership": "runtime-instance",
+      "sessionTopology": "acp-session",
+      "runTopology": "acp-request",
+      "concurrency": "one-active-run-per-session",
+      "recovery": "load-session-and-snapshot",
+      "historyHydration": "provider-native",
+      "agentObservation": "none",
+      "evidence": [
+        "src/providers/opencode/runtime/OpencodeChatRuntime.ts",
+        "tests/unit/providers/opencode/OpencodeChatRuntime.test.ts"
+      ]
+    },
+    {
+      "providerId": "mimocode",
+      "processTopology": "managed-acp-subprocess",
+      "backendOwnership": "runtime-instance",
+      "sessionTopology": "acp-session",
+      "runTopology": "acp-request",
+      "concurrency": "one-active-run-per-session",
+      "recovery": "load-session-and-snapshot",
+      "historyHydration": "provider-native",
+      "agentObservation": "none",
+      "evidence": [
+        "src/providers/mimocode/runtime/MimocodeChatRuntime.ts",
+        "tests/unit/providers/mimocode/MimocodeChatRuntime.test.ts"
+      ]
+    },
+    {
+      "providerId": "kimicode",
+      "processTopology": "managed-acp-subprocess",
+      "backendOwnership": "runtime-instance",
+      "sessionTopology": "acp-session",
+      "runTopology": "acp-request",
+      "concurrency": "one-active-run-per-session",
+      "recovery": "load-session-and-snapshot",
+      "historyHydration": "provider-native",
+      "agentObservation": "none",
+      "evidence": [
+        "src/providers/kimicode/runtime/KimicodeChatRuntime.ts",
+        "tests/unit/providers/kimicode/KimicodeChatRuntime.test.ts"
+      ]
+    },
+    {
+      "providerId": "grok",
+      "processTopology": "managed-acp-subprocess",
+      "backendOwnership": "runtime-instance",
+      "sessionTopology": "acp-session-with-extensions",
+      "runTopology": "acp-request",
+      "concurrency": "one-active-run-per-session",
+      "recovery": "native-resume-and-history-discovery",
+      "historyHydration": "provider-native",
+      "agentObservation": "aggregate",
+      "evidence": [
+        "src/providers/grok/runtime/GrokChatRuntime.ts",
+        "src/providers/grok/history/GrokConversationHistoryService.ts",
+        "tests/unit/providers/grok/GrokChatRuntime.test.ts"
+      ]
+    },
+    {
+      "providerId": "qwen",
+      "processTopology": "managed-acp-subprocess",
+      "backendOwnership": "runtime-instance",
+      "sessionTopology": "acp-session",
+      "runTopology": "acp-request",
+      "concurrency": "one-active-run-per-session",
+      "recovery": "native-resume-without-hydration",
+      "historyHydration": "grimoire-projection",
+      "agentObservation": "opaque",
+      "evidence": [
+        "src/providers/qwen/runtime/QwenChatRuntime.ts",
+        "tests/unit/providers/qwen/runtime/QwenChatRuntime.test.ts"
+      ]
+    },
+    {
+      "providerId": "gemini",
+      "processTopology": "managed-acp-subprocess",
+      "backendOwnership": "runtime-instance",
+      "sessionTopology": "acp-session",
+      "runTopology": "acp-request",
+      "concurrency": "one-active-run-per-session",
+      "recovery": "native-resume-without-hydration",
+      "historyHydration": "grimoire-projection",
+      "agentObservation": "none",
+      "evidence": [
+        "src/providers/gemini/runtime/GeminiChatRuntime.ts",
+        "tests/unit/providers/gemini/runtime/GeminiChatRuntime.test.ts"
+      ]
+    }
+  ]
+}

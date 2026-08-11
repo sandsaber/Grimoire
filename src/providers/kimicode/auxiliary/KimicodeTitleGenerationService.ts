@@ -1,11 +1,12 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { QueryBackedTitleGenerationService } from '../../../core/auxiliary/QueryBackedTitleGenerationService';
-import type GrimoirePlugin from '../../../main';
 import { decodeKimicodeModelId } from '../models';
 import { KimicodeAuxQueryRunner } from '../runtime/KimicodeAuxQueryRunner';
 import { kimicodeChatUIConfig } from '../ui/KimicodeChatUIConfig';
 
 export class KimicodeTitleGenerationService extends QueryBackedTitleGenerationService {
-  constructor(plugin: GrimoirePlugin) {
+  constructor(plugin: LegacyProviderContext) {
     super({
       createRunner: () => new KimicodeAuxQueryRunner(plugin, {
         agentProfile: 'passive',

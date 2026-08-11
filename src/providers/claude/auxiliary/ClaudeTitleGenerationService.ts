@@ -1,9 +1,10 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { TITLE_GENERATION_SYSTEM_PROMPT } from '../../../core/prompt/titleGeneration';
 import type {
   TitleGenerationCallback,
   TitleGenerationResult,
 } from '../../../core/providers/types';
-import type GrimoirePlugin from '../../../main';
 import { parseEnvironmentVariables } from '../../../utils/env';
 import { runColdStartQuery } from '../runtime/claudeColdStartQuery';
 import { claudeChatUIConfig } from '../ui/ClaudeChatUIConfig';
@@ -11,10 +12,10 @@ import { claudeChatUIConfig } from '../ui/ClaudeChatUIConfig';
 export type { TitleGenerationResult };
 
 export class TitleGenerationService {
-  private plugin: GrimoirePlugin;
+  private plugin: LegacyProviderContext;
   private activeGenerations: Map<string, AbortController> = new Map();
 
-  constructor(plugin: GrimoirePlugin) {
+  constructor(plugin: LegacyProviderContext) {
     this.plugin = plugin;
   }
 

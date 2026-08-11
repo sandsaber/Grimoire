@@ -1,10 +1,11 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { QueryBackedTitleGenerationService } from '../../../core/auxiliary/QueryBackedTitleGenerationService';
-import type GrimoirePlugin from '../../../main';
 import { CodexAuxQueryRunner } from '../runtime/CodexAuxQueryRunner';
 import { codexChatUIConfig } from '../ui/CodexChatUIConfig';
 
 export class CodexTitleGenerationService extends QueryBackedTitleGenerationService {
-  constructor(plugin: GrimoirePlugin) {
+  constructor(plugin: LegacyProviderContext) {
     super({
       createRunner: () => new CodexAuxQueryRunner(plugin),
       resolveModel: () => {

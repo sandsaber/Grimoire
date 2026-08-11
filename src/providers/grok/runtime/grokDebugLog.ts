@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 
-import type GrimoirePlugin from '../../../main';
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
 
 export const GROK_DEBUG_LOG_SCOPE = 'provider.grok';
 
@@ -23,7 +23,7 @@ export function grokAuthPathExists(authPath: string | undefined): boolean {
 }
 
 export function logGrokDebug(
-  plugin: GrimoirePlugin,
+  plugin: LegacyProviderContext,
   event: string,
   data: Record<string, unknown> = {},
   options?: {

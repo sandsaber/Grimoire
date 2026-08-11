@@ -1,11 +1,12 @@
 import * as fs from 'node:fs/promises';
 
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import type { AuxQueryConfig, AuxQueryRunner } from '../../../core/auxiliary/AuxQueryRunner';
 import { getRuntimeEnvironmentText } from '../../../core/providers/providerEnvironment';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { t } from '../../../i18n/i18n';
-import type GrimoirePlugin from '../../../main';
 import { getVaultPath } from '../../../utils/path';
 import {
   AcpClientConnection,
@@ -58,7 +59,7 @@ export class MimocodeAuxQueryRunner implements AuxQueryRunner {
   private transport: AcpJsonRpcTransport | null = null;
 
   constructor(
-    private readonly plugin: GrimoirePlugin,
+    private readonly plugin: LegacyProviderContext,
     private readonly options: MimocodeAuxQueryRunnerOptions,
   ) {}
 

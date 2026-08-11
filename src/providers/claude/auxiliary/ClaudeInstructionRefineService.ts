@@ -1,16 +1,17 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { buildRefineSystemPrompt } from '../../../core/prompt/instructionRefine';
 import type { RefineProgressCallback } from '../../../core/providers/types';
 import type { InstructionRefineResult } from '../../../core/types';
-import type GrimoirePlugin from '../../../main';
 import { runColdStartQuery } from '../runtime/claudeColdStartQuery';
 
 export class InstructionRefineService {
-  private plugin: GrimoirePlugin;
+  private plugin: LegacyProviderContext;
   private abortController: AbortController | null = null;
   private sessionId: string | null = null;
   private existingInstructions: string = '';
 
-  constructor(plugin: GrimoirePlugin) {
+  constructor(plugin: LegacyProviderContext) {
     this.plugin = plugin;
   }
 

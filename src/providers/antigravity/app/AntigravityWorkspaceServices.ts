@@ -1,3 +1,5 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderCliResolver,
@@ -6,7 +8,6 @@ import type {
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
-import type GrimoirePlugin from '../../../main';
 import { ANTIGRAVITY_FALLBACK_DISCOVERED_MODELS } from '../models';
 import { AntigravityCliResolver } from '../runtime/AntigravityCliResolver';
 import { discoverAntigravityModels } from '../runtime/AntigravityModelDiscovery';
@@ -31,7 +32,7 @@ const antigravityTabWarmupPolicy: ProviderTabWarmupPolicy = {
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
-function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
+function createAntigravityModelCatalog(plugin: LegacyProviderContext): ProviderModelCatalog {
   const initialSettings = getAntigravityProviderSettings(plugin.settings ?? {});
   let lastRefreshAt = initialSettings.discoveredModels.length > 0 ? Date.now() : 0;
   let lastRefreshCacheKey = buildAntigravityModelCatalogCacheKey(initialSettings);
@@ -164,7 +165,7 @@ function buildAntigravityModelCatalogCacheKey(settings: ReturnType<typeof getAnt
   });
 }
 
-export async function createAntigravityWorkspaceServices(plugin: GrimoirePlugin): Promise<AntigravityWorkspaceServices> {
+export async function createAntigravityWorkspaceServices(plugin: LegacyProviderContext): Promise<AntigravityWorkspaceServices> {
   return {
     cliResolver: createAntigravityCliResolver(),
     modelCatalog: createAntigravityModelCatalog(plugin),

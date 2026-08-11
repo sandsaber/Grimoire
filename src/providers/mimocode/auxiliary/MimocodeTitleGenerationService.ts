@@ -1,11 +1,12 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { QueryBackedTitleGenerationService } from '../../../core/auxiliary/QueryBackedTitleGenerationService';
-import type GrimoirePlugin from '../../../main';
 import { decodeMimocodeModelId } from '../models';
 import { MimocodeAuxQueryRunner } from '../runtime/MimocodeAuxQueryRunner';
 import { mimocodeChatUIConfig } from '../ui/MimocodeChatUIConfig';
 
 export class MimocodeTitleGenerationService extends QueryBackedTitleGenerationService {
-  constructor(plugin: GrimoirePlugin) {
+  constructor(plugin: LegacyProviderContext) {
     super({
       createRunner: () => new MimocodeAuxQueryRunner(plugin, {
         agentProfile: 'passive',

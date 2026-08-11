@@ -1,4 +1,5 @@
-import type GrimoirePlugin from '../../../main';
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { CodexAppServerProcess } from '../runtime/CodexAppServerProcess';
 import {
   initializeCodexAppServerTransport,
@@ -100,7 +101,7 @@ export class CodexSkillListingService implements CodexSkillListProvider {
   private readonly now: () => number;
 
   constructor(
-    private readonly plugin: GrimoirePlugin,
+    private readonly plugin: LegacyProviderContext,
     options: CodexSkillListingServiceOptions = {},
   ) {
     this.ttlMs = options.ttlMs ?? DEFAULT_SKILL_LIST_TTL_MS;

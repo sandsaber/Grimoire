@@ -1,6 +1,6 @@
-import type GrimoirePlugin from '../../main';
 import { HomeFileAdapter } from '../storage/HomeFileAdapter';
 import type { ProviderCommandCatalog } from './commands/ProviderCommandCatalog';
+import type { LegacyProviderContext } from './LegacyProviderContext';
 import type {
   AgentMentionProvider,
   ProviderCliResolver,
@@ -41,7 +41,7 @@ export class ProviderWorkspaceRegistry {
     return registration;
   }
 
-  static async initializeAll(plugin: GrimoirePlugin): Promise<void> {
+  static async initializeAll(plugin: LegacyProviderContext): Promise<void> {
     const providerIds = Object.keys(this.registrations);
     const storage = plugin.storage;
     const vaultAdapter = storage.getAdapter();

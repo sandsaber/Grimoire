@@ -1,3 +1,5 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
@@ -9,7 +11,6 @@ import type {
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
-import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { GeminiCommandCatalog } from '../commands/GeminiCommandCatalog';
 import { GeminiChatRuntime } from '../runtime/GeminiChatRuntime';
@@ -38,7 +39,7 @@ const geminiTabWarmupPolicy: ProviderTabWarmupPolicy = {
   },
 };
 
-function createGeminiModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
+function createGeminiModelCatalog(plugin: LegacyProviderContext): ProviderModelCatalog {
   return {
     isAvailable(settings) {
       return getGeminiProviderSettings(settings).enabled;
@@ -58,7 +59,7 @@ function createGeminiModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog 
 }
 
 export async function createGeminiWorkspaceServices(
-  plugin: GrimoirePlugin,
+  plugin: LegacyProviderContext,
   vaultAdapter: VaultFileAdapter,
 ): Promise<GeminiWorkspaceServices> {
   const mcpStorage = new AcpMcpStorage(vaultAdapter, 'gemini');

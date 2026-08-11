@@ -1,3 +1,7 @@
+import '@/providers';
+
+import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
+import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { getBuiltInProviderDefaultConfigs } from '@/providers/defaultProviderConfigs';
 
 describe('getBuiltInProviderDefaultConfigs', () => {
@@ -19,5 +23,15 @@ describe('getBuiltInProviderDefaultConfigs', () => {
     expect(first.gemini).not.toBe(second.gemini);
     expect(first.opencode).not.toBe(second.opencode);
     expect(first.qwen).not.toBe(second.qwen);
+  });
+
+  it('keeps runtime, workspace, and default-config inventories in parity', () => {
+    const runtimeProviderIds = ProviderRegistry.getRegisteredProviderIds();
+    const defaultConfigProviderIds = Object.keys(getBuiltInProviderDefaultConfigs()).sort();
+
+    expect([...runtimeProviderIds].sort()).toEqual(defaultConfigProviderIds);
+    for (const providerId of runtimeProviderIds) {
+      expect(ProviderWorkspaceRegistry.getCapabilities(providerId)).toBeDefined();
+    }
   });
 });

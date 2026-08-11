@@ -1,3 +1,5 @@
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
@@ -9,7 +11,6 @@ import type {
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
-import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { QwenCommandCatalog } from '../commands/QwenCommandCatalog';
 import { QwenChatRuntime } from '../runtime/QwenChatRuntime';
@@ -38,7 +39,7 @@ const qwenTabWarmupPolicy: ProviderTabWarmupPolicy = {
   },
 };
 
-function createQwenModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
+function createQwenModelCatalog(plugin: LegacyProviderContext): ProviderModelCatalog {
   return {
     isAvailable(settings) {
       return getQwenProviderSettings(settings).enabled;
@@ -58,7 +59,7 @@ function createQwenModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
 }
 
 export async function createQwenWorkspaceServices(
-  plugin: GrimoirePlugin,
+  plugin: LegacyProviderContext,
   vaultAdapter: VaultFileAdapter,
 ): Promise<QwenWorkspaceServices> {
   const mcpStorage = new AcpMcpStorage(vaultAdapter, 'qwen');

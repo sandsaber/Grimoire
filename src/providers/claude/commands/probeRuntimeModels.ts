@@ -1,6 +1,7 @@
 import { query as agentQuery } from '@anthropic-ai/claude-agent-sdk';
 
-import type GrimoirePlugin from '../../../main';
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { getEnhancedPath, parseEnvironmentVariables } from '../../../utils/env';
 import { getVaultPath } from '../../../utils/path';
 import { createCustomSpawnFunction } from '../runtime/customSpawn';
@@ -55,7 +56,7 @@ function toSdkDiscoveredModels(value: unknown): ClaudeDiscoveredModel[] {
  * Discovers the authenticated Claude Code model catalog without sending a prompt.
  * The SDK exposes this after its local system/init event, just like commands.
  */
-export async function probeRuntimeModels(plugin: GrimoirePlugin): Promise<ClaudeDiscoveredModel[]> {
+export async function probeRuntimeModels(plugin: LegacyProviderContext): Promise<ClaudeDiscoveredModel[]> {
   const vaultPath = getVaultPath(plugin.app);
   const cliPath = plugin.getResolvedProviderCliPath?.('claude');
   if (!vaultPath || !cliPath) return [];

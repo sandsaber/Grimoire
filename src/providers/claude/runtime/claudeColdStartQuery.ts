@@ -1,9 +1,10 @@
 import type { Options } from '@anthropic-ai/claude-agent-sdk';
 import { query as agentQuery } from '@anthropic-ai/claude-agent-sdk';
 
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { t } from '../../../i18n/i18n';
-import type GrimoirePlugin from '../../../main';
 import { getEnhancedPath, getMissingNodeError, parseEnvironmentVariables } from '../../../utils/env';
 import { getVaultPath } from '../../../utils/path';
 import { extractAssistantText } from '../auxiliary/extractAssistantText';
@@ -18,7 +19,7 @@ import {
 import { createCustomSpawnFunction } from './customSpawn';
 
 export interface ColdStartQueryConfig {
-  plugin: GrimoirePlugin;
+  plugin: LegacyProviderContext;
   systemPrompt: string;
   /** Tools available to the model. Omit for SDK default (all tools). */
   tools?: string[];

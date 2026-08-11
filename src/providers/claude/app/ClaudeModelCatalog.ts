@@ -1,7 +1,8 @@
 import { requestUrl } from 'obsidian';
 
+import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
+
 import type { ProviderModelCatalog } from '../../../core/providers/types';
-import type GrimoirePlugin from '../../../main';
 import { probeRuntimeModels } from '../commands/probeRuntimeModels';
 import {
   type ClaudeDiscoveredModel,
@@ -101,7 +102,7 @@ function buildClaudeModelCatalogCacheKey(
   });
 }
 
-export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
+export function createClaudeModelCatalog(plugin: LegacyProviderContext): ProviderModelCatalog {
   const refreshAttemptsByKey = new Map<string, number>();
   const refreshesByKey = new Map<string, Promise<boolean>>();
 
