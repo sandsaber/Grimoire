@@ -1,6 +1,6 @@
 import { createInterface } from 'readline';
+import type { Readable, Writable } from 'stream';
 
-import type { CodexAppServerProcess } from './CodexAppServerProcess';
 import type { JsonRpcError } from './codexAppServerTypes';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -13,25 +13,32 @@ interface PendingRequest {
 
 type NotificationHandler = (params: unknown) => void;
 type ServerRequestHandler = (requestId: string | number, params: unknown) => Promise<unknown>;
+type ConnectionLostHandler = (error: Error) => void;
+
+export interface CodexRpcProcessPort {
+  readonly stdin: Writable;
+  readonly stdout: Readable;
+  onExit(callback: (code: number | null, signal: string | null, error?: Error) => void): void;
+}
 
 export class CodexRpcTransport {
   private nextId = 1;
   private pending = new Map<number, PendingRequest>();
   private notificationHandlers = new Map<string, NotificationHandler>();
   private serverRequestHandlers = new Map<string, ServerRequestHandler>();
+  private connectionLostHandlers = new Set<ConnectionLostHandler>();
   private disposed = false;
   private disposeError: Error | null = null;
 
-  constructor(private readonly proc: CodexAppServerProcess) {}
+  constructor(private readonly proc: CodexRpcProcessPort) {}
 
   start(): void {
     const rl = createInterface({ input: this.proc.stdout });
     rl.on('line', (line) => this.handleLine(line));
+    this.proc.stdin.on('error', this.handleStdinError);
 
     this.proc.onExit((_code, _signal, error) => {
-      this.disposed = true;
-      this.disposeError = error ?? new Error('App-server process exited');
-      this.rejectAllPending(this.disposeError);
+      this.fail(error ?? new Error('App-server process exited'));
     });
   }
 
@@ -83,9 +90,19 @@ export class CodexRpcTransport {
     this.serverRequestHandlers.set(method, handler);
   }
 
+  onConnectionLost(handler: ConnectionLostHandler): () => void {
+    this.connectionLostHandlers.add(handler);
+    return () => this.connectionLostHandlers.delete(handler);
+  }
+
   dispose(): void {
+    if (this.disposed) {
+      return;
+    }
     this.disposed = true;
-    this.rejectAllPending(new Error('Transport disposed'));
+    this.disposeError = new Error('Transport disposed');
+    this.rejectAllPending(this.disposeError);
+    this.connectionLostHandlers.clear();
   }
 
   // -----------------------------------------------------------------------
@@ -94,7 +111,32 @@ export class CodexRpcTransport {
 
   private sendRaw(msg: unknown): void {
     if (this.disposed) return;
-    this.proc.stdin.write(JSON.stringify(msg) + '\n');
+    try {
+      this.proc.stdin.write(JSON.stringify(msg) + '\n', error => {
+        if (error) {
+          this.fail(error);
+        }
+      });
+    } catch (error) {
+      this.fail(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  private readonly handleStdinError = (error: Error): void => {
+    this.fail(error);
+  };
+
+  private fail(error: Error): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    this.disposeError = error;
+    this.rejectAllPending(error);
+    for (const handler of this.connectionLostHandlers) {
+      handler(error);
+    }
+    this.connectionLostHandlers.clear();
   }
 
   private handleLine(line: string): void {

@@ -31,6 +31,7 @@ export interface ExecutionRunRecord {
   dispatchState: 'pending' | 'accepted' | 'rejected' | 'unknown';
   cancellationRequested: boolean;
   resultRef?: ResultRef;
+  nativeRunRef?: string;
   terminal?: RunTerminal;
   openInteractionIds: string[];
   lastSequence: number;

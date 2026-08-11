@@ -131,6 +131,7 @@ export const executionRunRecordSchema: RecordSchema<ExecutionRunRecord> = {
       'dispatchState',
       'cancellationRequested',
       'resultRef',
+      'nativeRunRef',
       'terminal',
       'openInteractionIds',
       'lastSequence',
@@ -155,6 +156,7 @@ export const executionRunRecordSchema: RecordSchema<ExecutionRunRecord> = {
     const resultRef = record.resultRef === undefined
       ? undefined
       : decodeResultRef(record.resultRef);
+    const nativeRunRef = optionalIdentifier(record.nativeRunRef, 'native run ref');
     const terminal = record.terminal === undefined
       ? undefined
       : decodeTerminal(record.terminal);
@@ -179,6 +181,7 @@ export const executionRunRecordSchema: RecordSchema<ExecutionRunRecord> = {
       dispatchState: record.dispatchState,
       cancellationRequested: record.cancellationRequested,
       ...(resultRef ? { resultRef } : {}),
+      ...(nativeRunRef ? { nativeRunRef } : {}),
       ...(terminal ? { terminal } : {}),
       openInteractionIds,
       lastSequence: record.lastSequence,

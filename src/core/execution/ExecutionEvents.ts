@@ -62,6 +62,16 @@ export type ExecutionEvent =
     readonly kind: 'native-agent-result';
     readonly nativeAgentKey: string;
     readonly result: ResultRef;
+  }
+  | {
+    readonly kind: 'native-agent-activity';
+    readonly nativeAgentKey: string;
+    readonly activity: 'input-sent' | 'wait-observed' | 'resume-observed' | 'close-observed';
+  }
+  | {
+    readonly kind: 'native-agent-status';
+    readonly nativeAgentKey: string;
+    readonly status: 'running' | 'waiting' | 'completed' | 'failed' | 'closed';
   };
 
 /** Adapter-owned normalized event before core sequence assignment. */

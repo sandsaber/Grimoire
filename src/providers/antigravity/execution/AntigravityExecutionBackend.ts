@@ -16,8 +16,14 @@ import {
   type RunTerminalReason,
   type Unsubscribe,
 } from '@/core/execution/ExecutionContracts';
+import { ExecutionEventQueue } from '@/core/execution/ExecutionEventQueue';
 import type { ProviderExecutionEvent } from '@/core/execution/ExecutionEvents';
 import type { SessionInstanceId } from '@/core/execution/ExecutionIds';
+import {
+  type ResultCommitOutcome,
+  type ResultCommitSettlement,
+  settleResultCommit,
+} from '@/core/execution/ResultCommit';
 
 export interface AntigravityInvocation {
   readonly command: string;
@@ -63,12 +69,10 @@ export interface AntigravityResultSink {
     readonly output: string;
     readonly source: 'stdout' | 'transcript';
     readonly signal: AbortSignal;
-  }): Promise<AntigravityResultCommitOutcome>;
+  }): Promise<ResultCommitOutcome>;
 }
 
-export type AntigravityResultCommitOutcome =
-  | { readonly kind: 'committed'; readonly result: ResultRef }
-  | { readonly kind: 'aborted' };
+export type AntigravityResultCommitOutcome = ResultCommitOutcome;
 
 export interface AntigravityScheduler {
   setTimeout(callback: () => void, delayMs: number): unknown;
@@ -213,7 +217,7 @@ type TerminationTrigger = 'cancel' | 'timeout' | 'output-limit' | 'failure' | 'e
 
 class AntigravityExecutionRun implements ExecutionRun {
   readonly events: AsyncIterable<ProviderExecutionEvent>;
-  private readonly queue = new AsyncEventQueue<ProviderExecutionEvent>();
+  private readonly queue = new ExecutionEventQueue<ProviderExecutionEvent>();
   private process: AntigravityProcessHandle | undefined;
   private terminal = false;
   private cancellation: CancellationReason | undefined;
@@ -519,80 +523,6 @@ class AntigravityExecutionRun implements ExecutionRun {
       this.context.scheduler.clearTimeout(this.timeoutHandle);
       this.timeoutHandle = undefined;
     }
-  }
-}
-
-type ResultCommitSettlement =
-  | AntigravityResultCommitOutcome
-  | { readonly kind: 'unknown' };
-
-function settleResultCommit(
-  commit: Promise<AntigravityResultCommitOutcome>,
-  abort: AbortController,
-  scheduler: AntigravityScheduler,
-  timeoutMs: number,
-): Promise<ResultCommitSettlement> {
-  return new Promise(resolve => {
-    let settled = false;
-    let timeout: unknown;
-    const finish = (outcome: ResultCommitSettlement) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      scheduler.clearTimeout(timeout);
-      resolve(outcome);
-    };
-    timeout = scheduler.setTimeout(() => {
-      abort.abort();
-      finish({ kind: 'unknown' });
-    }, timeoutMs);
-    void commit.then(finish, () => finish({ kind: 'unknown' }));
-  });
-}
-
-class AsyncEventQueue<T> implements AsyncIterable<T> {
-  private readonly values: T[] = [];
-  private readonly readers: Array<(result: IteratorResult<T>) => void> = [];
-  private closed = false;
-  count = 0;
-
-  push(value: T): void {
-    if (this.closed) {
-      return;
-    }
-    this.count += 1;
-    const reader = this.readers.shift();
-    if (reader) {
-      reader({ value, done: false });
-    } else {
-      this.values.push(value);
-    }
-  }
-
-  close(): void {
-    if (this.closed) {
-      return;
-    }
-    this.closed = true;
-    for (const reader of this.readers.splice(0)) {
-      reader({ value: undefined as never, done: true });
-    }
-  }
-
-  [Symbol.asyncIterator](): AsyncIterator<T> {
-    return {
-      next: () => {
-        const value = this.values.shift();
-        if (value !== undefined) {
-          return Promise.resolve({ value, done: false });
-        }
-        if (this.closed) {
-          return Promise.resolve({ value: undefined as never, done: true });
-        }
-        return new Promise<IteratorResult<T>>(resolve => this.readers.push(resolve));
-      },
-    };
   }
 }
 

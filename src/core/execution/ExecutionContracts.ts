@@ -114,6 +114,7 @@ export interface ExecutionSessionConfig {
   readonly executionSessionId: ExecutionSessionId;
   readonly owner: ExecutionOwner;
   readonly backendGeneration: number;
+  readonly nativeSessionRef?: string;
 }
 
 export interface ExecutionBackend {
@@ -159,6 +160,8 @@ export interface RunRecoveryQuery {
   readonly executionSessionId: ExecutionSessionId;
   readonly sessionInstanceId: SessionInstanceId;
   readonly runId: RunId;
+  readonly nativeSessionRef?: string;
+  readonly nativeRunRef?: string;
   readonly cancellationRequested: boolean;
   readonly resultExpectation: ResultExpectation;
 }

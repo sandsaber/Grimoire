@@ -26,7 +26,7 @@
       "concurrency": "one-active-run-per-session",
       "recovery": "native-resume-and-status",
       "historyHydration": "provider-native",
-      "agentObservation": "full",
+      "agentObservation": "aggregate",
       "evidence": [
         "src/providers/codex/runtime/CodexChatRuntime.ts",
         "tests/unit/providers/codex/runtime/CodexChatRuntime.test.ts",

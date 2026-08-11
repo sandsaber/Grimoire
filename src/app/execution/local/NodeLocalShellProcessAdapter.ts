@@ -1,14 +1,12 @@
 import {
   type ChildProcess,
-  type ChildProcessByStdio,
   spawn,
 } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { PassThrough, type Readable } from 'node:stream';
+import { PassThrough, type Readable, type Writable } from 'node:stream';
 import { clearTimeout as clearNodeTimeout, setTimeout as setNodeTimeout } from 'node:timers';
 
 import type {
-  LocalShellChildProcess,
   LocalShellExit,
   LocalShellLaunchSpec,
   LocalShellPlatform,
@@ -19,8 +17,11 @@ import type {
 
 export interface SpawnedLocalProcess {
   readonly termination: LocalShellTerminationTarget;
+  readonly stdin?: Writable;
   readonly stdout: AsyncIterable<Uint8Array>;
   readonly stderr: AsyncIterable<Uint8Array>;
+  readonly stdoutReadable?: Readable;
+  readonly stderrReadable?: Readable;
   readonly started: Promise<void>;
   readonly exited: Promise<LocalShellExit>;
 }
@@ -38,7 +39,7 @@ LocalShellProcessLauncher,
 LocalShellProcessSupervisor {
   constructor(private readonly system: LocalProcessSystem = new NodeLocalProcessSystem()) {}
 
-  launch(spec: LocalShellLaunchSpec): LocalShellChildProcess {
+  launch(spec: LocalShellLaunchSpec): SpawnedLocalProcess {
     const child = this.system.spawn(spec);
     try {
       requireTerminationTarget(child.termination);
@@ -150,17 +151,22 @@ export class NodeLocalProcessSystem implements LocalProcessSystem {
       cwd: spec.cwd,
       env: spec.environment ? { ...spec.environment } : undefined,
       detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [spec.stdin === 'pipe' ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     });
     const started = new Promise<void>((resolve, reject) => {
       child.once('spawn', resolve);
       child.once('error', reject);
     });
     const exited = observeExit(child);
+    const stdout = requireReadablePipe(child.stdout, child);
+    const stderr = requireReadablePipe(child.stderr, child);
     return {
       termination: { pid: child.pid ?? 0, kind: 'posix-process-group' },
-      stdout: child.stdout,
-      stderr: child.stderr,
+      ...(child.stdin ? { stdin: child.stdin } : {}),
+      stdout,
+      stderr,
+      stdoutReadable: stdout,
+      stderrReadable: stderr,
       started,
       exited,
     };
@@ -194,14 +200,18 @@ export class NodeLocalProcessSystem implements LocalProcessSystem {
       guardian.once('exit', code => finish({ code }));
       guardian.once('error', () => finish({ code: null }));
     });
+    const stdout = requireReadablePipe(guardian.stdout, guardian);
     return {
       termination: {
         pid: guardian.pid ?? 0,
         kind: 'windows-process-tree',
         ownershipId,
       },
-      stdout: guardian.stdout,
+      ...(guardian.stdin ? { stdin: guardian.stdin } : {}),
+      stdout,
       stderr,
+      stdoutReadable: stdout,
+      stderrReadable: stderr,
       started,
       exited,
     };
@@ -232,7 +242,7 @@ export function localShellPlatformForNode(platform: NodeJS.Platform): LocalShell
 function spawnWindowsGuardian(
   spec: LocalShellLaunchSpec,
   ownershipId: string,
-): ChildProcessByStdio<null, Readable, Readable> {
+): ChildProcess {
   const suffix = ownershipId.replaceAll('-', '_');
   const executableVariable = `GRIMOIRE_JOB_EXECUTABLE_${suffix}`;
   const argumentsVariable = `GRIMOIRE_JOB_ARGUMENTS_${suffix}`;
@@ -244,7 +254,7 @@ function spawnWindowsGuardian(
     `$arguments=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:${argumentsVariable}))`,
     `[Environment]::SetEnvironmentVariable('${executableVariable}',$null,'Process')`,
     `[Environment]::SetEnvironmentVariable('${argumentsVariable}',$null,'Process')`,
-    '$exitCode=[GrimoireJobGuardian]::Run($exe,$arguments)',
+    `$exitCode=[GrimoireJobGuardian]::Run($exe,$arguments,${spec.stdin === 'pipe' ? '$true' : '$false'})`,
     'exit $exitCode',
   ].join('\r\n');
   return spawn('powershell.exe', [
@@ -261,7 +271,7 @@ function spawnWindowsGuardian(
       [executableVariable]: encodeBase64(childLaunch.executable),
       [argumentsVariable]: encodeBase64(childLaunch.arguments),
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: [spec.stdin === 'pipe' ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
 }
@@ -381,6 +391,14 @@ function observeExit(child: ChildProcess): Promise<LocalShellExit> {
     child.once('exit', code => finish({ code }));
     child.once('error', () => finish({ code: null }));
   });
+}
+
+function requireReadablePipe(stream: Readable | null, child: ChildProcess): Readable {
+  if (stream) {
+    return stream;
+  }
+  child.kill();
+  throw new Error('Owned process launch did not create its required output pipe.');
 }
 
 function settleWithin(task: Promise<void>, timeoutMs: number): Promise<boolean> {
@@ -527,7 +545,7 @@ public static class GrimoireJobGuardian
     [DllImport("kernel32.dll")]
     private static extern bool CloseHandle(IntPtr handle);
 
-    public static int Run(string executable, string arguments)
+    public static int Run(string executable, string arguments, bool pipeInput)
     {
         IntPtr job = CreateJobObject(IntPtr.Zero, null);
         if (job == IntPtr.Zero)
@@ -560,6 +578,7 @@ public static class GrimoireJobGuardian
             start.CreateNoWindow = true;
             start.RedirectStandardOutput = true;
             start.RedirectStandardError = true;
+            start.RedirectStandardInput = pipeInput;
 
             using (Process process = Process.Start(start))
             {
@@ -569,7 +588,11 @@ public static class GrimoireJobGuardian
                 Console.Error.Flush();
                 Task stdout = process.StandardOutput.BaseStream.CopyToAsync(Console.OpenStandardOutput());
                 Task stderr = process.StandardError.BaseStream.CopyToAsync(Console.OpenStandardError());
+                Task stdin = pipeInput
+                    ? Console.OpenStandardInput().CopyToAsync(process.StandardInput.BaseStream)
+                    : Task.CompletedTask;
                 process.WaitForExit();
+                if (pipeInput) process.StandardInput.Close();
                 try { Task.WaitAll(new Task[] { stdout, stderr }, 250); }
                 catch (AggregateException) { }
                 Environment.Exit(process.ExitCode);
