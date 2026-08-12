@@ -387,6 +387,9 @@ export class SessionStorage {
       resumeAtMessageId: conversation.resumeAtMessageId,
       vaultSearchContexts: collectVaultSearchContexts(conversation.messages),
       assistantResponseMetadata: collectAssistantResponseMetadata(conversation.messages),
+      executionCompletions: conversation.executionCompletions?.map(completion => ({
+        ...completion,
+      })),
     };
   }
 

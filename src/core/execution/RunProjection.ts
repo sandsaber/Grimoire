@@ -6,6 +6,7 @@ import type {
 } from './ExecutionContracts';
 import type {
   ExecutionReconciliationRecord,
+  ExecutionRunRecord,
   ReconciliationEvidenceRecord,
 } from './ExecutionControlRecords';
 import type { ExecutionEventEnvelope } from './ExecutionEvents';
@@ -31,6 +32,8 @@ export interface RunProjection {
   readonly interactionIds: readonly string[];
   readonly nativeAgentKeys: readonly string[];
   readonly lastSequence: number;
+  readonly lastEnvelopeSequence: number;
+  readonly lastRecordRevision: number;
   readonly recentEventIds: readonly string[];
   readonly reconciledOutcomes: readonly ReconciledOutcomeProjection[];
 }
@@ -49,6 +52,8 @@ export function createRunProjection(
     interactionIds: [],
     nativeAgentKeys: [],
     lastSequence: 0,
+    lastEnvelopeSequence: 0,
+    lastRecordRevision: 0,
     recentEventIds: [],
     reconciledOutcomes: [],
   };
@@ -58,17 +63,25 @@ export function reduceRunProjection(
   projection: RunProjection,
   envelope: ExecutionEventEnvelope,
 ): RunProjection {
-  if (projection.terminal
-    || envelope.sequence <= projection.lastSequence
-    || projection.recentEventIds.includes(envelope.eventId)
+  if (projection.recentEventIds.includes(envelope.eventId)
     || !belongsToRun(envelope, projection.runId)) {
+    return projection;
+  }
+  const recordIsAuthoritative = projection.lastRecordRevision > 0
+    && envelope.sequence <= projection.lastSequence;
+  if ((!recordIsAuthoritative && envelope.sequence <= projection.lastEnvelopeSequence)
+    || (projection.terminal && !recordIsAuthoritative)) {
     return projection;
   }
   const base = {
     ...projection,
-    lastSequence: envelope.sequence,
+    lastSequence: Math.max(projection.lastSequence, envelope.sequence),
+    lastEnvelopeSequence: Math.max(projection.lastEnvelopeSequence, envelope.sequence),
     recentEventIds: rememberEventId(projection.recentEventIds, envelope.eventId),
   };
+  if (recordIsAuthoritative) {
+    return reduceEnvelopeDetails(base, envelope);
+  }
   switch (envelope.event.kind) {
     case 'run-started':
       return { ...base, state: 'running' };
@@ -160,8 +173,70 @@ export function applyRunReconciliation(
   };
 }
 
+export function applyRunRecord(
+  projection: RunProjection,
+  record: Readonly<ExecutionRunRecord>,
+  revision: number,
+): RunProjection {
+  if (record.runId !== projection.runId || revision <= projection.lastRecordRevision) {
+    return projection;
+  }
+  const terminal = projection.terminal ?? record.terminal;
+  const next: RunProjection = {
+    ...projection,
+    state: terminal?.kind ?? record.state,
+    lastSequence: Math.max(projection.lastSequence, record.lastSequence),
+    lastRecordRevision: revision,
+    interactionIds: [...record.openInteractionIds],
+    result: record.resultRef ?? projection.result,
+    terminal,
+  };
+  return sameRunProjectionState(projection, next) ? projection : next;
+}
+
 function belongsToRun(envelope: ExecutionEventEnvelope, runId: RunId): boolean {
   return envelope.scope.kind === 'session' || envelope.scope.runId === runId;
+}
+
+function reduceEnvelopeDetails(
+  projection: RunProjection,
+  envelope: ExecutionEventEnvelope,
+): RunProjection {
+  switch (envelope.event.kind) {
+    case 'thinking-activity':
+      return projection.sawThinking ? projection : { ...projection, sawThinking: true };
+    case 'tool-activity':
+      return {
+        ...projection,
+        toolCallIds: appendUnique(projection.toolCallIds, envelope.event.toolCallId),
+      };
+    case 'progress':
+      return {
+        ...projection,
+        progressIds: appendUnique(projection.progressIds, envelope.event.progressId),
+      };
+    case 'native-agent-observed':
+    case 'native-agent-result':
+    case 'native-agent-activity':
+    case 'native-agent-status':
+      return {
+        ...projection,
+        nativeAgentKeys: appendUnique(
+          projection.nativeAgentKeys,
+          envelope.event.nativeAgentKey,
+        ),
+      };
+    case 'run-started':
+    case 'result':
+    case 'interaction-opened':
+    case 'interaction-resolved':
+    case 'connection-lost':
+    case 'recovery-started':
+    case 'recovered':
+    case 'cancellation-acknowledged':
+    case 'terminal':
+      return projection;
+  }
 }
 
 function terminalProjection(
@@ -191,4 +266,30 @@ function appendUnique(values: readonly string[], value: string): readonly string
 function rememberEventId(values: readonly string[], value: string): readonly string[] {
   const next = appendUnique(values, value);
   return next.length > 256 ? next.slice(next.length - 256) : next;
+}
+
+function sameRunProjectionState(left: RunProjection, right: RunProjection): boolean {
+  return left.state === right.state
+    && left.lastSequence === right.lastSequence
+    && left.lastRecordRevision === right.lastRecordRevision
+    && sameResultRef(left.result, right.result)
+    && sameTerminal(left.terminal, right.terminal)
+    && equalStrings(left.interactionIds, right.interactionIds);
+}
+
+function sameResultRef(left: ResultRef | undefined, right: ResultRef | undefined): boolean {
+  return left?.resultId === right?.resultId
+    && left?.storage === right?.storage
+    && left?.digest === right?.digest;
+}
+
+function sameTerminal(left: RunTerminal | undefined, right: RunTerminal | undefined): boolean {
+  return left?.kind === right?.kind
+    && left?.reason === right?.reason
+    && left?.occurredAt === right?.occurredAt
+    && sameResultRef(left?.resultRef, right?.resultRef);
+}
+
+function equalStrings(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }

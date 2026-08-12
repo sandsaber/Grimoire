@@ -121,6 +121,13 @@ export interface PersistedAssistantResponseMetadata {
   metadata: AssistantResponseMetadata;
 }
 
+export interface PersistedChatExecutionCompletion {
+  runId: string;
+  terminalKind: 'succeeded' | 'failed' | 'cancelled' | 'interrupted' | 'invalidated' | 'indeterminate';
+  completedAt: number;
+  assistantMessageId?: string;
+}
+
 /** Persisted conversation with messages and session state. */
 export interface Conversation {
   id: string;
@@ -153,6 +160,8 @@ export interface Conversation {
   vaultSearchContexts?: PersistedVaultSearchContext[];
   /** UI metadata restored after provider-native history hydration. */
   assistantResponseMetadata?: PersistedAssistantResponseMetadata[];
+  /** Run-specific proof that terminal result projection crossed the conversation write barrier. */
+  executionCompletions?: PersistedChatExecutionCompletion[];
 }
 
 /** Lightweight conversation metadata for the history dropdown. */
@@ -208,6 +217,7 @@ export interface SessionMetadata {
   vaultSearchContexts?: PersistedVaultSearchContext[];
   /** UI metadata for rendering assistant response headers after hydration. */
   assistantResponseMetadata?: PersistedAssistantResponseMetadata[];
+  executionCompletions?: PersistedChatExecutionCompletion[];
 }
 
 /**

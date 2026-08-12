@@ -58,6 +58,22 @@ describe('ConversationRepository', () => {
     });
   });
 
+  it('validates run-specific execution completion markers', async () => {
+    const repository = new ConversationRepository(new TestDurableStorage(), {
+      now: () => 10,
+    });
+    const malformed = {
+      ...createConversation(),
+      executionCompletions: [{
+        runId: 'run-1',
+        terminalKind: 'unexpected',
+        completedAt: 5,
+      }],
+    } as unknown as Conversation;
+
+    await expect(repository.create(malformed)).rejects.toThrow('Invalid conversation payload.');
+  });
+
   it('serializes updates, rejects stale revisions, and keeps provider binding immutable', async () => {
     const repository = new ConversationRepository(new TestDurableStorage(), {
       now: () => 10,

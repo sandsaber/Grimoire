@@ -28,7 +28,9 @@ const conversationSchema: RecordSchema<Conversation> = {
       || typeof payload.updatedAt !== 'number'
       || (payload.sessionId !== null && typeof payload.sessionId !== 'string')
       || !Array.isArray(payload.messages)
-      || (payload.providerState !== undefined && !isRecord(payload.providerState))) {
+      || (payload.providerState !== undefined && !isRecord(payload.providerState))
+      || (payload.executionCompletions !== undefined
+        && !isExecutionCompletions(payload.executionCompletions))) {
       throw new Error('Invalid conversation payload.');
     }
     return payload as unknown as Conversation;
@@ -115,6 +117,35 @@ export function conversationFromSessionMetadata(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isExecutionCompletions(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  const runIds = new Set<string>();
+  return value.every(candidate => {
+    if (!isRecord(candidate)
+      || typeof candidate.runId !== 'string'
+      || candidate.runId.length === 0
+      || !isTerminalKind(candidate.terminalKind)
+      || typeof candidate.completedAt !== 'number'
+      || !Number.isFinite(candidate.completedAt)
+      || (candidate.assistantMessageId !== undefined
+        && typeof candidate.assistantMessageId !== 'string')
+      || runIds.has(candidate.runId)) {
+      return false;
+    }
+    runIds.add(candidate.runId);
+    return true;
+  });
+}
+
+function isTerminalKind(value: unknown): boolean {
+  return value === 'succeeded'
+    || value === 'failed'
+    || value === 'cancelled'
+    || value === 'interrupted'
+    || value === 'invalidated'
+    || value === 'indeterminate';
 }
 
 function resolveExistingImport(

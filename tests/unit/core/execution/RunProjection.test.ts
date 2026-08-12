@@ -3,6 +3,7 @@ import type { ExecutionEvent } from '@/core/execution/ExecutionEvents';
 import { executionSessionId, runId, sessionInstanceId } from '@/core/execution/ExecutionIds';
 import {
   applyRunReconciliation,
+  applyRunRecord,
   createRunProjection,
   reduceRunProjection,
 } from '@/core/execution/RunProjection';
@@ -101,7 +102,85 @@ describe('RunProjection', () => {
       recordedAt: 20,
     })).toBe(reconciled);
   });
+
+  it('does not let an older envelope regress a newer durable record', () => {
+    const recorded = applyRunRecord(createRunProjection(RUN_ID, 'optional'), runRecord({
+      state: 'waiting-interaction',
+      resultRef: { resultId: 'result-1', storage: 'projection' },
+      openInteractionIds: ['interaction-1'],
+      lastSequence: 2,
+    }), 2);
+
+    const projected = reduceRunProjection(recorded, envelope(1, 'older-thinking', {
+      kind: 'thinking-activity',
+    }));
+
+    expect(projected).toMatchObject({
+      state: 'waiting-interaction',
+      result: { resultId: 'result-1' },
+      interactionIds: ['interaction-1'],
+      sawThinking: true,
+      lastSequence: 2,
+      lastRecordRevision: 2,
+    });
+  });
+
+  it('does not erase an immutable terminal with a stale equal-sequence record', () => {
+    const terminal = applyRunRecord(createRunProjection(RUN_ID, 'optional'), runRecord({
+      state: 'failed',
+      terminal: { kind: 'failed', reason: 'provider-failure', occurredAt: 10 },
+      lastSequence: 2,
+    }), 3);
+
+    expect(applyRunRecord(terminal, runRecord({
+      state: 'running',
+      lastSequence: 2,
+    }), 2)).toBe(terminal);
+  });
+
+  it('converges when an equal-sequence durable record and detail envelope reorder', () => {
+    const record = runRecord({ state: 'running', lastSequence: 1 });
+    const detail = envelope(1, 'tool-detail', {
+      kind: 'tool-activity',
+      toolCallId: 'tool-1',
+    });
+    const recordFirst = reduceRunProjection(
+      applyRunRecord(createRunProjection(RUN_ID, 'optional'), record, 1),
+      detail,
+    );
+    const envelopeFirst = applyRunRecord(
+      reduceRunProjection(createRunProjection(RUN_ID, 'optional'), detail),
+      record,
+      1,
+    );
+
+    expect(recordFirst).toEqual(envelopeFirst);
+  });
 });
+
+function runRecord(overrides: Partial<{
+  state: 'running' | 'waiting-interaction' | 'failed';
+  resultRef: { resultId: string; storage: 'projection' };
+  terminal: { kind: 'failed'; reason: 'provider-failure'; occurredAt: number };
+  openInteractionIds: string[];
+  lastSequence: number;
+}>) {
+  return {
+    runId: RUN_ID,
+    executionSessionId: SESSION_ID,
+    owner: { kind: 'conversation' as const, ownerId: 'conversation-1' },
+    resultExpectation: 'optional' as const,
+    state: overrides.state ?? 'running',
+    dispatchState: 'accepted' as const,
+    cancellationRequested: false,
+    ...(overrides.resultRef ? { resultRef: overrides.resultRef } : {}),
+    ...(overrides.terminal ? { terminal: overrides.terminal } : {}),
+    openInteractionIds: overrides.openInteractionIds ?? [],
+    lastSequence: overrides.lastSequence ?? 0,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+}
 
 function envelope(sequence: number, eventId: string, event: ExecutionEvent) {
   return {

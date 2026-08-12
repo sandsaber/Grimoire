@@ -197,6 +197,16 @@ describe('ExecutionLifecycleRegistry', () => {
       { kind: 'terminal', terminal: 'failed', reason: 'provider-failure' },
       { deliveryId: 'final-partial-terminal' },
     );
+    let terminalProjectionObservedAfterHooks = false;
+    const terminalProjectionEvents: string[] = [];
+    fixture.registry.subscribe(notification => {
+      if (notification.kind === 'envelope-accepted'
+        && notification.envelope.event.kind === 'terminal') {
+        terminalProjectionEvents.push(notification.envelope.eventId);
+        terminalProjectionObservedAfterHooks = fixture.backend.cancelledInteractions
+          .includes(INTERACTION_ID);
+      }
+    });
 
     failuresRemaining = 2;
     await expect(fixture.registry.ingest(terminal))
@@ -208,6 +218,8 @@ describe('ExecutionLifecycleRegistry', () => {
       reason: 'provider-failure',
     });
     expect(fixture.backend.cancelledInteractions).toEqual([INTERACTION_ID]);
+    expect(terminalProjectionEvents).toEqual(['final-partial-terminal']);
+    expect(terminalProjectionObservedAfterHooks).toBe(true);
     expect(fixture.registry.getInteraction(INTERACTION_ID)?.status).toBe('cancelled');
     expect((await currentRecord(
       fixture.repositories.settingsTransitions.read(transitionId),

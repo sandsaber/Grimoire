@@ -341,6 +341,41 @@ The independent Phase 6 lifecycle and architecture review is approved with no ma
 Its restart, provenance, permission, cancellation, adoption, and parallel-DAG findings are captured
 as permanent regression tests in this checkpoint.
 
+## Phase 7A chat execution projections
+
+- Added a post-commit lifecycle feed for revisioned run and interaction records, accepted envelopes,
+  and immutable reconciliation records. Notifications are emitted only after the durable aggregate
+  and its required post-commit hooks converge; startup reloads reconciliations and exposes
+  owner-scoped session/run snapshots for projection recovery.
+- Added pure run and chat reducers with independent durable-record and event-envelope cursors.
+  Durable revisions remain authoritative for lifecycle state while reordered envelopes may still
+  contribute append-only thinking, tool, progress, and native-agent detail. A stale record or event
+  cannot erase or rewrite an immutable terminal.
+- Added a provider-neutral chat execution coordinator that persists the user message before
+  dispatch, serializes turns per conversation, and releases queued input only after terminal result
+  materialization crosses the revisioned conversation write barrier. CAS conflicts retry without
+  redispatch, and persistence failures remain visible and explicitly retryable.
+- Added run-specific durable completion markers. Recovery requires both run identity and terminal
+  kind, repairs a mismatched marker from the authoritative lifecycle record, preserves the marker
+  through the existing session-metadata compatibility path, and never treats a newer generic
+  response timestamp as proof that a particular run was saved.
+- Added admission-generation fencing around conversation load, user-message persistence, session
+  creation, and run dispatch. Disposal settles pre-dispatch tickets and cannot create a session or
+  run after its lifecycle listener has detached; a dispatch already accepted by the durable
+  lifecycle remains application-owned for later recovery.
+- Added a parallel input command adapter, a projection-only renderer, and a generation-fenced
+  attachment adapter. Attachments own draft, selection, and scroll state only; detach never queries,
+  cancels, or disposes execution resources. The renderer keeps final text, partial text, thinking,
+  tools, progress, interactions, persistence failure, original terminal, and later reconciled
+  outcome/result evidence as distinct fields.
+- Added the new chat boundary, coordinator, reducer, renderer, attachment, completion-compatibility,
+  and run-projection suites to the macOS, Linux, and Windows execution matrix. The old production
+  input, stream, tab-runtime, and local-shell path remains unchanged until the Phase 9 cutover.
+
+The independent Phase 7A lifecycle and projection review is approved with no remaining material
+blocker. Its disposal/admission, record/event ordering, completion identity, metadata compatibility,
+and attachment-race findings are permanent regression tests in this checkpoint.
+
 ## Verification evidence
 
 - Phase 4C checkpoint gate: 432 unit suites / 7,218 tests; 7 integration suites / 222 tests;
@@ -418,9 +453,17 @@ as permanent regression tests in this checkpoint.
   release build: `main.js` SHA-256 `583fa1848749ffdfd763a8dd2bff24d659723b16932df00624a1ac8bdb736ce6`,
   `styles.css` `c079364c4f85717134955ce46b4c8a20ccfe403b4d1531675fa1a433e23c13eb`, and
   `manifest.json` `5058df46417fc0ec4debcc9eda1552c2fda654904132ab20b90d2bb1cbc63758`.
+- Current Phase 7A focused gate: 10 lifecycle, persistence, projection, coordinator, renderer,
+  attachment, boundary, and compatibility suites / 104 tests pass; typecheck, focused ESLint, and
+  `git diff --check` pass.
+- Final Phase 7A checkpoint gate: 489 unit suites / 7,641 tests and 7 integration suites / 222 tests
+  pass outside the restricted sandbox; typecheck, full ESLint, release build, Obsidian
+  source/CSS/dependency review, isolated bundle-load smoke, view-open smoke, and `git diff --check`
+  pass. The restricted full-unit attempt failed only at the existing home-directory temporary-path
+  and loopback-bind tests; the same suites pass outside the sandbox.
 
 ## Next steps
 
-1. Implement the Phase 7 application coordinators and pure chat/agent/result/work projections.
-2. Add the parallel provider-neutral command/rendering path without changing production composition
-   before the Phase 9 hard cutover.
+1. Implement Phase 7B agent, result, hierarchy, interaction, artifact, and work-card projections.
+2. Implement Phase 7C work-graph orchestration, local-shell projection, and isolated auxiliary-owner
+   routing while leaving production composition unchanged before the Phase 9 hard cutover.

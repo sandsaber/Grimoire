@@ -116,6 +116,29 @@ export type RegistryIngestResult =
   | { readonly kind: 'ignored-post-terminal' }
   | { readonly kind: 'ignored-invalid-scope' };
 
+export type ExecutionLifecycleNotification =
+  | {
+    readonly kind: 'run-updated';
+    readonly run: Readonly<ExecutionRunRecord>;
+    readonly revision: number;
+  }
+  | {
+    readonly kind: 'interaction-updated';
+    readonly interaction: Readonly<ExecutionInteractionRecord>;
+  }
+  | { readonly kind: 'envelope-accepted'; readonly envelope: ExecutionEventEnvelope }
+  | {
+    readonly kind: 'reconciliation-appended';
+    readonly reconciliation: Readonly<ExecutionReconciliationRecord>;
+  };
+
+export type ExecutionLifecycleListener = (notification: ExecutionLifecycleNotification) => void;
+
+export interface ExecutionRunSnapshot {
+  readonly record: Readonly<ExecutionRunRecord>;
+  readonly revision: number;
+}
+
 interface BackendEntry {
   readonly backend: ExecutionBackend;
   readonly recovery?: ExecutionRecoveryPort;
@@ -177,10 +200,12 @@ export class ExecutionLifecycleRegistry {
   private readonly sessions = new Map<ExecutionSessionId, SessionEntry>();
   private readonly runs = new Map<RunId, RunEntry>();
   private readonly interactions = new Map<InteractionId, InteractionEntry>();
+  private readonly reconciliations = new Map<RunId, ExecutionReconciliationRecord[]>();
   private readonly leases = new Map<LifecycleLeaseId, LeaseEntry>();
   private readonly sessionQueues = new Map<ExecutionSessionId, Promise<void>>();
   private readonly eventTasks = new Set<Promise<void>>();
   private readonly admissionWaiters = new Set<() => void>();
+  private readonly listeners = new Set<ExecutionLifecycleListener>();
   private state: RegistryState = 'initializing';
   private activeAdmissions = 0;
 
@@ -221,6 +246,13 @@ export class ExecutionLifecycleRegistry {
       state: 'stable',
       disposed: false,
     });
+  }
+
+  subscribe(listener: ExecutionLifecycleListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
   async start(): Promise<void> {
@@ -352,6 +384,11 @@ export class ExecutionLifecycleRegistry {
           revision: createdRun.revision,
         };
         this.runs.set(request.runId, runEntry);
+        this.notify({
+          kind: 'run-updated',
+          run: runEntry.record,
+          revision: runEntry.revision,
+        });
 
         let executionRun: ExecutionRun;
         try {
@@ -553,6 +590,10 @@ export class ExecutionLifecycleRegistry {
         );
         currentInteraction.record = updated.payload;
         currentInteraction.revision = updated.revision;
+        this.notify({
+          kind: 'interaction-updated',
+          interaction: currentInteraction.record,
+        });
       }
     });
     if (alreadyResolved) {
@@ -659,6 +700,11 @@ export class ExecutionLifecycleRegistry {
       await this.commitWrites([
         write('reconciliations', record.reconciliationId, null, record),
       ]);
+      const records = this.reconciliations.get(runId(record.runId)) ?? [];
+      records.push(record);
+      records.sort((left, right) => left.recordedAt - right.recordedAt);
+      this.reconciliations.set(runId(record.runId), records);
+      this.notify({ kind: 'reconciliation-appended', reconciliation: record });
     });
   }
 
@@ -930,12 +976,42 @@ export class ExecutionLifecycleRegistry {
     return this.runs.get(runId)?.record ?? null;
   }
 
+  getRunSnapshot(runId: RunId): ExecutionRunSnapshot | null {
+    const entry = this.runs.get(runId);
+    return entry ? { record: entry.record, revision: entry.revision } : null;
+  }
+
   getSession(executionSessionId: ExecutionSessionId): Readonly<ExecutionSessionRecord> | null {
     return this.sessions.get(executionSessionId)?.record ?? null;
   }
 
   getInteraction(interactionId: InteractionId): Readonly<ExecutionInteractionRecord> | null {
     return this.interactions.get(interactionId)?.record ?? null;
+  }
+
+  getRunsForOwner(owner: ExecutionOwner): readonly ExecutionRunSnapshot[] {
+    return [...this.runs.values()]
+      .filter(entry => sameOwner(entry.record.owner, owner))
+      .map(entry => ({ record: entry.record, revision: entry.revision }))
+      .sort((left, right) => left.record.createdAt - right.record.createdAt);
+  }
+
+  getSessionsForOwner(owner: ExecutionOwner): readonly Readonly<ExecutionSessionRecord>[] {
+    return [...this.sessions.values()]
+      .map(entry => entry.record)
+      .filter(record => sameOwner(record.owner, owner))
+      .sort((left, right) => left.createdAt - right.createdAt);
+  }
+
+  getInteractionsForRun(runId: RunId): readonly Readonly<ExecutionInteractionRecord>[] {
+    return [...this.interactions.values()]
+      .map(entry => entry.record)
+      .filter(record => record.runId === runId)
+      .sort((left, right) => left.createdAt - right.createdAt);
+  }
+
+  getReconciliationsForRun(runId: RunId): readonly Readonly<ExecutionReconciliationRecord>[] {
+    return [...(this.reconciliations.get(runId) ?? [])];
   }
 
   async waitForRunStream(runId: RunId): Promise<void> {
@@ -951,6 +1027,16 @@ export class ExecutionLifecycleRegistry {
 
   private async loadPersistedControls(): Promise<void> {
     await this.loadPersistedSettingsTransitions();
+    for (const id of await this.repositories.reconciliations.listRecordIds()) {
+      const current = await requireCurrent(this.repositories.reconciliations.read(id));
+      const typedRunId = runId(current.payload.runId);
+      const records = this.reconciliations.get(typedRunId) ?? [];
+      records.push(current.payload);
+      this.reconciliations.set(typedRunId, records);
+    }
+    for (const records of this.reconciliations.values()) {
+      records.sort((left, right) => left.recordedAt - right.recordedAt);
+    }
     for (const id of await this.repositories.interactions.listRecordIds()) {
       const current = await requireCurrent(this.repositories.interactions.read(id));
       const typedId = interactionId(current.payload.interactionId);
@@ -1209,8 +1295,8 @@ export class ExecutionLifecycleRegistry {
     writes.push(...interactionChanges.writes);
     await this.commitWrites(writes);
     await this.refreshSession(session);
-    await this.refreshRun(run);
-    await this.refreshInteractions(interactionChanges.ids);
+    await this.refreshRun(run, false);
+    await this.refreshInteractions(interactionChanges.ids, false);
     return { kind: 'accepted', envelopes: [envelope] };
   }
 
@@ -1250,6 +1336,7 @@ export class ExecutionLifecycleRegistry {
       this.scheduleBlockedIngestionRecovery(session);
       throw error;
     }
+    this.notifyEnvelopeProjection(session, envelope, interactionIds);
     return result;
   }
 
@@ -1273,6 +1360,11 @@ export class ExecutionLifecycleRegistry {
     if (committed) {
       try {
         await this.runEnvelopePostCommitHooks(
+          session,
+          blocked.envelope,
+          blocked.interactionIds,
+        );
+        this.notifyEnvelopeProjection(
           session,
           blocked.envelope,
           blocked.interactionIds,
@@ -1371,7 +1463,7 @@ export class ExecutionLifecycleRegistry {
     for (const runIdValue of session.record.runIds) {
       const run = this.runs.get(runId(runIdValue));
       if (run) {
-        await this.refreshRun(run);
+        await this.refreshRun(run, false);
       }
     }
     const interactionIds = new Set<InteractionId>(additionalInteractionIds);
@@ -1380,7 +1472,7 @@ export class ExecutionLifecycleRegistry {
         interactionIds.add(id);
       }
     }
-    await this.refreshInteractions([...interactionIds]);
+    await this.refreshInteractions([...interactionIds], false);
   }
 
   private async applySessionEnvelope(
@@ -1420,7 +1512,7 @@ export class ExecutionLifecycleRegistry {
     await this.commitWrites(writes);
     await this.refreshSession(session);
     for (const run of activeRuns) {
-      await this.refreshRun(run);
+      await this.refreshRun(run, false);
     }
     return { kind: 'accepted', envelopes: [envelope] };
   }
@@ -1722,6 +1814,7 @@ export class ExecutionLifecycleRegistry {
       );
       current.record = updated.payload;
       current.revision = updated.revision;
+      this.notify({ kind: 'interaction-updated', interaction: current.record });
     });
   }
 
@@ -1750,6 +1843,7 @@ export class ExecutionLifecycleRegistry {
     );
     run.record = updated.payload;
     run.revision = updated.revision;
+    this.notify({ kind: 'run-updated', run: run.record, revision: run.revision });
   }
 
   private async commitWrites(writes: readonly ExecutionControlWrite[]): Promise<void> {
@@ -1764,32 +1858,87 @@ export class ExecutionLifecycleRegistry {
     session.revision = current.revision;
   }
 
-  private async refreshRun(run: RunEntry): Promise<void> {
+  private async refreshRun(run: RunEntry, publish = true): Promise<void> {
     const current = await requireCurrent(this.repositories.runs.read(run.record.runId));
+    const changed = current.revision !== run.revision;
     run.record = current.payload;
     run.revision = current.revision;
+    if (changed && publish) {
+      this.notify({ kind: 'run-updated', run: run.record, revision: run.revision });
+    }
   }
 
-  private async refreshInteraction(interaction: InteractionEntry): Promise<void> {
+  private async refreshInteraction(interaction: InteractionEntry, publish = true): Promise<void> {
     const current = await requireCurrent(
       this.repositories.interactions.read(interaction.record.interactionId),
     );
     interaction.record = current.payload;
     interaction.revision = current.revision;
+    if (publish) {
+      this.notify({ kind: 'interaction-updated', interaction: interaction.record });
+    }
   }
 
-  private async refreshInteractions(interactionIds: readonly InteractionId[]): Promise<void> {
+  private async refreshInteractions(
+    interactionIds: readonly InteractionId[],
+    publish = true,
+  ): Promise<void> {
     for (const interactionId of interactionIds) {
       const current = await requireCurrent(this.repositories.interactions.read(interactionId));
       const existing = this.interactions.get(interactionId);
       if (existing) {
+        const changed = existing.revision !== current.revision;
         existing.record = current.payload;
         existing.revision = current.revision;
+        if (changed && publish) {
+          this.notify({ kind: 'interaction-updated', interaction: existing.record });
+        }
       } else {
-        this.interactions.set(interactionId, {
+        const entry = {
           record: current.payload,
           revision: current.revision,
+        };
+        this.interactions.set(interactionId, entry);
+        if (publish) {
+          this.notify({ kind: 'interaction-updated', interaction: entry.record });
+        }
+      }
+    }
+  }
+
+  private notifyEnvelopeProjection(
+    session: SessionEntry,
+    envelope: ExecutionEventEnvelope,
+    interactionIds: readonly InteractionId[],
+  ): void {
+    const runIds = envelope.scope.kind === 'session'
+      ? session.record.runIds.map(runId)
+      : [envelope.scope.runId];
+    for (const id of runIds) {
+      const run = this.runs.get(id);
+      if (run && run.record.lastSequence >= envelope.sequence) {
+        this.notify({
+          kind: 'run-updated',
+          run: run.record,
+          revision: run.revision,
         });
+      }
+    }
+    for (const id of interactionIds) {
+      const interaction = this.interactions.get(id);
+      if (interaction) {
+        this.notify({ kind: 'interaction-updated', interaction: interaction.record });
+      }
+    }
+    this.notify({ kind: 'envelope-accepted', envelope });
+  }
+
+  private notify(notification: ExecutionLifecycleNotification): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(notification);
+      } catch {
+        // Projection listeners cannot affect lifecycle durability or event admission.
       }
     }
   }

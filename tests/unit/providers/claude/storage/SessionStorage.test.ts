@@ -285,6 +285,12 @@ describe('SessionStorage', () => {
           providerSessionId: 'active-session',
           forkSource: { sessionId: 'parent', resumeAt: 'uuid-456' },
         },
+        executionCompletions: [{
+          runId: 'run-completed',
+          terminalKind: 'succeeded',
+          completedAt: 1700000900,
+          assistantMessageId: 'assistant-completed',
+        }],
         messages: [],
       };
 
@@ -305,6 +311,7 @@ describe('SessionStorage', () => {
         sessionId: 'parent',
         resumeAt: 'uuid-456',
       });
+      expect(loaded!.executionCompletions).toEqual(conversation.executionCompletions);
     });
 
     it('round-trips the bound conversation model', async () => {
