@@ -750,15 +750,23 @@ broker, durable result store, identity factory, interaction presentation store, 
 recovery port) without importing a legacy runtime. Each workspace context is bound to the active
 generation.
 
-Current broad evidence: 531 unit suites / 7,845 tests pass with typecheck, full ESLint, and
-`git diff --check`. The 12 factory/bridge suites / 24 tests and the 5 architecture boundary suites
-all pass. Production composition is unchanged and still uses the legacy runtime path.
+- `8b05ace5` — Added `ProviderApplicationContextComposition`: the sole production composition that
+  constructs all application-level singletons (identity factory, ephemeral request store, durable
+  result store, interaction presentation store) and wires the nine provider application context
+  factories through the `ProviderApplicationContextRegistry`. It validates one factory per catalog
+  module at construction and resolves a backend context for every provider without launching a
+  process.
+
+Current broad evidence: 532 unit suites / 7,848 tests pass with typecheck, full ESLint, and
+`git diff --check`. The 13 factory/bridge/composition suites / 27 tests and the 5 architecture
+boundary suites all pass. Production composition is unchanged and still uses the legacy runtime path.
 
 ## Next steps
 
-1. ~~Compose all nine provider backend contexts~~ — done. Remaining: wire the nine factories into
-   the `ProviderApplicationContextRegistry` production composition and the application runtime
-   bootstrap so the catalog constructs live backends through the new path.
+1. ~~Compose all nine provider backend contexts~~ — done.
+   ~~Wire factories into production composition~~ — done.
+   Remaining: connect the composition root to the `ProviderBackendBootstrap` and `ApplicationRuntime`
+   so the catalog constructs live backends through the new path on startup.
 2. Connect durable agent adoption, work dispatch, results, local shell, auxiliary execution, and
    settings transitions to `ApplicationRuntime`.
 3. Replace tab/input/stream ownership with projection-backed presentation, migrate existing vault
