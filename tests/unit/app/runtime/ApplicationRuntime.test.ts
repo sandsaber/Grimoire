@@ -7,7 +7,7 @@ import {
 describe('ApplicationRuntime', () => {
   it('keeps admission closed until every startup recovery phase completes in order', async () => {
     const calls: string[] = [];
-    const gates = Array.from({ length: 10 }, () => deferred<void>());
+    const gates = Array.from({ length: 11 }, () => deferred<void>());
     const options = createOptions(calls, gates);
     const runtime = new ApplicationRuntime(options);
 
@@ -20,6 +20,7 @@ describe('ApplicationRuntime', () => {
       'migration',
       'backends',
       'lifecycle',
+      'interaction-presentations',
       'settings',
       'shell',
       'auxiliary',
@@ -115,7 +116,7 @@ describe('ApplicationRuntime', () => {
 
   it('joins in-flight startup before shutdown without ever opening admission', async () => {
     const calls: string[] = [];
-    const gates = Array.from({ length: 10 }, () => deferred<void>());
+    const gates = Array.from({ length: 11 }, () => deferred<void>());
     const runtime = new ApplicationRuntime(createOptions(calls, gates));
 
     const startup = runtime.start();
@@ -136,6 +137,7 @@ describe('ApplicationRuntime', () => {
       'migration',
       'backends',
       'lifecycle',
+      'interaction-presentations',
       'settings',
       'shell',
       'auxiliary',
@@ -208,6 +210,7 @@ describe('ApplicationRuntime', () => {
       'migration',
       'backends',
       'lifecycle',
+      'interaction-presentations',
       'settings',
       'lifecycle-shutdown',
       'agent-idle',
@@ -245,7 +248,8 @@ function createOptions(
       start: phase('lifecycle', 2),
       shutdown: async () => { calls.push('lifecycle-shutdown'); },
     },
-    settings: { recoverPending: phase('settings', 3) },
+    interactionPresentations: { recover: phase('interaction-presentations', 3) },
+    settings: { recoverPending: phase('settings', 4) },
     chat: {
       loadConversation: async conversationId => ({ conversationId } as never),
       attach: async () => () => undefined,
@@ -256,23 +260,23 @@ function createOptions(
       dispose: () => { calls.push('chat-dispose'); },
     },
     shell: {
-      recover: phase('shell', 4),
+      recover: phase('shell', 5),
       waitForIdle: async () => { calls.push('shell-idle'); },
       dispose: () => { calls.push('shell-dispose'); },
     },
     auxiliary: {
-      recover: phase('auxiliary', 5),
+      recover: phase('auxiliary', 6),
       waitForIdle: async () => { calls.push('auxiliary-idle'); },
       dispose: () => { calls.push('auxiliary-dispose'); },
     },
     work: {
-      recoverDispatchBindings: phase('work-dispatch-bindings', 7),
-      recoverAll: phase('work', 9) as never,
+      recoverDispatchBindings: phase('work-dispatch-bindings', 8),
+      recoverAll: phase('work', 10) as never,
     },
     agents: {
       recover: async () => {
         calls.push('agents');
-        await gates[agentRecovery++ === 0 ? 6 : 8]?.promise;
+        await gates[agentRecovery++ === 0 ? 7 : 9]?.promise;
       },
       waitForIdle: async () => { calls.push('agent-idle'); },
       dispose: () => { calls.push('agent-dispose'); },

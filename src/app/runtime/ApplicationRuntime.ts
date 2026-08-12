@@ -38,6 +38,10 @@ export interface ApplicationRuntimeSettingsPort {
   recoverPending(): Promise<unknown>;
 }
 
+export interface ApplicationRuntimeInteractionPresentationPort {
+  recover(): Promise<unknown>;
+}
+
 export interface ApplicationRuntimeRecoverableCoordinator {
   recover(): Promise<void>;
   waitForIdle(): Promise<void>;
@@ -89,6 +93,7 @@ export interface ApplicationRuntimeOptions {
   readonly migration: ApplicationRuntimeMigrationPort;
   readonly backends: ApplicationRuntimeBackendPort;
   readonly lifecycle: ApplicationRuntimeLifecyclePort;
+  readonly interactionPresentations: ApplicationRuntimeInteractionPresentationPort;
   readonly settings: ApplicationRuntimeSettingsPort;
   readonly chat: ApplicationRuntimeChatPort;
   readonly shell: ApplicationRuntimeRecoverableCoordinator;
@@ -178,6 +183,7 @@ export class ApplicationRuntime {
       await this.options.backends.initialize();
       await this.options.lifecycle.start();
       this.lifecycleStarted = true;
+      await this.options.interactionPresentations.recover();
       await this.options.settings.recoverPending();
       await this.options.shell.recover();
       await this.options.auxiliary.recover();

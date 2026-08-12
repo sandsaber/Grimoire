@@ -8,6 +8,7 @@ export const PROVIDER_SETTINGS_TRANSACTION_INTENTS_PATH =
   `${TRANSACTION_INTENTS_PATH}/provider-settings`;
 export const PROVIDER_SETTINGS_STAGING_PATH = `${GRIMOIRE_STORAGE_PATH}/settings-transactions`;
 export const EXECUTION_RESULTS_PATH = `${GRIMOIRE_STORAGE_PATH}/results`;
+export const EXECUTION_PRESENTATIONS_PATH = `${GRIMOIRE_STORAGE_PATH}/presentations`;
 export const EXECUTION_SESSIONS_PATH = `${GRIMOIRE_CONTROL_PATH}/execution-sessions`;
 export const EXECUTION_RUNS_PATH = `${GRIMOIRE_CONTROL_PATH}/execution-runs`;
 export const EXECUTION_INTERACTIONS_PATH = `${GRIMOIRE_CONTROL_PATH}/interactions`;
