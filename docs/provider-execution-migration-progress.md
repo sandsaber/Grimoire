@@ -25,8 +25,8 @@ this file records what has actually landed and what remains open.
 | Phase 4C — persistent Claude SDK topology | Complete | `9dda0ebc` |
 | Phase 4D — managed ACP/OpenCode topology | Complete | `cb631f53` |
 | Semantic freeze review | Complete | `892eec78` |
-| Phase 5 — remaining provider modules/backends | Complete | MiMoCode/Kimi Code `6c4700cf`; Grok `104c88dd`; Qwen `d5042ec5`; Gemini `593b38d0`; immutable catalog pending checkpoint SHA |
-| Phase 6 — durable agents and work graphs | Pending | — |
+| Phase 5 — remaining provider modules/backends | Complete | MiMoCode/Kimi Code `6c4700cf`; Grok `104c88dd`; Qwen `d5042ec5`; Gemini `593b38d0`; immutable catalog `d1a41736` |
+| Phase 6 — durable agents and work graphs | Complete | checkpoint commit |
 | Phase 7 — application runtime and auxiliary work | Pending | — |
 | Phase 8 — catalog and provider-neutral feature ports | Pending | — |
 | Phase 9 — production cutover | Pending | — |
@@ -295,6 +295,52 @@ identities and ordering remain aligned, top-level import performs no process lau
 legacy production composition remains unchanged, and every module suite participates in the
 macOS/Linux/Windows execution matrix.
 
+## Phase 6 durable agents and work graphs
+
+- Added provider-neutral durable records for agent definition snapshots, logical instances,
+  immutable retry attempts, dispatch intents, append-only results, and explicit original versus
+  reconciled result references. Provider prompts, hidden reasoning, environment values, and raw
+  protocol payloads remain outside the control journal.
+- Added recoverable dispatch preparation and settlement. A Grimoire-requested attempt is persisted
+  before provider effects, a started dispatch is never automatically repeated after an uncertain
+  acknowledgement, and a provider-spawned child is adopted idempotently from its stable native key.
+  Adoption is bound to the exact originating parent attempt, so late evidence cannot inherit policy
+  or cancellation state from a newer retry.
+- Added an effective-policy snapshot that intersects provider, workspace, root, durable parent, and
+  definition allowances. Parent boundaries are derived from saved parent attempts rather than
+  caller input, and retries cannot regain a privilege excluded by an earlier attempt's ceiling.
+- Added append-time result integrity checks for instance/run ownership, provider and execution-run
+  provenance, execution mode, and descendant-only child result references. Invalid references are
+  rejected before append-only persistence; recovery reports and isolates an existing poisoned
+  record instead of preventing later valid results from linking. A committed direct result may
+  establish its exact execution session/run identity when dispatch settlement was interrupted.
+- Added attached-tree cancellation as a durable fence. Every nonterminal attached attempt is first
+  recorded as `cancelling` through one recoverable transaction before any provider call. Native
+  cancellation runs outside instance mutation queues under a bounded control deadline, so a late
+  authoritative result can win terminal arbitration and a crash between child and parent writes
+  recovers the complete intent. Detached children remain owned by the durable root.
+- Applied the same bounded outside-queue arbitration during restart reconciliation. A late attached
+  child discovered after its parent cancellation is adopted directly into `cancelling` and cannot
+  escape the durable cascade as a new active agent.
+- Added versioned work-graph revisions, a single authoritative revision head, durable executions,
+  DAG validation, bounded parallel scheduling, fail-fast and continue-independent failure policy,
+  partial-result preservation, explicit synthesis nodes, and exact result-ID inputs.
+- Added a work coordinator that durably claims a node before agent preparation, resumes only a safe
+  prepared dispatch, reconciles started attempts without duplicate launch, synchronizes live run
+  updates into node state, and recovers persisted executions after restart. Recovery links committed
+  append-only results before classifying an ambiguous dispatch or active attempt, while
+  execution-scoped serialization and bounded CAS retries preserve simultaneous sibling completions.
+- Added honest fidelity mapping from each immutable provider module: native child identity, result,
+  cancellation, status-query, and reattachment dimensions remain independent; limited providers do
+  not receive fabricated agent lifecycles.
+- Added the agent and work-graph suites to the macOS, Linux, and Windows execution-contract matrix.
+  The domain model has no OS-specific branch; provider process ownership continues to use the
+  previously verified POSIX process groups and Windows Job Objects.
+
+The independent Phase 6 lifecycle and architecture review is approved with no material blockers.
+Its restart, provenance, permission, cancellation, adoption, and parallel-DAG findings are captured
+as permanent regression tests in this checkpoint.
+
 ## Verification evidence
 
 - Phase 4C checkpoint gate: 432 unit suites / 7,218 tests; 7 integration suites / 222 tests;
@@ -362,10 +408,19 @@ macOS/Linux/Windows execution matrix.
   release build: `main.js` SHA-256 `4d9c36808986ef196a859b6e819570a0e6b8debd9759f4e5cff5a3cd0d774d67`,
   `styles.css` `c079364c4f85717134955ce46b4c8a20ccfe403b4d1531675fa1a433e23c13eb`, and
   `manifest.json` `5058df46417fc0ec4debcc9eda1552c2fda654904132ab20b90d2bb1cbc63758`.
+- Current Phase 6 focused gate: 6 agent/work suites / 33 tests pass; typecheck, focused ESLint, and
+  `git diff --check` pass.
+- Final Phase 6 checkpoint gate: 483 unit suites / 7,614 tests and 7 integration suites / 222 tests
+  pass outside the restricted sandbox; typecheck, full ESLint, release build, Obsidian
+  source/CSS/dependency review, isolated bundle-load smoke, view-open smoke, and `git diff --check`
+  pass. Independent review approved the checkpoint with no remaining material blocker.
+- Root, `dist/grimoire`, and the configured test-vault copies are byte-identical after the Phase 6
+  release build: `main.js` SHA-256 `583fa1848749ffdfd763a8dd2bff24d659723b16932df00624a1ac8bdb736ce6`,
+  `styles.css` `c079364c4f85717134955ce46b4c8a20ccfe403b4d1531675fa1a433e23c13eb`, and
+  `manifest.json` `5058df46417fc0ec4debcc9eda1552c2fda654904132ab20b90d2bb1cbc63758`.
 
 ## Next steps
 
-1. Implement durable agents/work graphs after every current provider module/backend is constructible
-   through the new catalog.
-2. Continue with the application runtime and provider-neutral feature ports only after the durable
-   work model is proven.
+1. Implement the Phase 7 application coordinators and pure chat/agent/result/work projections.
+2. Add the parallel provider-neutral command/rendering path without changing production composition
+   before the Phase 9 hard cutover.
