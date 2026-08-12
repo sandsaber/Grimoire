@@ -770,8 +770,14 @@ generation.
 - `a62f8957` — Added `ChatRuntimeWiring`: `createChatExecutionCoordinator` composes the chat
   coordinator from the lifecycle registry, conversation repository, result store, identity
   factory, and optional request broker.
+- `d7087365` — Added `ApplicationRuntimeComposition`: the complete production composition object
+  that `main.ts` will construct at the Phase 9 hard cutover. It wires infrastructure, nine-provider
+  context composition, backend startup, migration, interaction presentation recovery, chat, shell,
+  auxiliary, agent, and work coordinators from a single `DurableStorage` + digest port. The test
+  verifies all nine provider backends initialize and the lifecycle registry starts and shuts down
+  cleanly.
 
-Current broad evidence: 538 unit suites / 7,858 tests pass with typecheck, full ESLint, and
+Current broad evidence: 539 unit suites / 7,860 tests pass with typecheck, full ESLint, and
 `git diff --check`. Production composition is unchanged and still uses the legacy runtime path.
 
 ## Next steps
@@ -779,12 +785,13 @@ Current broad evidence: 538 unit suites / 7,858 tests pass with typecheck, full 
 1. ~~Compose all nine provider backend contexts~~ — done.
    ~~Wire factories into production composition~~ — done.
    ~~Connect composition root to ProviderBackendBootstrap~~ — done.
-   ~~Add runtime infrastructure + lifecycle adapter + chat coordinator wiring~~ — done.
-   Remaining coordinator wiring: settings recovery port, local shell, auxiliary, agent, work,
-   and projection ports for `ApplicationRuntime`.
-2. Connect durable agent adoption, work dispatch, results, local shell, auxiliary execution, and
-   settings transitions to `ApplicationRuntime` production composition.
-3. Replace tab/input/stream ownership with projection-backed presentation, migrate existing vault
+   ~~Add runtime infrastructure + lifecycle adapter + coordinator wiring~~ — done.
+   ~~Build complete ApplicationRuntimeComposition~~ — done.
+   Remaining: inject concrete Node process launchers (`NodeManagedAcpProcessLauncher`,
+   `NodeCodexExecutionProcessFactory`, `NodeAntigravityProcessTransport`,
+   `ClaudeSdkExecutionQueryFactory`) and the Phase 8 settings transaction coordinator into the
+   composition. The composition currently uses `unreachable` stubs for these.
+2. Replace tab/input/stream ownership with projection-backed presentation, migrate existing vault
    conversations, and switch `main.ts` once all current user paths pass through the platform.
-4. Run the Phase 9 manual test-vault matrix and full cross-platform checkpoint gate before the
+3. Run the Phase 9 manual test-vault matrix and full cross-platform checkpoint gate before the
    cutover commit.
