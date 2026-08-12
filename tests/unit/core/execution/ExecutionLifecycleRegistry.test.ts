@@ -832,6 +832,42 @@ describe('ExecutionLifecycleRegistry', () => {
       .rejects.toThrow('not accepting sessions');
   });
 
+  it('recovers an interrupted settings apply only when the active fingerprint matches', async () => {
+    const fixture = createFixture();
+    const transitionId = `st-${'d'.repeat(32)}`;
+    const fingerprint = 'e'.repeat(64);
+    await fixture.repositories.settingsTransitions.create(transitionId, {
+      transitionId,
+      backendId: fixture.backend.descriptor.backendId,
+      fromGeneration: 1,
+      toGeneration: 2,
+      status: 'restart-required',
+      settingsFingerprint: fingerprint,
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    await fixture.registry.start();
+
+    await expect(fixture.registry.recoverSettingsTransition(
+      transitionId,
+      'f'.repeat(64),
+    )).rejects.toThrow('do not match');
+    expect((await currentRecord(
+      fixture.repositories.settingsTransitions.read(transitionId),
+    )).payload.status).toBe('restart-required');
+
+    await fixture.registry.recoverSettingsTransition(transitionId, fingerprint);
+    expect(fixture.registry.getBackendGeneration(fixture.backend.descriptor.backendId)).toBe(2);
+    expect((await currentRecord(
+      fixture.repositories.settingsTransitions.read(transitionId),
+    )).payload.status).toBe('completed');
+    await expect(fixture.registry.listSettingsTransitions()).resolves.toEqual([
+      expect.objectContaining({
+        record: expect.objectContaining({ transitionId, status: 'completed' }),
+      }),
+    ]);
+  });
+
   it('keeps a settings transition admitted until its durable write completes', async () => {
     const storage = new GatedDurableStorage(SETTINGS_TRANSITIONS_PATH);
     const fixture = await startedFixture(storage);

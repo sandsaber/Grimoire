@@ -86,7 +86,16 @@ KimicodeExecutionBackend,
 KimicodeWorkspaceModuleContext,
 KimicodeExecutionBackendContext
 > = {
-  manifest: { id: 'kimicode', displayName: 'Kimi Code', order: 60 },
+  manifest: {
+    id: 'kimicode',
+    displayName: 'Kimi Code',
+    order: 60,
+    settingsPresentation: {
+      name: 'Kimi Code',
+      tabName: 'Kimi',
+      descriptionKey: 'settings.providers.kimicode.desc',
+    },
+  },
   settings: {
     providerId: 'kimicode',
     schemaVersion: 1,
@@ -124,6 +133,14 @@ KimicodeExecutionBackendContext
           discoveredModels,
         ),
         visibleModels: normalizeKimicodeVisibleModels(value.visibleModels, discoveredModels),
+      };
+    },
+    runtimeFingerprintInput(value) {
+      return {
+        cliPath: value.cliPath.trim(),
+        cliPathsByHost: normalizeStringMap(value.cliPathsByHost),
+        enabled: value.enabled,
+        environmentVariables: value.environmentVariables,
       };
     },
   },

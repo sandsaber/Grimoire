@@ -145,6 +145,11 @@ export interface ExecutionInteractionSnapshot {
   readonly revision: number;
 }
 
+export interface SettingsTransitionSnapshot {
+  readonly record: Readonly<SettingsTransitionRecord>;
+  readonly revision: number;
+}
+
 interface BackendEntry {
   readonly backend: ExecutionBackend;
   readonly recovery?: ExecutionRecoveryPort;
@@ -820,6 +825,87 @@ export class ExecutionLifecycleRegistry {
       backend.state = 'stable';
     } finally {
       releaseAdmission();
+    }
+  }
+
+  async getSettingsTransition(
+    transitionId: string,
+  ): Promise<SettingsTransitionSnapshot | null> {
+    requireOpaqueRecordId(transitionId, 'st', 'settings transition id');
+    const read = await this.repositories.settingsTransitions.read(transitionId);
+    if (read.kind === 'absent') return null;
+    const current = await requireCurrent(Promise.resolve(read));
+    return Object.freeze({ record: current.payload, revision: current.revision });
+  }
+
+  async listSettingsTransitions(): Promise<readonly SettingsTransitionSnapshot[]> {
+    const snapshots: SettingsTransitionSnapshot[] = [];
+    for (const transitionId of await this.repositories.settingsTransitions.listRecordIds()) {
+      const current = await requireCurrent(
+        this.repositories.settingsTransitions.read(transitionId),
+      );
+      snapshots.push(Object.freeze({
+        record: current.payload,
+        revision: current.revision,
+      }));
+    }
+    return Object.freeze(snapshots.sort((left, right) => (
+      left.record.createdAt - right.record.createdAt
+      || left.record.transitionId.localeCompare(right.record.transitionId)
+    )));
+  }
+
+  /**
+   * Re-enters an interrupted apply boundary only after the settings store
+   * proves that the exact target fingerprint is active.
+   */
+  async recoverSettingsTransition(
+    transitionId: string,
+    activeSettingsFingerprint: string,
+  ): Promise<void> {
+    const releaseAdmission = this.beginAdmission();
+    let shouldComplete = false;
+    try {
+      requireOpaqueRecordId(transitionId, 'st', 'settings transition id');
+      if (!/^[0-9a-f]{64}$/.test(activeSettingsFingerprint)) {
+        throw new Error('Settings fingerprint must be canonical SHA-256.');
+      }
+      let current = await requireCurrent(
+        this.repositories.settingsTransitions.read(transitionId),
+      );
+      if (current.payload.settingsFingerprint !== activeSettingsFingerprint) {
+        throw new Error('Active provider settings do not match the pending transition.');
+      }
+      const backend = this.requireBackend(executionBackendId(current.payload.backendId));
+      await this.fenceBackendSessions(backend);
+      if (current.payload.status === 'completed') {
+        backend.generation = Math.max(backend.generation, current.payload.toGeneration);
+        backend.state = 'stable';
+        return;
+      }
+      backend.state = 'draining';
+      await this.markTransitionQuiescentIfReady(transitionId);
+      current = await requireCurrent(this.repositories.settingsTransitions.read(transitionId));
+      if (current.payload.status === 'draining' || this.hasActiveRunsForBackend(backend)) {
+        throw new Error('Settings transition recovery is waiting for lifecycle quiescence.');
+      }
+      if (current.payload.status === 'quiescent'
+        || current.payload.status === 'restart-required') {
+        current = await this.repositories.settingsTransitions.update(
+          transitionId,
+          current.revision,
+          record => ({ ...record, status: 'applying', updatedAt: this.now() }),
+        );
+      }
+      if (current.payload.status !== 'applying') {
+        throw new Error(`Settings transition cannot recover from ${current.payload.status}.`);
+      }
+      shouldComplete = true;
+    } finally {
+      releaseAdmission();
+    }
+    if (shouldComplete) {
+      await this.completeSettingsTransition(transitionId);
     }
   }
 

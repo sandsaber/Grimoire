@@ -132,6 +132,11 @@ CodexExecutionBackendContext
     id: 'codex',
     displayName: 'Codex',
     order: 20,
+    settingsPresentation: {
+      name: 'Codex',
+      tabName: 'Codex',
+      descriptionKey: 'settings.providers.codex.desc',
+    },
   },
   settings: {
     providerId: 'codex',
@@ -168,6 +173,18 @@ CodexExecutionBackendContext
         reasoningSummary: normalizeReasoningSummary(value.reasoningSummary),
         wslDistroOverride: value.wslDistroOverride.trim(),
         wslDistroOverridesByHost: { ...normalizeStringMap(value.wslDistroOverridesByHost) },
+      };
+    },
+    runtimeFingerprintInput(value) {
+      return {
+        cliPath: value.cliPath.trim(),
+        cliPathsByHost: normalizeStringMap(value.cliPathsByHost),
+        enabled: value.enabled,
+        environmentVariables: value.environmentVariables,
+        installationMethod: normalizeInstallationMethod(value.installationMethod),
+        installationMethodsByHost: normalizeInstallationMethods(value.installationMethodsByHost),
+        wslDistroOverride: value.wslDistroOverride.trim(),
+        wslDistroOverridesByHost: normalizeStringMap(value.wslDistroOverridesByHost),
       };
     },
   },

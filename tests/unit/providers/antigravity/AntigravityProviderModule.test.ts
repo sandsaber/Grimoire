@@ -14,6 +14,11 @@ describe('antigravityProviderModule', () => {
       id: 'antigravity',
       displayName: 'Antigravity',
       order: 70,
+      settingsPresentation: {
+        name: 'Antigravity',
+        tabName: 'Antigravity',
+        descriptionKey: 'settings.providers.antigravity.desc',
+      },
     });
     expect(module.execution.descriptor).toEqual({
       backendId: 'provider-antigravity',

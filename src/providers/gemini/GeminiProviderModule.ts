@@ -68,7 +68,16 @@ GeminiExecutionBackend,
 GeminiWorkspaceModuleContext,
 GeminiExecutionBackendContext
 > = {
-  manifest: { id: 'gemini', displayName: 'Gemini CLI (Legacy)', order: 80 },
+  manifest: {
+    id: 'gemini',
+    displayName: 'Gemini CLI (Legacy)',
+    order: 80,
+    settingsPresentation: {
+      name: 'Gemini CLI (Legacy)',
+      tabName: 'Gemini',
+      descriptionKey: 'settings.providers.gemini.desc',
+    },
+  },
   settings: {
     providerId: 'gemini',
     schemaVersion: 1,
@@ -98,6 +107,14 @@ GeminiExecutionBackendContext
         modelAliases: normalizeGeminiModelAliases(value.modelAliases),
         selectedMode: value.selectedMode.trim(),
         visibleModels: normalizeGeminiVisibleModels(value.visibleModels),
+      };
+    },
+    runtimeFingerprintInput(value) {
+      return {
+        cliPath: value.cliPath.trim(),
+        cliPathsByHost: normalizeGeminiHostnameCliPaths(value.cliPathsByHost),
+        enabled: value.enabled,
+        environmentVariables: value.environmentVariables,
       };
     },
   },

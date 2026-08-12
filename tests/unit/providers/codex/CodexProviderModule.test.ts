@@ -11,7 +11,16 @@ describe('codexProviderModule', () => {
     const catalog = new ProviderCatalog([codexProviderModule]);
     const module = catalog.require('codex');
 
-    expect(module.manifest).toEqual({ id: 'codex', displayName: 'Codex', order: 20 });
+    expect(module.manifest).toEqual({
+      id: 'codex',
+      displayName: 'Codex',
+      order: 20,
+      settingsPresentation: {
+        name: 'Codex',
+        tabName: 'Codex',
+        descriptionKey: 'settings.providers.codex.desc',
+      },
+    });
     expect(module.execution.descriptor).toEqual({
       backendId: 'provider-codex',
       association: { kind: 'provider', providerId: 'codex' },

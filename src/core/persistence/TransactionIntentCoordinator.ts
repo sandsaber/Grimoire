@@ -39,6 +39,13 @@ export interface TransactionExecutionResult {
   readonly recovered: boolean;
 }
 
+export interface TransactionIntentSnapshot {
+  readonly transactionId: string;
+  readonly kind: string;
+  readonly steps: readonly TransactionStep[];
+  readonly status: 'pending' | 'completed';
+}
+
 interface PersistedTransactionStep {
   id: string;
   handlerId: string;
@@ -153,6 +160,21 @@ export class TransactionIntentCoordinator {
     ));
   }
 
+  async getIntent(transactionId: string): Promise<TransactionIntentSnapshot | null> {
+    requireTransactionId(transactionId);
+    const read = await this.repository.read(transactionId);
+    if (read.kind === 'absent') return null;
+    if (read.kind === 'future') {
+      throw new Error(
+        `Transaction "${transactionId}" uses future schema version ${read.schemaVersion}.`,
+      );
+    }
+    if (read.kind === 'corrupt') {
+      throw new Error(`Transaction "${transactionId}" is corrupt: ${read.error}`);
+    }
+    return snapshotIntent(read.record.payload);
+  }
+
   async recoverPending(): Promise<TransactionExecutionResult[]> {
     const results: TransactionExecutionResult[] = [];
     for (const transactionId of await this.repository.listRecordIds()) {
@@ -174,6 +196,19 @@ export class TransactionIntentCoordinator {
       }
     }
     return results;
+  }
+
+  async listTransactionIds(): Promise<readonly string[]> {
+    return Object.freeze(await this.repository.listRecordIds());
+  }
+
+  async listPendingTransactionIds(): Promise<readonly string[]> {
+    const pending: string[] = [];
+    for (const transactionId of await this.repository.listRecordIds()) {
+      const snapshot = await this.getIntent(transactionId);
+      if (snapshot?.status === 'pending') pending.push(transactionId);
+    }
+    return Object.freeze(pending);
   }
 
   private async executeUnlocked(
@@ -337,6 +372,19 @@ function decodeStep(value: unknown, index: number): PersistedTransactionStep {
     handlerId: step.handlerId,
     input: { ...step.input },
   };
+}
+
+function snapshotIntent(intent: TransactionIntent): TransactionIntentSnapshot {
+  return Object.freeze({
+    transactionId: intent.transactionId,
+    kind: intent.kind,
+    status: intent.status,
+    steps: Object.freeze(intent.steps.map(step => Object.freeze({
+      id: step.id,
+      handlerId: step.handlerId,
+      input: Object.freeze({ ...step.input }),
+    }))),
+  });
 }
 
 function validateExistingIntent(

@@ -86,7 +86,16 @@ MimocodeExecutionBackend,
 MimocodeWorkspaceModuleContext,
 MimocodeExecutionBackendContext
 > = {
-  manifest: { id: 'mimocode', displayName: 'MiMoCode', order: 50 },
+  manifest: {
+    id: 'mimocode',
+    displayName: 'MiMoCode',
+    order: 50,
+    settingsPresentation: {
+      name: 'MiMoCode',
+      tabName: 'MiMo',
+      descriptionKey: 'settings.providers.mimocode.desc',
+    },
+  },
   settings: {
     providerId: 'mimocode',
     schemaVersion: 1,
@@ -124,6 +133,14 @@ MimocodeExecutionBackendContext
           discoveredModels,
         ),
         visibleModels: normalizeMimocodeVisibleModels(value.visibleModels, discoveredModels),
+      };
+    },
+    runtimeFingerprintInput(value) {
+      return {
+        cliPath: value.cliPath.trim(),
+        cliPathsByHost: normalizeStringMap(value.cliPathsByHost),
+        enabled: value.enabled,
+        environmentVariables: value.environmentVariables,
       };
     },
   },

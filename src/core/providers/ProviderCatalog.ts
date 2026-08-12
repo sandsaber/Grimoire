@@ -63,6 +63,18 @@ const SECURITY_SURFACES = [
   'network',
   'permissions',
 ] as const;
+const FEATURE_KINDS = new Set([
+  'history',
+  'models',
+  'commands',
+  'mcp',
+  'usage',
+  'agents',
+  'fork',
+  'rewind',
+  'steering',
+  'compaction',
+]);
 
 export class ProviderCatalog {
   private readonly modules: readonly CatalogProviderModule[];
@@ -112,6 +124,19 @@ function validateModules(modules: readonly CatalogProviderModule[]): CatalogProv
     if (!Number.isSafeInteger(manifest.order) || manifest.order < 0) {
       throw new Error(`Provider "${providerId}" has invalid order ${manifest.order}.`);
     }
+    const settingsPresentation = requireRecord(
+      providerId,
+      'manifest.settingsPresentation',
+      manifest.settingsPresentation,
+    );
+    for (const field of ['name', 'tabName', 'descriptionKey'] as const) {
+      if (typeof settingsPresentation[field] !== 'string'
+        || !settingsPresentation[field].trim()) {
+        throw new Error(
+          `Provider "${providerId}" has invalid settings presentation ${field}.`,
+        );
+      }
+    }
     if (providerIds.has(providerId)) {
       throw new Error(`Duplicate provider id "${providerId}".`);
     }
@@ -137,10 +162,12 @@ function validateModules(modules: readonly CatalogProviderModule[]): CatalogProv
     requireMethod(providerId, 'settings', settings, 'defaults');
     requireMethod(providerId, 'settings', settings, 'decode');
     requireMethod(providerId, 'settings', settings, 'encode');
+    requireMethod(providerId, 'settings', settings, 'runtimeFingerprintInput');
     requireMethod(providerId, 'workspace', workspace, 'initialize');
     requireMethod(providerId, 'workspace', workspace, 'dispose');
     requireMethod(providerId, 'execution', execution, 'create');
-    requireRecord(providerId, 'features.ports', features.ports);
+    validateSettingsCodec(providerId, settings);
+    validateFeaturePorts(providerId, features.ports);
 
     const association = execution.descriptor?.association;
     if (association?.kind !== 'provider') {
@@ -161,6 +188,53 @@ function validateModules(modules: readonly CatalogProviderModule[]): CatalogProv
     orders.add(manifest.order);
     return module;
   });
+}
+
+function validateSettingsCodec(
+  providerId: ProviderId,
+  settings: CatalogProviderModule['settings'],
+): void {
+  let defaults: object;
+  let encoded: Record<string, unknown>;
+  let decoded: ReturnType<typeof settings.decode>;
+  try {
+    defaults = requireRecord(providerId, 'settings.defaults()', settings.defaults());
+    encoded = requireRecord(providerId, 'settings.encode(defaults)', settings.encode(defaults));
+    decoded = settings.decode(encoded);
+    settings.runtimeFingerprintInput(defaults);
+  } catch (error) {
+    throw new Error(`Provider "${providerId}" settings codec rejected its defaults.`, {
+      cause: error,
+    });
+  }
+  if (typeof encoded.enabled !== 'boolean') {
+    throw new Error(`Provider "${providerId}" settings defaults must encode enabled as boolean.`);
+  }
+  if (!decoded.ok) {
+    throw new Error(`Provider "${providerId}" settings defaults do not round-trip.`);
+  }
+  requireRecord(providerId, 'settings.decode(...).value', decoded.value);
+  requireRecord(
+    providerId,
+    'settings.decode(...).preservedUnknown',
+    decoded.preservedUnknown,
+  );
+}
+
+function validateFeaturePorts(
+  providerId: ProviderId,
+  portsValue: CatalogProviderModule['features']['ports'],
+): void {
+  const ports = requireRecord(providerId, 'features.ports', portsValue);
+  for (const [kind, port] of Object.entries(ports)) {
+    if (!FEATURE_KINDS.has(kind)) {
+      throw new Error(`Provider "${providerId}" has unknown feature port "${kind}".`);
+    }
+    requireRecord(providerId, `features.ports.${kind}`, port);
+    if (kind === 'models') {
+      requireMethod(providerId, 'features.ports.models', port as object, 'list');
+    }
+  }
 }
 
 function validateCapabilities(
@@ -279,13 +353,17 @@ function snapshotModule(module: CatalogProviderModule): CatalogProviderModule {
   const capabilities = module.capabilities;
 
   return Object.freeze({
-    manifest: Object.freeze({ ...module.manifest }),
+    manifest: Object.freeze({
+      ...module.manifest,
+      settingsPresentation: Object.freeze({ ...module.manifest.settingsPresentation }),
+    }),
     settings: Object.freeze({
       providerId: module.settings.providerId,
       schemaVersion: module.settings.schemaVersion,
       defaults: module.settings.defaults.bind(module.settings),
       decode: module.settings.decode.bind(module.settings),
       encode: module.settings.encode.bind(module.settings),
+      runtimeFingerprintInput: module.settings.runtimeFingerprintInput.bind(module.settings),
     }),
     workspace: Object.freeze({
       providerId: module.workspace.providerId,

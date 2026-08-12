@@ -43,6 +43,31 @@ describe('builtInProviderCatalog', () => {
       });
       expect(module.capabilities.providerId).toBe(providerId);
       expect(module.features.providerId).toBe(providerId);
+      expect(module.manifest.settingsPresentation).toEqual(expect.objectContaining({
+        name: expect.any(String),
+        tabName: expect.any(String),
+        descriptionKey: `settings.providers.${providerId}.desc`,
+      }));
+      expect(module.settings.runtimeFingerprintInput(module.settings.defaults()))
+        .toEqual(expect.any(Object));
+    }
+  });
+
+  it('preserves unknown settings and fails closed on malformed enablement for every provider', () => {
+    for (const module of builtInProviderCatalog.list()) {
+      const encodedDefaults = module.settings.encode(module.settings.defaults());
+      const futureField = { retained: module.manifest.id };
+      const decoded = module.settings.decode({
+        ...encodedDefaults,
+        futureProviderField: futureField,
+      });
+      expect(decoded.ok).toBe(true);
+      const value = decoded.ok ? decoded.value : decoded.fallback;
+      expect(module.settings.encode(value, decoded.preservedUnknown).futureProviderField)
+        .toEqual(futureField);
+
+      const invalid = module.settings.decode({ ...encodedDefaults, enabled: 'unsafe' });
+      expect(invalid.ok).toBe(false);
     }
   });
 

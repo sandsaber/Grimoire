@@ -23,6 +23,7 @@ const BUILT_IN_PROVIDER_MODULES = Object.freeze([
 ]);
 
 /** The sole module inventory for the new provider architecture. */
-export const builtInProviderCatalog = Object.freeze(
-  new ProviderCatalog(BUILT_IN_PROVIDER_MODULES),
+export const builtInProviderCatalog: ProviderCatalog = new ProviderCatalog(
+  BUILT_IN_PROVIDER_MODULES,
 );
+Object.freeze(builtInProviderCatalog);

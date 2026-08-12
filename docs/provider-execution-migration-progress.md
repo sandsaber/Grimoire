@@ -27,8 +27,8 @@ this file records what has actually landed and what remains open.
 | Semantic freeze review | Complete | `892eec78` |
 | Phase 5 — remaining provider modules/backends | Complete | MiMoCode/Kimi Code `6c4700cf`; Grok `104c88dd`; Qwen `d5042ec5`; Gemini `593b38d0`; immutable catalog `d1a41736` |
 | Phase 6 — durable agents and work graphs | Complete | `63320547` |
-| Phase 7 — application runtime and auxiliary work | Complete | chat projections `8cab81b4`; agent work UI `634dc4bb`; execution owners this checkpoint |
-| Phase 8 — catalog and provider-neutral feature ports | Pending | — |
+| Phase 7 — application runtime and auxiliary work | Complete | chat projections `8cab81b4`; agent work UI `634dc4bb`; execution owners `4ebbd5fa` |
+| Phase 8 — catalog and provider-neutral feature ports | Complete | this checkpoint |
 | Phase 9 — production cutover | Pending | — |
 | Phase 10 — legacy deletion | Pending | — |
 | Phase 11 — hardening and migration evidence | Pending | — |
@@ -447,6 +447,47 @@ lost admission acknowledgement, pre-admission cancellation, zero-run crash recov
 session restart, immutable reconciliation, per-run cleanup failure isolation, interaction-delayed
 cleanup, and disposal ownership fencing.
 
+## Phase 8 provider control plane
+
+- Extended every atomic provider module with validated settings presentation and an owned runtime
+  fingerprint projection. Defaults, deterministic order, enablement, settings search labels, current
+  provider presentation, capabilities, feature availability, and model routing now derive from the
+  one immutable nine-provider catalog in the planned composition.
+- Added a provider-neutral control plane that decodes untrusted settings, disables malformed
+  provider configs, preserves unknown provider-owned fields and unknown provider bags, snapshots
+  published values, and normalizes every provider's configured models through one typed feature
+  contract. It contains no built-in provider branching or legacy registry fallback.
+- Added canonical fingerprint version 1 over provider ID, provider settings schema, and only the
+  provider-declared runtime inputs. The application digest port uses Web Crypto SHA-256. Lifecycle
+  records receive only the canonical digest; environment values, secrets, and digest preimages stay
+  in the settings domain.
+- Added a lazy provider workspace manager with shared concurrent first use, failure isolation,
+  explicit retry, abort signals, generation and attempt fencing, stale-result disposal, per-provider
+  transition admission fences, bounded initialization and disposal settlement, retryable retained
+  cleanup ownership, concurrent one-flight unload, and no initialization of unused providers. A
+  provider that ignores cancellation cannot hang a settings transition or plugin unload, and its
+  late workspace remains quarantined until disposal is confirmed.
+- Added a staged settings store with provider-scoped expected-base patches. Activation merges over
+  the latest application document, preserves unrelated and unknown settings and independent
+  provider edits, and rejects same-provider drift instead of overwriting it. Runtime fingerprint
+  baselines are updated only for affected providers.
+- Sensitive stages are written only after transaction identity preflight. A completed transaction
+  replays without recreating its stage, conflicting reuse fails before staging, and orphaned stages
+  left before the durable-intent boundary are discovered and removed on recovery.
+- Added a serialized, provider-scoped settings transaction coordinator. It durably drains every
+  affected backend, fences and recycles its workspace, activates merged provider updates, verifies
+  the active fingerprint, advances the backend generation, releases workspace admission, and clears
+  the stage. Restart-required lifecycle and post-generation workspace failures replay idempotently.
+- Added active-settings audit projections for current, uninitialized, externally drifted, and
+  invalid providers. A manual file edit cannot silently reuse a recorded runtime generation; mixed
+  or unknown state remains fail-closed for the Phase 9 startup coordinator.
+- Added catalog, presentation, model-routing, codec, canonicalization, Web Crypto, workspace race
+  and deadline, transaction crash/restart/replay, external-drift, cross-owner concurrent-update,
+  boundary, and lifecycle recovery coverage. The Phase 8 suites are included in the Ubuntu, macOS,
+  and Windows execution matrix.
+- Production composition remains unchanged. The new control plane has no fallback to the old
+  runtime or workspace registries and becomes live only at the single Phase 9 hard cutover.
+
 ## Verification evidence
 
 - Phase 4C checkpoint gate: 432 unit suites / 7,218 tests; 7 integration suites / 222 tests;
@@ -559,7 +600,24 @@ cleanup, and disposal ownership fencing.
   `styles.css` `c079364c4f85717134955ce46b4c8a20ccfe403b4d1531675fa1a433e23c13eb`,
   and `manifest.json` `5058df46417fc0ec4debcc9eda1552c2fda654904132ab20b90d2bb1cbc63758`.
 
+- Final Phase 8 focused gate: 10 catalog, control-plane, fingerprint, workspace, settings,
+  lifecycle, and architecture suites / 88 tests pass; typecheck, full ESLint, and
+  `git diff --check` pass. Controlled regressions cover two independent settings owners,
+  same-provider mid-activation drift, completed sensitive-transaction replay, signal-ignoring
+  workspace initialization, never-settling workspace disposal, pending generation retry, and exact
+  presentation-only command identity. Independent review approved the checkpoint with no remaining
+  material blocker.
+- Final Phase 8 checkpoint gate: 504 unit suites / 7,734 tests and 7 integration suites / 222 tests
+  pass; typecheck, full ESLint, release build, Obsidian source/CSS/dependency review, isolated
+  bundle-load smoke, view-open smoke, and `git diff --check` pass. The configured test-vault copy
+  required the release build to run outside the restricted sandbox; all verification completed
+  successfully.
+- Root, `dist/grimoire`, and configured test-vault copies are byte-identical after the Phase 8
+  release build: `main.js` SHA-256 `8e81d52bcb4c755c2f4d8b8dcd136dd4e37595fa9d29a1d832337905ba257e1d`,
+  `styles.css` `c079364c4f85717134955ce46b4c8a20ccfe403b4d1531675fa1a433e23c13eb`,
+  and `manifest.json` `5058df46417fc0ec4debcc9eda1552c2fda654904132ab20b90d2bb1cbc63758`.
+
 ## Next steps
 
-1. Implement Phase 8 provider catalog composition and provider-neutral feature ports while leaving
-   production composition unchanged before the Phase 9 hard cutover.
+1. Implement the Phase 9 hard composition-root cutover with startup recovery completed before
+   command admission and the old production path stopped in one change.

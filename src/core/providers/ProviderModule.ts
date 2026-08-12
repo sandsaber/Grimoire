@@ -10,6 +10,11 @@ export interface ProviderManifest {
   readonly id: ProviderId;
   readonly displayName: string;
   readonly order: number;
+  readonly settingsPresentation: {
+    readonly name: string;
+    readonly tabName: string;
+    readonly descriptionKey: string;
+  };
 }
 
 export type ProviderSettingsDecodeResult<TSettings extends object> =
@@ -34,6 +39,8 @@ export interface ProviderSettingsCodec<TSettings extends object = Record<string,
     value: TSettings,
     preservedUnknown?: Readonly<Record<string, unknown>>,
   ): Record<string, unknown>;
+  /** Returns only values that require a new execution backend generation. */
+  runtimeFingerprintInput(value: TSettings): unknown;
 }
 
 export interface ProviderWorkspaceContribution<TContext = unknown, TWorkspace = unknown> {
@@ -54,9 +61,32 @@ export type ProviderFeatureKind =
   | 'steering'
   | 'compaction';
 
-export interface ProviderFeatureContributions {
+export interface ProviderConfiguredModelChoice {
+  readonly id: string;
+  readonly label: string;
+  readonly description: string;
+}
+
+export interface ProviderConfiguredModelsPort<TSettings extends object = object> {
+  list(settings: TSettings): readonly ProviderConfiguredModelChoice[];
+}
+
+export interface ProviderFeaturePorts<TSettings extends object = object> {
+  readonly history?: object;
+  readonly models?: ProviderConfiguredModelsPort<TSettings>;
+  readonly commands?: object;
+  readonly mcp?: object;
+  readonly usage?: object;
+  readonly agents?: object;
+  readonly fork?: object;
+  readonly rewind?: object;
+  readonly steering?: object;
+  readonly compaction?: object;
+}
+
+export interface ProviderFeatureContributions<TSettings extends object = object> {
   readonly providerId: ProviderId;
-  readonly ports: Readonly<Partial<Record<ProviderFeatureKind, object>>>;
+  readonly ports: Readonly<ProviderFeaturePorts<TSettings>>;
 }
 
 export type ProviderProcessTopology =
@@ -142,5 +172,5 @@ export interface ProviderModule<
   readonly workspace: ProviderWorkspaceContribution<TWorkspaceContext, TWorkspace>;
   readonly execution: ExecutionBackendFactory<TBackendContext, TBackend>;
   readonly capabilities: ProviderCapabilityDescriptor;
-  readonly features: ProviderFeatureContributions;
+  readonly features: ProviderFeatureContributions<TSettings>;
 }

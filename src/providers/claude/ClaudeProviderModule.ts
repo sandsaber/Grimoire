@@ -115,6 +115,11 @@ ClaudeExecutionBackendContext
     id: 'claude',
     displayName: 'Claude',
     order: 10,
+    settingsPresentation: {
+      name: 'Claude Code',
+      tabName: 'Claude',
+      descriptionKey: 'settings.providers.claude.desc',
+    },
   },
   settings: {
     providerId: 'claude',
@@ -152,6 +157,21 @@ ClaudeExecutionBackendContext
         ),
         discoveredModels: normalizeClaudeDiscoveredModels(value.discoveredModels)
           .map(model => ({ ...model })),
+      };
+    },
+    runtimeFingerprintInput(value) {
+      return {
+        cliPath: value.cliPath.trim(),
+        cliPathsByHost: normalizeStringMap(value.cliPathsByHost),
+        enableBangBash: value.enableBangBash,
+        enableChrome: value.enableChrome,
+        enabled: value.enabled,
+        environmentVariables: value.environmentVariables,
+        loadUserSettings: value.loadUserSettings,
+        projectSettingsSnapshot: normalizeClaudeCodeProjectSettingsSnapshot(
+          value.projectSettingsSnapshot,
+        ),
+        respectProjectSettings: value.respectProjectSettings,
       };
     },
   },

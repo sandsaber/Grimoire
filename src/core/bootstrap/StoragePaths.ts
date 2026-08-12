@@ -4,6 +4,9 @@ export const GRIMOIRE_SETTINGS_PATH = `${GRIMOIRE_STORAGE_PATH}/grimoire-setting
 export const GRIMOIRE_CONTROL_PATH = `${GRIMOIRE_STORAGE_PATH}/control`;
 export const CONVERSATION_RECORDS_PATH = `${GRIMOIRE_CONTROL_PATH}/conversations`;
 export const TRANSACTION_INTENTS_PATH = `${GRIMOIRE_CONTROL_PATH}/transaction-intents`;
+export const PROVIDER_SETTINGS_TRANSACTION_INTENTS_PATH =
+  `${TRANSACTION_INTENTS_PATH}/provider-settings`;
+export const PROVIDER_SETTINGS_STAGING_PATH = `${GRIMOIRE_STORAGE_PATH}/settings-transactions`;
 export const EXECUTION_SESSIONS_PATH = `${GRIMOIRE_CONTROL_PATH}/execution-sessions`;
 export const EXECUTION_RUNS_PATH = `${GRIMOIRE_CONTROL_PATH}/execution-runs`;
 export const EXECUTION_INTERACTIONS_PATH = `${GRIMOIRE_CONTROL_PATH}/interactions`;

@@ -22,17 +22,25 @@ function createFakeModule(
       id: providerId,
       displayName: 'Fake provider',
       order,
+      settingsPresentation: {
+        name: 'Fake provider',
+        tabName: 'Fake',
+        descriptionKey: 'settings.providers.fake.desc',
+      },
     },
     settings: {
       providerId,
       schemaVersion: 1,
-      defaults: () => ({}),
+      defaults: () => ({ enabled: true }),
       decode: input => ({
         ok: true,
-        value: typeof input === 'object' && input !== null ? { ...input } : {},
+        value: typeof input === 'object' && input !== null
+          ? { ...input }
+          : { enabled: true },
         preservedUnknown: {},
       }),
       encode: value => ({ ...value }),
+      runtimeFingerprintInput: value => ({ ...value }),
     },
     workspace: {
       providerId,
@@ -149,6 +157,12 @@ describe('ProviderCatalog', () => {
       createFakeModule('invalid-order', -1),
     ])).toThrow('Provider "invalid-order" has invalid order -1.');
 
+    const invalidPresentation = createFakeModule();
+    (invalidPresentation.manifest.settingsPresentation as { tabName: string }).tabName = '';
+    expect(() => new ProviderCatalog([invalidPresentation])).toThrow(
+      'Provider "fake" has invalid settings presentation tabName.',
+    );
+
     const missingWorkspace = createFakeModule() as unknown as Record<string, unknown>;
     delete missingWorkspace.workspace;
     expect(() => new ProviderCatalog([
@@ -172,6 +186,14 @@ describe('ProviderCatalog', () => {
         error: 'Provider "fake" settings.decode must be a function.',
       },
       {
+        mutate: module => { delete module.settings.runtimeFingerprintInput; },
+        error: 'Provider "fake" settings.runtimeFingerprintInput must be a function.',
+      },
+      {
+        mutate: module => { module.settings.defaults = () => ({}); },
+        error: 'Provider "fake" settings defaults must encode enabled as boolean.',
+      },
+      {
         mutate: module => { delete module.workspace.dispose; },
         error: 'Provider "fake" workspace.dispose must be a function.',
       },
@@ -182,6 +204,10 @@ describe('ProviderCatalog', () => {
       {
         mutate: module => { delete module.features.ports; },
         error: 'Provider "fake" features.ports must be an object.',
+      },
+      {
+        mutate: module => { module.features.ports.future = {}; },
+        error: 'Provider "fake" has unknown feature port "future".',
       },
       {
         mutate: module => { module.capabilities.security = {}; },
@@ -212,6 +238,7 @@ describe('ProviderCatalog', () => {
 
     expect(catalog.require('fake')).toBe(published);
     expect(published.manifest.id).toBe('fake');
+    expect(Object.isFrozen(published.manifest.settingsPresentation)).toBe(true);
     expect(published.capabilities.security.network).toBe('unsupported');
     expect(Object.isFrozen(published.capabilities.security)).toBe(true);
   });
@@ -223,7 +250,7 @@ describe('ProviderCatalog', () => {
       private readonly marker = 'settings';
 
       defaults(): Record<string, unknown> {
-        return { marker: this.marker };
+        return { enabled: true, marker: this.marker };
       }
 
       decode(): ReturnType<ProviderModule['settings']['decode']> {
@@ -231,6 +258,10 @@ describe('ProviderCatalog', () => {
       }
 
       encode(): Record<string, unknown> {
+        return this.defaults();
+      }
+
+      runtimeFingerprintInput(): Record<string, unknown> {
         return this.defaults();
       }
     }
@@ -267,7 +298,7 @@ describe('ProviderCatalog', () => {
     }]);
     const published = catalog.require('classy');
 
-    expect(published.settings.defaults()).toEqual({ marker: 'settings' });
+    expect(published.settings.defaults()).toEqual({ enabled: true, marker: 'settings' });
     expect(await published.workspace.initialize(undefined, new AbortController().signal))
       .toEqual({ marker: 'workspace' });
     expect(await published.execution.create(undefined)).toEqual({ marker: 'backend' });

@@ -72,7 +72,16 @@ QwenExecutionBackend,
 QwenWorkspaceModuleContext,
 QwenExecutionBackendContext
 > = {
-  manifest: { id: 'qwen', displayName: 'Qwen Code', order: 90 },
+  manifest: {
+    id: 'qwen',
+    displayName: 'Qwen Code',
+    order: 90,
+    settingsPresentation: {
+      name: 'Qwen Code',
+      tabName: 'Qwen',
+      descriptionKey: 'settings.providers.qwen.desc',
+    },
+  },
   settings: {
     providerId: 'qwen',
     schemaVersion: 1,
@@ -103,6 +112,14 @@ QwenExecutionBackendContext
         modelAliases: normalizeQwenModelAliases(value.modelAliases),
         selectedMode: value.selectedMode.trim(),
         visibleModels: normalizeQwenVisibleModels(value.visibleModels),
+      };
+    },
+    runtimeFingerprintInput(value) {
+      return {
+        cliPath: value.cliPath.trim(),
+        cliPathsByHost: normalizeQwenHostnameCliPaths(value.cliPathsByHost),
+        enabled: value.enabled,
+        environmentVariables: value.environmentVariables,
       };
     },
   },

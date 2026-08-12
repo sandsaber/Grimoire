@@ -1,4 +1,7 @@
-import type { ProviderModule } from '@/core/providers/ProviderModule';
+import type {
+  ProviderConfiguredModelsPort,
+  ProviderModule,
+} from '@/core/providers/ProviderModule';
 
 import {
   type AntigravityModelChoice,
@@ -49,6 +52,17 @@ export const antigravityConfiguredModelsPort: AntigravityConfiguredModelsPort = 
   },
 });
 
+const antigravityCatalogModelsPort: ProviderConfiguredModelsPort<AntigravityProviderSettings> =
+  Object.freeze({
+    list(settings: AntigravityProviderSettings) {
+      return antigravityConfiguredModelsPort.list(settings).map(choice => Object.freeze({
+        id: choice.selectionId,
+        label: choice.label,
+        description: choice.description,
+      }));
+    },
+  });
+
 export const antigravityProviderModule: ProviderModule<
 AntigravityProviderSettings,
 AntigravityModuleWorkspace,
@@ -60,6 +74,11 @@ AntigravityExecutionBackendContext
     id: 'antigravity',
     displayName: 'Antigravity',
     order: 70,
+    settingsPresentation: {
+      name: 'Antigravity',
+      tabName: 'Antigravity',
+      descriptionKey: 'settings.providers.antigravity.desc',
+    },
   },
   settings: {
     providerId: 'antigravity',
@@ -89,6 +108,14 @@ AntigravityExecutionBackendContext
         environmentVariables: value.environmentVariables,
         modelAliases: { ...normalizeAntigravityModelAliases(value.modelAliases) },
         visibleModels: [...normalizeAntigravityVisibleModels(value.visibleModels)],
+      };
+    },
+    runtimeFingerprintInput(value) {
+      return {
+        cliPath: value.cliPath.trim(),
+        cliPathsByHost: normalizeAntigravityHostnameCliPaths(value.cliPathsByHost),
+        enabled: value.enabled,
+        environmentVariables: value.environmentVariables,
       };
     },
   },
@@ -149,7 +176,7 @@ AntigravityExecutionBackendContext
   features: {
     providerId: 'antigravity',
     ports: {
-      models: antigravityConfiguredModelsPort,
+      models: antigravityCatalogModelsPort,
     },
   },
 };

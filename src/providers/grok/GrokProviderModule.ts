@@ -86,7 +86,16 @@ GrokExecutionBackend,
 GrokWorkspaceModuleContext,
 GrokExecutionBackendContext
 > = {
-  manifest: { id: 'grok', displayName: 'Grok Build', order: 40 },
+  manifest: {
+    id: 'grok',
+    displayName: 'Grok Build',
+    order: 40,
+    settingsPresentation: {
+      name: 'Grok Build',
+      tabName: 'Grok',
+      descriptionKey: 'settings.providers.grok.desc',
+    },
+  },
   settings: {
     providerId: 'grok',
     schemaVersion: 1,
@@ -124,6 +133,14 @@ GrokExecutionBackendContext
           discoveredModels,
         ),
         visibleModels: normalizeGrokVisibleModels(value.visibleModels, discoveredModels),
+      };
+    },
+    runtimeFingerprintInput(value) {
+      return {
+        cliPath: value.cliPath.trim(),
+        cliPathsByHost: normalizeStringMap(value.cliPathsByHost),
+        enabled: value.enabled,
+        environmentVariables: value.environmentVariables,
       };
     },
   },

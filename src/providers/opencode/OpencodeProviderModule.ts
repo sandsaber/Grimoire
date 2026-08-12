@@ -86,7 +86,16 @@ OpencodeExecutionBackend,
 OpencodeWorkspaceModuleContext,
 OpencodeExecutionBackendContext
 > = {
-  manifest: { id: 'opencode', displayName: 'OpenCode', order: 30 },
+  manifest: {
+    id: 'opencode',
+    displayName: 'OpenCode',
+    order: 30,
+    settingsPresentation: {
+      name: 'OpenCode',
+      tabName: 'OpenCode',
+      descriptionKey: 'settings.providers.opencode.desc',
+    },
+  },
   settings: {
     providerId: 'opencode',
     schemaVersion: 1,
@@ -124,6 +133,14 @@ OpencodeExecutionBackendContext
           discoveredModels,
         ),
         visibleModels: normalizeOpencodeVisibleModels(value.visibleModels, discoveredModels),
+      };
+    },
+    runtimeFingerprintInput(value) {
+      return {
+        cliPath: value.cliPath.trim(),
+        cliPathsByHost: normalizeStringMap(value.cliPathsByHost),
+        enabled: value.enabled,
+        environmentVariables: value.environmentVariables,
       };
     },
   },

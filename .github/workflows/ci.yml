@@ -96,6 +96,9 @@ jobs:
       - name: Verify lifecycle interaction revisions
         run: npm run test -- --selectProjects unit --runInBand tests/unit/core/execution/ExecutionLifecycleRegistry.test.ts
 
+      - name: Verify provider control plane
+        run: npm run test -- --selectProjects unit --runInBand tests/unit/architecture/providerControlPlaneBoundaries.test.ts tests/unit/core/providers/ProviderSettingsFingerprint.test.ts tests/unit/core/providers/ProviderControlPlane.test.ts tests/unit/core/providers/ProviderWorkspaceManager.test.ts tests/unit/core/providers/ProviderSettingsTransactionCoordinator.test.ts tests/unit/app/security/SubtleCryptoSha256DigestPort.test.ts tests/unit/app/settings/StagedProviderSettingsStore.test.ts
+
       - name: Verify application execution owners
         run: npm run test -- --selectProjects unit --runInBand tests/unit/app/execution/local/EphemeralLocalShellRequestStore.test.ts tests/unit/features/chat/application/LocalShellExecutionCoordinator.test.ts tests/unit/features/chat/application/AuxiliaryExecutionCoordinator.test.ts tests/unit/features/chat/application/OrchestratorWorkGraphCoordinator.test.ts
 
