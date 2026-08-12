@@ -757,18 +757,33 @@ generation.
   module at construction and resolves a backend context for every provider without launching a
   process.
 
-Current broad evidence: 532 unit suites / 7,848 tests pass with typecheck, full ESLint, and
-`git diff --check`. The 13 factory/bridge/composition suites / 27 tests and the 5 architecture
-boundary suites all pass. Production composition is unchanged and still uses the legacy runtime path.
+- `de051917` — Added `ApplicationRuntimeInfrastructure`: constructs the durable control
+  repositories, control transaction coordinator, execution lifecycle registry, identity factory,
+  and scheduler from a single `DurableStorage` and digest port. Added
+  `ProviderBackendGenerationStore` for per-provider generation tracking.
+- `de051917` — Added `ProviderBackendStartup`: wires the nine-provider composition root to the
+  lifecycle registry through the backend bootstrap. Prepares and registers every provider backend
+  before lifecycle startup recovery.
+- `0f997665` — Added `ApplicationRuntimeMigration` (storage migration entry point, idempotent
+  no-op until the cutover) and `ProviderBackendLifecycleAdapter` (wraps startup + lifecycle
+  registry into the runtime's backend and lifecycle ports).
+- `a62f8957` — Added `ChatRuntimeWiring`: `createChatExecutionCoordinator` composes the chat
+  coordinator from the lifecycle registry, conversation repository, result store, identity
+  factory, and optional request broker.
+
+Current broad evidence: 538 unit suites / 7,858 tests pass with typecheck, full ESLint, and
+`git diff --check`. Production composition is unchanged and still uses the legacy runtime path.
 
 ## Next steps
 
 1. ~~Compose all nine provider backend contexts~~ — done.
    ~~Wire factories into production composition~~ — done.
-   Remaining: connect the composition root to the `ProviderBackendBootstrap` and `ApplicationRuntime`
-   so the catalog constructs live backends through the new path on startup.
+   ~~Connect composition root to ProviderBackendBootstrap~~ — done.
+   ~~Add runtime infrastructure + lifecycle adapter + chat coordinator wiring~~ — done.
+   Remaining coordinator wiring: settings recovery port, local shell, auxiliary, agent, work,
+   and projection ports for `ApplicationRuntime`.
 2. Connect durable agent adoption, work dispatch, results, local shell, auxiliary execution, and
-   settings transitions to `ApplicationRuntime`.
+   settings transitions to `ApplicationRuntime` production composition.
 3. Replace tab/input/stream ownership with projection-backed presentation, migrate existing vault
    conversations, and switch `main.ts` once all current user paths pass through the platform.
 4. Run the Phase 9 manual test-vault matrix and full cross-platform checkpoint gate before the
