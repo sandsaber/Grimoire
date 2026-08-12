@@ -711,41 +711,54 @@ end-to-end.
 Started composing provider-owned application context factories and the durable interaction
 presentation surface that provider interaction bridges write into.
 
-Landed in the working tree (not yet committed as a checkpoint):
+Committed checkpoints:
 
-- Added `ProviderApplicationContextRegistry`: the application composition boundary that resolves
-  provider-owned backend and workspace contexts from narrow application mechanisms. It validates one
-  factory per catalog module, rejects duplicate or uncatalogued factories, requires both backend and
-  workspace context creation, and never branches on provider identity.
-- Added `ExecutionInteractionPresentationStore`: content-addressed, display-only interaction detail
-  storage under `.grimoire/storage/presentations`. Records are SHA-256-addressed by kind/title/
-  description/options content, byte-bounded per record and in aggregate, crash-orphan recoverable,
-  and round-trip verified on read so a valid-schema label swap is detected through the digest.
-- Added `ExecutionInteractionPresentationRecovery`: derives presentation retention exclusively from
-  durable lifecycle interaction ownership, so only interaction records that an accepted run opened
-  retain their presentation and everything else is removed as a crash orphan.
-- Added the Antigravity `AntigravityApplicationContextFactory` as the first provider-owned
-  composition entry. It composes the print-mode backend from the request broker, durable result
-  store, identity factory, process transport, scheduler, and workspace initializer without importing
-  a legacy runtime, and its workspace context is bound to the active generation.
-- Added `AcpPermissionInteractionBridge`: maps arbitrary ACP permission option identifiers into
-  bounded application responses, stores the display-only presentation, and resolves a selected
-  response back to the exact native option id. Shared ACP code remains limited to transport; the
-  bridge owns no lifecycle state.
-- Wired interaction presentation recovery into the `ApplicationRuntime` startup sequence after
-  lifecycle start and before settings recovery, and added the
-  `ApplicationRuntimeInteractionPresentationPort` to the runtime options contract.
-- Added the new execution-contract suites to the CI matrix.
+- `dd5f8b07` — Added `ProviderApplicationContextRegistry`: the application composition boundary
+  that resolves provider-owned backend and workspace contexts from narrow application mechanisms. It
+  validates one factory per catalog module, rejects duplicate or uncatalogued factories, requires
+  both backend and workspace context creation, and never branches on provider identity.
+- `dd5f8b07` — Added `ExecutionInteractionPresentationStore`: content-addressed, display-only
+  interaction detail storage under `.grimoire/storage/presentations`. Records are SHA-256-addressed
+  by kind/title/description/options content, byte-bounded per record and in aggregate, crash-orphan
+  recoverable, and round-trip verified on read so a valid-schema label swap is detected through the
+  digest. Exported `ExecutionInteractionPresentationPort` as the narrow write port bridges depend on.
+- `dd5f8b07` — Added `ExecutionInteractionPresentationRecovery`: derives presentation retention
+  exclusively from durable lifecycle interaction ownership, so only interaction records that an
+  accepted run opened retain their presentation and everything else is removed as a crash orphan.
+- `dd5f8b07` — Added the Antigravity `AntigravityApplicationContextFactory` as the first
+  provider-owned composition entry and the shared `AcpPermissionInteractionBridge`. Wired
+  interaction presentation recovery into the `ApplicationRuntime` startup sequence after lifecycle
+  start and before settings recovery.
+- `9eec34d4` — Added the Codex `CodexApplicationContextFactory` and
+  `CodexInteractionPresentationBridge`. The bridge maps the four app-server server-request methods
+  (command/file/permissions approval and user input) into bounded application interaction
+  presentations.
+- `c07641da` — Added managed-ACP family factories: `OpencodeApplicationContextFactory`,
+  `MimocodeApplicationContextFactory` (with empty-result policy), and
+  `KimicodeApplicationContextFactory`. Each composes the managed ACP client, ACP permission
+  interaction bridge, provider-owned dynamic config applier, native-scoped result sink, and isolated
+  auxiliary query.
+- `bf766c9a` — Added `ClaudeApplicationContextFactory` with
+  `ClaudeInteractionPresentationBridge` (tool permission, question, plan-exit),
+  `GrokApplicationContextFactory` with `GrokInteractionPresentationBridge` (approval + direct
+  question), `QwenApplicationContextFactory` (commands + usage), and
+  `GeminiApplicationContextFactory` (history replay fence + usage).
 
-Current focused evidence: the 5 new suites / 17 tests pass; the architecture boundary suites pass;
-typecheck, full ESLint, and `git diff --check` pass. Production composition is unchanged and still
-uses the legacy runtime path.
+All nine providers now have application context factories and provider-owned interaction bridges
+where applicable. Every factory composes its backend from narrow application mechanisms (request
+broker, durable result store, identity factory, interaction presentation store, process launcher,
+recovery port) without importing a legacy runtime. Each workspace context is bound to the active
+generation.
+
+Current broad evidence: 531 unit suites / 7,845 tests pass with typecheck, full ESLint, and
+`git diff --check`. The 12 factory/bridge suites / 24 tests and the 5 architecture boundary suites
+all pass. Production composition is unchanged and still uses the legacy runtime path.
 
 ## Next steps
 
-1. Compose all nine provider backend contexts from narrow application adapters and the ephemeral
-   request/presentation stores without importing a legacy runtime. Antigravity is done; Codex,
-   Claude, OpenCode, MiMoCode, Kimi Code, Grok, Qwen, and Gemini remain.
+1. ~~Compose all nine provider backend contexts~~ — done. Remaining: wire the nine factories into
+   the `ProviderApplicationContextRegistry` production composition and the application runtime
+   bootstrap so the catalog constructs live backends through the new path.
 2. Connect durable agent adoption, work dispatch, results, local shell, auxiliary execution, and
    settings transitions to `ApplicationRuntime`.
 3. Replace tab/input/stream ownership with projection-backed presentation, migrate existing vault
