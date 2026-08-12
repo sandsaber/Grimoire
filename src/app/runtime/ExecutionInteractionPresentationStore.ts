@@ -28,6 +28,11 @@ export interface StoreExecutionInteractionPresentationInput {
   readonly options: readonly ExecutionInteractionPresentationOption[];
 }
 
+/** Narrow write port provider interaction bridges depend on. */
+export interface ExecutionInteractionPresentationPort {
+  store(input: StoreExecutionInteractionPresentationInput): Promise<{ readonly presentationRef: string }>;
+}
+
 export interface InteractionPresentationRecoveryResult {
   readonly retained: number;
   readonly removed: number;
