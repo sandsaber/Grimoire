@@ -2,6 +2,7 @@ import type {
   AgentCancellationRecoveryPort,
   AgentDispatchPort,
   AgentDispatchRecoveryPort,
+  AgentResultRecord,
   AgentRunRecord,
   AgentRunRecoveryPort,
 } from '../agents/AgentContracts';
@@ -21,6 +22,7 @@ import {
   markWorkNodeRunning,
   markWorkNodesBlocked,
   planWork,
+  requireSynthesisInputs,
 } from './WorkScheduler';
 
 export type WorkNodeAgentDispatch =
@@ -34,6 +36,7 @@ export interface WorkNodeDispatchFactory {
     readonly execution: WorkGraphExecution;
     readonly node: WorkNode;
     readonly attempt: number;
+    readonly inputResultIds: readonly AgentResultRecord['agentResultId'][];
   }): WorkNodeAgentDispatch;
 }
 
@@ -86,18 +89,23 @@ export class WorkCoordinator {
           execution.revision,
           current => markWorkNodesBlocked(current, plan.blockedNodeIds, this.now()),
         );
+        this.notify(execution.payload);
         continue;
       }
       const nodeId = plan.readyNodeIds[0];
       if (!nodeId) return (await this.finalize(graph.payload, execution)).payload;
       const node = requireNode(graph.payload, nodeId);
+      const inputResultIds = node.kind === 'synthesis'
+        ? requireSynthesisInputs(graph.payload, execution.payload, nodeId)
+        : [];
       const dispatch = factory.create({
         graph: graph.payload,
         execution: execution.payload,
         node,
         attempt: requireNodeState(execution.payload, nodeId).attempt + 1,
+        inputResultIds,
       });
-      validateDispatchBinding(graph.payload, execution.payload, node, dispatch);
+      validateDispatchBinding(graph.payload, execution.payload, node, dispatch, inputResultIds);
       const command = dispatch.command;
       execution = await this.graphs.updateExecution(
         execution.recordId,
@@ -110,6 +118,7 @@ export class WorkCoordinator {
           this.now(),
         ),
       );
+      this.notify(execution.payload);
       try {
         if (dispatch.kind === 'new-instance') {
           await this.agents.prepareDispatch(dispatch.command);
@@ -123,6 +132,7 @@ export class WorkCoordinator {
           nodeId,
           'dispatch-preparation-failed',
         );
+        this.notify(execution.payload);
         continue;
       }
       execution = await this.graphs.updateExecution(
@@ -130,8 +140,10 @@ export class WorkCoordinator {
         execution.revision,
         current => markWorkNodeRunning(current, nodeId, this.now()),
       );
+      this.notify(execution.payload);
       const run = await this.agents.dispatchPrepared(command.agentRunId, dispatchPort);
-      await this.syncNode(execution, nodeId, run);
+      execution = await this.syncNode(execution, nodeId, run);
+      this.notify(execution.payload);
     }
     });
     this.notify(execution);
@@ -228,8 +240,15 @@ export class WorkCoordinator {
           execution: execution.payload,
           node,
           attempt: state.attempt,
+          inputResultIds: state.inputResultIds ?? [],
         });
-        validateDispatchBinding(graph.payload, execution.payload, node, dispatch);
+        validateDispatchBinding(
+          graph.payload,
+          execution.payload,
+          node,
+          dispatch,
+          state.inputResultIds ?? [],
+        );
         if (dispatch.command.agentRunId !== state.agentRunId) {
           execution = await this.failPreparingNode(
             execution,
@@ -392,12 +411,15 @@ function validateDispatchBinding(
   execution: WorkGraphExecution,
   node: WorkNode,
   dispatch: WorkNodeAgentDispatch,
+  inputResultIds: readonly AgentResultRecord['agentResultId'][],
 ): void {
   const work = dispatch.command.work;
   if (!work
     || work.workGraphRef !== graph.workGraphId
     || work.workGraphExecutionRef !== execution.workGraphExecutionId
     || work.workNodeRef !== node.workNodeId
+    || dispatch.command.goalRef !== node.goalRef
+    || !sameIds(work.inputResultIds ?? [], inputResultIds)
     || (dispatch.kind === 'new-instance'
       && (dispatch.command.rootOwner.kind !== 'work-graph'
         || dispatch.command.rootOwner.ownerId !== graph.workGraphId))) {
@@ -421,9 +443,17 @@ function validateRunBinding(
 ): void {
   if (run.workGraphExecutionRef !== execution.workGraphExecutionId
     || run.workGraphRef !== execution.workGraphId
-    || run.workNodeRef !== nodeId) {
+    || run.workNodeRef !== nodeId
+    || !sameIds(
+      run.inputResultIds ?? [],
+      requireNodeState(execution, nodeId).inputResultIds ?? [],
+    )) {
     throw new Error('Agent run is bound to a different work node.');
   }
+}
+
+function sameIds(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function requireNode(graph: WorkGraphRevision, nodeId: WorkNode['workNodeId']): WorkNode {

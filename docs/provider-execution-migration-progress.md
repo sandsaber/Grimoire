@@ -27,7 +27,7 @@ this file records what has actually landed and what remains open.
 | Semantic freeze review | Complete | `892eec78` |
 | Phase 5 — remaining provider modules/backends | Complete | MiMoCode/Kimi Code `6c4700cf`; Grok `104c88dd`; Qwen `d5042ec5`; Gemini `593b38d0`; immutable catalog `d1a41736` |
 | Phase 6 — durable agents and work graphs | Complete | `63320547` |
-| Phase 7 — application runtime and auxiliary work | In progress | chat projections `8cab81b4`; agent work UI this checkpoint |
+| Phase 7 — application runtime and auxiliary work | Complete | chat projections `8cab81b4`; agent work UI `634dc4bb`; execution owners this checkpoint |
 | Phase 8 — catalog and provider-neutral feature ports | Pending | — |
 | Phase 9 — production cutover | Pending | — |
 | Phase 10 — legacy deletion | Pending | — |
@@ -407,6 +407,46 @@ tests cover notification-during-hydration, expansion-during-refresh, missing res
 equal-timestamp interaction revisions, work nodes without agent instances, and the separation of
 original and later reconciled work-node results.
 
+## Phase 7C work orchestration and execution owners
+
+- Added a provider-neutral orchestrator command boundary that compiles opaque tasks, dependencies,
+  assignments, and explicit synthesis into an immutable graph revision and durable execution before
+  dispatch. Stable command replay returns the authoritative progressed execution and concurrent
+  admission cannot create a duplicate graph or execution.
+- Persisted the exact dependency result IDs admitted to every synthesis attempt in both work-node
+  state and the durable agent run. Dispatch and recovery validate graph, execution, node, goal, and
+  ordered input-result identity before provider work starts, so synthesis provenance cannot drift
+  after a restart.
+- Published every committed preparing, running, blocked, preparation-failed, and synchronized work
+  transition. A deferred or lost dispatch acknowledgement cannot leave a loaded work projection
+  behind the durable scheduler state.
+- Added an application-owned local-shell coordinator, one-shot raw request store, and bounded
+  stdout/stderr projection. Only an opaque request reference enters lifecycle commands; raw command,
+  working directory, environment, and output never enter durable control records. Output order and
+  split UTF-8 decoding remain exact, while restart honestly marks the ephemeral output history as
+  partial.
+- Added an application-owned auxiliary coordinator for title, refine, inline edit, command/model
+  probes, warm-up, and future isolated operations. Durable namespaced owners preserve operation kind
+  across restart, do not consume conversation events, and retain required results after their native
+  session is disposed.
+- Kept original indeterminate terminals immutable on both new surfaces and projected later observed
+  outcomes, result references, evidence, and provenance separately through reconciliation records.
+- Fenced cancellation behind in-flight session/run admission, joined duplicate starts, retained
+  ownership after lost acknowledgements, disposed crash-left zero-run preparation sessions, and
+  recovered durable terminal runs after session cleanup without redispatch.
+- Made terminal session cleanup per-run, retryable, and application-owned. A successful cleanup
+  cannot hide another run's failure, and application disposal fails closed while a task, failure,
+  interaction, lease, or tracked session still owns lifecycle resources.
+- Added the Phase 7C orchestrator, shell, auxiliary, lifecycle, work, projection-boundary, and host
+  process evidence to the Ubuntu, macOS, and Windows execution matrix. Production composition and
+  the old input, tab, auxiliary, and shell paths remain unchanged until the Phase 9 hard cutover.
+
+The independent Phase 7C review is approved with no remaining material blocker. Its controlled
+regressions cover deferred dispatch projection, exact synthesis inputs, concurrent stable replay,
+lost admission acknowledgement, pre-admission cancellation, zero-run crash recovery, disposed-
+session restart, immutable reconciliation, per-run cleanup failure isolation, interaction-delayed
+cleanup, and disposal ownership fencing.
+
 ## Verification evidence
 
 - Phase 4C checkpoint gate: 432 unit suites / 7,218 tests; 7 integration suites / 222 tests;
@@ -505,8 +545,21 @@ original and later reconciled work-node results.
   release build: `main.js` SHA-256 `6bb79e0ce51a1e4616b42beac85deeab06b39f757494e33d2b4caf1a6519f9ef`,
   `styles.css` `c079364c4f85717134955ce46b4c8a20ccfe403b4d1531675fa1a433e23c13eb`,
   and `manifest.json` `5058df46417fc0ec4debcc9eda1552c2fda654904132ab20b90d2bb1cbc63758`.
+- Current Phase 7C focused gate: 16 lifecycle, agent/work, shell, auxiliary, orchestration,
+  projection, renderer, and architecture suites / 148 tests pass; typecheck, focused ESLint, and
+  `git diff --check` pass. Independent review approved the checkpoint with no remaining material
+  blocker.
+- Final Phase 7C checkpoint gate: 497 unit suites / 7,691 tests and 7 integration suites / 222 tests
+  pass; typecheck, full ESLint, release build, Obsidian source/CSS/dependency review, isolated
+  bundle-load smoke, view-open smoke, and `git diff --check` pass. The configured test-vault copy
+  required the release build to run outside the restricted sandbox; all verification completed
+  successfully.
+- Root, `dist/grimoire`, and configured test-vault copies remain byte-identical after the Phase 7C
+  release build: `main.js` SHA-256 `6bb79e0ce51a1e4616b42beac85deeab06b39f757494e33d2b4caf1a6519f9ef`,
+  `styles.css` `c079364c4f85717134955ce46b4c8a20ccfe403b4d1531675fa1a433e23c13eb`,
+  and `manifest.json` `5058df46417fc0ec4debcc9eda1552c2fda654904132ab20b90d2bb1cbc63758`.
 
 ## Next steps
 
-1. Implement Phase 7C work-graph orchestration, local-shell projection, and isolated auxiliary-owner
-   routing while leaving production composition unchanged before the Phase 9 hard cutover.
+1. Implement Phase 8 provider catalog composition and provider-neutral feature ports while leaving
+   production composition unchanged before the Phase 9 hard cutover.

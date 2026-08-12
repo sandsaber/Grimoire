@@ -112,7 +112,8 @@ function decodeAssignment(value: unknown): WorkNodeAssignment {
 
 function decodeNodeState(value: unknown): WorkNodeExecutionState {
   const record = exactRecord(value, [
-    'workNodeId', 'state', 'attempt', 'agentRunId', 'resultIds', 'terminalCode', 'updatedAt',
+    'workNodeId', 'state', 'attempt', 'agentRunId', 'inputResultIds', 'resultIds', 'terminalCode',
+    'updatedAt',
   ], 'work node state');
   const state = oneOf(record.state, [
     'pending', 'preparing', 'running', 'succeeded', 'failed', 'cancelled', 'blocked',
@@ -132,11 +133,23 @@ function decodeNodeState(value: unknown): WorkNodeExecutionState {
   if (state === 'pending' && (agentRun || attempt !== 0)) {
     throw new Error('Pending work node cannot carry an agent run attempt.');
   }
+  const inputResultIds = record.inputResultIds === undefined
+    ? undefined
+    : decodeArray(record.inputResultIds, 'node input result ids', entry => (
+      agentResultId(requireString(entry, 'node input result id'))
+    ));
+  if (inputResultIds && state === 'pending') {
+    throw new Error('Pending work node cannot carry admitted synthesis inputs.');
+  }
+  if (inputResultIds && new Set(inputResultIds).size !== inputResultIds.length) {
+    throw new Error('Node input result ids must not contain duplicates.');
+  }
   return {
     workNodeId: workNodeId(requireString(record.workNodeId, 'work node id')),
     state,
     attempt,
     ...(agentRun ? { agentRunId: agentRun } : {}),
+    ...(inputResultIds ? { inputResultIds } : {}),
     resultIds: decodeArray(record.resultIds, 'node result ids', entry => (
       agentResultId(requireString(entry, 'node result id'))
     )),

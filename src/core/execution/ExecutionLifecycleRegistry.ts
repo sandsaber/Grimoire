@@ -1003,10 +1003,22 @@ export class ExecutionLifecycleRegistry {
       .sort((left, right) => left.record.createdAt - right.record.createdAt);
   }
 
+  getRunSnapshots(): readonly ExecutionRunSnapshot[] {
+    return [...this.runs.values()]
+      .map(entry => ({ record: entry.record, revision: entry.revision }))
+      .sort((left, right) => left.record.createdAt - right.record.createdAt);
+  }
+
   getSessionsForOwner(owner: ExecutionOwner): readonly Readonly<ExecutionSessionRecord>[] {
     return [...this.sessions.values()]
       .map(entry => entry.record)
       .filter(record => sameOwner(record.owner, owner))
+      .sort((left, right) => left.createdAt - right.createdAt);
+  }
+
+  getSessions(): readonly Readonly<ExecutionSessionRecord>[] {
+    return [...this.sessions.values()]
+      .map(entry => entry.record)
       .sort((left, right) => left.createdAt - right.createdAt);
   }
 

@@ -318,7 +318,7 @@ export function selectWorkNodeCards(
         dependencyNodeIds: node.dependencyNodeIds,
         blockedByNodeIds,
         assignment: node.assignment,
-        synthesisInputResultIds: node.synthesisInputResultIds,
+        synthesisInputResultIds: state.inputResultIds ?? node.synthesisInputResultIds,
         state: state.state,
         attempt: state.attempt,
         ...(state.agentRunId ? { agentRunId: state.agentRunId } : {}),

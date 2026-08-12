@@ -96,5 +96,8 @@ jobs:
       - name: Verify lifecycle interaction revisions
         run: npm run test -- --selectProjects unit --runInBand tests/unit/core/execution/ExecutionLifecycleRegistry.test.ts
 
+      - name: Verify application execution owners
+        run: npm run test -- --selectProjects unit --runInBand tests/unit/app/execution/local/EphemeralLocalShellRequestStore.test.ts tests/unit/features/chat/application/LocalShellExecutionCoordinator.test.ts tests/unit/features/chat/application/AuxiliaryExecutionCoordinator.test.ts tests/unit/features/chat/application/OrchestratorWorkGraphCoordinator.test.ts
+
       - name: Verify host process ownership
         run: npm run test -- --selectProjects integration --runInBand tests/integration/app/execution/local/LocalShellProcessOwnership.integration.test.ts tests/integration/app/execution/antigravity/NodeAntigravityProcessTransport.integration.test.ts tests/integration/app/execution/codex/CodexPersistentProcessOwnership.integration.test.ts

@@ -87,6 +87,7 @@ export interface AgentRunRecord {
   readonly workGraphRef?: string;
   readonly workGraphExecutionRef?: string;
   readonly workNodeRef?: string;
+  readonly inputResultIds?: readonly AgentResultId[];
   readonly dispatchToken?: AgentDispatchToken;
   readonly executionSessionId?: ExecutionSessionId;
   readonly executionRunId?: RunId;

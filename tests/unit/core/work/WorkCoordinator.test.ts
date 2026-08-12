@@ -22,13 +22,14 @@ import {
   workGraphRevisionId,
   workNodeId,
 } from '@/core/work/WorkIds';
-import { claimWorkNode,createWorkGraphExecution } from '@/core/work/WorkScheduler';
+import { claimWorkNode, createWorkGraphExecution } from '@/core/work/WorkScheduler';
 
 const GRAPH_ID = workGraphId(`wg-${'1'.repeat(32)}`);
 const REVISION_ID = workGraphRevisionId(`wgr-${'2'.repeat(32)}`);
 const EXECUTION_ID = workGraphExecutionId(`wge-${'3'.repeat(32)}`);
 const NODE_A = workNodeId(`wn-${'a'.repeat(32)}`);
 const NODE_B = workNodeId(`wn-${'b'.repeat(32)}`);
+const NODE_S = workNodeId(`wn-${'c'.repeat(32)}`);
 
 describe('WorkCoordinator', () => {
   it('publishes only a committed execution snapshot and isolates projection listeners', async () => {
@@ -50,6 +51,36 @@ describe('WorkCoordinator', () => {
     expect(execution.nodeStates).toEqual(expect.arrayContaining([
       expect.objectContaining({ workNodeId: NODE_A, state: 'running' }),
     ]));
+  });
+
+  it('publishes the durable running transition before a deferred dispatch acknowledgement', async () => {
+    const fixture = await createFixture();
+    const dispatchStarted = deferred<void>();
+    const dispatchResult = deferred<{ readonly kind: 'accepted' }>();
+    const observed: WorkGraphRevision['nodes'][number]['workNodeId'][] = [];
+    const states: string[] = [];
+    fixture.work.subscribe(notification => {
+      const state = notification.execution.nodeStates.find(candidate => (
+        candidate.workNodeId === NODE_A
+      ));
+      if (state) {
+        observed.push(state.workNodeId);
+        states.push(state.state);
+      }
+    });
+
+    const dispatch = fixture.work.dispatchReady(EXECUTION_ID, fixture.factory, {
+      dispatch: () => {
+        dispatchStarted.resolve();
+        return dispatchResult.promise;
+      },
+    });
+    await dispatchStarted.promise;
+
+    expect(observed).toContain(NODE_A);
+    expect(states).toEqual(expect.arrayContaining(['preparing', 'running']));
+    dispatchResult.resolve({ kind: 'accepted' });
+    await dispatch;
   });
 
   it('projects live agent completion and dispatches a newly unblocked dependency', async () => {
@@ -229,6 +260,50 @@ describe('WorkCoordinator', () => {
       expect.objectContaining({ workNodeId: NODE_B, state: 'succeeded', resultIds: runB.resultIds }),
     ]));
   });
+
+  it('binds exact dependency result ids into the durable synthesis attempt', async () => {
+    const synthesis = {
+      ...node(NODE_S, [NODE_A]),
+      kind: 'synthesis' as const,
+      synthesisInputResultIds: [],
+    };
+    const fixture = await createFixture(graphDefinition({
+      nodes: [node(NODE_A), synthesis],
+      synthesisNodeId: NODE_S,
+    }));
+    const factory: WorkNodeDispatchFactory = {
+      create: ({ node: workNode, inputResultIds }) => ({
+        kind: 'new-instance',
+        command: commandFor(workNode.workNodeId, {
+          goalRef: workNode.goalRef,
+          inputResultIds,
+        }),
+      }),
+    };
+    await fixture.work.dispatchReady(EXECUTION_ID, factory, {
+      dispatch: async () => ({ kind: 'accepted' }),
+    });
+    const workerResult = resultFor(commandFor(NODE_A));
+    const completed = await fixture.agents.appendResult(workerResult);
+    await fixture.work.synchronizeAgentRun(completed);
+
+    const execution = await fixture.work.dispatchReady(EXECUTION_ID, factory, {
+      dispatch: async () => ({ kind: 'accepted' }),
+    });
+    const synthesisState = execution.nodeStates.find(state => state.workNodeId === NODE_S);
+    const synthesisRun = synthesisState?.agentRunId
+      ? await fixture.agents.repositories.runs.read(synthesisState.agentRunId)
+      : undefined;
+
+    expect(synthesisState).toMatchObject({
+      state: 'running',
+      inputResultIds: [workerResult.agentResultId],
+    });
+    expect(synthesisRun).toMatchObject({
+      kind: 'current',
+      record: { payload: { inputResultIds: [workerResult.agentResultId] } },
+    });
+  });
 });
 
 async function createFixture(graph = graphDefinition()) {
@@ -278,7 +353,13 @@ function node(id: WorkNode['workNodeId'], dependencies: readonly WorkNode['workN
   };
 }
 
-function commandFor(nodeId: WorkNode['workNodeId']): PrepareAgentDispatchCommand {
+function commandFor(
+  nodeId: WorkNode['workNodeId'],
+  overrides: {
+    readonly goalRef?: string;
+    readonly inputResultIds?: readonly AgentResultRecord['agentResultId'][];
+  } = {},
+): PrepareAgentDispatchCommand {
   const isA = nodeId === NODE_A;
   const hex = isA ? 'a' : 'b';
   const transactionHexes = isA ? ['1', '2', '3', '4'] : ['5', '6', '7', '8'];
@@ -300,7 +381,7 @@ function commandFor(nodeId: WorkNode['workNodeId']): PrepareAgentDispatchCommand
     rootOwner: { kind: 'work-graph', ownerId: GRAPH_ID },
     attachment: 'detached',
     observation: 'none',
-    goalRef: `goal-${hex}`,
+    goalRef: overrides.goalRef ?? `goal-${hex}`,
     policyInputs: {
       provider: { granted: ['read'], approvable: [] },
       workspace: { granted: ['read'], approvable: [] },
@@ -312,6 +393,7 @@ function commandFor(nodeId: WorkNode['workNodeId']): PrepareAgentDispatchCommand
       workGraphRef: GRAPH_ID,
       workGraphExecutionRef: EXECUTION_ID,
       workNodeRef: nodeId,
+      ...(overrides.inputResultIds ? { inputResultIds: overrides.inputResultIds } : {}),
     },
   };
 }
@@ -369,4 +451,12 @@ function inertScheduler(): AgentCoordinatorScheduler {
     setTimeout: () => 'inert-timer',
     clearTimeout: jest.fn(),
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(next => {
+    resolve = next;
+  });
+  return { promise, resolve };
 }

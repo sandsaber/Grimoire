@@ -35,7 +35,9 @@ describe('chat execution projection boundaries', () => {
   it('keeps projections independent from providers, Obsidian, and DOM rendering', () => {
     const paths = [
       'features/chat/projections/AgentProjection.ts',
+      'features/chat/projections/AuxiliaryOperationProjection.ts',
       'features/chat/projections/ChatProjection.ts',
+      'features/chat/projections/LocalShellProjection.ts',
       'features/chat/rendering/AgentWorkCard.ts',
       'features/chat/rendering/ChatProjectionRenderer.ts',
     ];
@@ -69,9 +71,13 @@ describe('chat execution projection boundaries', () => {
     const paths = [
       'features/chat/application/AgentProjectionCoordinator.ts',
       'features/chat/application/AgentWorkCommandAdapter.ts',
+      'features/chat/application/AuxiliaryExecutionCoordinator.ts',
       'features/chat/application/ChatExecutionCoordinator.ts',
       'features/chat/application/ChatInputCommandAdapter.ts',
       'features/chat/application/ChatProjectionAttachment.ts',
+      'features/chat/application/LocalShellExecutionCoordinator.ts',
+      'features/chat/application/LocalShellOutputProjectionStore.ts',
+      'features/chat/application/OrchestratorWorkGraphCoordinator.ts',
     ];
     const violations = paths.flatMap(relativePath => {
       const parsed = parse(join(sourceRoot, relativePath));

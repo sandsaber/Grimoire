@@ -56,6 +56,7 @@ export interface PrepareAgentDispatchCommand {
     readonly workGraphRef: string;
     readonly workGraphExecutionRef: string;
     readonly workNodeRef: string;
+    readonly inputResultIds?: readonly AgentResultRecord['agentResultId'][];
   };
 }
 
@@ -78,6 +79,7 @@ export interface AdoptNativeAgentCommand {
     readonly workGraphRef: string;
     readonly workGraphExecutionRef: string;
     readonly workNodeRef: string;
+    readonly inputResultIds?: readonly AgentResultRecord['agentResultId'][];
   };
 }
 
@@ -96,6 +98,7 @@ export interface RetryAgentCommand {
     readonly workGraphRef: string;
     readonly workGraphExecutionRef: string;
     readonly workNodeRef: string;
+    readonly inputResultIds?: readonly AgentResultRecord['agentResultId'][];
   };
 }
 

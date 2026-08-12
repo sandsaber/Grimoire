@@ -107,7 +107,7 @@ export const agentRunRecordSchema: RecordSchema<AgentRunRecord> = {
       'agentRunId', 'agentInstanceId', 'attempt', 'goalRef', 'policy', 'dispatchToken',
       'executionSessionId', 'executionRunId', 'nativeAgentRef', 'state', 'resultIds', 'terminal',
       'terminalTransactionId', 'workGraphRef', 'workGraphExecutionRef', 'workNodeRef',
-      'observedResultIds',
+      'inputResultIds', 'observedResultIds',
       'createdAt', 'updatedAt',
     ], 'agent run');
     const id = agentRunId(requireString(record.agentRunId, 'agent run id'));
@@ -122,6 +122,14 @@ export const agentRunRecordSchema: RecordSchema<AgentRunRecord> = {
     if ([workGraphRef, workGraphExecutionRef, workNodeRef].filter(Boolean).length !== 0
       && [workGraphRef, workGraphExecutionRef, workNodeRef].filter(Boolean).length !== 3) {
       throw new Error('Work graph, execution, and node refs must be present together.');
+    }
+    const inputResultIds = record.inputResultIds === undefined
+      ? undefined
+      : decodeUniqueArray(record.inputResultIds, 'agent input result ids', value => (
+        agentResultId(requireString(value, 'agent input result id'))
+      ));
+    if (inputResultIds && !workNodeRef) {
+      throw new Error('Agent input results require a durable work node binding.');
     }
     const dispatchToken = record.dispatchToken === undefined
       ? undefined
@@ -172,6 +180,7 @@ export const agentRunRecordSchema: RecordSchema<AgentRunRecord> = {
       ...(workGraphRef ? { workGraphRef } : {}),
       ...(workGraphExecutionRef ? { workGraphExecutionRef } : {}),
       ...(workNodeRef ? { workNodeRef } : {}),
+      ...(inputResultIds ? { inputResultIds } : {}),
       ...(dispatchToken ? { dispatchToken } : {}),
       ...(executionSession ? { executionSessionId: executionSession } : {}),
       ...(executionRun ? { executionRunId: executionRun } : {}),

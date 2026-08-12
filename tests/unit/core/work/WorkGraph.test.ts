@@ -132,6 +132,12 @@ describe('WorkGraph', () => {
       agentRunId(`agr-${'d'.repeat(32)}`),
       6,
     );
+    expect(execution.nodeStates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        workNodeId: NODE_S,
+        inputResultIds: [RESULT_A, RESULT_B],
+      }),
+    ]));
     execution = completeWorkNode(execution, NODE_S, 'failed', [], 'synthesis-failure', 7);
     execution = finalizeWorkGraph(definition, execution, 8);
 

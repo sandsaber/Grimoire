@@ -134,12 +134,18 @@ export function claimWorkNode(
   if (!planWork(graph, execution).readyNodeIds.includes(nodeId)) {
     throw new Error(`Work node "${nodeId}" is not ready.`);
   }
+  const node = graph.nodes.find(candidate => candidate.workNodeId === nodeId);
+  if (!node) throw new Error(`Work node "${nodeId}" is absent.`);
+  const inputResultIds = node.kind === 'synthesis'
+    ? requireSynthesisInputs(graph, execution, nodeId)
+    : undefined;
   return updateExecution(execution, state => state.workNodeId === nodeId
     ? {
       ...state,
       state: 'preparing',
       attempt: state.attempt + 1,
       agentRunId,
+      ...(inputResultIds ? { inputResultIds } : {}),
       terminalCode: undefined,
       updatedAt: now,
     }
@@ -210,12 +216,15 @@ export function requireSynthesisInputs(
     && dependencies.some(dependency => dependency.state !== 'succeeded')) {
     throw new Error('Synthesis requires every dependency to succeed.');
   }
-  const available = new Set(dependencies.flatMap(dependency => dependency.resultIds));
-  if (node.synthesisInputResultIds.length === 0
-    || node.synthesisInputResultIds.some(resultId => !available.has(resultId))) {
+  const availableIds = dependencies.flatMap(dependency => dependency.resultIds);
+  const available = new Set(availableIds);
+  const selected = node.synthesisInputResultIds.length === 0
+    ? availableIds
+    : node.synthesisInputResultIds;
+  if (selected.length === 0 || selected.some(resultId => !available.has(resultId))) {
     throw new Error('Synthesis inputs must reference exact dependency results.');
   }
-  return node.synthesisInputResultIds;
+  return [...new Set(selected)];
 }
 
 function validateExecutionBinding(graph: WorkGraphRevision, execution: WorkGraphExecution): void {

@@ -52,6 +52,8 @@ export interface WorkNodeExecutionState {
   readonly state: WorkNodeState;
   readonly attempt: number;
   readonly agentRunId?: AgentRunId;
+  /** Exact dependency results admitted to a synthesis attempt. */
+  readonly inputResultIds?: readonly AgentResultId[];
   readonly resultIds: readonly AgentResultId[];
   readonly terminalCode?: string;
   readonly updatedAt: number;

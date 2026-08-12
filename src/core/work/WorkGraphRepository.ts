@@ -131,11 +131,20 @@ export class WorkGraphRepository {
       latestRevision: canonical.revision,
       updatedAt: this.now(),
     };
-    if (currentHead.kind === 'absent') {
-      await this.heads.save(canonical.workGraphId, nextHead, null);
-    } else {
-      const head = await requireCurrent(Promise.resolve(currentHead));
-      await this.heads.save(canonical.workGraphId, nextHead, head.revision);
+    try {
+      if (currentHead.kind === 'absent') {
+        await this.heads.save(canonical.workGraphId, nextHead, null);
+      } else {
+        const head = await requireCurrent(Promise.resolve(currentHead));
+        await this.heads.save(canonical.workGraphId, nextHead, head.revision);
+      }
+    } catch (error) {
+      if (!(error instanceof RevisionConflictError)) throw error;
+      const authoritative = await requireCurrent(this.heads.read(canonical.workGraphId));
+      if (authoritative.payload.latestRevisionId !== canonical.workGraphRevisionId
+        || authoritative.payload.latestRevision !== canonical.revision) {
+        throw error;
+      }
     }
     return revisionRecord;
   }
@@ -145,9 +154,16 @@ export class WorkGraphRepository {
     return requireCurrent(this.revisions.read(head.payload.latestRevisionId));
   }
 
-  createExecution(execution: WorkGraphExecution): Promise<VersionedRecord<WorkGraphExecution>> {
+  async createExecution(execution: WorkGraphExecution): Promise<VersionedRecord<WorkGraphExecution>> {
     const canonical = workGraphExecutionSchema.decode(execution);
-    return this.executions.save(canonical.workGraphExecutionId, canonical, null);
+    try {
+      return await this.executions.save(canonical.workGraphExecutionId, canonical, null);
+    } catch (error) {
+      if (!(error instanceof RevisionConflictError)) throw error;
+      const existing = await requireCurrent(this.executions.read(canonical.workGraphExecutionId));
+      if (stableSerialize(existing.payload) !== stableSerialize(canonical)) throw error;
+      return existing;
+    }
   }
 
   updateExecution(
