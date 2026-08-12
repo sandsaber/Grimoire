@@ -69,6 +69,7 @@ export interface ProviderApplicationContextCompositionOptions {
 export class ProviderApplicationContextComposition {
   readonly primitives: ProviderApplicationContextPrimitives;
   readonly registry: ProviderApplicationContextRegistry;
+  readonly presentationStore: ExecutionInteractionPresentationStore;
 
   constructor(options: ProviderApplicationContextCompositionOptions) {
     const identities = new ApplicationIdentityFactory();
@@ -76,6 +77,7 @@ export class ProviderApplicationContextComposition {
     const requests = new ApplicationExecutionRequestBroker(requestStore, identities);
     const results = new DurableExecutionResultStore(options.storage, options.digest);
     const presentations = new ExecutionInteractionPresentationStore(options.storage, options.digest);
+    this.presentationStore = presentations;
     this.primitives = Object.freeze({ requests, results, identities, presentations });
 
     const overrides = options.overrides ?? {};
