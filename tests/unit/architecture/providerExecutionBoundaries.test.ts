@@ -429,6 +429,7 @@ describe('provider execution architecture boundaries', () => {
       'ExecutionDispatchError.constructor.message',
       'ExecutionDispatchError.constructor.sideEffectFree',
       'ExecutionEvent.activity',
+      'ExecutionEvent.attachment',
       'ExecutionEvent.completed',
       'ExecutionEvent.interaction',
       'ExecutionEvent.interactionId',

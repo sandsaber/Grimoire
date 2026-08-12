@@ -118,6 +118,7 @@ export type AgentTerminalStatus =
   | 'failed'
   | 'cancelled'
   | 'interrupted'
+  | 'invalidated'
   | 'indeterminate';
 export type AgentResultStatus = 'partial' | AgentTerminalStatus;
 
@@ -211,7 +212,11 @@ export type AgentDispatchRecoveryEvidence =
   | { readonly kind: 'unknown'; readonly effectsPossible: boolean };
 
 export interface AgentDispatchRecoveryPort {
-  reconcile(intent: AgentDispatchIntentRecord): Promise<AgentDispatchRecoveryEvidence>;
+  reconcile(input: {
+    readonly intent: AgentDispatchIntentRecord;
+    readonly instance: AgentInstanceRecord;
+    readonly run: AgentRunRecord;
+  }): Promise<AgentDispatchRecoveryEvidence>;
 }
 
 export interface AgentRunRecoveryQuery {

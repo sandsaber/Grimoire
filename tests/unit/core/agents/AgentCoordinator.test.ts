@@ -38,6 +38,75 @@ const POLICY_INPUTS = {
 };
 
 describe('AgentCoordinator', () => {
+  it('adopts a provider-native root agent directly under a conversation owner', async () => {
+    const coordinator = new AgentCoordinator(new TestDurableStorage(), {
+      now: monotonicClock(),
+    });
+    const adoptionKey = nativeAgentAdoptionKey(`nad-${'a'.repeat(32)}`);
+
+    const instance = await coordinator.adoptNativeAgent({
+      transactionId: tx('a'),
+      terminalTransactionId: tx('b'),
+      adoptionKey,
+      agentRunId: agentRunId(`agr-${'c'.repeat(32)}`),
+      providerId: 'claude',
+      definition: {
+        definitionId: 'native-agent',
+        revisionDigest: 'd'.repeat(64),
+        source: 'provider-native',
+      },
+      rootOwner: { kind: 'conversation', ownerId: 'conversation-1' },
+      attachment: 'attached',
+      observation: 'full',
+      nativeAgentRef: 'native-task-1',
+      goalRef: 'native-agent',
+      policyInputs: POLICY_INPUTS,
+    });
+
+    expect(instance).toMatchObject({
+      agentInstanceId: adoptedAgentInstanceId(adoptionKey),
+      rootOwner: { kind: 'conversation', ownerId: 'conversation-1' },
+      origin: 'observed-native',
+      status: 'active',
+    });
+    expect(instance).not.toHaveProperty('parentAgentInstanceId');
+    expect(instance).not.toHaveProperty('parentAgentRunId');
+  });
+
+  it('terminalizes a live agent without fabricating a result and replays identically', async () => {
+    const coordinator = new AgentCoordinator(new TestDurableStorage(), {
+      now: monotonicClock(),
+    });
+    await coordinator.prepareAndDispatch(rootCommand(), { dispatch: acceptedPort().dispatch });
+
+    const first = await coordinator.completeRun(ROOT_RUN_ID, 'failed', 'provider-failure');
+    const replay = await coordinator.completeRun(ROOT_RUN_ID, 'failed', 'provider-failure');
+
+    expect(first).toMatchObject({
+      state: 'failed',
+      terminal: { kind: 'failed', reason: 'provider-failure' },
+      resultIds: [],
+    });
+    expect(replay).toEqual(first);
+    await expect(coordinator.completeRun(ROOT_RUN_ID, 'cancelled', 'cancellation-confirmed'))
+      .rejects.toThrow('immutable terminal');
+  });
+
+  it('projects provider waiting and resume activity without reopening a terminal run', async () => {
+    const coordinator = new AgentCoordinator(new TestDurableStorage(), {
+      now: monotonicClock(),
+    });
+    await coordinator.prepareAndDispatch(rootCommand(), { dispatch: acceptedPort().dispatch });
+
+    await expect(coordinator.updateRunState(ROOT_RUN_ID, 'waiting'))
+      .resolves.toMatchObject({ state: 'waiting' });
+    await expect(coordinator.updateRunState(ROOT_RUN_ID, 'running'))
+      .resolves.toMatchObject({ state: 'running' });
+    await coordinator.completeRun(ROOT_RUN_ID, 'invalidated', 'pre-dispatch-rejected');
+    await expect(coordinator.updateRunState(ROOT_RUN_ID, 'waiting'))
+      .resolves.toMatchObject({ state: 'invalidated' });
+  });
+
   it('publishes committed record identities and isolates projection listeners', async () => {
     const coordinator = new AgentCoordinator(new TestDurableStorage(), {
       now: monotonicClock(),
@@ -171,7 +240,11 @@ describe('AgentCoordinator', () => {
     const storage = new TestDurableStorage();
     const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
     await coordinator.prepareAndDispatch(rootCommand(), acceptedPort());
-    const command = adoptionCommand('7', '8', 'child-native-1', '6');
+    const command = {
+      ...adoptionCommand('7', '8', 'child-native-1', '6'),
+      executionSessionId: `es-${'7'.repeat(32)}` as AdoptNativeAgentCommand['executionSessionId'],
+      executionRunId: `run-${'8'.repeat(32)}` as AdoptNativeAgentCommand['executionRunId'],
+    };
 
     const first = await coordinator.adoptNativeAgent(command);
     const duplicate = await coordinator.adoptNativeAgent(command);
@@ -182,6 +255,10 @@ describe('AgentCoordinator', () => {
     await expect(coordinator.adoptNativeAgent({
       ...command,
       nativeAgentRef: 'conflicting-native-child',
+    })).rejects.toThrow('conflicts with an existing instance');
+    await expect(coordinator.adoptNativeAgent({
+      ...command,
+      executionRunId: `run-${'9'.repeat(32)}` as AdoptNativeAgentCommand['executionRunId'],
     })).rejects.toThrow('conflicts with an existing instance');
   });
 

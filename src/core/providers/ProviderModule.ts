@@ -71,13 +71,24 @@ export interface ProviderConfiguredModelsPort<TSettings extends object = object>
   list(settings: TSettings): readonly ProviderConfiguredModelChoice[];
 }
 
+export type ProviderNativeAgentCancellationOutcome =
+  | { readonly kind: 'cancelled' }
+  | { readonly kind: 'terminal'; readonly status: 'completed' | 'failed' | 'stopped' };
+
+export interface ProviderNativeAgentControlPort {
+  cancel(
+    backend: unknown,
+    input: { readonly executionSessionId: string; readonly taskId: string },
+  ): Promise<ProviderNativeAgentCancellationOutcome>;
+}
+
 export interface ProviderFeaturePorts<TSettings extends object = object> {
   readonly history?: object;
   readonly models?: ProviderConfiguredModelsPort<TSettings>;
   readonly commands?: object;
   readonly mcp?: object;
   readonly usage?: object;
-  readonly agents?: object;
+  readonly agents?: ProviderNativeAgentControlPort;
   readonly fork?: object;
   readonly rewind?: object;
   readonly steering?: object;

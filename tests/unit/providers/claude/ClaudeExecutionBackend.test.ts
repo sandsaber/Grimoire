@@ -756,7 +756,8 @@ describe('ClaudeExecutionBackend', () => {
       }),
     }));
     fixture.query.emit(taskNotification('task-1', 'stopped', 'tool-task-1'));
-    await Promise.all([firstCancellation, concurrentCancellation]);
+    await expect(Promise.all([firstCancellation, concurrentCancellation]))
+      .resolves.toEqual(['stopped', 'stopped']);
     expect(fixture.query.stopTask).toHaveBeenCalledWith('task-1');
     expect(fixture.query.stopTask).toHaveBeenCalledTimes(1);
     expect(observed).toContainEqual(expect.objectContaining({
@@ -795,7 +796,7 @@ describe('ClaudeExecutionBackend', () => {
     });
     await waitFor(() => fixture.query.stopTask.mock.calls.length === 1);
     fixture.query.emit(taskNotification('task-1', 'completed', 'tool-task-1'));
-    await cancellation;
+    await expect(cancellation).resolves.toBe('completed');
     await waitFor(() => observed.some(event =>
       event.event.kind === 'native-agent-result'
       && event.event.nativeAgentKey === 'task-1'));

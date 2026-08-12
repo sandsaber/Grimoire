@@ -4,6 +4,7 @@ import { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 
 describe('VaultFileAdapter', () => {
   let mockAdapter: jest.Mocked<any>;
+  let boundedReader: { readBounded: jest.Mock };
   let vaultAdapter: VaultFileAdapter;
 
   const mockApp: Partial<App> = {
@@ -14,6 +15,7 @@ describe('VaultFileAdapter', () => {
     mockAdapter = {
       exists: jest.fn(),
       read: jest.fn(),
+      readBinary: jest.fn(),
       write: jest.fn(),
       remove: jest.fn(),
       rename: jest.fn(),
@@ -23,7 +25,8 @@ describe('VaultFileAdapter', () => {
     };
 
     mockApp.vault = { adapter: mockAdapter } as any;
-    vaultAdapter = new VaultFileAdapter(mockApp as App);
+    boundedReader = { readBounded: jest.fn() };
+    vaultAdapter = new VaultFileAdapter(mockApp as App, boundedReader);
   });
 
   describe('exists', () => {
@@ -53,6 +56,22 @@ describe('VaultFileAdapter', () => {
 
       expect(result).toBe('file content');
       expect(mockAdapter.read).toHaveBeenCalledWith('test/path.md');
+    });
+  });
+
+  describe('readBounded', () => {
+    it('delegates to the capped platform reader without materializing through DataAdapter', async () => {
+      boundedReader.readBounded.mockResolvedValue('file content');
+
+      await expect(vaultAdapter.readBounded('test/path.md', 64)).resolves.toBe('file content');
+      expect(boundedReader.readBounded).toHaveBeenCalledWith('test/path.md', 64);
+      expect(mockAdapter.readBinary).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when the platform has no genuinely bounded reader', async () => {
+      const unbounded = new VaultFileAdapter(mockApp as App);
+      await expect(unbounded.readBounded('test/path.md', 64)).rejects.toThrow('unavailable');
+      expect(mockAdapter.readBinary).not.toHaveBeenCalled();
     });
   });
 

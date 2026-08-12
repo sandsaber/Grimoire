@@ -1,7 +1,11 @@
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { SETTINGS_TRANSITIONS_PATH } from '@/core/bootstrap/StoragePaths';
-import type { ResultRef } from '@/core/execution/ExecutionContracts';
+import {
+  executionBackendId,
+  internalExecutionServiceId,
+} from '@/core/execution/ExecutionBackendDescriptor';
+import type { ExecutionBackend, ResultRef } from '@/core/execution/ExecutionContracts';
 import { ExecutionControlRepositories } from '@/core/execution/ExecutionControlRepositories';
 import { ExecutionControlTransactionCoordinator } from '@/core/execution/ExecutionControlTransactionCoordinator';
 import type { RunId } from '@/core/execution/ExecutionIds';
@@ -29,6 +33,27 @@ const OWNER = { kind: 'conversation' as const, ownerId: 'conversation-1' };
 const RESULT: ResultRef = { resultId: 'result-1', storage: 'projection' };
 
 describe('ExecutionLifecycleRegistry', () => {
+  it('validates a backend batch before registering any member', () => {
+    const fixture = createFixture();
+    const additional: ExecutionBackend = {
+      descriptor: {
+        backendId: executionBackendId('internal-additional-test'),
+        association: {
+          kind: 'internal',
+          service: internalExecutionServiceId('deterministic-test'),
+        },
+      },
+      createSession: async () => { throw new Error('not used'); },
+      dispose: async () => undefined,
+    };
+
+    expect(() => fixture.registry.registerBackends([
+      { backend: additional },
+      { backend: fixture.backend },
+    ])).toThrow('already registered');
+    expect(() => fixture.registry.registerBackend({ backend: additional })).not.toThrow();
+  });
+
   it('keeps startup fail-closed and accepts a backend with no provider association', async () => {
     const fixture = createFixture();
 
@@ -80,6 +105,127 @@ describe('ExecutionLifecycleRegistry', () => {
     expect(afterRun.revision).toBe(beforeRun.revision);
     expect(afterSession.revision).toBe(beforeSession.revision);
     expect(afterRun.payload.terminal).toEqual(beforeRun.payload.terminal);
+  });
+
+  it('persists compact native-agent evidence in the accepted event transaction', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+
+    fixture.backend.emit(RUN_ID, {
+      kind: 'native-agent-observed',
+      nativeAgentKey: 'task-1',
+      attachment: 'attached',
+    }, { deliveryId: 'native-agent-observed-1', destination: 'session' });
+    fixture.backend.emit(RUN_ID, {
+      kind: 'native-agent-activity',
+      nativeAgentKey: 'task-1',
+      activity: 'wait-observed',
+    }, { deliveryId: 'native-agent-activity-1', destination: 'session' });
+    fixture.backend.emit(RUN_ID, {
+      kind: 'native-agent-result',
+      nativeAgentKey: 'task-1',
+      result: RESULT,
+    }, { deliveryId: 'native-agent-result-1', destination: 'session' });
+    fixture.backend.emit(RUN_ID, {
+      kind: 'native-agent-status',
+      nativeAgentKey: 'task-1',
+      status: 'completed',
+    }, { deliveryId: 'native-agent-status-1', destination: 'session' });
+    fixture.backend.emit(RUN_ID, {
+      kind: 'native-agent-status',
+      nativeAgentKey: 'task-1',
+      status: 'closed',
+    }, { deliveryId: 'native-agent-closed-1', destination: 'session' });
+    await settle(fixture.registry);
+
+    const durable = await currentRecord(fixture.repositories.runs.read(RUN_ID));
+    expect(durable.payload).toMatchObject({
+      lastSequence: 5,
+      nativeAgentEvidence: [{
+        nativeAgentKey: 'task-1',
+        resultRef: RESULT,
+        status: 'completed',
+        activities: ['wait-observed'],
+      }],
+    });
+  });
+
+  it('accepts detached native-agent evidence after the immutable parent terminal', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, {
+      kind: 'native-agent-observed',
+      nativeAgentKey: 'detached-task',
+      attachment: 'detached',
+    }, { deliveryId: 'detached-observed', destination: 'session' });
+    await settle(fixture.registry);
+    fixture.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    }, { deliveryId: 'parent-terminal', destination: 'session' });
+    await settle(fixture.registry);
+
+    fixture.backend.emit(RUN_ID, {
+      kind: 'native-agent-result',
+      nativeAgentKey: 'detached-task',
+      result: RESULT,
+    }, { deliveryId: 'detached-result', destination: 'session' });
+    fixture.backend.emit(RUN_ID, {
+      kind: 'native-agent-status',
+      nativeAgentKey: 'detached-task',
+      status: 'completed',
+    }, { deliveryId: 'detached-terminal', destination: 'session' });
+    await settle(fixture.registry);
+
+    expect(fixture.registry.getRun(RUN_ID)).toMatchObject({
+      state: 'succeeded',
+      terminal: { kind: 'succeeded', reason: 'completed' },
+      nativeAgentEvidence: [{
+        nativeAgentKey: 'detached-task',
+        attachment: 'detached',
+        resultRef: RESULT,
+        status: 'completed',
+      }],
+    });
+  });
+
+  it('preserves first native-agent hierarchy and result evidence across conflicts', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, {
+      kind: 'native-agent-observed',
+      nativeAgentKey: 'task-immutable',
+      attachment: 'attached',
+    }, { deliveryId: 'immutable-observed', destination: 'session' });
+    fixture.backend.emit(RUN_ID, {
+      kind: 'native-agent-result',
+      nativeAgentKey: 'task-immutable',
+      result: RESULT,
+    }, { deliveryId: 'immutable-result', destination: 'session' });
+    await settle(fixture.registry);
+
+    fixture.backend.emit(RUN_ID, {
+      kind: 'native-agent-observed',
+      nativeAgentKey: 'task-immutable',
+      parentNativeAgentKey: 'different-parent',
+      attachment: 'detached',
+    }, { deliveryId: 'conflicting-hierarchy', destination: 'session' });
+    fixture.backend.emit(RUN_ID, {
+      kind: 'native-agent-result',
+      nativeAgentKey: 'task-immutable',
+      result: { resultId: 'different-result', storage: 'projection' },
+    }, { deliveryId: 'conflicting-result', destination: 'session' });
+    await settle(fixture.registry);
+
+    expect(fixture.registry.getRun(RUN_ID)?.nativeAgentEvidence).toEqual([{
+      nativeAgentKey: 'task-immutable',
+      attachment: 'attached',
+      resultRef: RESULT,
+      activities: [],
+      observedAt: expect.any(Number),
+      updatedAt: expect.any(Number),
+    }]);
   });
 
   it('accepts the identical delivery after persistence fails before an intent exists', async () => {
@@ -1180,6 +1326,10 @@ class GatedDurableStorage implements DurableStorage {
     return this.delegate.read(path);
   }
 
+  readBounded(path: string, maxBytes: number): Promise<string | null> {
+    return this.delegate.readBounded(path, maxBytes);
+  }
+
   writeAtomic(path: string, content: string): Promise<void> {
     return this.delegate.writeAtomic(path, content);
   }
@@ -1195,6 +1345,20 @@ class GatedDurableStorage implements DurableStorage {
       await this.released.promise;
     }
     return this.delegate.compareAndSwap(path, expectedContent, nextContent);
+  }
+
+  compareAndSwapBounded(
+    path: string,
+    expectedContent: string | null,
+    nextContent: string | null,
+    maxCurrentBytes: number,
+  ): Promise<boolean> {
+    return this.delegate.compareAndSwapBounded(
+      path,
+      expectedContent,
+      nextContent,
+      maxCurrentBytes,
+    );
   }
 
   remove(path: string): Promise<void> {

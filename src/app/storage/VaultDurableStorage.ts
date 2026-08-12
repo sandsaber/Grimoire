@@ -7,6 +7,7 @@ export interface AtomicTextFileAdapter {
   readonly coordinationKey: object;
   exists(path: string): Promise<boolean>;
   read(path: string): Promise<string>;
+  readBounded(path: string, maxBytes: number): Promise<string>;
   write(path: string, content: string): Promise<void>;
   rename(oldPath: string, newPath: string): Promise<void>;
   delete(path: string): Promise<void>;
@@ -38,6 +39,16 @@ export class VaultDurableStorage implements DurableStorage {
     });
   }
 
+  readBounded(path: string, maxBytes: number): Promise<string | null> {
+    requireByteLimit(maxBytes);
+    return this.enqueue(path, async () => {
+      await this.recover(path);
+      return await this.adapter.exists(path)
+        ? this.adapter.readBounded(path, maxBytes)
+        : null;
+    });
+  }
+
   writeAtomic(path: string, content: string): Promise<void> {
     return this.enqueue(path, async () => {
       await this.recover(path);
@@ -58,6 +69,28 @@ export class VaultDurableStorage implements DurableStorage {
       if (current !== expectedContent) {
         return false;
       }
+      if (nextContent === null) {
+        await this.removeUnlocked(path);
+      } else {
+        await this.writeAtomicUnlocked(path, nextContent);
+      }
+      return true;
+    });
+  }
+
+  compareAndSwapBounded(
+    path: string,
+    expectedContent: string | null,
+    nextContent: string | null,
+    maxCurrentBytes: number,
+  ): Promise<boolean> {
+    requireByteLimit(maxCurrentBytes);
+    return this.enqueue(path, async () => {
+      await this.recover(path);
+      const current = await this.adapter.exists(path)
+        ? await this.adapter.readBounded(path, maxCurrentBytes)
+        : null;
+      if (current !== expectedContent) return false;
       if (nextContent === null) {
         await this.removeUnlocked(path);
       } else {
@@ -136,6 +169,12 @@ export class VaultDurableStorage implements DurableStorage {
         this.queues.delete(path);
       }
     });
+  }
+}
+
+function requireByteLimit(value: number): void {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new Error('Durable storage byte limit must be a positive safe integer.');
   }
 }
 

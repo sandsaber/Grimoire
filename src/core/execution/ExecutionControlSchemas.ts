@@ -12,6 +12,7 @@ import type {
   ExecutionReconciliationRecord,
   ExecutionRunRecord,
   ExecutionSessionRecord,
+  NativeAgentEvidenceRecord,
   ReconciliationEvidenceRecord,
   SettingsTransitionRecord,
   ShutdownCheckpointRecord,
@@ -134,6 +135,7 @@ export const executionRunRecordSchema: RecordSchema<ExecutionRunRecord> = {
       'nativeRunRef',
       'terminal',
       'openInteractionIds',
+      'nativeAgentEvidence',
       'lastSequence',
       'createdAt',
       'updatedAt',
@@ -169,6 +171,9 @@ export const executionRunRecordSchema: RecordSchema<ExecutionRunRecord> = {
       'ix',
       'interaction ids',
     );
+    const nativeAgentEvidence = record.nativeAgentEvidence === undefined
+      ? undefined
+      : decodeNativeAgentEvidence(record.nativeAgentEvidence);
     requireNonNegativeInteger(record.lastSequence, 'last sequence');
     requireTimestamp(record.createdAt, 'createdAt');
     requireTimestamp(record.updatedAt, 'updatedAt');
@@ -184,12 +189,92 @@ export const executionRunRecordSchema: RecordSchema<ExecutionRunRecord> = {
       ...(nativeRunRef ? { nativeRunRef } : {}),
       ...(terminal ? { terminal } : {}),
       openInteractionIds,
+      ...(nativeAgentEvidence ? { nativeAgentEvidence } : {}),
       lastSequence: record.lastSequence,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     };
   },
 };
+
+function decodeNativeAgentEvidence(value: unknown): NativeAgentEvidenceRecord[] {
+  if (!Array.isArray(value) || value.length > 512) {
+    throw new Error('Native agent evidence must be an array with at most 512 entries.');
+  }
+  const seen = new Set<string>();
+  return value.map((entry, index) => {
+    const record = exactRecord(entry, [
+      'nativeAgentKey',
+      'parentNativeAgentKey',
+      'attachment',
+      'resultRef',
+      'status',
+      'activities',
+      'observedAt',
+      'updatedAt',
+    ], `native agent evidence ${index}`);
+    requireIdentifier(record.nativeAgentKey, 'native agent key');
+    const nativeAgentKey = record.nativeAgentKey;
+    if (seen.has(nativeAgentKey)) throw new Error('Native agent evidence keys must be unique.');
+    seen.add(nativeAgentKey);
+    const parentNativeAgentKey = optionalIdentifier(
+      record.parentNativeAgentKey,
+      'parent native agent key',
+    );
+    if (parentNativeAgentKey === nativeAgentKey) {
+      throw new Error('Native agent evidence cannot parent itself.');
+    }
+    if (!isOneOf(record.attachment, ['attached', 'detached'])) {
+      throw new Error('Native agent attachment policy is invalid.');
+    }
+    const attachment = record.attachment;
+    const resultRef = record.resultRef === undefined
+      ? undefined
+      : decodeResultRef(record.resultRef);
+    const status = record.status === undefined
+      ? undefined
+      : isOneOf(record.status, ['running', 'waiting', 'completed', 'failed', 'closed'])
+        ? record.status
+        : undefined;
+    if (record.status !== undefined && status === undefined) {
+      throw new Error('Native agent status is invalid.');
+    }
+    if (!Array.isArray(record.activities)) {
+      throw new Error('Native agent activities must be unique supported values.');
+    }
+    const activities = record.activities.map(activity => {
+      if (!isOneOf(activity, [
+        'input-sent',
+        'wait-observed',
+        'resume-observed',
+        'close-observed',
+      ])) {
+        throw new Error('Native agent activities must be unique supported values.');
+      }
+      return activity;
+    });
+    if (new Set(activities).size !== activities.length) {
+      throw new Error('Native agent activities must be unique supported values.');
+    }
+    requireTimestamp(record.observedAt, 'native agent observedAt');
+    requireTimestamp(record.updatedAt, 'native agent updatedAt');
+    const observedAt = record.observedAt;
+    const updatedAt = record.updatedAt;
+    if (updatedAt < observedAt) {
+      throw new Error('Native agent evidence cannot update before observation.');
+    }
+    return {
+      nativeAgentKey,
+      ...(parentNativeAgentKey ? { parentNativeAgentKey } : {}),
+      attachment,
+      ...(resultRef ? { resultRef } : {}),
+      ...(status ? { status } : {}),
+      activities,
+      observedAt,
+      updatedAt,
+    };
+  });
+}
 
 export const executionInteractionRecordSchema: RecordSchema<ExecutionInteractionRecord> = {
   currentVersion: 1,

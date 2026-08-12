@@ -231,9 +231,11 @@ interface NativeTaskOwner {
   readonly parentTaskId?: string;
   readonly terminalNotification: Promise<'completed' | 'failed' | 'stopped'>;
   readonly resolveTerminalNotification: (status: 'completed' | 'failed' | 'stopped') => void;
-  cancellationTask?: Promise<void>;
+  cancellationTask?: Promise<NativeTaskTerminalStatus>;
   terminal: boolean;
 }
+
+type NativeTaskTerminalStatus = 'completed' | 'failed' | 'stopped';
 
 interface NativeTaskFinalization {
   readonly abort: AbortController;
@@ -404,7 +406,7 @@ ExecutionRecoveryPort {
   async cancelNativeTask(input: {
     readonly executionSessionId: string;
     readonly taskId: string;
-  }): Promise<void> {
+  }): Promise<NativeTaskTerminalStatus> {
     if (this.disposing) {
       throw new Error('Claude execution backend is disposing.');
     }
@@ -412,7 +414,7 @@ ExecutionRecoveryPort {
     if (!session) {
       throw new Error('Claude execution session is not active.');
     }
-    await session.stopNativeTask(input.taskId);
+    return session.stopNativeTask(input.taskId);
   }
 
   dispose(): Promise<void> {
@@ -765,7 +767,7 @@ class ClaudeExecutionSession implements ExecutionSession {
     }
   }
 
-  async stopNativeTask(taskId: string): Promise<void> {
+  async stopNativeTask(taskId: string): Promise<NativeTaskTerminalStatus> {
     requireNativeId(taskId, 'Claude native task id');
     const owner = this.tasks.get(taskId);
     if (!owner || owner.terminal || !this.liveTaskIds.has(taskId)) {
@@ -779,7 +781,9 @@ class ClaudeExecutionSession implements ExecutionSession {
     return task;
   }
 
-  private async requestNativeTaskCancellation(owner: NativeTaskOwner): Promise<void> {
+  private async requestNativeTaskCancellation(
+    owner: NativeTaskOwner,
+  ): Promise<NativeTaskTerminalStatus> {
     const query = this.query;
     if (!query) {
       throw new Error('Claude persistent query is not active.');
@@ -800,6 +804,9 @@ class ClaudeExecutionSession implements ExecutionSession {
     if (!terminalStatus) {
       throw new Error('Claude native task terminal notification timed out.');
     }
+    const finalization = this.taskFinalizations.get(owner.taskId)?.task;
+    if (finalization) await finalization;
+    return terminalStatus;
   }
 
   async reconcileRun(run: ClaudeExecutionRun): Promise<ClaudeReconciliationEvidence> {
@@ -1227,6 +1234,7 @@ class ClaudeExecutionSession implements ExecutionSession {
       kind: 'native-agent-observed',
       nativeAgentKey: message.task_id,
       ...(parentTaskId ? { parentNativeAgentKey: parentTaskId } : {}),
+      attachment: 'attached',
     });
     this.emitTask(owner, {
       kind: 'native-agent-status',

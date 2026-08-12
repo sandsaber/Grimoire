@@ -68,12 +68,14 @@ export interface AdoptNativeAgentCommand {
   readonly providerId: ProviderId;
   readonly definition: AgentDefinitionSnapshot;
   readonly rootOwner: ExecutionOwner;
-  readonly parentAgentInstanceId: AgentInstanceId;
-  readonly parentAgentRunId: AgentRunId;
+  readonly parentAgentInstanceId?: AgentInstanceId;
+  readonly parentAgentRunId?: AgentRunId;
   readonly attachment: AgentAttachmentPolicy;
   readonly observation: Exclude<AgentObservationFidelity, 'opaque' | 'none'>;
   readonly nativeAgentRef: string;
   readonly goalRef: string;
+  readonly executionSessionId?: AgentRunRecord['executionSessionId'];
+  readonly executionRunId?: AgentRunRecord['executionRunId'];
   readonly policyInputs: AgentDispatchPolicyInputs;
   readonly work?: {
     readonly workGraphRef: string;
@@ -318,6 +320,10 @@ export class AgentCoordinator {
 
   async adoptNativeAgent(command: AdoptNativeAgentCommand): Promise<AgentInstanceRecord> {
     requireDistinctTransactionIds([command.transactionId, command.terminalTransactionId]);
+    if ((command.parentAgentInstanceId === undefined)
+      !== (command.parentAgentRunId === undefined)) {
+      throw new Error('Native agent parent instance and attempt must be present together.');
+    }
     const instanceId = adoptedAgentInstanceId(command.adoptionKey);
     const instance = await this.enqueueTopology(() => this.enqueue(instanceId, async () => {
       const parent = await this.requireParent(
@@ -326,16 +332,24 @@ export class AgentCoordinator {
         true,
         true,
       );
-      const parentRun = await this.requireParentRun(parent!, command.parentAgentRunId);
+      const parentRun = parent
+        ? await this.requireParentRun(parent, command.parentAgentRunId)
+        : undefined;
       requireNewWorkOwner(command.rootOwner, command.work);
+      const policy = await this.resolveCommandPolicy(
+        command.policyInputs,
+        parentRun ? [effectivePolicyBoundary(parentRun.policy)] : [],
+      );
       const existing = await this.repositories.instances.read(instanceId);
       if (existing.kind === 'current' || existing.kind === 'migrated') {
-        requireMatchingAdoption(existing.record.payload, command);
+        const run = await requireCurrent(this.repositories.runs.read(command.agentRunId));
+        requireMatchingAdoption(existing.record.payload, run.payload, command, policy);
         return existing.record.payload;
       }
       if (existing.kind !== 'absent') await requireCurrent(Promise.resolve(existing));
       const timestamp = this.now();
       const inheritsCancellation = command.attachment === 'attached'
+        && parentRun !== undefined
         && hasCancellationCascade(parentRun);
       const instance: AgentInstanceRecord = {
         agentInstanceId: instanceId,
@@ -344,8 +358,10 @@ export class AgentCoordinator {
         executionMode: 'provider-native',
         origin: 'observed-native',
         rootOwner: command.rootOwner,
-        parentAgentInstanceId: command.parentAgentInstanceId,
-        parentAgentRunId: command.parentAgentRunId,
+        ...(command.parentAgentInstanceId
+          ? { parentAgentInstanceId: command.parentAgentInstanceId }
+          : {}),
+        ...(command.parentAgentRunId ? { parentAgentRunId: command.parentAgentRunId } : {}),
         attachment: command.attachment,
         observation: command.observation,
         nativeAdoptionKey: command.adoptionKey,
@@ -360,13 +376,14 @@ export class AgentCoordinator {
         agentInstanceId: instanceId,
         attempt: 1,
         goalRef: command.goalRef,
-        policy: await this.resolveCommandPolicy(
-          command.policyInputs,
-          [effectivePolicyBoundary(parentRun.policy)],
-        ),
+        policy,
         terminalTransactionId: command.terminalTransactionId,
         ...(command.work ?? {}),
         nativeAgentRef: command.nativeAgentRef,
+        ...(command.executionSessionId
+          ? { executionSessionId: command.executionSessionId }
+          : {}),
+        ...(command.executionRunId ? { executionRunId: command.executionRunId } : {}),
         state: inheritsCancellation ? 'cancelling' : 'running',
         resultIds: [],
         observedResultIds: [],
@@ -381,6 +398,50 @@ export class AgentCoordinator {
     }));
     this.notify([instance.agentInstanceId], [command.agentRunId]);
     return instance;
+  }
+
+  async completeRun(
+    agentRunId: AgentRunId,
+    status: AgentTerminalStatus,
+    reason: RunTerminalReason,
+  ): Promise<AgentRunRecord> {
+    const snapshot = await requireCurrent(this.repositories.runs.read(agentRunId));
+    const completed = await this.enqueue(snapshot.payload.agentInstanceId, async () => {
+      const current = await requireCurrent(this.repositories.runs.read(agentRunId));
+      if (current.payload.terminal) {
+        if (current.payload.terminal.kind !== status
+          || current.payload.terminal.reason !== reason) {
+          throw new Error('Agent run already has another immutable terminal outcome.');
+        }
+        return current.payload;
+      }
+      return this.terminalizeRun(current, status, reason);
+    });
+    this.notify([completed.agentInstanceId], [completed.agentRunId]);
+    return completed;
+  }
+
+  async updateRunState(
+    agentRunId: AgentRunId,
+    state: 'running' | 'waiting' | 'cancelling',
+  ): Promise<AgentRunRecord> {
+    const snapshot = await requireCurrent(this.repositories.runs.read(agentRunId));
+    const updated = await this.enqueue(snapshot.payload.agentInstanceId, async () => {
+      const current = await requireCurrent(this.repositories.runs.read(agentRunId));
+      if (current.payload.terminal || current.payload.state === state) return current.payload;
+      if (current.payload.state !== 'running'
+        && current.payload.state !== 'waiting'
+        && current.payload.state !== 'cancelling') {
+        throw new Error('Agent run cannot accept provider activity in its current state.');
+      }
+      return (await this.repositories.runs.update(
+        current.recordId,
+        current.revision,
+        record => ({ ...record, state, updatedAt: this.now() }),
+      )).payload;
+    });
+    this.notify([updated.agentInstanceId], [updated.agentRunId]);
+    return updated;
   }
 
   async recoverPendingDispatches(port: AgentDispatchRecoveryPort): Promise<AgentRunRecord[]> {
@@ -399,11 +460,18 @@ export class AgentCoordinator {
         const currentRun = await requireCurrent(
           this.repositories.runs.read(currentIntent.payload.agentRunId),
         );
-        return { intent: currentIntent.payload, run: currentRun.payload };
+        const instance = await requireCurrent(
+          this.repositories.instances.read(currentRun.payload.agentInstanceId),
+        );
+        return {
+          intent: currentIntent.payload,
+          instance: instance.payload,
+          run: currentRun.payload,
+        };
       });
       if (!snapshot) continue;
       const evidence = await this.resolveControlWithinDeadline(
-        () => port.reconcile(snapshot.intent),
+        () => port.reconcile(snapshot),
         { kind: 'unknown' as const, effectsPossible: true },
       );
       const settled = await this.enqueue(snapshot.run.agentInstanceId, async () => {
@@ -1226,7 +1294,9 @@ async function requireCurrent<T>(
 
 function requireMatchingAdoption(
   existing: AgentInstanceRecord,
+  run: AgentRunRecord,
   command: AdoptNativeAgentCommand,
+  policy: AgentRunRecord['policy'],
 ): void {
   if (existing.nativeAdoptionKey !== command.adoptionKey
     || existing.nativeAgentRef !== command.nativeAgentRef
@@ -1240,7 +1310,20 @@ function requireMatchingAdoption(
     || existing.runIds.length !== 1
     || existing.runIds[0] !== command.agentRunId
     || stableSerialize(existing.rootOwner) !== stableSerialize(command.rootOwner)
-    || stableSerialize(existing.definition) !== stableSerialize(command.definition)) {
+    || stableSerialize(existing.definition) !== stableSerialize(command.definition)
+    || run.agentRunId !== command.agentRunId
+    || run.agentInstanceId !== existing.agentInstanceId
+    || run.attempt !== 1
+    || run.goalRef !== command.goalRef
+    || run.terminalTransactionId !== command.terminalTransactionId
+    || run.nativeAgentRef !== command.nativeAgentRef
+    || run.executionSessionId !== command.executionSessionId
+    || run.executionRunId !== command.executionRunId
+    || run.workGraphRef !== command.work?.workGraphRef
+    || run.workGraphExecutionRef !== command.work?.workGraphExecutionRef
+    || run.workNodeRef !== command.work?.workNodeRef
+    || stableSerialize(run.inputResultIds) !== stableSerialize(command.work?.inputResultIds)
+    || stableSerialize(run.policy) !== stableSerialize(policy)) {
     throw new Error('Native agent adoption key conflicts with an existing instance.');
   }
 }

@@ -38,6 +38,12 @@ class SharedAtomicTextAdapter implements AtomicTextFileAdapter {
     return value;
   }
 
+  async readBounded(path: string, maxBytes: number): Promise<string> {
+    const value = await this.read(path);
+    if (Buffer.byteLength(value, 'utf8') > maxBytes) throw new Error('oversize');
+    return value;
+  }
+
   async write(path: string, content: string): Promise<void> {
     this.files.set(path, content);
   }

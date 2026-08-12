@@ -34,8 +34,20 @@ export interface ExecutionRunRecord {
   nativeRunRef?: string;
   terminal?: RunTerminal;
   openInteractionIds: string[];
+  nativeAgentEvidence?: NativeAgentEvidenceRecord[];
   lastSequence: number;
   createdAt: number;
+  updatedAt: number;
+}
+
+export interface NativeAgentEvidenceRecord {
+  nativeAgentKey: string;
+  parentNativeAgentKey?: string;
+  attachment: 'attached' | 'detached';
+  resultRef?: ResultRef;
+  status?: 'running' | 'waiting' | 'completed' | 'failed' | 'closed';
+  activities: Array<'input-sent' | 'wait-observed' | 'resume-observed' | 'close-observed'>;
+  observedAt: number;
   updatedAt: number;
 }
 

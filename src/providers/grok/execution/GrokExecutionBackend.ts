@@ -1272,7 +1272,7 @@ class GrokExecutionRun implements ExecutionRun {
   private observeNativeAgent(nativeAgentKey: string): void {
     if (this.terminal || this.observedAgentKeys.has(nativeAgentKey)) return;
     this.observedAgentKeys.add(nativeAgentKey);
-    this.emit({ kind: 'native-agent-observed', nativeAgentKey });
+    this.emit({ kind: 'native-agent-observed', nativeAgentKey, attachment: 'attached' });
     this.emit({ kind: 'native-agent-status', nativeAgentKey, status: 'running' });
   }
 

@@ -695,6 +695,7 @@ describe('CodexExecutionBackend', () => {
           kind: 'native-agent-observed',
           nativeAgentKey: 'native-agent-7',
           parentNativeAgentKey: 'root-agent',
+          attachment: 'attached',
         },
       }),
       expect.objectContaining({

@@ -39,6 +39,7 @@ describe('ChatExecutionCoordinator', () => {
       kind: 'conversation',
       ownerId: 'conversation-1',
     })).toEqual([]);
+    expect(fixture.forgetRequest).toHaveBeenCalledWith('request-1');
   });
 
   it('does not dispatch after disposal wins a deferred user-message write', async () => {
@@ -62,6 +63,22 @@ describe('ChatExecutionCoordinator', () => {
     await waitUntil(async () => (
       (await currentConversation(fixture.repository, 'conversation-1')).payload.messages.length === 1
     ));
+    expect(fixture.registry.getSessionsForOwner({
+      kind: 'conversation',
+      ownerId: 'conversation-1',
+    })).toEqual([]);
+    expect(fixture.forgetRequest).toHaveBeenCalledWith('request-1');
+  });
+
+  it('forgets a broker request when command validation rejects before admission', async () => {
+    const fixture = await createFixture(false);
+
+    await expect(fixture.coordinator.submitTurn({
+      ...command(1, 'none'),
+      userMessage: { ...command(1, 'none').userMessage, role: 'assistant' },
+    })).rejects.toThrow('user message');
+
+    expect(fixture.forgetRequest).toHaveBeenCalledWith('request-1');
     expect(fixture.registry.getSessionsForOwner({
       kind: 'conversation',
       ownerId: 'conversation-1',
@@ -466,8 +483,10 @@ async function createFixture(gateCompletion: boolean, gateUpdate?: number) {
         `lease-${(++leaseOrdinal).toString(16).padStart(32, '0')}`,
       ),
       assistantMessageIdForRun: id => `assistant-${id}`,
+      requests: { forget: forgetRequest },
       now,
     });
+  const forgetRequest = jest.fn();
   const coordinator = createCoordinator();
   const restartLifecycle = async () => {
     const nextBackend = createBackend();
@@ -481,6 +500,7 @@ async function createFixture(gateCompletion: boolean, gateUpdate?: number) {
     backend,
     registry,
     coordinator,
+    forgetRequest,
     createCoordinator,
     restartLifecycle,
     failNextLease: () => { leaseFailures += 1; },

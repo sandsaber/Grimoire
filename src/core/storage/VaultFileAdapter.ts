@@ -7,11 +7,18 @@
 
 import type { App } from 'obsidian';
 
+export interface BoundedVaultTextReader {
+  readBounded(normalizedPath: string, maxBytes: number): Promise<string>;
+}
+
 export class VaultFileAdapter {
   readonly coordinationKey: object;
   private writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(private app: App) {
+  constructor(
+    private app: App,
+    private readonly boundedReader?: BoundedVaultTextReader,
+  ) {
     this.coordinationKey = app.vault.adapter;
   }
 
@@ -21,6 +28,16 @@ export class VaultFileAdapter {
 
   async read(path: string): Promise<string> {
     return this.app.vault.adapter.read(path);
+  }
+
+  async readBounded(path: string, maxBytes: number): Promise<string> {
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+      throw new Error('Vault read byte limit must be a positive safe integer.');
+    }
+    if (!this.boundedReader) {
+      throw new Error('Bounded vault reads are unavailable for this storage adapter.');
+    }
+    return this.boundedReader.readBounded(path, maxBytes);
   }
 
   async write(path: string, content: string): Promise<void> {

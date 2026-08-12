@@ -1106,6 +1106,7 @@ class CodexExecutionRun implements ExecutionRun {
           ...(readString(item.arguments?.parent_agent_id)
             ? { parentNativeAgentKey: readString(item.arguments?.parent_agent_id)! }
             : {}),
+          attachment: 'attached',
         });
         this.emit({ kind: 'native-agent-status', nativeAgentKey, status: 'running' });
       }

@@ -85,6 +85,10 @@ export interface ChatConversationPersistencePort {
   update: ConversationRepository['update'];
 }
 
+export interface ChatExecutionRequestPort {
+  forget(requestRef: string): void;
+}
+
 export interface SubmitChatTurnCommand {
   readonly commandId: string;
   readonly conversationId: string;
@@ -120,6 +124,7 @@ export interface ChatExecutionCoordinatorOptions {
   readonly nextRunId: () => RunId;
   readonly nextLeaseId: () => LifecycleLeaseId;
   readonly assistantMessageIdForRun: (runId: RunId) => string;
+  readonly requests?: ChatExecutionRequestPort;
   readonly now?: () => number;
   readonly maxConversationWriteAttempts?: number;
 }
@@ -163,6 +168,7 @@ export class ChatExecutionCoordinator {
   private readonly nextRunId: () => RunId;
   private readonly nextLeaseId: () => LifecycleLeaseId;
   private readonly assistantMessageIdForRun: (runId: RunId) => string;
+  private readonly requests?: ChatExecutionRequestPort;
   private readonly now: () => number;
   private readonly maxConversationWriteAttempts: number;
   private readonly entries = new Map<string, ConversationEntry>();
@@ -181,6 +187,7 @@ export class ChatExecutionCoordinator {
     this.nextRunId = options.nextRunId;
     this.nextLeaseId = options.nextLeaseId;
     this.assistantMessageIdForRun = options.assistantMessageIdForRun;
+    this.requests = options.requests;
     this.now = options.now ?? Date.now;
     this.maxConversationWriteAttempts = options.maxConversationWriteAttempts ?? 4;
     if (!Number.isSafeInteger(this.maxConversationWriteAttempts)
@@ -213,10 +220,17 @@ export class ChatExecutionCoordinator {
   }
 
   async submitTurn(command: SubmitChatTurnCommand): Promise<ChatTurnTicket> {
-    const admissionGeneration = this.beginAdmission();
-    validateTurnCommand(command);
-    const entry = await this.requireEntry(command.conversationId, admissionGeneration);
-    this.requireAdmission(admissionGeneration);
+    let admissionGeneration: number;
+    let entry: ConversationEntry;
+    try {
+      admissionGeneration = this.beginAdmission();
+      validateTurnCommand(command);
+      entry = await this.requireEntry(command.conversationId, admissionGeneration);
+      this.requireAdmission(admissionGeneration);
+    } catch (error) {
+      this.forgetRequest(command.requestRef);
+      throw error;
+    }
     const admission = entry.active || entry.queue.length > 0 ? 'queued' : 'started';
     const pending: PendingTurn = {
       command,
@@ -258,6 +272,17 @@ export class ChatExecutionCoordinator {
     await this.scheduleFinalization(entry, active, run);
   }
 
+  async waitForIdle(): Promise<void> {
+    while (true) {
+      const tasks: Promise<unknown>[] = [...this.loads.values()];
+      for (const entry of this.entries.values()) {
+        if (entry.active?.finalization) tasks.push(entry.active.finalization);
+      }
+      if (tasks.length === 0) return;
+      await Promise.allSettled(tasks);
+    }
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -270,12 +295,14 @@ export class ChatExecutionCoordinator {
           ? 'Chat execution coordinator detached while the durable turn continues.'
           : 'Chat execution coordinator was disposed before turn admission.');
         if (!active.started && !active.dispatching) {
+          this.forgetRequest(active.pending.command.requestRef);
           active.pending.started.reject(error);
           entry.active = undefined;
         }
         active.pending.completion.reject(error);
       }
       for (const pending of entry.queue) {
+        this.forgetRequest(pending.command.requestRef);
         const error = new Error('Chat execution coordinator was disposed before turn admission.');
         pending.started.reject(error);
         pending.completion.reject(error);
@@ -514,6 +541,7 @@ export class ChatExecutionCoordinator {
       }
       active.pending.started.reject(error);
       active.pending.completion.reject(error);
+      this.forgetRequest(command.requestRef);
       if (active.runId) this.runOwners.delete(active.runId);
       if (entry.active === active) entry.active = undefined;
       if (!this.disposed) this.startNext(entry);
@@ -789,6 +817,14 @@ export class ChatExecutionCoordinator {
   private requireAdmission(generation: number): void {
     if (this.disposed || generation !== this.admissionGeneration) {
       throw new Error('Chat execution coordinator was disposed before turn admission.');
+    }
+  }
+
+  private forgetRequest(requestRef: string): void {
+    try {
+      this.requests?.forget(requestRef);
+    } catch {
+      // Invalid command input must retain its original validation failure.
     }
   }
 }

@@ -1,5 +1,8 @@
 import type { VersionedRecord } from '../persistence/VersionedRecord';
-import { type ExecutionBackendId,executionBackendId } from './ExecutionBackendDescriptor';
+import {
+  type ExecutionBackendId,
+  executionBackendId,
+} from './ExecutionBackendDescriptor';
 import type {
   CancellationReason,
   ExecutionBackend,
@@ -22,6 +25,7 @@ import type {
   ExecutionReconciliationRecord,
   ExecutionRunRecord,
   ExecutionSessionRecord,
+  NativeAgentEvidenceRecord,
   SettingsTransitionRecord,
   ShutdownCheckpointRecord,
 } from './ExecutionControlRecords';
@@ -238,25 +242,35 @@ export class ExecutionLifecycleRegistry {
   }
 
   registerBackend(registration: BackendLifecycleRegistration): void {
+    this.registerBackends([registration]);
+  }
+
+  registerBackends(registrations: readonly BackendLifecycleRegistration[]): void {
     if (this.state !== 'initializing') {
       throw new Error('Execution backends must be registered before startup recovery.');
     }
-    const backendId = registration.backend.descriptor.backendId;
-    if (this.backends.has(backendId)) {
-      throw new Error(`Execution backend "${backendId}" is already registered.`);
+    const pending = new Map<ExecutionBackendId, BackendEntry>();
+    for (const registration of registrations) {
+      const backendId = registration.backend.descriptor.backendId;
+      if (this.backends.has(backendId) || pending.has(backendId)) {
+        throw new Error(`Execution backend "${backendId}" is already registered.`);
+      }
+      const generation = registration.initialGeneration ?? 1;
+      if (!Number.isSafeInteger(generation) || generation < 0) {
+        throw new Error('Initial backend generation must be a non-negative safe integer.');
+      }
+      pending.set(backendId, {
+        backend: registration.backend,
+        recovery: registration.recovery,
+        interactions: registration.interactions,
+        generation,
+        state: 'stable',
+        disposed: false,
+      });
     }
-    const generation = registration.initialGeneration ?? 1;
-    if (!Number.isSafeInteger(generation) || generation < 0) {
-      throw new Error('Initial backend generation must be a non-negative safe integer.');
+    for (const [backendId, entry] of pending) {
+      this.backends.set(backendId, entry);
     }
-    this.backends.set(backendId, {
-      backend: registration.backend,
-      recovery: registration.recovery,
-      interactions: registration.interactions,
-      generation,
-      state: 'stable',
-      disposed: false,
-    });
   }
 
   subscribe(listener: ExecutionLifecycleListener): () => void {
@@ -1367,7 +1381,7 @@ export class ExecutionLifecycleRegistry {
     if (!run) {
       return { kind: 'unknown-run' };
     }
-    if (run.record.terminal) {
+    if (run.record.terminal && !isNativeAgentEvidenceEvent(envelope.event)) {
       return { kind: 'ignored-post-terminal' };
     }
     const nativeRunRef = envelope.scope.kind === 'run'
@@ -2287,7 +2301,7 @@ function reduceRun(
   event: ExecutionEvent,
   occurredAt: number,
 ): ExecutionRunRecord | null {
-  if (record.terminal) {
+  if (record.terminal && !isNativeAgentEvidenceEvent(event)) {
     return null;
   }
   switch (event.kind) {
@@ -2340,9 +2354,102 @@ function reduceRun(
     case 'native-agent-observed':
     case 'native-agent-result':
     case 'native-agent-activity':
-    case 'native-agent-status':
-      return record;
+    case 'native-agent-status': {
+      const evidence = applyNativeAgentEvidence(
+        record.nativeAgentEvidence ?? [],
+        event,
+        occurredAt,
+      );
+      return evidence ? { ...record, nativeAgentEvidence: evidence } : null;
+    }
   }
+}
+
+function isNativeAgentEvidenceEvent(event: ExecutionEvent): event is Extract<ExecutionEvent, {
+  readonly kind:
+    | 'native-agent-observed'
+    | 'native-agent-result'
+    | 'native-agent-activity'
+    | 'native-agent-status';
+}> {
+  return event.kind === 'native-agent-observed'
+    || event.kind === 'native-agent-result'
+    || event.kind === 'native-agent-activity'
+    || event.kind === 'native-agent-status';
+}
+
+function applyNativeAgentEvidence(
+  current: NonNullable<ExecutionRunRecord['nativeAgentEvidence']>,
+  event: Extract<ExecutionEvent, {
+    readonly kind:
+      | 'native-agent-observed'
+      | 'native-agent-result'
+      | 'native-agent-activity'
+      | 'native-agent-status';
+  }>,
+  occurredAt: number,
+): NonNullable<ExecutionRunRecord['nativeAgentEvidence']> | null {
+  const index = current.findIndex(entry => entry.nativeAgentKey === event.nativeAgentKey);
+  const existing = current[index];
+  if (!existing && current.length >= 512) return null;
+  if (!existing && event.kind !== 'native-agent-observed') return null;
+  if (event.kind === 'native-agent-observed'
+    && existing
+    && existing.parentNativeAgentKey !== event.parentNativeAgentKey) {
+    return null;
+  }
+  if (event.kind === 'native-agent-observed'
+    && existing
+    && existing.attachment !== event.attachment) {
+    return null;
+  }
+  if (event.kind === 'native-agent-result'
+    && existing?.resultRef
+    && !sameResultRef(existing.resultRef, event.result)) {
+    return null;
+  }
+  if (event.kind === 'native-agent-status'
+    && existing?.status
+    && isNativeAgentTerminalStatus(existing.status)) {
+    return current;
+  }
+  const next = {
+    ...(existing ?? {
+      nativeAgentKey: event.nativeAgentKey,
+      attachment: event.kind === 'native-agent-observed' ? event.attachment : 'attached',
+      activities: [],
+      observedAt: occurredAt,
+      updatedAt: occurredAt,
+    }),
+    ...(event.kind === 'native-agent-observed' && event.parentNativeAgentKey
+      ? { parentNativeAgentKey: event.parentNativeAgentKey }
+      : {}),
+    ...(event.kind === 'native-agent-result' ? { resultRef: event.result } : {}),
+    ...(event.kind === 'native-agent-status' ? { status: event.status } : {}),
+    ...(event.kind === 'native-agent-activity'
+      ? {
+        activities: existing?.activities.includes(event.activity)
+          ? existing.activities
+          : [...(existing?.activities ?? []), event.activity],
+      }
+      : {}),
+    updatedAt: Math.max(existing?.updatedAt ?? occurredAt, occurredAt),
+  };
+  return index < 0
+    ? [...current, next]
+    : current.map((entry, candidate) => candidate === index ? next : entry);
+}
+
+function isNativeAgentTerminalStatus(
+  status: NonNullable<NativeAgentEvidenceRecord['status']>,
+): boolean {
+  return status === 'completed' || status === 'failed' || status === 'closed';
+}
+
+function sameResultRef(left: ResultRef, right: ResultRef): boolean {
+  return left.resultId === right.resultId
+    && left.storage === right.storage
+    && left.digest === right.digest;
 }
 
 function reduceTerminal(

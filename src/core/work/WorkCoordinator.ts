@@ -170,6 +170,18 @@ export class WorkCoordinator {
     return recovered;
   }
 
+  /**
+   * Settles durable lost-ack dispatches before execution-result materialization.
+   * The application runs its lifecycle-to-agent result bridge after this phase
+   * and only then permits active-run and DAG recovery.
+   */
+  async recoverDispatchBindings(
+    port: AgentDispatchRecoveryPort,
+  ): Promise<readonly AgentRunRecord[]> {
+    await this.agents.recoverResultLinks();
+    return this.agents.recoverPendingDispatches(port);
+  }
+
   /** Live bridge used by the application coordinator after any durable agent-run change. */
   async synchronizeAgentRun(run: AgentRunRecord): Promise<WorkGraphExecution | null> {
     if (!run.workGraphExecutionRef || !run.workNodeRef) return null;

@@ -57,6 +57,7 @@ export type ExecutionEvent =
     readonly kind: 'native-agent-observed';
     readonly nativeAgentKey: string;
     readonly parentNativeAgentKey?: string;
+    readonly attachment: 'attached' | 'detached';
   }
   | {
     readonly kind: 'native-agent-result';

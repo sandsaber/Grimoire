@@ -7,6 +7,14 @@ export class TestDurableStorage implements DurableStorage {
     return this.records.get(path) ?? null;
   }
 
+  async readBounded(path: string, maxBytes: number): Promise<string | null> {
+    const value = await this.read(path);
+    if (value !== null && Buffer.byteLength(value, 'utf8') > maxBytes) {
+      throw new Error('Durable value exceeds the byte limit.');
+    }
+    return value;
+  }
+
   async writeAtomic(path: string, content: string): Promise<void> {
     this.records.set(path, content);
   }
@@ -25,6 +33,16 @@ export class TestDurableStorage implements DurableStorage {
       this.records.set(path, nextContent);
     }
     return true;
+  }
+
+  async compareAndSwapBounded(
+    path: string,
+    expectedContent: string | null,
+    nextContent: string | null,
+    maxCurrentBytes: number,
+  ): Promise<boolean> {
+    await this.readBounded(path, maxCurrentBytes);
+    return this.compareAndSwap(path, expectedContent, nextContent);
   }
 
   async remove(path: string): Promise<void> {

@@ -1,4 +1,8 @@
-import type { ProviderModule } from '@/core/providers/ProviderModule';
+import type {
+  ProviderModule,
+  ProviderNativeAgentCancellationOutcome,
+  ProviderNativeAgentControlPort,
+} from '@/core/providers/ProviderModule';
 
 import {
   CLAUDE_EXECUTION_DESCRIPTOR,
@@ -62,12 +66,7 @@ export interface ClaudeRewindPort {
   ): Promise<ClaudeRewindResult>;
 }
 
-export interface ClaudeNativeAgentControlPort {
-  cancel(
-    backend: ClaudeExecutionBackend,
-    input: { readonly executionSessionId: string; readonly taskId: string },
-  ): Promise<void>;
-}
+export type ClaudeNativeAgentControlPort = ProviderNativeAgentControlPort;
 
 export const claudeConfiguredModelsPort: ClaudeConfiguredModelsPort = Object.freeze({
   list(settings: ClaudeProviderSettings) {
@@ -98,10 +97,16 @@ export const claudeRewindPort: ClaudeRewindPort = Object.freeze({
 });
 
 export const claudeNativeAgentControlPort: ClaudeNativeAgentControlPort = Object.freeze({
-  cancel: (
-    backend: ClaudeExecutionBackend,
+  cancel: async (
+    backend: unknown,
     input: { readonly executionSessionId: string; readonly taskId: string },
-  ) => backend.cancelNativeTask(input),
+  ): Promise<ProviderNativeAgentCancellationOutcome> => {
+    if (!(backend instanceof ClaudeExecutionBackend)) {
+      throw new Error('Claude native agent control requires a Claude execution backend.');
+    }
+    const status = await backend.cancelNativeTask(input);
+    return { kind: 'terminal', status };
+  },
 });
 
 export const claudeProviderModule: ProviderModule<
