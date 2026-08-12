@@ -1,6 +1,6 @@
 # Full Execution Architecture Migration Plan
 
-Status: approved implementation plan; implementation is in progress through Phase 4D.
+Status: approved implementation plan; implementation is complete through Phase 8.
 
 Checkpoint status and verification evidence are recorded in
 [`provider-execution-migration-progress.md`](provider-execution-migration-progress.md).

@@ -28,7 +28,7 @@ this file records what has actually landed and what remains open.
 | Phase 5 — remaining provider modules/backends | Complete | MiMoCode/Kimi Code `6c4700cf`; Grok `104c88dd`; Qwen `d5042ec5`; Gemini `593b38d0`; immutable catalog `d1a41736` |
 | Phase 6 — durable agents and work graphs | Complete | `63320547` |
 | Phase 7 — application runtime and auxiliary work | Complete | chat projections `8cab81b4`; agent work UI `634dc4bb`; execution owners `4ebbd5fa` |
-| Phase 8 — catalog and provider-neutral feature ports | Complete | this checkpoint |
+| Phase 8 — catalog and provider-neutral feature ports | Complete | `91af3577` |
 | Phase 9 — production cutover | Pending | — |
 | Phase 10 — legacy deletion | Pending | — |
 | Phase 11 — hardening and migration evidence | Pending | — |
