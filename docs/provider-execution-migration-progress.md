@@ -29,7 +29,7 @@ this file records what has actually landed and what remains open.
 | Phase 6 — durable agents and work graphs | Complete | `63320547` |
 | Phase 7 — application runtime and auxiliary work | Complete | chat projections `8cab81b4`; agent work UI `634dc4bb`; execution owners `4ebbd5fa` |
 | Phase 8 — catalog and provider-neutral feature ports | Complete | `91af3577` |
-| Phase 9 — production cutover | Pending | — |
+| Phase 9 — production cutover | In progress | foundation `0da2104b` |
 | Phase 10 — legacy deletion | Pending | — |
 | Phase 11 — hardening and migration evidence | Pending | — |
 
@@ -617,7 +617,102 @@ cleanup, and disposal ownership fencing.
   `styles.css` `c079364c4f85717134955ce46b4c8a20ccfe403b4d1531675fa1a433e23c13eb`,
   and `manifest.json` `5058df46417fc0ec4debcc9eda1552c2fda654904132ab20b90d2bb1cbc63758`.
 
+## Phase 9 production cutover — current work
+
+Completed in the Phase 9 foundation checkpoint `0da2104b`:
+
+- Added the single `ApplicationRuntime` admission and lifecycle boundary. Startup runs migration,
+  complete backend preparation, lifecycle recovery, pending settings recovery, local-shell and
+  auxiliary recovery, and work-graph recovery before accepting any command.
+- Added unload joining during startup. A shutdown request closes admission immediately, waits for
+  the in-flight recovery sequence without opening the gate, then performs lifecycle classification,
+  coordinator draining, projection detachment, backend cleanup, and workspace disposal in order.
+- Added an atomic provider-backend bootstrap. It prepares the complete catalog before registering
+  any backend, validates module/backend descriptor identity, exposes recovery and interaction ports
+  structurally, preserves the active backend generation, and disposes partially prepared backends
+  in reverse order on failure. Backend construction remains process-free; provider CLIs and SDK
+  sessions are still initialized lazily on first execution.
+- Added application-domain durable result storage with deterministic SHA-256 identity, bounded
+  UTF-8 output, worst-case JSON escape accounting, overflow-safe bounds, abort-aware idempotent CAS,
+  and digest-bound materialization. Projection results without the immutable reference digest fail
+  closed; raw provider identities are never used as paths. Desktop vault reads use a capped
+  file-descriptor buffer and stable file identity on macOS, Linux, and Windows. Vault adapters that
+  cannot provide a genuinely capped read fail closed instead of allocating through an unbounded
+  whole-file API.
+- Added a capacity-bounded, process-only execution request store for prompts, launch specifications,
+  environment values, and other sensitive one-shot inputs. Both individual payloads and aggregate
+  retained bytes are bounded; opaque object graphs, accessors, custom array prototypes, and
+  noncanonical array properties are rejected before caller-owned code can execute. Immutable
+  descriptor-based snapshots preserve sparse arrays and own data keys such as `__proto__` without
+  prototype mutation. Chat pre-dispatch rejection and queued disposal forget unconsumed references,
+  and `ApplicationRuntime` clears the store during every shutdown or failed-start cleanup. Durable
+  lifecycle records retain only an opaque request reference.
+- Added coordinator idle draining needed to keep chat result persistence subscribed until lifecycle
+  shutdown has classified every accepted run.
+- Added the application agent dispatch and recovery bridge. Grimoire-managed agents use durable
+  dispatch-token-derived execution identities, do not redispatch after a lost acknowledgement, and
+  reuse ordinary lifecycle sessions. Provider-native cancellation targets a native task only when
+  that backend exposes a task-level control; it never cancels the parent run as a substitute.
+- Added an atomic native-agent evidence ledger to execution-run records. Stable identity, hierarchy,
+  attachment policy, activity, terminal status, and result references are committed in the same CAS
+  transaction as provider event acceptance, including late evidence after the immutable parent
+  terminal. Result bodies remain in bounded result storage rather than control records.
+- Added restart-safe native-agent materialization into durable agent instances, attempts, results,
+  work nodes, and UI projections. Root provider-native agents attach directly to the conversation or
+  work owner; nested agents bind to the exact parent attempt; attachment policy is declared by the
+  provider event rather than inferred by the application. Adoption replay validates execution,
+  policy, and work ownership before accepting the same native identity.
+- Added explicit startup recovery phases for lost dispatch acknowledgements: durable dispatch
+  identities are rebound first, lifecycle results are materialized into the newly bound agent
+  attempt second, and only then may active-run and work-graph recovery schedule or finalize nodes.
+  A restart regression covers a provider-accepted terminal result while the durable dispatch intent
+  still says `dispatching` and has no execution identity.
+- Made native-agent projection failures retryable per execution run. A transient child-before-parent
+  snapshot or result-store conflict no longer poisons future recovery for that run or unrelated
+  runs. Attached native children under cancelled/interrupted managed or root attempts fail closed as
+  indeterminate unless authoritative child terminal evidence is available; they are never silently
+  left active after shutdown recovery.
+- Captured provider profile identity synchronously when lifecycle notifications enter the native-
+  agent bridge. Registry shutdown may remove the live session only after that capture; queued
+  terminal result and attached-child evidence still materializes after a slower preceding update.
+- Native task cancellation is reached only through the positively declared provider feature port
+  and exact capability descriptor. The port returns the authoritative provider terminal status and
+  waits for result commit, lifecycle ingestion, and agent materialization before cancellation
+  arbitration. Provider completion can therefore win a concurrent cancel without losing its result.
+
+Current focused evidence: 23 architecture, application-runtime, agent, lifecycle, result, storage,
+work, chat, and provider suites / 293 tests pass with typecheck, full ESLint, and
+`git diff --check`. The hard cutover is not yet complete: real provider context composition,
+projection-backed tabs, settings commands, internal execution surfaces, legacy-data migration, and
+the one-time `main.ts` switch remain open. Production still uses the old path until all of those
+items pass together.
+
+Current Phase 9 foundation broad gate: 515 unit suites / 7,805 tests and 7 integration suites / 222
+tests pass with typecheck, full ESLint, and `git diff --check`. The final adversarial request-memory
+gate passes 6 focused suites / 76 tests, and independent review approved the foundation with no
+remaining material blocker.
+
+The local-only Phase 9 foundation release gate also passes release metadata, Obsidian source/CSS/
+dependency review, production bundling, isolated bundle loading, and view-open smoke. Root and
+`dist/grimoire` artifacts are byte-identical: `main.js` SHA-256
+`86e64006509be603a41f5ffe79777dd29749e5c357cb3cfd4dd4de9daea4d7e9`, `styles.css`
+`c079364c4f85717134955ce46b4c8a20ccfe403b4d1531675fa1a433e23c13eb`, and `manifest.json`
+`5058df46417fc0ec4debcc9eda1552c2fda654904132ab20b90d2bb1cbc63758`. The configured external
+test-vault copy and manual matrix remain open for the final cutover because this environment did not
+grant the external-write operation.
+
+The Phase 9 application/runtime, durable-result, request-memory, native-agent, vault CAS, and real
+descriptor-read suites are included in the Ubuntu, macOS, and Windows execution matrix. The host
+test uses a real temporary file and exercises result store → vault CAS → capped descriptor read
+end-to-end.
+
 ## Next steps
 
-1. Implement the Phase 9 hard composition-root cutover with startup recovery completed before
-   command admission and the old production path stopped in one change.
+1. Compose all nine provider backend contexts from narrow application adapters and the ephemeral
+   request/presentation stores without importing a legacy runtime.
+2. Connect durable agent adoption, work dispatch, results, local shell, auxiliary execution, and
+   settings transitions to `ApplicationRuntime`.
+3. Replace tab/input/stream ownership with projection-backed presentation, migrate existing vault
+   conversations, and switch `main.ts` once all current user paths pass through the platform.
+4. Run the Phase 9 manual test-vault matrix and full cross-platform checkpoint gate before the
+   cutover commit.
