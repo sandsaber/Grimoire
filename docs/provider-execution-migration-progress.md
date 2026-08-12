@@ -26,8 +26,8 @@ this file records what has actually landed and what remains open.
 | Phase 4D — managed ACP/OpenCode topology | Complete | `cb631f53` |
 | Semantic freeze review | Complete | `892eec78` |
 | Phase 5 — remaining provider modules/backends | Complete | MiMoCode/Kimi Code `6c4700cf`; Grok `104c88dd`; Qwen `d5042ec5`; Gemini `593b38d0`; immutable catalog `d1a41736` |
-| Phase 6 — durable agents and work graphs | Complete | checkpoint commit |
-| Phase 7 — application runtime and auxiliary work | Pending | — |
+| Phase 6 — durable agents and work graphs | Complete | `63320547` |
+| Phase 7 — application runtime and auxiliary work | In progress | chat projections `8cab81b4`; agent work UI this checkpoint |
 | Phase 8 — catalog and provider-neutral feature ports | Pending | — |
 | Phase 9 — production cutover | Pending | — |
 | Phase 10 — legacy deletion | Pending | — |
@@ -376,6 +376,37 @@ The independent Phase 7A lifecycle and projection review is approved with no rem
 blocker. Its disposal/admission, record/event ordering, completion identity, metadata compatibility,
 and attachment-race findings are permanent regression tests in this checkpoint.
 
+## Phase 7B durable agent work UI
+
+- Added post-commit agent and work-coordinator feeds. Projection listeners receive only committed
+  agent identities and durable work-execution snapshots, cannot block lifecycle or scheduling, and
+  detach without changing execution ownership.
+- Added durable interaction revisions to lifecycle notifications and snapshots. Agent projections
+  order open, resolving, resolved, and cancelled interaction states by repository revision rather
+  than wall-clock timestamps, so two writes in the same millisecond cannot preserve a stale prompt.
+- Added pure provider-neutral agent and work reducers. They render hierarchy, all retry attempts,
+  policy-bounded provider fidelity, partial and final results, immutable original terminals, later
+  reconciled evidence, provenance, usage, artifacts, changed files, citations, child results,
+  missing result references, interactions, and available actions as distinct data.
+- Added standalone work-node projections for pending, blocked, failed, indeterminate, and synthesis
+  work even before an agent instance exists. Dependencies, blockers, dispatch-preparation failure,
+  assignment, synthesis inputs, available results, and missing result references remain visible.
+- Added a durable projection coordinator with one-flight initial hydration, change-sequence retry,
+  targeted agent refresh, full work/interaction refresh, and generation-fenced disposal. A commit
+  racing the first repository snapshot is reloaded, an absent/future/corrupt result remains visible
+  as a missing reference, and a user expansion made during an asynchronous refresh is preserved.
+- Added a fail-closed action adapter for cancel, retry, focus, result inspection, hierarchy
+  expansion, and exact declared interaction responses. Added a projection-only renderer that
+  publishes agent cards and standalone work nodes without lifecycle decisions.
+- Added the Phase 7B boundary, lifecycle, coordinator, reducer, action, and renderer suites to the
+  macOS, Linux, and Windows execution-contract matrix. Production composition still uses the old
+  path and is unchanged before the Phase 9 hard cutover.
+
+The independent Phase 7B review is approved with no remaining material blocker. Its controlled
+tests cover notification-during-hydration, expansion-during-refresh, missing results,
+equal-timestamp interaction revisions, work nodes without agent instances, and the separation of
+original and later reconciled work-node results.
+
 ## Verification evidence
 
 - Phase 4C checkpoint gate: 432 unit suites / 7,218 tests; 7 integration suites / 222 tests;
@@ -461,9 +492,21 @@ and attachment-race findings are permanent regression tests in this checkpoint.
   source/CSS/dependency review, isolated bundle-load smoke, view-open smoke, and `git diff --check`
   pass. The restricted full-unit attempt failed only at the existing home-directory temporary-path
   and loopback-bind tests; the same suites pass outside the sandbox.
+- Current Phase 7B focused gate: 10 lifecycle, agent/work, boundary, projection, coordinator,
+  action, renderer, and compatibility suites / 92 tests pass; typecheck, focused ESLint, and
+  `git diff --check` pass. The expanded cross-platform execution-contract selection passes 82
+  suites / 688 tests.
+- Final Phase 7B checkpoint gate: 493 unit suites / 7,663 tests and 7 integration suites / 222 tests
+  pass; typecheck, full ESLint, release build, Obsidian source/CSS/dependency review, isolated
+  bundle-load smoke, view-open smoke, and `git diff --check` pass. The release build required the
+  configured test-vault copy to run outside the restricted sandbox; the build itself and all
+  verification completed successfully.
+- Root, `dist/grimoire`, and configured test-vault copies remain byte-identical after the Phase 7B
+  release build: `main.js` SHA-256 `6bb79e0ce51a1e4616b42beac85deeab06b39f757494e33d2b4caf1a6519f9ef`,
+  `styles.css` `c079364c4f85717134955ce46b4c8a20ccfe403b4d1531675fa1a433e23c13eb`,
+  and `manifest.json` `5058df46417fc0ec4debcc9eda1552c2fda654904132ab20b90d2bb1cbc63758`.
 
 ## Next steps
 
-1. Implement Phase 7B agent, result, hierarchy, interaction, artifact, and work-card projections.
-2. Implement Phase 7C work-graph orchestration, local-shell projection, and isolated auxiliary-owner
+1. Implement Phase 7C work-graph orchestration, local-shell projection, and isolated auxiliary-owner
    routing while leaving production composition unchanged before the Phase 9 hard cutover.

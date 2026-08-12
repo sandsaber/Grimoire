@@ -31,6 +31,27 @@ const NODE_A = workNodeId(`wn-${'a'.repeat(32)}`);
 const NODE_B = workNodeId(`wn-${'b'.repeat(32)}`);
 
 describe('WorkCoordinator', () => {
+  it('publishes only a committed execution snapshot and isolates projection listeners', async () => {
+    const fixture = await createFixture();
+    const observed = jest.fn();
+    fixture.work.subscribe(observed);
+    fixture.work.subscribe(() => { throw new Error('projection listener failed'); });
+
+    const execution = await fixture.work.dispatchReady(
+      EXECUTION_ID,
+      fixture.factory,
+      { dispatch: async () => ({ kind: 'accepted' }) },
+    );
+
+    expect(observed).toHaveBeenCalledWith({
+      kind: 'execution-updated',
+      execution,
+    });
+    expect(execution.nodeStates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ workNodeId: NODE_A, state: 'running' }),
+    ]));
+  });
+
   it('projects live agent completion and dispatches a newly unblocked dependency', async () => {
     const fixture = await createFixture();
     const dispatch = jest.fn(async () => ({ kind: 'accepted' as const }));

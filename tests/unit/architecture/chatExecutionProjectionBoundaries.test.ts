@@ -34,7 +34,9 @@ describe('chat execution projection boundaries', () => {
 
   it('keeps projections independent from providers, Obsidian, and DOM rendering', () => {
     const paths = [
+      'features/chat/projections/AgentProjection.ts',
       'features/chat/projections/ChatProjection.ts',
+      'features/chat/rendering/AgentWorkCard.ts',
       'features/chat/rendering/ChatProjectionRenderer.ts',
     ];
     const forbiddenIdentifiers = new Set([
@@ -65,6 +67,8 @@ describe('chat execution projection boundaries', () => {
 
   it('keeps the parallel application path provider-neutral and process-free', () => {
     const paths = [
+      'features/chat/application/AgentProjectionCoordinator.ts',
+      'features/chat/application/AgentWorkCommandAdapter.ts',
       'features/chat/application/ChatExecutionCoordinator.ts',
       'features/chat/application/ChatInputCommandAdapter.ts',
       'features/chat/application/ChatProjectionAttachment.ts',

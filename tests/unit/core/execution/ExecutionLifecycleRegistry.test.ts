@@ -611,6 +611,41 @@ describe('ExecutionLifecycleRegistry', () => {
     })).rejects.toThrow('after its run is terminal');
   });
 
+  it('publishes and snapshots the durable interaction revision', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    const revisions: number[] = [];
+    fixture.registry.subscribe(notification => {
+      if (notification.kind === 'interaction-updated') revisions.push(notification.revision);
+    });
+    fixture.backend.emit(RUN_ID, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: INTERACTION_ID,
+        runId: RUN_ID,
+        kind: 'question',
+        presentationRef: 'question-revision',
+        responseIds: ['yes', 'no'],
+      },
+    });
+    await settle(fixture.registry);
+    await fixture.registry.resolveInteraction({
+      interactionId: INTERACTION_ID,
+      responseId: 'yes',
+      resolvedAt: 50,
+    });
+
+    expect(revisions).toEqual([1, 2, 3]);
+    expect(fixture.registry.getInteractionSnapshotsForRun(RUN_ID)).toEqual([{
+      record: expect.objectContaining({
+        interactionId: INTERACTION_ID,
+        status: 'resolved',
+        selectedResponseId: 'yes',
+      }),
+      revision: 3,
+    }]);
+  });
+
   it('recovers an interaction resolution through an idempotent resolving intent', async () => {
     const fixture = await startedFixture();
     await startDefaultRun(fixture);

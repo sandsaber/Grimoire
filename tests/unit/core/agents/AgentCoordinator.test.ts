@@ -38,6 +38,24 @@ const POLICY_INPUTS = {
 };
 
 describe('AgentCoordinator', () => {
+  it('publishes committed record identities and isolates projection listeners', async () => {
+    const coordinator = new AgentCoordinator(new TestDurableStorage(), {
+      now: monotonicClock(),
+    });
+    const observed = jest.fn();
+    coordinator.subscribe(observed);
+    coordinator.subscribe(() => { throw new Error('projection listener failed'); });
+
+    const prepared = await coordinator.prepareDispatch(rootCommand());
+
+    expect(observed).toHaveBeenCalledWith({
+      kind: 'records-changed',
+      agentInstanceIds: [prepared.agentInstanceId],
+      agentRunIds: [prepared.agentRunId],
+      agentResultIds: [],
+    });
+  });
+
   it('persists dispatch before side effects, records results, and preserves retry attempts', async () => {
     const storage = new TestDurableStorage();
     const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });

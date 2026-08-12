@@ -44,8 +44,16 @@ export interface WorkRecoveryPorts {
   readonly cancellationRecovery: AgentCancellationRecoveryPort;
 }
 
+export interface WorkCoordinatorNotification {
+  readonly kind: 'execution-updated';
+  readonly execution: Readonly<WorkGraphExecution>;
+}
+
+export type WorkCoordinatorListener = (notification: WorkCoordinatorNotification) => void;
+
 export class WorkCoordinator {
   private readonly executionQueues = new Map<string, Promise<void>>();
+  private readonly listeners = new Set<WorkCoordinatorListener>();
 
   constructor(
     readonly graphs: WorkGraphRepository,
@@ -53,12 +61,19 @@ export class WorkCoordinator {
     private readonly now: () => number = Date.now,
   ) {}
 
+  subscribe(listener: WorkCoordinatorListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
   async dispatchReady(
     executionId: string,
     factory: WorkNodeDispatchFactory,
     dispatchPort: AgentDispatchPort,
   ): Promise<WorkGraphExecution> {
-    return this.enqueueExecution(executionId, async () => {
+    const execution = await this.enqueueExecution(executionId, async () => {
     while (true) {
       let execution = await requireCurrent(this.graphs.readExecution(executionId));
       const graph = await requireCurrent(
@@ -119,6 +134,8 @@ export class WorkCoordinator {
       await this.syncNode(execution, nodeId, run);
     }
     });
+    this.notify(execution);
+    return execution;
   }
 
   async recoverAll(
@@ -137,22 +154,27 @@ export class WorkCoordinator {
           : this.synchronizePersistedExecution(execution);
       }));
     }
+    recovered.forEach(execution => this.notify(execution));
     return recovered;
   }
 
   /** Live bridge used by the application coordinator after any durable agent-run change. */
   async synchronizeAgentRun(run: AgentRunRecord): Promise<WorkGraphExecution | null> {
     if (!run.workGraphExecutionRef || !run.workNodeRef) return null;
-    return this.enqueueExecution(run.workGraphExecutionRef, () => (
+    const execution = await this.enqueueExecution(run.workGraphExecutionRef, () => (
       this.synchronizeAgentRunWithRetry(run)
     ));
+    this.notify(execution);
+    return execution;
   }
 
   async synchronizeExecution(executionId: string): Promise<WorkGraphExecution> {
-    return this.enqueueExecution(executionId, async () => {
+    const execution = await this.enqueueExecution(executionId, async () => {
       const execution = await requireCurrent(this.graphs.readExecution(executionId));
       return this.synchronizePersistedExecution(execution);
     });
+    this.notify(execution);
+    return execution;
   }
 
   private async synchronizeAgentRunWithRetry(run: AgentRunRecord): Promise<WorkGraphExecution> {
@@ -348,6 +370,20 @@ export class WorkCoordinator {
         this.executionQueues.delete(executionId);
       }
     });
+  }
+
+  private notify(execution: WorkGraphExecution): void {
+    const notification: WorkCoordinatorNotification = {
+      kind: 'execution-updated',
+      execution,
+    };
+    for (const listener of this.listeners) {
+      try {
+        listener(notification);
+      } catch {
+        // Durable scheduling cannot depend on a projection listener.
+      }
+    }
   }
 }
 

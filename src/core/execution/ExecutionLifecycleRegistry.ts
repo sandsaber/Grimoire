@@ -125,6 +125,7 @@ export type ExecutionLifecycleNotification =
   | {
     readonly kind: 'interaction-updated';
     readonly interaction: Readonly<ExecutionInteractionRecord>;
+    readonly revision: number;
   }
   | { readonly kind: 'envelope-accepted'; readonly envelope: ExecutionEventEnvelope }
   | {
@@ -136,6 +137,11 @@ export type ExecutionLifecycleListener = (notification: ExecutionLifecycleNotifi
 
 export interface ExecutionRunSnapshot {
   readonly record: Readonly<ExecutionRunRecord>;
+  readonly revision: number;
+}
+
+export interface ExecutionInteractionSnapshot {
+  readonly record: Readonly<ExecutionInteractionRecord>;
   readonly revision: number;
 }
 
@@ -593,6 +599,7 @@ export class ExecutionLifecycleRegistry {
         this.notify({
           kind: 'interaction-updated',
           interaction: currentInteraction.record,
+          revision: currentInteraction.revision,
         });
       }
     });
@@ -1008,6 +1015,13 @@ export class ExecutionLifecycleRegistry {
       .map(entry => entry.record)
       .filter(record => record.runId === runId)
       .sort((left, right) => left.createdAt - right.createdAt);
+  }
+
+  getInteractionSnapshotsForRun(runId: RunId): readonly ExecutionInteractionSnapshot[] {
+    return [...this.interactions.values()]
+      .filter(entry => entry.record.runId === runId)
+      .sort((left, right) => left.record.createdAt - right.record.createdAt)
+      .map(entry => ({ record: entry.record, revision: entry.revision }));
   }
 
   getReconciliationsForRun(runId: RunId): readonly Readonly<ExecutionReconciliationRecord>[] {
@@ -1814,7 +1828,11 @@ export class ExecutionLifecycleRegistry {
       );
       current.record = updated.payload;
       current.revision = updated.revision;
-      this.notify({ kind: 'interaction-updated', interaction: current.record });
+      this.notify({
+        kind: 'interaction-updated',
+        interaction: current.record,
+        revision: current.revision,
+      });
     });
   }
 
@@ -1875,7 +1893,11 @@ export class ExecutionLifecycleRegistry {
     interaction.record = current.payload;
     interaction.revision = current.revision;
     if (publish) {
-      this.notify({ kind: 'interaction-updated', interaction: interaction.record });
+      this.notify({
+        kind: 'interaction-updated',
+        interaction: interaction.record,
+        revision: interaction.revision,
+      });
     }
   }
 
@@ -1891,7 +1913,11 @@ export class ExecutionLifecycleRegistry {
         existing.record = current.payload;
         existing.revision = current.revision;
         if (changed && publish) {
-          this.notify({ kind: 'interaction-updated', interaction: existing.record });
+          this.notify({
+            kind: 'interaction-updated',
+            interaction: existing.record,
+            revision: existing.revision,
+          });
         }
       } else {
         const entry = {
@@ -1900,7 +1926,11 @@ export class ExecutionLifecycleRegistry {
         };
         this.interactions.set(interactionId, entry);
         if (publish) {
-          this.notify({ kind: 'interaction-updated', interaction: entry.record });
+          this.notify({
+            kind: 'interaction-updated',
+            interaction: entry.record,
+            revision: entry.revision,
+          });
         }
       }
     }
@@ -1927,7 +1957,11 @@ export class ExecutionLifecycleRegistry {
     for (const id of interactionIds) {
       const interaction = this.interactions.get(id);
       if (interaction) {
-        this.notify({ kind: 'interaction-updated', interaction: interaction.record });
+        this.notify({
+          kind: 'interaction-updated',
+          interaction: interaction.record,
+          revision: interaction.revision,
+        });
       }
     }
     this.notify({ kind: 'envelope-accepted', envelope });

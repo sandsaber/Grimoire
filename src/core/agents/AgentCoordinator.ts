@@ -121,6 +121,15 @@ export interface AgentCoordinatorOptions {
   readonly scheduler?: AgentCoordinatorScheduler;
 }
 
+export interface AgentCoordinatorNotification {
+  readonly kind: 'records-changed';
+  readonly agentInstanceIds: readonly AgentInstanceId[];
+  readonly agentRunIds: readonly AgentRunId[];
+  readonly agentResultIds: readonly AgentResultRecord['agentResultId'][];
+}
+
+export type AgentCoordinatorListener = (notification: AgentCoordinatorNotification) => void;
+
 export class AgentCoordinator {
   readonly repositories: AgentRepositories;
   private readonly transactions: AgentControlTransactionCoordinator;
@@ -128,6 +137,7 @@ export class AgentCoordinator {
   private readonly controlTimeoutMs: number;
   private readonly scheduler?: AgentCoordinatorScheduler;
   private readonly instanceQueues = new Map<string, Promise<void>>();
+  private readonly listeners = new Set<AgentCoordinatorListener>();
   private topologyQueue: Promise<void> = Promise.resolve();
 
   constructor(storage: DurableStorage, options: AgentCoordinatorOptions = {}) {
@@ -145,6 +155,13 @@ export class AgentCoordinator {
     this.scheduler = options.scheduler;
   }
 
+  subscribe(listener: AgentCoordinatorListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
   async prepareAndDispatch(
     command: PrepareAgentDispatchCommand,
     port: AgentDispatchPort,
@@ -160,7 +177,7 @@ export class AgentCoordinator {
       command.settlementTransactionId,
       command.terminalTransactionId,
     ]);
-    return this.enqueueTopology(() => this.enqueue(command.agentInstanceId, async () => {
+    const run = await this.enqueueTopology(() => this.enqueue(command.agentInstanceId, async () => {
       const parent = await this.requireParent(command.parentAgentInstanceId, command.rootOwner);
       const parentRun = parent ? await this.requireParentRun(parent) : undefined;
       const timestamp = this.now();
@@ -212,6 +229,8 @@ export class AgentCoordinator {
       ]);
       return run;
     }));
+    this.notify([run.agentInstanceId], [run.agentRunId]);
+    return run;
   }
 
   async retry(command: RetryAgentCommand, port: AgentDispatchPort): Promise<AgentRunRecord> {
@@ -226,7 +245,7 @@ export class AgentCoordinator {
       command.settlementTransactionId,
       command.terminalTransactionId,
     ]);
-    return this.enqueueTopology(() => this.enqueue(command.agentInstanceId, async () => {
+    const run = await this.enqueueTopology(() => this.enqueue(command.agentInstanceId, async () => {
       const currentInstance = await requireCurrent(
         this.repositories.instances.read(command.agentInstanceId),
       );
@@ -290,12 +309,14 @@ export class AgentCoordinator {
       ]);
       return run;
     }));
+    this.notify([run.agentInstanceId], [run.agentRunId]);
+    return run;
   }
 
   async adoptNativeAgent(command: AdoptNativeAgentCommand): Promise<AgentInstanceRecord> {
     requireDistinctTransactionIds([command.transactionId, command.terminalTransactionId]);
     const instanceId = adoptedAgentInstanceId(command.adoptionKey);
-    return this.enqueueTopology(() => this.enqueue(instanceId, async () => {
+    const instance = await this.enqueueTopology(() => this.enqueue(instanceId, async () => {
       const parent = await this.requireParent(
         command.parentAgentInstanceId,
         command.rootOwner,
@@ -355,6 +376,8 @@ export class AgentCoordinator {
       ]);
       return instance;
     }));
+    this.notify([instance.agentInstanceId], [command.agentRunId]);
+    return instance;
   }
 
   async recoverPendingDispatches(port: AgentDispatchRecoveryPort): Promise<AgentRunRecord[]> {
@@ -414,6 +437,10 @@ export class AgentCoordinator {
       });
       if (settled) recovered.push(settled);
     }
+    this.notify(
+      recovered.map(run => run.agentInstanceId),
+      recovered.map(run => run.agentRunId),
+    );
     return recovered;
   }
 
@@ -485,13 +512,17 @@ export class AgentCoordinator {
       });
       recovered.push(settled);
     }
+    this.notify(
+      recovered.map(run => run.agentInstanceId),
+      recovered.map(run => run.agentRunId),
+    );
     return recovered;
   }
 
   async appendResult(result: AgentResultRecord): Promise<AgentRunRecord> {
     await this.transactions.recoverPending();
     const canonical = agentResultRecordSchema.decode(result);
-    return this.enqueue(canonical.agentInstanceId, async () => {
+    const run = await this.enqueue(canonical.agentInstanceId, async () => {
       await this.validateResultReferences(canonical);
       try {
         await this.repositories.results.append(canonical.agentResultId, canonical);
@@ -502,6 +533,12 @@ export class AgentCoordinator {
       }
       return this.linkResultUnlocked(canonical);
     });
+    this.notify(
+      [run.agentInstanceId],
+      [run.agentRunId],
+      [canonical.agentResultId],
+    );
+    return run;
   }
 
   async recoverResultLinks(): Promise<AgentResultLinkRecoveryReport> {
@@ -533,6 +570,10 @@ export class AgentCoordinator {
         });
       }
     }
+    this.notify(
+      linked.map(run => run.agentInstanceId),
+      linked.map(run => run.agentRunId),
+    );
     return { linkedRuns: linked, issues };
   }
 
@@ -570,6 +611,10 @@ export class AgentCoordinator {
           }
         }
         if (writes.length > 0) await this.transactions.execute(command.transactionId, writes);
+        this.notify(
+          targets.map(target => target.instance.agentInstanceId),
+          targets.map(target => target.run.agentRunId),
+        );
         return targets;
       });
     });
@@ -590,6 +635,7 @@ export class AgentCoordinator {
         );
       });
       terminalized.push(terminal);
+      this.notify([terminal.agentInstanceId], [terminal.agentRunId]);
     }
     return terminalized;
   }
@@ -597,7 +643,7 @@ export class AgentCoordinator {
   async dispatchPrepared(agentRunRecordId: AgentRunId, port: AgentDispatchPort): Promise<AgentRunRecord> {
     await this.transactions.recoverPending();
     const initialRun = await requireCurrent(this.repositories.runs.read(agentRunRecordId));
-    return this.enqueue(initialRun.payload.agentInstanceId, async () => {
+    const run = await this.enqueue(initialRun.payload.agentInstanceId, async () => {
       const run = await requireCurrent(this.repositories.runs.read(agentRunRecordId));
       if (!run.payload.dispatchToken) throw new Error('Agent run has no Grimoire dispatch intent.');
       const intent = await requireCurrent(
@@ -624,6 +670,8 @@ export class AgentCoordinator {
       );
       return this.dispatch(instance.payload, run.payload, refreshedIntent.payload, port);
     });
+    this.notify([run.agentInstanceId], [run.agentRunId]);
+    return run;
   }
 
   private async dispatch(
@@ -1046,6 +1094,31 @@ export class AgentCoordinator {
     const operation = this.topologyQueue.catch(() => undefined).then(task);
     this.topologyQueue = operation.then(() => undefined, () => undefined);
     return operation;
+  }
+
+  private notify(
+    agentInstanceIds: readonly AgentInstanceId[],
+    agentRunIds: readonly AgentRunId[],
+    agentResultIds: readonly AgentResultRecord['agentResultId'][] = [],
+  ): void {
+    if (agentInstanceIds.length === 0
+      && agentRunIds.length === 0
+      && agentResultIds.length === 0) {
+      return;
+    }
+    const notification: AgentCoordinatorNotification = {
+      kind: 'records-changed',
+      agentInstanceIds: [...new Set(agentInstanceIds)],
+      agentRunIds: [...new Set(agentRunIds)],
+      agentResultIds: [...new Set(agentResultIds)],
+    };
+    for (const listener of this.listeners) {
+      try {
+        listener(notification);
+      } catch {
+        // Durable agent progress cannot depend on a projection listener.
+      }
+    }
   }
 }
 
