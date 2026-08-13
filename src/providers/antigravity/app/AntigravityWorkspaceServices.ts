@@ -186,6 +186,6 @@ export const antigravityWorkspaceRegistration: ProviderWorkspaceRegistration<Ant
 };
 
 export function maybeGetAntigravityWorkspaceServices(): AntigravityWorkspaceServices | null {
-  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  // ProviderWorkspaceRegistry.getServices removed.
   return null;
 }

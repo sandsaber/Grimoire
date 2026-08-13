@@ -43,7 +43,7 @@ function createGeminiModelCatalog(plugin: LegacyProviderContext): ProviderModelC
       return getGeminiProviderSettings(settings).enabled;
     },
     async refreshModels({ settings }) {
-      // Phase 9 cutover — GeminiChatRuntime removed. Model discovery now
+      // GeminiChatRuntime removed. Model discovery now
       // happens through the application runtime; legacy refresh reports no change.
       void settings;
       void plugin;
@@ -85,6 +85,6 @@ export const geminiWorkspaceRegistration: ProviderWorkspaceRegistration<GeminiWo
 };
 
 export function maybeGetGeminiWorkspaceServices(): GeminiWorkspaceServices | null {
-  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  // ProviderWorkspaceRegistry.getServices removed.
   return null;
 }

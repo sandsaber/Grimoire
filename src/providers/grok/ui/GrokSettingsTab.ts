@@ -246,7 +246,7 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
     };
 
     const persistModelMetadata = async (_rawId: string): Promise<void> => {
-      // Phase 9 cutover — GrokChatRuntime removed. Model metadata persistence
+      // GrokChatRuntime removed. Model metadata persistence
       // now happens through the application runtime; this hook is a no-op.
     };
 
@@ -536,7 +536,7 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
       modelCatalogLoadFailed = false;
       renderAll();
 
-      // Phase 9 cutover — GrokChatRuntime removed. Catalog refresh now happens
+      // GrokChatRuntime removed. Catalog refresh now happens
       // through the application runtime; legacy manual refresh reports failure.
       try {
         modelCatalogLoadFailed = getGrokProviderSettings(settingsBag).discoveredModels.length === 0;

@@ -69,7 +69,7 @@ function createKimicodeModelCatalog(plugin: LegacyProviderContext): ProviderMode
       return refreshCache.refresh({
         fingerprint: cacheKey,
         hasCachedModels: currentSettings.discoveredModels.length > 0,
-        // Phase 9 cutover — KimicodeChatRuntime removed. Model discovery now
+        // KimicodeChatRuntime removed. Model discovery now
         // happens through the application runtime; legacy load reports no change.
         load: async () => false,
       });
@@ -127,6 +127,6 @@ export const kimicodeWorkspaceRegistration: ProviderWorkspaceRegistration<Kimico
 };
 
 export function maybeGetKimicodeWorkspaceServices(): KimicodeWorkspaceServices | null {
-  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  // ProviderWorkspaceRegistry.getServices removed.
   return null;
 }

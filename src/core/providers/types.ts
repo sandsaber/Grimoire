@@ -20,7 +20,7 @@ import type { LegacyProviderContext } from './LegacyProviderContext';
 
 export type { ProviderId } from '../types/provider';
 
-// Phase 9 cutover — ChatRuntime interface removed. The new application
+// ChatRuntime interface removed. The new application
 // runtime owns execution; provider-facing contracts use the new execution
 // backend and coordinator ports instead.
 

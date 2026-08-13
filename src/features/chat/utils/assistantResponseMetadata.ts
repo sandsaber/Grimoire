@@ -14,7 +14,7 @@ const CHAT_PROVIDER_LABELS: Record<string, string> = {
   qwen: 'Qwen Code',
 };
 
-// Phase 9 cutover — ProviderRegistry removed. The provider UI config / capabilities
+// ProviderRegistry removed. The provider UI config / capabilities
 // are now owned by the application runtime; these stubs preserve the legacy
 // metadata-builder contract during the cutover.
 const STUB_UI_CONFIG: ProviderChatUIConfig = {

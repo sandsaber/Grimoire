@@ -132,7 +132,7 @@ function getFileName(path: string): string {
 }
 
 function getProviderLabel(providerId: ProviderId): string {
-  // Phase 9 cutover — ProviderRegistry.getProviderDisplayNameOrId removed.
+  // ProviderRegistry.getProviderDisplayNameOrId removed.
   return providerId;
 }
 

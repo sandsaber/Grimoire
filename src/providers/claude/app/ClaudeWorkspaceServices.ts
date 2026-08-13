@@ -107,11 +107,11 @@ export const claudeWorkspaceRegistration: ProviderWorkspaceRegistration<ClaudeWo
 };
 
 export function maybeGetClaudeWorkspaceServices(): ClaudeWorkspaceServices | null {
-  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  // ProviderWorkspaceRegistry.getServices removed.
   return null;
 }
 
 export function getClaudeWorkspaceServices(): ClaudeWorkspaceServices {
-  // Phase 9 cutover — ProviderWorkspaceRegistry.requireServices removed.
-  throw new Error('Claude workspace services unavailable during Phase 9 cutover');
+  // ProviderWorkspaceRegistry.requireServices removed.
+  throw new Error('Claude workspace services unavailable — provider workspace not initialized');
 }

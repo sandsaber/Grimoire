@@ -248,7 +248,7 @@ export const mimocodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
     };
 
     const persistModelMetadata = async (_rawId: string): Promise<void> => {
-      // Phase 9 cutover — MimocodeChatRuntime removed. Model metadata
+      // MimocodeChatRuntime removed. Model metadata
       // persistence now happens through the application runtime; no-op.
     };
 
@@ -540,7 +540,7 @@ export const mimocodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
       modelCatalogLoadFailed = false;
       renderAll();
 
-      // Phase 9 cutover — MimocodeChatRuntime removed. Catalog refresh now
+      // MimocodeChatRuntime removed. Catalog refresh now
       // happens through the application runtime; legacy manual refresh reports failure.
       try {
         modelCatalogLoadFailed = getMimocodeProviderSettings(settingsBag).discoveredModels.length === 0;

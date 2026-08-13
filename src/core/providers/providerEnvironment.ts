@@ -49,7 +49,7 @@ function classifyEnvironmentKey(key: string): EnvironmentKeyOwnership {
     return { type: 'shared-known' };
   }
 
-  // Phase 9 cutover — ProviderRegistry removed. Per-provider environment key
+  // ProviderRegistry removed. Per-provider environment key
   // classification is delegated to the application runtime; legacy callers
   // treat unclassified keys as shared-unknown during the cutover.
 

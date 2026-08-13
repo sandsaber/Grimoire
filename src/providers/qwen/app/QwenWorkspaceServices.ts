@@ -43,7 +43,7 @@ function createQwenModelCatalog(plugin: LegacyProviderContext): ProviderModelCat
       return getQwenProviderSettings(settings).enabled;
     },
     async refreshModels({ settings }) {
-      // Phase 9 cutover — QwenChatRuntime removed. Model discovery now happens
+      // QwenChatRuntime removed. Model discovery now happens
       // through the application runtime; legacy refresh reports no change.
       void settings;
       void plugin;
@@ -85,6 +85,6 @@ export const qwenWorkspaceRegistration: ProviderWorkspaceRegistration<QwenWorksp
 };
 
 export function maybeGetQwenWorkspaceServices(): QwenWorkspaceServices | null {
-  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  // ProviderWorkspaceRegistry.getServices removed.
   return null;
 }

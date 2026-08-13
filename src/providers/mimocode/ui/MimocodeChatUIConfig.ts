@@ -181,7 +181,7 @@ export const mimocodeChatUIConfig: ProviderChatUIConfig = {
       return;
     }
 
-    // Phase 9 cutover — MimocodeChatRuntime removed. Model metadata warmup now
+    // MimocodeChatRuntime removed. Model metadata warmup now
     // happens through the application runtime; this opportunistic hook is a no-op.
     void model;
     void context;

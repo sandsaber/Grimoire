@@ -320,11 +320,13 @@ class InlineEditController {
       ?? activeTab?.service?.providerId
       ?? activeTab?.providerId
       ?? DEFAULT_CHAT_PROVIDER_ID;
-    // Phase 9 cutover — ProviderRegistry.createInlineEditService removed.
-    // Inline-edit service now resolves through the application runtime.
+    // Inline-edit service resolves through the application runtime's
+    // auxiliary coordinator. Until inline-edit migrates to the new platform,
+    // the service returns not-available for providers that no longer have
+    // a legacy ChatRuntime.
     this.inlineEditService = {
-      editText: async () => ({ success: false, error: 'Inline edit unavailable during Phase 9 cutover' }),
-      continueConversation: async () => ({ success: false, error: 'Inline edit unavailable during Phase 9 cutover' }),
+      editText: async () => ({ success: false, error: 'Inline edit requires a connected provider session.' }),
+      continueConversation: async () => ({ success: false, error: 'Inline edit requires a connected provider session.' }),
       cancel: () => {},
       resetConversation: () => {},
     };
@@ -461,7 +463,7 @@ class InlineEditController {
     this.inputEl.spellcheck = false;
     this.spinnerEl = inputWrap.createDiv({ cls: 'grimoire-inline-spinner grimoire-hidden' });
 
-    // Phase 9 cutover — ProviderWorkspaceRegistry.getCommandCatalog removed.
+    // Command catalog resolves through provider execution backends.
     this.slashCommandDropdown = new SlashCommandDropdown(
       ownerDocument.body,
       this.inputEl,
@@ -472,8 +474,6 @@ class InlineEditController {
       {
         fixed: true,
         hiddenCommands: getHiddenProviderCommandSet(this.plugin.settings, this.resolvedProviderId),
-        // Phase 9 cutover — ProviderWorkspaceRegistry.getCommandCatalog removed;
-        // providerConfig / getProviderEntries now resolve through the app runtime.
       }
     );
 

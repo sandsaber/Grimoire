@@ -67,13 +67,13 @@ export class MimocodeAuxQueryRunner implements AuxQueryRunner {
     await this.ensureReady(cwd, config.systemPrompt);
 
     if (!this.connection) {
-      throw new Error(t('chat.ui.errors.provider.notReady', { provider: 'mimocode' /* Phase 9 cutover */ }));
+      throw new Error(t('chat.ui.errors.provider.notReady', { provider: 'mimocode'  }));
     }
 
     if (!this.sessionId) {
       const sessionId = await this.createSession(cwd);
       if (!sessionId) {
-        throw new Error(t('chat.ui.errors.provider.sessionCreateFailed', { provider: 'mimocode' /* Phase 9 cutover */ }));
+        throw new Error(t('chat.ui.errors.provider.sessionCreateFailed', { provider: 'mimocode'  }));
       }
     }
 
@@ -137,7 +137,7 @@ export class MimocodeAuxQueryRunner implements AuxQueryRunner {
 
       return accumulatedText;
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('chat.ui.errors.provider.requestFailed', { provider: 'mimocode' /* Phase 9 cutover */ });
+      const message = error instanceof Error ? error.message : t('chat.ui.errors.provider.requestFailed', { provider: 'mimocode'  });
       const stderr = this.process?.getStderrSnapshot();
       throw new Error(
         stderr ? `${message}\n\n${stderr}` : message,

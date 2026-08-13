@@ -194,11 +194,11 @@ export const codexWorkspaceRegistration: ProviderWorkspaceRegistration<CodexWork
 };
 
 export function maybeGetCodexWorkspaceServices(): CodexWorkspaceServices | null {
-  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  // ProviderWorkspaceRegistry.getServices removed.
   return null;
 }
 
 export function getCodexWorkspaceServices(): CodexWorkspaceServices {
-  // Phase 9 cutover — ProviderWorkspaceRegistry.requireServices removed.
-  throw new Error('Codex workspace services unavailable during Phase 9 cutover');
+  // ProviderWorkspaceRegistry.requireServices removed.
+  throw new Error('Codex workspace services unavailable — provider workspace not initialized');
 }

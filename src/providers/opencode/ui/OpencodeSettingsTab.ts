@@ -248,7 +248,7 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
     };
 
     const persistModelMetadata = async (_rawId: string): Promise<void> => {
-      // Phase 9 cutover — OpencodeChatRuntime removed. Model metadata
+      // OpencodeChatRuntime removed. Model metadata
       // persistence now happens through the application runtime; no-op.
     };
 
@@ -540,7 +540,7 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
       modelCatalogLoadFailed = false;
       renderAll();
 
-      // Phase 9 cutover — OpencodeChatRuntime removed. Catalog refresh now
+      // OpencodeChatRuntime removed. Catalog refresh now
       // happens through the application runtime; legacy manual refresh reports failure.
       try {
         modelCatalogLoadFailed = getOpencodeProviderSettings(settingsBag).discoveredModels.length === 0;

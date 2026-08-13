@@ -40,6 +40,7 @@ import {
 import { getAvailableLocales, getLocaleDisplayName, setLocale, t } from '../../i18n/i18n';
 import type { Locale, TranslationKey } from '../../i18n/types';
 import type GrimoirePlugin from '../../main';
+import { builtInProviderCatalog } from '../../providers/BuiltInProviderCatalog';
 import { confirmDelete } from '../../shared/modals/ConfirmModal';
 import { showWhatsNewModal } from '../../shared/modals/WhatsNewModal';
 import { formatContextLimit, parseContextLimit, parseEnvironmentVariables } from '../../utils/env';
@@ -121,11 +122,8 @@ type AppWithHotkeyInternals = App & {
   setting?: ObsidianSettingsController;
 };
 
-// Phase 9 cutover — ProviderRegistry / ProviderWorkspaceRegistry removed.
-// Provider-owned workspace services and provider catalog data now resolve
-// through the application runtime. These stubs keep the legacy settings tab
-// compiling and rendering an empty provider/workspace surface during the
-// cutover.
+// Provider data resolves through the immutable builtInProviderCatalog.
+// Workspace services and CLI resolution are owned by the application runtime.
 function stubWorkspaceCapabilities(): ProviderWorkspaceCapabilities {
   const empty = { inventory: 'none', manager: 'none' } as const;
   return {
@@ -138,19 +136,29 @@ function stubWorkspaceCapabilities(): ProviderWorkspaceCapabilities {
 }
 
 function providerRegistryGetRegisteredProviderIds(): ProviderId[] {
-  return [];
+  return builtInProviderCatalog.list().map(m => m.manifest.id);
 }
 
-function providerRegistryIsEnabled(_providerId: ProviderId, _settings: Record<string, unknown>): boolean {
-  return false;
+function providerRegistryIsEnabled(providerId: ProviderId, _settings: Record<string, unknown>): boolean {
+  const module = builtInProviderCatalog.get(providerId);
+  if (!module) return false;
+  const decoded = module.settings.decode(_settings[providerId] ?? {});
+  if (!decoded.ok) return true;
+  const value = decoded.value as Record<string, unknown>;
+  return typeof value.enabled === 'boolean' ? value.enabled : true;
 }
 
 function providerRegistryGetProviderDisplayName(providerId: ProviderId): string {
-  return providerId;
+  return builtInProviderCatalog.get(providerId)?.manifest.displayName ?? providerId;
 }
 
-function providerRegistrySetEnabled(_providerId: ProviderId, _settings: Record<string, unknown>, _enabled: boolean): void {
-  // no-op
+function providerRegistrySetEnabled(providerId: ProviderId, settings: Record<string, unknown>, enabled: boolean): void {
+  const module = builtInProviderCatalog.get(providerId);
+  if (!module) return;
+  const decoded = module.settings.decode(settings[providerId] ?? {});
+  if (!decoded.ok) return;
+  const value = { ...(decoded.value as Record<string, unknown>), enabled };
+  settings[providerId] = module.settings.encode(value, decoded.preservedUnknown);
 }
 
 const STUB_CHAT_UI_CONFIG: ProviderChatUIConfig = {

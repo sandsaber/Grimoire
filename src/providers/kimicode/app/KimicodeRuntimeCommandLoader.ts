@@ -5,7 +5,7 @@ import type {
 import type { SlashCommand } from '../../../core/types';
 import { getKimicodeProviderSettings } from '../settings';
 
-// Phase 9 cutover — KimicodeChatRuntime removed. Runtime command discovery now
+// KimicodeChatRuntime removed. Runtime command discovery now
 // resolves through the application runtime; this loader reports no commands.
 // `ChatRuntime` is now opaque (`unknown`), so the minimal runtime surface this
 // loader touches is described locally to keep access type-safe.
@@ -60,7 +60,7 @@ export class KimicodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
 
     try {
       if (context.conversation) {
-        // Phase 9 cutover — runtime sync removed
+        // runtime sync removed
       } else if (shouldWarmBlankSession) {
         // Blank-tab warmup uses an isolated in-memory session to fetch metadata
         // without binding a persisted Kimi Code session to the tab.
@@ -79,7 +79,7 @@ export class KimicodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
 
       return await Promise.resolve([]);
     } finally {
-      // Phase 9 cutover — runtime cleanup removed
+      // runtime cleanup removed
     }
   }
 }

@@ -82,7 +82,7 @@ function isSupportedSessionMetadata(value: unknown): value is SessionMetadata {
     return false;
   }
 
-  // Phase 9 cutover — ProviderRegistry.isRegisteredProviderId removed.
+  // ProviderRegistry.isRegisteredProviderId removed.
   // Accept any providerId; membership validation now happens in the app runtime.
   return true;
 }
@@ -362,7 +362,7 @@ export class SessionStorage {
   }
 
   toSessionMetadata(conversation: Conversation): SessionMetadata {
-    // Phase 9 cutover — ProviderRegistry.getConversationHistoryService removed.
+    // ProviderRegistry.getConversationHistoryService removed.
     // Provider-owned persisted state enrichment now happens in the app runtime.
     const providerState = conversation.providerState;
 

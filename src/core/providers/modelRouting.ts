@@ -1,6 +1,6 @@
 import type { ProviderId } from './types';
 
-// Phase 9 cutover — ProviderRegistry removed. Model-to-provider routing now
+// ProviderRegistry removed. Model-to-provider routing now
 // resolves through the application runtime; legacy callers fall back to the
 // default provider until rewired.
 export function getProviderForModel(_model: string, _settings?: Record<string, unknown>): ProviderId {

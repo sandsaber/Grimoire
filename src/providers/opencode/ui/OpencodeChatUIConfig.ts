@@ -181,7 +181,7 @@ export const opencodeChatUIConfig: ProviderChatUIConfig = {
       return;
     }
 
-    // Phase 9 cutover — OpencodeChatRuntime removed. Model metadata warmup now
+    // OpencodeChatRuntime removed. Model metadata warmup now
     // happens through the application runtime; this opportunistic hook is a no-op.
     void model;
     void context;

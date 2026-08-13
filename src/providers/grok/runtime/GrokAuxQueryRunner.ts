@@ -55,13 +55,13 @@ export class GrokAuxQueryRunner implements AuxQueryRunner {
     await this.ensureReady(cwd, config.systemPrompt);
 
     if (!this.connection) {
-      throw new Error(t('chat.ui.errors.provider.notReady', { provider: 'grok' /* Phase 9 cutover */ }));
+      throw new Error(t('chat.ui.errors.provider.notReady', { provider: 'grok'  }));
     }
 
     if (!this.sessionId) {
       const sessionId = await this.createSession(cwd);
       if (!sessionId) {
-        throw new Error(t('chat.ui.errors.provider.sessionCreateFailed', { provider: 'grok' /* Phase 9 cutover */ }));
+        throw new Error(t('chat.ui.errors.provider.sessionCreateFailed', { provider: 'grok'  }));
       }
     }
 
@@ -122,7 +122,7 @@ export class GrokAuxQueryRunner implements AuxQueryRunner {
 
       return accumulatedText;
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('chat.ui.errors.provider.requestFailed', { provider: 'grok' /* Phase 9 cutover */ });
+      const message = error instanceof Error ? error.message : t('chat.ui.errors.provider.requestFailed', { provider: 'grok'  });
       const stderr = this.process?.getStderrSnapshot();
       throw new Error(
         stderr ? `${message}\n\n${stderr}` : message,

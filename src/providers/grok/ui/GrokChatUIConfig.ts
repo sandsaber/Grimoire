@@ -185,7 +185,7 @@ export const grokChatUIConfig: ProviderChatUIConfig = {
       return;
     }
 
-    // Phase 9 cutover — GrokChatRuntime removed. Model metadata warmup now
+    // GrokChatRuntime removed. Model metadata warmup now
     // happens through the application runtime; this opportunistic hook is a no-op.
     void model;
     void context;

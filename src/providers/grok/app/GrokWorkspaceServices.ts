@@ -82,7 +82,7 @@ function createGrokModelCatalog(plugin: LegacyProviderContext): ProviderModelCat
         level: 'debug',
         scope: 'provider.grok',
       });
-      // Phase 9 cutover — GrokChatRuntime removed. Model discovery now happens
+      // GrokChatRuntime removed. Model discovery now happens
       // through the application runtime; legacy catalog refresh reports no change.
       plugin.recordDebugLog?.({
         data: {
@@ -151,6 +151,6 @@ export const grokWorkspaceRegistration: ProviderWorkspaceRegistration<GrokWorksp
 };
 
 export function maybeGetGrokWorkspaceServices(): GrokWorkspaceServices | null {
-  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  // ProviderWorkspaceRegistry.getServices removed.
   return null;
 }

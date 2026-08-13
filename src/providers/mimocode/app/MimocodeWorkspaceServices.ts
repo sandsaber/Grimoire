@@ -69,7 +69,7 @@ function createMimocodeModelCatalog(plugin: LegacyProviderContext): ProviderMode
       return refreshCache.refresh({
         fingerprint: cacheKey,
         hasCachedModels: currentSettings.discoveredModels.length > 0,
-        // Phase 9 cutover — MimocodeChatRuntime removed. Model discovery now
+        // MimocodeChatRuntime removed. Model discovery now
         // happens through the application runtime; legacy load reports no change.
         load: async () => false,
       });
@@ -127,6 +127,6 @@ export const mimocodeWorkspaceRegistration: ProviderWorkspaceRegistration<Mimoco
 };
 
 export function maybeGetMimocodeWorkspaceServices(): MimocodeWorkspaceServices | null {
-  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  // ProviderWorkspaceRegistry.getServices removed.
   return null;
 }

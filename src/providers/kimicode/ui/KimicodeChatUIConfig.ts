@@ -181,7 +181,7 @@ export const kimicodeChatUIConfig: ProviderChatUIConfig = {
       return;
     }
 
-    // Phase 9 cutover — KimicodeChatRuntime removed. Model metadata warmup now
+    // KimicodeChatRuntime removed. Model metadata warmup now
     // happens through the application runtime; this opportunistic hook is a no-op.
     void model;
     void context;

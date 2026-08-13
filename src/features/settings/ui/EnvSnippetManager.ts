@@ -106,7 +106,7 @@ export class EnvSnippetModal extends Modal {
       contextLimitInputs.clear();
       modelAliasInputs.clear();
 
-      // Phase 9 cutover — ProviderRegistry.getCustomModelIds removed.
+      // ProviderRegistry.getCustomModelIds removed.
       const uniqueModelIds = new Set<string>();
 
       if (uniqueModelIds.size === 0) {
@@ -361,7 +361,7 @@ export class EnvSnippetManager {
     // Legacy snippets without modelAliases don't modify aliases. Snippets saved
     // with alias fields clear aliases for their own model IDs when left empty.
     if (snippet.modelAliases) {
-      // Phase 9 cutover — ProviderRegistry.getCustomModelIds removed.
+      // ProviderRegistry.getCustomModelIds removed.
       const modelIds = new Set<string>();
       const nextAliases = { ...(this.plugin.settings.customModelAliases ?? {}) };
       for (const modelId of modelIds) {

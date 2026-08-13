@@ -50,6 +50,7 @@ import { type InlineEditContext, InlineEditModal } from './features/inline-edit/
 import { GrimoireSettingTab } from './features/settings/GrimoireSettings';
 import { setLocale, t } from './i18n/i18n';
 import type { Locale } from './i18n/types';
+import { builtInProviderCatalog } from './providers/BuiltInProviderCatalog';
 import {
   getClaudeProviderSettings,
   getClaudeRuntimeEnvironmentText,
@@ -98,8 +99,8 @@ export default class GrimoirePlugin extends Plugin {
   async onload() {
     try {
       await this.loadSettings();
-      // Construct the new ApplicationRuntime as the sole execution authority.
-      // Phase 9 cutover — ProviderRegistry/ProviderWorkspaceRegistry removed.
+      // Construct the ApplicationRuntime as the sole execution authority.
+      // Provider backends are registered through the immutable catalog.
       try {
         this.applicationRuntime = createObsidianApplicationRuntime({
           app: this.app,
@@ -115,8 +116,7 @@ export default class GrimoirePlugin extends Plugin {
           data: { error: String(error) },
         });
       }
-      // Phase 9 cutover — ProviderWorkspaceRegistry.initializeAll removed.
-      // Provider workspace initialization now happens through the application runtime.
+      // Provider workspaces initialize lazily through the application runtime.
       await this.writeDebugLog({
         data: {
           providerCount: 0,
@@ -775,8 +775,7 @@ export default class GrimoirePlugin extends Plugin {
 
   /** Returns the runtime environment variables (fixed at plugin load). */
   getActiveEnvironmentVariables(
-    // Phase 9 cutover — ProviderRegistry.resolveSettingsProviderId removed.
-    providerId: ProviderId = ('codex'),
+    providerId: ProviderId = builtInProviderCatalog.list()[0]?.manifest.id ?? 'codex',
   ): string {
     if (providerId === 'claude') {
       return getClaudeRuntimeEnvironmentText(
@@ -798,8 +797,8 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   getResolvedProviderCliPath(providerId: ProviderId): string | null {
-    // Phase 9 cutover — ProviderWorkspaceRegistry.getCliResolver removed.
-    // CLI resolution now happens through the application runtime.
+    // CLI resolution is owned by provider execution backends through the
+    // application runtime. This method is retained for API compatibility.
     return null;
   }
 
@@ -815,8 +814,9 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   private getAffectedEnvironmentProviders(scopes: EnvironmentScope[]): ProviderId[] {
-    // Phase 9 cutover — ProviderRegistry.getRegisteredProviderIds removed.
-    const registeredProviderIds = new Set<ProviderId>();
+    const registeredProviderIds = new Set<ProviderId>(
+      builtInProviderCatalog.list().map(m => m.manifest.id),
+    );
     const affectedProviderIds = new Set<ProviderId>();
 
     for (const scope of scopes) {
@@ -859,8 +859,8 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   private async loadSdkMessagesForConversation(conversation: Conversation): Promise<void> {
-    // Phase 9 cutover — ProviderRegistry.getConversationHistoryService removed.
-    // History hydration now happens through the application runtime.
+    // History hydration is owned by provider execution backends through the
+    // application runtime. Message metadata enrichment is applied here.
     applyVaultSearchContextsToMessages(
       conversation.messages,
       conversation.vaultSearchContexts,
@@ -913,8 +913,8 @@ export default class GrimoirePlugin extends Plugin {
 
     this.conversations.splice(index, 1);
 
-    // Phase 9 cutover — ProviderRegistry.getConversationHistoryService removed.
-    // Session deletion now happens through the application runtime.
+    // Session metadata deletion; provider-native history is owned by
+    // the application runtime execution backends.
 
     await this.storage.sessions.deleteMetadata(id);
 
@@ -963,8 +963,6 @@ export default class GrimoirePlugin extends Plugin {
     );
 
     // Clear image data from memory after save (data is persisted by SDK).
-    // Skip for pending forks: their deep-cloned images aren't in SDK storage yet.
-    // Phase 9 cutover — ProviderRegistry fork check removed; always clear now.
     for (const msg of conversation.messages) {
       if (msg.images) {
         for (const img of msg.images) {
@@ -1050,11 +1048,10 @@ export default class GrimoirePlugin extends Plugin {
   private getConversationModelLabel(conversation: Conversation): string | undefined {
     const model = conversation.usage?.model?.trim();
     if (!model) {
-      // Phase 9 cutover — ProviderRegistry.getProviderDisplayName removed.
-      return conversation.providerId;
+      const module = builtInProviderCatalog.get(conversation.providerId);
+      return module?.manifest.displayName ?? conversation.providerId;
     }
 
-    // Phase 9 cutover — ProviderRegistry.getChatUIConfig removed.
     return formatHistoryModelFallbackLabel(model);
   }
 

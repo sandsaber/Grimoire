@@ -17,7 +17,7 @@ const PROJECTION_KEYS = new Set([
 
 type ProviderProjectionMap = Partial<Record<string, string>>;
 
-// Phase 9 cutover — ProviderRegistry removed. These stubs keep the coordinator
+// ProviderRegistry removed. These stubs keep the coordinator
 // compiling while the application runtime takes over settings reconciliation.
 function getSettingsProviderId(_settings: Record<string, unknown>): ProviderId {
   return 'codex';

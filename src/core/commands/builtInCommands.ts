@@ -84,7 +84,7 @@ function resolveCapabilities(
     return context;
   }
 
-  // Phase 9 cutover — ProviderRegistry.getCapabilities removed. Capability
+  // ProviderRegistry.getCapabilities removed. Capability
   // resolution now happens in the app runtime; legacy callers receive null.
   return null;
 }

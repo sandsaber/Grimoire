@@ -29,7 +29,7 @@ function chooseRicherResult(sdkResult?: string, cachedResult?: string): string |
 }
 
 function getClaudeConfigDirContext(vaultPath: string): ClaudeConfigDirContext {
-  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  // ProviderWorkspaceRegistry.getServices removed.
   // CLAUDE_CONFIG_DIR enrichment now happens through the application runtime.
   return { vaultPath };
 }

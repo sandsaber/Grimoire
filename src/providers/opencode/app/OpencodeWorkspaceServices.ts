@@ -69,7 +69,7 @@ function createOpencodeModelCatalog(plugin: LegacyProviderContext): ProviderMode
       return refreshCache.refresh({
         fingerprint: cacheKey,
         hasCachedModels: currentSettings.discoveredModels.length > 0,
-        // Phase 9 cutover — OpencodeChatRuntime removed. Model discovery now
+        // OpencodeChatRuntime removed. Model discovery now
         // happens through the application runtime; legacy load reports no change.
         load: async () => false,
       });
@@ -127,6 +127,6 @@ export const opencodeWorkspaceRegistration: ProviderWorkspaceRegistration<Openco
 };
 
 export function maybeGetOpencodeWorkspaceServices(): OpencodeWorkspaceServices | null {
-  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  // ProviderWorkspaceRegistry.getServices removed.
   return null;
 }

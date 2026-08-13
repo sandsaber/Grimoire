@@ -39,7 +39,7 @@ export interface ApplicationRuntimeCompositionOptions {
  * The complete production composition of the application runtime: durable
  * infrastructure, provider context composition, backend startup, and all
  * coordinators (chat, shell, auxiliary, agents, work). This is the single
- * object `main.ts` will construct at the Phase 9 hard cutover.
+ * object `main.ts` will construct at the hard cutover.
  */
 export class ApplicationRuntimeComposition {
   readonly infrastructure: ApplicationRuntimeInfrastructure;

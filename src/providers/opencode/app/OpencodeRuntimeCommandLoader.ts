@@ -5,7 +5,7 @@ import type {
 import type { SlashCommand } from '../../../core/types';
 import { getOpencodeProviderSettings } from '../settings';
 
-// Phase 9 cutover — OpencodeChatRuntime removed. Runtime command discovery now
+// OpencodeChatRuntime removed. Runtime command discovery now
 // resolves through the application runtime; this loader reports no commands.
 // `ChatRuntime` is now opaque (`unknown`), so the minimal runtime surface this
 // loader touches is described locally to keep access type-safe.
@@ -60,7 +60,7 @@ export class OpencodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
 
     try {
       if (context.conversation) {
-        // Phase 9 cutover — runtime sync removed
+        // runtime sync removed
       } else if (shouldWarmBlankSession) {
         // Blank-tab warmup uses an isolated in-memory session to fetch metadata
         // without binding a persisted OpenCode session to the tab.
@@ -79,7 +79,7 @@ export class OpencodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
 
       return await Promise.resolve([]);
     } finally {
-      // Phase 9 cutover — runtime cleanup removed
+      // runtime cleanup removed
     }
   }
 }
