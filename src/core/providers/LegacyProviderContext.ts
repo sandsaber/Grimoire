@@ -25,7 +25,7 @@ export interface LegacyProviderTabManagerHandle {
 }
 
 /**
- * Temporary structural host for the production registries and ChatRuntime path.
+ * Transitional host retained until provider settings migrate fully to the new control plane.
  * New provider modules and execution backends must not depend on this contract;
  * it is deleted with the legacy registries at the application-wide cutover.
  */
