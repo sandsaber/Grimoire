@@ -241,7 +241,11 @@ function createOptions(
       start: phase('lifecycle', 2),
       shutdown: async () => { calls.push('lifecycle-shutdown'); },
     },
-    interactionPresentations: { recover: phase('interaction-presentations', 3) },
+    turnPreparation: { prepare: async () => { throw new Error('not used'); } },
+    interactionPresentations: {
+      recover: phase('interaction-presentations', 3),
+      read: async () => null,
+    },
     settings: { recoverPending: phase('settings', 4) },
     chat: {
       createConversation: async () => undefined,

@@ -2,6 +2,7 @@ import { AgentCoordinator } from '../../core/agents/AgentCoordinator';
 import { executionBackendId } from '../../core/execution/ExecutionBackendDescriptor';
 import { ConversationRepository } from '../../core/persistence/ConversationRepository';
 import type { DurableStorage } from '../../core/persistence/DurableStorage';
+import type { ChatTurnRequestPreparerRegistry } from '../../core/providers/ChatTurnRequestPreparer';
 import type { Sha256DigestPort } from '../../core/providers/ProviderSettingsFingerprint';
 import { WorkCoordinator } from '../../core/work/WorkCoordinator';
 import { WorkGraphRepository } from '../../core/work/WorkGraphRepository';
@@ -16,6 +17,7 @@ import type { ApplicationIdentityFactory } from './ApplicationIdentityFactory';
 import { ApplicationRuntimeInfrastructure } from './ApplicationRuntimeInfrastructure';
 import { ApplicationRuntimeMigration } from './ApplicationRuntimeMigration';
 import { createChatExecutionCoordinator } from './ChatRuntimeWiring';
+import { createChatTurnRequestPreparers } from './ChatTurnPreparerComposition';
 import { DurableExecutionResultStore } from './DurableExecutionResultStore';
 import { EphemeralExecutionRequestStore } from './EphemeralExecutionRequestStore';
 import { ExecutionInteractionPresentationRecovery } from './ExecutionInteractionPresentationRecovery';
@@ -31,6 +33,12 @@ import { createProviderSettingsCoordinator } from './ProviderSettingsCoordinator
 export interface ApplicationRuntimeCompositionOptions {
   readonly storage: DurableStorage;
   readonly digest: Sha256DigestPort;
+  /**
+   * Workspace root provider processes run in. Required for turn preparation;
+   * without it no provider launch specification can be built.
+   */
+  readonly workspaceRoot?: string;
+  readonly userName?: string;
   readonly now?: () => number;
   readonly launchers?: NodeProcessLauncherComposition;
   readonly claudeQueryFactory?: ClaudeExecutionQueryFactory;
@@ -60,6 +68,7 @@ export class ApplicationRuntimeComposition {
   readonly auxiliary: AuxiliaryExecutionCoordinator;
   readonly shellOutput: LocalShellOutputProjectionStore;
   readonly settings: ProviderSettingsCoordinatorWiring;
+  readonly turnPreparers: ChatTurnRequestPreparerRegistry;
 
   constructor(options: ApplicationRuntimeCompositionOptions) {
     this.infrastructure = new ApplicationRuntimeInfrastructure({
@@ -102,6 +111,10 @@ export class ApplicationRuntimeComposition {
       this.infrastructure.identities,
     );
     this.results = new DurableExecutionResultStore(options.storage, options.digest);
+    this.turnPreparers = createChatTurnRequestPreparers({
+      requests: this.requests,
+      ...(options.userName ? { userName: options.userName } : {}),
+    });
     this.presentations = new ExecutionInteractionPresentationRecovery(
       this.infrastructure.lifecycle,
       this.composition.presentationStore,

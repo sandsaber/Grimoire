@@ -60,7 +60,13 @@ export function createApplicationRuntime(
     migration: composition.migration,
     backends: composition.lifecycleAdapter,
     lifecycle: composition.lifecycleAdapter,
-    interactionPresentations: composition.presentations,
+    turnPreparation: {
+      prepare: (providerId, input) => composition.turnPreparers.prepare(providerId, input),
+    },
+    interactionPresentations: {
+      recover: () => composition.presentations.recover(),
+      read: presentationRef => composition.composition.presentationStore.read(presentationRef),
+    },
     settings: composition.settings.coordinator,
     chat: chatPort,
     shell: composition.shell,

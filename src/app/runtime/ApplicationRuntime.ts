@@ -1,5 +1,9 @@
 import type { InteractionResolution } from '../../core/execution/ExecutionContracts';
 import type {
+  ChatTurnRequestInput,
+  ChatTurnRequestPreparation,
+} from '../../core/providers/ChatTurnRequestPreparer';
+import type {
   WorkNodeDispatchFactory,
   WorkRecoveryPorts,
 } from '../../core/work/WorkCoordinator';
@@ -11,6 +15,7 @@ import type {
 import type {
   ChatProjection,
 } from '../../features/chat/projections/ChatProjection';
+import type { ExecutionInteractionPresentation } from './ExecutionInteractionPresentationStore';
 
 export type ApplicationRuntimeState =
   | 'constructed'
@@ -40,6 +45,12 @@ export interface ApplicationRuntimeSettingsPort {
 
 export interface ApplicationRuntimeInteractionPresentationPort {
   recover(): Promise<unknown>;
+  /**
+   * Display-only lookup for an open interaction. Views need the title,
+   * description, and answer options to render a prompt; the durable
+   * interaction record carries only the content-addressed reference.
+   */
+  read(presentationRef: string): Promise<ExecutionInteractionPresentation | null>;
 }
 
 export interface ApplicationRuntimeRecoverableCoordinator {
@@ -73,6 +84,13 @@ export interface ApplicationRuntimeChatPort {
   dispose(): void;
 }
 
+export interface ApplicationRuntimeTurnPreparationPort {
+  prepare(
+    providerId: string,
+    input: ChatTurnRequestInput,
+  ): Promise<ChatTurnRequestPreparation>;
+}
+
 export interface ApplicationRuntimeWorkPort {
   recoverDispatchBindings(
     port: WorkRecoveryPorts['dispatchRecovery'],
@@ -100,6 +118,7 @@ export interface ApplicationRuntimeOptions {
   readonly backends: ApplicationRuntimeBackendPort;
   readonly lifecycle: ApplicationRuntimeLifecyclePort;
   readonly interactionPresentations: ApplicationRuntimeInteractionPresentationPort;
+  readonly turnPreparation: ApplicationRuntimeTurnPreparationPort;
   readonly settings: ApplicationRuntimeSettingsPort;
   readonly chat: ApplicationRuntimeChatPort;
   readonly shell: ApplicationRuntimeRecoverableCoordinator;
@@ -184,6 +203,29 @@ export class ApplicationRuntime {
   resolveInteraction(resolution: InteractionResolution): Promise<void> {
     this.requireAccepting();
     return this.options.chat.resolveInteraction(resolution);
+  }
+
+  /**
+   * Turns a prompt into a dispatchable execution request. Provider-owned launch
+   * resolution happens here so views never build a launch specification.
+   */
+  prepareChatTurn(
+    providerId: string,
+    input: ChatTurnRequestInput,
+  ): Promise<ChatTurnRequestPreparation> {
+    this.requireAccepting();
+    return this.options.turnPreparation.prepare(providerId, input);
+  }
+
+  /**
+   * Not gated on the admission state: rendering an already-open prompt is
+   * display-only and must keep working while the runtime is draining, so a
+   * shutting-down view does not blank an interaction the user can still read.
+   */
+  readInteractionPresentation(
+    presentationRef: string,
+  ): Promise<ExecutionInteractionPresentation | null> {
+    return this.options.interactionPresentations.read(presentationRef);
   }
 
   shutdown(): Promise<void> {

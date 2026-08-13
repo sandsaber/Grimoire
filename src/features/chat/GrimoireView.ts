@@ -1,7 +1,8 @@
 import type { WorkspaceLeaf } from 'obsidian';
 import { ItemView, Notice, setIcon, setTooltip } from 'obsidian';
 
-import { executionBackendId } from '../../core/execution/ExecutionBackendDescriptor';
+import type { ExecutionInteractionPresentation } from '../../app/runtime/ExecutionInteractionPresentationStore';
+import type { InteractionId } from '../../core/execution/ExecutionIds';
 import type { LegacyProviderTabManagerHandle } from '../../core/providers/LegacyProviderContext';
 import type { ProviderCapabilities } from '../../core/providers/types';
 import { DEFAULT_CHAT_PROVIDER_ID } from '../../core/providers/types';
@@ -9,12 +10,15 @@ import { VIEW_TYPE_GRIMOIRE } from '../../core/types';
 import type { ChatMessage } from '../../core/types/chat';
 import type GrimoirePlugin from '../../main';
 import { builtInProviderCatalog } from '../../providers/BuiltInProviderCatalog';
+import { getVaultPath } from '../../utils/path';
 import { ChatInputCommandAdapter } from './application/ChatInputCommandAdapter';
 import { ChatProjectionAttachment } from './application/ChatProjectionAttachment';
 import { ChatProjectionViewController } from './application/ChatProjectionViewController';
-import type { ChatProjection } from './projections/ChatProjection';
+import type { ChatProjection, InteractionProjection } from './projections/ChatProjection';
 import type { ChatProjectionRenderModel,ChatProjectionRenderTarget } from './rendering/ChatProjectionRenderer';
 import { ChatProjectionRenderer } from './rendering/ChatProjectionRenderer';
+import type { InteractionPromptModel } from './rendering/InteractionPromptRenderer';
+import { InteractionPromptRenderer } from './rendering/InteractionPromptRenderer';
 import { MessageRenderer } from './rendering/MessageRenderer';
 import { autoResizeTextarea } from './ui/textareaResize';
 
@@ -98,6 +102,11 @@ export class GrimoireView extends ItemView implements ChatProjectionRenderTarget
   // Rendering pipeline
   private messageRenderer: MessageRenderer | null = null;
   private projectionRenderer: ChatProjectionRenderer | null = null;
+  private interactionsEl: HTMLElement | null = null;
+  private interactionRenderer: InteractionPromptRenderer | null = null;
+  /** Presentation lookups are content-addressed and immutable, so they cache. */
+  private readonly presentationCache = new Map<string, ExecutionInteractionPresentation>();
+  private renderedInteractionKey = '';
   private viewController: ChatProjectionViewController | null = null;
   private attachment: ChatProjectionAttachment | null = null;
   private unsubscribeAttachment: (() => void) | null = null;
@@ -259,6 +268,15 @@ export class GrimoireView extends ItemView implements ChatProjectionRenderTarget
     welcomeEl.createDiv({
       cls: 'grimoire-welcome-greeting',
       text: this.getGreeting(),
+    });
+
+    // Open interactions sit between the transcript and the composer so a
+    // pending approval is visible without scrolling the transcript.
+    this.interactionsEl = grid.createDiv({ cls: 'grimoire-interactions is-empty' });
+    this.interactionRenderer = new InteractionPromptRenderer(this.interactionsEl, {
+      onRespond: (interactionId, responseId) => {
+        void this.respondToInteraction(interactionId, responseId);
+      },
     });
 
     // Composer goes in the same grid as a third row.
@@ -463,6 +481,10 @@ export class GrimoireView extends ItemView implements ChatProjectionRenderTarget
       this.titleEl.textContent = model.title;
     }
 
+    // Interactions render independently of the transcript: an open approval
+    // must appear even when the message list is unchanged.
+    this.renderInteractions(model.interactions);
+
     const messages = [...model.messages];
 
     // Full re-render when message count changes (new message added)
@@ -477,6 +499,94 @@ export class GrimoireView extends ItemView implements ChatProjectionRenderTarget
     // Same message count but content may have changed (streaming).
     // Do a full re-render for now — incremental updates can be optimized later.
     this.messageRenderer.renderMessages(messages, () => this.getGreeting());
+  }
+
+  // ============================================
+  // Interactions
+  // ============================================
+
+  /**
+   * Renders the interactions the user can still act on. Presentation content is
+   * fetched asynchronously; refs already in the cache render immediately, and a
+   * missing one triggers one fetch followed by a re-render.
+   */
+  private renderInteractions(interactions: readonly InteractionProjection[]): void {
+    if (!this.interactionRenderer) return;
+
+    const visible = interactions.filter(
+      interaction => interaction.status !== 'resolved'
+        && interaction.status !== 'cancelled'
+        && interaction.status !== 'expired',
+    );
+
+    const missing = visible
+      .map(interaction => interaction.presentationRef)
+      .filter(ref => !this.presentationCache.has(ref));
+    if (missing.length > 0) {
+      void this.loadPresentations(missing, interactions);
+    }
+
+    const models = visible.flatMap<InteractionPromptModel>(interaction => {
+      const presentation = this.presentationCache.get(interaction.presentationRef);
+      return presentation ? [{ interaction, presentation }] : [];
+    });
+
+    // Re-rendering unconditionally would drop focus while the user is choosing.
+    const key = models
+      .map(model => `${model.interaction.interactionId}:${model.interaction.status}`
+        + `:${model.interaction.selectedResponseId ?? ''}`)
+      .join('|');
+    if (key === this.renderedInteractionKey) return;
+    this.renderedInteractionKey = key;
+    this.interactionRenderer.render(models);
+  }
+
+  private async loadPresentations(
+    refs: readonly string[],
+    interactions: readonly InteractionProjection[],
+  ): Promise<void> {
+    const lifecycle = this.plugin.applicationRuntime;
+    if (!lifecycle) return;
+
+    let loaded = false;
+    for (const ref of new Set(refs)) {
+      try {
+        const presentation = await lifecycle.runtime.readInteractionPresentation(ref);
+        if (presentation) {
+          this.presentationCache.set(ref, presentation);
+          loaded = true;
+        }
+      } catch (error) {
+        // A prompt that cannot be read must not take the transcript down with
+        // it; the interaction stays open and the next projection retries.
+        void this.plugin.writeDebugLog?.({
+          event: 'view.interaction.presentationFailed',
+          level: 'warn',
+          scope: 'view.interaction',
+          data: { error: error instanceof Error ? error.message : String(error) },
+        });
+      }
+    }
+    if (loaded && this.isActive) {
+      this.renderedInteractionKey = '';
+      this.renderInteractions(interactions);
+    }
+  }
+
+  private async respondToInteraction(interactionId: string, responseId: string): Promise<void> {
+    const lifecycle = this.plugin.applicationRuntime;
+    if (!lifecycle) return;
+    try {
+      await lifecycle.runtime.resolveInteraction({
+        interactionId: interactionId as InteractionId,
+        responseId,
+        resolvedAt: Date.now(),
+      });
+    } catch (error) {
+      new Notice(
+        `Failed to answer: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   private getGreeting(): string {
@@ -518,14 +628,6 @@ export class GrimoireView extends ItemView implements ChatProjectionRenderTarget
     autoResizeTextarea(this.inputEl);
 
     const runtime = lifecycle.runtime;
-    const module = builtInProviderCatalog.list().find(m => m.manifest.id === this.providerId);
-    const backendId = module?.execution.descriptor.backendId ?? executionBackendId(`provider-${this.providerId}`);
-    const requestRef = runtime.registerRequestRef(`${this.providerId}-turn`, {
-      startupRef: `startup-${Date.now()}`,
-      restartFingerprint: `fp-${Date.now()}`,
-      prompt: [{ type: 'text', text }],
-    });
-
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
       role: 'user',
@@ -534,13 +636,28 @@ export class GrimoireView extends ItemView implements ChatProjectionRenderTarget
     };
 
     try {
+      // Launch resolution is provider-owned. The view supplies the prompt and
+      // workspace root and receives an opaque request reference; it never
+      // builds a launch specification.
+      const prepared = await runtime.prepareChatTurn(this.providerId, {
+        conversationId: this.conversationId,
+        prompt: text,
+        cwd: getVaultPath(this.app) ?? '',
+        settings: this.plugin.settings,
+      });
+
       await this.viewController.submitTurn({
-        backendId,
-        requestRef,
+        backendId: prepared.backendId,
+        requestRef: prepared.requestRef,
         resultExpectation: 'required',
         userMessage,
       });
     } catch (error) {
+      // Restore the draft so a failed send does not lose the user's message.
+      if (this.inputEl && !this.inputEl.value) {
+        this.inputEl.value = text;
+        autoResizeTextarea(this.inputEl);
+      }
       new Notice(`Failed to send: ${error instanceof Error ? error.message : String(error)}`);
     }
   }

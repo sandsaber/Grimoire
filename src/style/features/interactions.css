@@ -1,0 +1,58 @@
+/* Open execution interactions: approvals, questions, and plan decisions.
+   Rendered between the transcript and the composer by InteractionPromptRenderer. */
+
+.grimoire-interactions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+  padding: var(--size-4-2) var(--size-4-3);
+}
+
+.grimoire-interactions.is-empty {
+  display: none;
+}
+
+.grimoire-interaction {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background-color: var(--background-secondary);
+  padding: var(--size-4-3);
+}
+
+.grimoire-interaction-title {
+  font-weight: var(--font-semibold);
+  color: var(--text-normal);
+}
+
+.grimoire-interaction-description {
+  margin-top: var(--size-2-2);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  /* Provider text can be long; keep it readable without widening the chat. */
+  max-height: 12em;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.grimoire-interaction-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-2);
+  margin-top: var(--size-4-2);
+}
+
+.grimoire-interaction-option {
+  cursor: pointer;
+}
+
+.grimoire-interaction-option:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.grimoire-interaction-option.is-selected {
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  background-color: var(--interactive-accent);
+}

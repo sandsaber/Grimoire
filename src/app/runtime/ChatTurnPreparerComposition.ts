@@ -1,0 +1,113 @@
+import { ChatTurnRequestPreparerRegistry } from '../../core/providers/ChatTurnRequestPreparer';
+import { ManagedAcpTurnRequestPreparer } from '../../providers/acp/app/ManagedAcpTurnRequestPreparer';
+import { GEMINI_EXECUTION_REQUEST_KIND } from '../../providers/gemini/app/GeminiApplicationContextFactory';
+import { GEMINI_EXECUTION_DESCRIPTOR } from '../../providers/gemini/execution/GeminiExecutionBackend';
+import { GeminiCliResolver } from '../../providers/gemini/runtime/GeminiCliResolver';
+import { buildGeminiRuntimeEnv } from '../../providers/gemini/runtime/GeminiRuntimeEnvironment';
+import { KIMICODE_EXECUTION_REQUEST_KIND } from '../../providers/kimicode/app/KimicodeApplicationContextFactory';
+import { KIMICODE_EXECUTION_DESCRIPTOR } from '../../providers/kimicode/execution/KimicodeExecutionBackend';
+import { KimicodeCliResolver } from '../../providers/kimicode/runtime/KimicodeCliResolver';
+import { prepareKimicodeLaunchArtifacts } from '../../providers/kimicode/runtime/KimicodeLaunchArtifacts';
+import { buildKimicodeRuntimeEnv } from '../../providers/kimicode/runtime/KimicodeRuntimeEnvironment';
+import { MIMOCODE_EXECUTION_REQUEST_KIND } from '../../providers/mimocode/app/MimocodeApplicationContextFactory';
+import { MIMOCODE_EXECUTION_DESCRIPTOR } from '../../providers/mimocode/execution/MimocodeExecutionBackend';
+import { MimocodeCliResolver } from '../../providers/mimocode/runtime/MimocodeCliResolver';
+import { prepareMimocodeLaunchArtifacts } from '../../providers/mimocode/runtime/MimocodeLaunchArtifacts';
+import { buildMimocodeRuntimeEnv } from '../../providers/mimocode/runtime/MimocodeRuntimeEnvironment';
+import { OPENCODE_EXECUTION_REQUEST_KIND } from '../../providers/opencode/app/OpencodeApplicationContextFactory';
+import { OPENCODE_EXECUTION_DESCRIPTOR } from '../../providers/opencode/execution/OpencodeExecutionBackend';
+import { OpencodeCliResolver } from '../../providers/opencode/runtime/OpencodeCliResolver';
+import { prepareOpencodeLaunchArtifacts } from '../../providers/opencode/runtime/OpencodeLaunchArtifacts';
+import { buildOpencodeRuntimeEnv } from '../../providers/opencode/runtime/OpencodeRuntimeEnvironment';
+import { QWEN_EXECUTION_REQUEST_KIND } from '../../providers/qwen/app/QwenApplicationContextFactory';
+import { QWEN_EXECUTION_DESCRIPTOR } from '../../providers/qwen/execution/QwenExecutionBackend';
+import { QwenCliResolver } from '../../providers/qwen/runtime/QwenCliResolver';
+import { buildQwenRuntimeEnv } from '../../providers/qwen/runtime/QwenRuntimeEnvironment';
+import type { ApplicationExecutionRequestBroker } from './ApplicationExecutionRequestBroker';
+
+/**
+ * Composes the provider-owned chat turn preparers.
+ *
+ * Only providers listed here can start a turn. A provider that is absent fails
+ * closed with a named error rather than registering a launch reference nothing
+ * can resolve — which is how the Phase 9 cutover left every provider.
+ *
+ * Adding a provider means implementing its preparer and registering it here;
+ * see Phase 12B in `docs/provider-execution-migration-plan.md`.
+ */
+export function createChatTurnRequestPreparers(options: {
+  readonly requests: ApplicationExecutionRequestBroker;
+  readonly userName?: string;
+}): ChatTurnRequestPreparerRegistry {
+  const userName = options.userName ? { userName: options.userName } : {};
+  return new ChatTurnRequestPreparerRegistry([
+    new ManagedAcpTurnRequestPreparer({
+      providerId: 'opencode',
+      displayName: 'OpenCode',
+      executableName: 'opencode',
+      backendId: OPENCODE_EXECUTION_DESCRIPTOR.backendId,
+      requestKind: OPENCODE_EXECUTION_REQUEST_KIND,
+      configEnvVar: 'OPENCODE_CONFIG',
+      launchArguments: ['acp'],
+      requests: options.requests,
+      cliResolver: new OpencodeCliResolver(),
+      prepareLaunchArtifacts: prepareOpencodeLaunchArtifacts,
+      buildRuntimeEnv: buildOpencodeRuntimeEnv,
+      ...userName,
+    }),
+    new ManagedAcpTurnRequestPreparer({
+      providerId: 'mimocode',
+      displayName: 'MiMoCode',
+      executableName: 'mimocode',
+      backendId: MIMOCODE_EXECUTION_DESCRIPTOR.backendId,
+      requestKind: MIMOCODE_EXECUTION_REQUEST_KIND,
+      configEnvVar: 'MIMOCODE_CONFIG',
+      launchArguments: ['acp'],
+      requests: options.requests,
+      cliResolver: new MimocodeCliResolver(),
+      prepareLaunchArtifacts: prepareMimocodeLaunchArtifacts,
+      buildRuntimeEnv: buildMimocodeRuntimeEnv,
+      ...userName,
+    }),
+    new ManagedAcpTurnRequestPreparer({
+      providerId: 'kimicode',
+      displayName: 'Kimi Code',
+      executableName: 'kimi',
+      backendId: KIMICODE_EXECUTION_DESCRIPTOR.backendId,
+      requestKind: KIMICODE_EXECUTION_REQUEST_KIND,
+      configEnvVar: 'KIMICODE_CONFIG',
+      launchArguments: ['acp'],
+      requests: options.requests,
+      cliResolver: new KimicodeCliResolver(),
+      prepareLaunchArtifacts: prepareKimicodeLaunchArtifacts,
+      buildRuntimeEnv: buildKimicodeRuntimeEnv,
+      ...userName,
+    }),
+    // Gemini and Qwen generate no configuration file, so they have no launch
+    // artifacts and their restart fingerprint is derived from the launch inputs.
+    new ManagedAcpTurnRequestPreparer({
+      providerId: 'gemini',
+      displayName: 'Gemini CLI',
+      executableName: 'gemini',
+      backendId: GEMINI_EXECUTION_DESCRIPTOR.backendId,
+      requestKind: GEMINI_EXECUTION_REQUEST_KIND,
+      launchArguments: ['--acp'],
+      requests: options.requests,
+      cliResolver: new GeminiCliResolver(),
+      buildRuntimeEnv: buildGeminiRuntimeEnv,
+      ...userName,
+    }),
+    new ManagedAcpTurnRequestPreparer({
+      providerId: 'qwen',
+      displayName: 'Qwen Code',
+      executableName: 'qwen',
+      backendId: QWEN_EXECUTION_DESCRIPTOR.backendId,
+      requestKind: QWEN_EXECUTION_REQUEST_KIND,
+      launchArguments: ['--acp'],
+      requests: options.requests,
+      cliResolver: new QwenCliResolver(),
+      buildRuntimeEnv: buildQwenRuntimeEnv,
+      ...userName,
+    }),
+  ]);
+}

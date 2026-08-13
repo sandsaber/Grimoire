@@ -44,6 +44,7 @@
 @import "./features/slash-commands.css";
 @import "./features/resume-session.css";
 @import "./features/ask-user-question.css";
+@import "./features/interactions.css";
 @import "./features/plan-mode.css";
 @import "./features/orchestrator-plan.css";
 
