@@ -98,15 +98,14 @@ export default class GrimoirePlugin extends Plugin {
   async onload() {
     try {
       await this.loadSettings();
-      // Construct the new ApplicationRuntime alongside the legacy path.
-      // The hard cutover will remove the legacy ProviderRegistry initialization
-      // and make the runtime the sole execution authority.
-      this.applicationRuntime = createObsidianApplicationRuntime({
-        app: this.app,
-        workDispatchFactory: {} as never,
-        workRecoveryPorts: {} as never,
-      });
+      // Construct the new ApplicationRuntime as the sole execution authority.
+      // Phase 9 cutover — ProviderRegistry/ProviderWorkspaceRegistry removed.
       try {
+        this.applicationRuntime = createObsidianApplicationRuntime({
+          app: this.app,
+          workDispatchFactory: {} as never,
+          workRecoveryPorts: {} as never,
+        });
         await this.applicationRuntime.start();
       } catch (error) {
         this.recordDebugLog({

@@ -1,5 +1,4 @@
 import type {
-  ChatRuntime,
   ProviderRuntimeCommandLoader,
   ProviderRuntimeCommandLoaderContext,
 } from '../../../core/providers/types';
@@ -8,10 +7,17 @@ import { getMimocodeProviderSettings } from '../settings';
 
 // Phase 9 cutover — MimocodeChatRuntime removed. Runtime command discovery now
 // resolves through the application runtime; this loader reports no commands.
-function createStubRuntime(): Pick<
-  ChatRuntime,
-  'syncConversationState' | 'ensureReady' | 'getSupportedCommands' | 'cleanup'
-> {
+// `ChatRuntime` is now opaque (`unknown`), so the minimal runtime surface this
+// loader touches is described locally to keep access type-safe.
+interface StubRuntime {
+  providerId?: string;
+  syncConversationState(state: unknown): void;
+  ensureReady(options: { allowSessionCreation: boolean }): Promise<boolean>;
+  getSupportedCommands(): Promise<SlashCommand[]>;
+  cleanup(): void;
+}
+
+function createStubRuntime(): StubRuntime {
   return {
     syncConversationState: () => {},
     ensureReady: async () => false,
@@ -45,15 +51,16 @@ export class MimocodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
     // no session id must stay cold until the first send. If command discovery
     // creates a real session on that bound runtime, the first turn can skip
     // history bootstrap. Keep this warmup isolated instead.
-    const canReuseRuntime = context.runtime?.providerId === 'mimocode'
+    const contextRuntime = context.runtime as StubRuntime | null;
+    const canReuseRuntime = contextRuntime?.providerId === 'mimocode'
       && !shouldWarmPreSessionConversation;
     const runtime = canReuseRuntime
-      ? context.runtime!
+      ? contextRuntime
       : createStubRuntime();
 
     try {
       if (context.conversation) {
-        runtime.syncConversationState(context.conversation, context.externalContextPaths);
+        // Phase 9 cutover — runtime sync removed
       } else if (shouldWarmBlankSession) {
         // Blank-tab warmup uses an isolated in-memory session to fetch metadata
         // without binding a persisted MiMoCode session to the tab.
@@ -70,11 +77,9 @@ export class MimocodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
         return [];
       }
 
-      return await runtime.getSupportedCommands();
+      return await Promise.resolve([]);
     } finally {
-      if (runtime !== context.runtime) {
-        runtime.cleanup();
-      }
+      // Phase 9 cutover — runtime cleanup removed
     }
   }
 }

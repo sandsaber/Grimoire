@@ -85,7 +85,7 @@ export class GrimoireView extends ItemView {
     this.contentEl.addClass('grimoire-container--chat-window');
 
     const shellEl = this.contentEl.createDiv({ cls: 'grimoire-chat-window-shell' });
-    this.messageContainerEl = shellEl.createDiv({ cls: 'grimoire-tab-content-container grimoire-tab-content-container--chat-window' });
+    this.messageContainerEl = shellEl.createDiv({ cls: 'grimoire-tab-content-container grimoire-tab-content-container--chat-window grimoire-tab-content' });
 
     const inputContainer = shellEl.createDiv({ cls: 'grimoire-input-container' });
     this.inputEl = inputContainer.createEl('textarea', {

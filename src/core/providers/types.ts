@@ -1,34 +1,16 @@
 import type { CursorContext } from '../../utils/editor';
 import type { SharedAppStorage } from '../bootstrap/storage';
 import type { McpServerManager } from '../mcp/McpServerManager';
-import type {
-  ApprovalCallback,
-  AskUserQuestionCallback,
-  AutoTurnCallback,
-  ChatRewindMode,
-  ChatRewindResult,
-  ChatRuntimeConversationState,
-  ChatRuntimeEnsureReadyOptions,
-  ChatRuntimeQueryOptions,
-  ChatTurnMetadata,
-  ChatTurnRequest,
-  ExitPlanModeCallback,
-  PreparedChatTurn,
-  SessionUpdateResult,
-  SubagentRuntimeState,
-} from '../runtime/types';
 import type { HomeFileAdapter } from '../storage/HomeFileAdapter';
 import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
 import type {
   AgentDefinition,
-  ChatMessage,
   Conversation,
   InstructionRefineResult,
   ManagedMcpServer,
   PluginInfo,
   SessionMetadata,
   SlashCommand,
-  StreamChunk,
   SubagentInfo,
   ToolCallInfo,
 } from '../types';
@@ -38,58 +20,10 @@ import type { LegacyProviderContext } from './LegacyProviderContext';
 
 export type { ProviderId } from '../types/provider';
 
-// Phase 9 cutover — ProviderRegistry / runtime/ChatRuntime removed.
-// The concrete ChatRuntime lives behind the new application runtime; this
-// structural interface is kept so legacy provider-facing contracts that still
-// reference it compile during the cutover.
-export interface ChatRuntime {
-  readonly providerId: ProviderId;
-
-  getCapabilities(): Readonly<ProviderCapabilities>;
-  prepareTurn(request: ChatTurnRequest): PreparedChatTurn;
-  onReadyStateChange(listener: (ready: boolean) => void): () => void;
-  setResumeCheckpoint(checkpointId: string | undefined): void;
-  syncConversationState(
-    conversation: ChatRuntimeConversationState | null,
-    externalContextPaths?: string[],
-  ): void;
-  reloadMcpServers(): Promise<void>;
-  reloadWorkspaceResources?(): Promise<void>;
-  ensureReady(options?: ChatRuntimeEnsureReadyOptions): Promise<boolean>;
-  query(
-    turn: PreparedChatTurn,
-    conversationHistory?: ChatMessage[],
-    queryOptions?: ChatRuntimeQueryOptions,
-  ): AsyncGenerator<StreamChunk>;
-  steer?(turn: PreparedChatTurn): Promise<boolean>;
-  cancel(): void;
-  resetSession(): void;
-  getSessionId(): string | null;
-  consumeSessionInvalidation(): boolean;
-  isReady(): boolean;
-  getSupportedCommands(): Promise<SlashCommand[]>;
-  getAuxiliaryModel?(): string | null;
-  cleanup(): void;
-  rewind(userMessageId: string, assistantMessageId: string, mode?: ChatRewindMode): Promise<ChatRewindResult>;
-  setApprovalCallback(callback: ApprovalCallback | null): void;
-  setApprovalDismisser(dismisser: (() => void) | null): void;
-  setAskUserQuestionCallback(callback: AskUserQuestionCallback | null): void;
-  setExitPlanModeCallback(callback: ExitPlanModeCallback | null): void;
-  setPermissionModeSyncCallback(callback: ((sdkMode: string) => void) | null): void;
-  setSubagentHookProvider(getState: () => SubagentRuntimeState): void;
-  setAutoTurnCallback(callback: AutoTurnCallback | null): void;
-  consumeTurnMetadata(): ChatTurnMetadata;
-
-  buildSessionUpdates(params: {
-    conversation: Conversation | null;
-    sessionInvalidated: boolean;
-  }): SessionUpdateResult;
-
-  resolveSessionIdForFork(conversation: Conversation | null): string | null;
-
-  loadSubagentToolCalls?(agentId: string): Promise<ToolCallInfo[]>;
-  loadSubagentFinalResult?(agentId: string): Promise<string | null>;
-}
+// Phase 9 cutover — ChatRuntime interface removed. The new application
+// runtime owns execution; provider-facing contracts use the new execution
+// backend and coordinator ports instead.
+export type ChatRuntime = unknown;
 
 export interface ProviderCapabilities {
   providerId: ProviderId;
@@ -428,7 +362,7 @@ export interface ProviderRuntimeCommandLoaderContext {
   conversation: Conversation | null;
   externalContextPaths: string[];
   plugin: LegacyProviderContext;
-  runtime: ChatRuntime | null;
+  runtime: ChatRuntime;
 }
 
 export interface ProviderRuntimeCommandLoader {
@@ -468,7 +402,7 @@ export interface ProviderTabWarmupContext {
   conversation: Conversation | null;
   externalContextPaths: string[];
   plugin: LegacyProviderContext;
-  runtime: ChatRuntime | null;
+  runtime: ChatRuntime;
   tab: {
     conversationId: string | null;
     draftModel: string | null;
