@@ -45,14 +45,14 @@ export interface ProviderApplicationContextPrimitives {
 
 export interface ProviderApplicationContextOverrides {
   readonly antigravity?: Partial<AntigravityApplicationContextFactoryOptions>;
-  readonly codex?: Omit<CodexApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>;
-  readonly claude?: Omit<ClaudeApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>;
-  readonly opencode?: Omit<OpencodeApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>;
-  readonly mimocode?: Omit<MimocodeApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>;
-  readonly kimicode?: Omit<KimicodeApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>;
-  readonly grok?: Omit<GrokApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>;
-  readonly qwen?: Omit<QwenApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>;
-  readonly gemini?: Omit<GeminiApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>;
+  readonly codex?: Partial<Omit<CodexApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>>;
+  readonly claude?: Partial<Omit<ClaudeApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>>;
+  readonly opencode?: Partial<Omit<OpencodeApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>>;
+  readonly mimocode?: Partial<Omit<MimocodeApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>>;
+  readonly kimicode?: Partial<Omit<KimicodeApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>>;
+  readonly grok?: Partial<Omit<GrokApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>>;
+  readonly qwen?: Partial<Omit<QwenApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>>;
+  readonly gemini?: Partial<Omit<GeminiApplicationContextFactoryOptions, keyof ProviderApplicationContextPrimitives>>;
 }
 
 export interface ProviderApplicationContextCompositionOptions {

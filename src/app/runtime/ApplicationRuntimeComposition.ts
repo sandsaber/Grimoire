@@ -8,6 +8,8 @@ import { WorkGraphRepository } from '../../core/work/WorkGraphRepository';
 import { AuxiliaryExecutionCoordinator } from '../../features/chat/application/AuxiliaryExecutionCoordinator';
 import { LocalShellExecutionCoordinator } from '../../features/chat/application/LocalShellExecutionCoordinator';
 import { LocalShellOutputProjectionStore } from '../../features/chat/application/LocalShellOutputProjectionStore';
+import type { ClaudeExecutionQueryFactory } from '../../providers/claude/execution/ClaudeExecutionBackend';
+import type { NodeProcessLauncherComposition } from '../execution/NodeProcessLauncherComposition';
 import { ApplicationExecutionRequestBroker } from './ApplicationExecutionRequestBroker';
 import type { ApplicationIdentityFactory } from './ApplicationIdentityFactory';
 import { ApplicationRuntimeInfrastructure } from './ApplicationRuntimeInfrastructure';
@@ -16,6 +18,7 @@ import { createChatExecutionCoordinator } from './ChatRuntimeWiring';
 import { DurableExecutionResultStore } from './DurableExecutionResultStore';
 import { EphemeralExecutionRequestStore } from './EphemeralExecutionRequestStore';
 import { ExecutionInteractionPresentationRecovery } from './ExecutionInteractionPresentationRecovery';
+import type { ProviderApplicationContextOverrides } from './ProviderApplicationContextComposition';
 import { ProviderApplicationContextComposition } from './ProviderApplicationContextComposition';
 import { ProviderBackendGenerationStore } from './ProviderBackendGenerationStore';
 import { ProviderBackendLifecycleAdapter } from './ProviderBackendLifecycleAdapter';
@@ -25,6 +28,8 @@ export interface ApplicationRuntimeCompositionOptions {
   readonly storage: DurableStorage;
   readonly digest: Sha256DigestPort;
   readonly now?: () => number;
+  readonly launchers?: NodeProcessLauncherComposition;
+  readonly claudeQueryFactory?: ClaudeExecutionQueryFactory;
 }
 
 /**
@@ -61,6 +66,7 @@ export class ApplicationRuntimeComposition {
     this.composition = new ProviderApplicationContextComposition({
       storage: options.storage,
       digest: options.digest,
+      overrides: this.createProviderOverrides(options),
     });
 
     this.generations = new ProviderBackendGenerationStore();
@@ -126,5 +132,29 @@ export class ApplicationRuntimeComposition {
 
   get identities(): ApplicationIdentityFactory {
     return this.infrastructure.identities;
+  }
+
+  private createProviderOverrides(
+    options: ApplicationRuntimeCompositionOptions,
+  ): ProviderApplicationContextOverrides {
+    const launchers = options.launchers;
+    const managedAcp = launchers?.managedAcpLauncher;
+    return {
+      ...(launchers ? {
+        antigravity: { processTransport: launchers.antigravityTransport },
+        codex: { processFactory: launchers.codexProcessFactory },
+        ...(managedAcp ? {
+          opencode: { processLauncher: managedAcp },
+          mimocode: { processLauncher: managedAcp },
+          kimicode: { processLauncher: managedAcp },
+          grok: { processLauncher: managedAcp },
+          qwen: { processLauncher: managedAcp },
+          gemini: { processLauncher: managedAcp },
+        } : {}),
+      } : {}),
+      ...(options.claudeQueryFactory
+        ? { claude: { queryFactory: options.claudeQueryFactory } }
+        : {}),
+    };
   }
 }

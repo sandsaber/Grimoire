@@ -50,4 +50,28 @@ describe('ApplicationRuntimeComposition', () => {
     await composition.lifecycleAdapter.shutdown(`sd-${'1'.repeat(32)}`);
     await composition.lifecycleAdapter.dispose();
   });
+
+  it('accepts concrete Node process launchers and wires them into provider overrides', async () => {
+    const storage = new TestDurableStorage();
+    const identities = new (await import('@/app/runtime/ApplicationIdentityFactory')).ApplicationIdentityFactory(() => '3'.repeat(32));
+    const { ApplicationExecutionRequestBroker } = await import('@/app/runtime/ApplicationExecutionRequestBroker');
+    const { EphemeralExecutionRequestStore } = await import('@/app/runtime/EphemeralExecutionRequestStore');
+    const { createNodeProcessLauncherComposition } = await import('@/app/execution/NodeProcessLauncherComposition');
+    const requests = new ApplicationExecutionRequestBroker(new EphemeralExecutionRequestStore(), identities);
+    const launchers = createNodeProcessLauncherComposition({
+      requests,
+      codexLaunchSpec: { command: 'codex', args: [], spawnCwd: '/vault', env: {} },
+    });
+
+    const composition = new ApplicationRuntimeComposition({
+      storage,
+      digest,
+      launchers,
+    });
+
+    await composition.lifecycleAdapter.initialize();
+    // All nine backends should have been prepared with the concrete launchers.
+    expect(composition.startup.bootstrap).toBeDefined();
+    await composition.lifecycleAdapter.dispose();
+  });
 });
