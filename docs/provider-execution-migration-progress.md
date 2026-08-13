@@ -807,6 +807,30 @@ generation.
 Current broad evidence: 546 unit suites / 7,873 tests pass with typecheck, full ESLint, and
 `git diff --check`. Production composition is unchanged and still uses the legacy runtime path.
 
+- `48f015db` — Added `ObsidianVaultTextFileAdapter` (bridges Obsidian Vault API to the
+  AtomicTextFileAdapter contract) and `createObsidianApplicationRuntime` (production entry point:
+  constructs the complete ApplicationRuntime from Obsidian primitives). This is the bootstrap that
+  `main.ts` will call in `onload()` to replace `ProviderRegistry` initialization.
+
+### Phase 9 cutover status
+
+The complete new application runtime composition layer is built and tested (546 suites / 7,873 tests):
+- 9 provider context factories + 4 interaction bridges
+- Complete `ApplicationRuntimeComposition` with all coordinators + concrete launchers + settings
+- `createApplicationRuntime` factory with native agent lifecycle bridge
+- `createApplicationRuntimePluginLifecycle` for Obsidian Plugin lifecycle
+- `ChatProjectionViewController` replacing tab-owned chat runtime
+- `createObsidianApplicationRuntime` production bootstrap from Obsidian vault
+
+**Remaining for the hard cutover:**
+1. Rewrite `main.ts` `onload()` to construct `ApplicationRuntime` instead of `ProviderRegistry`
+2. Rewrite `GrimoireView` (1,052 lines) to use `ChatProjectionViewController` instead of `TabManager`
+3. Migrate existing vault conversations to the revisioned conversation repository
+4. Delete `TabManager`, `Tab`, `InputController`, `StreamController`, `ConversationController`,
+   `SubagentManager`, all 9 `*ChatRuntime.ts` files, `ProviderRegistry`, `ProviderWorkspaceRegistry`,
+   `ChatRuntime`, and `LegacyProviderContext`
+5. Run structural deletion searches and confirm zero legacy references in production source
+
 ## Next steps
 
 1. ~~Compose all nine provider backend contexts~~ — done.
