@@ -7,7 +7,7 @@ import {
 describe('ApplicationRuntime', () => {
   it('keeps admission closed until every startup recovery phase completes in order', async () => {
     const calls: string[] = [];
-    const gates = Array.from({ length: 11 }, () => deferred<void>());
+    const gates = Array.from({ length: 8 }, () => deferred<void>());
     const options = createOptions(calls, gates);
     const runtime = new ApplicationRuntime(options);
 
@@ -25,9 +25,6 @@ describe('ApplicationRuntime', () => {
       'shell',
       'auxiliary',
       'agents',
-      'work-dispatch-bindings',
-      'agents',
-      'work',
     ];
     for (let index = 0; index < gates.length; index += 1) {
       await flushPromises();
@@ -116,7 +113,7 @@ describe('ApplicationRuntime', () => {
 
   it('joins in-flight startup before shutdown without ever opening admission', async () => {
     const calls: string[] = [];
-    const gates = Array.from({ length: 11 }, () => deferred<void>());
+    const gates = Array.from({ length: 8 }, () => deferred<void>());
     const runtime = new ApplicationRuntime(createOptions(calls, gates));
 
     const startup = runtime.start();
@@ -142,9 +139,6 @@ describe('ApplicationRuntime', () => {
       'shell',
       'auxiliary',
       'agents',
-      'work-dispatch-bindings',
-      'agents',
-      'work',
       'lifecycle-shutdown',
       'agent-idle',
       'chat-idle',
@@ -237,7 +231,6 @@ function createOptions(
     calls.push(name);
     await gates[index]?.promise;
   };
-  let agentRecovery = 0;
   return {
     migration: { migrate: phase('migration', 0) },
     backends: {
@@ -251,6 +244,8 @@ function createOptions(
     interactionPresentations: { recover: phase('interaction-presentations', 3) },
     settings: { recoverPending: phase('settings', 4) },
     chat: {
+      createConversation: async () => undefined,
+      registerRequestRef: () => 'req-test',
       loadConversation: async conversationId => ({ conversationId } as never),
       attach: async () => () => undefined,
       submitTurn: async () => ({} as never),
@@ -276,13 +271,11 @@ function createOptions(
     agents: {
       recover: async () => {
         calls.push('agents');
-        await gates[agentRecovery++ === 0 ? 7 : 9]?.promise;
+        await gates[7]?.promise;
       },
       waitForIdle: async () => { calls.push('agent-idle'); },
       dispose: () => { calls.push('agent-dispose'); },
     },
-    workDispatchFactory: {} as never,
-    workRecoveryPorts: {} as never,
     projections: { dispose: () => { calls.push('projection-dispose'); } },
     requests: { dispose: () => { calls.push('request-dispose'); } },
     workspaces: { dispose: async () => { calls.push('workspace-dispose'); } },

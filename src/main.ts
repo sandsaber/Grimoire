@@ -104,8 +104,6 @@ export default class GrimoirePlugin extends Plugin {
       try {
         this.applicationRuntime = createObsidianApplicationRuntime({
           app: this.app,
-          workDispatchFactory: {} as never,
-          workRecoveryPorts: {} as never,
         });
         await this.applicationRuntime.start();
       } catch (error) {

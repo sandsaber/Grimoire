@@ -122,17 +122,12 @@ export class GrimoireView extends ItemView {
 
     if (!this.conversationId) {
       this.conversationId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      // Create the conversation in the revisioned repository so
-      // loadConversation and attachConversation succeed.
+      // Create the conversation through the runtime's admission boundary.
       try {
-        await lifecycle.composition.conversations.create({
-          id: this.conversationId,
+        await lifecycle.runtime.createConversation({
+          conversationId: this.conversationId,
           providerId: this.providerId,
           title: 'New Conversation',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          sessionId: null,
-          messages: [],
         });
       } catch {
         // Conversation may already exist; that's fine.
@@ -199,10 +194,10 @@ export class GrimoireView extends ItemView {
 
     this.inputEl.value = '';
 
-    const composition = lifecycle.composition;
+    const runtime = lifecycle.runtime;
     const module = builtInProviderCatalog.list().find(m => m.manifest.id === this.providerId);
     const backendId = module?.execution.descriptor.backendId ?? executionBackendId(`provider-${this.providerId}`);
-    const requestRef = composition.requests.register(`${this.providerId}-turn`, {
+    const requestRef = runtime.registerRequestRef(`${this.providerId}-turn`, {
       startupRef: `startup-${Date.now()}`,
       restartFingerprint: `fp-${Date.now()}`,
       prompt: [{ type: 'text', text }],

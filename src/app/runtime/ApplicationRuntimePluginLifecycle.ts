@@ -5,8 +5,8 @@ import { createApplicationRuntime } from './ApplicationRuntimeFactory';
 
 export interface ApplicationRuntimePluginLifecycleOptions {
   readonly composition: ApplicationRuntimeComposition;
-  readonly workDispatchFactory: WorkNodeDispatchFactory;
-  readonly workRecoveryPorts: WorkRecoveryPorts;
+  readonly workDispatchFactory?: WorkNodeDispatchFactory;
+  readonly workRecoveryPorts?: WorkRecoveryPorts;
 }
 
 export interface ApplicationRuntimePluginLifecycle {

@@ -1,6 +1,5 @@
 import type { App } from 'obsidian';
 
-import type { WorkNodeDispatchFactory, WorkRecoveryPorts } from '../../core/work/WorkCoordinator';
 import { getVaultPath } from '../../utils/path';
 import { SubtleCryptoSha256DigestPort } from '../security/SubtleCryptoSha256DigestPort';
 import { ObsidianVaultTextFileAdapter } from '../storage/ObsidianVaultTextFileAdapter';
@@ -11,13 +10,15 @@ import { createApplicationRuntimePluginLifecycle } from './ApplicationRuntimePlu
 
 export interface ObsidianApplicationRuntimeBootstrapOptions {
   readonly app: App;
-  readonly workDispatchFactory: WorkNodeDispatchFactory;
-  readonly workRecoveryPorts: WorkRecoveryPorts;
 }
 
 /**
  * The production entry point for constructing the ApplicationRuntime from
  * Obsidian vault primitives. main.ts calls this once during onload().
+ *
+ * The composition is constructed internally from the vault's durable storage
+ * and SubtleCrypto digest. Work dispatch and recovery ports are optional;
+ * they are wired when orchestrator work graphs are introduced.
  */
 export function createObsidianApplicationRuntime(
   options: ObsidianApplicationRuntimeBootstrapOptions,
@@ -29,9 +30,8 @@ export function createObsidianApplicationRuntime(
   const digest = new SubtleCryptoSha256DigestPort(crypto.subtle);
 
   const composition = new ApplicationRuntimeComposition({ storage, digest });
+
   return createApplicationRuntimePluginLifecycle({
     composition,
-    workDispatchFactory: options.workDispatchFactory,
-    workRecoveryPorts: options.workRecoveryPorts,
   });
 }

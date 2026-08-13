@@ -1,14 +1,14 @@
 import type { WorkNodeDispatchFactory, WorkRecoveryPorts } from '../../core/work/WorkCoordinator';
 import { builtInProviderCatalog } from '../../providers/BuiltInProviderCatalog';
-import { ApplicationRuntime } from './ApplicationRuntime';
+import { ApplicationRuntime, type ApplicationRuntimeChatPort } from './ApplicationRuntime';
 import type { ApplicationRuntimeComposition } from './ApplicationRuntimeComposition';
 import { ApplicationRuntimeProjectionPort } from './ApplicationRuntimeProjectionPort';
 import { createNativeAgentLifecycleBridge } from './NativeAgentLifecycleBridgeWiring';
 
 export interface ApplicationRuntimeFactoryOptions {
   readonly composition: ApplicationRuntimeComposition;
-  readonly workDispatchFactory: WorkNodeDispatchFactory;
-  readonly workRecoveryPorts: WorkRecoveryPorts;
+  readonly workDispatchFactory?: WorkNodeDispatchFactory;
+  readonly workRecoveryPorts?: WorkRecoveryPorts;
 }
 
 /**
@@ -28,13 +28,41 @@ export function createApplicationRuntime(
   const projections = new ApplicationRuntimeProjectionPort([
     () => nativeAgents.dispose(),
   ]);
+
+  // Wrap the chat coordinator to expose conversation creation and request
+  // registration through the runtime's admission boundary.
+  const chatPort: ApplicationRuntimeChatPort = {
+    createConversation: async (input) => {
+      const existing = await composition.conversations.read(input.conversationId);
+      if (existing.kind !== 'absent') return;
+      await composition.conversations.create({
+        id: input.conversationId,
+        providerId: input.providerId,
+        title: input.title,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        sessionId: null,
+        messages: [],
+      });
+    },
+    registerRequestRef: (kind, payload) =>
+      composition.requests.register(kind, payload),
+    loadConversation: (id) => composition.chat.loadConversation(id),
+    attach: (id, listener) => composition.chat.attach(id, listener),
+    submitTurn: (command) => composition.chat.submitTurn(command),
+    cancelActive: (id) => composition.chat.cancelActive(id),
+    resolveInteraction: (resolution) => composition.chat.resolveInteraction(resolution),
+    waitForIdle: () => composition.chat.waitForIdle(),
+    dispose: () => composition.chat.dispose(),
+  };
+
   return new ApplicationRuntime({
     migration: composition.migration,
     backends: composition.lifecycleAdapter,
     lifecycle: composition.lifecycleAdapter,
     interactionPresentations: composition.presentations,
     settings: composition.settings.coordinator,
-    chat: composition.chat,
+    chat: chatPort,
     shell: composition.shell,
     auxiliary: composition.auxiliary,
     agents: nativeAgents,
@@ -42,8 +70,8 @@ export function createApplicationRuntime(
       recoverDispatchBindings: port => composition.work.recoverDispatchBindings(port),
       recoverAll: (factory, ports) => composition.work.recoverAll(factory, ports),
     },
-    workDispatchFactory: options.workDispatchFactory,
-    workRecoveryPorts: options.workRecoveryPorts,
+    ...(options.workDispatchFactory ? { workDispatchFactory: options.workDispatchFactory } : {}),
+    ...(options.workRecoveryPorts ? { workRecoveryPorts: options.workRecoveryPorts } : {}),
     projections,
     workspaces: { dispose: async () => composition.settings.workspaceManager.dispose() },
     requests: { dispose: () => composition.requests.dispose() },

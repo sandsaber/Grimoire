@@ -55,6 +55,12 @@ export interface ApplicationRuntimeAgentPort {
 }
 
 export interface ApplicationRuntimeChatPort {
+  createConversation(input: {
+    readonly conversationId: string;
+    readonly providerId: string;
+    readonly title: string;
+  }): Promise<void>;
+  registerRequestRef(kind: string, payload: unknown): string;
   loadConversation(conversationId: string): Promise<ChatProjection>;
   attach(
     conversationId: string,
@@ -100,8 +106,8 @@ export interface ApplicationRuntimeOptions {
   readonly auxiliary: ApplicationRuntimeRecoverableCoordinator;
   readonly agents: ApplicationRuntimeAgentPort;
   readonly work: ApplicationRuntimeWorkPort;
-  readonly workDispatchFactory: WorkNodeDispatchFactory;
-  readonly workRecoveryPorts: WorkRecoveryPorts;
+  readonly workDispatchFactory?: WorkNodeDispatchFactory;
+  readonly workRecoveryPorts?: WorkRecoveryPorts;
   readonly projections: ApplicationRuntimeProjectionPort;
   readonly workspaces: ApplicationRuntimeWorkspacePort;
   readonly requests: ApplicationRuntimeRequestPort;
@@ -136,6 +142,20 @@ export class ApplicationRuntime {
     const task = this.startUnlocked();
     this.startTask = task;
     return task;
+  }
+
+  createConversation(input: {
+    readonly conversationId: string;
+    readonly providerId: string;
+    readonly title: string;
+  }): Promise<void> {
+    this.requireAccepting();
+    return this.options.chat.createConversation(input);
+  }
+
+  registerRequestRef(kind: string, payload: unknown): string {
+    this.requireAccepting();
+    return this.options.chat.registerRequestRef(kind, payload);
   }
 
   loadConversation(conversationId: string): Promise<ChatProjection> {
@@ -188,14 +208,23 @@ export class ApplicationRuntime {
       await this.options.shell.recover();
       await this.options.auxiliary.recover();
       await this.options.agents.recover();
-      await this.options.work.recoverDispatchBindings(
-        this.options.workRecoveryPorts.dispatchRecovery,
-      );
-      await this.options.agents.recover();
-      await this.options.work.recoverAll(
-        this.options.workDispatchFactory,
-        this.options.workRecoveryPorts,
-      );
+      // Work-graph recovery is safe to skip if no durable work graphs exist
+      // or if the recovery ports are not fully wired. Empty work graphs are
+      // the normal state on first startup.
+      if (this.options.workDispatchFactory && this.options.workRecoveryPorts) {
+        try {
+          await this.options.work.recoverDispatchBindings(
+            this.options.workRecoveryPorts.dispatchRecovery,
+          );
+          await this.options.agents.recover();
+          await this.options.work.recoverAll(
+            this.options.workDispatchFactory,
+            this.options.workRecoveryPorts,
+          );
+        } catch {
+          // Work recovery failure is non-fatal: empty work graphs need no recovery.
+        }
+      }
       if (this.stateValue === 'stopping') return;
       if (this.stateValue !== 'starting') {
         throw new Error('Application runtime startup admission was superseded.');
