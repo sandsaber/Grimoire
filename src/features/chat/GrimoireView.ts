@@ -48,7 +48,7 @@ interface GrimoireActiveTabStub {
  * projection listener, and renders updates through ChatProjectionRenderer.
  * It never creates, queries, cancels, or disposes execution resources.
  *
- * This replaces the legacy TabManager/Tab/InputController/StreamController
+ * Projection-backed view replacing the legacy tab architecture
  * architecture. The legacy tab state (AppTabManagerState) is migrated to
  * conversation-level projection attachments.
  */

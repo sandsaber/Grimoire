@@ -1,7 +1,7 @@
 /**
  * Lightweight lifecycle helpers shared by ACP managed-CLI runtimes.
  *
- * Full ChatRuntime base extraction is intentionally incremental: these helpers
+ * Full runtime base extraction is intentionally incremental: these helpers
  * cover generation/cleanup races first without forcing a large class hierarchy.
  */
 

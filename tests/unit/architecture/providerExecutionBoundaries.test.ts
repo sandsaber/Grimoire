@@ -354,9 +354,7 @@ describe('provider execution architecture boundaries', () => {
       readTypeScriptSources(join(sourceRoot, 'features')),
     );
 
-    expect(processImports).toEqual([
-      'features/chat/services/BangBashService.ts',
-    ]);
+    expect(processImports).toEqual([]);
   });
 
   it('keeps the execution kernel independent from DOM ownership', () => {

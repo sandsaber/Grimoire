@@ -23,7 +23,7 @@ export type { ProviderId } from '../types/provider';
 // Phase 9 cutover — ChatRuntime interface removed. The new application
 // runtime owns execution; provider-facing contracts use the new execution
 // backend and coordinator ports instead.
-export type ChatRuntime = unknown;
+
 
 export interface ProviderCapabilities {
   providerId: ProviderId;
@@ -67,7 +67,7 @@ export interface ProviderRegistration {
   environmentKeyPatterns?: RegExp[];
   chatUIConfig: ProviderChatUIConfig;
   settingsReconciler: ProviderSettingsReconciler;
-  createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => ChatRuntime;
+  createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => unknown;
   createTitleGenerationService: (plugin: LegacyProviderContext) => TitleGenerationService;
   createInstructionRefineService: (plugin: LegacyProviderContext) => InstructionRefineService;
   createInlineEditService: (plugin: LegacyProviderContext) => InlineEditService;
@@ -362,7 +362,7 @@ export interface ProviderRuntimeCommandLoaderContext {
   conversation: Conversation | null;
   externalContextPaths: string[];
   plugin: LegacyProviderContext;
-  runtime: ChatRuntime;
+  runtime: unknown;
 }
 
 export interface ProviderRuntimeCommandLoader {
@@ -402,7 +402,7 @@ export interface ProviderTabWarmupContext {
   conversation: Conversation | null;
   externalContextPaths: string[];
   plugin: LegacyProviderContext;
-  runtime: ChatRuntime;
+  runtime: unknown;
   tab: {
     conversationId: string | null;
     draftModel: string | null;
