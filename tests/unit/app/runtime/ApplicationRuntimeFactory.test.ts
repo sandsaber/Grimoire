@@ -10,24 +10,35 @@ const digest = {
 };
 
 describe('createApplicationRuntime', () => {
-  it('constructs the runtime admission boundary from the production composition', async () => {
+  it('constructs the runtime admission boundary with native agent bridge from the composition', () => {
     const composition = new ApplicationRuntimeComposition({
       storage: new TestDurableStorage(),
       digest,
     });
     const runtime = createApplicationRuntime({
       composition,
-      agents: {
-        recover: async () => undefined,
-        waitForIdle: async () => undefined,
-        dispose: () => undefined,
-      },
-      projections: { dispose: () => undefined },
       workDispatchFactory: ({} as never),
       workRecoveryPorts: ({} as never),
     });
 
     expect(runtime.state).toBe('constructed');
     expect(() => runtime.loadConversation('c1')).toThrow();
+  });
+
+  it('starts, accepts commands, and shuts down through the full composition', async () => {
+    const composition = new ApplicationRuntimeComposition({
+      storage: new TestDurableStorage(),
+      digest,
+    });
+    const runtime = createApplicationRuntime({
+      composition,
+      workDispatchFactory: ({} as never),
+      workRecoveryPorts: ({} as never),
+    });
+
+    await runtime.start();
+    expect(runtime.state).toBe('accepting');
+    await runtime.shutdown();
+    expect(runtime.state).toBe('stopped');
   });
 });

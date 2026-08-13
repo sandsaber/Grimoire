@@ -1,11 +1,12 @@
 import type { WorkNodeDispatchFactory, WorkRecoveryPorts } from '../../core/work/WorkCoordinator';
-import { ApplicationRuntime, type ApplicationRuntimeOptions } from './ApplicationRuntime';
+import { builtInProviderCatalog } from '../../providers/BuiltInProviderCatalog';
+import { ApplicationRuntime } from './ApplicationRuntime';
 import type { ApplicationRuntimeComposition } from './ApplicationRuntimeComposition';
+import { ApplicationRuntimeProjectionPort } from './ApplicationRuntimeProjectionPort';
+import { createNativeAgentLifecycleBridge } from './NativeAgentLifecycleBridgeWiring';
 
 export interface ApplicationRuntimeFactoryOptions {
   readonly composition: ApplicationRuntimeComposition;
-  readonly agents: ApplicationRuntimeOptions['agents'];
-  readonly projections: ApplicationRuntimeOptions['projections'];
   readonly workDispatchFactory: WorkNodeDispatchFactory;
   readonly workRecoveryPorts: WorkRecoveryPorts;
 }
@@ -14,16 +15,19 @@ export interface ApplicationRuntimeFactoryOptions {
  * Constructs the ApplicationRuntime from the complete production composition.
  * The runtime is the sole admission boundary; views own presentation only.
  *
- * The `agents` and `projections` ports require additional wiring
- * (NativeAgentLifecycleBridge, projection coordinator) that depends on
- * the composition's lifecycle, agent coordinator, and result store. Those
- * adapters are constructed by the caller and passed here so the factory
- * remains a pure mapping from composition to runtime options.
+ * The native agent lifecycle bridge and projection port are constructed
+ * internally from the composition. The work dispatch factory and recovery
+ * ports are injected by the caller because they depend on provider-specific
+ * dispatch semantics.
  */
 export function createApplicationRuntime(
   options: ApplicationRuntimeFactoryOptions,
 ): ApplicationRuntime {
   const composition = options.composition;
+  const nativeAgents = createNativeAgentLifecycleBridge(composition, builtInProviderCatalog);
+  const projections = new ApplicationRuntimeProjectionPort([
+    () => nativeAgents.dispose(),
+  ]);
   return new ApplicationRuntime({
     migration: composition.migration,
     backends: composition.lifecycleAdapter,
@@ -33,14 +37,14 @@ export function createApplicationRuntime(
     chat: composition.chat,
     shell: composition.shell,
     auxiliary: composition.auxiliary,
-    agents: options.agents,
+    agents: nativeAgents,
     work: {
       recoverDispatchBindings: port => composition.work.recoverDispatchBindings(port),
       recoverAll: (factory, ports) => composition.work.recoverAll(factory, ports),
     },
     workDispatchFactory: options.workDispatchFactory,
     workRecoveryPorts: options.workRecoveryPorts,
-    projections: options.projections,
+    projections,
     workspaces: { dispose: async () => composition.settings.workspaceManager.dispose() },
     requests: { dispose: () => composition.requests.dispose() },
     nextShutdownCheckpointId: () => composition.identities.nextShutdownCheckpointId(),

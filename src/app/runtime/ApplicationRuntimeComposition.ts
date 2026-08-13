@@ -102,6 +102,10 @@ export class ApplicationRuntimeComposition {
     this.conversations = new ConversationRepository(options.storage);
     this.agents = new AgentCoordinator(options.storage, {
       ...(options.now ? { now: options.now } : {}),
+      scheduler: {
+        setTimeout: (callback: () => void, delayMs: number) => window.setTimeout(callback, delayMs),
+        clearTimeout: (handle: unknown) => window.clearTimeout(handle as ReturnType<typeof setTimeout>),
+      },
     });
 
     const workGraphs = new WorkGraphRepository(options.storage, options.now);
