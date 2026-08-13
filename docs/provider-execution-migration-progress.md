@@ -31,7 +31,7 @@ this file records what has actually landed and what remains open.
 | Phase 8 — catalog and provider-neutral feature ports | Complete | `91af3577` |
 | Phase 9 — production cutover | Complete | `e7604e15` |
 | Phase 10 — legacy deletion | Complete | `42ad4474` |
-| Phase 11 — hardening and migration evidence | Complete | `c3382080`, `fdfb9a2c` |
+| Phase 11 — hardening and migration evidence | Complete | `c3382080`, `fdfb9a2c`, `f5576f31` |
 
 ## Completed architecture foundation
 
