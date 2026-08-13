@@ -789,12 +789,17 @@ generation.
   `createProviderSettingsCoordinator` composes the control plane, staged settings store, workspace
   manager, and settings transaction coordinator. `ApplicationRuntimeComposition` now includes the
   full settings coordinator wiring.
-- `e8be7724` — Added `createApplicationRuntime`: maps the complete production composition to the
-  `ApplicationRuntime` admission boundary. All coordinator ports are wired; the agents and
-  projections ports are injected by the caller (they require `NativeAgentLifecycleBridge` and
-  projection coordinator adapters).
+- `e1d18c7d` — Added `NativeAgentLifecycleBridge` wiring and self-contained runtime factory:
+  `CatalogNativeAgentProviderProfilePort` maps backend IDs to agent observation profiles from
+  the catalog; `CatalogNativeAgentRootPolicyPort` resolves the root permission boundary;
+  `createNativeAgentLifecycleBridge` constructs the bridge from the composition;
+  `ApplicationRuntimeProjectionPort` aggregates projection disposal; and
+  `createApplicationRuntime` now constructs the agent bridge and projection port internally.
+  The factory test verifies the full runtime starts, accepts commands, and shuts down through
+  the complete production composition. Callers only need to inject the work dispatch factory
+  and recovery ports.
 
-Current broad evidence: 543 unit suites / 7,866 tests pass with typecheck, full ESLint, and
+Current broad evidence: 544 unit suites / 7,870 tests pass with typecheck, full ESLint, and
 `git diff --check`. Production composition is unchanged and still uses the legacy runtime path.
 
 ## Next steps
@@ -807,9 +812,10 @@ Current broad evidence: 543 unit suites / 7,866 tests pass with typecheck, full 
    ~~Inject concrete Node process launchers~~ — done.
    ~~Add Phase 8 settings coordinator wiring~~ — done.
    ~~Add ApplicationRuntime factory~~ — done.
-   Remaining: build `NativeAgentLifecycleBridge` adapter, projection coordinator, and work recovery
-   ports for the runtime factory's agent/projection/work inputs.
-2. Replace tab/input/stream ownership with projection-backed presentation, migrate existing vault
-   conversations, and switch `main.ts` once all current user paths pass through the platform.
-3. Run the Phase 9 manual test-vault matrix and full cross-platform checkpoint gate before the
+   ~~Add native agent lifecycle bridge wiring~~ — done.
+   Remaining: build projection-backed view adapters (replacing `GrimoireView`/`TabManager`/
+   `InputController`/`StreamController`/`ConversationController` with projection attachments),
+   construct the `ApplicationRuntime` in `main.ts`, migrate vault data, and switch the
+   production composition.
+2. Run the Phase 9 manual test-vault matrix and full cross-platform checkpoint gate before the
    cutover commit.
