@@ -884,3 +884,39 @@ These cannot be completed by automated tooling:
    production composition.
 2. Run the Phase 9 manual test-vault matrix and full cross-platform checkpoint gate before the
    cutover commit.
+
+## Migration status: automated scope complete, human verification required
+
+The provider execution migration is complete in all aspects that can be
+automated by an AI agent. Two Definition of Done items require human
+action and cannot be completed programmatically:
+
+1. **Manual test-vault smoke** (DoD line 1017): The automated smoke test
+   (6 integration tests) covers runtime startup, conversation creation,
+   provider resolution, projection attachment, and shutdown. The plugin
+   is installed in the test vault with a verified checksum match, Obsidian
+   is running, and the plugin has been reloaded. Actual GUI testing —
+   opening the chat view, selecting a provider, sending a message through
+   a provider backend, and visually confirming the projection renders —
+   requires a human to interact with the Obsidian Electron application.
+
+2. **Independent human reviewer** (DoD line 1018): Two rounds of automated
+   architecture review were conducted, identifying and resolving all 5
+   blockers. The final review confirmed zero unresolved blockers. A human
+   reviewer's sign-off is required by the plan but cannot be provided by
+   an AI agent.
+
+### Final automated evidence summary (45 commits)
+
+- 81,391+ lines of legacy code deleted
+- 0 functional references to ChatRuntime, ProviderRegistry,
+  ProviderWorkspaceRegistry, TabManager, InputController, StreamController,
+  SubagentManager, BangBashService
+- 0 child_process imports in features
+- 6,039 tests pass (5,961 unit + 78 integration)
+- Typecheck, lint, release build all clean
+- All 5 architecture review blockers resolved
+- ApplicationRuntimeMigration imports legacy conversations
+- Concrete Node process launchers wired for all 9 providers
+- Provider selector dropdown in chat view
+- Test vault build verified by SHA-256 checksum match
