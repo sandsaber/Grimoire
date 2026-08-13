@@ -1,9 +1,12 @@
 # Full Execution Architecture Migration Plan
 
-Status: approved implementation plan; implementation is complete through Phase 8.
+Status: approved implementation plan. The execution core is delivered through Phase 8. Phases 9
+through 11 were checkpointed but did not meet their exit gates; Phase 12 closes the gap.
 
 Checkpoint status and verification evidence are recorded in
-[`provider-execution-migration-progress.md`](provider-execution-migration-progress.md).
+[`provider-execution-migration-progress.md`](provider-execution-migration-progress.md). The
+presentation and control-plane baseline that Phase 0 should have produced is recorded in
+[`provider-execution-presentation-parity.md`](provider-execution-presentation-parity.md).
 
 This document is the operational source of truth for replacing Grimoire's current provider, chat-execution, tab, and subagent lifecycle architecture in this branch. The architectural reasoning and lifecycle semantics are defined in
 [`provider-architecture-research.md`](provider-architecture-research.md).
@@ -657,7 +660,16 @@ Exit gate:
 - final assistant text, thinking, tools, progress, and agent results remain distinct fields;
 - missing required result is visible and never treated as empty success;
 - local shell has exactly one terminal and no feature-owned process;
-- auxiliary sessions cannot cross-contaminate chat history or provider state.
+- auxiliary sessions cannot cross-contaminate chat history or provider state;
+- **presentation parity inventory**: every user-facing surface recorded in the Phase 0 baseline is
+  either reachable from `src/main.ts` in the new composition, or listed with an explicit,
+  named decision to drop it from the product. A surface is not "migrated" because its module still
+  compiles — an import-graph walk from the entry point must reach it. Silent orphaning is a Phase 7
+  failure, not acceptable debt.
+
+The last gate exists because the first cutover attempt satisfied every other item on this list while
+leaving most of the product unreachable. Reducing a view to a projection consumer is necessary but
+not sufficient; the surfaces it used to host need a new owner or a recorded removal.
 
 Checkpoints:
 
@@ -773,6 +785,94 @@ Work:
 Branch completion requires every definition-of-done item below. Near completion, remaining old code is a blocker, not accepted debt.
 
 Checkpoint: `test: harden lifecycle architecture migration`
+
+### Phase 12 — Presentation and control-plane parity
+
+Objective: restore the product surface that the Phase 9 cutover left without an owner, and make its
+absence impossible to reintroduce silently.
+
+This phase was not in the original plan. It exists because Phase 0 was skipped, so Phase 9's exit
+gate *"every current user path is present through the new composition"* had no baseline and was
+recorded as met while 324 files became unreachable. The baseline is now
+[`provider-execution-presentation-parity.md`](provider-execution-presentation-parity.md).
+
+The work is contract extension first, wiring second. The replacement `ProviderModule` has no slot for
+most of what the deleted `ProviderRegistration` and `WorkspaceRegistration` carried, so re-adding
+imports cannot fix it.
+
+#### 12A — Parity gate
+
+- add a checked-in import-graph walk from `src/main.ts` that resolves relative specifiers, the `@/*`
+  alias, side-effect imports, dynamic `import()`, and `require()`;
+- add a parity manifest listing every surface with its expected state: `wired`, `intentionally-removed`,
+  or `pending` with an owning Phase 12 item;
+- add a fitness test that fails when reality and the manifest disagree in either direction — an
+  orphaned surface that claims `wired`, and a surface that reached `wired` without the manifest being
+  updated;
+- the gate stays green by construction; its purpose is that the remaining work is counted rather than
+  narrated.
+
+Checkpoint: `test: add presentation parity gate`
+
+#### 12B — Provider module contract and the launch pipeline
+
+The first item is not a settings surface: no provider can execute a turn at all. `startupRef` must be
+a broker reference resolving to an executable, arguments, cwd, and environment, and nothing registers
+one. Restoring provider execution is therefore the highest-priority work in Phase 12, ahead of every
+missing UI surface.
+
+- rebuild the per-provider launch pipeline: CLI resolution, launch artifacts, and runtime
+  environment, registered through the execution request broker under the kind each resolver expects;
+- supply the complete execution invocation, including `cwd` and `mcpServers`;
+- derive `restartFingerprint` from provider settings so a managed client is reused across turns
+  instead of being fingerprinted by the clock;
+
+then continue with the contract slots:
+
+- add slots for settings presentation, chat UI configuration, auxiliary services, agent mentions,
+  CLI resolution, and workspace capabilities;
+- replace the eight `ProviderFeaturePorts` entries typed as bare `object` with real contracts;
+- keep every slot optional and absent when unsupported, per the capability rule above.
+
+Checkpoint: `refactor: extend provider module contributions`
+
+#### 12C — Populate and wire
+
+- populate the new slots in all nine modules;
+- replace the stub entry points in `GrimoireSettings.ts`, `GrimoireView.ts`,
+  `assistantResponseMetadata.ts`, and `InlineEditModal.ts` with catalog-backed lookups;
+- order by user impact: settings tabs and model catalog, then command catalogs, then capabilities,
+  then auxiliary services.
+
+Checkpoints: one per group.
+
+#### 12D — Chat surfaces
+
+- re-host the four inline interaction renderers first; without them a provider that requests tool
+  permission cannot be answered;
+- then file and image context, input toolbar, agent work cards, and the remaining orphaned views;
+- record an explicit decision on multi-tab conversations: restore, or replace with Obsidian leaves
+  and remove the remaining tab vocabulary.
+
+Checkpoint: `feat(chat): restore projection-backed surfaces`
+
+#### 12E — Branch-tip defects
+
+- derive `restartFingerprint` and `startupRef` from provider settings rather than `Date.now()`, so
+  managed-ACP clients are reused across turns;
+- remove the diagnostic `Notice` from view open;
+- make projection rendering incremental instead of a full re-render per update;
+- delete `LegacyProviderContext`, `LegacyProviderTabManagerHandle`, `GrimoireTabManagerStub`, and the
+  no-op compatibility methods.
+
+Checkpoint: `fix: correct cutover regressions`
+
+Exit gate:
+
+- the parity manifest contains no `pending` entry;
+- no production entry point returns a stub for an implemented capability;
+- unreachable-module count in `src/` is zero excluding files reachable from tests;
+- the Phase 11 gate and the manual test-vault matrix pass on the branch tip.
 
 ## Per-provider trace requirements
 
@@ -1011,6 +1111,10 @@ The full migration is complete only when all statements are true:
 - restart, unload, settings transitions, cancellation, and unknown outcomes are evidence-based;
 - agent results and reconciliation are visible without rewriting operational truth;
 - no provider protocol or feature controller leaks into core;
+- no production entry point returns a stub, `null`, or a no-op for a capability the baseline
+  implemented; a capability that is genuinely dropped is removed together with its call sites, not
+  left as a call site that silently succeeds with nothing;
+- every module in `src/` is either reachable from `src/main.ts`, reachable from a test, or deleted;
 - every structural deletion search is clean;
 - the old runtime, split registries, old subagent lifecycle, direct feature process execution, worker ownership, temporary bridges, and architecture flags are gone;
 - root and nested architecture documentation describe the implemented system;
