@@ -777,7 +777,24 @@ generation.
   verifies all nine provider backends initialize and the lifecycle registry starts and shuts down
   cleanly.
 
-Current broad evidence: 539 unit suites / 7,860 tests pass with typecheck, full ESLint, and
+- `d3bf55f8` — Added concrete Node process launcher composition:
+  `ManagedAcpLaunchResolverAdapter` (broker-backed managed-ACP startup resolver),
+  `ClaudeStartupOptionsResolverAdapter` (broker-backed Claude SDK startup resolver), and
+  `createNodeProcessLauncherComposition` (constructs Antigravity transport, managed ACP launcher,
+  and Codex process factory from a single request broker + Codex launch spec).
+- `757c730b` — Wired concrete Node launchers into `ApplicationRuntimeComposition`. The composition
+  now accepts optional `launchers` and `claudeQueryFactory` and passes them as overrides to the
+  provider context factories, replacing the unreachable stubs.
+- `35059815` — Added Phase 8 settings coordinator production wiring:
+  `createProviderSettingsCoordinator` composes the control plane, staged settings store, workspace
+  manager, and settings transaction coordinator. `ApplicationRuntimeComposition` now includes the
+  full settings coordinator wiring.
+- `e8be7724` — Added `createApplicationRuntime`: maps the complete production composition to the
+  `ApplicationRuntime` admission boundary. All coordinator ports are wired; the agents and
+  projections ports are injected by the caller (they require `NativeAgentLifecycleBridge` and
+  projection coordinator adapters).
+
+Current broad evidence: 543 unit suites / 7,866 tests pass with typecheck, full ESLint, and
 `git diff --check`. Production composition is unchanged and still uses the legacy runtime path.
 
 ## Next steps
@@ -787,10 +804,11 @@ Current broad evidence: 539 unit suites / 7,860 tests pass with typecheck, full 
    ~~Connect composition root to ProviderBackendBootstrap~~ — done.
    ~~Add runtime infrastructure + lifecycle adapter + coordinator wiring~~ — done.
    ~~Build complete ApplicationRuntimeComposition~~ — done.
-   Remaining: inject concrete Node process launchers (`NodeManagedAcpProcessLauncher`,
-   `NodeCodexExecutionProcessFactory`, `NodeAntigravityProcessTransport`,
-   `ClaudeSdkExecutionQueryFactory`) and the Phase 8 settings transaction coordinator into the
-   composition. The composition currently uses `unreachable` stubs for these.
+   ~~Inject concrete Node process launchers~~ — done.
+   ~~Add Phase 8 settings coordinator wiring~~ — done.
+   ~~Add ApplicationRuntime factory~~ — done.
+   Remaining: build `NativeAgentLifecycleBridge` adapter, projection coordinator, and work recovery
+   ports for the runtime factory's agent/projection/work inputs.
 2. Replace tab/input/stream ownership with projection-backed presentation, migrate existing vault
    conversations, and switch `main.ts` once all current user paths pass through the platform.
 3. Run the Phase 9 manual test-vault matrix and full cross-platform checkpoint gate before the
