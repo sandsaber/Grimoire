@@ -1,5 +1,9 @@
 import { ChatTurnRequestPreparerRegistry } from '../../core/providers/ChatTurnRequestPreparer';
 import { ManagedAcpTurnRequestPreparer } from '../../providers/acp/app/ManagedAcpTurnRequestPreparer';
+import { CLAUDE_EXECUTION_REQUEST_KIND } from '../../providers/claude/app/ClaudeApplicationContextFactory';
+import { ClaudeTurnRequestPreparer } from '../../providers/claude/app/ClaudeTurnRequestPreparer';
+import { CLAUDE_EXECUTION_DESCRIPTOR } from '../../providers/claude/execution/ClaudeExecutionBackend';
+import { ClaudeCliResolver } from '../../providers/claude/runtime/ClaudeCliResolver';
 import { GEMINI_EXECUTION_REQUEST_KIND } from '../../providers/gemini/app/GeminiApplicationContextFactory';
 import { GEMINI_EXECUTION_DESCRIPTOR } from '../../providers/gemini/execution/GeminiExecutionBackend';
 import { GeminiCliResolver } from '../../providers/gemini/runtime/GeminiCliResolver';
@@ -128,6 +132,14 @@ export function createChatTurnRequestPreparers(options: {
       buildRuntimeEnv: buildGrokRuntimeEnv,
       buildProcessArguments: buildGrokAgentProcessArgs,
       ...userName,
+    }),
+    // Claude is not managed-ACP: its startup reference resolves to SDK options
+    // rather than a process launch specification.
+    new ClaudeTurnRequestPreparer({
+      backendId: CLAUDE_EXECUTION_DESCRIPTOR.backendId,
+      requestKind: CLAUDE_EXECUTION_REQUEST_KIND,
+      requests: options.requests,
+      cliResolver: new ClaudeCliResolver(),
     }),
   ]);
 }

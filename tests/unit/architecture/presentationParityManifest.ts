@@ -45,8 +45,8 @@ export interface ParitySurface {
 
 export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
   {
-    id: 'managed-acp-launch-pipeline',
-    title: 'Managed-ACP turn preparation and process launch',
+    id: 'provider-launch-pipeline',
+    title: 'Provider turn preparation and process launch',
     area: 'provider-services',
     state: 'wired',
     modules: [
@@ -54,6 +54,11 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       'src/core/providers/ChatTurnRequestPreparer.ts',
       'src/app/runtime/ChatTurnPreparerComposition.ts',
       'src/providers/acp/app/ManagedAcpTurnRequestPreparer.ts',
+      'src/providers/claude/app/ClaudeTurnRequestPreparer.ts',
+      'src/providers/claude/cli/findClaudeCLIPath.ts',
+      'src/providers/claude/runtime/ClaudeCliResolver.ts',
+      'src/providers/claude/runtime/ClaudeUserMessageFactory.ts',
+      'src/providers/claude/runtime/types.ts',
       'src/providers/grok/app/GrokTurnRequestPreparer.ts',
       'src/providers/grok/runtime/GrokCliResolver.ts',
       'src/providers/grok/runtime/GrokLaunchArgs.ts',
@@ -84,8 +89,10 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       + 'fingerprint is derived from executable, arguments, cwd, and environment instead. '
       + 'Grok keeps its own preparer: its artifacts are built before the environment, which '
       + 'needs the generated Grok home, and its arguments come from the configured permission '
-      + 'mode and reasoning effort. Claude, Codex, and Antigravity still have no preparer and '
-      + 'fail closed by name; none of them is managed-ACP.',
+      + 'mode and reasoning effort. Claude has its own too: its startup reference resolves to '
+      + 'SDK options rather than a launch specification, and it is deliberately conservative '
+      + 'until workspace services return, so it starts without MCP servers, plugins, hooks, or '
+      + 'setting sources. Codex and Antigravity still have no preparer and fail closed by name.',
   },
   {
     id: 'interaction-prompts',
@@ -445,8 +452,6 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
     phase: '12B',
     modules: [
       'src/providers/antigravity/runtime/AntigravityCliResolver.ts',
-      'src/providers/claude/cli/findClaudeCLIPath.ts',
-      'src/providers/claude/runtime/ClaudeCliResolver.ts',
       'src/providers/codex/runtime/CodexBinaryLocator.ts',
       'src/providers/codex/runtime/CodexCliResolver.ts',
     ],
@@ -525,10 +530,8 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       'src/providers/claude/runtime/ClaudeRewindService.ts',
       'src/providers/claude/runtime/ClaudeSessionManager.ts',
       'src/providers/claude/runtime/ClaudeTaskResultInterpreter.ts',
-      'src/providers/claude/runtime/ClaudeUserMessageFactory.ts',
       'src/providers/claude/runtime/claudeColdStartQuery.ts',
       'src/providers/claude/runtime/customSpawn.ts',
-      'src/providers/claude/runtime/types.ts',
       'src/providers/claude/sdk/messages.ts',
       'src/providers/claude/sdk/toolResultContent.ts',
       'src/providers/claude/sdk/typeGuards.ts',
