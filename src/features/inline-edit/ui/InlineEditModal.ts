@@ -5,8 +5,6 @@ import type { App, Editor, MarkdownView } from 'obsidian';
 import { Notice } from 'obsidian';
 
 import { getHiddenProviderCommandSet } from '../../../core/providers/commands/hiddenCommands';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import { DEFAULT_CHAT_PROVIDER_ID, type InlineEditMode, type InlineEditService, type ProviderId } from '../../../core/providers/types';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
@@ -322,7 +320,14 @@ class InlineEditController {
       ?? activeTab?.service?.providerId
       ?? activeTab?.providerId
       ?? DEFAULT_CHAT_PROVIDER_ID;
-    this.inlineEditService = ProviderRegistry.createInlineEditService(plugin, providerId);
+    // Phase 9 cutover — ProviderRegistry.createInlineEditService removed.
+    // Inline-edit service now resolves through the application runtime.
+    this.inlineEditService = {
+      editText: async () => ({ success: false, error: 'Inline edit unavailable during Phase 9 cutover' }),
+      continueConversation: async () => ({ success: false, error: 'Inline edit unavailable during Phase 9 cutover' }),
+      cancel: () => {},
+      resetConversation: () => {},
+    };
     const auxiliaryModel = activeTab?.service?.providerId === providerId
       ? activeTab.service.getAuxiliaryModel?.()
       : activeTab?.providerId === providerId
@@ -456,7 +461,7 @@ class InlineEditController {
     this.inputEl.spellcheck = false;
     this.spinnerEl = inputWrap.createDiv({ cls: 'grimoire-inline-spinner grimoire-hidden' });
 
-    const inlineCatalog = ProviderWorkspaceRegistry.getCommandCatalog(this.resolvedProviderId);
+    // Phase 9 cutover — ProviderWorkspaceRegistry.getCommandCatalog removed.
     this.slashCommandDropdown = new SlashCommandDropdown(
       ownerDocument.body,
       this.inputEl,
@@ -467,10 +472,8 @@ class InlineEditController {
       {
         fixed: true,
         hiddenCommands: getHiddenProviderCommandSet(this.plugin.settings, this.resolvedProviderId),
-        ...(inlineCatalog ? {
-          providerConfig: inlineCatalog.getDropdownConfig(),
-          getProviderEntries: () => inlineCatalog.listDropdownEntries({ includeBuiltIns: false }),
-        } : {}),
+        // Phase 9 cutover — ProviderWorkspaceRegistry.getCommandCatalog removed;
+        // providerConfig / getProviderEntries now resolve through the app runtime.
       }
     );
 

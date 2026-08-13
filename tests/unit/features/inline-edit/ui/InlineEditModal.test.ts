@@ -1,5 +1,3 @@
-import '@/providers';
-
 import { Text } from '@codemirror/state';
 import { WidgetType } from '@codemirror/view';
 

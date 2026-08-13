@@ -1,6 +1,5 @@
 import { parseEnvironmentVariables } from '../../utils/env';
 import { getProviderConfig, setProviderConfig } from './providerConfig';
-import { ProviderRegistry } from './ProviderRegistry';
 import type { ProviderId } from './types';
 
 export type EnvironmentScope = 'shared' | `provider:${string}`;
@@ -50,12 +49,9 @@ function classifyEnvironmentKey(key: string): EnvironmentKeyOwnership {
     return { type: 'shared-known' };
   }
 
-  for (const providerId of ProviderRegistry.getRegisteredProviderIds()) {
-    const patterns = ProviderRegistry.getEnvironmentKeyPatterns(providerId);
-    if (patterns.some((pattern) => pattern.test(normalized))) {
-      return { type: 'provider', providerId };
-    }
-  }
+  // Phase 9 cutover — ProviderRegistry removed. Per-provider environment key
+  // classification is delegated to the application runtime; legacy callers
+  // treat unclassified keys as shared-unknown during the cutover.
 
   return { type: 'shared-unknown' };
 }

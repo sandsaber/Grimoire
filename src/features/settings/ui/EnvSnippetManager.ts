@@ -6,12 +6,11 @@ import {
   getEnvironmentScopeUpdates,
   resolveEnvironmentSnippetScope,
 } from '../../../core/providers/providerEnvironment';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import type { EnvironmentScope, EnvSnippet } from '../../../core/types';
 import { VIEW_TYPE_GRIMOIRE } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
 import { confirmDelete } from '../../../shared/modals/ConfirmModal';
-import { formatContextLimit, parseContextLimit, parseEnvironmentVariables } from '../../../utils/env';
+import { formatContextLimit, parseContextLimit } from '../../../utils/env';
 import type { GrimoireView } from '../../chat/GrimoireView';
 
 export class EnvSnippetModal extends Modal {
@@ -107,8 +106,8 @@ export class EnvSnippetModal extends Modal {
       contextLimitInputs.clear();
       modelAliasInputs.clear();
 
-      const envVars = parseEnvironmentVariables(envVarsEl.value);
-      const uniqueModelIds = ProviderRegistry.getCustomModelIds(envVars);
+      // Phase 9 cutover — ProviderRegistry.getCustomModelIds removed.
+      const uniqueModelIds = new Set<string>();
 
       if (uniqueModelIds.size === 0) {
         contextLimitsContainer.addClass('grimoire-hidden');
@@ -362,7 +361,8 @@ export class EnvSnippetManager {
     // Legacy snippets without modelAliases don't modify aliases. Snippets saved
     // with alias fields clear aliases for their own model IDs when left empty.
     if (snippet.modelAliases) {
-      const modelIds = ProviderRegistry.getCustomModelIds(parseEnvironmentVariables(snippet.envVars));
+      // Phase 9 cutover — ProviderRegistry.getCustomModelIds removed.
+      const modelIds = new Set<string>();
       const nextAliases = { ...(this.plugin.settings.customModelAliases ?? {}) };
       for (const modelId of modelIds) {
         const alias = snippet.modelAliases[modelId]?.trim();

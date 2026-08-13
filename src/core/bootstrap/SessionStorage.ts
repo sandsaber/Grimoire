@@ -1,4 +1,3 @@
-import { ProviderRegistry } from '../providers/ProviderRegistry';
 import { DEFAULT_CHAT_PROVIDER_ID } from '../providers/types';
 import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
 import type {
@@ -83,8 +82,9 @@ function isSupportedSessionMetadata(value: unknown): value is SessionMetadata {
     return false;
   }
 
-  const providerId = (value as { providerId?: unknown }).providerId;
-  return providerId === undefined || ProviderRegistry.isRegisteredProviderId(providerId);
+  // Phase 9 cutover — ProviderRegistry.isRegisteredProviderId removed.
+  // Accept any providerId; membership validation now happens in the app runtime.
+  return true;
 }
 
 function getMessagePreview(messages: ChatMessage[] | undefined): string {
@@ -362,10 +362,9 @@ export class SessionStorage {
   }
 
   toSessionMetadata(conversation: Conversation): SessionMetadata {
-    const providerState = ProviderRegistry
-      .getConversationHistoryService(conversation.providerId)
-      .buildPersistedProviderState?.(conversation)
-      ?? conversation.providerState;
+    // Phase 9 cutover — ProviderRegistry.getConversationHistoryService removed.
+    // Provider-owned persisted state enrichment now happens in the app runtime.
+    const providerState = conversation.providerState;
 
     return {
       id: conversation.id,

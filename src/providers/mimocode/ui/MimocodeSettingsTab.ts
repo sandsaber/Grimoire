@@ -14,11 +14,9 @@ import { maybeGetMimocodeWorkspaceServices } from '../app/MimocodeWorkspaceServi
 import { clearMimocodeDiscoveryState } from '../discoveryState';
 import {
   buildMimocodeBaseModels,
-  encodeMimocodeModelId,
   type MimocodeDiscoveredModel,
   splitMimocodeModelLabel,
 } from '../models';
-import { MimocodeChatRuntime } from '../runtime/MimocodeChatRuntime';
 import {
   getMimocodeProviderSettings,
   MIMOCODE_DEFAULT_ENVIRONMENT_VARIABLES,
@@ -28,7 +26,6 @@ import {
 import { MimocodeAgentSettings } from './MimocodeAgentSettings';
 
 const ALL_PROVIDERS_KEY = 'all';
-const MIMOCODE_METADATA_WARMUP_DB = ':memory:';
 
 interface EnrichedModel {
   description: string;
@@ -250,22 +247,9 @@ export const mimocodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
       context.refreshModelSelectors();
     };
 
-    const persistModelMetadata = async (rawId: string): Promise<void> => {
-      const runtime = new MimocodeChatRuntime(context.plugin);
-      try {
-        runtime.syncConversationState({
-          providerState: { databasePath: MIMOCODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-        const loaded = await runtime.warmModelMetadata(encodeMimocodeModelId(rawId));
-        if (loaded) {
-          context.refreshModelSelectors();
-        }
-      } catch {
-        // Metadata warmup is opportunistic; the first chat turn can still discover it.
-      } finally {
-        runtime.cleanup();
-      }
+    const persistModelMetadata = async (_rawId: string): Promise<void> => {
+      // Phase 9 cutover — MimocodeChatRuntime removed. Model metadata
+      // persistence now happens through the application runtime; no-op.
     };
 
     const persistModelAliases = async (modelAliases: Record<string, string>): Promise<void> => {
@@ -556,14 +540,10 @@ export const mimocodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
       modelCatalogLoadFailed = false;
       renderAll();
 
-      const runtime = new MimocodeChatRuntime(context.plugin);
+      // Phase 9 cutover — MimocodeChatRuntime removed. Catalog refresh now
+      // happens through the application runtime; legacy manual refresh reports failure.
       try {
-        runtime.syncConversationState({
-          providerState: { databasePath: MIMOCODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-        modelCatalogLoadFailed = !loaded || getMimocodeProviderSettings(settingsBag).discoveredModels.length === 0;
+        modelCatalogLoadFailed = getMimocodeProviderSettings(settingsBag).discoveredModels.length === 0;
         if (!modelCatalogLoadFailed) {
           context.refreshModelSelectors();
         }
@@ -571,7 +551,6 @@ export const mimocodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
         modelCatalogLoadFailed = true;
       } finally {
         loadingModelCatalog = false;
-        runtime.cleanup();
         renderAll();
       }
     };

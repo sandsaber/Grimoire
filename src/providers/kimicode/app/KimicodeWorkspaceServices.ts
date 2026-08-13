@@ -3,7 +3,6 @@ import type { LegacyProviderContext } from '@/core/providers/LegacyProviderConte
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderModelCatalog,
   ProviderTabWarmupPolicy,
@@ -14,7 +13,6 @@ import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { KimicodeAgentMentionProvider } from '../agents/KimicodeAgentMentionProvider';
 import { KimicodeCommandCatalog } from '../commands/KimicodeCommandCatalog';
-import { KimicodeChatRuntime } from '../runtime/KimicodeChatRuntime';
 import { KimicodeCliResolver } from '../runtime/KimicodeCliResolver';
 import { getKimicodeProviderSettings } from '../settings';
 import { KimicodeAgentStorage } from '../storage/KimicodeAgentStorage';
@@ -30,8 +28,6 @@ export interface KimicodeWorkspaceServices extends ProviderWorkspaceServices {
   mcpStorage: AcpMcpStorage;
   mcpServerManager: McpServerManager;
 }
-
-const KIMICODE_METADATA_WARMUP_DB = ':memory:';
 
 const kimicodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
   resolveMode() {
@@ -73,21 +69,9 @@ function createKimicodeModelCatalog(plugin: LegacyProviderContext): ProviderMode
       return refreshCache.refresh({
         fingerprint: cacheKey,
         hasCachedModels: currentSettings.discoveredModels.length > 0,
-        load: async () => {
-          const before = JSON.stringify(currentSettings.discoveredModels);
-          const runtime = new KimicodeChatRuntime(plugin);
-          try {
-            runtime.syncConversationState({
-              providerState: { databasePath: KIMICODE_METADATA_WARMUP_DB },
-              sessionId: null,
-            });
-            const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-            const after = JSON.stringify(getKimicodeProviderSettings(settings).discoveredModels);
-            return loaded && before !== after;
-          } finally {
-            runtime.cleanup();
-          }
-        },
+        // Phase 9 cutover — KimicodeChatRuntime removed. Model discovery now
+        // happens through the application runtime; legacy load reports no change.
+        load: async () => false,
       });
     },
   };
@@ -143,5 +127,6 @@ export const kimicodeWorkspaceRegistration: ProviderWorkspaceRegistration<Kimico
 };
 
 export function maybeGetKimicodeWorkspaceServices(): KimicodeWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('kimicode') as KimicodeWorkspaceServices | null;
+  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  return null;
 }

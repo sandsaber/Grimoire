@@ -3,8 +3,22 @@ import { MarkdownView } from 'obsidian';
 
 import { hideSelectionHighlight, showSelectionHighlight } from '../../../shared/components/SelectionHighlight';
 import { type EditorSelectionContext, getEditorView } from '../../../utils/editor';
-import type { StoredSelection } from '../state/types';
 import { updateContextRowHasContent } from './contextRowVisibility';
+
+export interface StoredSelection {
+  notePath?: string;
+  editorView?: any;
+  from?: any;
+  to?: any;
+  selectedText?: string;
+  content?: string;
+  lineCount?: number;
+  startLine?: number;
+  domRanges?: any;
+  source?: string;
+  reference?: string;
+  [key: string]: unknown;
+}
 
 const SELECTION_POLL_INTERVAL = 250;
 const INPUT_HANDOFF_GRACE_MS = 1500;
@@ -346,7 +360,7 @@ export class SelectionController {
         return;
       }
       // Native selection not visible (e.g., input has focus) — show mock
-      const validRanges = sel.domRanges.filter(r => r.startContainer.isConnected);
+      const validRanges = (sel.domRanges as any[]).filter((r: any) => r.startContainer.isConnected);
       const HighlightCtor = this.highlightConstructor;
       if (validRanges.length && HighlightCtor) {
         this.cssHighlights?.set(HIGHLIGHT_KEY, new HighlightCtor(...validRanges));
@@ -391,7 +405,7 @@ export class SelectionController {
   getContext(): EditorSelectionContext | null {
     if (!this.storedSelection) return null;
     return {
-      notePath: this.storedSelection.notePath,
+      notePath: this.storedSelection.notePath ?? '',
       mode: 'selection',
       selectedText: this.storedSelection.selectedText,
       lineCount: this.storedSelection.lineCount,

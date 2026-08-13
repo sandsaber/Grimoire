@@ -14,11 +14,9 @@ import { maybeGetGrokWorkspaceServices } from '../app/GrokWorkspaceServices';
 import { clearGrokDiscoveryState } from '../discoveryState';
 import {
   buildGrokBaseModels,
-  encodeGrokModelId,
   type GrokDiscoveredModel,
   splitGrokModelLabel,
 } from '../models';
-import { GrokChatRuntime } from '../runtime/GrokChatRuntime';
 import {
   getGrokProviderSettings,
   GROK_DEFAULT_ENVIRONMENT_VARIABLES,
@@ -247,22 +245,9 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
       context.refreshModelSelectors();
     };
 
-    const persistModelMetadata = async (rawId: string): Promise<void> => {
-      const runtime = new GrokChatRuntime(context.plugin);
-      try {
-        runtime.syncConversationState({
-          providerState: {},
-          sessionId: null,
-        });
-        const loaded = await runtime.warmModelMetadata(encodeGrokModelId(rawId));
-        if (loaded) {
-          context.refreshModelSelectors();
-        }
-      } catch {
-        // Metadata warmup is opportunistic; the first chat turn can still discover it.
-      } finally {
-        runtime.cleanup();
-      }
+    const persistModelMetadata = async (_rawId: string): Promise<void> => {
+      // Phase 9 cutover — GrokChatRuntime removed. Model metadata persistence
+      // now happens through the application runtime; this hook is a no-op.
     };
 
     const persistModelAliases = async (modelAliases: Record<string, string>): Promise<void> => {
@@ -551,14 +536,10 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
       modelCatalogLoadFailed = false;
       renderAll();
 
-      const runtime = new GrokChatRuntime(context.plugin);
+      // Phase 9 cutover — GrokChatRuntime removed. Catalog refresh now happens
+      // through the application runtime; legacy manual refresh reports failure.
       try {
-        runtime.syncConversationState({
-          providerState: {},
-          sessionId: null,
-        });
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-        modelCatalogLoadFailed = !loaded || getGrokProviderSettings(settingsBag).discoveredModels.length === 0;
+        modelCatalogLoadFailed = getGrokProviderSettings(settingsBag).discoveredModels.length === 0;
         if (!modelCatalogLoadFailed) {
           context.refreshModelSelectors();
         }
@@ -566,7 +547,6 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
         modelCatalogLoadFailed = true;
       } finally {
         loadingModelCatalog = false;
-        runtime.cleanup();
         renderAll();
       }
     };

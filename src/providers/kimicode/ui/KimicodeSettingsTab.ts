@@ -14,11 +14,9 @@ import { maybeGetKimicodeWorkspaceServices } from '../app/KimicodeWorkspaceServi
 import { clearKimicodeDiscoveryState } from '../discoveryState';
 import {
   buildKimicodeBaseModels,
-  encodeKimicodeModelId,
   type KimicodeDiscoveredModel,
   splitKimicodeModelLabel,
 } from '../models';
-import { KimicodeChatRuntime } from '../runtime/KimicodeChatRuntime';
 import {
   getKimicodeProviderSettings,
   KIMICODE_DEFAULT_ENVIRONMENT_VARIABLES,
@@ -28,7 +26,6 @@ import {
 import { KimicodeAgentSettings } from './KimicodeAgentSettings';
 
 const ALL_PROVIDERS_KEY = 'all';
-const KIMICODE_METADATA_WARMUP_DB = ':memory:';
 
 interface EnrichedModel {
   description: string;
@@ -250,22 +247,9 @@ export const kimicodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
       context.refreshModelSelectors();
     };
 
-    const persistModelMetadata = async (rawId: string): Promise<void> => {
-      const runtime = new KimicodeChatRuntime(context.plugin);
-      try {
-        runtime.syncConversationState({
-          providerState: { databasePath: KIMICODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-        const loaded = await runtime.warmModelMetadata(encodeKimicodeModelId(rawId));
-        if (loaded) {
-          context.refreshModelSelectors();
-        }
-      } catch {
-        // Metadata warmup is opportunistic; the first chat turn can still discover it.
-      } finally {
-        runtime.cleanup();
-      }
+    const persistModelMetadata = async (_rawId: string): Promise<void> => {
+      // Phase 9 cutover — KimicodeChatRuntime removed. Model metadata
+      // persistence now happens through the application runtime; no-op.
     };
 
     const persistModelAliases = async (modelAliases: Record<string, string>): Promise<void> => {
@@ -556,14 +540,10 @@ export const kimicodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
       modelCatalogLoadFailed = false;
       renderAll();
 
-      const runtime = new KimicodeChatRuntime(context.plugin);
+      // Phase 9 cutover — KimicodeChatRuntime removed. Catalog refresh now
+      // happens through the application runtime; legacy manual refresh reports failure.
       try {
-        runtime.syncConversationState({
-          providerState: { databasePath: KIMICODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-        modelCatalogLoadFailed = !loaded || getKimicodeProviderSettings(settingsBag).discoveredModels.length === 0;
+        modelCatalogLoadFailed = getKimicodeProviderSettings(settingsBag).discoveredModels.length === 0;
         if (!modelCatalogLoadFailed) {
           context.refreshModelSelectors();
         }
@@ -571,7 +551,6 @@ export const kimicodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
         modelCatalogLoadFailed = true;
       } finally {
         loadingModelCatalog = false;
-        runtime.cleanup();
         renderAll();
       }
     };

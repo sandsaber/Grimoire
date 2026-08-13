@@ -1,5 +1,3 @@
-import '@/providers';
-
 import { AcpClientConnection, AcpJsonRpcTransport, AcpSubprocess } from '@/providers/acp';
 import { KimicodeAuxQueryRunner } from '@/providers/kimicode/runtime/KimicodeAuxQueryRunner';
 import { prepareKimicodeLaunchArtifacts } from '@/providers/kimicode/runtime/KimicodeLaunchArtifacts';

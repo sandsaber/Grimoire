@@ -2,7 +2,6 @@ import type { LegacyProviderContext } from '@/core/providers/LegacyProviderConte
 
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
@@ -13,7 +12,6 @@ import type {
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { GeminiCommandCatalog } from '../commands/GeminiCommandCatalog';
-import { GeminiChatRuntime } from '../runtime/GeminiChatRuntime';
 import { GeminiCliResolver } from '../runtime/GeminiCliResolver';
 import { getGeminiProviderSettings } from '../settings';
 import { GeminiAgentStorage } from '../storage/GeminiAgentStorage';
@@ -45,15 +43,11 @@ function createGeminiModelCatalog(plugin: LegacyProviderContext): ProviderModelC
       return getGeminiProviderSettings(settings).enabled;
     },
     async refreshModels({ settings }) {
-      const before = JSON.stringify(getGeminiProviderSettings(settings).discoveredModels);
-      const runtime = new GeminiChatRuntime(plugin);
-      try {
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-        const after = JSON.stringify(getGeminiProviderSettings(settings).discoveredModels);
-        return loaded && before !== after;
-      } finally {
-        runtime.cleanup();
-      }
+      // Phase 9 cutover — GeminiChatRuntime removed. Model discovery now
+      // happens through the application runtime; legacy refresh reports no change.
+      void settings;
+      void plugin;
+      return false;
     },
   };
 }
@@ -91,5 +85,6 @@ export const geminiWorkspaceRegistration: ProviderWorkspaceRegistration<GeminiWo
 };
 
 export function maybeGetGeminiWorkspaceServices(): GeminiWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('gemini') as GeminiWorkspaceServices | null;
+  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  return null;
 }

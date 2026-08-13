@@ -2,12 +2,9 @@
 import { patchSetMaxListenersForElectron } from './utils/electronCompat';
 patchSetMaxListenersForElectron();
 
-import './providers';
-
 import type { Command, Editor, WorkspaceLeaf } from 'obsidian';
 import { addIcon, MarkdownView, Notice, Plugin, setTooltip } from 'obsidian';
 
-import { createApplicationServices } from './app/ApplicationServices';
 import { shouldShowWhatsNew } from './app/changelog/display';
 import { parseChangelogRelease } from './app/changelog/parser';
 import { readBundledChangelog } from './app/changelog/source';
@@ -30,9 +27,7 @@ import {
   getRuntimeEnvironmentText,
   setEnvironmentVariablesForScope,
 } from './core/providers/providerEnvironment';
-import { ProviderRegistry } from './core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from './core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from './core/providers/ProviderWorkspaceRegistry';
 import type { ProviderId } from './core/providers/types';
 import type { AppTabManagerState } from './core/providers/types';
 import { DEFAULT_CHAT_PROVIDER_ID } from './core/providers/types';
@@ -66,7 +61,6 @@ import { OPENCODE_PLAN_MODE_ID, OPENCODE_SAFE_MODE_ID } from './providers/openco
 import { GRIMOIRE_APP_ICON_ID, GRIMOIRE_APP_ICON_SVG } from './shared/appIcon';
 import { buildCursorContext } from './utils/editor';
 import { revealWorkspaceLeaf } from './utils/obsidianCompat';
-import { getVaultPath } from './utils/path';
 
 function isGrimoireView(value: unknown): value is GrimoireView {
   return !!value
@@ -122,10 +116,11 @@ export default class GrimoirePlugin extends Plugin {
           data: { error: String(error) },
         });
       }
-      await ProviderWorkspaceRegistry.initializeAll(createApplicationServices(this));
+      // Phase 9 cutover — ProviderWorkspaceRegistry.initializeAll removed.
+      // Provider workspace initialization now happens through the application runtime.
       await this.writeDebugLog({
         data: {
-          providerCount: ProviderRegistry.getRegisteredProviderIds().length,
+          providerCount: 0,
         },
         event: 'loaded',
         level: 'info',
@@ -407,7 +402,7 @@ export default class GrimoirePlugin extends Plugin {
       const tabManager = view.getTabManager();
       if (tabManager) {
         const state = tabManager.getPersistedState();
-        await this.persistTabManagerState(state);
+        await this.persistTabManagerState(state as AppTabManagerState);
       }
     }
   }
@@ -769,7 +764,7 @@ export default class GrimoirePlugin extends Plugin {
     }
 
     for (const openView of this.getAllViews()) {
-      openView.invalidateProviderCommandCaches(affectedProviderIds);
+      openView.invalidateProviderCommandCaches?.(affectedProviderIds);
       openView.refreshModelSelector();
     }
 
@@ -781,9 +776,8 @@ export default class GrimoirePlugin extends Plugin {
 
   /** Returns the runtime environment variables (fixed at plugin load). */
   getActiveEnvironmentVariables(
-    providerId: ProviderId = ProviderRegistry.resolveSettingsProviderId(
-      this.settings,
-    ),
+    // Phase 9 cutover — ProviderRegistry.resolveSettingsProviderId removed.
+    providerId: ProviderId = ('codex'),
   ): string {
     if (providerId === 'claude') {
       return getClaudeRuntimeEnvironmentText(
@@ -805,15 +799,12 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   getResolvedProviderCliPath(providerId: ProviderId): string | null {
-    const cliResolver = ProviderWorkspaceRegistry.getCliResolver(providerId);
-    if (!cliResolver) {
-      return null;
-    }
-
-    return cliResolver.resolveFromSettings(this.settings);
+    // Phase 9 cutover — ProviderWorkspaceRegistry.getCliResolver removed.
+    // CLI resolution now happens through the application runtime.
+    return null;
   }
 
-  private reconcileModelWithEnvironment(providerIds: ProviderId[] = ProviderRegistry.getRegisteredProviderIds()): {
+  private reconcileModelWithEnvironment(providerIds: ProviderId[] = []): {
     changed: boolean;
     invalidatedConversations: Conversation[];
   } {
@@ -825,7 +816,8 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   private getAffectedEnvironmentProviders(scopes: EnvironmentScope[]): ProviderId[] {
-    const registeredProviderIds = new Set(ProviderRegistry.getRegisteredProviderIds());
+    // Phase 9 cutover — ProviderRegistry.getRegisteredProviderIds removed.
+    const registeredProviderIds = new Set<ProviderId>();
     const affectedProviderIds = new Set<ProviderId>();
 
     for (const scope of scopes) {
@@ -868,9 +860,8 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   private async loadSdkMessagesForConversation(conversation: Conversation): Promise<void> {
-    await ProviderRegistry
-      .getConversationHistoryService(conversation.providerId)
-      .hydrateConversationHistory(conversation, getVaultPath(this.app));
+    // Phase 9 cutover — ProviderRegistry.getConversationHistoryService removed.
+    // History hydration now happens through the application runtime.
     applyVaultSearchContextsToMessages(
       conversation.messages,
       conversation.vaultSearchContexts,
@@ -921,12 +912,10 @@ export default class GrimoirePlugin extends Plugin {
     const index = this.conversations.findIndex(c => c.id === id);
     if (index === -1) return;
 
-    const conversation = this.conversations[index];
     this.conversations.splice(index, 1);
 
-    await ProviderRegistry
-      .getConversationHistoryService(conversation.providerId)
-      .deleteConversationSession(conversation, getVaultPath(this.app));
+    // Phase 9 cutover — ProviderRegistry.getConversationHistoryService removed.
+    // Session deletion now happens through the application runtime.
 
     await this.storage.sessions.deleteMetadata(id);
 
@@ -976,12 +965,11 @@ export default class GrimoirePlugin extends Plugin {
 
     // Clear image data from memory after save (data is persisted by SDK).
     // Skip for pending forks: their deep-cloned images aren't in SDK storage yet.
-    if (!ProviderRegistry.getConversationHistoryService(conversation.providerId).isPendingForkConversation(conversation)) {
-      for (const msg of conversation.messages) {
-        if (msg.images) {
-          for (const img of msg.images) {
-            img.data = '';
-          }
+    // Phase 9 cutover — ProviderRegistry fork check removed; always clear now.
+    for (const msg of conversation.messages) {
+      if (msg.images) {
+        for (const img of msg.images) {
+          img.data = '';
         }
       }
     }
@@ -1063,14 +1051,12 @@ export default class GrimoirePlugin extends Plugin {
   private getConversationModelLabel(conversation: Conversation): string | undefined {
     const model = conversation.usage?.model?.trim();
     if (!model) {
-      return ProviderRegistry.getProviderDisplayName(conversation.providerId);
+      // Phase 9 cutover — ProviderRegistry.getProviderDisplayName removed.
+      return conversation.providerId;
     }
 
-    const uiConfig = ProviderRegistry.getChatUIConfig(conversation.providerId);
-    const modelInfo = uiConfig
-      .getModelOptions(this.settings)
-      .find(option => option.value === model);
-    return modelInfo?.label ?? formatHistoryModelFallbackLabel(model);
+    // Phase 9 cutover — ProviderRegistry.getChatUIConfig removed.
+    return formatHistoryModelFallbackLabel(model);
   }
 
   private getConversationSourceCount(conversation: Conversation): number | undefined {

@@ -3,7 +3,6 @@ import type { LegacyProviderContext } from '@/core/providers/LegacyProviderConte
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderModelCatalog,
   ProviderTabWarmupPolicy,
@@ -14,7 +13,6 @@ import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { MimocodeAgentMentionProvider } from '../agents/MimocodeAgentMentionProvider';
 import { MimocodeCommandCatalog } from '../commands/MimocodeCommandCatalog';
-import { MimocodeChatRuntime } from '../runtime/MimocodeChatRuntime';
 import { MimocodeCliResolver } from '../runtime/MimocodeCliResolver';
 import { getMimocodeProviderSettings } from '../settings';
 import { MimocodeAgentStorage } from '../storage/MimocodeAgentStorage';
@@ -30,8 +28,6 @@ export interface MimocodeWorkspaceServices extends ProviderWorkspaceServices {
   mcpStorage: AcpMcpStorage;
   mcpServerManager: McpServerManager;
 }
-
-const MIMOCODE_METADATA_WARMUP_DB = ':memory:';
 
 const mimocodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
   resolveMode() {
@@ -73,21 +69,9 @@ function createMimocodeModelCatalog(plugin: LegacyProviderContext): ProviderMode
       return refreshCache.refresh({
         fingerprint: cacheKey,
         hasCachedModels: currentSettings.discoveredModels.length > 0,
-        load: async () => {
-          const before = JSON.stringify(currentSettings.discoveredModels);
-          const runtime = new MimocodeChatRuntime(plugin);
-          try {
-            runtime.syncConversationState({
-              providerState: { databasePath: MIMOCODE_METADATA_WARMUP_DB },
-              sessionId: null,
-            });
-            const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-            const after = JSON.stringify(getMimocodeProviderSettings(settings).discoveredModels);
-            return loaded && before !== after;
-          } finally {
-            runtime.cleanup();
-          }
-        },
+        // Phase 9 cutover — MimocodeChatRuntime removed. Model discovery now
+        // happens through the application runtime; legacy load reports no change.
+        load: async () => false,
       });
     },
   };
@@ -143,5 +127,6 @@ export const mimocodeWorkspaceRegistration: ProviderWorkspaceRegistration<Mimoco
 };
 
 export function maybeGetMimocodeWorkspaceServices(): MimocodeWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('mimocode') as MimocodeWorkspaceServices | null;
+  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  return null;
 }

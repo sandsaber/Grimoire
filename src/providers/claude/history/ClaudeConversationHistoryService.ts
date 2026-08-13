@@ -1,4 +1,3 @@
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type { ProviderConversationHistoryService } from '../../../core/providers/types';
 import { isSubagentToolName, TOOL_TASK } from '../../../core/tools/toolNames';
 import type {
@@ -30,13 +29,9 @@ function chooseRicherResult(sdkResult?: string, cachedResult?: string): string |
 }
 
 function getClaudeConfigDirContext(vaultPath: string): ClaudeConfigDirContext {
-  const services = ProviderWorkspaceRegistry.getServices('claude') as {
-    getClaudeConfigDir?: () => string;
-  } | null;
-  const configDir = services?.getClaudeConfigDir?.();
-  return configDir
-    ? { environment: { CLAUDE_CONFIG_DIR: configDir }, vaultPath }
-    : { vaultPath };
+  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  // CLAUDE_CONFIG_DIR enrichment now happens through the application runtime.
+  return { vaultPath };
 }
 
 function chooseRicherToolCalls(

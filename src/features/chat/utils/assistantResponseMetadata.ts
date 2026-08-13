@@ -1,5 +1,4 @@
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
-import type { ProviderId } from '../../../core/providers/types';
+import type { ProviderCapabilities, ProviderChatUIConfig, ProviderId, ProviderUIOption } from '../../../core/providers/types';
 import type { AssistantResponseMetadata } from '../../../core/types';
 
 type MetadataOptions = {
@@ -15,8 +14,38 @@ const CHAT_PROVIDER_LABELS: Record<string, string> = {
   qwen: 'Qwen Code',
 };
 
+// Phase 9 cutover — ProviderRegistry removed. The provider UI config / capabilities
+// are now owned by the application runtime; these stubs preserve the legacy
+// metadata-builder contract during the cutover.
+const STUB_UI_CONFIG: ProviderChatUIConfig = {
+  getModelOptions: () => [],
+  ownsModel: () => false,
+  isAdaptiveReasoningModel: () => false,
+  getReasoningOptions: () => [] as ProviderUIOption[],
+  getDefaultReasoningValue: () => '',
+  getContextWindowSize: () => 0,
+  isDefaultModel: () => false,
+  applyModelDefaults: () => {},
+  normalizeModelVariant: (model: string) => model,
+  getCustomModelIds: () => new Set<string>(),
+};
+
+const STUB_CAPABILITIES: ProviderCapabilities = {
+  providerId: '',
+  supportsPersistentRuntime: false,
+  supportsNativeHistory: false,
+  supportsPlanMode: false,
+  supportsRewind: false,
+  supportsFork: false,
+  supportsProviderCommands: false,
+  supportsImageAttachments: false,
+  supportsInstructionMode: false,
+  supportsMcpTools: false,
+  reasoningControl: 'none',
+};
+
 export function getAssistantResponseProviderLabel(providerId: ProviderId): string {
-  return CHAT_PROVIDER_LABELS[providerId] ?? ProviderRegistry.getProviderDisplayName(providerId);
+  return CHAT_PROVIDER_LABELS[providerId] ?? providerId;
 }
 
 function normalizeDisplayString(value: unknown): string | undefined {
@@ -55,8 +84,8 @@ function resolveModelLabel(
     return undefined;
   }
 
-  const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
-  return uiConfig.getModelOptions(settings).find(option => option.value === model)?.label
+  const uiConfig = STUB_UI_CONFIG;
+  return uiConfig.getModelOptions(settings).find((option: ProviderUIOption) => option.value === model)?.label
     ?? formatModelFallbackLabel(model);
 }
 
@@ -65,12 +94,12 @@ function resolveEffortMetadata(
   model: string,
   settings: Record<string, unknown>,
 ): Pick<AssistantResponseMetadata, 'effort' | 'effortLabel'> {
-  const capabilities = ProviderRegistry.getCapabilities(providerId);
+  const capabilities = STUB_CAPABILITIES;
   if (capabilities.reasoningControl !== 'effort') {
     return {};
   }
 
-  const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
+  const uiConfig = STUB_UI_CONFIG;
   const options = uiConfig.getReasoningOptions(model, settings);
   const rawEffort = normalizeDisplayString(settings.effortLevel)
     ?? normalizeDisplayString(uiConfig.getDefaultReasoningValue(model, settings));
@@ -78,14 +107,14 @@ function resolveEffortMetadata(
     return {};
   }
 
-  const effort = options.some(option => option.value === rawEffort)
+  const effort = options.some((option: ProviderUIOption) => option.value === rawEffort)
     ? rawEffort
     : normalizeDisplayString(uiConfig.getDefaultReasoningValue(model, settings));
   if (!effort) {
     return {};
   }
 
-  const effortLabel = options.find(option => option.value === effort)?.label
+  const effortLabel = options.find((option: ProviderUIOption) => option.value === effort)?.label
     ?? formatModelFallbackLabel(effort);
 
   return { effort, effortLabel };

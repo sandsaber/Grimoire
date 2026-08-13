@@ -1,5 +1,3 @@
-import '@/providers';
-
 import { AcpClientConnection, AcpJsonRpcTransport, AcpSubprocess } from '@/providers/acp';
 import { OpencodeAuxQueryRunner } from '@/providers/opencode/runtime/OpencodeAuxQueryRunner';
 import { prepareOpencodeLaunchArtifacts } from '@/providers/opencode/runtime/OpencodeLaunchArtifacts';

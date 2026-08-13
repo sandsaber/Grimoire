@@ -1,7 +1,6 @@
 import type { Conversation } from '../types';
 import { coercePermissionMode } from '../types/settings';
-import { ProviderRegistry } from './ProviderRegistry';
-import type { ProviderChatUIConfig, ProviderId } from './types';
+import type { ProviderChatUIConfig, ProviderId, ProviderSettingsReconciler, ProviderUIOption } from './types';
 
 export interface SettingsReconciliationResult {
   changed: boolean;
@@ -18,8 +17,38 @@ const PROJECTION_KEYS = new Set([
 
 type ProviderProjectionMap = Partial<Record<string, string>>;
 
-function getSettingsProviderId(settings: Record<string, unknown>): ProviderId {
-  return ProviderRegistry.resolveSettingsProviderId(settings);
+// Phase 9 cutover — ProviderRegistry removed. These stubs keep the coordinator
+// compiling while the application runtime takes over settings reconciliation.
+function getSettingsProviderId(_settings: Record<string, unknown>): ProviderId {
+  return 'codex';
+}
+
+function getRegisteredProviderIds(): ProviderId[] {
+  return [];
+}
+
+function getSettingsReconciler(_providerId: ProviderId): ProviderSettingsReconciler {
+  return {
+    reconcileModelWithEnvironment: () => ({ changed: false, invalidatedConversations: [] }),
+    normalizeModelVariantSettings: () => false,
+  };
+}
+
+const STUB_UI_CONFIG: ProviderChatUIConfig = {
+  getModelOptions: () => [],
+  ownsModel: () => false,
+  isAdaptiveReasoningModel: () => false,
+  getReasoningOptions: () => [] as ProviderUIOption[],
+  getDefaultReasoningValue: () => '',
+  getContextWindowSize: () => 0,
+  isDefaultModel: () => false,
+  applyModelDefaults: () => {},
+  normalizeModelVariant: (model: string) => model,
+  getCustomModelIds: () => new Set<string>(),
+};
+
+function getChatUIConfig(_providerId: ProviderId): ProviderChatUIConfig {
+  return STUB_UI_CONFIG;
 }
 
 function ensureProjectionMap(
@@ -111,7 +140,7 @@ export class ProviderSettingsCoordinator {
   ): boolean {
     let anyChanged = false;
     for (const providerId of providerIds) {
-      const reconciler = ProviderRegistry.getSettingsReconciler(providerId);
+      const reconciler = getSettingsReconciler(providerId);
       if (reconciler.handleEnvironmentChange?.(settings)) {
         anyChanged = true;
       }
@@ -127,10 +156,10 @@ export class ProviderSettingsCoordinator {
       return false;
     }
 
-    const isValid = ProviderRegistry.getRegisteredProviderIds().some((providerId) =>
-      ProviderRegistry.getChatUIConfig(providerId)
+    const isValid = getRegisteredProviderIds().some((providerId) =>
+      getChatUIConfig(providerId)
         .getModelOptions(settings)
-        .some((option) => option.value === currentModel)
+        .some((option: ProviderUIOption) => option.value === currentModel)
     );
     if (isValid) {
       return false;
@@ -184,7 +213,7 @@ export class ProviderSettingsCoordinator {
     const savedServiceTier = ensureProjectionMap(settings, 'savedProviderServiceTier');
     const savedBudget = ensureProjectionMap(settings, 'savedProviderThinkingBudget');
     const savedPermissionMode = ensureProjectionMap(settings, 'savedProviderPermissionMode');
-    const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
+    const uiConfig = getChatUIConfig(providerId);
     const normalizedModel = normalizeProviderModel(
       uiConfig,
       settings,
@@ -220,7 +249,7 @@ export class ProviderSettingsCoordinator {
     settings: Record<string, unknown>,
     providerId: ProviderId,
   ): void {
-    const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
+    const uiConfig = getChatUIConfig(providerId);
     const savedModel = settings.savedProviderModel as ProviderProjectionMap | undefined;
     const savedEffort = settings.savedProviderEffort as ProviderProjectionMap | undefined;
     const savedServiceTier = settings.savedProviderServiceTier as ProviderProjectionMap | undefined;
@@ -237,14 +266,14 @@ export class ProviderSettingsCoordinator {
     const currentBudget = typeof settings.thinkingBudget === 'string' ? settings.thinkingBudget : undefined;
     const modelOptions = uiConfig.getModelOptions(settings);
     const isDefaultModelOfAnotherProvider = currentModel.length > 0
-      && ProviderRegistry.getRegisteredProviderIds()
-        .filter(id => id !== providerId)
-        .some(id => ProviderRegistry.getChatUIConfig(id).isDefaultModel(currentModel));
+      && getRegisteredProviderIds()
+        .filter((id: string) => id !== providerId)
+        .some((id: string) => getChatUIConfig(id).isDefaultModel(currentModel));
     const canReuseCurrentModel = currentModel.length > 0
       && !isDefaultModelOfAnotherProvider
       && (
         shouldPreferCurrentProjection
-        || modelOptions.some(option => option.value === currentModel)
+        || modelOptions.some((option: ProviderUIOption) => option.value === currentModel)
       );
     const fallbackModel = canReuseCurrentModel
       ? currentModel
@@ -338,7 +367,7 @@ export class ProviderSettingsCoordinator {
     return this.reconcileProviders(
       settings,
       conversations,
-      ProviderRegistry.getRegisteredProviderIds(),
+      getRegisteredProviderIds(),
     );
   }
 
@@ -352,7 +381,7 @@ export class ProviderSettingsCoordinator {
     const settingsProvider = getSettingsProviderId(settings);
 
     for (const providerId of providerIds) {
-      const reconciler = ProviderRegistry.getSettingsReconciler(providerId);
+      const reconciler = getSettingsReconciler(providerId);
       const providerConversations = conversations.filter(c => c.providerId === providerId);
       const targetSettings = providerId === settingsProvider
         ? settings
@@ -388,8 +417,8 @@ export class ProviderSettingsCoordinator {
     let anyChanged = false;
     const settingsProvider = getSettingsProviderId(settings);
 
-    for (const providerId of ProviderRegistry.getRegisteredProviderIds()) {
-      const reconciler = ProviderRegistry.getSettingsReconciler(providerId);
+    for (const providerId of getRegisteredProviderIds()) {
+      const reconciler = getSettingsReconciler(providerId);
       const targetSettings = providerId === settingsProvider
         ? settings
         : cloneProviderSettings(settings);

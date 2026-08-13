@@ -2,7 +2,6 @@ import type { LegacyProviderContext } from '@/core/providers/LegacyProviderConte
 
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
@@ -195,9 +194,11 @@ export const codexWorkspaceRegistration: ProviderWorkspaceRegistration<CodexWork
 };
 
 export function maybeGetCodexWorkspaceServices(): CodexWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('codex') as CodexWorkspaceServices | null;
+  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  return null;
 }
 
 export function getCodexWorkspaceServices(): CodexWorkspaceServices {
-  return ProviderWorkspaceRegistry.requireServices('codex') as CodexWorkspaceServices;
+  // Phase 9 cutover — ProviderWorkspaceRegistry.requireServices removed.
+  throw new Error('Codex workspace services unavailable during Phase 9 cutover');
 }

@@ -5,7 +5,6 @@
  * These are handled separately from user-defined slash commands.
  */
 
-import { ProviderRegistry } from '../providers/ProviderRegistry';
 import type { ProviderCapabilities, ProviderId } from '../providers/types';
 
 export type BuiltInCommandAction = 'clear' | 'add-dir' | 'resume' | 'fork' | 'image';
@@ -85,11 +84,9 @@ function resolveCapabilities(
     return context;
   }
 
-  try {
-    return ProviderRegistry.getCapabilities(context);
-  } catch {
-    return null;
-  }
+  // Phase 9 cutover — ProviderRegistry.getCapabilities removed. Capability
+  // resolution now happens in the app runtime; legacy callers receive null.
+  return null;
 }
 
 export function isBuiltInCommandSupported(

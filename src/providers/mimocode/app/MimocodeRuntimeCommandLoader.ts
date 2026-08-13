@@ -1,11 +1,24 @@
 import type {
+  ChatRuntime,
   ProviderRuntimeCommandLoader,
   ProviderRuntimeCommandLoaderContext,
 } from '../../../core/providers/types';
-import { MimocodeChatRuntime } from '../runtime/MimocodeChatRuntime';
+import type { SlashCommand } from '../../../core/types';
 import { getMimocodeProviderSettings } from '../settings';
 
-const MIMOCODE_METADATA_WARMUP_DB = ':memory:';
+// Phase 9 cutover — MimocodeChatRuntime removed. Runtime command discovery now
+// resolves through the application runtime; this loader reports no commands.
+function createStubRuntime(): Pick<
+  ChatRuntime,
+  'syncConversationState' | 'ensureReady' | 'getSupportedCommands' | 'cleanup'
+> {
+  return {
+    syncConversationState: () => {},
+    ensureReady: async () => false,
+    getSupportedCommands: async () => [] as SlashCommand[],
+    cleanup: () => {},
+  };
+}
 
 export class MimocodeRuntimeCommandLoader implements ProviderRuntimeCommandLoader {
   isAvailable(settings: Record<string, unknown>): boolean {
@@ -36,16 +49,16 @@ export class MimocodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
       && !shouldWarmPreSessionConversation;
     const runtime = canReuseRuntime
       ? context.runtime!
-      : new MimocodeChatRuntime(context.plugin);
+      : createStubRuntime();
 
     try {
       if (context.conversation) {
         runtime.syncConversationState(context.conversation, context.externalContextPaths);
       } else if (shouldWarmBlankSession) {
         // Blank-tab warmup uses an isolated in-memory session to fetch metadata
-        // without binding a persisted Mimocode session to the tab.
+        // without binding a persisted MiMoCode session to the tab.
         runtime.syncConversationState({
-          providerState: { databasePath: MIMOCODE_METADATA_WARMUP_DB },
+          providerState: { databasePath: ':memory:' },
           sessionId: null,
         });
       }

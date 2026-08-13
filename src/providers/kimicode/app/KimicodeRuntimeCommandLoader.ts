@@ -1,11 +1,24 @@
 import type {
+  ChatRuntime,
   ProviderRuntimeCommandLoader,
   ProviderRuntimeCommandLoaderContext,
 } from '../../../core/providers/types';
-import { KimicodeChatRuntime } from '../runtime/KimicodeChatRuntime';
+import type { SlashCommand } from '../../../core/types';
 import { getKimicodeProviderSettings } from '../settings';
 
-const KIMICODE_METADATA_WARMUP_DB = ':memory:';
+// Phase 9 cutover — KimicodeChatRuntime removed. Runtime command discovery now
+// resolves through the application runtime; this loader reports no commands.
+function createStubRuntime(): Pick<
+  ChatRuntime,
+  'syncConversationState' | 'ensureReady' | 'getSupportedCommands' | 'cleanup'
+> {
+  return {
+    syncConversationState: () => {},
+    ensureReady: async () => false,
+    getSupportedCommands: async () => [] as SlashCommand[],
+    cleanup: () => {},
+  };
+}
 
 export class KimicodeRuntimeCommandLoader implements ProviderRuntimeCommandLoader {
   isAvailable(settings: Record<string, unknown>): boolean {
@@ -36,7 +49,7 @@ export class KimicodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
       && !shouldWarmPreSessionConversation;
     const runtime = canReuseRuntime
       ? context.runtime!
-      : new KimicodeChatRuntime(context.plugin);
+      : createStubRuntime();
 
     try {
       if (context.conversation) {
@@ -45,7 +58,7 @@ export class KimicodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
         // Blank-tab warmup uses an isolated in-memory session to fetch metadata
         // without binding a persisted Kimi Code session to the tab.
         runtime.syncConversationState({
-          providerState: { databasePath: KIMICODE_METADATA_WARMUP_DB },
+          providerState: { databasePath: ':memory:' },
           sessionId: null,
         });
       }

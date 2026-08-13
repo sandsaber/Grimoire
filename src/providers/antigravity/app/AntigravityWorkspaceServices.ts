@@ -1,6 +1,5 @@
 import type { LegacyProviderContext } from '@/core/providers/LegacyProviderContext';
 
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
@@ -187,5 +186,6 @@ export const antigravityWorkspaceRegistration: ProviderWorkspaceRegistration<Ant
 };
 
 export function maybeGetAntigravityWorkspaceServices(): AntigravityWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('antigravity') as AntigravityWorkspaceServices | null;
+  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  return null;
 }

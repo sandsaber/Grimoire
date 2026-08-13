@@ -2,7 +2,6 @@ import type { LegacyProviderContext } from '@/core/providers/LegacyProviderConte
 
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   AppAgentManager,
   AppAgentStorage,
@@ -108,9 +107,11 @@ export const claudeWorkspaceRegistration: ProviderWorkspaceRegistration<ClaudeWo
 };
 
 export function maybeGetClaudeWorkspaceServices(): ClaudeWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('claude') as ClaudeWorkspaceServices | null;
+  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  return null;
 }
 
 export function getClaudeWorkspaceServices(): ClaudeWorkspaceServices {
-  return ProviderWorkspaceRegistry.requireServices('claude') as ClaudeWorkspaceServices;
+  // Phase 9 cutover — ProviderWorkspaceRegistry.requireServices removed.
+  throw new Error('Claude workspace services unavailable during Phase 9 cutover');
 }

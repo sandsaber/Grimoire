@@ -2,7 +2,6 @@ import type { LegacyProviderContext } from '@/core/providers/LegacyProviderConte
 
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
@@ -13,7 +12,6 @@ import type {
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { QwenCommandCatalog } from '../commands/QwenCommandCatalog';
-import { QwenChatRuntime } from '../runtime/QwenChatRuntime';
 import { QwenCliResolver } from '../runtime/QwenCliResolver';
 import { getQwenProviderSettings } from '../settings';
 import { QwenAgentStorage } from '../storage/QwenAgentStorage';
@@ -45,15 +43,11 @@ function createQwenModelCatalog(plugin: LegacyProviderContext): ProviderModelCat
       return getQwenProviderSettings(settings).enabled;
     },
     async refreshModels({ settings }) {
-      const before = JSON.stringify(getQwenProviderSettings(settings).discoveredModels);
-      const runtime = new QwenChatRuntime(plugin);
-      try {
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-        const after = JSON.stringify(getQwenProviderSettings(settings).discoveredModels);
-        return loaded && before !== after;
-      } finally {
-        runtime.cleanup();
-      }
+      // Phase 9 cutover — QwenChatRuntime removed. Model discovery now happens
+      // through the application runtime; legacy refresh reports no change.
+      void settings;
+      void plugin;
+      return false;
     },
   };
 }
@@ -91,5 +85,6 @@ export const qwenWorkspaceRegistration: ProviderWorkspaceRegistration<QwenWorksp
 };
 
 export function maybeGetQwenWorkspaceServices(): QwenWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('qwen') as QwenWorkspaceServices | null;
+  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  return null;
 }

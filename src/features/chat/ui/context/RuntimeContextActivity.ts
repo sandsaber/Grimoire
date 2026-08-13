@@ -1,4 +1,3 @@
-import { ProviderRegistry } from '../../../../core/providers/ProviderRegistry';
 import { TOOL_BASH, TOOL_READ } from '../../../../core/tools/toolNames';
 import type { ChatMessage, ProviderId, ToolCallInfo } from '../../../../core/types';
 import { t } from '../../../../i18n/i18n';
@@ -133,7 +132,8 @@ function getFileName(path: string): string {
 }
 
 function getProviderLabel(providerId: ProviderId): string {
-  return ProviderRegistry.getProviderDisplayNameOrId(providerId);
+  // Phase 9 cutover — ProviderRegistry.getProviderDisplayNameOrId removed.
+  return providerId;
 }
 
 export class RuntimeContextActivityView {

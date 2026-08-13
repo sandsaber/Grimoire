@@ -1,5 +1,3 @@
-import '@/providers';
-
 const mockTransportRequest = jest.fn();
 const mockTransportNotify = jest.fn();
 const mockTransportOnNotification = jest.fn();

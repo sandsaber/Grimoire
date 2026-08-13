@@ -14,11 +14,9 @@ import { maybeGetOpencodeWorkspaceServices } from '../app/OpencodeWorkspaceServi
 import { clearOpencodeDiscoveryState } from '../discoveryState';
 import {
   buildOpencodeBaseModels,
-  encodeOpencodeModelId,
   type OpencodeDiscoveredModel,
   splitOpencodeModelLabel,
 } from '../models';
-import { OpencodeChatRuntime } from '../runtime/OpencodeChatRuntime';
 import {
   getOpencodeProviderSettings,
   normalizeOpencodeVisibleModels,
@@ -28,7 +26,6 @@ import {
 import { OpencodeAgentSettings } from './OpencodeAgentSettings';
 
 const ALL_PROVIDERS_KEY = 'all';
-const OPENCODE_METADATA_WARMUP_DB = ':memory:';
 
 interface EnrichedModel {
   description: string;
@@ -250,22 +247,9 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
       context.refreshModelSelectors();
     };
 
-    const persistModelMetadata = async (rawId: string): Promise<void> => {
-      const runtime = new OpencodeChatRuntime(context.plugin);
-      try {
-        runtime.syncConversationState({
-          providerState: { databasePath: OPENCODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-        const loaded = await runtime.warmModelMetadata(encodeOpencodeModelId(rawId));
-        if (loaded) {
-          context.refreshModelSelectors();
-        }
-      } catch {
-        // Metadata warmup is opportunistic; the first chat turn can still discover it.
-      } finally {
-        runtime.cleanup();
-      }
+    const persistModelMetadata = async (_rawId: string): Promise<void> => {
+      // Phase 9 cutover — OpencodeChatRuntime removed. Model metadata
+      // persistence now happens through the application runtime; no-op.
     };
 
     const persistModelAliases = async (modelAliases: Record<string, string>): Promise<void> => {
@@ -556,14 +540,10 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
       modelCatalogLoadFailed = false;
       renderAll();
 
-      const runtime = new OpencodeChatRuntime(context.plugin);
+      // Phase 9 cutover — OpencodeChatRuntime removed. Catalog refresh now
+      // happens through the application runtime; legacy manual refresh reports failure.
       try {
-        runtime.syncConversationState({
-          providerState: { databasePath: OPENCODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-        modelCatalogLoadFailed = !loaded || getOpencodeProviderSettings(settingsBag).discoveredModels.length === 0;
+        modelCatalogLoadFailed = getOpencodeProviderSettings(settingsBag).discoveredModels.length === 0;
         if (!modelCatalogLoadFailed) {
           context.refreshModelSelectors();
         }
@@ -571,7 +551,6 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
         modelCatalogLoadFailed = true;
       } finally {
         loadingModelCatalog = false;
-        runtime.cleanup();
         renderAll();
       }
     };

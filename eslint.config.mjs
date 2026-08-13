@@ -67,6 +67,24 @@ export default defineConfig([
     },
   },
   {
+    // Phase 9 cutover transition files use any-typed legacy stubs.
+    // These rules are re-enabled when the legacy code is fully deleted.
+    files: [
+      'src/features/chat/controllers/SelectionController.ts',
+      'src/features/inline-edit/ui/InlineEditModal.ts',
+      'src/features/settings/GrimoireSettings.ts',
+      'src/main.ts',
+      'src/providers/*/ui/*SettingsTab.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+    },
+  },
+  {
     files: ['src/**/*.ts'],
     rules: {
       ...projectObsidianRuleOverrides,

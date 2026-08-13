@@ -1,17 +1,16 @@
-import { ProviderRegistry } from './ProviderRegistry';
 import type { ProviderId } from './types';
 
-export function getProviderForModel(model: string, settings?: Record<string, unknown>): ProviderId {
-  return ProviderRegistry.resolveProviderForModel(model, settings);
+// Phase 9 cutover — ProviderRegistry removed. Model-to-provider routing now
+// resolves through the application runtime; legacy callers fall back to the
+// default provider until rewired.
+export function getProviderForModel(_model: string, _settings?: Record<string, unknown>): ProviderId {
+  return 'codex';
 }
 
 export function getEnabledProviderForModel(
-  model: string,
-  settings: Record<string, unknown>,
+  _model: string,
+  _settings: Record<string, unknown>,
   fallbackProviderId?: ProviderId,
 ): ProviderId {
-  return ProviderRegistry.resolveProviderForModel(model, settings, {
-    onlyEnabledProviders: true,
-    fallbackProviderId,
-  });
+  return fallbackProviderId ?? ('codex');
 }

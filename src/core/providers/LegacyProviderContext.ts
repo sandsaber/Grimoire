@@ -2,7 +2,6 @@ import type { App, PluginManifest } from 'obsidian';
 
 import type { SharedAppStorage } from '../bootstrap/storage';
 import type { DebugLogEvent } from '../debug/DebugLogService';
-import type { ChatRuntime } from '../runtime/ChatRuntime';
 import type { GrimoireSettings } from '../types';
 import type { ProviderId } from '../types/provider';
 import type { EnvironmentScope } from '../types/settings';
@@ -14,14 +13,14 @@ export interface LegacyProviderViewHandle {
   refreshModelSelector(): void;
 }
 
-/** Legacy tab-runtime broadcast handle retained only for the old production path. */
+/** Legacy tab-runtime broadcast handle — no-op after cutover. */
 export interface LegacyProviderTabManagerHandle {
   broadcastToProviderTabs(
     providerId: ProviderId,
-    callback: (runtime: ChatRuntime) => Promise<void> | void,
+    callback: (runtime?: any) => Promise<void> | void,
   ): Promise<void>;
   broadcastToAllTabs(
-    callback: (runtime: ChatRuntime) => Promise<void> | void,
+    callback: (runtime?: any) => Promise<void> | void,
   ): Promise<void>;
 }
 

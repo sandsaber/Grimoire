@@ -18,7 +18,6 @@ import {
   resolveMimocodeModeForPermissionMode,
   resolvePermissionModeForManagedMimocodeMode,
 } from '../modes';
-import { MimocodeChatRuntime } from '../runtime/MimocodeChatRuntime';
 import { getMimocodeProviderSettings, updateMimocodeProviderSettings } from '../settings';
 
 const MIMOCODE_MODELS: ProviderUIOption[] = [
@@ -31,7 +30,6 @@ const MIMOCODE_FALLBACK_THINKING_OPTIONS: ProviderReasoningOption[] = [
 ];
 const MIMOCODE_FALLBACK_THINKING_DEFAULT = 'high';
 const DEFAULT_CONTEXT_WINDOW = 200_000;
-const MIMOCODE_METADATA_WARMUP_DB = ':memory:';
 const MIMOCODE_PERMISSION_MODE_TOGGLE: ProviderPermissionModeToggleConfig = {
   inactiveValue: 'normal',
   inactiveLabel: 'Safe',
@@ -183,18 +181,10 @@ export const mimocodeChatUIConfig: ProviderChatUIConfig = {
       return;
     }
 
-    const runtime = new MimocodeChatRuntime(context.plugin);
-    try {
-      runtime.syncConversationState({
-        providerState: { databasePath: MIMOCODE_METADATA_WARMUP_DB },
-        sessionId: null,
-      });
-      await runtime.warmModelMetadata(model);
-    } catch {
-      // Metadata warmup is opportunistic; the first real turn can still discover it.
-    } finally {
-      runtime.cleanup();
-    }
+    // Phase 9 cutover — MimocodeChatRuntime removed. Model metadata warmup now
+    // happens through the application runtime; this opportunistic hook is a no-op.
+    void model;
+    void context;
   },
 
   applyReasoningSelection(model: string, value: string, settings: unknown): void {

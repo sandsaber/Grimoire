@@ -1,5 +1,3 @@
-import '@/providers';
-
 import { AcpClientConnection, AcpJsonRpcTransport, AcpSubprocess } from '@/providers/acp';
 import { GrokAuxQueryRunner } from '@/providers/grok/runtime/GrokAuxQueryRunner';
 import { prepareGrokLaunchArtifacts } from '@/providers/grok/runtime/GrokLaunchArtifacts';

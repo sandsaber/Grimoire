@@ -2,7 +2,6 @@ import type { LegacyProviderContext } from '@/core/providers/LegacyProviderConte
 
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderModelCatalog,
   ProviderTabWarmupPolicy,
@@ -13,7 +12,6 @@ import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { GrokAgentMentionProvider } from '../agents/GrokAgentMentionProvider';
 import { GrokCommandCatalog } from '../commands/GrokCommandCatalog';
-import { GrokChatRuntime } from '../runtime/GrokChatRuntime';
 import { GrokCliResolver } from '../runtime/GrokCliResolver';
 import { getGrokProviderSettings } from '../settings';
 import { GrokAgentStorage } from '../storage/GrokAgentStorage';
@@ -75,7 +73,6 @@ function createGrokModelCatalog(plugin: LegacyProviderContext): ProviderModelCat
         return false;
       }
 
-      const before = JSON.stringify(currentSettings.discoveredModels);
       plugin.recordDebugLog?.({
         data: {
           discoveredModelCount: currentSettings.discoveredModels.length,
@@ -85,33 +82,21 @@ function createGrokModelCatalog(plugin: LegacyProviderContext): ProviderModelCat
         level: 'debug',
         scope: 'provider.grok',
       });
-      const runtime = new GrokChatRuntime(plugin);
-      try {
-        runtime.syncConversationState({
-          providerState: {},
-          sessionId: null,
-        });
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-        const updatedSettings = getGrokProviderSettings(settings);
-        lastRefreshAt = Date.now();
-        lastRefreshCacheKey = buildGrokModelCatalogCacheKey(updatedSettings);
-        const after = JSON.stringify(getGrokProviderSettings(settings).discoveredModels);
-        const changed = loaded && before !== after;
-        plugin.recordDebugLog?.({
-          data: {
-            changed,
-            discoveredModelCount: getGrokProviderSettings(settings).discoveredModels.length,
-            loaded,
-            providerId: 'grok',
-          },
-          event: changed ? 'modelCatalog.refresh.succeeded' : 'modelCatalog.refresh.empty',
-          level: changed ? 'info' : 'debug',
-          scope: 'provider.grok',
-        });
-        return changed;
-      } finally {
-        runtime.cleanup();
-      }
+      // Phase 9 cutover — GrokChatRuntime removed. Model discovery now happens
+      // through the application runtime; legacy catalog refresh reports no change.
+      plugin.recordDebugLog?.({
+        data: {
+          changed: false,
+          discoveredModelCount: getGrokProviderSettings(settings).discoveredModels.length,
+          loaded: false,
+          providerId: 'grok',
+          reason: 'phase9_runtime_removed',
+        },
+        event: 'modelCatalog.refresh.empty',
+        level: 'debug',
+        scope: 'provider.grok',
+      });
+      return false;
     },
   };
 }
@@ -166,5 +151,6 @@ export const grokWorkspaceRegistration: ProviderWorkspaceRegistration<GrokWorksp
 };
 
 export function maybeGetGrokWorkspaceServices(): GrokWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('grok') as GrokWorkspaceServices | null;
+  // Phase 9 cutover — ProviderWorkspaceRegistry.getServices removed.
+  return null;
 }

@@ -1,9 +1,24 @@
 import type {
+  ChatRuntime,
   ProviderRuntimeCommandLoader,
   ProviderRuntimeCommandLoaderContext,
 } from '../../../core/providers/types';
-import { GrokChatRuntime } from '../runtime/GrokChatRuntime';
+import type { SlashCommand } from '../../../core/types';
 import { getGrokProviderSettings } from '../settings';
+
+// Phase 9 cutover — GrokChatRuntime removed. Runtime command discovery now
+// resolves through the application runtime; this loader reports no commands.
+function createStubRuntime(): Pick<
+  ChatRuntime,
+  'syncConversationState' | 'ensureReady' | 'getSupportedCommands' | 'cleanup'
+> {
+  return {
+    syncConversationState: () => {},
+    ensureReady: async () => false,
+    getSupportedCommands: async () => [] as SlashCommand[],
+    cleanup: () => {},
+  };
+}
 
 
 
@@ -36,7 +51,7 @@ export class GrokRuntimeCommandLoader implements ProviderRuntimeCommandLoader {
       && !shouldWarmPreSessionConversation;
     const runtime = canReuseRuntime
       ? context.runtime!
-      : new GrokChatRuntime(context.plugin);
+      : createStubRuntime();
 
     try {
       if (context.conversation) {

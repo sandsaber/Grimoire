@@ -18,7 +18,6 @@ import {
   resolveKimicodeModeForPermissionMode,
   resolvePermissionModeForManagedKimicodeMode,
 } from '../modes';
-import { KimicodeChatRuntime } from '../runtime/KimicodeChatRuntime';
 import { getKimicodeProviderSettings, updateKimicodeProviderSettings } from '../settings';
 
 const KIMICODE_MODELS: ProviderUIOption[] = [
@@ -31,7 +30,6 @@ const KIMICODE_FALLBACK_THINKING_OPTIONS: ProviderReasoningOption[] = [
 ];
 const KIMICODE_FALLBACK_THINKING_DEFAULT = 'high';
 const DEFAULT_CONTEXT_WINDOW = 200_000;
-const KIMICODE_METADATA_WARMUP_DB = ':memory:';
 const KIMICODE_PERMISSION_MODE_TOGGLE: ProviderPermissionModeToggleConfig = {
   inactiveValue: 'normal',
   inactiveLabel: 'Safe',
@@ -183,18 +181,10 @@ export const kimicodeChatUIConfig: ProviderChatUIConfig = {
       return;
     }
 
-    const runtime = new KimicodeChatRuntime(context.plugin);
-    try {
-      runtime.syncConversationState({
-        providerState: { databasePath: KIMICODE_METADATA_WARMUP_DB },
-        sessionId: null,
-      });
-      await runtime.warmModelMetadata(model);
-    } catch {
-      // Metadata warmup is opportunistic; the first real turn can still discover it.
-    } finally {
-      runtime.cleanup();
-    }
+    // Phase 9 cutover — KimicodeChatRuntime removed. Model metadata warmup now
+    // happens through the application runtime; this opportunistic hook is a no-op.
+    void model;
+    void context;
   },
 
   applyReasoningSelection(model: string, value: string, settings: unknown): void {

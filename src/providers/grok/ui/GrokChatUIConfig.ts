@@ -21,7 +21,6 @@ import {
   resolveGrokModeForPermissionMode,
   resolvePermissionModeForManagedGrokMode,
 } from '../modes';
-import { GrokChatRuntime } from '../runtime/GrokChatRuntime';
 import { getGrokProviderSettings, updateGrokProviderSettings } from '../settings';
 
 const GROK_MODELS: ProviderUIOption[] = [
@@ -186,18 +185,10 @@ export const grokChatUIConfig: ProviderChatUIConfig = {
       return;
     }
 
-    const runtime = new GrokChatRuntime(context.plugin);
-    try {
-      runtime.syncConversationState({
-        providerState: {},
-        sessionId: null,
-      });
-      await runtime.warmModelMetadata(model);
-    } catch {
-      // Metadata warmup is opportunistic; the first real turn can still discover it.
-    } finally {
-      runtime.cleanup();
-    }
+    // Phase 9 cutover — GrokChatRuntime removed. Model metadata warmup now
+    // happens through the application runtime; this opportunistic hook is a no-op.
+    void model;
+    void context;
   },
 
   applyReasoningSelection(model: string, value: string, settings: unknown): void {

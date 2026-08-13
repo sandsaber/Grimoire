@@ -4,7 +4,6 @@ import type { LegacyProviderContext } from '@/core/providers/LegacyProviderConte
 
 import type { AuxQueryConfig, AuxQueryRunner } from '../../../core/auxiliary/AuxQueryRunner';
 import { getRuntimeEnvironmentText } from '../../../core/providers/providerEnvironment';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { t } from '../../../i18n/i18n';
 import { getVaultPath } from '../../../utils/path';
@@ -56,13 +55,13 @@ export class GrokAuxQueryRunner implements AuxQueryRunner {
     await this.ensureReady(cwd, config.systemPrompt);
 
     if (!this.connection) {
-      throw new Error(t('chat.ui.errors.provider.notReady', { provider: ProviderRegistry.getProviderDisplayNameOrId('grok') }));
+      throw new Error(t('chat.ui.errors.provider.notReady', { provider: 'grok' /* Phase 9 cutover */ }));
     }
 
     if (!this.sessionId) {
       const sessionId = await this.createSession(cwd);
       if (!sessionId) {
-        throw new Error(t('chat.ui.errors.provider.sessionCreateFailed', { provider: ProviderRegistry.getProviderDisplayNameOrId('grok') }));
+        throw new Error(t('chat.ui.errors.provider.sessionCreateFailed', { provider: 'grok' /* Phase 9 cutover */ }));
       }
     }
 
@@ -123,7 +122,7 @@ export class GrokAuxQueryRunner implements AuxQueryRunner {
 
       return accumulatedText;
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('chat.ui.errors.provider.requestFailed', { provider: ProviderRegistry.getProviderDisplayNameOrId('grok') });
+      const message = error instanceof Error ? error.message : t('chat.ui.errors.provider.requestFailed', { provider: 'grok' /* Phase 9 cutover */ });
       const stderr = this.process?.getStderrSnapshot();
       throw new Error(
         stderr ? `${message}\n\n${stderr}` : message,

@@ -1,5 +1,3 @@
-import '@/providers';
-
 import { AcpClientConnection, AcpJsonRpcTransport, AcpSubprocess } from '@/providers/acp';
 import { MimocodeAuxQueryRunner } from '@/providers/mimocode/runtime/MimocodeAuxQueryRunner';
 import { prepareMimocodeLaunchArtifacts } from '@/providers/mimocode/runtime/MimocodeLaunchArtifacts';
