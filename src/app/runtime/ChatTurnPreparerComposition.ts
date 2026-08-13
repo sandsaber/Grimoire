@@ -5,6 +5,9 @@ import { CLAUDE_EXECUTION_REQUEST_KIND } from '../../providers/claude/app/Claude
 import { ClaudeTurnRequestPreparer } from '../../providers/claude/app/ClaudeTurnRequestPreparer';
 import { CLAUDE_EXECUTION_DESCRIPTOR } from '../../providers/claude/execution/ClaudeExecutionBackend';
 import { ClaudeCliResolver } from '../../providers/claude/runtime/ClaudeCliResolver';
+import { CODEX_EXECUTION_REQUEST_KIND } from '../../providers/codex/app/CodexApplicationContextFactory';
+import { CodexTurnRequestPreparer } from '../../providers/codex/app/CodexTurnRequestPreparer';
+import { CODEX_EXECUTION_DESCRIPTOR } from '../../providers/codex/execution/CodexExecutionBackend';
 import { GEMINI_EXECUTION_REQUEST_KIND } from '../../providers/gemini/app/GeminiApplicationContextFactory';
 import { GEMINI_EXECUTION_DESCRIPTOR } from '../../providers/gemini/execution/GeminiExecutionBackend';
 import { GeminiCliResolver } from '../../providers/gemini/runtime/GeminiCliResolver';
@@ -153,6 +156,13 @@ export function createChatTurnRequestPreparers(options: {
       requestKind: CLAUDE_EXECUTION_REQUEST_KIND,
       requests: options.requests,
       cliResolver: new ClaudeCliResolver(),
+    }),
+    // Codex needs no startup reference: its app-server launch specification is
+    // supplied once at composition time.
+    new CodexTurnRequestPreparer({
+      backendId: CODEX_EXECUTION_DESCRIPTOR.backendId,
+      requestKind: CODEX_EXECUTION_REQUEST_KIND,
+      requests: options.requests,
     }),
   ]);
 }

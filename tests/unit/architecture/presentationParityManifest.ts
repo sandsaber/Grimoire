@@ -58,6 +58,7 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       'src/providers/acp/mcp/AcpMcpStorage.ts',
       'src/providers/acp/mcp/toAcpMcpServers.ts',
       'src/providers/claude/app/ClaudeTurnRequestPreparer.ts',
+      'src/providers/codex/app/CodexTurnRequestPreparer.ts',
       'src/providers/claude/cli/findClaudeCLIPath.ts',
       'src/providers/claude/runtime/ClaudeCliResolver.ts',
       'src/providers/claude/runtime/ClaudeUserMessageFactory.ts',
@@ -95,7 +96,10 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       + 'mode and reasoning effort. Claude has its own too: its startup reference resolves to '
       + 'SDK options rather than a launch specification, and it is deliberately conservative '
       + 'until workspace services return, so it starts without MCP servers, plugins, hooks, or '
-      + 'setting sources. Codex and Antigravity still have no preparer and fail closed by name.',
+      + 'setting sources. Codex needs no startup reference at all: its app-server launch '
+      + 'specification is supplied once at composition time, so a turn only names the thread '
+      + 'and input. Antigravity is the last provider without a preparer and fails closed by '
+      + 'name.',
   },
   {
     id: 'interaction-prompts',
