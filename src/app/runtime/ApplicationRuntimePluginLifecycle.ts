@@ -11,6 +11,7 @@ export interface ApplicationRuntimePluginLifecycleOptions {
 
 export interface ApplicationRuntimePluginLifecycle {
   readonly runtime: ApplicationRuntime;
+  readonly composition: ApplicationRuntimeComposition;
   start(): Promise<void>;
   shutdown(): Promise<void>;
 }
@@ -32,6 +33,7 @@ export function createApplicationRuntimePluginLifecycle(
   let shutdownTask: Promise<void> | undefined;
   return Object.freeze({
     runtime,
+    composition: options.composition,
     start: async () => {
       if (shutdownTask) await shutdownTask.catch(() => undefined);
       startTask ??= runtime.start();

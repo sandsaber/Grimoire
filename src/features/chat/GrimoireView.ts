@@ -1,9 +1,12 @@
 import type { WorkspaceLeaf } from 'obsidian';
 import { ItemView, Notice } from 'obsidian';
 
+import { executionBackendId } from '../../core/execution/ExecutionBackendDescriptor';
 import type { LegacyProviderTabManagerHandle } from '../../core/providers/LegacyProviderContext';
 import { VIEW_TYPE_GRIMOIRE } from '../../core/types';
+import type { ChatMessage } from '../../core/types/chat';
 import type GrimoirePlugin from '../../main';
+import { builtInProviderCatalog } from '../../providers/BuiltInProviderCatalog';
 
 /** Legacy tab identifier retained for no-op compatibility. */
 type TabId = string;
@@ -45,12 +48,8 @@ interface GrimoireActiveTabStub {
  * selection. Execution lifecycle is owned by the ApplicationRuntime.
  *
  * The view loads the active conversation from the runtime, attaches a
- * projection listener, and renders updates through ChatProjectionRenderer.
- * It never creates, queries, cancels, or disposes execution resources.
- *
- * Projection-backed view replacing the legacy tab architecture
- * architecture. The legacy tab state (AppTabManagerState) is migrated to
- * conversation-level projection attachments.
+ * projection listener, and renders updates. It submits turns through the
+ * runtime's chat coordinator and renders projection responses.
  */
 export class GrimoireView extends ItemView {
   private plugin: GrimoirePlugin;
@@ -59,6 +58,7 @@ export class GrimoireView extends ItemView {
   private inputEl: HTMLTextAreaElement | null = null;
   private projectionUnsubscribe: (() => void) | null = null;
   private isActive = false;
+  private readonly providerId = builtInProviderCatalog.list()[0]?.manifest.id ?? 'claude';
 
   constructor(leaf: WorkspaceLeaf, plugin: GrimoirePlugin) {
     super(leaf);
@@ -101,7 +101,6 @@ export class GrimoireView extends ItemView {
     });
 
     this.isActive = true;
-    // Create or restore a conversation on first open.
     if (!this.conversationId) {
       await this.ensureConversation();
     }
@@ -114,21 +113,30 @@ export class GrimoireView extends ItemView {
   }
 
   /**
-   * Creates a new conversation if none exists, or loads the existing one.
-   * The conversation is owned by the ApplicationRuntime; the view only
-   * attaches a projection listener.
+   * Creates a new conversation in the revisioned repository through the
+   * runtime, then attaches a projection listener.
    */
   private async ensureConversation(): Promise<void> {
-    const runtime = this.plugin.applicationRuntime;
-    if (!runtime || !this.isActive) return;
+    const lifecycle = this.plugin.applicationRuntime;
+    if (!lifecycle || !this.isActive) return;
 
-    // For now, create a fresh conversation. Migration of legacy tab state
-    // will restore previously open conversations by their IDs.
     if (!this.conversationId) {
-      this.conversationId = `conv-${Date.now()}`;
-      // TODO: The conversation needs to be created in the revisioned repository
-      // through the runtime's chat coordinator. For now, the view just displays
-      // an empty state until a turn is submitted.
+      this.conversationId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      // Create the conversation in the revisioned repository so
+      // loadConversation and attachConversation succeed.
+      try {
+        await lifecycle.composition.conversations.create({
+          id: this.conversationId,
+          providerId: this.providerId,
+          title: 'New Conversation',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          sessionId: null,
+          messages: [],
+        });
+      } catch {
+        // Conversation may already exist; that's fine.
+      }
     }
 
     await this.attachProjection();
@@ -157,10 +165,7 @@ export class GrimoireView extends ItemView {
 
   private renderProjection(projection: unknown): void {
     if (!this.messageContainerEl) return;
-    // The full ChatProjectionRenderer renders messages, turns, interactions,
-    // and agent work cards. For the initial cutover, we display the conversation
-    // title and message count. The renderer will be wired in the next step.
-    const p = projection as { title?: string; messages?: readonly unknown[] };
+    const p = projection as { title?: string; messages?: readonly ChatMessage[] };
     this.messageContainerEl.empty();
     if (p.title) {
       this.messageContainerEl.createDiv({
@@ -170,35 +175,62 @@ export class GrimoireView extends ItemView {
     }
     if (p.messages) {
       for (const message of p.messages) {
-        const m = message as { role?: string; content?: string };
         this.messageContainerEl.createDiv({
-          cls: `grimoire-message grimoire-message--${m.role ?? 'unknown'}`,
-          text: m.content ?? '',
+          cls: `grimoire-message grimoire-message--${message.role}`,
+          text: message.content ?? '',
         });
       }
     }
   }
 
+  /**
+   * Submits the current input text as a chat turn through the ApplicationRuntime.
+   * The runtime persists the user message, creates the execution run, and
+   * streams projection updates that this view renders.
+   */
   private async submitInput(): Promise<void> {
-    if (!this.inputEl || !this.conversationId || !this.plugin.applicationRuntime) return;
+    const lifecycle = this.plugin.applicationRuntime;
+    if (!lifecycle || !this.inputEl || !this.conversationId) {
+      new Notice('Runtime is not ready yet.');
+      return;
+    }
     const text = this.inputEl.value.trim();
     if (!text) return;
 
     this.inputEl.value = '';
+
+    const composition = lifecycle.composition;
+    const module = builtInProviderCatalog.list().find(m => m.manifest.id === this.providerId);
+    const backendId = module?.execution.descriptor.backendId ?? executionBackendId(`provider-${this.providerId}`);
+    const requestRef = composition.requests.register(`${this.providerId}-turn`, {
+      startupRef: `startup-${Date.now()}`,
+      restartFingerprint: `fp-${Date.now()}`,
+      prompt: [{ type: 'text', text }],
+    });
+
+    const userMessage: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      role: 'user',
+      content: text,
+      timestamp: Date.now(),
+    };
+
     try {
-      // Submit through the runtime's chat coordinator. The actual command
-      // construction (backend ID, request ref, result expectation) will be
-      // handled by the coordinator or a view-level adapter.
-      // For the initial cutover, this is a placeholder that shows the input
-      // was accepted.
-      new Notice('Message queued');
+      await lifecycle.runtime.submitChatTurn({
+        commandId: `cmd-${Date.now()}`,
+        conversationId: this.conversationId,
+        backendId,
+        requestRef,
+        resultExpectation: 'required',
+        userMessage,
+      });
     } catch (error) {
       new Notice(`Failed to send: ${String(error)}`);
     }
   }
 
   // Legacy compatibility stubs — main.ts calls these but they are no-ops
-  // in the projection-backed architecture. Tabs are optional Obsidian views.
+  // in the projection-backed architecture.
 
   showPendingWhatsNew(): void {
     // What's New card rendering will be handled through projections.
@@ -206,7 +238,6 @@ export class GrimoireView extends ItemView {
 
   async createNewTab(): Promise<void> {
     // Opening a new view leaf replaces tab creation.
-    // main.ts handles leaf management.
   }
 
   requestTabClose(_tabId: TabId): void {
@@ -226,7 +257,7 @@ export class GrimoireView extends ItemView {
     return this.conversationId
       ? {
         conversationId: this.conversationId,
-        providerId: null,
+        providerId: this.providerId,
         draftModel: null,
         id: 'active',
         lifecycleState: 'bound_active',
