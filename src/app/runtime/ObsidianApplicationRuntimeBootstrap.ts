@@ -60,6 +60,10 @@ export function createObsidianApplicationRuntime(
     digest,
     launchers,
     claudeQueryFactory,
+    workspaceRoot: vaultPath,
+    // Grimoire-owned MCP servers live in the vault, so the same adapter that
+    // backs durable storage supplies them.
+    vaultFiles: adapter,
   });
 
   return createApplicationRuntimePluginLifecycle({

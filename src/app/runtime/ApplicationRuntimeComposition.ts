@@ -4,11 +4,13 @@ import { ConversationRepository } from '../../core/persistence/ConversationRepos
 import type { DurableStorage } from '../../core/persistence/DurableStorage';
 import type { ChatTurnRequestPreparerRegistry } from '../../core/providers/ChatTurnRequestPreparer';
 import type { Sha256DigestPort } from '../../core/providers/ProviderSettingsFingerprint';
+import type { VaultFileAdapter } from '../../core/storage/VaultFileAdapter';
 import { WorkCoordinator } from '../../core/work/WorkCoordinator';
 import { WorkGraphRepository } from '../../core/work/WorkGraphRepository';
 import { AuxiliaryExecutionCoordinator } from '../../features/chat/application/AuxiliaryExecutionCoordinator';
 import { LocalShellExecutionCoordinator } from '../../features/chat/application/LocalShellExecutionCoordinator';
 import { LocalShellOutputProjectionStore } from '../../features/chat/application/LocalShellOutputProjectionStore';
+import { createAcpMcpServerSource } from '../../providers/acp/app/AcpMcpServerSource';
 import { builtInProviderCatalog } from '../../providers/BuiltInProviderCatalog';
 import type { ClaudeExecutionQueryFactory } from '../../providers/claude/execution/ClaudeExecutionBackend';
 import type { NodeProcessLauncherComposition } from '../execution/NodeProcessLauncherComposition';
@@ -39,6 +41,8 @@ export interface ApplicationRuntimeCompositionOptions {
    */
   readonly workspaceRoot?: string;
   readonly userName?: string;
+  /** Vault adapter used to read Grimoire-owned MCP server configuration. */
+  readonly vaultFiles?: Pick<VaultFileAdapter, 'exists' | 'read' | 'write'>;
   readonly now?: () => number;
   readonly launchers?: NodeProcessLauncherComposition;
   readonly claudeQueryFactory?: ClaudeExecutionQueryFactory;
@@ -113,6 +117,9 @@ export class ApplicationRuntimeComposition {
     this.results = new DurableExecutionResultStore(options.storage, options.digest);
     this.turnPreparers = createChatTurnRequestPreparers({
       requests: this.requests,
+      ...(options.vaultFiles
+        ? { mcpServers: createAcpMcpServerSource(options.vaultFiles) }
+        : {}),
       ...(options.userName ? { userName: options.userName } : {}),
     });
     this.presentations = new ExecutionInteractionPresentationRecovery(

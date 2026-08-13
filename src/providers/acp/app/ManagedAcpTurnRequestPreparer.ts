@@ -75,8 +75,11 @@ export interface ManagedAcpTurnRequestPreparerOptions {
     cliPath: string,
     databasePathOverride?: string | null,
   ): NodeJS.ProcessEnv;
-  /** Grimoire-owned MCP servers injected into the ACP session, if any. */
-  readonly mcpServers?: AcpNewSessionRequest['mcpServers'];
+  /**
+   * Grimoire-owned MCP servers for the session. Resolved per turn because a
+   * server can be added or disabled between messages.
+   */
+  loadMcpServers?(): Promise<AcpNewSessionRequest['mcpServers']>;
   readonly userName?: string;
 }
 
@@ -151,7 +154,7 @@ export class ManagedAcpTurnRequestPreparer implements ChatTurnRequestPreparer {
       restartFingerprint,
       cwd: input.cwd,
       prompt: [{ type: 'text', text: input.prompt }],
-      mcpServers: this.options.mcpServers ?? [],
+      mcpServers: await this.options.loadMcpServers?.() ?? [],
     };
     const requestRef = this.options.requests.register(this.options.requestKind, invocation);
 

@@ -53,7 +53,10 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       'src/core/prompt/mainAgent.ts',
       'src/core/providers/ChatTurnRequestPreparer.ts',
       'src/app/runtime/ChatTurnPreparerComposition.ts',
+      'src/providers/acp/app/AcpMcpServerSource.ts',
       'src/providers/acp/app/ManagedAcpTurnRequestPreparer.ts',
+      'src/providers/acp/mcp/AcpMcpStorage.ts',
+      'src/providers/acp/mcp/toAcpMcpServers.ts',
       'src/providers/claude/app/ClaudeTurnRequestPreparer.ts',
       'src/providers/claude/cli/findClaudeCLIPath.ts',
       'src/providers/claude/runtime/ClaudeCliResolver.ts',
@@ -109,7 +112,7 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
   },
   {
     id: 'mcp-management-ui',
-    title: 'MCP server management',
+    title: 'MCP server management UI',
     area: 'settings',
     state: 'pending',
     phase: '12C',
@@ -120,10 +123,11 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       'src/features/settings/ui/McpServerModal.ts',
       'src/features/settings/ui/McpSettingsManager.ts',
       'src/features/settings/ui/McpTestModal.ts',
-      'src/providers/acp/mcp/AcpMcpStorage.ts',
-      'src/providers/acp/mcp/toAcpMcpServers.ts',
       'src/providers/claude/storage/McpStorage.ts',
     ],
+    note: 'Reading Grimoire-owned ACP MCP servers is restored — the six managed-ACP providers '
+      + 'now carry them into their sessions. What remains orphaned is the UI for editing that '
+      + 'configuration and Claude-side MCP, which needs workspace services.',
   },
   {
     id: 'provider-agent-settings',

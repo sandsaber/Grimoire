@@ -60,7 +60,7 @@ export interface GrokTurnRequestPreparerOptions {
     reasoningEffort?: string | null,
     permissionMode?: GrokPermissionMode,
   ): string[];
-  readonly mcpServers?: AcpNewSessionRequest['mcpServers'];
+  loadMcpServers?(): Promise<AcpNewSessionRequest['mcpServers']>;
   readonly userName?: string;
 }
 
@@ -131,7 +131,7 @@ export class GrokTurnRequestPreparer implements ChatTurnRequestPreparer {
       restartFingerprint,
       cwd: input.cwd,
       prompt: [{ type: 'text', text: input.prompt }],
-      mcpServers: this.options.mcpServers ?? [],
+      mcpServers: await this.options.loadMcpServers?.() ?? [],
     });
 
     return { backendId: this.options.backendId, requestRef, restartFingerprint };

@@ -1,4 +1,5 @@
 import { ChatTurnRequestPreparerRegistry } from '../../core/providers/ChatTurnRequestPreparer';
+import type { AcpMcpServerSource } from '../../providers/acp/app/AcpMcpServerSource';
 import { ManagedAcpTurnRequestPreparer } from '../../providers/acp/app/ManagedAcpTurnRequestPreparer';
 import { CLAUDE_EXECUTION_REQUEST_KIND } from '../../providers/claude/app/ClaudeApplicationContextFactory';
 import { ClaudeTurnRequestPreparer } from '../../providers/claude/app/ClaudeTurnRequestPreparer';
@@ -48,12 +49,19 @@ import type { ApplicationExecutionRequestBroker } from './ApplicationExecutionRe
  */
 export function createChatTurnRequestPreparers(options: {
   readonly requests: ApplicationExecutionRequestBroker;
+  /** Grimoire-owned MCP servers. Absent until a vault adapter is available. */
+  readonly mcpServers?: AcpMcpServerSource;
   readonly userName?: string;
 }): ChatTurnRequestPreparerRegistry {
   const userName = options.userName ? { userName: options.userName } : {};
+  const mcp = options.mcpServers;
+  const loadMcpServers = (providerId: 'opencode' | 'mimocode' | 'kimicode' | 'grok' | 'gemini' | 'qwen') => (
+    mcp ? { loadMcpServers: () => mcp.load(providerId) } : {}
+  );
   return new ChatTurnRequestPreparerRegistry([
     new ManagedAcpTurnRequestPreparer({
       providerId: 'opencode',
+      ...loadMcpServers('opencode'),
       displayName: 'OpenCode',
       executableName: 'opencode',
       backendId: OPENCODE_EXECUTION_DESCRIPTOR.backendId,
@@ -68,6 +76,7 @@ export function createChatTurnRequestPreparers(options: {
     }),
     new ManagedAcpTurnRequestPreparer({
       providerId: 'mimocode',
+      ...loadMcpServers('mimocode'),
       displayName: 'MiMoCode',
       executableName: 'mimocode',
       backendId: MIMOCODE_EXECUTION_DESCRIPTOR.backendId,
@@ -82,6 +91,7 @@ export function createChatTurnRequestPreparers(options: {
     }),
     new ManagedAcpTurnRequestPreparer({
       providerId: 'kimicode',
+      ...loadMcpServers('kimicode'),
       displayName: 'Kimi Code',
       executableName: 'kimi',
       backendId: KIMICODE_EXECUTION_DESCRIPTOR.backendId,
@@ -98,6 +108,7 @@ export function createChatTurnRequestPreparers(options: {
     // artifacts and their restart fingerprint is derived from the launch inputs.
     new ManagedAcpTurnRequestPreparer({
       providerId: 'gemini',
+      ...loadMcpServers('gemini'),
       displayName: 'Gemini CLI',
       executableName: 'gemini',
       backendId: GEMINI_EXECUTION_DESCRIPTOR.backendId,
@@ -110,6 +121,7 @@ export function createChatTurnRequestPreparers(options: {
     }),
     new ManagedAcpTurnRequestPreparer({
       providerId: 'qwen',
+      ...loadMcpServers('qwen'),
       displayName: 'Qwen Code',
       executableName: 'qwen',
       backendId: QWEN_EXECUTION_DESCRIPTOR.backendId,
@@ -131,6 +143,7 @@ export function createChatTurnRequestPreparers(options: {
       prepareLaunchArtifacts: prepareGrokLaunchArtifacts,
       buildRuntimeEnv: buildGrokRuntimeEnv,
       buildProcessArguments: buildGrokAgentProcessArgs,
+      ...loadMcpServers('grok'),
       ...userName,
     }),
     // Claude is not managed-ACP: its startup reference resolves to SDK options
