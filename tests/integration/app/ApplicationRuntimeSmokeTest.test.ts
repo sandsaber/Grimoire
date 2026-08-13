@@ -98,9 +98,9 @@ describe('Application Runtime Smoke Test', () => {
     for (const module of builtInProviderCatalog.list()) {
       const descriptor = module.execution.descriptor;
       expect(descriptor.association.kind).toBe('provider');
-      if (descriptor.association.kind === 'provider') {
-        expect(descriptor.association.providerId).toBe(module.manifest.id);
-      }
+      expect(descriptor).toMatchObject({
+        association: { kind: 'provider', providerId: module.manifest.id },
+      });
       expect(descriptor.backendId).toMatch(/^provider-/);
     }
   });
