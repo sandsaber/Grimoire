@@ -8,6 +8,7 @@ import { WorkGraphRepository } from '../../core/work/WorkGraphRepository';
 import { AuxiliaryExecutionCoordinator } from '../../features/chat/application/AuxiliaryExecutionCoordinator';
 import { LocalShellExecutionCoordinator } from '../../features/chat/application/LocalShellExecutionCoordinator';
 import { LocalShellOutputProjectionStore } from '../../features/chat/application/LocalShellOutputProjectionStore';
+import { builtInProviderCatalog } from '../../providers/BuiltInProviderCatalog';
 import type { ClaudeExecutionQueryFactory } from '../../providers/claude/execution/ClaudeExecutionBackend';
 import type { NodeProcessLauncherComposition } from '../execution/NodeProcessLauncherComposition';
 import { ApplicationExecutionRequestBroker } from './ApplicationExecutionRequestBroker';
@@ -23,6 +24,8 @@ import { ProviderApplicationContextComposition } from './ProviderApplicationCont
 import { ProviderBackendGenerationStore } from './ProviderBackendGenerationStore';
 import { ProviderBackendLifecycleAdapter } from './ProviderBackendLifecycleAdapter';
 import { ProviderBackendStartup } from './ProviderBackendStartup';
+import type { ProviderSettingsCoordinatorWiring } from './ProviderSettingsCoordinatorWiring';
+import { createProviderSettingsCoordinator } from './ProviderSettingsCoordinatorWiring';
 
 export interface ApplicationRuntimeCompositionOptions {
   readonly storage: DurableStorage;
@@ -55,6 +58,7 @@ export class ApplicationRuntimeComposition {
   readonly shell: LocalShellExecutionCoordinator;
   readonly auxiliary: AuxiliaryExecutionCoordinator;
   readonly shellOutput: LocalShellOutputProjectionStore;
+  readonly settings: ProviderSettingsCoordinatorWiring;
 
   constructor(options: ApplicationRuntimeCompositionOptions) {
     this.infrastructure = new ApplicationRuntimeInfrastructure({
@@ -128,6 +132,15 @@ export class ApplicationRuntimeComposition {
       this.infrastructure.lifecycle,
       this.requests,
     );
+
+    this.settings = createProviderSettingsCoordinator({
+      storage: options.storage,
+      digest: options.digest,
+      catalog: builtInProviderCatalog,
+      lifecycle: this.infrastructure.lifecycle,
+      generations: this.generations,
+      workspaceRegistry: this.composition.registry,
+    });
   }
 
   get identities(): ApplicationIdentityFactory {
