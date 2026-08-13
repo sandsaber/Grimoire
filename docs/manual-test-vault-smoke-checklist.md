@@ -91,9 +91,10 @@ The following automated tests cover the same paths:
   during the cutover. The history button and dropdown are not yet reconnected.
   Legacy conversations are migrated to the revisioned repository on startup
   by ApplicationRuntimeMigration, but the history UI is not yet wired.
-- Provider/model selection UI is not yet available in the new view; the view
-  defaults to the first catalog provider (Claude). Provider backends are
-  wired with concrete Node process launchers (Antigravity transport, managed
-  ACP launcher, Codex app-server, Claude SDK query factory).
+- Provider/model selection: a provider dropdown is available in the chat
+  header, allowing users to switch between all 9 providers at runtime.
+  Model selection within a provider is not yet available. Provider backends
+  are wired with concrete Node process launchers (Antigravity transport,
+  managed ACP launcher, Codex app-server, Claude SDK query factory).
 - Inline edit returns "requires a connected provider session" because the
   inline edit service has not been migrated to the new execution platform.
