@@ -89,6 +89,8 @@ The following automated tests cover the same paths:
   complete ChatProjectionRenderer will be wired in a follow-up.
 - History browsing depends on the full GrimoireView UI, which was rewritten
   during the cutover. The history button and dropdown are not yet reconnected.
+  Legacy conversations are migrated to the revisioned repository on startup
+  by ApplicationRuntimeMigration, but the history UI is not yet wired.
 - Provider/model selection UI is not yet available in the new view; the view
   defaults to the first catalog provider (Claude).
 - Inline edit returns "requires a connected provider session" because the
