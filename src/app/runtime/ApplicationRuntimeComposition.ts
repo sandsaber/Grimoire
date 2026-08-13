@@ -19,6 +19,7 @@ import { createChatExecutionCoordinator } from './ChatRuntimeWiring';
 import { DurableExecutionResultStore } from './DurableExecutionResultStore';
 import { EphemeralExecutionRequestStore } from './EphemeralExecutionRequestStore';
 import { ExecutionInteractionPresentationRecovery } from './ExecutionInteractionPresentationRecovery';
+import { LegacySessionMetadataAdapter } from './LegacySessionMetadataAdapter';
 import type { ProviderApplicationContextOverrides } from './ProviderApplicationContextComposition';
 import { ProviderApplicationContextComposition } from './ProviderApplicationContextComposition';
 import { ProviderBackendGenerationStore } from './ProviderBackendGenerationStore';
@@ -87,7 +88,13 @@ export class ApplicationRuntimeComposition {
       nextShutdownCheckpointId: () => this.infrastructure.identities.nextShutdownCheckpointId(),
     });
 
-    this.migration = new ApplicationRuntimeMigration();
+    this.conversations = new ConversationRepository(options.storage);
+    const legacySessions = new LegacySessionMetadataAdapter(options.storage);
+    this.migration = new ApplicationRuntimeMigration(
+      this.conversations,
+      legacySessions,
+      builtInProviderCatalog,
+    );
 
     const ephemeralRequests = new EphemeralExecutionRequestStore();
     this.requests = new ApplicationExecutionRequestBroker(
@@ -99,7 +106,6 @@ export class ApplicationRuntimeComposition {
       this.infrastructure.lifecycle,
       this.composition.presentationStore,
     );
-    this.conversations = new ConversationRepository(options.storage);
     this.agents = new AgentCoordinator(options.storage, {
       ...(options.now ? { now: options.now } : {}),
       scheduler: {
