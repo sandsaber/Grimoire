@@ -187,7 +187,7 @@ function deriveLaunchFingerprint(launch: ManagedAcpLaunchInvocation): string {
  * concrete strings. Undefined entries are dropped rather than coerced, so an
  * unset variable stays unset in the child process.
  */
-function toStringEnvironment(env: NodeJS.ProcessEnv): Record<string, string> {
+export function toStringEnvironment(env: NodeJS.ProcessEnv): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
     if (typeof value === 'string') result[key] = value;

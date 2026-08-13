@@ -15,7 +15,7 @@ function createRegistry() {
 }
 
 /** Providers with a preparer. Kept here so both assertions stay in step. */
-const WIRED = ['opencode', 'mimocode', 'kimicode', 'gemini', 'qwen'] as const;
+const WIRED = ['opencode', 'mimocode', 'kimicode', 'gemini', 'qwen', 'grok'] as const;
 
 describe('createChatTurnRequestPreparers', () => {
   it('registers every managed-ACP provider whose launch pipeline is wired', () => {

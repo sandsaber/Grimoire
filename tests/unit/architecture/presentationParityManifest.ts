@@ -54,6 +54,11 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       'src/core/providers/ChatTurnRequestPreparer.ts',
       'src/app/runtime/ChatTurnPreparerComposition.ts',
       'src/providers/acp/app/ManagedAcpTurnRequestPreparer.ts',
+      'src/providers/grok/app/GrokTurnRequestPreparer.ts',
+      'src/providers/grok/runtime/GrokCliResolver.ts',
+      'src/providers/grok/runtime/GrokLaunchArgs.ts',
+      'src/providers/grok/runtime/GrokLaunchArtifacts.ts',
+      'src/providers/grok/runtime/GrokRuntimeEnvironment.ts',
       'src/providers/gemini/runtime/GeminiCliResolver.ts',
       'src/providers/gemini/runtime/GeminiRuntimeEnvironment.ts',
       'src/providers/qwen/runtime/QwenCliResolver.ts',
@@ -77,9 +82,10 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       + 'provider-specific decision arrives as an option rather than through inheritance. '
       + 'Gemini and Qwen generate no config file, so they have no launch artifacts and their '
       + 'fingerprint is derived from executable, arguments, cwd, and environment instead. '
-      + 'Claude, Codex, Antigravity, and Grok still have no preparer and fail closed by name: '
-      + 'Claude and Codex are not managed-ACP at all, and Grok builds its arguments from '
-      + 'per-turn reasoning effort and permission mode that the view does not yet supply.',
+      + 'Grok keeps its own preparer: its artifacts are built before the environment, which '
+      + 'needs the generated Grok home, and its arguments come from the configured permission '
+      + 'mode and reasoning effort. Claude, Codex, and Antigravity still have no preparer and '
+      + 'fail closed by name; none of them is managed-ACP.',
   },
   {
     id: 'interaction-prompts',
@@ -443,7 +449,6 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       'src/providers/claude/runtime/ClaudeCliResolver.ts',
       'src/providers/codex/runtime/CodexBinaryLocator.ts',
       'src/providers/codex/runtime/CodexCliResolver.ts',
-      'src/providers/grok/runtime/GrokCliResolver.ts',
     ],
   },
   {
@@ -546,8 +551,6 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       'src/providers/gemini/execution/GeminiNativeHistoryReplayResolver.ts',
       'src/providers/gemini/types/index.ts',
       'src/providers/grok/execution/GrokAcpFileSystem.ts',
-      'src/providers/grok/runtime/GrokLaunchArgs.ts',
-      'src/providers/grok/runtime/GrokLaunchArtifacts.ts',
       'src/providers/grok/runtime/buildGrokPrompt.ts',
       'src/providers/grok/runtime/formatGrokAskUserQuestionResponse.ts',
       'src/providers/grok/runtime/grokDebugLog.ts',
@@ -582,7 +585,6 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       'src/providers/codex/env/CodexSettingsReconciler.ts',
       'src/providers/gemini/env/GeminiSettingsReconciler.ts',
       'src/providers/grok/env/GrokSettingsReconciler.ts',
-      'src/providers/grok/runtime/GrokRuntimeEnvironment.ts',
       'src/providers/kimicode/env/KimicodeSettingsReconciler.ts',
       'src/providers/mimocode/env/MimocodeSettingsReconciler.ts',
       'src/providers/opencode/env/OpencodeSettingsReconciler.ts',

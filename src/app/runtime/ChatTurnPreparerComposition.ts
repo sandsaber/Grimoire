@@ -4,6 +4,13 @@ import { GEMINI_EXECUTION_REQUEST_KIND } from '../../providers/gemini/app/Gemini
 import { GEMINI_EXECUTION_DESCRIPTOR } from '../../providers/gemini/execution/GeminiExecutionBackend';
 import { GeminiCliResolver } from '../../providers/gemini/runtime/GeminiCliResolver';
 import { buildGeminiRuntimeEnv } from '../../providers/gemini/runtime/GeminiRuntimeEnvironment';
+import { GROK_EXECUTION_REQUEST_KIND } from '../../providers/grok/app/GrokApplicationContextFactory';
+import { GrokTurnRequestPreparer } from '../../providers/grok/app/GrokTurnRequestPreparer';
+import { GROK_EXECUTION_DESCRIPTOR } from '../../providers/grok/execution/GrokExecutionBackend';
+import { GrokCliResolver } from '../../providers/grok/runtime/GrokCliResolver';
+import { buildGrokAgentProcessArgs } from '../../providers/grok/runtime/GrokLaunchArgs';
+import { prepareGrokLaunchArtifacts } from '../../providers/grok/runtime/GrokLaunchArtifacts';
+import { buildGrokRuntimeEnv } from '../../providers/grok/runtime/GrokRuntimeEnvironment';
 import { KIMICODE_EXECUTION_REQUEST_KIND } from '../../providers/kimicode/app/KimicodeApplicationContextFactory';
 import { KIMICODE_EXECUTION_DESCRIPTOR } from '../../providers/kimicode/execution/KimicodeExecutionBackend';
 import { KimicodeCliResolver } from '../../providers/kimicode/runtime/KimicodeCliResolver';
@@ -107,6 +114,19 @@ export function createChatTurnRequestPreparers(options: {
       requests: options.requests,
       cliResolver: new QwenCliResolver(),
       buildRuntimeEnv: buildQwenRuntimeEnv,
+      ...userName,
+    }),
+    // Grok is managed-ACP but does not share the family's preparation order:
+    // its artifacts come before the environment, and its arguments depend on
+    // the configured permission mode and reasoning effort.
+    new GrokTurnRequestPreparer({
+      backendId: GROK_EXECUTION_DESCRIPTOR.backendId,
+      requestKind: GROK_EXECUTION_REQUEST_KIND,
+      requests: options.requests,
+      cliResolver: new GrokCliResolver(),
+      prepareLaunchArtifacts: prepareGrokLaunchArtifacts,
+      buildRuntimeEnv: buildGrokRuntimeEnv,
+      buildProcessArguments: buildGrokAgentProcessArgs,
       ...userName,
     }),
   ]);
