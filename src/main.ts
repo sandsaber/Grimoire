@@ -12,6 +12,8 @@ import { shouldShowWhatsNew } from './app/changelog/display';
 import { parseChangelogRelease } from './app/changelog/parser';
 import { readBundledChangelog } from './app/changelog/source';
 import type { ChangelogRelease } from './app/changelog/types';
+import type { ApplicationRuntimePluginLifecycle } from './app/runtime/ApplicationRuntimePluginLifecycle';
+import { createObsidianApplicationRuntime } from './app/runtime/ObsidianApplicationRuntimeBootstrap';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
 import {
@@ -90,6 +92,7 @@ function formatHistoryModelFallbackLabel(model: string): string {
 export default class GrimoirePlugin extends Plugin {
   settings!: GrimoireSettings;
   storage!: SharedAppStorage;
+  applicationRuntime?: ApplicationRuntimePluginLifecycle;
   private conversations: Conversation[] = [];
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
@@ -101,6 +104,24 @@ export default class GrimoirePlugin extends Plugin {
   async onload() {
     try {
       await this.loadSettings();
+      // Construct the new ApplicationRuntime alongside the legacy path.
+      // The hard cutover will remove the legacy ProviderRegistry initialization
+      // and make the runtime the sole execution authority.
+      this.applicationRuntime = createObsidianApplicationRuntime({
+        app: this.app,
+        workDispatchFactory: {} as never,
+        workRecoveryPorts: {} as never,
+      });
+      try {
+        await this.applicationRuntime.start();
+      } catch (error) {
+        this.recordDebugLog({
+          event: 'runtime.start.failed',
+          level: 'error',
+          scope: 'plugin.onload',
+          data: { error: String(error) },
+        });
+      }
       await ProviderWorkspaceRegistry.initializeAll(createApplicationServices(this));
       await this.writeDebugLog({
         data: {
@@ -325,6 +346,9 @@ export default class GrimoirePlugin extends Plugin {
       scope: 'plugin',
     });
     void this.persistOpenTabStates();
+    if (this.applicationRuntime) {
+      void this.applicationRuntime.shutdown();
+    }
   }
 
   async writeDebugLog(event: DebugLogEvent): Promise<void> {
