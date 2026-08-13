@@ -56,9 +56,10 @@ export class GrimoireView extends ItemView {
   private conversationId: string | null = null;
   private messageContainerEl: HTMLElement | null = null;
   private inputEl: HTMLTextAreaElement | null = null;
+  private providerSelectEl: HTMLSelectElement | null = null;
   private projectionUnsubscribe: (() => void) | null = null;
   private isActive = false;
-  private readonly providerId = builtInProviderCatalog.list()[0]?.manifest.id ?? 'claude';
+  private providerId: string = builtInProviderCatalog.list()[0]?.manifest.id ?? 'claude';
 
   constructor(leaf: WorkspaceLeaf, plugin: GrimoirePlugin) {
     super(leaf);
@@ -85,6 +86,21 @@ export class GrimoireView extends ItemView {
     this.contentEl.addClass('grimoire-container--chat-window');
 
     const shellEl = this.contentEl.createDiv({ cls: 'grimoire-chat-window-shell' });
+
+    // Provider selector dropdown
+    const headerEl = shellEl.createDiv({ cls: 'grimoire-chat-header' });
+    this.providerSelectEl = headerEl.createEl('select', { cls: 'grimoire-provider-select' });
+    for (const module of builtInProviderCatalog.list()) {
+      const option = this.providerSelectEl.createEl('option', {
+        value: module.manifest.id,
+        text: module.manifest.displayName,
+      });
+      if (module.manifest.id === this.providerId) option.selected = true;
+    }
+    this.providerSelectEl.addEventListener('change', () => {
+      this.providerId = this.providerSelectEl?.value ?? 'claude';
+    });
+
     this.messageContainerEl = shellEl.createDiv({ cls: 'grimoire-tab-content-container grimoire-tab-content-container--chat-window grimoire-tab-content' });
 
     const inputContainer = shellEl.createDiv({ cls: 'grimoire-input-container' });
