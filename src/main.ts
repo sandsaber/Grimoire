@@ -107,11 +107,17 @@ export default class GrimoirePlugin extends Plugin {
         });
         await this.applicationRuntime.start();
       } catch (error) {
+        // Surface the failure visibly so the user can report the cause.
+        // A silent catch leaves the view in a broken, uninformative state.
+        const message = error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : String(error);
+        new Notice(`Grimoire runtime failed to start: ${message}`, 15000);
         this.recordDebugLog({
           event: 'runtime.start.failed',
           level: 'error',
           scope: 'plugin.onload',
-          data: { error: String(error) },
+          data: { error: message, stack: error instanceof Error ? error.stack : undefined },
         });
       }
       // Provider workspaces initialize lazily through the application runtime.

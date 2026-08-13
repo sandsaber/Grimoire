@@ -1,12 +1,22 @@
 import type { WorkspaceLeaf } from 'obsidian';
-import { ItemView, Notice } from 'obsidian';
+import { ItemView, Notice, setIcon, setTooltip } from 'obsidian';
 
 import { executionBackendId } from '../../core/execution/ExecutionBackendDescriptor';
 import type { LegacyProviderTabManagerHandle } from '../../core/providers/LegacyProviderContext';
+import type { ProviderCapabilities } from '../../core/providers/types';
+import { DEFAULT_CHAT_PROVIDER_ID } from '../../core/providers/types';
 import { VIEW_TYPE_GRIMOIRE } from '../../core/types';
 import type { ChatMessage } from '../../core/types/chat';
 import type GrimoirePlugin from '../../main';
 import { builtInProviderCatalog } from '../../providers/BuiltInProviderCatalog';
+import { ChatInputCommandAdapter } from './application/ChatInputCommandAdapter';
+import { ChatProjectionAttachment } from './application/ChatProjectionAttachment';
+import { ChatProjectionViewController } from './application/ChatProjectionViewController';
+import type { ChatProjection } from './projections/ChatProjection';
+import type { ChatProjectionRenderModel,ChatProjectionRenderTarget } from './rendering/ChatProjectionRenderer';
+import { ChatProjectionRenderer } from './rendering/ChatProjectionRenderer';
+import { MessageRenderer } from './rendering/MessageRenderer';
+import { autoResizeTextarea } from './ui/textareaResize';
 
 /** Legacy tab identifier retained for no-op compatibility. */
 type TabId = string;
@@ -43,23 +53,58 @@ interface GrimoireActiveTabStub {
   orchestratorMode?: boolean;
 }
 
+/** Minimal capability descriptor used when no provider-specific one is wired. */
+function getDefaultCapabilities(providerId: string): ProviderCapabilities {
+  return {
+    providerId: providerId,
+    supportsPersistentRuntime: false,
+    supportsNativeHistory: false,
+    supportsPlanMode: false,
+    supportsRewind: false,
+    supportsFork: false,
+    supportsProviderCommands: false,
+    supportsImageAttachments: false,
+    supportsInstructionMode: false,
+    supportsMcpTools: false,
+    reasoningControl: 'none',
+  };
+}
+
 /**
  * Projection-backed chat view. Owns presentation only — DOM, draft, scroll,
  * selection. Execution lifecycle is owned by the ApplicationRuntime.
  *
  * The view loads the active conversation from the runtime, attaches a
- * projection listener, and renders updates. It submits turns through the
- * runtime's chat coordinator and renders projection responses.
+ * projection listener through the ChatProjectionViewController, and renders
+ * updates via the MessageRenderer. It submits turns through the controller's
+ * input adapter and renders projection responses.
  */
-export class GrimoireView extends ItemView {
+export class GrimoireView extends ItemView implements ChatProjectionRenderTarget {
   private plugin: GrimoirePlugin;
   private conversationId: string | null = null;
+
+  // DOM element refs
+  private shellEl: HTMLElement | null = null;
+  private sessionStripEl: HTMLElement | null = null;
+  private chatScrollEl: HTMLElement | null = null;
+  private messagesEl: HTMLElement | null = null;
   private messageContainerEl: HTMLElement | null = null;
   private inputEl: HTMLTextAreaElement | null = null;
+  private sendButtonEl: HTMLElement | null = null;
   private providerSelectEl: HTMLSelectElement | null = null;
-  private projectionUnsubscribe: (() => void) | null = null;
+  private titleEl: HTMLElement | null = null;
+  private newChatButtonEl: HTMLElement | null = null;
+
+  // Rendering pipeline
+  private messageRenderer: MessageRenderer | null = null;
+  private projectionRenderer: ChatProjectionRenderer | null = null;
+  private viewController: ChatProjectionViewController | null = null;
+  private attachment: ChatProjectionAttachment | null = null;
+  private unsubscribeAttachment: (() => void) | null = null;
+
   private isActive = false;
-  private providerId: string = builtInProviderCatalog.list()[0]?.manifest.id ?? 'claude';
+  private providerId: string = builtInProviderCatalog.list()[0]?.manifest.id ?? DEFAULT_CHAT_PROVIDER_ID;
+  private lastRenderedMessageCount = -1;
 
   constructor(leaf: WorkspaceLeaf, plugin: GrimoirePlugin) {
     super(leaf);
@@ -79,17 +124,166 @@ export class GrimoireView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
-    if (!this.contentEl) return;
+    // Temporary diagnostic — show visible Notice to confirm onOpen is called.
+    new Notice(`Grimoire onOpen: contentEl=${!!this.contentEl}`, 5000);
+    // Diagnostic: log that onOpen was called and whether contentEl exists.
+    void this.plugin.writeDebugLog?.({
+      event: 'view.onOpen.started',
+      level: 'info',
+      scope: 'view.open',
+      data: { hasContentEl: !!this.contentEl, hasRuntime: !!this.plugin.applicationRuntime },
+    });
+    try {
+      if (!this.contentEl) {
+        void this.plugin.writeDebugLog?.({
+          event: 'view.onOpen.skipped',
+          level: 'warn',
+          scope: 'view.open',
+          data: { reason: 'missing_contentEl' },
+        });
+        return;
+      }
 
-    this.contentEl.empty();
-    this.contentEl.addClass('grimoire-container');
-    this.contentEl.addClass('grimoire-container--chat-window');
+      this.contentEl.empty();
+      this.contentEl.addClass('grimoire-container');
+      this.contentEl.addClass('grimoire-container--chat-window');
 
-    const shellEl = this.contentEl.createDiv({ cls: 'grimoire-chat-window-shell' });
+      this.buildShell();
+      this.buildSessionStrip();
+      this.buildChatArea();
+      this.wireEventHandlers();
 
-    // Provider selector dropdown
-    const headerEl = shellEl.createDiv({ cls: 'grimoire-chat-header' });
-    this.providerSelectEl = headerEl.createEl('select', { cls: 'grimoire-provider-select' });
+      void this.plugin.writeDebugLog?.({
+        event: 'view.onOpen.domBuilt',
+        level: 'info',
+        scope: 'view.open',
+        data: { childCount: this.contentEl.children.length },
+      });
+
+      this.isActive = true;
+      if (!this.conversationId) {
+        await this.ensureConversation();
+      }
+
+      void this.plugin.writeDebugLog?.({
+        event: 'view.onOpen.finished',
+        level: 'info',
+        scope: 'view.open',
+        data: { conversationId: this.conversationId },
+      });
+    } catch (error) {
+      // Surface any onOpen failure so the panel is never silently empty.
+      const message = error instanceof Error
+        ? `${error.name}: ${error.message}`
+        : String(error);
+      void this.plugin.writeDebugLog?.({
+        event: 'view.onOpen.failed',
+        level: 'error',
+        scope: 'view.open',
+        data: { error: message },
+      });
+      try {
+        this.contentEl?.empty();
+        this.contentEl?.createDiv({
+          cls: 'grimoire-message grimoire-message-error',
+          text: `Grimoire view failed to open: ${message}`,
+        });
+      } catch {
+        new Notice(`Grimoire view failed to open: ${message}`, 15000);
+      }
+    }
+  }
+
+  async onClose(): Promise<void> {
+    this.isActive = false;
+    this.detachProjection();
+    this.messageRenderer = null;
+    this.projectionRenderer = null;
+    this.viewController = null;
+    this.attachment = null;
+    this.contentEl?.empty();
+  }
+
+  // ============================================
+  // DOM Construction
+  // ============================================
+
+  private buildShell(): void {
+    this.shellEl = this.contentEl.createDiv({ cls: 'grimoire-chat-window-shell' });
+  }
+
+  private buildSessionStrip(): void {
+    if (!this.shellEl) return;
+    this.sessionStripEl = this.shellEl.createDiv({
+      cls: 'grimoire-header grimoire-session-strip',
+    });
+
+    // Conversation title (shows "New Conversation" initially)
+    this.titleEl = this.sessionStripEl.createDiv({
+      cls: 'grimoire-session-title',
+      text: 'New Conversation',
+    });
+
+    const actionsEl = this.sessionStripEl.createDiv({ cls: 'grimoire-header-actions' });
+
+    // New chat button
+    this.newChatButtonEl = actionsEl.createDiv({ cls: 'grimoire-header-btn grimoire-new-tab-btn' });
+    setIcon(this.newChatButtonEl, 'plus');
+    setTooltip(this.newChatButtonEl, 'New conversation');
+    this.registerDomEvent(this.newChatButtonEl, 'click', () => {
+      void this.startNewConversation();
+    });
+  }
+
+  private buildChatArea(): void {
+    if (!this.shellEl) return;
+    // The tab content container is the second grid row of the shell.
+    this.messageContainerEl = this.shellEl.createDiv({
+      cls: 'grimoire-tab-content-container grimoire-tab-content-container--chat-window grimoire-tab-content',
+    });
+    // Inside it, a 3-row grid: panel tabs nav (auto) + chat scroll (fills) + composer (auto).
+    const grid = this.messageContainerEl.createDiv({ cls: 'grimoire-chat-window-grid' });
+    // Panel tabs nav — empty in single-panel mode but occupies grid row 1.
+    grid.createDiv({ cls: 'grimoire-panel-tabs' });
+    // Panel content wrapper — wraps the scrollable chat area.
+    const panelContent = grid.createDiv({ cls: 'grimoire-panel-content' });
+    const chatPanel = panelContent.createDiv({
+      cls: 'grimoire-panel-view grimoire-chat-panel is-active',
+    });
+    this.chatScrollEl = chatPanel.createDiv({ cls: 'grimoire-chat-scroll' });
+    const messagesWrapper = this.chatScrollEl.createDiv({ cls: 'grimoire-messages-wrapper' });
+    this.messagesEl = messagesWrapper.createDiv({ cls: 'grimoire-messages' });
+
+    // Welcome element (MessageRenderer.renderMessages will recreate this)
+    const welcomeEl = this.messagesEl.createDiv({ cls: 'grimoire-welcome' });
+    welcomeEl.createDiv({
+      cls: 'grimoire-welcome-greeting',
+      text: this.getGreeting(),
+    });
+
+    // Composer goes in the same grid as a third row.
+    this.buildComposer(grid);
+  }
+
+  private buildComposer(parentGrid: HTMLElement): void {
+    const composerSurface = parentGrid.createDiv({
+      cls: 'grimoire-composer-surface grimoire-composer',
+    });
+    const inputContainer = composerSurface.createDiv({
+      cls: 'grimoire-input-container grimoire-composer-shell',
+    });
+    const inputWrapper = inputContainer.createDiv({ cls: 'grimoire-input-wrapper' });
+
+    // Provider selector row
+    const toolbarEl = inputWrapper.createDiv({ cls: 'grimoire-input-toolbar' });
+    const toolbarRow = toolbarEl.createDiv({
+      cls: 'grimoire-input-toolbar-row grimoire-input-toolbar-model-row grimoire-input-toolbar-actions-row',
+    });
+    const modelStack = toolbarRow.createDiv({ cls: 'grimoire-model-context-stack' });
+
+    this.providerSelectEl = modelStack.createEl('select', {
+      cls: 'grimoire-provider-select dropdown',
+    });
     for (const module of builtInProviderCatalog.list()) {
       const option = this.providerSelectEl.createEl('option', {
         value: module.manifest.id,
@@ -98,35 +292,46 @@ export class GrimoireView extends ItemView {
       if (module.manifest.id === this.providerId) option.selected = true;
     }
     this.providerSelectEl.addEventListener('change', () => {
-      this.providerId = this.providerSelectEl?.value ?? 'claude';
+      this.providerId = this.providerSelectEl?.value ?? DEFAULT_CHAT_PROVIDER_ID;
     });
 
-    this.messageContainerEl = shellEl.createDiv({ cls: 'grimoire-tab-content-container grimoire-tab-content-container--chat-window grimoire-tab-content' });
-
-    const inputContainer = shellEl.createDiv({ cls: 'grimoire-input-container' });
-    this.inputEl = inputContainer.createEl('textarea', {
-      cls: 'grimoire-input-textarea',
+    // Textarea
+    const inputRow = inputWrapper.createDiv({ cls: 'grimoire-input-row' });
+    this.inputEl = inputRow.createEl('textarea', {
+      cls: 'grimoire-input',
       attr: { placeholder: 'Send a message…', rows: '1' },
     });
 
-    this.inputEl.addEventListener('keydown', event => {
+    // Send button
+    this.sendButtonEl = inputRow.createDiv({ cls: 'grimoire-send-button grimoire-header-btn' });
+    setIcon(this.sendButtonEl, 'arrow-up');
+    setTooltip(this.sendButtonEl, 'Send message');
+    this.registerDomEvent(this.sendButtonEl, 'click', () => {
+      void this.submitInput();
+    });
+  }
+
+  private wireEventHandlers(): void {
+    if (!this.inputEl) return;
+
+    // Enter to send, Shift+Enter for newline
+    this.registerDomEvent(this.inputEl, 'keydown', event => {
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         void this.submitInput();
       }
     });
 
-    this.isActive = true;
-    if (!this.conversationId) {
-      await this.ensureConversation();
-    }
+    // Auto-resize textarea
+    this.registerDomEvent(this.inputEl, 'input', () => {
+      autoResizeTextarea(this.inputEl!);
+      this.attachment?.setDraft(this.inputEl!.value);
+    });
   }
 
-  async onClose(): Promise<void> {
-    this.isActive = false;
-    this.detachProjection();
-    this.contentEl?.empty();
-  }
+  // ============================================
+  // Conversation lifecycle
+  // ============================================
 
   /**
    * Creates a new conversation in the revisioned repository through the
@@ -134,74 +339,175 @@ export class GrimoireView extends ItemView {
    */
   private async ensureConversation(): Promise<void> {
     const lifecycle = this.plugin.applicationRuntime;
-    if (!lifecycle || !this.isActive) return;
+    if (!lifecycle) {
+      this.renderError('Grimoire runtime is not available. Check the startup error and reload the plugin.');
+      return;
+    }
+    if (!this.isActive) return;
 
     if (!this.conversationId) {
       this.conversationId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      // Create the conversation through the runtime's admission boundary.
       try {
         await lifecycle.runtime.createConversation({
           conversationId: this.conversationId,
           providerId: this.providerId,
           title: 'New Conversation',
         });
-      } catch {
-        // Conversation may already exist; that's fine.
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/already exist/i.test(message)) {
+          this.renderError(`Failed to start conversation: ${message}`);
+          return;
+        }
       }
     }
 
     await this.attachProjection();
   }
 
-  private async attachProjection(): Promise<void> {
-    if (!this.conversationId || !this.plugin.applicationRuntime) return;
+  private async startNewConversation(): Promise<void> {
     this.detachProjection();
-    try {
-      const unsubscribe = await this.plugin.applicationRuntime.runtime.attachConversation(
-        this.conversationId,
-        projection => this.renderProjection(projection),
+    this.conversationId = null;
+    this.lastRenderedMessageCount = -1;
+    if (this.titleEl) this.titleEl.textContent = 'New conversation';
+    await this.ensureConversation();
+  }
+
+  private async attachProjection(): Promise<void> {
+    const lifecycle = this.plugin.applicationRuntime;
+    if (!this.conversationId || !lifecycle || !this.messagesEl) return;
+
+    this.detachProjection();
+
+    const runtime = lifecycle.runtime;
+
+    // Instantiate the rendering pipeline.
+    if (!this.messageRenderer) {
+      this.messageRenderer = new MessageRenderer(
+        this.plugin,
+        this,
+        this.messagesEl,
+        undefined, // rewindCallback — not wired in projection-backed mode yet
+        undefined, // forkCallback
+        () => getDefaultCapabilities(this.providerId),
+        { getScrollEl: () => this.chatScrollEl ?? this.messagesEl! },
       );
-      this.projectionUnsubscribe = unsubscribe;
-    } catch {
-      // Runtime may not be accepting yet; view will retry on next interaction.
+    }
+
+    if (!this.projectionRenderer) {
+      this.projectionRenderer = new ChatProjectionRenderer(this);
+    }
+
+    // Build the attachment and view controller for this conversation.
+    // ApplicationRuntime has attachConversation(); ChatProjectionSource needs attach().
+    const projectionSource = {
+      attach: (conversationId: string, listener: (projection: ChatProjection) => void) =>
+        runtime.attachConversation(conversationId, listener),
+    };
+    this.attachment = new ChatProjectionAttachment(projectionSource, this.conversationId);
+
+    const inputAdapter = new ChatInputCommandAdapter(
+      { submitTurn: runtime.submitChatTurn.bind(runtime) },
+      () => `cmd-${Date.now()}`,
+    );
+
+    this.viewController = new ChatProjectionViewController(
+      {
+        runtime,
+        conversationId: this.conversationId,
+        inputAdapter,
+        renderer: this.projectionRenderer,
+      },
+      this.attachment,
+    );
+
+    // Subscribe to attachment state changes for draft/scroll sync.
+    this.unsubscribeAttachment = this.attachment.subscribe(state => {
+      // Title comes from the projection, not the attachment state.
+      if (state.projection?.title && this.titleEl) {
+        this.titleEl.textContent = state.projection.title;
+      }
+    });
+
+    try {
+      await this.viewController.attach();
+
+      // Load the initial projection and render it.
+      const projection = await this.viewController.load();
+      this.viewController.render(projection);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.renderError(`Failed to attach conversation: ${message}`);
     }
   }
 
   private detachProjection(): void {
-    if (this.projectionUnsubscribe) {
-      this.projectionUnsubscribe();
-      this.projectionUnsubscribe = null;
+    if (this.unsubscribeAttachment) {
+      this.unsubscribeAttachment();
+      this.unsubscribeAttachment = null;
     }
+    this.viewController?.detach();
+    this.viewController = null;
+    this.attachment = null;
   }
 
-  private renderProjection(projection: unknown): void {
-    if (!this.messageContainerEl) return;
-    const p = projection as { title?: string; messages?: readonly ChatMessage[] };
-    this.messageContainerEl.empty();
-    if (p.title) {
-      this.messageContainerEl.createDiv({
-        cls: 'grimoire-conversation-title',
-        text: p.title,
-      });
+  // ============================================
+  // ChatProjectionRenderTarget implementation
+  // ============================================
+
+  replace(model: ChatProjectionRenderModel): void {
+    if (!this.messageRenderer) return;
+
+    // Update title
+    if (model.title && this.titleEl) {
+      this.titleEl.textContent = model.title;
     }
-    if (p.messages) {
-      for (const message of p.messages) {
-        this.messageContainerEl.createDiv({
-          cls: `grimoire-message grimoire-message--${message.role}`,
-          text: message.content ?? '',
-        });
-      }
+
+    const messages = [...model.messages];
+
+    // Full re-render when message count changes (new message added)
+    // or on first render. This is the simplest correct approach —
+    // MessageRenderer.renderMessages clears and rebuilds everything.
+    if (messages.length !== this.lastRenderedMessageCount) {
+      this.messageRenderer.renderMessages(messages, () => this.getGreeting());
+      this.lastRenderedMessageCount = messages.length;
+      return;
     }
+
+    // Same message count but content may have changed (streaming).
+    // Do a full re-render for now — incremental updates can be optimized later.
+    this.messageRenderer.renderMessages(messages, () => this.getGreeting());
   }
+
+  private getGreeting(): string {
+    return 'How can I help you today?';
+  }
+
+  private renderError(message: string): void {
+    if (!this.messagesEl) return;
+    this.messagesEl.empty();
+    const errorEl = this.messagesEl.createDiv({
+      cls: 'grimoire-message grimoire-message-error',
+    });
+    errorEl.createDiv({
+      cls: 'grimoire-message-content',
+      text: message,
+    });
+  }
+
+  // ============================================
+  // Submission
+  // ============================================
 
   /**
-   * Submits the current input text as a chat turn through the ApplicationRuntime.
-   * The runtime persists the user message, creates the execution run, and
-   * streams projection updates that this view renders.
+   * Submits the current input text as a chat turn through the view controller.
+   * The controller routes through the input adapter to the runtime's chat
+   * coordinator, which persists the user message, creates the execution run,
+   * and streams projection updates.
    */
   private async submitInput(): Promise<void> {
     const lifecycle = this.plugin.applicationRuntime;
-    if (!lifecycle || !this.inputEl || !this.conversationId) {
+    if (!lifecycle || !this.inputEl || !this.conversationId || !this.viewController) {
       new Notice('Runtime is not ready yet.');
       return;
     }
@@ -209,6 +515,7 @@ export class GrimoireView extends ItemView {
     if (!text) return;
 
     this.inputEl.value = '';
+    autoResizeTextarea(this.inputEl);
 
     const runtime = lifecycle.runtime;
     const module = builtInProviderCatalog.list().find(m => m.manifest.id === this.providerId);
@@ -227,28 +534,27 @@ export class GrimoireView extends ItemView {
     };
 
     try {
-      await lifecycle.runtime.submitChatTurn({
-        commandId: `cmd-${Date.now()}`,
-        conversationId: this.conversationId,
+      await this.viewController.submitTurn({
         backendId,
         requestRef,
         resultExpectation: 'required',
         userMessage,
       });
     } catch (error) {
-      new Notice(`Failed to send: ${String(error)}`);
+      new Notice(`Failed to send: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  // Legacy compatibility stubs — main.ts calls these but they are no-ops
-  // in the projection-backed architecture.
+  // ============================================
+  // Legacy compatibility stubs
+  // ============================================
 
   showPendingWhatsNew(): void {
     // What's New card rendering will be handled through projections.
   }
 
   async createNewTab(): Promise<void> {
-    // Opening a new view leaf replaces tab creation.
+    await this.startNewConversation();
   }
 
   requestTabClose(_tabId: TabId): void {

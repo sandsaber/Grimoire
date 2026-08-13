@@ -26,7 +26,17 @@ export class ApplicationRuntimeMigration {
     if (this.migrated) return;
     this.migrated = true;
 
-    const metadatas = await this.legacySessions.listMetadata();
+    // Listing legacy metadata touches the durable storage layer and can
+    // encounter recovery/ENOENT errors from stale .pending files. Migration
+    // is best-effort: it must never block runtime startup.
+    let metadatas: readonly SessionMetadata[];
+    try {
+      metadatas = await this.legacySessions.listMetadata();
+    } catch {
+      // If legacy session listing fails, skip migration entirely. Legacy
+      // conversations remain in the old store; the user can start fresh.
+      return;
+    }
     if (metadatas.length === 0) return;
 
     const defaultProviderId: ProviderId = this.catalog.list()[0]?.manifest.id ?? 'claude';

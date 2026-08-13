@@ -14,7 +14,14 @@ export class LegacySessionMetadataAdapter implements LegacySessionMetadataReader
   async listMetadata(): Promise<SessionMetadata[]> {
     const results: SessionMetadata[] = [];
     for (const basePath of [SESSIONS_PATH, LEGACY_SESSIONS_PATH]) {
-      const paths = await this.storage.list(basePath);
+      let paths: string[];
+      try {
+        paths = await this.storage.list(basePath);
+      } catch {
+        // Storage listing can fail due to recovery errors from stale
+        // .pending/.backup companions. Skip this path and continue.
+        continue;
+      }
       for (const path of paths) {
         if (!path.endsWith('.meta.json')) continue;
         try {

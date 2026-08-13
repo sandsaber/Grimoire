@@ -7,14 +7,18 @@ const MAX_LIST_ENTRIES = 10_000;
 /**
  * Bridges the Obsidian Vault API to the AtomicTextFileAdapter contract
  * for durable storage. All reads and writes go through the vault's
- * coordinated file API.
+ * coordinated file API using vault-relative paths.
  */
 export class ObsidianVaultTextFileAdapter implements AtomicTextFileAdapter {
   readonly coordinationKey: object;
 
   constructor(
     private readonly vault: Vault,
-    private readonly vaultBasePath: string,
+    /**
+     * Retained for callers that need the absolute vault path (e.g. process
+     * spawn CWD). This adapter itself uses vault-relative paths only.
+     */
+    _vaultBasePath?: string,
   ) {
     this.coordinationKey = vault;
   }
@@ -59,7 +63,14 @@ export class ObsidianVaultTextFileAdapter implements AtomicTextFileAdapter {
   async delete(path: string): Promise<void> {
     const normalized = this.normalize(path);
     if (!normalized) return;
-    await this.vault.adapter.remove(normalized);
+    // delete() must be idempotent: the durable storage layer calls it on
+    // .pending/.backup companions that may not exist. Obsidian's remove()
+    // throws ENOENT on missing files, so swallow that error.
+    try {
+      await this.vault.adapter.remove(normalized);
+    } catch (error) {
+      if (!isENOENT(error)) throw error;
+    }
   }
 
   async listFilesRecursive(path: string): Promise<string[]> {
@@ -70,9 +81,15 @@ export class ObsidianVaultTextFileAdapter implements AtomicTextFileAdapter {
     return results.slice(0, MAX_LIST_ENTRIES);
   }
 
+  /**
+   * Returns the vault-relative path for storage operations.
+   * The vault adapter expects paths relative to the vault root (e.g.
+   * `.grimoire/control/conversations/foo.json`), NOT absolute filesystem
+   * paths. The vaultBasePath is retained only for adapter compatibility.
+   */
   private normalize(path: string): string | null {
     if (!path.startsWith('.grimoire/')) return null;
-    return `${this.vaultBasePath}/${path}`;
+    return path;
   }
 
   private async ensureDirectory(fullPath: string): Promise<void> {
@@ -96,19 +113,28 @@ export class ObsidianVaultTextFileAdapter implements AtomicTextFileAdapter {
     } catch {
       return;
     }
+    // vault.adapter.list() returns vault-relative paths already in the
+    // normalized format this adapter uses (.grimoire/...).
     for (const file of entries.files) {
       if (results.length >= MAX_LIST_ENTRIES) return;
-      results.push(this.denormalize(file));
+      results.push(file);
     }
     for (const folder of entries.folders) {
       await this.collectFiles(folder, results);
     }
   }
-
-  private denormalize(fullPath: string): string {
-    const prefix = `${this.vaultBasePath}/`;
-    return fullPath.startsWith(prefix) ? fullPath.slice(prefix.length) : fullPath;
-  }
 }
 
 export type { TFile,Vault };
+
+/**
+ * Returns true when an error is a "file not found" error from the vault
+ * adapter (Node ENOENT or Obsidian's normalized equivalent).
+ */
+function isENOENT(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = (error as NodeJS.ErrnoException).code;
+  if (code === 'ENOENT') return true;
+  // Obsidian may wrap the error or use a message-only form.
+  return /ENOENT|no such file or directory/i.test(error.message);
+}
