@@ -798,8 +798,13 @@ generation.
   The factory test verifies the full runtime starts, accepts commands, and shuts down through
   the complete production composition. Callers only need to inject the work dispatch factory
   and recovery ports.
+- `de162ca6` — Added `createApplicationRuntimePluginLifecycle`: bridges the Obsidian Plugin
+  lifecycle to the ApplicationRuntime with shared concurrent start/shutdown.
+- `d02cb9e3` — Added `ChatProjectionViewController`: the projection-backed view controller
+  replacing the legacy tab-owned chat runtime. Owns a conversation attachment, input adapter,
+  and renderer without creating, querying, canceling, or disposing execution resources.
 
-Current broad evidence: 544 unit suites / 7,870 tests pass with typecheck, full ESLint, and
+Current broad evidence: 546 unit suites / 7,873 tests pass with typecheck, full ESLint, and
 `git diff --check`. Production composition is unchanged and still uses the legacy runtime path.
 
 ## Next steps
