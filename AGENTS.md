@@ -29,11 +29,13 @@ OpenCode and MiMoCode intentionally mirror each other closely; when changing lau
 
 ## Architecture Rules
 
-- Keep `src/core/` provider-neutral. Shared chat/runtime/settings contracts belong there only when at least two providers need the behavior.
+- `ApplicationRuntime` is the sole application-scoped execution composition root. It owns the catalog, repositories, lifecycle registry, coordinators, workspace manager, internal backends, startup recovery, and shutdown.
+- Keep `src/core/` provider-neutral. Shared execution/runtime/settings contracts belong there only when at least two providers need the behavior.
 - Keep provider-specific protocol, storage, CLI resolution, history parsing, model discovery, settings UI, and launch artifacts inside `src/providers/<provider>/`.
-- Register provider runtime and auxiliary services through `ProviderRegistry`.
-- Register provider workspace services through `ProviderWorkspaceRegistry`.
-- Feature code must consume provider-neutral contracts. Do not read provider-specific `Conversation.providerState` fields directly from `src/features/`.
+- Register provider execution backends through `ProviderApplicationContextFactory` and the immutable `builtInProviderCatalog`.
+- Register provider workspace services through `ProviderApplicationContextComposition`.
+- Feature code must consume provider-neutral contracts and projections. Do not read provider-specific `Conversation.providerState` fields directly from `src/features/`.
+- Tabs and views own presentation only. They submit commands through the runtime and render projections. They never create, query, cancel, or dispose execution resources.
 - Preserve provider-native behavior first. Prefer adapting official CLI/runtime semantics over reimplementing provider features inside Grimoire.
 - Use `.grimoire/` for Grimoire-owned vault data. Do not add legacy storage migration behavior unless a migration milestone explicitly asks for it.
 
@@ -41,11 +43,12 @@ OpenCode and MiMoCode intentionally mirror each other closely; when changing lau
 
 | Path | Purpose |
 |------|---------|
-| `src/main.ts` | Obsidian plugin entry point, view registration, commands, lifecycle |
+| `src/main.ts` | Obsidian plugin entry point, view registration, commands, lifecycle. Constructs ApplicationRuntime in onload(). |
+| `src/app/runtime/` | Application runtime composition: infrastructure, provider context factories, coordinator wiring, lifecycle adapter, plugin lifecycle bridge, Obsidian vault bootstrap. |
 | `src/app/` | Settings defaults and plugin-level storage helpers |
-| `src/core/` | Provider-neutral runtime, providers, MCP, security, storage, tools, shared types |
-| `src/providers/` | Provider adapters and provider-owned services |
-| `src/features/chat/` | Main sidebar chat interface and tab lifecycle |
+| `src/core/` | Provider-neutral execution lifecycle, providers catalog, MCP, security, storage, tools, shared types |
+| `src/providers/` | Provider adapters: execution backends, application context factories, settings codecs, workspace services |
+| `src/features/chat/` | Projection-backed chat view, chat execution coordinator, projections, rendering |
 | `src/features/inline-edit/` | Inline edit modal and provider-backed edit services |
 | `src/features/settings/` | Shared settings shell plus provider-owned settings tabs |
 | `src/shared/` | Reusable UI components, modals, mention UI, icons |
