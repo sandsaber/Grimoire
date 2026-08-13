@@ -823,13 +823,49 @@ The complete new application runtime composition layer is built and tested (546 
 - `createObsidianApplicationRuntime` production bootstrap from Obsidian vault
 
 **Remaining for the hard cutover:**
-1. Rewrite `main.ts` `onload()` to construct `ApplicationRuntime` instead of `ProviderRegistry`
-2. Rewrite `GrimoireView` (1,052 lines) to use `ChatProjectionViewController` instead of `TabManager`
-3. Migrate existing vault conversations to the revisioned conversation repository
-4. Delete `TabManager`, `Tab`, `InputController`, `StreamController`, `ConversationController`,
-   `SubagentManager`, all 9 `*ChatRuntime.ts` files, `ProviderRegistry`, `ProviderWorkspaceRegistry`,
-   `ChatRuntime`, and `LegacyProviderContext`
-5. Run structural deletion searches and confirm zero legacy references in production source
+1. ~~Rewrite `main.ts` `onload()` to construct `ApplicationRuntime`~~ — done (`e7604e15`)
+2. ~~Rewrite `GrimoireView` to use projections instead of `TabManager`~~ — done (`e7604e15`)
+3. ~~Migrate existing vault conversations to revisioned repository~~ — done (`acbba0ae`)
+4. ~~Delete legacy architecture~~ — done (`e7604e15`, 81k+ lines deleted)
+5. ~~Run structural deletion searches~~ — done (all zero)
+
+### Post-cutover hardening
+
+- `d842f504` — Replaced all transition stubs with catalog routing (main.ts, GrimoireSettings, InlineEditModal)
+- `05f1e609` — Wired concrete provider launchers (NodeAntigravityProcessTransport, NodeManagedAcpProcessLauncher, NodeCodexExecutionProcessFactory, ClaudeSdkExecutionQueryFactory)
+- `672d3e49` — Added provider selector dropdown to GrimoireView
+- `acbba0ae` — Implemented legacy conversation migration through ApplicationRuntimeMigration
+
+### Definition of Done status
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| ApplicationRuntime is sole composition root | ✅ PASS | main.ts constructs it |
+| 9 providers use catalog | ✅ PASS | 9 factories + BuiltInProviderCatalog |
+| All suites pass | ✅ PASS | 5961 unit + 78 integration |
+| Coordinators use lifecycle | ✅ PASS | All wired in ApplicationRuntimeComposition |
+| Views own presentation only | ✅ PASS | GrimoireView rewritten |
+| Provider-native data parity | ⚠️ Automated PASS, manual pending |
+| Restart/cancellation evidence-based | ✅ PASS | Lifecycle registry |
+| Agent results visible | ✅ PASS | Projection-backed |
+| No provider protocol in core | ✅ PASS | Architecture tests |
+| Structural deletion clean | ✅ PASS | All zero |
+| Old runtime gone | ✅ PASS | 81k+ lines deleted |
+| Documentation updated | ✅ PASS | AGENTS.md updated |
+| Test-vault smoke | ⚠️ Automated 6 tests pass, manual GUI test pending |
+| Independent reviewer | ⚠️ Automated review done (0 blockers), human sign-off pending |
+
+### Items requiring human action
+
+These cannot be completed by automated tooling:
+
+1. **Manual test-vault smoke in Obsidian GUI**: Open Obsidian → Grimoire chat → send message → verify
+   provider response → check settings tabs. Plugin installed at
+   `/Users/mimakarov/HomeBrew/GrimorieTestObsidian`, build current, plugin reloaded.
+   Checklist: `docs/manual-test-vault-smoke-checklist.md`
+
+2. **Independent human reviewer sign-off**: Automated architecture review completed (all 5 blockers
+   resolved, all structural deletion gates clean). Final human confirmation needed.
 
 ## Next steps
 
