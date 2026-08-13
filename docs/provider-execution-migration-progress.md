@@ -29,9 +29,9 @@ this file records what has actually landed and what remains open.
 | Phase 6 — durable agents and work graphs | Complete | `63320547` |
 | Phase 7 — application runtime and auxiliary work | Complete | chat projections `8cab81b4`; agent work UI `634dc4bb`; execution owners `4ebbd5fa` |
 | Phase 8 — catalog and provider-neutral feature ports | Complete | `91af3577` |
-| Phase 9 — production cutover | In progress | foundation `0da2104b` |
-| Phase 10 — legacy deletion | Pending | — |
-| Phase 11 — hardening and migration evidence | Pending | — |
+| Phase 9 — production cutover | Complete | `e7604e15` |
+| Phase 10 — legacy deletion | Complete | `42ad4474` |
+| Phase 11 — hardening and migration evidence | Complete | `c3382080`, `fdfb9a2c` |
 
 ## Completed architecture foundation
 
