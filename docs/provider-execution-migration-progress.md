@@ -69,7 +69,8 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | Research and plan v2 saved to `docs/` | Complete | `ffebd58` |
 | Plan revised per adversarial review (M0a/M0b, M2 split, adapter spec, harvest bans, contribution inventory) | Complete | `4fb915c` |
 | Consistency pass: inventory completed (+3 rows), WorkGraph removed from operational target, stop condition aligned with mixed-authority rule, harvest source map, resumability rules | Complete | `da05d8e` |
-| Third review applied: kernel-in-production-at-first-flip owned (interim kernel host, storage docs, revert safety, unload), adapter bound to the lifecycle registry, capability-driven flip smoke, providerState parity gate, release-train rules, shared-resource inventory in M0a | Complete | this commit |
+| Third review applied: kernel-in-production-at-first-flip owned (interim kernel host, storage docs, revert safety, unload), adapter bound to the lifecycle registry, capability-driven flip smoke, providerState parity gate, release-train rules, shared-resource inventory in M0a | Complete | `6df5658` |
+| UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | this commit |
 | M0a — parity gate and adapter contract | Not started | — |
 | M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Not started | — |
 | M1 — execution kernel, dark-launched | Not started | — |

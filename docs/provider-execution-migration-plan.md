@@ -24,6 +24,23 @@ area passes. A checkpoint that breaks a baseline surface does not land, regardle
 automated suites pass. This invariant is the operational form of the product requirement that the
 migration must be invisible to the user while the internals are replaced.
 
+The invariant is enforced by layered checks, and the layers prove different things:
+
+1. **Reachability** — the import-graph walk, parity manifest, and contribution-inventory fitness
+   tests (added in M0a) prove every surface is in the bundle and wired;
+2. **Renderability at the entry point** — the existing release gates `verify-release-load.cjs`
+   (the built bundle loads in isolation) and `verify-release-smoke.cjs` (the view constructs and
+   opens), already wired into `npm run build:release` on `main`, run at every checkpoint that runs
+   the release build;
+3. **Behavior** — the M0a contract characterization suites, adapter conformance, and provider
+   trace parity;
+4. **Full surface** — the capability-driven manual smoke matrix.
+
+Reachability does not imply renderability, and the view-open smoke covers only the entry point —
+which is why layer 4 cannot be skipped at flip and milestone checkpoints. Extending the automated
+view-open smoke to deeper surfaces is welcome at any milestone; it never substitutes for the
+manual matrix.
+
 Because the invariant holds at every checkpoint, milestones merge to `main` when their exit gates
 pass. There is no long-lived integration branch accumulating divergence; the first attempt's
 77-commit unmergeable branch is the anti-pattern this rule exists to prevent.
@@ -860,7 +877,10 @@ Work:
   to projection consumption, rendering into the existing DOM structure; turn acceptance,
   completion, persistence barriers, and queued-input release move to the chat execution
   coordinator. Harvest the v1 Phase 7 reducers and coordinators as material for this rework, not as
-  view replacements;
+  view replacements. **Projections and reducers stay presentation-agnostic**: no DOM types, CSS
+  class names, element structure, or layout vocabulary in projection contracts — the renderer is a
+  thin replaceable layer that maps projections onto the current DOM. This single rule is what makes
+  a post-migration UI redesign a renderer swap instead of another architecture event;
 - durable agents (v1 Phase 6 harvest, **instance/attempt scope only**): agent instances and
   attempts survive tab close; `SubagentManager` loses lifecycle authority while its rendering is
   retained; the compact work card ships with this step. The dependency `WorkGraph`, scheduler, and
@@ -1097,6 +1117,8 @@ Do not work around these findings with optional fields or provider-ID branches. 
 - the lifecycle registry is constructed anywhere except the interim kernel host (M2–M4) or
   `ApplicationRuntime` (M5 onward);
 - the adapter outlives the M5 seam-deletion checkpoint;
+- a projection or reducer contract acquires DOM types, CSS class names, element structure, or
+  layout vocabulary;
 - a flipped provider's new chat backend and its legacy auxiliary path contend for the same provider
   session or process, or corrupt each other's state;
 
@@ -1121,6 +1143,30 @@ and, unchanged from v1, when:
   authorities during M2-flips, and a flipped provider's auxiliary services (title, refine, inline
   edit) remaining on the legacy path until M5. Do not stop a flip because an auxiliary service is
   still old; stop it only on the session/process-contention condition above.
+
+## After the migration
+
+Two projects are deliberately excluded from this migration and become cheap because of it. Each is
+a separate effort with its own baseline, run under the same manifest discipline; neither may start
+before M6 closes.
+
+### Work graph and synthesis
+
+The dependency `WorkGraph`, scheduler, and synthesis runs from the research document, built on the
+delivered agent instance/attempt domain when a real dependent workflow exists. The v1 Phase 6
+material (`63320547`) remains the harvesting source.
+
+### UI evolution
+
+A redesigned UI is intentionally a **post-migration renderer swap, not a migration goal**. After
+M5 the views are pure projection consumers, so a new UI is a new renderer over the same projection
+contracts: it can be built beside the current renderer, switched surface by surface, and reverted
+without touching execution. Attempting it during the migration would destroy the parity baseline
+that makes regressions detectable — the exact coupling of architecture replacement with
+presentation replacement that killed v1. The deferred presentation questions live here too:
+multi-tab versus Obsidian leaves, and any visual redesign. Precondition for all of it is the M5
+rule that projections carry no presentation vocabulary; if that rule held, this project needs no
+changes to core, providers, or persistence.
 
 ## Future extension rules
 
