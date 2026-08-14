@@ -19,7 +19,7 @@ lessons that force the v2 delivery shape are defined in
 ## Product invariant
 
 At every checkpoint the built plugin is fully functional: it installs, every user-facing surface in
-the M0 parity manifest is reachable from `src/main.ts`, and the manual smoke matrix for the touched
+the M0a parity manifest is reachable from `src/main.ts`, and the manual smoke matrix for the touched
 area passes. A checkpoint that breaks a baseline surface does not land, regardless of how many
 automated suites pass. This invariant is the operational form of the product requirement that the
 migration must be invisible to the user while the internals are replaced.
@@ -38,7 +38,9 @@ The final system will have:
 - one application-scoped lifecycle for provider-backed and Grimoire-owned execution;
 - explicit backend, session, run, interaction, terminal, recovery, and result contracts;
 - durable agent instances and attempts that are independent of tabs;
-- a revisioned work graph for dependencies, retries, result provenance, and synthesis;
+- a revisioned work graph for dependencies, retries, result provenance, and synthesis — as a
+  post-migration extension built on the delivered agent domain, not as part of this migration's
+  definition of done;
 - pure chat and agent projections that the UI renders but does not own;
 - one validated provider catalog instead of separately maintained registries and defaults;
 - versioned, privacy-bounded control persistence and serialized conversation mutations;
@@ -63,9 +65,20 @@ The production seam is one provider-neutral presentation adapter that implements
 strict: the adapter consumes the new lifecycle; the new core never imports the old contract. Flipping
 a provider means replacing its `createRuntime` registration with the adapter over its new backend
 and deleting its legacy `*ChatRuntime` in the same checkpoint. There are no runtime flags: a flip is
-a commit, reverted as a commit if it cannot pass. Inside one provider there is exactly one execution
-authority at any commit; across providers, mixed authorities are accepted during the flip series
-because providers share no execution state.
+a commit, reverted as a commit if it cannot pass. Inside one provider there is exactly one **chat
+execution** authority at any commit; across providers, mixed authorities are accepted during the
+flip series because providers share no execution state.
+
+The chat qualifier is deliberate. A flip moves only `createRuntime`; the provider's auxiliary
+execution paths — `createTitleGenerationService`, `createInstructionRefineService`,
+`createInlineEditService` — and its workspace-driven services remain on the legacy path until their
+milestones (M3/M5, per the contribution inventory). A flipped provider therefore intentionally runs
+new chat execution beside legacy auxiliary execution. This mixed state is planned and bounded, with
+one hard rule: the two paths must not contend for the same provider session or process. For
+persistent-topology providers (Codex app-server, Claude SDK, managed ACP) the flip work must verify
+that auxiliary services use their own isolated sessions or processes, as they do today; any
+observed session reuse, process contention, or state corruption between the new chat backend and a
+legacy auxiliary path is a stop condition for that provider's flip.
 
 The adapter is under feature freeze from the day it exists: no new capability may be exposed through
 the `ChatRuntime` contract. New capabilities land as projections or capability ports on the new
@@ -89,13 +102,25 @@ The archived branch is a parts library, not a base:
 - a harvested slice that fails review on this branch is reworked or rewritten; prior review on the
   archived branch does not exempt it.
 
+Three explicit harvest bans, each rooted in a v1 defect:
+
+1. **The v1 `ProviderModule` is never harvested verbatim.** It is known defective: no slots for most
+   of the contribution inventory, workspace ports typed as bare `object`. The M1 contract is
+   designed against [`provider-contribution-inventory.md`](provider-contribution-inventory.md);
+   only its execution-facing pieces may be reused.
+2. **WorkGraph and synthesis are not harvested into M1 and do not block seam deletion.** Durable
+   agent instance/attempt records and the work card are the M5 requirement; the dependency DAG and
+   synthesis runs arrive when a real dependent workflow exists (post-migration scope).
+3. **Windows process-tree conformance is not an M1 blocker** while CI runs Ubuntu only; it becomes
+   a hard prerequisite of M2-flips, satisfied by a `windows-latest` CI job, not by a waiver.
+
 ## Scope and preservation boundary
 
 ### In scope
 
 - application startup, shutdown, recovery, and execution ownership;
 - provider registration, settings decoding, capability declarations, workspace lifecycle, and backend factories;
-- chat, agent, work-graph, local-shell, inline-edit, title, refine, probe, and warm-up execution;
+- chat, agent, local-shell, inline-edit, title, refine, probe, and warm-up execution;
 - provider event ingestion, correlation, cancellation, interactions, terminal outcomes, results, and reconciliation;
 - conversation revision control and typed history hydration;
 - result-focused agent UI and restored projections;
@@ -133,6 +158,8 @@ cancel and clean up that tab's work until durable ownership and its UI exist in 
 
 ### Out of scope
 
+- the dependency `WorkGraph`, scheduler, and synthesis runs — a post-migration extension on the
+  delivered agent domain, started only when a real dependent workflow exists;
 - a third-party provider plugin ABI;
 - a provider marketplace or dynamic code loading;
 - replacing provider-native transcript storage with a Grimoire database;
@@ -459,11 +486,12 @@ milestone may introduce internal code that is not yet composed into production, 
 broken tests, a broken product surface, or ambiguous persisted state at its checkpoint. Checkpoint
 commits inside a milestone hold the same rule at smaller scope.
 
-### M0 — Baseline and parity gate
+### M0a — Parity gate and adapter contract (blocker)
 
-Objective: create the evidence and the automated gate the first attempt lacked. Mandatory; no later
-milestone may start before M0 is green. Skipping this phase is the recorded root cause of the v1
-failure.
+Objective: create the cheap, automated gate and the seam specification the first attempt lacked.
+Mandatory; no later milestone may start before M0a is green. Skipping this work is the recorded
+root cause of the v1 failure — and the opposite failure, inflating M0 until the core never starts,
+is equally fatal, which is why M0a contains only what is cheap and blocking.
 
 Work:
 
@@ -474,65 +502,108 @@ Work:
   (`wired`, `intentionally-removed`, or `pending` with an owning milestone item): settings tabs and
   settings search, model selection, slash commands, approvals, questions, plan mode, inline edit,
   file and image context, input toolbar, tabs and history, usage indicators, agent mentions, MCP
-  management, and every further surface the walk discovers;
+  management, and every further surface the walk discovers. Seed the surface inventory from the
+  archived branch's `provider-execution-presentation-parity.md` rather than rediscovering it;
 - add a fitness test that fails when the manifest and reality disagree in either direction;
-- add sanitized golden traces for new sessions, resume, cancel, process loss, interactions,
-  background work, required final result, and provider-native history;
-- record process, backend, session, run, concurrency, and recovery topology for every provider;
-- reconcile current capability declarations against observed runtime behavior;
-- characterize settings, session metadata, persisted tab state, conversation provider state, and
-  history hydration — including the UI-facing `ChatRuntime` contract behavior the M2 adapter must
-  reproduce;
-- add race tests for duplicate terminal, late event, cancellation without acknowledgement, view
-  detach, pending save, process death, unknown dispatch, and missing required result;
+- adopt and maintain
+  [`provider-contribution-inventory.md`](provider-contribution-inventory.md) — the checked-in table
+  of all 16 `ProviderRegistration` fields and 11 `ProviderWorkspaceServices` members with target
+  home and owning milestone. No prose counts; the table is the authority;
+- write the **presentation adapter specification**: a method-by-method table mapping every
+  `ChatRuntime` member (~27, including `cancel(): void`, readiness callbacks,
+  `consumeSessionInvalidation`, `buildSessionUpdates`, `consumeTurnMetadata`, `steer`, `rewind`,
+  the approval/question/plan/subagent callback wiring, and generator semantics) to a session/run
+  operation, a capability port, or an explicit absence. Two questions must be answered on paper
+  here, not during M2: how synchronous `cancel()` and generator end map onto asynchronous run
+  terminals so that `indeterminate` and open interactions remain representable, and which contract
+  behaviors the current `InputController` actually depends on (characterized as executable contract
+  tests). If the mapping needs a new `ChatRuntime` method, that is a stop condition against the
+  contract, found now instead of mid-port;
+- record per-provider capability and topology tables (process model, session boundary, resume,
+  concurrency), reconciled against observed behavior where cheap — a failing characterization test
+  where declaration and behavior disagree;
+- characterize settings, session metadata, persisted tab state, and conversation provider state as
+  fixtures;
 - decide lifecycle/result retention, user deletion, schema versions, and diagnostic redaction in a
   short internal decision record;
 - prohibit new product features on the old runtime path after this checkpoint; bug fixes remain
   allowed and must be absorbed by later harvested slices.
 
+Exit gate:
+
+- the import-graph walk, parity manifest, contribution inventory, and their fitness tests are green
+  and enforced by the test suite;
+- the adapter specification covers every `ChatRuntime` member with no "decide later" rows, and the
+  cancel/terminal and generator-end mappings are resolved;
+- the UI-facing contract behavior the adapter must reproduce is executable as tests;
+- every provider has a capability and topology record;
+- existing provider-native data is byte-preserved by the test harness.
+
+Checkpoint: `test: add presentation parity gate and adapter contract`
+
+### M0b — Golden traces (amortized, not a blocker)
+
+Sanitized golden traces for new sessions, resume, cancel, process loss, interactions, background
+work, required final result, and provider-native history are required evidence — but recording and
+sanitizing them for nine providers up front is a program of its own and must not gate the kernel.
+
+Schedule:
+
+- the four topology-proof providers (Antigravity, Codex, Claude, OpenCode) need their traces before
+  the semantic freeze in M2-proofs;
+- each remaining provider needs its traces before its own flip in M2-flips;
+- race tests that exercise new-core vocabulary (duplicate terminal, unknown dispatch, missing
+  required result) belong to the kernel suites in M1, not to characterization of the old runtime.
+  Cheap characterization of current failure behavior (what today's runtime does on process death or
+  unacknowledged cancel) is welcome as adapter-contract input but never blocks a checkpoint.
+
 Provider traces must contain Grimoire test identities and normalized timestamps only. Secrets,
 prompts, personal paths, and provider payloads not required for parity are removed.
 
-Exit gate:
-
-- every provider has an explicit topology and capability record;
-- current behavior is executable as tests or fixtures rather than prose alone;
-- the import-graph walk and parity manifest are green and enforced by the test suite;
-- known capability mismatches are represented as failing or corrected characterization tests;
-- existing provider-native data is byte-preserved by the test harness.
-
-Checkpoint: `test: characterize provider execution lifecycles`
-
 ### M1 — Execution core, dark-launched
 
-Objective: land the lifecycle kernel and persistence substrate on this branch without touching
-production composition.
+Objective: land the lifecycle kernel on this branch without touching production composition.
 
 Work, harvested from the archived branch per the harvesting policy:
 
 - composition boundaries (v1 Phase 1): `ApplicationServices`, provider context ports,
-  `ExecutionBackendDescriptor`, provider module / settings-codec / workspace / capability contracts,
-  a validating `ProviderCatalog` fixture, and the architecture fitness test for forbidden imports
-  and process launch from features;
-- versioned persistence substrate (v1 Phase 2): atomic revisioned repositories, transaction
-  intents, schema envelopes, the conversation mutation queue, typed history hydration, and crash
-  injection around every multi-record write boundary. Production writes stay on the old path until
-  M4; the new repositories are exercised by tests only;
+  `ExecutionBackendDescriptor`, settings-codec / workspace / capability contracts, a validating
+  `ProviderCatalog` fixture, and the architecture fitness test for forbidden imports and process
+  launch from features;
+- the **full `ProviderModule` contract, designed here, not harvested**. The v1 module is known
+  defective: it had no slots for most of the contribution inventory (chat UI config, settings
+  reconciliation, environment key patterns, title/refine/inline-edit, history service, task result
+  interpreter, and the workspace ports were bare `object`), which is exactly why the v1 cutover
+  dropped them. M1 declares a typed slot for every row of
+  [`provider-contribution-inventory.md`](provider-contribution-inventory.md), even though most
+  consumers move only at M3/M5. Slots for genuinely unsupported capabilities remain absent per the
+  capability rule; slots for baseline contributions may not;
 - execution kernel (v1 Phase 3): backend, session, run, owner, lease, generation, interaction,
   result-expectation, and terminal types; the single-writer event ingestor with stable
   deduplication, sequencing, gap handling, and generation fencing; disconnect, recovery,
   cancellation intent, exactly-one-terminal, result validation, shutdown, and append-only
   reconciliation; `LocalShellBackend` as an internal backend (not yet routed from the UI); the
-  deterministic fake backend and its fault matrix.
+  deterministic fake backend and its fault matrix;
+- kernel race suites in new-core vocabulary (duplicate terminal, unknown dispatch, missing required
+  result, cancellation races) live here, per M0b;
+- persistence substrate, **narrow and demand-driven**: only the durable record support the kernel
+  itself requires (run/interaction/reconciliation records with atomic writes, schema envelopes, and
+  crash injection over those specific boundaries). It may land as a late M1 checkpoint or inside
+  M2-proofs when the kernel first needs it. The conversation mutation queue, typed history
+  hydration at call sites, and all vault data migration stay in M4; harvesting the full v1 Phase 2
+  substrate as a standalone dark library is explicitly out of scope.
 
 Exit gate:
 
 - exactly one terminal is proven under duplicates, reorder, gaps, cancellation races, unload, and
-  reconnect; required results cannot succeed with progress or tool activity alone; projection
-  reduction is idempotent;
+  reconnect; required results cannot succeed with progress or tool activity alone; lifecycle state
+  reduction (event/record ingestion into snapshots) is idempotent — UI projections do not exist yet
+  and are not claimed;
 - core execution has no provider, feature, Obsidian, plugin, or DOM imports;
-- macOS and Linux process groups and Windows process trees pass the same ownership, cancellation,
-  unload, and terminal conformance cases;
+- POSIX process-group ownership, cancellation, unload, and terminal conformance pass on macOS and
+  Linux (local and CI). Windows process-tree conformance is **not** an M1 blocker while CI runs
+  only on Ubuntu; it becomes a hard blocker for M2-flips, and the cheapest path — a `windows-latest`
+  CI job for the execution-contract suites — should be added during M1/M2-proofs rather than waived;
 - the parity gate proves the production bundle surface is unchanged.
 
 Checkpoints mirror v1 Phases 1–3: `refactor: define execution composition boundaries`,
@@ -540,46 +611,70 @@ Checkpoints mirror v1 Phases 1–3: `refactor: define execution composition boun
 
 ### M2 — Provider backends, the presentation adapter, and production flips
 
-Objective: replace execution underneath the unchanged UI, one provider at a time.
+M2 is three separately mergeable sub-milestones, not one mass. The v1 failure mode — a large dark
+stack that is frightening to switch on — reappears if proofs, adapter, and flips land as one unit.
 
-Topology proofs first, harvested and still dark:
+#### M2-proofs — Topology proofs, dark
 
 - Antigravity (stateless per-run process), Codex (multiplexed app-server), Claude (persistent SDK
-  stream), and OpenCode (managed ACP subprocess), each with backend, module, settings codec,
-  capability descriptor, shared conformance, and sanitized trace parity (v1 Phases 4A–4D);
+  stream), and OpenCode (managed ACP subprocess), each with backend, module contribution, settings
+  codec, capability descriptor, shared conformance, and sanitized trace parity (v1 Phases 4A–4D);
 - the semantic freeze happens only after all four topology families pass, unchanged from v1;
-- then the remaining backends: MiMoCode and Kimi Code (family rules apply), Grok, Qwen, and Gemini
-  (v1 Phase 5), with the post-baseline `main` fixes absorbed — UTF-8 stream decoding and Grok
-  transcript recovery are backend semantics now, not patches on the old runtime.
+- the remaining backends — MiMoCode and Kimi Code (family rules apply), Grok, Qwen, and Gemini
+  (v1 Phase 5) — may be harvested here or deferred to just before their own flip; they do not gate
+  the freeze. The post-baseline `main` fixes are absorbed as backend semantics: UTF-8 stream
+  decoding and Grok transcript recovery are not patches on the old runtime anymore;
+- the `windows-latest` CI job for the execution-contract suites lands here at the latest.
 
-The presentation adapter:
+Exit gate: four topology families plus the fake pass the common conformance suite; semantic freeze
+recorded; production untouched; parity gate unchanged.
+
+#### M2-adapter — The seam, proven without a flip
 
 - one provider-neutral implementation of the current `ChatRuntime` contract over an execution
-  session and its runs: envelope events map to `StreamChunk` content; interactions map to the
-  existing approval, question, and plan-exit callbacks; terminal outcomes map to explicit done or
-  error chunks — a terminal without the required result is an explicit error, never a silent empty
-  response; `cancel` targets the active run; `buildSessionUpdates` and `consumeTurnMetadata` are
-  derived from session snapshots and run metadata; optional contract methods (history, commands,
+  session and its runs, built strictly from the M0a adapter specification: envelope events map to
+  `StreamChunk` content; interactions map to the existing approval, question, and plan-exit
+  callbacks; terminal outcomes map to explicit done or error chunks — a terminal without the
+  required result is an explicit error, never a silent empty response; the generator is closed only
+  by a terminal fact, so iterator end ceases to be a lifecycle signal by construction; `cancel()`
+  records intent immediately while the run resolves to `cancelled` or `indeterminate`
+  asynchronously, per the M0a mapping; `buildSessionUpdates` and `consumeTurnMetadata` are derived
+  from session snapshots and run metadata; optional contract methods (history, commands,
   rewind/fork, subagent result loading) delegate to capability ports and stay absent where the
   capability is absent;
-- adapter conformance: the adapter must pass the M0 UI-facing contract characterization and the
-  golden traces of every flipped provider;
+- adapter conformance: the adapter passes the M0a UI-facing contract tests over the fake backend
+  and the four proof backends — before any production flip exists;
+- a deviation that needs a new `ChatRuntime` member is a stop condition, not an adapter feature;
 - the adapter is under feature freeze from its first commit.
 
-Production flips, one provider per checkpoint, in waves:
+Exit gate: adapter passes contract conformance over fake + four proof topologies; production
+untouched.
 
-1. Antigravity — smallest topology, no resume or agents;
-2. Codex; 3. Claude; 4. OpenCode;
+#### M2-flips — Production flips, one provider per checkpoint
+
+Waves: 1. Antigravity (smallest topology, no resume or agents); 2. Codex; 3. Claude; 4. OpenCode;
 5. MiMoCode and Kimi Code; 6. Grok; 7. Qwen; 8. Gemini.
+
+Prerequisite: Windows process-tree conformance is green in CI. Flips change process ownership on
+every desktop platform users already run; Ubuntu-only evidence does not cover them.
 
 Each flip:
 
 - replaces the provider's `createRuntime` registration with the adapter over its new backend;
-- passes that provider's sanitized trace parity, the shared conformance suite, and a manual smoke
-  matrix on the built plugin (new session, resume, cancel, approval, history, model selection);
+- passes that provider's sanitized trace parity (recorded per M0b at the latest here), the shared
+  conformance suite, and a manual smoke matrix on the built plugin (new session, resume, cancel,
+  approval, history, model selection);
 - deletes the provider's legacy `*ChatRuntime` implementation and its now-dead helpers in the same
   checkpoint;
-- leaves workspace services, settings surfaces, and every non-execution registration untouched.
+- leaves workspace services, settings surfaces, auxiliary services, and every non-execution
+  registration untouched — see the mixed-authority rule in the Delivery decision: after a flip the
+  provider intentionally runs new chat execution beside legacy auxiliary execution until M5, and a
+  session or process conflict between those two paths is a stop condition.
+
+One user-visible change is planned and allowed from the first flip onward, because it is a defect
+fix the adapter produces by construction: a completed turn without the required result renders as
+an explicit error instead of a silent empty response, and an unacknowledged cancellation is no
+longer presented as cancelled. Everything else must be indistinguishable.
 
 Exit gate:
 
@@ -588,10 +683,9 @@ Exit gate:
   adapter's presentation contract;
 - trace parity, shared conformance, and the parity manifest are green; the manual smoke matrix
   passes for all nine providers;
-- user-visible behavior is unchanged except for corrected defect classes: silent empty responses
-  and mis-scoped cancellation.
+- user-visible behavior is unchanged except the declared defect-fix classes above.
 
-Checkpoints: one per topology proof, one per flip.
+Checkpoints: one per topology proof, one for the adapter, one per flip.
 
 ### M3 — Provider control plane behind the existing UI
 
@@ -602,11 +696,13 @@ Work:
 
 - harvest the catalog, settings presentation codecs, canonical versioned SHA-256 fingerprints, lazy
   workspace manager, and settings transaction coordinator (v1 Phase 8);
-- move registry consumers to the catalog one contribution class at a time — defaults and ordering,
+- move registry consumers to the catalog one contribution row at a time — defaults and ordering,
   enablement, settings tabs, model routing, command catalogs, agent mentions, MCP managers, CLI
-  resolvers, usage providers, and the rest of the thirteen contribution classes the old
-  registrations carry. This is the dependency class whose silent loss broke the first attempt; the
-  parity manifest tracks each class explicitly;
+  resolvers, usage providers, and every remaining M3-tagged row of
+  [`provider-contribution-inventory.md`](provider-contribution-inventory.md) (16 registration
+  fields plus 11 workspace members; no prose count is authoritative). This is the dependency class
+  whose silent loss broke the first attempt; the inventory and parity manifest track each row
+  explicitly;
 - make provider workspaces lazy, failure-isolated, generation-fenced, retryable, and asynchronously
   disposable; one provider failure cannot block startup or another provider;
 - delete `ProviderRegistry`, `ProviderWorkspaceRegistry`, and the separately maintained default
@@ -655,10 +751,12 @@ Work:
   completion, persistence barriers, and queued-input release move to the chat execution
   coordinator. Harvest the v1 Phase 7 reducers and coordinators as material for this rework, not as
   view replacements;
-- durable agents and work graphs (v1 Phase 6 harvest): agent instances and attempts survive tab
-  close; `SubagentManager` loses lifecycle authority while its rendering is retained; orchestrator
-  plans become durable work graphs with explicit synthesis; worker tabs become optional focused
-  views;
+- durable agents (v1 Phase 6 harvest, **instance/attempt scope only**): agent instances and
+  attempts survive tab close; `SubagentManager` loses lifecycle authority while its rendering is
+  retained; the compact work card ships with this step. The dependency `WorkGraph`, scheduler, and
+  synthesis runs are **not** part of M5 and do not gate seam deletion — they are post-migration
+  scope, built when a real dependent workflow exists. Orchestrator worker launches keep their
+  current independent-task behavior on durable attempts; worker tabs become optional focused views;
 - tab close stops cancelling background work only in the same checkpoint that ships the
   durable-ownership UI (work cards, reattachment) — never before;
 - auxiliary work (title, refine, inline edit, command/model probes, warm-up) moves to isolated
@@ -697,8 +795,7 @@ Work:
 - exercise migration crash injection at each durable boundary;
 - verify duplicate, gap, stale-generation, wrong-session, late-terminal, unload, and
   uncertain-dispatch behavior;
-- verify agent detach, restart, retry, partial failure, synthesis failure, and reconciled result
-  UI;
+- verify agent detach, restart, retry, partial failure, and reconciled result UI;
 - measure startup and first-use behavior to confirm lazy provider initialization;
 - run manual test-vault smoke on the built plugin;
 - review privacy boundaries and confirm debug logs contain no newly durable sensitive payloads;
@@ -885,6 +982,8 @@ Do not work around these findings with optional fields or provider-ID branches. 
 - a checkpoint would make any baseline surface unreachable or nonfunctional in the built plugin;
 - the presentation adapter needs a new `ChatRuntime` method or capability to keep working;
 - the adapter outlives the M5 seam-deletion checkpoint;
+- a flipped provider's new chat backend and its legacy auxiliary path contend for the same provider
+  session or process, or corrupt each other's state;
 
 and, unchanged from v1, when:
 
@@ -945,7 +1044,8 @@ The full migration is complete only when all statements are true:
 - `ApplicationRuntime` is the sole application-scoped execution composition root;
 - generic backend identity supports provider-associated and internal execution;
 - all nine providers use new native backends and one validated catalog;
-- all topology, provider, migration, repository, projection, agent, and work-graph suites pass;
+- all topology, provider, migration, repository, projection, and agent suites pass (work-graph
+  suites belong to the post-migration extension);
 - chat, auxiliary operations, orchestration, agents, and local shell use lifecycle owners and projections;
 - tabs and views own presentation only;
 - provider-native behavior and data pass trace and migration parity;

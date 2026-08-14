@@ -30,19 +30,47 @@ None of that code is on this branch. Every harvested slice must be ported onto c
 re-run through its gates here, and reconciled with the post-`710a43cf` fixes (UTF-8 stream
 decoding, Grok transcript recovery) before its checkpoint is recorded below.
 
+## Required reading before M0a
+
+- [`provider-execution-migration-plan.md`](provider-execution-migration-plan.md) — the operational
+  canon, including the M0a scope and the three harvest bans;
+- [`provider-contribution-inventory.md`](provider-contribution-inventory.md) — the checked-in
+  16 + 11 contribution table that seeds the parity manifest and the M1 `ProviderModule` slots;
+- `provider-execution-presentation-parity.md` on the archived
+  `codex/provider-architecture-research` branch — the audit of what the v1 cutover orphaned. The
+  M0a surface inventory is copied from it, not rediscovered.
+
 ## Checkpoint status
 
 | Scope | Status | Checkpoint |
 |---|---|---|
-| Research and plan v2 saved to `docs/` | Complete | this commit |
-| M0 — baseline and parity gate | Not started | — |
-| M1 — execution core, dark-launched | Not started | — |
-| M2 — backends, presentation adapter, provider flips | Not started | — |
+| Research and plan v2 saved to `docs/` | Complete | `ffebd58` |
+| Plan revised per adversarial review (M0a/M0b, M2 split, adapter spec, harvest bans, contribution inventory) | Complete | this commit |
+| M0a — parity gate and adapter contract | Not started | — |
+| M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Not started | — |
+| M1 — execution kernel, dark-launched | Not started | — |
+| M2-proofs — four topology proofs, dark | Not started | — |
+| M2-adapter — presentation seam, proven without a flip | Not started | — |
+| M2-flips — nine production flips with legacy deletion | Not started | — |
 | M3 — provider control plane | Not started | — |
 | M4 — revisioned persistence in production | Not started | — |
 | M5 — presentation evolution and seam deletion | Not started | — |
 | M6 — final hardening | Not started | — |
 
-## Next step
+## Checkpoint entry template
 
-Start M0. Nothing else may start first.
+Every checkpoint recorded here must use this shape — executed evidence only:
+
+```markdown
+### <milestone> — <checkpoint subject> (`<commit>`)
+
+- Gate commands run and results (suite counts, typecheck, lint, build as applicable).
+- Parity manifest state: wired / pending / intentionally-removed deltas since last entry.
+- Contribution inventory rows moved (if any).
+- What was deleted.
+- What remains open, as concrete items with an owning milestone.
+```
+
+## Current blocker
+
+M0a has not started. Nothing else may start first.

@@ -2,6 +2,17 @@
 
 This file tracks future provider integrations and the implementation sequence for agents working on Grimoire. It is not a promise that every listed provider is ready to ship; each provider still needs current runtime discovery before code is written.
 
+> **Architecture status.** The canonical execution architecture and its replacement sequence are
+> defined in [`provider-execution-migration-plan.md`](provider-execution-migration-plan.md) (with
+> reasoning in [`provider-architecture-research.md`](provider-architecture-research.md)). This
+> roadmap describes the **current, pre-migration** integration path. The checklist below produces a
+> `registration.ts` + `*ChatRuntime` provider — code the migration's M2 milestone deletes. Once the
+> plan's M0a checkpoint lands, the old runtime path is frozen for new product features: do not add
+> methods to `ChatRuntime`, and a new provider integration either waits for the presentation seam
+> or implements an execution backend per the plan's "Adding a provider" rules. Check
+> [`provider-execution-migration-progress.md`](provider-execution-migration-progress.md) for the
+> current milestone before starting provider work.
+
 ## Provider Implementation Checklist
 
 1. Capture the current CLI/runtime behavior first.
