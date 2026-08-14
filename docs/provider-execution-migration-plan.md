@@ -28,6 +28,19 @@ Because the invariant holds at every checkpoint, milestones merge to `main` when
 pass. There is no long-lived integration branch accumulating divergence; the first attempt's
 77-commit unmergeable branch is the anti-pattern this rule exists to prevent.
 
+### Release train
+
+`main` keeps shipping releases while milestones merge into it, which imposes three rules:
+
+- dark code must pass the release gates from its first commit: `review:source`, lint, and the
+  dependency review all scan the source tree regardless of reachability, and the kernel adds no
+  runtime dependencies. The parity gate is what proves dark code stays out of the shipped bundle;
+- the declared defect-fix classes that ship with flips are user-visible and get `CHANGELOG.md`
+  entries per the repository release rules; invisible infrastructure milestones need none;
+- a flip that shipped in a release is still revertible as a commit, but the revert is itself a
+  release; the revert-safety rule in M2-flips (control-store files inert to the old path) is what
+  makes that release safe.
+
 ## Resumable by construction
 
 The migration must be droppable at any moment and resumable on a different machine by a different
@@ -41,7 +54,9 @@ person or agent. That is a standing requirement, not a courtesy:
 - stopping mid-milestone is legal only in one of two states: uncommitted work is discarded, or it
   is committed to the branch with an open-items entry in the progress log saying exactly what is
   unfinished and what the next action is. A dirty working tree is not a valid stopping point;
-- the migration branch and its milestone merges live on `origin`; push at every checkpoint;
+- the migration branch and its milestone merges live on `origin`; push at every checkpoint. Work
+  continues on `providers-migration` across milestones, merging to `main` at milestone gates; if a
+  different branch ever becomes the active one, the progress log's "Current blocker" line names it;
 - the harvest source map below pins exact v1 commits, so harvesting is reproducible anywhere the
   remote is reachable;
 - the progress log's "Current blocker" line is the single resume pointer: a new machine starts by
@@ -80,8 +95,17 @@ backends may reuse extracted process, transport, native-session, and history pri
 must not wrap `ChatRuntime` or inherit its generator and callback lifecycle.
 
 The production seam is one provider-neutral presentation adapter that implements the existing
-`ChatRuntime` contract on top of an execution backend, session, and run. The dependency direction is
-strict: the adapter consumes the new lifecycle; the new core never imports the old contract. Flipping
+`ChatRuntime` contract on top of the execution lifecycle — and specifically as a client of the
+`ExecutionLifecycleRegistry`, never of a bare backend or session. The guarantees each flip exists
+for (exactly one terminal, deduplication, generation fencing, honest `indeterminate`) are registry
+and ingestor functions, not backend functions; an adapter wired straight to a backend would either
+lack them or re-implement core policy locally, and both are forbidden. The dependency direction is
+strict: the adapter consumes the new lifecycle; the new core never imports the old contract.
+
+A consequence the plan owns explicitly: **the kernel enters production at the first flip, not at
+M4 or M5.** The first flip brings the lifecycle registry, its event ingestion, and its durable
+control records into the running plugin. See the M2-flips section for the interim composition
+owner, storage-documentation, unload, and revert-safety obligations this creates. Flipping
 a provider means replacing its `createRuntime` registration with the adapter over its new backend
 and deleting its legacy `*ChatRuntime` in the same checkpoint. There are no runtime flags: a flip is
 a commit, reverted as a commit if it cannot pass. Inside one provider there is exactly one **chat
@@ -566,11 +590,14 @@ Work:
   against the contract, found now instead of mid-port;
 - record per-provider capability and topology tables (process model, session boundary, resume,
   concurrency), reconciled against observed behavior where cheap — a failing characterization test
-  where declaration and behavior disagree;
+  where declaration and behavior disagree — plus a **shared-resource inventory** per provider
+  (ports, locks, session files, sockets, daemons shared between chat and auxiliary paths); the M2
+  flip's auxiliary-contention check verifies against this inventory mechanically;
 - characterize settings, session metadata, persisted tab state, and conversation provider state as
   fixtures;
 - decide lifecycle/result retention, user deletion, schema versions, and diagnostic redaction in a
-  short internal decision record;
+  short internal decision record — explicitly covering the durable control store, because it
+  reaches production at the first M2 flip, not at M4;
 - prohibit new product features on the old runtime path after this checkpoint; bug fixes remain
   allowed and must be absorbed by later harvested slices.
 
@@ -679,8 +706,10 @@ recorded; production untouched; parity gate unchanged.
 
 #### M2-adapter — The seam, proven without a flip
 
-- one provider-neutral implementation of the current `ChatRuntime` contract over an execution
-  session and its runs, built strictly from the M0a adapter specification: envelope events map to
+- one provider-neutral implementation of the current `ChatRuntime` contract as a **client of the
+  lifecycle registry** — the adapter acquires sessions and runs only through the registry, never
+  drives a backend or session directly, and never re-implements ingestion, deduplication, or
+  terminal policy locally — built strictly from the M0a adapter specification: envelope events map to
   `StreamChunk` content; interactions map to the existing approval, question, and plan-exit
   callbacks; terminal outcomes map to explicit done or error chunks — a terminal without the
   required result is an explicit error, never a silent empty response; the generator is closed only
@@ -706,18 +735,47 @@ Waves: 1. Antigravity (smallest topology, no resume or agents); 2. Codex; 3. Cla
 Prerequisite: Windows process-tree conformance is green in CI. Flips change process ownership on
 every desktop platform users already run; Ubuntu-only evidence does not cover them.
 
+**The kernel enters production at the first flip.** The first flip checkpoint therefore also owns:
+
+- an **interim application-scoped kernel host** in `src/app/`: one explicit object constructed in
+  `main.ts` `onload()` that owns the lifecycle registry, ingestion, and control-store wiring, and is
+  disposed in `onunload()` through the kernel's shutdown path (acceptance gate closes first, then
+  bounded cancellation and cleanup). It is the seed that grows into `ApplicationRuntime` at M5 —
+  not a throwaway parallel structure, and not a lazy module singleton. Between the first flip and
+  M5 this host is the only place allowed to construct the registry;
+- the durable control store appears under `.grimoire/` at this checkpoint — before M4. The root
+  storage documentation (`AGENTS.md` storage boundaries) is updated in the same commit, and the
+  M0a retention/deletion ADR must already cover these records;
+- **revert safety**: control-store files must be inert to the old path. A release that shipped a
+  flip may be followed by a release that reverts it; the old runtime never reads these files and
+  must not break on their presence;
+- plugin unload during the M2–M4 window drives kernel shutdown for flipped providers and legacy
+  cleanup for unflipped ones; neither may block the other.
+
 Each flip:
 
-- replaces the provider's `createRuntime` registration with the adapter over its new backend;
-- passes that provider's sanitized trace parity (recorded per M0b at the latest here), the shared
-  conformance suite, and a manual smoke matrix on the built plugin (new session, resume, cancel,
-  approval, history, model selection);
+- replaces the provider's `createRuntime` **factory inside the existing `ProviderRegistry`
+  registration** with the adapter over its new backend. The registry mechanism itself and the
+  construction call site (`TabManager` → registry) are untouched here; moving that call site to
+  the catalog is an M3 inventory row;
+- passes that provider's sanitized trace parity (recorded per M0b at the latest here) and the
+  shared conformance suite;
+- passes a **capability-driven manual smoke matrix** on the built plugin: every capability the
+  provider declares in its M0a capability record is exercised once — always new session, cancel,
+  history, and model selection; plus resume, approvals, questions, plan mode, steering, queued
+  input, rewind, fork, images, and slash commands where declared. A fixed six-item list is not
+  sufficient evidence for a provider that declares more;
+- passes **persisted-state parity**: the adapter's `buildSessionUpdates` output and the resulting
+  `Conversation.providerState` round-trip against the M0a fixtures, so resume after a revert,
+  fork, and history hydration keep working across the flip boundary in both directions;
 - deletes the provider's legacy `*ChatRuntime` implementation and its now-dead helpers in the same
   checkpoint;
 - leaves workspace services, settings surfaces, auxiliary services, and every non-execution
   registration untouched — see the mixed-authority rule in the Delivery decision: after a flip the
   provider intentionally runs new chat execution beside legacy auxiliary execution until M5, and a
-  session or process conflict between those two paths is a stop condition.
+  session or process conflict between those two paths is a stop condition. The check is mechanical:
+  verify against the provider's M0a shared-resource inventory (ports, locks, session files,
+  sockets) that the new chat backend and each legacy auxiliary service hold disjoint resources.
 
 One user-visible change is planned and allowed from the first flip onward, because it is a defect
 fix the adapter produces by construction: a completed turn without the required result renders as
@@ -775,7 +833,10 @@ path.
 Work:
 
 - route conversation saves through the mutation queue and revisioned repository; migrate existing
-  vault data through explicit, idempotent steps;
+  vault data through explicit, idempotent steps. The call sites are the legacy controllers
+  (`InputController`, `ConversationController`) that M5 later deletes — editing dying code in place
+  is the intended move here, not a reason to defer to M5: M5's multiple views and durable agents
+  are unsafe without revisioned saves already live underneath them;
 - replace side-effect-only history hydration with the typed result at each call site;
 - keep `.grimoire/` layouts compatible per the preservation boundary and document the final layout
   in root storage documentation when the code lands.
@@ -812,9 +873,10 @@ Work:
   auxiliary owners; auxiliary results cannot mutate the visible conversation session;
 - `BangBashService` routes through `LocalShellBackend`; tab close detaches its projection and
   application shutdown owns cleanup;
-- `ApplicationRuntime` becomes the composition root in `main.ts`. By this point it composes parts
-  that are already live in production, so the change is a refactor of wiring, not an architecture
-  switch; startup recovery completes before views accept work;
+- `ApplicationRuntime` becomes the composition root in `main.ts` by absorbing the interim kernel
+  host that has owned the registry since the first flip — promotion of an existing owner, not an
+  architecture switch, because it composes parts already live in production; startup recovery
+  completes before views accept work;
 - when the last UI consumer of `ChatRuntime` is gone: delete the interface, the presentation
   adapter, lifecycle `StreamChunk` variants, runtime approval/question/plan/subagent callbacks,
   warm-runtime tab LRU ownership, and worker-tab ownership fields, then run the structural deletion
@@ -1030,6 +1092,10 @@ Do not work around these findings with optional fields or provider-ID branches. 
 
 - a checkpoint would make any baseline surface unreachable or nonfunctional in the built plugin;
 - the presentation adapter needs a new `ChatRuntime` method or capability to keep working;
+- the presentation adapter drives a backend or session without going through the lifecycle
+  registry, or re-implements ingestion, deduplication, or terminal policy locally;
+- the lifecycle registry is constructed anywhere except the interim kernel host (M2–M4) or
+  `ApplicationRuntime` (M5 onward);
 - the adapter outlives the M5 seam-deletion checkpoint;
 - a flipped provider's new chat backend and its legacy auxiliary path contend for the same provider
   session or process, or corrupt each other's state;
