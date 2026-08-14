@@ -15,7 +15,7 @@ function createRegistry() {
 }
 
 /** Providers with a preparer. Kept here so both assertions stay in step. */
-const WIRED = ['opencode', 'mimocode', 'kimicode', 'gemini', 'qwen', 'grok', 'claude', 'codex'] as const;
+const WIRED = ['opencode', 'mimocode', 'kimicode', 'gemini', 'qwen', 'grok', 'claude', 'codex', 'antigravity'] as const;
 
 describe('createChatTurnRequestPreparers', () => {
   it('registers every managed-ACP provider whose launch pipeline is wired', () => {
@@ -26,25 +26,27 @@ describe('createChatTurnRequestPreparers', () => {
     }
   });
 
-  it('fails closed by name for providers whose launch pipeline is not wired', async () => {
+  it('covers every provider in the catalog', () => {
     const registry = createRegistry();
-    const wired = new Set<string>(WIRED);
-    const unwired = builtInProviderCatalog.list()
+    const missing = builtInProviderCatalog.list()
       .map(module => module.manifest.id)
-      .filter(providerId => !wired.has(providerId));
+      .filter(providerId => !registry.has(providerId));
 
-    // Every remaining provider must announce itself rather than fail later as
-    // an unresolvable request reference inside its backend.
-    expect(unwired.length).toBeGreaterThan(0);
-    for (const providerId of unwired) {
-      expect(registry.has(providerId)).toBe(false);
-      await expect(registry.prepare(providerId, {
-        conversationId: 'conv-1',
-        prompt: 'hello',
-        cwd: '/vault',
-        settings: {},
-      })).rejects.toThrow(ChatTurnPreparationUnsupportedError);
-    }
+    // A provider present in the catalog but absent here would reach its backend
+    // and fail there as an unresolvable request reference.
+    expect(missing).toEqual([]);
+  });
+
+  it('fails closed by name for a provider with no preparer', async () => {
+    const registry = createRegistry();
+
+    expect(registry.has('not-a-provider')).toBe(false);
+    await expect(registry.prepare('not-a-provider', {
+      conversationId: 'conv-1',
+      prompt: 'hello',
+      cwd: '/vault',
+      settings: {},
+    })).rejects.toThrow(ChatTurnPreparationUnsupportedError);
   });
 
   it('rejects a duplicate preparer for the same provider', () => {

@@ -1,6 +1,11 @@
 import { ChatTurnRequestPreparerRegistry } from '../../core/providers/ChatTurnRequestPreparer';
 import type { AcpMcpServerSource } from '../../providers/acp/app/AcpMcpServerSource';
 import { ManagedAcpTurnRequestPreparer } from '../../providers/acp/app/ManagedAcpTurnRequestPreparer';
+import { ANTIGRAVITY_EXECUTION_REQUEST_KIND } from '../../providers/antigravity/app/AntigravityApplicationContextFactory';
+import { AntigravityTurnRequestPreparer } from '../../providers/antigravity/app/AntigravityTurnRequestPreparer';
+import { ANTIGRAVITY_EXECUTION_DESCRIPTOR } from '../../providers/antigravity/execution/AntigravityExecutionBackend';
+import { AntigravityCliResolver } from '../../providers/antigravity/runtime/AntigravityCliResolver';
+import { buildAntigravityRuntimeEnv } from '../../providers/antigravity/runtime/AntigravityRuntimeEnvironment';
 import { CLAUDE_EXECUTION_REQUEST_KIND } from '../../providers/claude/app/ClaudeApplicationContextFactory';
 import { ClaudeTurnRequestPreparer } from '../../providers/claude/app/ClaudeTurnRequestPreparer';
 import { CLAUDE_EXECUTION_DESCRIPTOR } from '../../providers/claude/execution/ClaudeExecutionBackend';
@@ -163,6 +168,15 @@ export function createChatTurnRequestPreparers(options: {
       backendId: CODEX_EXECUTION_DESCRIPTOR.backendId,
       requestKind: CODEX_EXECUTION_REQUEST_KIND,
       requests: options.requests,
+    }),
+    // Antigravity runs one print-mode process per turn, so the invocation
+    // carries the command and prompt directly with no startup reference.
+    new AntigravityTurnRequestPreparer({
+      backendId: ANTIGRAVITY_EXECUTION_DESCRIPTOR.backendId,
+      requestKind: ANTIGRAVITY_EXECUTION_REQUEST_KIND,
+      requests: options.requests,
+      cliResolver: new AntigravityCliResolver(),
+      buildRuntimeEnv: buildAntigravityRuntimeEnv,
     }),
   ]);
 }

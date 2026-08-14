@@ -54,6 +54,9 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       'src/core/providers/ChatTurnRequestPreparer.ts',
       'src/app/runtime/ChatTurnPreparerComposition.ts',
       'src/providers/acp/app/AcpMcpServerSource.ts',
+      'src/providers/antigravity/app/AntigravityTurnRequestPreparer.ts',
+      'src/providers/antigravity/runtime/AntigravityCliResolver.ts',
+      'src/providers/antigravity/runtime/AntigravityRuntimeEnvironment.ts',
       'src/providers/acp/app/ManagedAcpTurnRequestPreparer.ts',
       'src/providers/acp/mcp/AcpMcpStorage.ts',
       'src/providers/acp/mcp/toAcpMcpServers.ts',
@@ -98,8 +101,9 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
       + 'until workspace services return, so it starts without MCP servers, plugins, hooks, or '
       + 'setting sources. Codex needs no startup reference at all: its app-server launch '
       + 'specification is supplied once at composition time, so a turn only names the thread '
-      + 'and input. Antigravity is the last provider without a preparer and fails closed by '
-      + 'name.',
+      + 'and input. Antigravity runs one print-mode process per turn, so its invocation carries '
+      + 'the command and prompt directly with no startup reference either. All nine providers '
+      + 'can now start a turn; what each one starts without is recorded on its own surface.',
   },
   {
     id: 'interaction-prompts',
@@ -459,7 +463,6 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
     state: 'pending',
     phase: '12B',
     modules: [
-      'src/providers/antigravity/runtime/AntigravityCliResolver.ts',
       'src/providers/codex/runtime/CodexBinaryLocator.ts',
       'src/providers/codex/runtime/CodexCliResolver.ts',
     ],
@@ -589,7 +592,6 @@ export const PRESENTATION_PARITY_MANIFEST: readonly ParitySurface[] = [
     phase: '12B',
     modules: [
       'src/providers/antigravity/env/AntigravitySettingsReconciler.ts',
-      'src/providers/antigravity/runtime/AntigravityRuntimeEnvironment.ts',
       'src/providers/claude/config/ClaudeConfigDir.ts',
       'src/providers/claude/env/ClaudeSettingsReconciler.ts',
       'src/providers/claude/env/claudeModelEnv.ts',
