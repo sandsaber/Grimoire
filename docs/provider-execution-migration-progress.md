@@ -9,6 +9,27 @@ A checkpoint entry must record executed evidence (test counts, gate results, par
 not intentions. The v1 log demonstrated why: phases were recorded as complete on the strength of
 gates that did not measure the product surface.
 
+## Continuation on another machine
+
+This migration is resumable from the repository alone. To pick it up anywhere:
+
+1. `git clone` the repository, `git checkout providers-migration` (the branch is on `origin`).
+2. Read, in order: [`provider-execution-migration-plan.md`](provider-execution-migration-plan.md)
+   (canon), [`provider-contribution-inventory.md`](provider-contribution-inventory.md),
+   then this log. The **Current blocker** line at the bottom is the single resume pointer.
+3. For harvesting: `git fetch origin codex/provider-architecture-research`; exact per-slice commits
+   are pinned in the plan's Harvest source map.
+4. Environment: `npm ci`; gate commands are in the plan's Test strategy section; optionally set
+   `OBSIDIAN_VAULT` in `.env.local` for manual smoke on a test vault.
+5. Any `Downloads/` or out-of-repo copies of these documents are superseded; `docs/` is canonical.
+
+Journal rules that keep this true:
+
+- every checkpoint commit contains its entry here, in the same commit;
+- stopping mid-milestone requires either discarding uncommitted work or committing it with an
+  open-items note here stating what is unfinished and the exact next action;
+- push to `origin` at every checkpoint; a local-only branch is not a valid stopping point.
+
 ## Branch
 
 - Migration branch: `providers-migration`
@@ -35,7 +56,8 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 - [`provider-execution-migration-plan.md`](provider-execution-migration-plan.md) — the operational
   canon, including the M0a scope and the three harvest bans;
 - [`provider-contribution-inventory.md`](provider-contribution-inventory.md) — the checked-in
-  16 + 11 contribution table that seeds the parity manifest and the M1 `ProviderModule` slots;
+  contribution tables (16 registration fields, 11 workspace members, 3 registration/app-level
+  contributions) that seed the parity manifest and the M1 `ProviderModule` slots;
 - `provider-execution-presentation-parity.md` on the archived
   `codex/provider-architecture-research` branch — the audit of what the v1 cutover orphaned. The
   M0a surface inventory is copied from it, not rediscovered.
@@ -45,7 +67,8 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | Scope | Status | Checkpoint |
 |---|---|---|
 | Research and plan v2 saved to `docs/` | Complete | `ffebd58` |
-| Plan revised per adversarial review (M0a/M0b, M2 split, adapter spec, harvest bans, contribution inventory) | Complete | this commit |
+| Plan revised per adversarial review (M0a/M0b, M2 split, adapter spec, harvest bans, contribution inventory) | Complete | `4fb915c` |
+| Consistency pass: inventory completed (+3 rows), WorkGraph removed from operational target, stop condition aligned with mixed-authority rule, harvest source map, resumability rules | Complete | this commit |
 | M0a — parity gate and adapter contract | Not started | — |
 | M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Not started | — |
 | M1 — execution kernel, dark-launched | Not started | — |

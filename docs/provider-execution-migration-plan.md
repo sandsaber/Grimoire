@@ -28,6 +28,25 @@ Because the invariant holds at every checkpoint, milestones merge to `main` when
 pass. There is no long-lived integration branch accumulating divergence; the first attempt's
 77-commit unmergeable branch is the anti-pattern this rule exists to prevent.
 
+## Resumable by construction
+
+The migration must be droppable at any moment and resumable on a different machine by a different
+person or agent. That is a standing requirement, not a courtesy:
+
+- the documents in `docs/` — this plan, the research document, the contribution inventory, and the
+  progress log — are the only canon. Continuing must never require chat transcripts, files outside
+  the repository, or anyone's memory;
+- every checkpoint commit includes its progress-log entry **in the same commit**, so the journal
+  can never lag the code it describes;
+- stopping mid-milestone is legal only in one of two states: uncommitted work is discarded, or it
+  is committed to the branch with an open-items entry in the progress log saying exactly what is
+  unfinished and what the next action is. A dirty working tree is not a valid stopping point;
+- the migration branch and its milestone merges live on `origin`; push at every checkpoint;
+- the harvest source map below pins exact v1 commits, so harvesting is reproducible anywhere the
+  remote is reachable;
+- the progress log's "Current blocker" line is the single resume pointer: a new machine starts by
+  reading plan → inventory → progress, then acts on that line.
+
 ## Outcome
 
 The migration will replace the old runtime architecture completely, delivered as a series of
@@ -90,9 +109,10 @@ named checkpoint in the presentation-evolution milestone.
 The archived branch is a parts library, not a base:
 
 - harvest by porting (cherry-pick, then fix) onto current `main`; wholesale merge is forbidden;
-- eligible: the reviewed slices of Phases 1 through 8 — composition boundaries, persistence
-  substrate, execution kernel, fake backend, the nine provider backends and modules, conformance and
-  sanitized trace suites, agent/work-graph domain, projection reducers as material;
+- eligible: the reviewed slices of Phases 1 through 8 — composition boundaries, the narrow
+  kernel-record persistence support, execution kernel, fake backend, the nine provider backends and
+  modules, conformance and sanitized trace suites, the durable agent instance/attempt domain
+  (excluding the WorkGraph scheduler and synthesis, per ban 2), projection reducers as material;
 - not eligible: the Phase 9/10 cutover commits — `main.ts` and `GrimoireView` rewrites, tab
   deletion, stub entry points, legacy-architecture deletion sweeps;
 - every harvested slice re-runs its own gates on this branch and is reconciled with the fixes that
@@ -113,6 +133,36 @@ Three explicit harvest bans, each rooted in a v1 defect:
    synthesis runs arrive when a real dependent workflow exists (post-migration scope).
 3. **Windows process-tree conformance is not an M1 blocker** while CI runs Ubuntu only; it becomes
    a hard prerequisite of M2-flips, satisfied by a `windows-latest` CI job, not by a waiver.
+
+### Harvest source map
+
+Exact v1 checkpoints on `codex/provider-architecture-research`, verified against git on
+2026-08-15. Fetch with `git fetch origin codex/provider-architecture-research`. This map exists so
+harvesting never depends on anyone's memory or on files outside this repository.
+
+| v1 slice | Commit | Harvest target |
+|---|---|---|
+| Phase 1 — composition boundaries | `1ae6a620` | M1 |
+| Phase 2 — persistence foundation | `347586ff` | M1 (narrow kernel records only) and M4 (the rest) |
+| Phase 3 — lifecycle kernel + local shell | `1220271a` | M1 |
+| Phase 4A — Antigravity backend | `07939092` | M2-proofs |
+| Phase 4B — Codex backend | `309f1558` | M2-proofs |
+| Phase 4C — Claude backend | `9dda0ebc` | M2-proofs |
+| Phase 4D — OpenCode managed-ACP backend | `cb631f53` | M2-proofs |
+| Semantic freeze suites | `892eec78` | M2-proofs |
+| MiMoCode / Kimi Code backends | `6c4700cf` | before their M2 flip |
+| Grok backend | `104c88dd` | before its M2 flip |
+| Qwen backend | `d5042ec5` | before its M2 flip |
+| Gemini backend | `593b38d0` | before its M2 flip |
+| Immutable provider catalog | `d1a41736` | M3 |
+| Phase 6 — durable agents (instance/attempt scope only, per ban 2) | `63320547` | M5 |
+| Phase 7A — chat projections | `8cab81b4` | M5, as material |
+| Phase 7B — agent work UI | `634dc4bb` | M5, as material |
+| Phase 7C — auxiliary and local-shell owners | `4ebbd5fa` | M5, as material |
+| Phase 8 — provider control plane | `91af3577` | M3 |
+
+Not in the map by design: the Phase 9/10 cutover commits (`e7604e15`, `42ad4474`, and their
+follow-ups) — the not-eligible list above.
 
 ## Scope and preservation boundary
 
@@ -183,7 +233,6 @@ flowchart TB
     providerBackends --> lifecycle
     internalBackends --> lifecycle
 
-    coordinator --> work["WorkGraph scheduler"]
     coordinator --> lifecycle
     lifecycle --> projections["Pure projections"]
     repositories --> projections
@@ -197,7 +246,7 @@ main.ts
   -> app/ApplicationRuntime
        -> core provider catalog and repositories
        -> core execution lifecycle
-       -> core agents and work graphs
+       -> core agents
        -> provider and internal backend factories
 
 providers/<provider>
@@ -254,12 +303,6 @@ src/core/agents/
   policies.ts
   AgentCoordinator.ts
 
-src/core/work/
-  WorkGraph.ts
-  WorkGraphRepository.ts
-  WorkScheduler.ts
-  SynthesisCoordinator.ts
-
 src/core/conversations/
   ConversationRepository.ts
   ConversationMutationQueue.ts
@@ -293,7 +336,6 @@ src/providers/<provider>/execution/
 tests/fixtures/provider-traces/
 tests/unit/core/execution/
 tests/unit/core/agents/
-tests/unit/core/work/
 tests/unit/core/providers/
 tests/unit/features/chat/projections/
 tests/integration/providers/
@@ -386,9 +428,10 @@ Every run has one durable owner:
 
 - conversation;
 - agent instance;
-- work graph;
 - auxiliary operation;
 - internal service invocation.
+
+(The post-migration work-graph extension adds a graph owner kind; it is not a migration contract.)
 
 Tabs receive projection attachments. The lifecycle registry is the sole authority for backend, session, run, interaction, persistence, and recovery leases. A resource cannot cool while active work, an open interaction, a durable write, a reattach attempt, or a settings transition still owns it.
 
@@ -427,12 +470,11 @@ The durable identities are separate:
 - `AgentDefinition`: reusable configuration and policy request;
 - `AgentInstance`: logical participant with a captured definition revision;
 - `AgentRun`: one immutable attempt;
-- `WorkGraph`: revisioned scheduling and dependency graph;
-- `WorkNode`: one goal and assignment;
-- `AgentResult`: one attempt's structured result;
-- `SynthesisRun`: a normal run referencing exact result IDs.
+- `AgentResult`: one attempt's structured result.
 
-Parent-child agent ownership remains a tree. Work dependencies remain a directed acyclic graph. Dynamic additions create a new graph revision; they do not mutate the meaning of a revision already used for scheduling.
+Parent-child agent ownership remains a tree. `WorkGraph`, `WorkNode`, and `SynthesisRun` — the
+dependency-scheduling vocabulary — are post-migration extensions defined in the research document;
+they are not migration contracts and no migration milestone depends on them.
 
 Grimoire-requested agent dispatch persists intent and a stable dispatch token before calling a provider. Native identity or explicit rejection is persisted before the attempt becomes running. An unknown dispatch never launches again automatically. Retry creates a new attempt.
 
@@ -448,7 +490,6 @@ The new stores are versioned and provider-neutral. They persist only what is nee
 
 - logical IDs, owner links, generations, attempts, and state-machine positions;
 - dispatch intents and accepted native opaque identities needed for recovery;
-- work graph revisions and scheduling decisions;
 - terminal outcomes, result references, and reconciliation evidence;
 - projection and conversation revisions;
 - shutdown and settings-transition checkpoints.
@@ -516,9 +557,13 @@ Work:
   operation, a capability port, or an explicit absence. Two questions must be answered on paper
   here, not during M2: how synchronous `cancel()` and generator end map onto asynchronous run
   terminals so that `indeterminate` and open interactions remain representable, and which contract
-  behaviors the current `InputController` actually depends on (characterized as executable contract
-  tests). If the mapping needs a new `ChatRuntime` method, that is a stop condition against the
-  contract, found now instead of mid-port;
+  behaviors the current `InputController` actually depends on. The contract tests come in two
+  deliberately separate suites: a characterization suite pinning today's controller-observable
+  behavior (including that iterator end is currently treated as a completion signal), and a target
+  suite pinning the adapter semantics (the generator closes only on a terminal fact). They differ
+  by design at exactly the defect-fix points; conflating them would either freeze the defect or
+  silently change the UI. If the mapping needs a new `ChatRuntime` method, that is a stop condition
+  against the contract, found now instead of mid-port;
 - record per-provider capability and topology tables (process model, session boundary, resume,
   concurrency), reconciled against observed behavior where cheap — a failing characterization test
   where declaration and behavior disagree;
@@ -606,8 +651,11 @@ Exit gate:
   CI job for the execution-contract suites — should be added during M1/M2-proofs rather than waived;
 - the parity gate proves the production bundle surface is unchanged.
 
-Checkpoints mirror v1 Phases 1–3: `refactor: define execution composition boundaries`,
-`feat: add versioned persistence foundation`, `feat: establish execution lifecycle kernel`.
+Checkpoints: `refactor: define execution composition boundaries`,
+`feat: establish execution lifecycle kernel`, and — when the kernel first needs durable records —
+`feat: add kernel persistence records`. (The v1 name `feat: add versioned persistence foundation`
+is retired: M1 persistence is deliberately narrow, and reusing the old name would misrepresent the
+scope.)
 
 ### M2 — Provider backends, the presentation adapter, and production flips
 
@@ -699,10 +747,11 @@ Work:
 - move registry consumers to the catalog one contribution row at a time — defaults and ordering,
   enablement, settings tabs, model routing, command catalogs, agent mentions, MCP managers, CLI
   resolvers, usage providers, and every remaining M3-tagged row of
-  [`provider-contribution-inventory.md`](provider-contribution-inventory.md) (16 registration
-  fields plus 11 workspace members; no prose count is authoritative). This is the dependency class
-  whose silent loss broke the first attempt; the inventory and parity manifest track each row
-  explicitly;
+  [`provider-contribution-inventory.md`](provider-contribution-inventory.md) — all three of its
+  tables, including `workspaceCapabilities`, the separate default-config source, and the workspace
+  initialize/dispose lifecycle; the table is the authority, not any prose count. This is the
+  dependency class whose silent loss broke the first attempt; the inventory and parity manifest
+  track each row explicitly;
 - make provider workspaces lazy, failure-isolated, generation-fenced, retryable, and asynchronously
   disposable; one provider failure cannot block startup or another provider;
 - delete `ProviderRegistry`, `ProviderWorkspaceRegistry`, and the separately maintained default
@@ -909,7 +958,7 @@ Agent-capable backends also run conformance for native identity, fidelity, statu
 - required result failure;
 - partial output after failure or interruption;
 - original indeterminate plus later observed result;
-- successful siblings retained after child or synthesis failure;
+- successful siblings retained after another child's failure;
 - restored interactions and available actions;
 - tab/view detach without lifecycle mutation;
 - honest native fidelity labels and no invented child state.
@@ -1000,9 +1049,12 @@ and, unchanged from v1, when:
 - persistence duplicates a provider transcript or records sensitive raw events;
 - one provider's special feature widens the base session contract;
 - an emergency bridge survives its required deletion checkpoint;
-- production composition would contain both old and new execution authorities for the same
-  provider, or any runtime flag selecting between them. (During M2, different providers on
-  different authorities is the planned state, not a violation.)
+- production composition would contain two **chat-execution** authorities for the same provider,
+  or any runtime flag selecting between execution authorities. Two states are explicitly NOT
+  violations, because the Delivery decision plans them: different providers on different
+  authorities during M2-flips, and a flipped provider's auxiliary services (title, refine, inline
+  edit) remaining on the legacy path until M5. Do not stop a flip because an auxiliary service is
+  still old; stop it only on the session/process-contention condition above.
 
 ## Future extension rules
 
