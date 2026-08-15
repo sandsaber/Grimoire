@@ -18,7 +18,7 @@
 ## Rendering
 
 - `MessageRenderer` owns message orchestration, markdown rendering, rewind/fork affordances, images, and copy buttons.
-- `ToolCallRenderer`, `ThinkingBlockRenderer`, `WriteEditRenderer`, `DiffRenderer`, `TodoListRenderer`, and `SubagentRenderer` own specialized render surfaces.
+- `ToolCallRenderer`, `ThinkingBlockRenderer`, `WriteEditRenderer`, `DiffRenderer`, and `SubagentRenderer` own specialized render surfaces. Todo lists are parsed by `core/tools/todo` and presented through `rendering/todoUtils.ts`.
 - Keep provider-specific tool normalization in provider code. Chat rendering should consume normalized `ToolCallInfo` and related shared types.
 - Long tool outputs and tables must remain readable in the chat column. Prefer contained scrolling/truncation over widening the chat.
 

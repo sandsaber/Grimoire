@@ -34,7 +34,8 @@ Journal rules that keep this true:
 
 - Migration branch: `providers-migration`
 - Baseline: `main` at 1.1.6 (`b08e4bd`)
-- **No milestone work has started. Nothing from the plan is implemented on this branch.**
+- M0a is under way. Landed checkpoints are listed below; every earlier milestone row in the
+  status table is still untouched.
 
 ## Prior attempt (reference only)
 
@@ -70,8 +71,8 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | Plan revised per adversarial review (M0a/M0b, M2 split, adapter spec, harvest bans, contribution inventory) | Complete | `4fb915c` |
 | Consistency pass: inventory completed (+3 rows), WorkGraph removed from operational target, stop condition aligned with mixed-authority rule, harvest source map, resumability rules | Complete | `da05d8e` |
 | Third review applied: kernel-in-production-at-first-flip owned (interim kernel host, storage docs, revert safety, unload), adapter bound to the lifecycle registry, capability-driven flip smoke, providerState parity gate, release-train rules, shared-resource inventory in M0a | Complete | `6df5658` |
-| UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | this commit |
-| M0a — parity gate and adapter contract | In progress — baseline recorded | this commit |
+| UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | `b94a588` |
+| M0a — parity gate and adapter contract | In progress | `3273321`, `79184ce`, `db6ad82`, `6cbf0e0`, this commit |
 | M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Not started | — |
 | M1 — execution kernel, dark-launched | Not started | — |
 | M2-proofs — four topology proofs, dark | Not started | — |
@@ -98,7 +99,7 @@ Every checkpoint recorded here must use this shape — executed evidence only:
 
 ## Checkpoints
 
-### M0a — baseline gate recorded (this commit)
+### M0a — baseline gate recorded (`3273321`)
 
 Gate commands run on `b94a588` (branch tip before this commit), after `npm ci`:
 
@@ -144,7 +145,7 @@ Open items, all owned by M0a: the import-graph walker is not checked in (WP1), t
 and its fitness test do not exist (WP2), the contribution-inventory fitness test does not exist
 (WP3), the adapter specification is unwritten (WP4).
 
-### M0a — import-graph walker checked in (this commit)
+### M0a — import-graph walker checked in (`79184ce`)
 
 `tests/helpers/moduleReachability.ts` is now in the tree, ported from
 `origin/codex/provider-architecture-research` and generalized to accept a source root and base
@@ -165,7 +166,7 @@ Parity manifest state: still not created. Contribution inventory rows moved: non
 Open items unchanged: parity manifest and fitness test (WP2), contribution-inventory fitness test
 (WP3), adapter specification (WP4).
 
-### M0a — presentation parity manifest and gate (this commit)
+### M0a — presentation parity manifest and gate (`db6ad82`)
 
 The parity gate exists and is enforced by the unit suite.
 
@@ -208,7 +209,7 @@ clean, `lint` clean, `build:release` passed with no artifact drift.
 
 Contribution inventory rows moved: none.
 
-### M0a — contribution inventory made executable (this commit)
+### M0a — contribution inventory made executable (`6cbf0e0`)
 
 [`provider-contribution-inventory.md`](provider-contribution-inventory.md) is no longer prose that
 can drift. `tests/unit/architecture/providerContributionInventory.test.ts` (26 tests) asserts it
@@ -234,11 +235,53 @@ Verified by injection: adding an undocumented optional field to `ProviderRegistr
 Gates: unit suite, `typecheck`, and `lint` all exit 0. Parity manifest state: unchanged.
 Contribution inventory rows moved: none — the table is now enforced at its current state.
 
+### M0a — presentation adapter specification (this commit)
+
+[`provider-execution-adapter-contract.md`](provider-execution-adapter-contract.md) maps every
+`ChatRuntime` member onto the new lifecycle, with no deferred rows.
+
+**Correction to the earlier entries and to the plan's estimate:** the contract has **32** members,
+not the "~27" the plan estimates and not the 31 counted in the previous blocker line. The count is
+now pinned by a test rather than by reading.
+
+The plan's two mandatory questions are answered from call sites, not from the interface:
+
+- **Synchronous `cancel()` and generator end.** Today `cancelStreaming()`
+  ([InputController.ts:1566](../src/features/chat/controllers/InputController.ts)) sets a local
+  flag, calls `cancel()` without awaiting or acknowledging anything, and the `for await` loop breaks
+  on the next chunk — cancellation is optimistic and purely local. Generator end is treated as
+  completion unconditionally in the `finally` block
+  ([InputController.ts:638-729](../src/features/chat/controllers/InputController.ts)): finalization,
+  `completedAt`, save, and the queued-message pump all run without consulting any terminal fact. The
+  adapter keeps the synchronous signature, dispatches `run.cancel()` fire-and-forget, and closes the
+  generator only on a terminal. The six run terminals map onto the two the UI observes through
+  chunk types that already exist — `error` for `failed`, a warning `notice` for `indeterminate`,
+  silence for the rest — so no member and no metadata field is added. Richer presentation of
+  `indeterminate` is an M5 projection concern.
+- **What `InputController` really depends on.** Eight behaviors, each cited to a line: the fields
+  `prepareTurn()` writes back onto the user message, the `for await` shape, the break conditions
+  being local rather than provider-driven, `consumeTurnMetadata()` being called exactly once inside
+  `finally`, generator-end-as-completion, the unacknowledged `cancel()`, `steer()`'s boolean, and
+  `setResumeCheckpoint()` before send. `ConversationController` adds
+  `consumeSessionInvalidation()` → `buildSessionUpdates()` on save and `cancel()` on conversation
+  switch.
+
+Enforcement landed with the document, so the specification cannot drift from the interface:
+`tests/unit/architecture/chatRuntimeContractFreeze.test.ts` pins the exact 32-member set (a new
+member is a stop condition, not a routine change), asserts the count, asserts every member appears
+in the specification, and rejects undecided verdicts in its tables.
+
+Also corrected: `src/features/chat/AGENTS.md` still listed the deleted `TodoListRenderer` as a
+render surface.
+
+Gates: unit suite, `typecheck`, `lint` all exit 0.
+
 ## Current blocker
 
-M0a is in progress on `providers-migration`. The three mechanical gates (walker, parity manifest,
-contribution inventory) are green and enforced. The next action is WP4, the presentation adapter
-specification: a method-by-method mapping of all 31 `ChatRuntime` members
-(`src/core/runtime/ChatRuntime.ts:20-67`) to a session/run operation, a capability port, or an
-explicit absence, with the synchronous-`cancel()`/generator-end question and the real
-`InputController` dependencies resolved on paper.
+M0a is in progress on `providers-migration`. The three mechanical gates and the adapter
+specification are green and enforced. The next action is WP5: the two deliberately separate contract
+suites — a characterization suite pinning today's controller-observable behavior including
+generator-end-as-completion, and a target suite pinning the adapter semantics where the generator
+closes only on a terminal fact, executable now against a spec-level double and re-pointed at the
+real adapter in M2-adapter. After that: WP6 capability/topology and shared-resource records, WP7
+persisted-state fixtures, WP8 the persistence and retention decision record.
