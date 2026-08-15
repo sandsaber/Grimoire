@@ -1,7 +1,5 @@
 import '@/providers';
 
-import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
-import type { Conversation, SessionMetadata, UsageInfo } from '@/core/types';
 import {
   applyAssistantResponseMetadataToMessages,
   applyVaultSearchContextsToMessages,
@@ -9,7 +7,9 @@ import {
   LEGACY_SESSIONS_PATH,
   SESSIONS_PATH,
   SessionStorage,
-} from '@/providers/claude/storage/SessionStorage';
+} from '@/core/bootstrap/SessionStorage';
+import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
+import type { Conversation, SessionMetadata, UsageInfo } from '@/core/types';
 
 describe('SessionStorage', () => {
   let mockAdapter: jest.Mocked<VaultFileAdapter>;

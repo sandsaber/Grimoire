@@ -1,11 +1,11 @@
 import '@/providers';
 
-import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
-import { getClaudeProviderSettings } from '@/providers/claude/settings';
 import {
   GRIMOIRE_SETTINGS_PATH,
   GrimoireSettingsStorage,
-} from '@/providers/claude/storage/GrimoireSettingsStorage';
+} from '@/app/settings/GrimoireSettingsStorage';
+import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
+import { getClaudeProviderSettings } from '@/providers/claude/settings';
 import { DEFAULT_SETTINGS } from '@/providers/claude/types/settings';
 import { getCodexProviderSettings } from '@/providers/codex/settings';
 import { getOpencodeProviderSettings } from '@/providers/opencode/settings';

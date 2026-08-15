@@ -165,9 +165,52 @@ Parity manifest state: still not created. Contribution inventory rows moved: non
 Open items unchanged: parity manifest and fitness test (WP2), contribution-inventory fitness test
 (WP3), adapter specification (WP4).
 
+### M0a — presentation parity manifest and gate (this commit)
+
+The parity gate exists and is enforced by the unit suite.
+
+- `tests/unit/architecture/presentationParityManifest.ts` — 40 user-facing surfaces across shell,
+  chat, settings, and provider contributions, each with the modules that are its reachability
+  evidence, plus 4 attributed orphans. `chatUIConfig` is split into separate surfaces
+  (model selection, reasoning controls, capability gating) rather than tracked as one row;
+- `tests/unit/architecture/presentationParity.test.ts` — 7 assertions: listed modules exist, ids and
+  module claims are unique, non-wired surfaces name an owner, wired surfaces stay reachable,
+  non-wired surfaces and recorded orphans stay unreachable, and **every** unreachable module is
+  attributed.
+
+Bidirectionality was verified by deliberately introducing each failure, not asserted:
+
+| Injected condition | Assertion that fired |
+|---|---|
+| new unreferenced module added under `src/` | attributes every unreachable module to a manifest entry |
+| recorded orphan imported from `src/main.ts` | keeps every recorded orphan orphaned |
+| `src/main.ts` replaced by a stub that wires nothing — the v1 failure shape | keeps every wired surface reachable, plus the attribution assertion |
+
+Orphan verdicts landed. Deleted as pure re-export barrels of reachable modules, with no behavior
+attached: `src/features/chat/rendering/TodoListRenderer.ts` (its test duplicated
+`tests/unit/core/tools/todo.test.ts` and went with it),
+`src/providers/claude/storage/GrimoireSettingsStorage.ts`,
+`src/providers/claude/storage/SessionStorage.ts`, `src/providers/gemini/types/index.ts`,
+`src/providers/qwen/types/index.ts`. The two claude storage tests were re-pointed at the canonical
+modules (`@/app/settings/GrimoireSettingsStorage`, `@/core/bootstrap/SessionStorage`) so no
+coverage was lost. `npm run build:release` produced byte-identical artifacts afterwards, which is
+the proof the five modules were dead rather than merely unreferenced by the walker.
+
+The remaining four orphans are recorded with owners in `ORPHANED_MODULES`, with the evidence for
+each: `acp/history/sqliteModule.ts` (superseded by the inline `require('node:sqlite')` at
+`AcpSqliteReader.ts:13`; M2 managed-ACP wave), `core/context/ContextIngestionService.ts` (never
+wired; product decision), `codex/runtime/CodexSessionFileTail.ts` (legacy tail parser superseded by
+`CodexNotificationRouter`; deleted with the Codex flip in M2-flips), `i18n/constants.ts` (staged
+i18n work, outside this migration).
+
+Gates: unit 401 suites / 6966 tests passed, integration 4 suites / 216 tests passed, `typecheck`
+clean, `lint` clean, `build:release` passed with no artifact drift.
+
+Contribution inventory rows moved: none.
+
 ## Current blocker
 
-M0a is in progress on `providers-migration`. The walker is checked in; the next action is the
-presentation parity manifest and its bidirectional fitness test, seeded from the surface inventory
-in `provider-execution-presentation-parity.md` on the archived branch, including an explicit verdict
-for each of the nine orphaned modules listed above.
+M0a is in progress on `providers-migration`. The parity gate is enforced; the next action is the
+contribution-inventory fitness test (WP3) that asserts the 16 + 11 + 3 rows of
+[`provider-contribution-inventory.md`](provider-contribution-inventory.md) against the real
+`ProviderRegistration`, `ProviderWorkspaceServices`, and registration-hub shapes.
