@@ -2,9 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # The migration branch is included deliberately: milestones are not merged
+    # to main, so without it the execution suites below would never run.
+    branches: [main, providers-migration]
   pull_request:
-    branches: [main]
+    branches: [main, providers-migration]
   workflow_dispatch:
 
 permissions:
@@ -56,3 +58,46 @@ jobs:
 
       - name: Build release artifacts
         run: npm run build:release
+
+  execution-platforms:
+    name: Execution lifecycle (${{ matrix.os }})
+    # Process ownership, cancellation, and terminal semantics differ per
+    # platform, and flips change process ownership on every desktop users run.
+    # Ubuntu-only evidence does not cover them, which is why Windows is a hard
+    # prerequisite of the M2 flips rather than a waiver.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22.22.2
+          cache: 'npm'
+
+      - name: Install isolated npm 12.0.2
+        shell: bash
+        run: |
+          npm install --global --prefix "${RUNNER_TEMP}/npm-12.0.2" npm@12.0.2 --ignore-scripts --no-audit --no-fund
+          if [ "${RUNNER_OS}" = "Windows" ]; then
+            echo "${RUNNER_TEMP}/npm-12.0.2" >> "${GITHUB_PATH}"
+          else
+            echo "${RUNNER_TEMP}/npm-12.0.2/bin" >> "${GITHUB_PATH}"
+          fi
+
+      - name: Verify npm version
+        shell: bash
+        run: test "$(npm --version)" = "12.0.2"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify execution contracts
+        run: npm run test -- --selectProjects unit --runInBand tests/unit/core/execution tests/unit/app/execution
+
+      - name: Verify host process ownership
+        run: npm run test -- --selectProjects integration --runInBand tests/integration/app/execution/local/LocalShellProcessOwnership.integration.test.ts

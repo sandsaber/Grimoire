@@ -572,6 +572,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
     state: 'pending',
     owner: 'M2 — becomes reachable when the first provider flip wires the adapter over its backend.',
     modules: [
+      'src/app/execution/local/NodeLocalShellProcessAdapter.ts',
       'src/app/storage/VaultDurableStorage.ts',
       'src/core/execution/ExecutionBackendDescriptor.ts',
       'src/core/execution/ExecutionContracts.ts',
@@ -584,6 +585,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/core/execution/ExecutionEvents.ts',
       'src/core/execution/ExecutionIds.ts',
       'src/core/execution/ExecutionTerminalPolicy.ts',
+      'src/core/execution/local/LocalShellBackend.ts',
       'src/core/execution/RunProjection.ts',
       'src/core/execution/testing/DeterministicFakeBackend.ts',
       'src/core/persistence/ControlRecordPayloadPolicy.ts',

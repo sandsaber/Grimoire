@@ -29,6 +29,7 @@ const STRICT_MODULES = [
   'src/core/execution/ExecutionIds.ts',
   'src/core/execution/ExecutionTerminalPolicy.ts',
   'src/core/execution/RunProjection.ts',
+  'src/core/execution/local/LocalShellBackend.ts',
 ];
 
 /**

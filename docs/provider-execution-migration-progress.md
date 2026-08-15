@@ -35,8 +35,8 @@ Journal rules that keep this true:
 - Migration branch: `providers-migration`
 - Baseline: `main` at 1.1.6 (`b08e4bd`)
 - Last synced with `main`: 1.1.7 (`0f84b41`), merged at the M0a gate
-- M0a is complete. Landed checkpoints are listed below; every later milestone row in the status
-  table is still untouched.
+- M0a and M1 are complete. Landed checkpoints are listed below; every later milestone row in the
+  status table is still untouched.
 
 ## Prior attempt (reference only)
 
@@ -75,7 +75,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | `b94a588` |
 | M0a — parity gate and adapter contract | Complete | `3273321` … `401a1b8`, plus post-review corrections in this commit |
 | M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Not started | — |
-| M1 — execution kernel, dark-launched | In progress — kernel complete, local shell remains | `dca2f84`, `cc6081e`, `ec1303f`, this commit |
+| M1 — execution kernel, dark-launched | Complete | `dca2f84`, `cc6081e`, `ec1303f`, `86f0585`, this commit |
 | M2-proofs — four topology proofs, dark | Not started | — |
 | M2-adapter — presentation seam, proven without a flip | Not started | — |
 | M2-flips — nine production flips with legacy deletion | Not started | — |
@@ -610,7 +610,7 @@ Ported suites pass unchanged: 31 tests across the persistence and control-record
 Gates: unit 418 suites / 7247 tests passed, `typecheck` clean, `lint` clean, `build:release` passed
 with no artifact drift. Parity manifest: ten more modules join `execution-platform-dark`.
 
-### M1 — the execution lifecycle registry (this commit)
+### M1 — the execution lifecycle registry (`86f0585`)
 
 Fourth M1 checkpoint. The largest single harvest in the migration: `ExecutionLifecycleRegistry`
 (2183 lines) with its 1109-line suite, plus `RunProjection` and the `DeterministicFakeBackend` the
@@ -645,17 +645,56 @@ Gates: unit 420 suites / 7281 tests passed, `typecheck` clean, `lint` clean, `bu
 with no artifact drift. Parity manifest: four more modules join `execution-platform-dark`; the
 registry and projection are held to the strict boundary rule.
 
+### M1 — local shell backend and cross-platform CI (this commit)
+
+Final M1 checkpoint. `LocalShellBackend` lands as an internal backend — a run with an owner and a
+terminal like any other, with no provider association and no UI route yet — alongside its Node
+process adapter, and the milestone's exit gate closes.
+
+The split matters and is enforced: the backend lives in `src/core/execution/local/` and holds no
+process API, while `src/app/execution/local/NodeLocalShellProcessAdapter.ts` owns spawning. The
+strict boundary rule covers the core half, so a future edit that reaches for `child_process` there
+fails rather than quietly making the kernel platform-bound.
+
+**CI, and a consequence of the branch policy caught here.** The v1 commit already carried a
+three-platform execution job (`ubuntu-latest`, `macos-latest`, `windows-latest`), which is exactly
+the `windows-latest` prerequisite M2-flips requires. Harvested — but the workflow only triggered on
+`main`, and milestones are not merged to `main`, so the job would never have run on this branch. It
+would have been a decoration until the first flip discovered it. `providers-migration` is now a
+trigger branch, with the reason recorded in the workflow.
+
+Locally on Linux the process-ownership integration suite passes; macOS and Windows evidence arrives
+from CI on the next push.
+
+Gates: unit 422 suites / 7313 tests passed, integration 5 suites / 218 tests passed, `typecheck`
+clean, `lint` clean, `build:release` passed with no artifact drift.
+
+**M1 exit gate, item by item:**
+
+| Exit-gate item | Evidence |
+|---|---|
+| exactly one terminal under duplicates, reorder, gaps, cancellation races, unload, reconnect | `ExecutionLifecycleRegistry.test.ts`, 29 tests, mapped to the gate in the previous entry |
+| required results cannot succeed on progress or tool activity alone | does not treat thinking, tools, or progress as a required result |
+| lifecycle state reduction is idempotent | `RunProjection.test.ts` — duplicate, stale, and wrong-run envelopes |
+| core execution has no provider, feature, Obsidian, plugin, or DOM imports | `executionCompositionBoundaries.test.ts`, strict list, no allowlist |
+| POSIX process-group ownership, cancellation, unload, terminal conformance on macOS and Linux | `LocalShellProcessOwnership.integration.test.ts` green locally on Linux; macOS and Windows from the new CI matrix |
+| the parity gate proves the production bundle surface is unchanged | `build:release` byte-identical at every M1 checkpoint; 22 kernel modules held `pending` in `execution-platform-dark` |
+
+Windows process-tree conformance is explicitly **not** claimed as passing yet — the job exists, its
+first run happens on push. It is not an M1 blocker and is a hard prerequisite of M2-flips.
+
 ## Current blocker
 
-M1 is in progress on `providers-migration`. The lifecycle kernel is complete and dark. Remaining for
-the milestone: the local-shell internal backend (`LocalShellBackend` plus its Node process adapter
-and the process-ownership integration suite, v1 `1220271a`), and a `windows-latest` CI job for the
-execution-contract suites — not an M1 blocker while CI runs Ubuntu only, but a hard prerequisite of
-M2-flips that the plan says to add during M1 or M2-proofs rather than waive.
+M1 is complete on `providers-migration`. The execution kernel, its narrow persistence substrate, and
+the local-shell internal backend are landed and dark: 22 modules, none reachable from `src/main.ts`,
+every release build byte-identical.
 
-Note for the M2 harvest, not yet acted on: the provider backends must absorb the UTF-8 stream
-decoding and Grok transcript recovery semantics that landed on `main` after the v1 baseline. The
-kernel harvested so far is provider-neutral and unaffected by both.
+The next action is **M2-proofs**: four topology proofs, still dark — Antigravity (`07939092`), Codex
+(`309f1558`), Claude (`9dda0ebc`), and OpenCode (`cb631f53`), plus the semantic freeze suites
+(`892eec78`). Two obligations attach to that harvest and have not been acted on yet: the backends
+must absorb the UTF-8 stream decoding (`utf8Stream`) and Grok transcript recovery semantics that
+landed on `main` after the v1 baseline, and M0b golden traces for those four providers must exist
+before the semantic freeze. The kernel harvested so far is provider-neutral and unaffected by both.
 
 M0a is complete, including the post-review corrections above. The old
 runtime path is frozen for new product features: no new methods on `ChatRuntime` — the freeze test
