@@ -34,8 +34,8 @@ Journal rules that keep this true:
 
 - Migration branch: `providers-migration`
 - Baseline: `main` at 1.1.6 (`b08e4bd`)
-- M0a is under way. Landed checkpoints are listed below; every earlier milestone row in the
-  status table is still untouched.
+- M0a is complete. Landed checkpoints are listed below; every later milestone row in the status
+  table is still untouched.
 
 ## Prior attempt (reference only)
 
@@ -72,7 +72,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | Consistency pass: inventory completed (+3 rows), WorkGraph removed from operational target, stop condition aligned with mixed-authority rule, harvest source map, resumability rules | Complete | `da05d8e` |
 | Third review applied: kernel-in-production-at-first-flip owned (interim kernel host, storage docs, revert safety, unload), adapter bound to the lifecycle registry, capability-driven flip smoke, providerState parity gate, release-train rules, shared-resource inventory in M0a | Complete | `6df5658` |
 | UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | `b94a588` |
-| M0a — parity gate and adapter contract | In progress | `3273321`, `79184ce`, `db6ad82`, `6cbf0e0`, this commit |
+| M0a — parity gate and adapter contract | Complete | `3273321`, `79184ce`, `db6ad82`, `6cbf0e0`, `85a9dc5`, `ae6f38f`, `da24e72`, `2aef017`, this commit |
 | M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Not started | — |
 | M1 — execution kernel, dark-launched | Not started | — |
 | M2-proofs — four topology proofs, dark | Not started | — |
@@ -235,7 +235,7 @@ Verified by injection: adding an undocumented optional field to `ProviderRegistr
 Gates: unit suite, `typecheck`, and `lint` all exit 0. Parity manifest state: unchanged.
 Contribution inventory rows moved: none — the table is now enforced at its current state.
 
-### M0a — presentation adapter specification (this commit)
+### M0a — presentation adapter specification (`85a9dc5`)
 
 [`provider-execution-adapter-contract.md`](provider-execution-adapter-contract.md) maps every
 `ChatRuntime` member onto the new lifecycle, with no deferred rows.
@@ -276,7 +276,7 @@ render surface.
 
 Gates: unit suite, `typecheck`, `lint` all exit 0.
 
-### M0a — the two contract suites (this commit)
+### M0a — the two contract suites (`ae6f38f`)
 
 The UI-facing behavior the adapter must reproduce is now executable, in two suites that disagree by
 design.
@@ -306,7 +306,7 @@ extracted to `tests/helpers/inputControllerHarness.ts`. That file's 142 tests pa
 
 Gates: unit and integration suites, `typecheck`, and `lint` all exit 0.
 
-### M0a — capability, topology, and shared-resource records (this commit)
+### M0a — capability, topology, and shared-resource records (`da24e72`)
 
 Every provider now has an execution record, machine-readable so the M2 flip's auxiliary-contention
 check verifies against something instead of against a recollection.
@@ -337,7 +337,7 @@ because an empty list reads as an unexamined claim and the test rejects it.
 
 Gates: unit suite, `typecheck`, `lint` all exit 0.
 
-### M0a — persisted-state characterization fixtures (this commit)
+### M0a — persisted-state characterization fixtures (`2aef017`)
 
 The compatibility promise now has evidence instead of a claim.
 `tests/unit/core/storage/persistedStateCharacterization.test.ts` (14 tests) runs real storage code
@@ -362,9 +362,65 @@ Two behaviors were characterized rather than endorsed, both relevant to later mi
 
 Gates: unit suite, `typecheck`, `lint` all exit 0.
 
+### M0a — persistence decisions, and the milestone gate (this commit)
+
+[`provider-execution-persistence-decisions.md`](provider-execution-persistence-decisions.md) settles
+what the lifecycle may write, for how long, what deletion does, how records are versioned, and what
+diagnostics may contain. Eight decisions, each with its rejected alternative where one existed:
+
+- **D1** the control store is `.grimoire/control/`, created at the first M2 flip — not merged into
+  `.grimoire/sessions/`, which carries its own compatibility promise;
+- **D2** a control record must establish what happened and who owns it, and must be insufficient to
+  reconstruct what was said; secrets, hidden reasoning, raw payloads, second transcripts, and local
+  shell output are forbidden outright;
+- **D3** retention is tied to conversation lifetime, with only two seven-day operational windows, so
+  "deleting the chat deletes its traces" stays true without a second concept to explain;
+- **D4** deletion is idempotent, crash-recoverable, never touches provider-native data, and never
+  removes a record while a lease is held;
+- **D5** `schemaVersion` on every record; known-older migrates lazily and idempotently, unknown-future
+  opens read-only and surfaces migration-required — never guessed, discarded, or downgraded;
+- **D6** revert safety is structural: the old path has no reader for the store and no dependency on
+  its absence;
+- **D7** debug logs may carry control-plane facts and normalized error classes, never prompts,
+  payloads, tool IO, or paths outside the vault;
+- **D8** record shapes (M1), the revision model (M4), and the work graph (post-migration) are
+  explicitly out of scope here.
+
+`tests/unit/architecture/persistenceDecisions.test.ts` (9 tests) arms the rules before the code
+exists. Two of them are conditional and pass trivially today, which is their purpose — they fire at
+the checkpoint where forgetting them is easiest: the storage-boundary documentation must gain its
+`.grimoire/control` row as soon as any reachable module references the store, and no legacy runtime
+module may read it. Verified by injecting a control-store reference into `src/main.ts` and watching
+the documentation guard fail.
+
+**M0a exit gate, item by item:**
+
+| Exit-gate item | Evidence |
+|---|---|
+| Walker, parity manifest, contribution inventory and their fitness tests green and enforced | `tests/unit/architecture/` — walker 8, parity 7, inventory 26, topology 51, freeze 4, persistence 9 |
+| Adapter specification covers every `ChatRuntime` member, no deferred rows; cancel/terminal and generator-end resolved | `docs/provider-execution-adapter-contract.md`, enforced by the freeze test over all 32 members |
+| UI-facing contract behavior executable as tests | characterization 8 tests against the real `InputController`, target semantics 12 tests |
+| Every provider has a capability and topology record | `tests/fixtures/providerExecutionTopology.ts`, all nine, no contended resources |
+| Existing provider-native data byte-preserved by the harness | `tests/unit/core/storage/persistedStateCharacterization.test.ts`, 14 tests over on-disk fixtures |
+
+Checkpoint gate: unit 408 suites / 7090 tests passed, integration 4 suites / 216 tests passed,
+`typecheck` clean, `lint` clean, `build:release` passed with no artifact drift, `git diff --check`
+clean.
+
+Deleted across the milestone: five orphaned re-export barrels and one duplicated test. Contribution
+inventory rows moved: none — the table is now enforced at its current state.
+
+Open items handed forward: the four recorded orphans keep their owning milestones; golden traces are
+M0b, amortized, with the four topology-proof providers needed before the M2-proofs semantic freeze;
+Windows process-tree conformance in CI is a hard prerequisite of M2-flips.
+
 ## Current blocker
 
-M0a is in progress on `providers-migration`. The next action is WP8, the last work package before
-the milestone gate: the persistence and retention decision record — lifecycle and result retention,
-user deletion, schema versions, diagnostic redaction — covering the durable control store
-explicitly, because the kernel reaches production at the first M2 flip rather than at M4.
+M0a is complete on `providers-migration`. The old runtime path is now frozen for new product
+features: no new methods on `ChatRuntime` — the freeze test enforces the member set — and bug fixes
+must be absorbed by later harvested slices.
+
+The next action is M1, the execution kernel dark-launched, harvested per the plan's source map
+(Phase 1 `1ae6a620`, Phase 2 `347586ff` narrow kernel records only, Phase 3 `1220271a`), with the
+`ProviderModule` contract designed against the contribution inventory rather than harvested from v1.
+M0b runs alongside and blocks nothing until the M2-proofs freeze.
