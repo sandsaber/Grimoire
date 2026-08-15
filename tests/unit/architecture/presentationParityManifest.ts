@@ -555,6 +555,27 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/qwen/runtime/QwenChatRuntime.ts',
     ],
   },
+
+  // -------------------------------------------------------------------------
+  // Dark migration code, deliberately outside the shipped bundle
+  //
+  // `pending` rather than orphaned: it has an owner, a destination, and a
+  // checkpoint at which it becomes reachable. Until then the gate asserts it
+  // stays unreachable, which is what proves the new platform is not leaking
+  // into releases while it is being built.
+  // -------------------------------------------------------------------------
+  {
+    id: 'execution-platform-dark',
+    area: 'shell',
+    description:
+      'Execution composition boundaries and the provider module contract, built beside the running application.',
+    state: 'pending',
+    owner: 'M2 — becomes reachable when the first provider flip wires the adapter over its backend.',
+    modules: [
+      'src/core/execution/ExecutionBackendDescriptor.ts',
+      'src/core/providers/ProviderModule.ts',
+    ],
+  },
 ];
 
 export const ORPHANED_MODULES: OrphanRecord[] = [

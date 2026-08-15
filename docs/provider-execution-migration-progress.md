@@ -75,7 +75,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | `b94a588` |
 | M0a — parity gate and adapter contract | Complete | `3273321` … `401a1b8`, plus post-review corrections in this commit |
 | M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Not started | — |
-| M1 — execution kernel, dark-launched | Not started | — |
+| M1 — execution kernel, dark-launched | In progress | composition boundaries in this commit |
 | M2-proofs — four topology proofs, dark | Not started | — |
 | M2-adapter — presentation seam, proven without a flip | Not started | — |
 | M2-flips — nine production flips with legacy deletion | Not started | — |
@@ -493,9 +493,55 @@ branch is now 1.1.7.
 
 Divergence from `main` after this sync: zero commits behind.
 
+### M1 — execution composition boundaries (this commit)
+
+First M1 checkpoint. Dark by construction: nothing constructs any of it, and the release build
+produced byte-identical artifacts afterwards, which is the empirical form of "the parity gate proves
+dark code stays out of the shipped bundle".
+
+- `src/core/execution/ExecutionBackendDescriptor.ts` — harvested from v1 `1ae6a620` and kept close
+  to the plan's contract: a branded backend id, a branded internal-service id, and an association
+  that is a tagged union rather than an assumed `providerId`, so a local shell or a probe can be a
+  backend without inventing a provider to own it;
+- `src/core/providers/ProviderModule.ts` — **designed here, not harvested**, per harvest ban 1. The
+  v1 module reserved eight feature ports as bare `object` and had no slot at all for chat UI config,
+  settings reconciliation, environment keys, the three auxiliary services, the history service, the
+  task-result interpreter, agent mentions, CLI resolution, or workspace capabilities. That absence is
+  why its cutover dropped them. This contract declares a typed slot for **all thirty** inventory
+  rows, with two rules stated in the file: no bare `object` slots, and an absent slot means
+  unsupported rather than a no-op the UI cannot detect;
+- `tests/unit/architecture/executionCompositionBoundaries.test.ts` (39 tests) — the architecture
+  fitness test the plan requires from the first composition commit. It maps every one of the thirty
+  inventory rows to the slot that carries it and asserts the slot exists through the AST, rejects
+  bare `object` placeholders, and holds the two new modules to zero plugin, provider, feature,
+  Obsidian, DOM, or `child_process` imports.
+
+Two pre-existing violations of the permanent forbidden directions are enumerated rather than
+wildcarded, each with an owner: three `src/core/providers/*` modules import the plugin type
+(resolved at M3 when the catalog replaces the split registries), and
+`src/features/chat/services/BangBashService.ts` launches a process directly (resolved at M5 when it
+moves to the local-shell backend). The list is checked in both directions — new violations fail, and
+a listed file that stops violating must leave the list, so the allowlist cannot outlive its reason.
+
+Parity manifest: one new `pending` surface, `execution-platform-dark`, owned by M2. The gate now
+asserts these modules stay **unreachable** until the first flip wires them.
+
+Gates: unit 412 suites / 7204 tests passed, `typecheck` clean, `lint` clean, `build:release` passed
+with no artifact drift.
+
+Open for the rest of M1: the lifecycle kernel itself (`feat: establish execution lifecycle kernel`)
+— backend, session, run, lease, generation, interaction, terminal types, the single-writer event
+ingestor, the fake backend and its fault matrix, and the kernel race suites — then narrow kernel
+persistence records when the kernel first needs them.
+
 ## Current blocker
 
-M0a is complete on `providers-migration`, including the post-review corrections above. The old
+M1 is in progress on `providers-migration`. Composition boundaries and the provider module contract
+have landed dark; the next action is the lifecycle kernel, harvested from v1 `1220271a` and
+reconciled with the UTF-8 stream decoding and Grok transcript recovery fixes that landed on `main`
+after that baseline.
+
+M0a is complete, including the post-review corrections above. The old
 runtime path is frozen for new product features: no new methods on `ChatRuntime` — the freeze test
 enforces the member set — and bug fixes must be absorbed by later harvested slices.
 
