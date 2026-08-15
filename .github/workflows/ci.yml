@@ -94,6 +94,7 @@ jobs:
         run: test "$(npm --version)" = "12.0.2"
 
       - name: Install dependencies
+        shell: bash
         run: npm ci
 
       # Patterns, not paths. Jest matches positional arguments as regular
@@ -102,8 +103,13 @@ jobs:
       # class matches either separator. Without --passWithNoTests, a pattern
       # that stops matching fails loudly instead of reporting a green gate that
       # measured nothing.
+      # bash on every platform, including Windows: PowerShell steps on the
+      # Windows runner discard child stdout, so a failure there reports an exit
+      # code and nothing else. Diagnosing a platform gate needs its output.
       - name: Verify execution contracts
+        shell: bash
         run: npm run test -- --selectProjects unit --runInBand --testPathPatterns "tests[\\/]unit[\\/](core|app)[\\/]execution"
 
       - name: Verify host process ownership
+        shell: bash
         run: npm run test -- --selectProjects integration --runInBand --testPathPatterns "LocalShellProcessOwnership"
