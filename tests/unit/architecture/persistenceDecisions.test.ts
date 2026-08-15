@@ -51,10 +51,19 @@ describe('persistence decisions', () => {
     // forgetting them is easiest.
     const sourceModules = [...findReachableModules()];
 
+    /**
+     * Matches the literal path and the constant that composes it.
+     *
+     * The first version of this guard looked only for the literal string, which
+     * made it blind the moment the paths were assembled from
+     * `GRIMOIRE_CONTROL_PATH` — exactly how they are actually written.
+     */
+    const CONTROL_STORE_REFERENCE = /\.grimoire\/control|GRIMOIRE_CONTROL_PATH|EXECUTION_(RUNS|SESSIONS|INTERACTIONS|RECONCILIATIONS)_PATH/;
+
     function modulesMentioningControlStore(filter: (module: string) => boolean): string[] {
       return sourceModules
         .filter(filter)
-        .filter(module => read(module).includes(CONTROL_STORE_PATH));
+        .filter(module => CONTROL_STORE_REFERENCE.test(read(module)));
     }
 
     it('documents the control store in the storage boundary table once code writes to it', () => {

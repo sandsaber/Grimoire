@@ -575,14 +575,49 @@ or `child_process` imports, with no allowlist.
 Gates: unit 413 suites / 7225 tests passed, `typecheck` clean, `lint` clean, `build:release` passed
 with no artifact drift.
 
+### M1 — kernel persistence records (this commit)
+
+Third M1 checkpoint, still dark, release build still byte-identical.
+
+The registry needs durable records, so the plan's narrow, demand-driven persistence substrate lands
+now rather than at M4. The boundary the plan draws is respected exactly: `VersionedRecord`,
+`VersionedRepository`, `DurableStorage`, `TransactionIntentCoordinator`, and
+`ControlRecordPayloadPolicy` are ported; `ConversationRepository` and `HistoryOutcomes` are **not**
+— the conversation mutation queue and typed history hydration stay in M4. `VaultDurableStorage`
+comes with them as the recoverable same-directory replacement for vault adapters that have no
+native atomic replace.
+
+On top of that: `ExecutionControlRecords`, `ExecutionControlSchemas`, `ExecutionControlRepositories`,
+and `ExecutionControlTransactionCoordinator` — run, interaction, and reconciliation records with
+schema envelopes and intent-plus-completion-marker writes.
+
+**The control store paths now exist, and they match decision D1**: v1 already used
+`.grimoire/control`, so the M0a decision record and the harvested code agree without adjustment.
+The paths are declared at M1 so the dark kernel can be written and tested against them; nothing
+writes to a vault until the first flip.
+
+Two corrections this checkpoint forced:
+
+- **the D1 coupling guard was blind.** It matched the literal string `.grimoire/control/`, but the
+  paths are composed from `GRIMOIRE_CONTROL_PATH`, so the guard would have stayed silent through the
+  entire migration. It now matches the constants as well — and immediately fired, which is how the
+  storage-boundary row below got written rather than forgotten;
+- `AGENTS.md` gains its `.grimoire/control/**` row, stating what may live there, what may not, that
+  it is created at the first flip, and that it is inert to the legacy path so a flip revert is safe.
+
+Ported suites pass unchanged: 31 tests across the persistence and control-record suites.
+
+Gates: unit 418 suites / 7247 tests passed, `typecheck` clean, `lint` clean, `build:release` passed
+with no artifact drift. Parity manifest: ten more modules join `execution-platform-dark`.
+
 ## Current blocker
 
-M1 is in progress on `providers-migration`. Kernel contracts and the ingestor have landed dark. The
-next action is `ExecutionLifecycleRegistry` from the same v1 commit — 2183 lines with a 1109-line
-suite, the largest single harvest in the migration — followed by the deterministic fake backend and
-its fault matrix, then the local-shell backend. The registry harvest must be reconciled with the
-same work-graph removal applied here, and with the UTF-8 stream decoding and Grok transcript
-recovery fixes that landed on `main` after the v1 baseline.
+M1 is in progress on `providers-migration`. Contracts, the ingestor, and the persistence substrate
+have landed dark. The next action is `ExecutionLifecycleRegistry` from v1 `1220271a` — 2183 lines
+with a 1109-line suite, the largest single harvest in the migration — followed by the deterministic
+fake backend and its fault matrix, then the local-shell backend. The registry harvest must carry the
+same work-graph removal applied to the contracts, and be reconciled with the UTF-8 stream decoding
+and Grok transcript recovery fixes that landed on `main` after the v1 baseline.
 
 M0a is complete, including the post-review corrections above. The old
 runtime path is frozen for new product features: no new methods on `ChatRuntime` — the freeze test
