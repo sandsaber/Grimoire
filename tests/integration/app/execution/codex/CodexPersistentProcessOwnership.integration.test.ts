@@ -42,7 +42,11 @@ describe('Codex persistent process ownership on the host OS', () => {
       // launch, which on a cold runner takes seconds before the child is even
       // spawned. Budgeted rather than hidden, because it is real latency a
       // Codex daemon start will pay on Windows.
-      descendantPid = await waitForPidFile(pidPath, platform === 'windows' ? 15_000 : 5_000);
+      descendantPid = await waitForPidFile(
+        pidPath,
+        platform === 'windows' ? 15_000 : 5_000,
+        'direct',
+      );
       expect(isProcessRunning(descendantPid)).toBe(true);
 
       const response = nextLine(processAdapter.stdout, 5_000);
@@ -112,12 +116,15 @@ describe('Codex persistent process ownership on the host OS', () => {
       ];
       for (const form of forms) {
         const pidPath = join(directory, `${form.name}.pid`);
+        // Named, because the failure this case is most likely to report is
+        // "the descendant did not publish its pid" and the four forms fail for
+        // different reasons — a `.cmd` shim is not a `.com` copy of cmd.exe.
         await runPersistentForm({
           command: form.command,
           args: form.args(pidPath),
           spawnCwd: directory,
           env: definedEnvironment(process.env),
-        }, pidPath);
+        }, pidPath, form.name);
       }
 
       const missing = new NodeCodexExecutionProcess({
@@ -147,6 +154,7 @@ describe('Codex persistent process ownership on the host OS', () => {
 async function runPersistentForm(
   launchSpec: ConstructorParameters<typeof NodeCodexExecutionProcess>[0]['launchSpec'],
   pidPath: string,
+  form: string,
 ): Promise<void> {
   const adapter = new NodeCodexExecutionProcess({
     launchSpec,
@@ -160,7 +168,7 @@ async function runPersistentForm(
     // Each launch form pays its own `Add-Type` compile of the guardian, and
     // this case runs four of them in sequence, so the budget is per form and
     // matches the one the first case uses.
-    descendantPid = await waitForPidFile(pidPath, 15_000);
+    descendantPid = await waitForPidFile(pidPath, 15_000, form);
     expect(isProcessRunning(descendantPid)).toBe(true);
     const response = nextLine(adapter.stdout, 10_000);
     adapter.stdin.write(`${JSON.stringify({ id: 8, method: 'ping' })}\n`);
@@ -217,7 +225,7 @@ function nextLine(stream: NodeJS.ReadableStream, timeoutMs: number): Promise<str
   });
 }
 
-async function waitForPidFile(path: string, timeoutMs: number): Promise<number> {
+async function waitForPidFile(path: string, timeoutMs: number, form: string): Promise<number> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -230,7 +238,10 @@ async function waitForPidFile(path: string, timeoutMs: number): Promise<number> 
     }
     await delay(25);
   }
-  throw new Error('The persistent process descendant did not publish its pid.');
+  throw new Error(
+    `The persistent process descendant did not publish its pid `
+    + `(form "${form}", waited ${timeoutMs}ms).`,
+  );
 }
 
 async function waitForPidTermination(pid: number): Promise<void> {
