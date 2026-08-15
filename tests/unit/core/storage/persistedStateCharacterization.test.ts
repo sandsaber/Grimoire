@@ -5,6 +5,8 @@ import { resolve } from 'node:path';
 
 import { createInMemoryVaultAdapter } from '@test/helpers/inMemoryVaultAdapter';
 
+import { GRIMOIRE_SETTINGS_PATH, GrimoireSettingsStorage } from '@/app/settings/GrimoireSettingsStorage';
+import { SharedStorageService } from '@/app/storage/SharedStorageService';
 import { SESSIONS_PATH, SessionStorage } from '@/core/bootstrap/SessionStorage';
 import type { AppTabManagerState } from '@/core/providers/types';
 import type { SessionMetadata } from '@/core/types';
@@ -132,6 +134,19 @@ describe('persisted state characterization', () => {
     const raw = readFixture('grimoire-settings.json');
     const parsed = JSON.parse(raw) as Record<string, unknown>;
 
+    async function loadAndSave(): Promise<Record<string, unknown>> {
+      const adapter = createInMemoryVaultAdapter({ [GRIMOIRE_SETTINGS_PATH]: raw });
+      const storage = new GrimoireSettingsStorage(adapter);
+
+      const loaded = await storage.load();
+      await storage.save(loaded);
+
+      return JSON.parse(adapter.files.get(GRIMOIRE_SETTINGS_PATH) as string) as Record<
+        string,
+        unknown
+      >;
+    }
+
     it('describes every registered provider', () => {
       const providerConfigs = parsed.providerConfigs as Record<string, unknown>;
       const registered = [
@@ -143,33 +158,129 @@ describe('persisted state characterization', () => {
       expect(Object.keys(providerConfigs).sort()).toEqual([...registered].sort());
     });
 
-    it('carries a provider-owned setting this build does not model', () => {
-      const providerConfigs = parsed.providerConfigs as Record<string, Record<string, unknown>>;
+    it('drops provider-config keys outside the provider settings schema', async () => {
+      const rewritten = await loadAndSave();
+      const providerConfigs = rewritten.providerConfigs as Record<string, Record<string, unknown>>;
 
-      // Pinned so a future settings normalization that strips unknown provider
-      // keys has to face this fixture first.
-      expect(providerConfigs.claude.providerOwnedSetting).toBe('kept verbatim');
+      // Characterized, and the most consequential finding of this suite:
+      // `load()` rebuilds each provider config block from that provider's own
+      // settings schema, so a key written by a newer build — or simply a key
+      // this build does not model — does not survive. Settings are normalized
+      // state, not a preserved document. Anything the migration needs to keep
+      // across a flip must live in the schema or in session metadata, which is
+      // the artifact that genuinely is byte-preserved.
+      expect((parsed.providerConfigs as Record<string, Record<string, unknown>>).claude
+        .providerOwnedSetting).toBe('kept verbatim');
+      expect(providerConfigs.claude.providerOwnedSetting).toBeUndefined();
+    });
+
+    it('keeps every provider config block through a real load-save cycle', async () => {
+      const rewritten = await loadAndSave();
+      const before = parsed.providerConfigs as Record<string, unknown>;
+      const after = rewritten.providerConfigs as Record<string, unknown>;
+
+      // The blocks themselves survive even though their unknown keys do not.
+      expect(Object.keys(after).sort()).toEqual(Object.keys(before).sort());
+      expect((after.claude as Record<string, unknown>).enabled).toBe(true);
+    });
+
+    it('strips the declared transient provider field on save', async () => {
+      const rewritten = await loadAndSave();
+      const providerConfigs = rewritten.providerConfigs as Record<string, Record<string, unknown>>;
+
+      // By design, not by accident: `projectSettingsSnapshot` is listed as a
+      // transient Claude field and is removed when settings are written.
+      expect(providerConfigs.claude.projectSettingsSnapshot).toBeUndefined();
+    });
+
+    it('rewrites tabBarPosition rather than preserving it', async () => {
+      const rewritten = await loadAndSave();
+
+      // Characterized, not endorsed, and the reason the exit-gate wording is
+      // "session metadata is byte-preserved" rather than "settings are":
+      // `normalizeTabBarPosition` returns 'header' unconditionally, so a stored
+      // 'top' does not survive a load-save cycle. Settings are normalized state,
+      // not a preserved document.
+      expect(parsed.tabBarPosition).toBe('top');
+      expect(rewritten.tabBarPosition).toBe('header');
     });
   });
 
   describe('persisted tab state', () => {
     const parsed = JSON.parse(readFixture('tab-state.json')) as AppTabManagerState;
 
-    it('matches the shape the plugin persists', () => {
-      expect(parsed.activeTabId).toBe('tab-1');
-      expect(parsed.openTabs).toHaveLength(2);
-      expect(parsed.openTabs[0].conversationId).toBe('session-m0a-fixture');
-      expect(parsed.openTabs[1].conversationId).toBeNull();
+    /** Drives the real validation path, which reads through `plugin.loadData()`. */
+    async function loadThroughStorage(state: unknown): Promise<AppTabManagerState | null> {
+      const plugin = {
+        app: { vault: { adapter: {} } },
+        loadData: async () => ({ tabManagerState: state }),
+        saveData: jest.fn(),
+      } as unknown as ConstructorParameters<typeof SharedStorageService>[0];
+
+      const storage = new SharedStorageService(plugin);
+      return (await storage.getTabManagerState());
+    }
+
+    it('normalizes rather than preserves: falsy and null fields are dropped', async () => {
+      const loaded = await loadThroughStorage(parsed);
+
+      // Characterized, not endorsed. `validateTabManagerState` rebuilds each
+      // tab from scratch and only carries a field forward when it has the
+      // expected type, so `orchestratorMode: false` and explicit nulls vanish.
+      // The surviving values are equivalent in meaning, which is why this is
+      // normalized state rather than a preserved document — the same reason the
+      // exit-gate wording promises byte preservation for session metadata only.
+      expect(loaded).toEqual({
+        activeTabId: 'tab-1',
+        openTabs: [
+          {
+            tabId: 'tab-1',
+            conversationId: 'session-m0a-fixture',
+            draftModel: 'gpt-5.3-codex',
+            draftSettings: {
+              reasoningEffort: 'high',
+              providerOwnedDraftField: 'kept verbatim',
+            },
+          },
+          {
+            tabId: 'tab-2',
+            conversationId: null,
+          },
+        ],
+      });
     });
 
-    it('keeps provider-owned draft settings opaque', () => {
-      const draftSettings = parsed.openTabs[0].draftSettings as Record<string, unknown>;
+    it('keeps an orchestrator tab flagged when the flag is true', async () => {
+      const withOrchestrator = {
+        ...parsed,
+        openTabs: [{ ...parsed.openTabs[0], orchestratorMode: true }],
+      };
+
+      const loaded = await loadThroughStorage(withOrchestrator);
+
+      expect(loaded?.openTabs[0].orchestratorMode).toBe(true);
+    });
+
+    it('keeps provider-owned draft settings opaque', async () => {
+      const loaded = await loadThroughStorage(parsed);
+      const draftSettings = loaded?.openTabs[0].draftSettings as Record<string, unknown>;
 
       expect(draftSettings.providerOwnedDraftField).toBe('kept verbatim');
     });
 
-    it('survives a JSON round-trip unchanged', () => {
-      expect(JSON.parse(JSON.stringify(parsed))).toEqual(parsed);
+    it('drops a tab without a string id instead of failing the whole state', async () => {
+      const damaged = {
+        ...parsed,
+        openTabs: [...parsed.openTabs, { conversationId: 'orphan-without-a-tab-id' }],
+      };
+
+      const loaded = await loadThroughStorage(damaged);
+
+      expect(loaded?.openTabs).toHaveLength(parsed.openTabs.length);
+    });
+
+    it('returns null when the persisted shape is not a tab state at all', async () => {
+      expect(await loadThroughStorage({ openTabs: 'not an array' })).toBeNull();
     });
   });
 });

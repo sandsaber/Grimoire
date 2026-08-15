@@ -12,7 +12,10 @@
     "claude": {
       "enabled": true,
       "model": "claude-sonnet-5",
-      "providerOwnedSetting": "kept verbatim"
+      "providerOwnedSetting": "kept verbatim",
+      "projectSettingsSnapshot": {
+        "transient": "stripped on save by design"
+      }
     },
     "codex": {
       "enabled": true,

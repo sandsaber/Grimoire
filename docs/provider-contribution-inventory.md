@@ -10,8 +10,23 @@ service objects.
 The v1 `ProviderModule` had slots for execution, settings codec, workspace lifecycle, capabilities,
 and feature ports typed as bare `object` — and nothing else. The v1 cutover replaced `createRuntime`
 and silently dropped most of the rest. A contribution below may not be harvested, moved, or deleted
-without its row being updated; the M0a fitness test enforces agreement between this inventory, the
-parity manifest, and reality.
+without its row being updated. The M0a fitness test
+(`tests/unit/architecture/providerContributionInventory.test.ts`) enforces that in three directions,
+and it is worth being precise about which:
+
+- **against the declarations** — the two tables are compared for exact set equality with the members
+  of `ProviderRegistration` and `ProviderWorkspaceServices`, read through the TypeScript AST;
+- **against the registrations** — all nine `*ProviderRegistration` objects must supply every required
+  field and no undocumented one, and all nine workspace registrations must carry
+  `workspaceCapabilities` and an initializer;
+- **against the parity manifest** — for the ten contributions that own a named user-facing surface,
+  the inventory row and the manifest state must agree, so a contribution cannot be listed as live
+  here while its surface is quietly marked pending there.
+
+What it does **not** check: the concrete `ProviderWorkspaceServices` object a provider returns, since
+that is produced by `initialize(context)` and needs a live plugin. A provider that stops supplying an
+optional workspace member is caught only by the parity gate, and only if its module leaves the
+bundle.
 
 ## `ProviderRegistration` fields (16) — [types.ts:56](../src/core/providers/types.ts)
 

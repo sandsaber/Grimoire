@@ -9,7 +9,24 @@
  *
  * Every claim here is read off the code cited in `evidence`. When a provider's
  * runtime changes, this record moves with it or the fitness test fails.
+ *
+ * It is also the single machine-readable capability record the M2 flip smoke
+ * matrix reads: `capabilities` re-exports each provider's own declaration, so
+ * "exercise every capability the provider declares" has one place to read
+ * rather than a fixture for topology and a separate hunt through each
+ * provider's own capabilities module.
  */
+
+import type { ProviderCapabilities } from '@/core/providers/types';
+import { ANTIGRAVITY_PROVIDER_CAPABILITIES } from '@/providers/antigravity/capabilities';
+import { CLAUDE_PROVIDER_CAPABILITIES } from '@/providers/claude/capabilities';
+import { CODEX_PROVIDER_CAPABILITIES } from '@/providers/codex/capabilities';
+import { GEMINI_PROVIDER_CAPABILITIES } from '@/providers/gemini/capabilities';
+import { GROK_PROVIDER_CAPABILITIES } from '@/providers/grok/capabilities';
+import { KIMICODE_PROVIDER_CAPABILITIES } from '@/providers/kimicode/capabilities';
+import { MIMOCODE_PROVIDER_CAPABILITIES } from '@/providers/mimocode/capabilities';
+import { OPENCODE_PROVIDER_CAPABILITIES } from '@/providers/opencode/capabilities';
+import { QWEN_PROVIDER_CAPABILITIES } from '@/providers/qwen/capabilities';
 
 export type ProcessTopology =
   /** One short-lived process per run, no reusable session. */
@@ -64,6 +81,17 @@ export interface ProviderExecutionTopology {
    * A `contended` entry is a stop condition for that provider's flip.
    */
   sharedResources: SharedResource[];
+  /**
+   * The provider's own capability declaration, re-exported so the M2 smoke
+   * matrix has one record to read. `capabilities.ts` stays canonical: this is a
+   * reference, never a copy.
+   */
+  capabilities: Readonly<ProviderCapabilities>;
+  /**
+   * A literal string that must appear in `auxiliaryOwner`, proving the
+   * isolation claim rather than pattern-matching around it.
+   */
+  isolationEvidence: string;
   /** Modules the claims above were read from. */
   evidence: string[];
 }
@@ -102,6 +130,8 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
         note: 'no auxiliary execution exists: title, refine, and inline edit are registered as no-ops, so contention is impossible by construction',
       },
     ],
+    capabilities: ANTIGRAVITY_PROVIDER_CAPABILITIES,
+    isolationEvidence: 'TitleGenerationService',
     evidence: [
       'src/providers/antigravity/runtime/AntigravityChatRuntime.ts',
       'src/providers/antigravity/auxiliary/AntigravityNoopServices.ts',
@@ -128,6 +158,8 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
         note: 'both paths read the same project settings; neither mutates them during a turn',
       },
     ],
+    capabilities: CLAUDE_PROVIDER_CAPABILITIES,
+    isolationEvidence: 'persistSession',
     evidence: [
       'src/providers/claude/runtime/ClaudeChatRuntime.ts',
       'src/providers/claude/runtime/claudeColdStartQuery.ts',
@@ -159,6 +191,8 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
         note: 'resolved identically by both paths, written by neither',
       },
     ],
+    capabilities: CODEX_PROVIDER_CAPABILITIES,
+    isolationEvidence: 'Manages its own process lifecycle',
     evidence: [
       'src/providers/codex/runtime/CodexChatRuntime.ts',
       'src/providers/codex/runtime/CodexAuxQueryRunner.ts',
@@ -180,6 +214,8 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
         note: 'registered as no-ops; no auxiliary process or session exists',
       },
     ],
+    capabilities: GEMINI_PROVIDER_CAPABILITIES,
+    isolationEvidence: 'TitleGenerationService',
     evidence: [
       'src/providers/gemini/runtime/GeminiChatRuntime.ts',
       'src/providers/gemini/auxiliary/GeminiNoopServices.ts',
@@ -202,6 +238,8 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
         note: 'derived from the artifacts subdirectory, so the auxiliary purpose gets its own home',
       },
     ],
+    capabilities: GROK_PROVIDER_CAPABILITIES,
+    isolationEvidence: 'grok/auxiliary/',
     evidence: [
       'src/providers/grok/runtime/GrokChatRuntime.ts',
       'src/providers/grok/runtime/GrokAuxQueryRunner.ts',
@@ -217,6 +255,8 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     auxiliary: 'isolated',
     auxiliaryOwner: 'src/providers/kimicode/runtime/KimicodeAuxQueryRunner.ts',
     sharedResources: MANAGED_ACP_SHARED_RESOURCES('kimicode'),
+    capabilities: KIMICODE_PROVIDER_CAPABILITIES,
+    isolationEvidence: 'kimicode/auxiliary/',
     evidence: [
       'src/providers/kimicode/runtime/KimicodeChatRuntime.ts',
       'src/providers/kimicode/runtime/KimicodeAuxQueryRunner.ts',
@@ -232,6 +272,8 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     auxiliary: 'isolated',
     auxiliaryOwner: 'src/providers/mimocode/runtime/MimocodeAuxQueryRunner.ts',
     sharedResources: MANAGED_ACP_SHARED_RESOURCES('mimocode'),
+    capabilities: MIMOCODE_PROVIDER_CAPABILITIES,
+    isolationEvidence: 'mimocode/auxiliary/',
     evidence: [
       'src/providers/mimocode/runtime/MimocodeChatRuntime.ts',
       'src/providers/mimocode/runtime/MimocodeAuxQueryRunner.ts',
@@ -247,6 +289,8 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     auxiliary: 'isolated',
     auxiliaryOwner: 'src/providers/opencode/runtime/OpencodeAuxQueryRunner.ts',
     sharedResources: MANAGED_ACP_SHARED_RESOURCES('opencode'),
+    capabilities: OPENCODE_PROVIDER_CAPABILITIES,
+    isolationEvidence: 'opencode/auxiliary/',
     evidence: [
       'src/providers/opencode/runtime/OpencodeChatRuntime.ts',
       'src/providers/opencode/runtime/OpencodeAuxQueryRunner.ts',
@@ -268,6 +312,8 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
         note: 'registered as no-ops; no auxiliary process or session exists',
       },
     ],
+    capabilities: QWEN_PROVIDER_CAPABILITIES,
+    isolationEvidence: 'TitleGenerationService',
     evidence: [
       'src/providers/qwen/runtime/QwenChatRuntime.ts',
       'src/providers/qwen/auxiliary/QwenNoopServices.ts',

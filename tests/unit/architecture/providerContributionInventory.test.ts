@@ -3,16 +3,27 @@ import { resolve } from 'node:path';
 
 import { readInterfaceMembers } from '@test/helpers/interfaceMembers';
 
+import { antigravityWorkspaceRegistration } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
 import { antigravityProviderRegistration } from '@/providers/antigravity/registration';
+import { claudeWorkspaceRegistration } from '@/providers/claude/app/ClaudeWorkspaceServices';
 import { claudeProviderRegistration } from '@/providers/claude/registration';
+import { codexWorkspaceRegistration } from '@/providers/codex/app/CodexWorkspaceServices';
 import { codexProviderRegistration } from '@/providers/codex/registration';
 import { getBuiltInProviderDefaultConfigs } from '@/providers/defaultProviderConfigs';
+import { geminiWorkspaceRegistration } from '@/providers/gemini/app/GeminiWorkspaceServices';
 import { geminiProviderRegistration } from '@/providers/gemini/registration';
+import { grokWorkspaceRegistration } from '@/providers/grok/app/GrokWorkspaceServices';
 import { grokProviderRegistration } from '@/providers/grok/registration';
+import { kimicodeWorkspaceRegistration } from '@/providers/kimicode/app/KimicodeWorkspaceServices';
 import { kimicodeProviderRegistration } from '@/providers/kimicode/registration';
+import { mimocodeWorkspaceRegistration } from '@/providers/mimocode/app/MimocodeWorkspaceServices';
 import { mimocodeProviderRegistration } from '@/providers/mimocode/registration';
+import { opencodeWorkspaceRegistration } from '@/providers/opencode/app/OpencodeWorkspaceServices';
 import { opencodeProviderRegistration } from '@/providers/opencode/registration';
+import { qwenWorkspaceRegistration } from '@/providers/qwen/app/QwenWorkspaceServices';
 import { qwenProviderRegistration } from '@/providers/qwen/registration';
+
+import { PARITY_SURFACES } from './presentationParityManifest';
 
 /**
  * Makes `docs/provider-contribution-inventory.md` executable.
@@ -27,6 +38,18 @@ import { qwenProviderRegistration } from '@/providers/qwen/registration';
 
 const INVENTORY_PATH = 'docs/provider-contribution-inventory.md';
 const TYPES_PATH = 'src/core/providers/types.ts';
+
+const WORKSPACE_REGISTRATIONS = {
+  antigravity: antigravityWorkspaceRegistration,
+  claude: claudeWorkspaceRegistration,
+  codex: codexWorkspaceRegistration,
+  gemini: geminiWorkspaceRegistration,
+  grok: grokWorkspaceRegistration,
+  kimicode: kimicodeWorkspaceRegistration,
+  mimocode: mimocodeWorkspaceRegistration,
+  opencode: opencodeWorkspaceRegistration,
+  qwen: qwenWorkspaceRegistration,
+};
 
 const REGISTRATIONS = {
   antigravity: antigravityProviderRegistration,
@@ -116,6 +139,56 @@ describe('provider contribution inventory', () => {
     it('claims the count the heading advertises', () => {
       expect(documented).toHaveLength(11);
     });
+
+    it.each(Object.entries(WORKSPACE_REGISTRATIONS))(
+      '%s registers a workspace contribution with both halves of the lifecycle',
+      (_providerId, registration) => {
+        // The services object itself is produced by `initialize(context)` and
+        // needs a live plugin, so what is checkable statically is that the
+        // registration exists and carries capabilities plus an initializer.
+        // Row 3 of the app-level table owns the missing dispose half.
+        expect(typeof registration.initialize).toBe('function');
+        expect(registration.workspaceCapabilities).toBeDefined();
+      },
+    );
+  });
+
+  describe('agreement with the presentation parity manifest', () => {
+    // The inventory says which contributions exist and where they are going;
+    // the manifest says whether each is still in the bundle. Those two claims
+    // have to agree, or a contribution can be recorded as live here while its
+    // surface is quietly marked pending there.
+    const CONTRIBUTION_SURFACES: Array<{ contribution: string; surfaceId: string }> = [
+      { contribution: 'capabilities', surfaceId: 'provider-capability-gating' },
+      { contribution: 'createRuntime', surfaceId: 'provider-chat-execution' },
+      { contribution: 'createTitleGenerationService', surfaceId: 'provider-auxiliary-services' },
+      { contribution: 'historyService', surfaceId: 'provider-history-services' },
+      { contribution: 'commandCatalog', surfaceId: 'provider-command-catalogs' },
+      { contribution: 'agentMentionProvider', surfaceId: 'provider-agent-mentions' },
+      { contribution: 'cliResolver', surfaceId: 'provider-cli-resolution' },
+      { contribution: 'modelCatalog', surfaceId: 'provider-model-selection' },
+      { contribution: 'settingsTabRenderer', surfaceId: 'settings-provider-tabs' },
+      { contribution: 'mcpServerManager', surfaceId: 'settings-mcp-management' },
+    ];
+
+    const documented = [
+      ...readInventoryRows('## `ProviderRegistration` fields'),
+      ...readInventoryRows('## `ProviderWorkspaceServices` members'),
+    ];
+
+    it.each(CONTRIBUTION_SURFACES)(
+      '$contribution is inventoried and its surface $surfaceId is wired',
+      ({ contribution, surfaceId }) => {
+        expect(documented).toContain(contribution);
+
+        const surface = PARITY_SURFACES.find(entry => entry.id === surfaceId);
+        expect(surface).toBeDefined();
+        // A contribution the inventory still lists as live cannot have a
+        // surface that left the bundle. When one moves at its milestone, both
+        // records move in the same commit.
+        expect(surface?.state).toBe('wired');
+      },
+    );
   });
 
   describe('registration- and app-level contributions', () => {

@@ -1,7 +1,10 @@
 # Full Execution Architecture Migration Plan
 
-Status: revised plan (v2) for the `providers-migration` branch. **Nothing from this plan is
-implemented on this branch.** The first attempt executed the v1 plan through its cutover on
+Status: revised plan (v2) for the `providers-migration` branch. **M0a is complete; M0b and M1 are
+the open work.** The authoritative, per-checkpoint state is
+[`provider-execution-migration-progress.md`](provider-execution-migration-progress.md) — this line
+records only which milestone the reader should expect to find in the tree, and the log's
+"Current blocker" is the resume pointer. The first attempt executed the v1 plan through its cutover on
 `codex/provider-architecture-research` (77 commits over baseline `710a43cf`, never merged); its
 execution core is sound and is harvested by this plan, its cutover broke the product surface and is
 not. That branch, its historical progress log, and its retro-active parity audit
@@ -41,13 +44,25 @@ which is why layer 4 cannot be skipped at flip and milestone checkpoints. Extend
 view-open smoke to deeper surfaces is welcome at any milestone; it never substitutes for the
 manual matrix.
 
-Because the invariant holds at every checkpoint, milestones merge to `main` when their exit gates
-pass. There is no long-lived integration branch accumulating divergence; the first attempt's
-77-commit unmergeable branch is the anti-pattern this rule exists to prevent.
+Because the invariant holds at every checkpoint, every milestone is *mergeable* to `main` when its
+exit gate passes. Whether it is actually merged is a project decision, recorded below.
+
+**Branch policy (owner's decision, 2026-08-15): milestones are not merged to `main`. All migration
+work stays on `providers-migration`.** The original rule required merging at each gate, because the
+first attempt's 77-commit unmergeable branch was the anti-pattern to avoid. Holding the work on one
+branch reintroduces that divergence risk, so the mitigation is mandatory and replaces the merge:
+
+- **sync `main` into `providers-migration` at every milestone gate**, and whenever `main` ships a
+  release. A milestone gate is not green until the branch contains current `main`;
+- the product invariant is unchanged and still enforced per checkpoint, which is what keeps each
+  milestone mergeable whenever the decision is revisited;
+- the checkpoint's evidence entry records the `main` commit the branch was synced to, so divergence
+  is a measured number rather than a surprise discovered at merge time.
 
 ### Release train
 
-`main` keeps shipping releases while milestones merge into it, which imposes three rules:
+`main` keeps shipping releases while the migration proceeds on its own branch, which imposes four
+rules:
 
 - dark code must pass the release gates from its first commit: `review:source`, lint, and the
   dependency review all scan the source tree regardless of reachability, and the kernel adds no
@@ -56,7 +71,11 @@ pass. There is no long-lived integration branch accumulating divergence; the fir
   entries per the repository release rules; invisible infrastructure milestones need none;
 - a flip that shipped in a release is still revertible as a commit, but the revert is itself a
   release; the revert-safety rule in M2-flips (control-store files inert to the old path) is what
-  makes that release safe.
+  makes that release safe;
+- because milestones are not merged, a release containing migration work requires the branch to be
+  released from, or the work to be merged deliberately at that point. Until then `main` releases
+  contain no migration code, and every `main` fix must be absorbed by the branch through the
+  milestone-gate sync above.
 
 ## Resumable by construction
 
@@ -71,9 +90,10 @@ person or agent. That is a standing requirement, not a courtesy:
 - stopping mid-milestone is legal only in one of two states: uncommitted work is discarded, or it
   is committed to the branch with an open-items entry in the progress log saying exactly what is
   unfinished and what the next action is. A dirty working tree is not a valid stopping point;
-- the migration branch and its milestone merges live on `origin`; push at every checkpoint. Work
-  continues on `providers-migration` across milestones, merging to `main` at milestone gates; if a
-  different branch ever becomes the active one, the progress log's "Current blocker" line names it;
+- the migration branch lives on `origin`; push at every checkpoint. Work continues on
+  `providers-migration` across every milestone and is not merged to `main` (see the branch policy);
+  if a different branch ever becomes the active one, the progress log's "Current blocker" line
+  names it;
 - the harvest source map below pins exact v1 commits, so harvesting is reproducible anywhere the
   remote is reachable;
 - the progress log's "Current blocker" line is the single resume pointer: a new machine starts by
@@ -563,8 +583,9 @@ Grok, Qwen, and Gemini use the shared ACP transport primitives but retain distin
 
 ## Implementation milestones
 
-Each milestone ends with a green checkpoint and merges to `main` when its exit gate passes. A
-milestone may introduce internal code that is not yet composed into production, but it cannot leave
+Each milestone ends with a green checkpoint that leaves it mergeable to `main`; per the branch
+policy above it is not actually merged, and the gate instead requires the branch to be synced with
+current `main`. A milestone may introduce internal code that is not yet composed into production, but it cannot leave
 broken tests, a broken product surface, or ambiguous persisted state at its checkpoint. Checkpoint
 commits inside a milestone hold the same rule at smaller scope.
 
@@ -592,7 +613,8 @@ Work:
   of all 16 `ProviderRegistration` fields and 11 `ProviderWorkspaceServices` members with target
   home and owning milestone. No prose counts; the table is the authority;
 - write the **presentation adapter specification**: a method-by-method table mapping every
-  `ChatRuntime` member (~27, including `cancel(): void`, readiness callbacks,
+  `ChatRuntime` member (32 — an earlier estimate said "~27"; the count is pinned by a freeze test
+  and specified in `provider-execution-adapter-contract.md` — including `cancel(): void`, readiness callbacks,
   `consumeSessionInvalidation`, `buildSessionUpdates`, `consumeTurnMetadata`, `steer`, `rewind`,
   the approval/question/plan/subagent callback wiring, and generator semantics) to a session/run
   operation, a capability port, or an explicit absence. Two questions must be answered on paper

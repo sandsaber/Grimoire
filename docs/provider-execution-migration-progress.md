@@ -72,7 +72,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | Consistency pass: inventory completed (+3 rows), WorkGraph removed from operational target, stop condition aligned with mixed-authority rule, harvest source map, resumability rules | Complete | `da05d8e` |
 | Third review applied: kernel-in-production-at-first-flip owned (interim kernel host, storage docs, revert safety, unload), adapter bound to the lifecycle registry, capability-driven flip smoke, providerState parity gate, release-train rules, shared-resource inventory in M0a | Complete | `6df5658` |
 | UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | `b94a588` |
-| M0a — parity gate and adapter contract | Complete | `3273321`, `79184ce`, `db6ad82`, `6cbf0e0`, `85a9dc5`, `ae6f38f`, `da24e72`, `2aef017`, this commit |
+| M0a — parity gate and adapter contract | Complete | `3273321` … `401a1b8`, plus post-review corrections in this commit |
 | M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Not started | — |
 | M1 — execution kernel, dark-launched | Not started | — |
 | M2-proofs — four topology proofs, dark | Not started | — |
@@ -362,7 +362,7 @@ Two behaviors were characterized rather than endorsed, both relevant to later mi
 
 Gates: unit suite, `typecheck`, `lint` all exit 0.
 
-### M0a — persistence decisions, and the milestone gate (this commit)
+### M0a — persistence decisions, and the milestone gate (`401a1b8`)
 
 [`provider-execution-persistence-decisions.md`](provider-execution-persistence-decisions.md) settles
 what the lifecycle may write, for how long, what deletion does, how records are versioned, and what
@@ -401,7 +401,7 @@ the documentation guard fail.
 | Adapter specification covers every `ChatRuntime` member, no deferred rows; cancel/terminal and generator-end resolved | `docs/provider-execution-adapter-contract.md`, enforced by the freeze test over all 32 members |
 | UI-facing contract behavior executable as tests | characterization 8 tests against the real `InputController`, target semantics 12 tests |
 | Every provider has a capability and topology record | `tests/fixtures/providerExecutionTopology.ts`, all nine, no contended resources |
-| Existing provider-native data byte-preserved by the harness | `tests/unit/core/storage/persistedStateCharacterization.test.ts`, 14 tests over on-disk fixtures |
+| Existing provider-native data byte-preserved by the harness | `tests/unit/core/storage/persistedStateCharacterization.test.ts` — byte preservation holds for session metadata and `providerState`; settings and tab state are characterized as normalized state, see the correction entry below |
 
 Checkpoint gate: unit 408 suites / 7090 tests passed, integration 4 suites / 216 tests passed,
 `typecheck` clean, `lint` clean, `build:release` passed with no artifact drift, `git diff --check`
@@ -414,11 +414,77 @@ Open items handed forward: the four recorded orphans keep their owning milestone
 M0b, amortized, with the four topology-proof providers needed before the M2-proofs semantic freeze;
 Windows process-tree conformance in CI is a hard prerequisite of M2-flips.
 
+### M0a — post-review corrections (this commit)
+
+A review of the closed milestone found three places where a document claimed more than the code
+held, and two gates weaker than their description. All are fixed here rather than carried into M1.
+
+**Documents that were wrong:**
+
+- the plan's status line still read "Nothing from this plan is implemented on this branch", which is
+  the first thing a resuming reader sees and directly contradicted this log. It now names the
+  current milestone and points at this file as the authoritative state;
+- the plan still specified the adapter table as "~27" `ChatRuntime` members. Corrected to 32, with
+  the freeze test named as the authority;
+- the contribution inventory claimed its fitness test "enforces agreement between this inventory,
+  the parity manifest, and reality". It did not check the parity manifest at all, and imported no
+  workspace registrations. Both are now true — see below — and the sentence is replaced by a precise
+  three-part description plus an explicit statement of what is still unchecked.
+
+**Gates that were weaker than described:**
+
+- the inventory test now imports all nine workspace registrations, and cross-checks ten
+  contributions against their parity-manifest surfaces. Verified by marking
+  `provider-history-services` pending and watching the inventory test fail, not just the parity one;
+- the topology test's auxiliary-isolation check was a permissive alternation ending in `options\.`,
+  which almost any file satisfies. Each record now names a literal `isolationEvidence` string that
+  must appear in its auxiliary owner, with a guard that the string is specific enough to mean
+  something. The document-agreement check compared only the auxiliary owner's basename; it now
+  compares topology, session boundary, resume, and concurrency per row.
+
+**Exit-gate wording narrowed, because the original claim did not survive contact with real storage.**
+The persisted-state suite previously only parsed the settings and tab-state fixtures. Driven through
+the real code, three behaviors came out:
+
+- **`GrimoireSettingsStorage.load()` rebuilds each provider config block from that provider's own
+  settings schema.** A key written by a newer build, or simply one this build does not model, is
+  dropped — the stored `providerOwnedSetting` does not survive. Settings are normalized state, not a
+  preserved document;
+- `tabBarPosition` is rewritten unconditionally to `header` by `normalizeTabBarPosition`, so a
+  stored `top` does not round-trip;
+- `validateTabManagerState` rebuilds each tab and carries a field forward only when it has the
+  expected type, so `orchestratorMode: false` and explicit nulls disappear. The surviving state is
+  equivalent in meaning, but it is not the same document.
+
+Byte preservation therefore holds for `.grimoire/sessions/*.meta.json` and the opaque
+`providerState` — which is what M2's persisted-state parity actually depends on — and the exit-gate
+row now says so instead of implying it covers settings and tabs. The transient-field strip
+(`claude.projectSettingsSnapshot`, removed on save by design) is pinned as well.
+
+Gates: unit 408 suites / 7133 tests passed, `typecheck` clean, `lint` clean.
+
+**Open items carried into later milestones, recorded so they are not rediscovered:**
+
+- **D7 (diagnostic redaction) has no automated guard.** The persistence-decision test checks the
+  document, not the logger. Arming it belongs to M1, when the kernel starts emitting records;
+- **the target contract suite covers `query`, `cancel`, terminals, and turn metadata only.**
+  `prepareTurn`, `steer`, `setResumeCheckpoint`, `buildSessionUpdates`, and
+  `consumeSessionInvalidation` remain paper mappings. `createSubject` must grow to cover them at
+  M2-adapter, or the adapter's conformance will be narrower than its specification;
+- the M2 smoke matrix now has one machine-readable capability record to derive from — the topology
+  fixture re-exports each provider's `capabilities.ts` — but the matrix itself is still written per
+  flip.
+
 ## Current blocker
 
-M0a is complete on `providers-migration`. The old runtime path is now frozen for new product
-features: no new methods on `ChatRuntime` — the freeze test enforces the member set — and bug fixes
-must be absorbed by later harvested slices.
+M0a is complete on `providers-migration`, including the post-review corrections above. The old
+runtime path is frozen for new product features: no new methods on `ChatRuntime` — the freeze test
+enforces the member set — and bug fixes must be absorbed by later harvested slices.
+
+Branch policy, per the owner's decision: milestones are **not** merged to `main`; all work stays on
+`providers-migration`. The plan's mitigation is mandatory — sync `main` into the branch at every
+milestone gate and whenever `main` ships a release, and record the synced `main` commit in that
+checkpoint's entry, so divergence stays a measured number.
 
 The next action is M1, the execution kernel dark-launched, harvested per the plan's source map
 (Phase 1 `1ae6a620`, Phase 2 `347586ff` narrow kernel records only, Phase 3 `1220271a`), with the
