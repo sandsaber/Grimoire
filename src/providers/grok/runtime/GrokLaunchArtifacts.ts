@@ -20,6 +20,7 @@ export interface GrokLaunchArtifacts {
 
 export interface PrepareGrokLaunchArtifactsParams {
   artifactsSubdir?: string;
+  defaultModel?: string | null;
   permissionMode?: GrokPermissionMode;
   settings?: SystemPromptSettings;
   systemPromptKey?: string;
@@ -45,6 +46,7 @@ export async function prepareGrokLaunchArtifacts(
       ? params.systemPromptText
       : computeSystemPromptKey(requireSettings(params)));
   const configContent = buildGrokManagedConfigToml({
+    defaultModel: params.defaultModel,
     permissionMode: params.permissionMode,
   });
 
@@ -62,6 +64,7 @@ export async function prepareGrokLaunchArtifacts(
 }
 
 interface BuildGrokManagedConfigTomlParams {
+  defaultModel?: string | null;
   permissionMode?: GrokPermissionMode;
 }
 
@@ -69,6 +72,7 @@ export function buildGrokManagedConfigToml(
   params: BuildGrokManagedConfigTomlParams = {},
 ): string {
   const permissionMode = params.permissionMode ?? 'ask';
+  const defaultModel = params.defaultModel?.trim();
   const lines = [
     '# Grimoire-managed Grok Build configuration',
     '',
@@ -76,6 +80,9 @@ export function buildGrokManagedConfigToml(
     `permission_mode = "${permissionMode}"`,
     '',
   ];
+  if (defaultModel) {
+    lines.push('[models]', `default = "${defaultModel}"`, '');
+  }
 
   return `${lines.join('\n').trimEnd()}\n`;
 }

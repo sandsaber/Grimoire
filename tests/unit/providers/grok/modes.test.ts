@@ -9,6 +9,7 @@ import {
   normalizeGrokAvailableModes,
   normalizeGrokSelectedMode,
   normalizeManagedGrokSelectedMode,
+  resolveGrokAcpModeId,
   resolveGrokModeForPermissionMode,
   resolveGrokPermissionModeForSettings,
   resolvePermissionModeForManagedGrokMode,
@@ -85,6 +86,22 @@ describe('Grok Build mode settings', () => {
     expect(resolvePermissionModeForManagedGrokMode('ask')).toBe('normal');
     expect(resolvePermissionModeForManagedGrokMode('default')).toBe('normal');
     expect(resolvePermissionModeForManagedGrokMode('summary')).toBeNull();
+  });
+
+  it('maps toolbar mode ids onto advertised ACP ids and skips unknown native sessions', () => {
+    expect(resolveGrokAcpModeId(GROK_SAFE_MODE_ID, 'ask', [])).toBe('ask');
+    expect(resolveGrokAcpModeId(GROK_FULL_ACCESS_MODE_ID, 'always-approve', [])).toBe('always-approve');
+    expect(resolveGrokAcpModeId(
+      GROK_FULL_ACCESS_MODE_ID,
+      GROK_SAFE_MODE_ID,
+      [GROK_FULL_ACCESS_MODE_ID, GROK_SAFE_MODE_ID],
+    )).toBe(GROK_FULL_ACCESS_MODE_ID);
+    expect(resolveGrokAcpModeId(
+      GROK_FULL_ACCESS_MODE_ID,
+      'ask',
+      ['always-approve', 'ask', 'plan'],
+    )).toBe('always-approve');
+    expect(resolveGrokAcpModeId(GROK_FULL_ACCESS_MODE_ID, 'ask', [])).toBeNull();
   });
 });
 

@@ -408,7 +408,14 @@ describe('ModelSelector', () => {
     expect(button?.getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('warms model options as soon as the selector is created', () => {
+    expect(callbacks.refreshModelOptions).toHaveBeenCalled();
+  });
+
   it('refreshes model options when opened while keeping fallback options visible', async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+
     let resolveRefresh!: () => void;
     let models = [
       { value: 'sonnet', label: 'Sonnet 4.6', description: 'Balanced performance', group: 'Claude' },
@@ -416,6 +423,7 @@ describe('ModelSelector', () => {
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockImplementation(() => models);
     callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.refreshModelOptions.mockReset();
     callbacks.refreshModelOptions.mockImplementation(() => new Promise<void>((resolve) => {
       resolveRefresh = resolve;
     }));
@@ -424,7 +432,7 @@ describe('ModelSelector', () => {
     const button = parentEl.querySelector('.grimoire-model-btn');
     await button?.dispatchEvent('click', { stopPropagation: () => {} });
 
-    expect(callbacks.refreshModelOptions).toHaveBeenCalledTimes(1);
+    expect(callbacks.refreshModelOptions).toHaveBeenCalled();
     expect(parentEl.querySelector('.grimoire-model-catalog-loading')?.textContent).toBe('Loading models…');
     expect(parentEl.querySelector('.grimoire-model-option-label')?.textContent).toBe('Sonnet 4.6');
 
@@ -443,6 +451,9 @@ describe('ModelSelector', () => {
   });
 
   it('keeps a collapsed model group collapsed after catalog refresh finishes', async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+
     let resolveRefresh!: () => void;
     let models = [
       { value: 'sonnet', label: 'Sonnet 4.6', description: 'Balanced performance', group: 'Claude Code' },
@@ -450,6 +461,7 @@ describe('ModelSelector', () => {
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockImplementation(() => models);
     callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.refreshModelOptions.mockReset();
     callbacks.refreshModelOptions.mockImplementation(() => new Promise<void>((resolve) => {
       resolveRefresh = resolve;
     }));
@@ -481,11 +493,15 @@ describe('ModelSelector', () => {
   });
 
   it('shows a model catalog refresh failure without hiding fallback options', async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockReturnValue([
       { value: 'sonnet', label: 'Sonnet 4.6', description: 'Balanced performance', group: 'Claude' },
     ]);
     callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.refreshModelOptions.mockReset();
     callbacks.refreshModelOptions.mockRejectedValue(new Error('model/list failed'));
     selector.renderOptions();
 

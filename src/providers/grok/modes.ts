@@ -156,6 +156,44 @@ export function resolveGrokPermissionModeForSettings(
   return 'ask';
 }
 
+/**
+ * ACP `session/set_mode` must use an id the live session actually advertised.
+ * Grimoire toolbar ids (`grimoire-full-access`, `grimoire-safe`) are not Grok
+ * native mode ids; sending them after a later `current_mode_update` yields
+ * JSON-RPC `-32602 Invalid params` and aborts the turn before the prompt.
+ */
+export function resolveGrokAcpModeId(
+  selectedModeId: string,
+  currentModeId: string | null,
+  advertisedModeIds: readonly string[] = [],
+): string | null {
+  const selectedPermission = resolvePermissionModeForManagedGrokMode(selectedModeId);
+  if (
+    currentModeId
+    && selectedPermission
+    && selectedPermission === resolvePermissionModeForManagedGrokMode(currentModeId)
+  ) {
+    return currentModeId;
+  }
+
+  if (advertisedModeIds.includes(selectedModeId)) {
+    return selectedModeId;
+  }
+
+  if (!selectedPermission) {
+    return null;
+  }
+
+  const nativeId = resolveGrokPermissionModeForSettings(selectedPermission);
+  if (advertisedModeIds.includes(nativeId)) {
+    return nativeId;
+  }
+
+  return advertisedModeIds.find((id) => (
+    resolvePermissionModeForManagedGrokMode(id) === selectedPermission
+  )) ?? null;
+}
+
 export function resolvePermissionModeForManagedGrokMode(
   modeId: unknown,
 ): 'normal' | 'plan' | 'full_access' | null {

@@ -9,11 +9,19 @@ import type {
 } from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
+import { getVaultPath } from '../../../utils/path';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { GrokAgentMentionProvider } from '../agents/GrokAgentMentionProvider';
 import { GrokCommandCatalog } from '../commands/GrokCommandCatalog';
 import { GrokChatRuntime } from '../runtime/GrokChatRuntime';
 import { GrokCliResolver } from '../runtime/GrokCliResolver';
+import { discoverGrokModelsFromCli } from '../runtime/GrokModelDiscovery';
+import {
+  applyGrokNativeModelCatalog,
+  readGrokNativeModelCatalog,
+} from '../runtime/GrokModelsCache';
+import { resolveManagedGrokHomePath } from '../runtime/GrokPaths';
+import { buildGrokRuntimeEnv } from '../runtime/GrokRuntimeEnvironment';
 import { getGrokProviderSettings } from '../settings';
 import { GrokAgentStorage } from '../storage/GrokAgentStorage';
 import { grokSettingsTabRenderer } from '../ui/GrokSettingsTab';
@@ -35,93 +43,98 @@ const grokTabWarmupPolicy: ProviderTabWarmupPolicy = {
   },
 };
 
-const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
-
 function createGrokModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
-  const initialSettings = getGrokProviderSettings(plugin.settings ?? {});
-  let lastRefreshAt = initialSettings.discoveredModels.length > 0 ? Date.now() : 0;
-  let lastRefreshCacheKey = buildGrokModelCatalogCacheKey(initialSettings);
+  let pendingRefresh: Promise<boolean> | null = null;
 
   return {
     isAvailable(settings) {
       return getGrokProviderSettings(settings).enabled;
     },
     async refreshModels({ settings }) {
-      const currentSettings = getGrokProviderSettings(settings);
-      const cacheKey = buildGrokModelCatalogCacheKey(currentSettings);
-      if (currentSettings.discoveredModels.length > 0 && lastRefreshAt === 0) {
-        lastRefreshAt = Date.now();
-        lastRefreshCacheKey = cacheKey;
-      }
-      const cacheAgeMs = lastRefreshAt > 0 ? Date.now() - lastRefreshAt : Number.POSITIVE_INFINITY;
-      if (
-        currentSettings.discoveredModels.length > 0
-        && cacheKey === lastRefreshCacheKey
-        && cacheAgeMs < MODEL_CATALOG_CACHE_TTL_MS
-      ) {
+      if (pendingRefresh) {
         plugin.recordDebugLog?.({
           data: {
-            ageMs: cacheAgeMs,
-            modelCount: currentSettings.discoveredModels.length,
+            modelCount: getGrokProviderSettings(settings).discoveredModels.length,
             providerId: 'grok',
-            reason: 'cache_fresh',
-            ttlMs: MODEL_CATALOG_CACHE_TTL_MS,
+            reason: 'in_flight',
           },
-          event: 'modelCatalog.refresh.skipped',
+          event: 'modelCatalog.refresh.joined',
           level: 'debug',
           scope: 'provider.grok',
         });
-        return false;
+        return pendingRefresh;
       }
 
-      const before = JSON.stringify(currentSettings.discoveredModels);
-      plugin.recordDebugLog?.({
-        data: {
-          discoveredModelCount: currentSettings.discoveredModels.length,
-          providerId: 'grok',
-        },
-        event: 'modelCatalog.refresh.started',
-        level: 'debug',
-        scope: 'provider.grok',
+      pendingRefresh = refreshGrokModelCatalog(plugin, settings).finally(() => {
+        pendingRefresh = null;
       });
-      const runtime = new GrokChatRuntime(plugin);
-      try {
-        runtime.syncConversationState({
-          providerState: {},
-          sessionId: null,
-        });
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-        const updatedSettings = getGrokProviderSettings(settings);
-        lastRefreshAt = Date.now();
-        lastRefreshCacheKey = buildGrokModelCatalogCacheKey(updatedSettings);
-        const after = JSON.stringify(getGrokProviderSettings(settings).discoveredModels);
-        const changed = loaded && before !== after;
-        plugin.recordDebugLog?.({
-          data: {
-            changed,
-            discoveredModelCount: getGrokProviderSettings(settings).discoveredModels.length,
-            loaded,
-            providerId: 'grok',
-          },
-          event: changed ? 'modelCatalog.refresh.succeeded' : 'modelCatalog.refresh.empty',
-          level: changed ? 'info' : 'debug',
-          scope: 'provider.grok',
-        });
-        return changed;
-      } finally {
-        runtime.cleanup();
-      }
+      return pendingRefresh;
     },
   };
 }
 
-function buildGrokModelCatalogCacheKey(settings: ReturnType<typeof getGrokProviderSettings>): string {
-  return JSON.stringify({
-    cliPath: settings.cliPath,
-    cliPathsByHost: settings.cliPathsByHost,
-    environmentHash: settings.environmentHash,
-    environmentVariables: settings.environmentVariables,
+async function refreshGrokModelCatalog(
+  plugin: GrimoirePlugin,
+  settings: Record<string, unknown>,
+): Promise<boolean> {
+  const before = JSON.stringify(getGrokProviderSettings(settings).discoveredModels);
+  plugin.recordDebugLog?.({
+    data: {
+      discoveredModelCount: getGrokProviderSettings(settings).discoveredModels.length,
+      providerId: 'grok',
+    },
+    event: 'modelCatalog.refresh.started',
+    level: 'debug',
+    scope: 'provider.grok',
   });
+
+  let catalog = await discoverGrokModelsFromCli(plugin);
+  if (catalog.models.length === 0) {
+    const cwd = plugin.app ? getVaultPath(plugin.app) ?? process.cwd() : process.cwd();
+    catalog = readGrokNativeModelCatalog({
+      env: buildGrokRuntimeEnv(
+        plugin.settings,
+        plugin.getResolvedProviderCliPath('grok') ?? 'grok',
+        resolveManagedGrokHomePath(cwd),
+      ),
+      managedGrokHomePath: resolveManagedGrokHomePath(cwd),
+    });
+  }
+
+  let changed = applyGrokNativeModelCatalog(settings, catalog);
+  if (catalog.models.length === 0) {
+    const runtime = new GrokChatRuntime(plugin);
+    try {
+      runtime.syncConversationState({
+        providerState: {},
+        sessionId: null,
+      });
+      const loaded = await runtime.ensureReady({ allowSessionCreation: true });
+      const after = JSON.stringify(getGrokProviderSettings(settings).discoveredModels);
+      changed = loaded && before !== after;
+    } finally {
+      runtime.cleanup();
+    }
+  }
+
+  if (changed) {
+    await plugin.saveSettings();
+    for (const view of plugin.getAllViews?.() ?? []) {
+      view.refreshModelSelector?.();
+    }
+  }
+
+  plugin.recordDebugLog?.({
+    data: {
+      changed,
+      discoveredModelCount: getGrokProviderSettings(settings).discoveredModels.length,
+      providerId: 'grok',
+    },
+    event: changed ? 'modelCatalog.refresh.succeeded' : 'modelCatalog.refresh.empty',
+    level: changed ? 'info' : 'debug',
+    scope: 'provider.grok',
+  });
+  return changed;
 }
 
 export async function createGrokWorkspaceServices(

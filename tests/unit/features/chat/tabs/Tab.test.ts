@@ -25,6 +25,7 @@ import {
   type TabCreateOptions,
   wireTabInputEvents,
 } from '@/features/chat/tabs/Tab';
+import { getTabPermissionMode } from '@/features/chat/tabs/tabSettings';
 import { setLocale } from '@/i18n/i18n';
 import {
   DEFAULT_CODEX_PRIMARY_MODEL,
@@ -1713,7 +1714,7 @@ describe('Tab - Service Callbacks', () => {
       setupServiceCallbacks(tab, plugin);
 
       const autoTurnCallback = service.setAutoTurnCallback.mock.calls[0][0];
-      return { tab, addMessageSpy, addMessage, handleStreamChunk, scrollToBottom, autoTurnCallback };
+      return { tab, addMessageSpy, addMessage, handleStreamChunk, scrollToBottom, autoTurnCallback, plugin, service };
     }
 
     it('renders tool-only auto-triggered turns with a placeholder assistant message', async () => {
@@ -1784,6 +1785,15 @@ describe('Tab - Service Callbacks', () => {
       expect(addMessage).not.toHaveBeenCalled();
       expect(handleStreamChunk).not.toHaveBeenCalled();
       expect(scrollToBottom).not.toHaveBeenCalled();
+    });
+
+    it('keeps Auto-approve when an ACP provider syncs full_access', () => {
+      const { tab, plugin, service } = setupAutoTurnTest();
+      const syncPermissionMode = service.setPermissionModeSyncCallback.mock.calls[0][0];
+
+      expect(getTabPermissionMode(tab, plugin)).toBe('full_access');
+      syncPermissionMode('full_access');
+      expect(getTabPermissionMode(tab, plugin)).toBe('full_access');
     });
   });
 });

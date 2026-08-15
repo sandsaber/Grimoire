@@ -867,6 +867,29 @@ describe('MimocodeChatRuntime', () => {
     expect(syncCallback).toHaveBeenCalledWith('full_access');
   });
 
+  it('does not overwrite the toolbar from the default agent reported by session/new', async () => {
+    const runtime = new MimocodeChatRuntime(createMockPlugin());
+    const syncCallback = jest.fn();
+    runtime.setPermissionModeSyncCallback(syncCallback);
+    (runtime as any).connection = {
+      newSession: jest.fn().mockResolvedValue({
+        modes: {
+          availableModes: [
+            { id: MIMOCODE_BUILD_MODE_ID, name: 'build' },
+            { id: MIMOCODE_SAFE_MODE_ID, name: 'safe' },
+          ],
+          currentModeId: MIMOCODE_BUILD_MODE_ID,
+        },
+        sessionId: 'session-1',
+      }),
+    };
+
+    await expect((runtime as any).createSession('/tmp/vault')).resolves.toBe('session-1');
+
+    expect((runtime as any).currentSessionModeId).toBe(MIMOCODE_BUILD_MODE_ID);
+    expect(syncCallback).not.toHaveBeenCalled();
+  });
+
   it('summarizes workflow approval prompts with tool metadata', async () => {
     const runtime = new MimocodeChatRuntime(createMockPlugin());
     const approvalCallback = jest.fn().mockResolvedValue('allow');

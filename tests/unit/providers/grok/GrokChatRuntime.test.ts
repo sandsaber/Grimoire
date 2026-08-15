@@ -14,6 +14,14 @@ import { GrokChatRuntime } from '@/providers/grok/runtime/GrokChatRuntime';
 import * as launchArtifacts from '@/providers/grok/runtime/GrokLaunchArtifacts';
 import { getGrokProviderSettings } from '@/providers/grok/settings';
 
+jest.mock('@/providers/grok/runtime/GrokModelsCache', () => {
+  const actual = jest.requireActual('@/providers/grok/runtime/GrokModelsCache');
+  return {
+    ...actual,
+    readGrokNativeModelCatalog: jest.fn(() => ({ defaultModelId: null, models: [] })),
+  };
+});
+
 function createMockPlugin(overrides: Record<string, unknown> = {}): any {
   return {
     settings: {},
@@ -52,6 +60,14 @@ describe('GrokChatRuntime', () => {
     }
     return chunks;
   }
+
+  it('persists the user question so a failed turn is not wiped on hydrate', () => {
+    const runtime = new GrokChatRuntime(createMockPlugin());
+
+    expect(runtime.prepareTurn({ text: 'Keep this question' }).persistedContent).toBe(
+      'Keep this question',
+    );
+  });
 
   it('sends orchestrator instructions in the per-turn ACP prompt when active', async () => {
     const runtime = new GrokChatRuntime(createMockPlugin());
@@ -923,7 +939,10 @@ describe('GrokChatRuntime', () => {
         permissionMode: 'full_access',
         providerConfigs: {
           grok: {
-            availableModes: [],
+            availableModes: [
+              { id: GROK_FULL_ACCESS_MODE_ID, name: 'Auto-approve' },
+              { id: GROK_SAFE_MODE_ID, name: 'Safe' },
+            ],
             selectedMode: GROK_FULL_ACCESS_MODE_ID,
           },
         },
@@ -953,7 +972,10 @@ describe('GrokChatRuntime', () => {
         permissionMode: 'full_access',
         providerConfigs: {
           grok: {
-            availableModes: [],
+            availableModes: [
+              { id: GROK_FULL_ACCESS_MODE_ID, name: 'Auto-approve' },
+              { id: GROK_SAFE_MODE_ID, name: 'Safe' },
+            ],
             selectedMode: GROK_FULL_ACCESS_MODE_ID,
           },
         },
@@ -976,6 +998,112 @@ describe('GrokChatRuntime', () => {
 
     expect(setConfigOption).not.toHaveBeenCalled();
     expect((runtime as any).currentSessionModeId).toBe(GROK_SAFE_MODE_ID);
+  });
+
+  it('does not send synthetic toolbar mode ids when Grok only reported a current native mode', async () => {
+    const plugin = createMockPlugin({
+      settings: {
+        permissionMode: 'full_access',
+        providerConfigs: {
+          grok: {
+            availableModes: [],
+            selectedMode: GROK_FULL_ACCESS_MODE_ID,
+          },
+        },
+      },
+    });
+    const runtime = new GrokChatRuntime(plugin);
+    const setMode = jest.fn();
+    const setConfigOption = jest.fn();
+    (runtime as any).connection = { setConfigOption, setMode };
+    (runtime as any).currentSessionModeId = 'ask';
+    jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
+
+    await (runtime as any).applySelectedMode('session-1');
+
+    expect(setMode).not.toHaveBeenCalled();
+    expect(setConfigOption).not.toHaveBeenCalled();
+    expect((runtime as any).currentSessionModeId).toBe('ask');
+  });
+
+  it('keeps the turn alive when ACP rejects a mode id with Invalid params', async () => {
+    const plugin = createMockPlugin({
+      settings: {
+        permissionMode: 'full_access',
+        providerConfigs: {
+          grok: {
+            availableModes: [
+              { id: GROK_FULL_ACCESS_MODE_ID, name: 'Auto-approve' },
+              { id: GROK_SAFE_MODE_ID, name: 'Safe' },
+            ],
+            selectedMode: GROK_FULL_ACCESS_MODE_ID,
+          },
+        },
+      },
+    });
+    const runtime = new GrokChatRuntime(plugin);
+    const setMode = jest.fn().mockRejectedValue(new JsonRpcErrorResponse(
+      'session/set_mode',
+      -32602,
+      'Invalid params',
+    ));
+    const setConfigOption = jest.fn();
+    (runtime as any).connection = { setConfigOption, setMode };
+    (runtime as any).currentSessionModeId = GROK_SAFE_MODE_ID;
+    jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
+
+    await expect((runtime as any).applySelectedMode('session-1')).resolves.toBeUndefined();
+
+    expect(setConfigOption).not.toHaveBeenCalled();
+    expect((runtime as any).currentSessionModeId).toBe(GROK_SAFE_MODE_ID);
+  });
+
+  it('does not leak CLI stderr into user-facing Invalid params errors', () => {
+    const plugin = createMockPlugin({
+      recordDebugLog: jest.fn(),
+    });
+    const runtime = new GrokChatRuntime(plugin);
+    (runtime as any).process = {
+      getStderrSnapshot: () => [
+        'Error: Invalid params',
+        "ERROR Failed to spawn MCP server 'telegram': No such file or directory (os error 2)",
+      ].join('\n'),
+    };
+
+    expect((runtime as any).formatRuntimeError(
+      new JsonRpcErrorResponse('session/prompt', -32602, 'Invalid params'),
+    )).toEqual(expect.stringMatching(/Grok Build/));
+    expect((runtime as any).formatRuntimeError(
+      new JsonRpcErrorResponse('session/prompt', -32602, 'Invalid params'),
+    )).not.toContain('telegram');
+    expect(plugin.recordDebugLog).toHaveBeenCalledWith(expect.objectContaining({
+      event: 'runtime.error.stderr',
+    }));
+  });
+
+  it('recovers a completed answer when session/prompt fails with Invalid params', async () => {
+    const runtime = new GrokChatRuntime(createMockPlugin());
+    const prompt = jest.fn().mockRejectedValue(
+      new JsonRpcErrorResponse('session/prompt', -32602, 'Invalid params'),
+    );
+    const recoverFinalAssistantMessage = jest.fn().mockResolvedValue('Recovered after invalid params');
+
+    jest.spyOn(runtime, 'ensureReady').mockResolvedValue(true);
+    (runtime as any).sessionId = 'session-1';
+    (runtime as any).loadedSessionId = 'session-1';
+    (runtime as any).connection = { prompt };
+    (runtime as any).transcriptRecovery = { recoverFinalAssistantMessage };
+    (runtime as any).applySelectedMode = jest.fn().mockResolvedValue(undefined);
+    (runtime as any).applySelectedModel = jest.fn().mockResolvedValue(undefined);
+    (runtime as any).applySelectedEffort = jest.fn().mockResolvedValue(undefined);
+
+    const chunks = await collectRuntimeChunks(runtime);
+
+    expect(recoverFinalAssistantMessage).toHaveBeenCalled();
+    expect(chunks).toEqual([
+      { content: 'Recovered after invalid params', type: 'text' },
+      { type: 'done' },
+    ]);
   });
 
   it('keeps provider-reported modes observational instead of persisting authorization', async () => {
@@ -1226,6 +1354,54 @@ describe('GrokChatRuntime', () => {
     expect(plugin.settings.effortLevel).toBe('default');
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
     expect(refreshModelSelector).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps Grok 4.6 visible and selected when ACP only reports a seeded 4.5 session', async () => {
+    const refreshModelSelector = jest.fn();
+    const plugin = createMockPlugin({
+      getAllViews: jest.fn().mockReturnValue([{ refreshModelSelector }]),
+      settings: {
+        model: 'grok:grok-4.5',
+        providerConfigs: {
+          grok: {
+            visibleModels: ['grok-4.5'],
+          },
+        },
+        savedProviderModel: {
+          grok: 'grok:grok-4.5',
+        },
+        settingsProvider: 'grok',
+      },
+    });
+    const runtime = new GrokChatRuntime(plugin);
+    jest.spyOn(runtime as any, 'readNativeModelCatalog').mockReturnValue({
+      defaultModelId: 'grok-4.6',
+      models: [
+        { label: 'Grok 4.6', rawId: 'grok-4.6' },
+        { label: 'Grok 4.5', rawId: 'grok-4.5' },
+      ],
+    });
+    jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
+
+    await (runtime as any).syncSessionModelState({
+      models: {
+        availableModels: [
+          { id: 'grok-4.5', name: 'Grok 4.5' },
+        ],
+        currentModelId: 'grok-4.5',
+      },
+    });
+
+    expect(getGrokProviderSettings(plugin.settings).discoveredModels).toEqual([
+      { label: 'Grok 4.6', rawId: 'grok-4.6' },
+      { label: 'Grok 4.5', rawId: 'grok-4.5' },
+    ]);
+    expect(plugin.settings.providerConfigs.grok.visibleModels).toEqual([
+      'grok-4.5',
+      'grok-4.6',
+    ]);
+    expect(plugin.settings.savedProviderModel.grok).toBe('grok:grok-4.6');
+    expect(plugin.settings.model).toBe('grok:grok-4.6');
   });
 
   it('syncs detached ACP thought-level options into Grok Build provider state', async () => {

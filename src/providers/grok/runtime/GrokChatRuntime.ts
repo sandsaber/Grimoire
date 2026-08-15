@@ -94,6 +94,7 @@ import {
   encodeGrokModelId,
   GROK_DEFAULT_THINKING_LEVEL,
   GROK_SYNTHETIC_MODEL_ID,
+  type GrokDiscoveredModel,
   isGrokModelSelectionId,
   normalizeGrokDiscoveredModels,
   normalizeGrokModelVariants,
@@ -103,6 +104,7 @@ import {
   getManagedGrokModes,
   type GrokPermissionMode,
   normalizeGrokAvailableModes,
+  resolveGrokAcpModeId,
   resolveGrokModeForPermissionMode,
   resolveGrokPermissionModeForSettings,
 } from '../modes';
@@ -119,7 +121,19 @@ import {
 } from './grokDebugLog';
 import { buildGrokAgentProcessArgs } from './GrokLaunchArgs';
 import { prepareGrokLaunchArtifacts } from './GrokLaunchArtifacts';
-import { buildManagedGrokProcessEnv, resolveGrokSessionDirectory } from './GrokPaths';
+import {
+  applyGrokNativeModelCatalog,
+  expandGrokVisibleModelsWithFrontier,
+  mergeGrokDiscoveredModels,
+  readGrokNativeModelCatalog,
+  resolveGrokCatalogDefaultModel,
+  shouldUpgradeGrokFrontierDefault,
+} from './GrokModelsCache';
+import {
+  buildManagedGrokProcessEnv,
+  resolveGrokSessionDirectory,
+  resolveManagedGrokHomePath,
+} from './GrokPaths';
 import { resolveGrokProviderAuthPath } from './GrokRuntimeEnvironment';
 import { buildGrokRuntimeEnv } from './GrokRuntimeEnvironment';
 import { GrokSessionNotificationMirrorDeduplicator } from './GrokSessionNotificationMirrorDeduplicator';
@@ -234,7 +248,7 @@ export class GrokChatRuntime implements ChatRuntime {
     return {
       isCompact: false,
       mcpMentions: request.enabledMcpServers ?? new Set(),
-      persistedContent: '',
+      persistedContent: request.text,
       prompt: buildGrokPromptText(request),
       request,
     };
@@ -345,7 +359,9 @@ export class GrokChatRuntime implements ChatRuntime {
     const permissionMode = resolveGrokPermissionModeForSettings(
       providerSettings.permissionMode,
     );
+    this.hydrateNativeModelCatalog();
     const artifacts = await prepareGrokLaunchArtifacts({
+      defaultModel: this.resolveLaunchDefaultModel(),
       permissionMode,
       settings: promptSettings,
       workspaceRoot: cwd,
@@ -618,6 +634,17 @@ export class GrokChatRuntime implements ChatRuntime {
         }
       } catch (retryError) {
         reportedError = retryError;
+      }
+
+      if (!activeTurn.sawAssistantText) {
+        const recovered = await this.recoverNativeTranscriptOutput(activeTurn.sessionId, cwd);
+        if (recovered) {
+          activeTurn.sawAssistantText = true;
+          activeTurn.queue.push({ type: 'text', content: recovered });
+          activeTurn.queue.push({ type: 'done' });
+          activeTurn.queue.close();
+          return;
+        }
       }
 
       activeTurn.queue.push({
@@ -1028,7 +1055,7 @@ export class GrokChatRuntime implements ChatRuntime {
     }
 
     const selectedModeId = this.resolveSelectedModeId();
-    if (!selectedModeId || selectedModeId === this.currentSessionModeId) {
+    if (!selectedModeId) {
       return;
     }
 
@@ -1038,15 +1065,30 @@ export class GrokChatRuntime implements ChatRuntime {
       return;
     }
 
+    const advertisedModeIds = getGrokProviderSettings(this.getProviderSettings())
+      .availableModes
+      .map((mode) => mode.id);
+    const modeToSend = resolveGrokAcpModeId(
+      selectedModeId,
+      this.currentSessionModeId,
+      advertisedModeIds,
+    );
+    if (!modeToSend || modeToSend === this.currentSessionModeId) {
+      return;
+    }
+
     let unsupportedMethodError: JsonRpcErrorResponse | null = null;
     try {
       await this.connection.setMode({
-        modeId: selectedModeId,
+        modeId: modeToSend,
         sessionId,
       });
-      this.currentSessionModeId = selectedModeId;
+      this.currentSessionModeId = modeToSend;
       return;
     } catch (error) {
+      if (this.isIgnorableAcpModeError(error, modeToSend, sessionId, 'session.set_mode')) {
+        return;
+      }
       if (!(error instanceof JsonRpcErrorResponse) || error.code !== -32601) {
         throw error;
       }
@@ -1057,16 +1099,43 @@ export class GrokChatRuntime implements ChatRuntime {
       throw unsupportedMethodError;
     }
 
-    const response = await this.connection.setConfigOption({
-      configId: this.currentSessionModeConfigId,
+    try {
+      const response = await this.connection.setConfigOption({
+        configId: this.currentSessionModeConfigId,
+        sessionId,
+        type: 'select',
+        value: modeToSend,
+      });
+      this.currentSessionModeId = modeToSend;
+      await this.syncSessionModeState({
+        configOptions: response.configOptions,
+      });
+    } catch (error) {
+      if (this.isIgnorableAcpModeError(error, modeToSend, sessionId, 'session.set_config_option')) {
+        return;
+      }
+      throw error;
+    }
+  }
+
+  private isIgnorableAcpModeError(
+    error: unknown,
+    modeId: string,
+    sessionId: string,
+    event: string,
+  ): boolean {
+    if (!(error instanceof JsonRpcErrorResponse) || error.code !== -32602) {
+      return false;
+    }
+
+    logGrokDebug(this.plugin, event, {
+      modeId,
       sessionId,
-      type: 'select',
-      value: selectedModeId,
+    }, {
+      error,
+      level: 'warn',
     });
-    this.currentSessionModeId = selectedModeId;
-    await this.syncSessionModeState({
-      configOptions: response.configOptions,
-    });
+    return true;
   }
 
   private async applySelectedModel(
@@ -1143,13 +1212,17 @@ export class GrokChatRuntime implements ChatRuntime {
       ? options.currentRawModelId.trim()
       : '';
     const currentRawModelId = forcedCurrentRawModelId || acpState.currentModelId || this.currentSessionModelId;
-    const discoveredModels = normalizeGrokDiscoveredModels(
+    const acpDiscoveredModels = normalizeGrokDiscoveredModels(
       acpState.availableModels.map((model) => ({
         ...(model.description ? { description: model.description } : {}),
         label: model.name,
         rawId: model.id,
       })),
     );
+    const nativeCatalog = this.readNativeModelCatalog();
+    const discoveredModels = nativeCatalog.models.length > 0
+      ? mergeGrokDiscoveredModels(nativeCatalog.models, acpDiscoveredModels)
+      : acpDiscoveredModels;
     if (currentRawModelId) {
       this.currentSessionModelId = currentRawModelId;
     }
@@ -1193,7 +1266,7 @@ export class GrokChatRuntime implements ChatRuntime {
     );
     const removedUnavailableVisibleModels = discoveredBaseModelIds.length > 0
       && availableVisibleModels.length !== currentSettings.visibleModels.length;
-    const nextVisibleModels = currentSettings.visibleModels.length === 0
+    const reconciledVisibleModels = currentSettings.visibleModels.length === 0
       ? (discoveredBaseModelIds.length > 0
         ? discoveredBaseModelIds
         : (currentBaseRawModelId ? [currentBaseRawModelId] : []))
@@ -1208,6 +1281,10 @@ export class GrokChatRuntime implements ChatRuntime {
             : []),
         ]
       : currentSettings.visibleModels;
+    const nextVisibleModels = expandGrokVisibleModelsWithFrontier(
+      reconciledVisibleModels,
+      discoveredModels,
+    );
     const currentPreferredThinking = currentBaseRawModelId
       ? currentSettings.preferredThinkingByModel[currentBaseRawModelId]
       : '';
@@ -1226,6 +1303,12 @@ export class GrokChatRuntime implements ChatRuntime {
         [currentBaseRawModelId]: currentThinkingLevel,
       }
       : currentSettings.preferredThinkingByModel;
+    const upgradedDefault = this.upgradeFrontierDefaultSelection(
+      settingsBag,
+      discoveredModels,
+      currentSettings.visibleModels,
+      nativeCatalog.defaultModelId,
+    );
     const shouldSeedVisibleModels = !sameStringList(currentSettings.visibleModels, nextVisibleModels);
     const shouldSeedPreferredThinking = !sameStringMap(
       currentSettings.preferredThinkingByModel,
@@ -1249,7 +1332,7 @@ export class GrokChatRuntime implements ChatRuntime {
         level: discoveryChanged ? 'info' : 'debug',
       });
     }
-    let changed = shouldSeedVisibleModels || shouldSeedPreferredThinking;
+    let changed = shouldSeedVisibleModels || shouldSeedPreferredThinking || upgradedDefault;
 
     if (currentBaseRawModelId && options.seedActiveSelection !== false) {
       const seeded = this.seedActiveModelSelection(
@@ -1276,6 +1359,75 @@ export class GrokChatRuntime implements ChatRuntime {
       await this.plugin.saveSettings();
     }
     this.refreshModelSelectors();
+  }
+
+  private hydrateNativeModelCatalog(): void {
+    const catalog = this.readNativeModelCatalog();
+    const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
+    if (!applyGrokNativeModelCatalog(settingsBag, catalog)) {
+      return;
+    }
+
+    void this.plugin.saveSettings();
+    this.refreshModelSelectors();
+  }
+
+  private readNativeModelCatalog() {
+    const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
+    const runtimeEnv = this.buildRuntimeEnv(
+      this.plugin.getResolvedProviderCliPath('grok') ?? 'grok',
+      resolveManagedGrokHomePath(cwd),
+    );
+    return readGrokNativeModelCatalog({
+      env: runtimeEnv,
+      managedGrokHomePath: runtimeEnv.GROK_HOME ?? null,
+    });
+  }
+
+  private resolveLaunchDefaultModel(): string | null {
+    const providerSettings = this.getProviderSettings();
+    const selectedRawModelId = this.resolveSelectedRawModelId();
+    if (selectedRawModelId) {
+      return selectedRawModelId;
+    }
+
+    return resolveGrokCatalogDefaultModel(
+      getGrokProviderSettings(providerSettings).discoveredModels,
+      this.readNativeModelCatalog().defaultModelId,
+    );
+  }
+
+  private upgradeFrontierDefaultSelection(
+    settingsBag: Record<string, unknown>,
+    discoveredModels: readonly { rawId: string }[],
+    visibleModels: readonly string[],
+    configuredDefault?: string | null,
+  ): boolean {
+    const savedProviderModel = ensureProviderProjectionMap(settingsBag, 'savedProviderModel');
+    const savedRawId = typeof savedProviderModel.grok === 'string'
+      ? resolveGrokBaseModelRawId(
+        decodeGrokModelId(savedProviderModel.grok) ?? '',
+        discoveredModels as GrokDiscoveredModel[],
+      )
+      : null;
+    const defaultRawId = resolveGrokCatalogDefaultModel(
+      discoveredModels as GrokDiscoveredModel[],
+      configuredDefault,
+    );
+    if (!shouldUpgradeGrokFrontierDefault({
+      defaultRawId,
+      savedRawId: savedRawId || null,
+      visibleModels,
+    }) || !defaultRawId) {
+      return false;
+    }
+
+    const nextModelId = encodeGrokModelId(defaultRawId);
+    savedProviderModel.grok = nextModelId;
+    if (ProviderRegistry.resolveSettingsProviderId(settingsBag) === this.providerId) {
+      settingsBag.model = nextModelId;
+    }
+    return true;
   }
 
   private seedActiveModelSelection(
@@ -1784,9 +1936,31 @@ export class GrokChatRuntime implements ChatRuntime {
   }
 
   private formatRuntimeError(error: unknown): string {
-    const baseMessage = error instanceof Error ? error.message : t('chat.ui.errors.provider.requestFailed', { provider: ProviderRegistry.getProviderDisplayNameOrId('grok') });
-    const stderr = this.process?.getStderrSnapshot();
-    return stderr ? `${baseMessage}\n\n${stderr}` : baseMessage;
+    const stderr = this.process?.getStderrSnapshot() ?? '';
+    if (stderr) {
+      logGrokDebug(this.plugin, 'runtime.error.stderr', {
+        stderrPreview: summarizeGrokCliText(stderr),
+      }, {
+        error,
+        level: 'warn',
+      });
+    }
+
+    const fallback = t('chat.ui.errors.provider.requestFailed', {
+      provider: ProviderRegistry.getProviderDisplayNameOrId('grok'),
+    });
+    if (!(error instanceof Error)) {
+      return fallback;
+    }
+
+    // Generic JSON-RPC strings like "Invalid params" are not actionable, and
+    // accumulated CLI stderr (MCP spawn failures, ANSI rust logs) must stay in
+    // debug logs rather than replace the user's question with a wall of noise.
+    if (error instanceof JsonRpcErrorResponse && isGenericJsonRpcErrorMessage(error.message)) {
+      return fallback;
+    }
+
+    return error.message.trim() || fallback;
   }
 
   private async prepareClosedTransportRetry(
@@ -1836,6 +2010,11 @@ export class GrokChatRuntime implements ChatRuntime {
     this.currentSessionModeId = null;
     this.setSupportedCommands([]);
   }
+}
+
+function isGenericJsonRpcErrorMessage(message: string): boolean {
+  return /^(invalid params|invalid request|method not found|parse error|internal error)$/i
+    .test(message.trim());
 }
 
 function resolveGrokRestartReasons(params: {

@@ -34,6 +34,7 @@ Journal rules that keep this true:
 
 - Migration branch: `providers-migration`
 - Baseline: `main` at 1.1.6 (`b08e4bd`)
+- Last synced with `main`: 1.1.7 (`0f84b41`), merged at the M0a gate
 - M0a is complete. Landed checkpoints are listed below; every later milestone row in the status
   table is still untouched.
 
@@ -474,6 +475,23 @@ Gates: unit 408 suites / 7133 tests passed, `typecheck` clean, `lint` clean.
 - the M2 smoke matrix now has one machine-readable capability record to derive from — the topology
   fixture re-exports each provider's `capabilities.ts` — but the matrix itself is still written per
   flip.
+
+### M0a gate — synced with `main` at 1.1.7 (`0f84b41`)
+
+The branch policy replaces merging to `main` with syncing from it, so this is the first mandatory
+sync. `origin/main` had moved three commits past the baseline: release 1.1.7, the OpenCode Auto-mode
+and Grok `Invalid params` recovery fixes (#52, #47), and live Grok model loading — which added
+`GrokModelDiscovery.ts` and `GrokModelsCache.ts` to the tree.
+
+Merged cleanly, no conflicts. The gates then did the job they were built for: the parity manifest
+attributed the two new Grok modules without complaint, meaning they are reachable from `src/main.ts`
+rather than orphaned, and no inventory, topology, or contract record needed changing.
+
+Gates after the sync: unit 411 suites / 7165 tests passed, integration 4 suites / 216 tests passed,
+`typecheck` clean, `lint` clean, `build:release` passed with no artifact drift. Plugin version on the
+branch is now 1.1.7.
+
+Divergence from `main` after this sync: zero commits behind.
 
 ## Current blocker
 

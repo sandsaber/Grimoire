@@ -29,7 +29,7 @@ import {
   type UsageInfo,
   VIEW_TYPE_GRIMOIRE,
 } from '../../../core/types';
-import { LEGACY_YOLO_PERMISSION_MODE } from '../../../core/types/settings';
+import { coercePermissionMode, LEGACY_YOLO_PERMISSION_MODE } from '../../../core/types/settings';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
 import { SlashCommandDropdown } from '../../../shared/components/SlashCommandDropdown';
@@ -1794,11 +1794,11 @@ export function setupServiceCallbacks(tab: TabData, plugin: GrimoirePlugin): voi
     );
     tab.service.setAutoTurnCallback((result: AutoTurnResult) => renderAutoTriggeredTurn(tab, plugin, result));
     tab.service.setPermissionModeSyncCallback((sdkMode) => {
+      // Claude SDK uses bypassPermissions; ACP providers emit already-normalized
+      // Grimoire modes (full_access / plan / normal). Unknown values stay Safe.
       const mode = sdkMode === 'bypassPermissions' || sdkMode === LEGACY_YOLO_PERMISSION_MODE
         ? 'full_access'
-        : sdkMode === 'plan'
-        ? 'plan'
-        : 'normal';
+        : coercePermissionMode(sdkMode) ?? 'normal';
       const currentMode = getTabPermissionMode(tab, plugin);
 
       if (currentMode !== mode) {

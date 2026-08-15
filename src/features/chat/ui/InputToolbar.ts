@@ -256,6 +256,7 @@ export class ModelSelector {
     this.callbacks = callbacks;
     this.container = parentEl.createDiv({ cls: 'grimoire-model-selector' });
     this.render();
+    this.refreshModelOptionsInBackground();
   }
 
   destroy(): void {
@@ -337,7 +338,9 @@ export class ModelSelector {
     this.isRefreshingModelCatalog = true;
     this.modelCatalogRefreshFailed = false;
     this.renderOptions();
-    this.searchInputEl?.focus();
+    if (this.container.hasClass('open')) {
+      this.searchInputEl?.focus();
+    }
 
     const refreshPromise = this.callbacks.refreshModelOptions();
     this.modelCatalogRefreshPromise = refreshPromise;

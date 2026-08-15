@@ -309,6 +309,39 @@ describe('extractUserQuery', () => {
       ].join('\n');
       expect(extractUserQuery(prompt)).toBe('hello vault');
     });
+
+    it('returns empty for Grok workspace rules dumps after user_info', () => {
+      const prompt = [
+        '<user_info>',
+        'OS Version: macos',
+        'Workspace Path: /vault',
+        '</user_info>',
+        '<rules>',
+        'The rules section has a number of possible rules/memories/context that you should consider.',
+        '<always_applied_workspace_rules description="workspace-level rules">',
+        '<always_applied_workspace_rule name="/vault/Agents.md"># AGENTS.md</always_applied_workspace_rule>',
+        '</always_applied_workspace_rules>',
+        '<user_rules description="user rules">',
+        '<user_rule>Be concise.</user_rule>',
+        '</user_rules>',
+        '</rules>',
+      ].join('\n');
+      expect(extractUserQuery(prompt)).toBe('');
+    });
+
+    it('keeps the real question when workspace rules precede user_query', () => {
+      const prompt = [
+        '<rules>',
+        '<always_applied_workspace_rules>',
+        '<always_applied_workspace_rule name="/vault/Agents.md">Keep notes unique.</always_applied_workspace_rule>',
+        '</always_applied_workspace_rules>',
+        '</rules>',
+        '<user_query>',
+        'Summarize sharks',
+        '</user_query>',
+      ].join('\n');
+      expect(extractUserQuery(prompt)).toBe('Summarize sharks');
+    });
   });
 });
 

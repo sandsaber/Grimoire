@@ -543,7 +543,7 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
     renderAll();
 
     const loadModelCatalog = async (): Promise<void> => {
-      if (loadingModelCatalog || getGrokProviderSettings(settingsBag).discoveredModels.length > 0) {
+      if (loadingModelCatalog) {
         return;
       }
 
@@ -551,14 +551,26 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
       modelCatalogLoadFailed = false;
       renderAll();
 
-      const runtime = new GrokChatRuntime(context.plugin);
       try {
-        runtime.syncConversationState({
-          providerState: {},
-          sessionId: null,
-        });
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-        modelCatalogLoadFailed = !loaded || getGrokProviderSettings(settingsBag).discoveredModels.length === 0;
+        const catalog = maybeGetGrokWorkspaceServices()?.modelCatalog;
+        if (catalog) {
+          await catalog.refreshModels({
+            plugin: context.plugin,
+            settings: settingsBag,
+          });
+        } else {
+          const runtime = new GrokChatRuntime(context.plugin);
+          try {
+            runtime.syncConversationState({
+              providerState: {},
+              sessionId: null,
+            });
+            await runtime.ensureReady({ allowSessionCreation: true });
+          } finally {
+            runtime.cleanup();
+          }
+        }
+        modelCatalogLoadFailed = getGrokProviderSettings(settingsBag).discoveredModels.length === 0;
         if (!modelCatalogLoadFailed) {
           context.refreshModelSelectors();
         }
@@ -566,7 +578,6 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
         modelCatalogLoadFailed = true;
       } finally {
         loadingModelCatalog = false;
-        runtime.cleanup();
         renderAll();
       }
     };

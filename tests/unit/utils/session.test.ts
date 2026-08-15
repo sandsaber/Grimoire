@@ -421,6 +421,22 @@ describe('session utilities', () => {
       expect(result).toBe('');
     });
 
+    it('uses displayContent when a Grok user bubble persisted an empty content field', () => {
+      const messages: ChatMessage[] = [
+        {
+          content: '',
+          displayContent: 'Question that never reached Grok',
+          id: 'msg-1',
+          role: 'user',
+          timestamp: 1000,
+        },
+      ];
+
+      expect(buildContextFromHistory(messages)).toContain(
+        'User: Question that never reached Grok',
+      );
+    });
+
     it('handles messages with only whitespace content', () => {
       const messages: ChatMessage[] = [
         { id: 'msg-1', role: 'user', content: '  \n  ', timestamp: 1000 },

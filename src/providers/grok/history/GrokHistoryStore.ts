@@ -245,18 +245,22 @@ export function normalizeImportedGrokUserMessage(message: ChatMessage): ChatMess
     return null;
   }
 
-  const content = extractUserQuery(message.content);
+  const rawContent = message.content.trim()
+    ? message.content
+    : (message.displayContent ?? '');
+  const content = extractUserQuery(rawContent);
   if (!content) {
     return null;
   }
 
-  if (content === message.content) {
+  if (content === message.content && content === (message.displayContent ?? content)) {
     return message;
   }
 
   return {
     ...message,
     content,
+    displayContent: content,
   };
 }
 

@@ -170,7 +170,11 @@ export function buildContextFromHistory(messages: ChatMessage[]): string {
 
     const role = message.role === 'user' ? 'User' : 'Assistant';
     const lines: string[] = [];
-    const content = message.content?.trim();
+    const content = (
+      message.role === 'user'
+        ? (message.displayContent || message.content)
+        : message.content
+    )?.trim();
     const contextLine = formatContextLine(message);
 
     const userPayload = contextLine

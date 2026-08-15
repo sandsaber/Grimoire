@@ -26,6 +26,15 @@ describe('buildGrokManagedConfigToml', () => {
   it('defaults to ask when no permission mode is provided', () => {
     expect(buildGrokManagedConfigToml()).toContain('permission_mode = "ask"');
   });
+
+  it('writes the selected Grok default model into managed config', () => {
+    const config = buildGrokManagedConfigToml({
+      defaultModel: 'grok-4.6',
+      permissionMode: 'ask',
+    });
+    expect(config).toContain('[models]');
+    expect(config).toContain('default = "grok-4.6"');
+  });
 });
 
 describe('prepareGrokLaunchArtifacts', () => {

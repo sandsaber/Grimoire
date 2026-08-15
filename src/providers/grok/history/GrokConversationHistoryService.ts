@@ -46,6 +46,14 @@ export class GrokConversationHistoryService implements ProviderConversationHisto
       return;
     }
 
+    // A prompt that never reached Grok (Invalid params before session/prompt)
+    // is saved only in Grimoire. Replacing a longer local transcript with the
+    // native log would drop that question when the user reopens the chat.
+    if (conversation.messages.length > messages.length) {
+      this.hydratedKeys.set(conversation.id, hydrationKey);
+      return;
+    }
+
     conversation.messages = messages;
     this.hydratedKeys.set(conversation.id, hydrationKey);
   }

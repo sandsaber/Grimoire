@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.7 - 2026-08-15
+
+### Improved
+
+- Refresh Grok Build models from the live `grok models` list when chat opens or you open the model picker, so new models appear without disabling and re-enabling the provider.
+
+### Fixed
+
+- Stopped OpenCode, MiMoCode, and Kimi Code from flipping Auto-approve to Safe when the first message creates a session.
+- Stopped Grok Build from aborting later turns with a raw `Invalid params` error, leaking MCP stderr into the chat, and dropping the question when you reopen the conversation.
+- Surfaced Grok 4.6 from the live CLI catalog (with the on-disk cache as fallback) instead of staying stuck on a previously seeded Grok 4.5 default.
+- Hid Grok Build's injected workspace `<rules>` dump (AGENTS.md / user rules) when reopening a conversation, so it no longer appears as the first chat message.
+
 ## 1.1.6 - 2026-08-14
 
 ### Fixed

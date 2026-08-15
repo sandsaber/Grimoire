@@ -1128,6 +1128,7 @@ export class KimicodeChatRuntime implements ChatRuntime {
   private async syncSessionModeState(params: {
     configOptions?: AcpSessionConfigOption[] | null;
     currentModeId?: string | null;
+    emitPermissionSync?: boolean;
     modes?: AcpSessionModeState | null;
   }): Promise<void> {
     const acpState = extractAcpSessionModeState(params);
@@ -1135,7 +1136,12 @@ export class KimicodeChatRuntime implements ChatRuntime {
     const currentModeId = params.currentModeId ?? acpState.currentModeId;
     if (currentModeId) {
       this.currentSessionModeId = currentModeId;
-      this.emitPermissionModeSync(currentModeId);
+      // session/new and session/load report the CLI default agent (`build`).
+      // Pushing that into the toolbar overwrites the user's Safe/Plan/Auto pick
+      // before applySelectedMode can run.
+      if (params.emitPermissionSync !== false) {
+        this.emitPermissionModeSync(currentModeId);
+      }
     }
 
     const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
@@ -1198,6 +1204,7 @@ export class KimicodeChatRuntime implements ChatRuntime {
       });
       await this.syncSessionModeState({
         configOptions: response.configOptions ?? null,
+        emitPermissionSync: false,
         modes: response.modes ?? null,
       });
       return response.sessionId;
@@ -1228,6 +1235,7 @@ export class KimicodeChatRuntime implements ChatRuntime {
       });
       await this.syncSessionModeState({
         configOptions: response.configOptions ?? null,
+        emitPermissionSync: false,
         modes: response.modes ?? null,
       });
       return true;

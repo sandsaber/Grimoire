@@ -87,6 +87,60 @@ describe('parseGrokChatHistoryJsonl', () => {
     })).toBe(false);
   });
 
+  it('hides Grok Build workspace rules dumps that follow user_info', () => {
+    const messages = parseGrokChatHistoryJsonl([
+      JSON.stringify({
+        content: [
+          {
+            text: [
+              '<user_info>',
+              'OS Version: macos',
+              'Workspace Path: /vault',
+              '</user_info>',
+              '<rules>',
+              'The rules section has a number of possible rules/memories/context that you should consider.',
+              '<always_applied_workspace_rules description="workspace-level rules">',
+              '<always_applied_workspace_rule name="/vault/Agents.md"># AGENTS.md</always_applied_workspace_rule>',
+              '</always_applied_workspace_rules>',
+              '</rules>',
+            ].join('\n'),
+            type: 'text',
+          },
+        ],
+        type: 'user',
+      }),
+      JSON.stringify({
+        content: [{ text: '<user_query>\nSummarize sharks', type: 'text' }],
+        type: 'user',
+      }),
+      JSON.stringify({
+        content: 'Sharks are cartilaginous fish.',
+        type: 'assistant',
+      }),
+    ].join('\n'));
+
+    expect(messages).toEqual([
+      {
+        assistantMessageId: undefined,
+        content: 'Summarize sharks',
+        id: 'grok-user-2',
+        role: 'user',
+        timestamp: 2_000,
+        userMessageId: 'grok-user-2',
+      },
+      {
+        assistantMessageId: 'grok-assistant-3',
+        content: 'Sharks are cartilaginous fish.',
+        contentBlocks: [
+          { content: 'Sharks are cartilaginous fish.', type: 'text' },
+        ],
+        id: 'grok-assistant-3',
+        role: 'assistant',
+        timestamp: 3_000,
+      },
+    ]);
+  });
+
   it('hides Grok Build user_info harness and unwraps user_query tags', () => {
     const messages = parseGrokChatHistoryJsonl([
       JSON.stringify({
@@ -158,10 +212,39 @@ describe('parseGrokChatHistoryJsonl', () => {
       timestamp: 1,
     })).toEqual({
       content: 'нтык тык',
+      displayContent: 'нтык тык',
       id: 'u2',
       role: 'user',
       timestamp: 1,
     });
+
+    expect(normalizeImportedGrokUserMessage({
+      content: '',
+      displayContent: 'Question that never reached Grok',
+      id: 'u3',
+      role: 'user',
+      timestamp: 1,
+    })).toEqual({
+      content: 'Question that never reached Grok',
+      displayContent: 'Question that never reached Grok',
+      id: 'u3',
+      role: 'user',
+      timestamp: 1,
+    });
+
+    expect(normalizeImportedGrokUserMessage({
+      content: '',
+      displayContent: [
+        '<rules>',
+        '<always_applied_workspace_rules>',
+        '<always_applied_workspace_rule name="/vault/Agents.md"># AGENTS.md</always_applied_workspace_rule>',
+        '</always_applied_workspace_rules>',
+        '</rules>',
+      ].join('\n'),
+      id: 'u4',
+      role: 'user',
+      timestamp: 1,
+    })).toBeNull();
   });
 });
 
