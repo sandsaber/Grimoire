@@ -75,7 +75,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | `b94a588` |
 | M0a — parity gate and adapter contract | Complete | `3273321` … `401a1b8`, plus post-review corrections in this commit |
 | M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Not started | — |
-| M1 — execution kernel, dark-launched | In progress | composition boundaries in this commit |
+| M1 — execution kernel, dark-launched | In progress — kernel complete, local shell remains | `dca2f84`, `cc6081e`, `ec1303f`, this commit |
 | M2-proofs — four topology proofs, dark | Not started | — |
 | M2-adapter — presentation seam, proven without a flip | Not started | — |
 | M2-flips — nine production flips with legacy deletion | Not started | — |
@@ -493,7 +493,7 @@ branch is now 1.1.7.
 
 Divergence from `main` after this sync: zero commits behind.
 
-### M1 — execution composition boundaries (this commit)
+### M1 — execution composition boundaries (`dca2f84`)
 
 First M1 checkpoint. Dark by construction: nothing constructs any of it, and the release build
 produced byte-identical artifacts afterwards, which is the empirical form of "the parity gate proves
@@ -534,7 +534,7 @@ Open for the rest of M1: the lifecycle kernel itself (`feat: establish execution
 ingestor, the fake backend and its fault matrix, and the kernel race suites — then narrow kernel
 persistence records when the kernel first needs them.
 
-### M1 — kernel contracts and the event ingestor (this commit)
+### M1 — kernel contracts and the event ingestor (`cc6081e`)
 
 Second M1 checkpoint, still dark: `build:release` again produced byte-identical artifacts.
 
@@ -575,7 +575,7 @@ or `child_process` imports, with no allowlist.
 Gates: unit 413 suites / 7225 tests passed, `typecheck` clean, `lint` clean, `build:release` passed
 with no artifact drift.
 
-### M1 — kernel persistence records (this commit)
+### M1 — kernel persistence records (`ec1303f`)
 
 Third M1 checkpoint, still dark, release build still byte-identical.
 
@@ -610,14 +610,52 @@ Ported suites pass unchanged: 31 tests across the persistence and control-record
 Gates: unit 418 suites / 7247 tests passed, `typecheck` clean, `lint` clean, `build:release` passed
 with no artifact drift. Parity manifest: ten more modules join `execution-platform-dark`.
 
+### M1 — the execution lifecycle registry (this commit)
+
+Fourth M1 checkpoint. The largest single harvest in the migration: `ExecutionLifecycleRegistry`
+(2183 lines) with its 1109-line suite, plus `RunProjection` and the `DeterministicFakeBackend` the
+suite drives. Still dark, release build still byte-identical. The kernel now stands at 5561 lines
+across `src/core/execution/` and `src/core/persistence/`, none of it reachable.
+
+**The work-graph reconciliation had two more sites than the contracts commit found.** The registry's
+owner validation still accepted `'work-graph'`, and — missed on the previous checkpoint —
+`ExecutionControlSchemas` still listed it among the persisted owner kinds. Both are removed with the
+reason recorded inline. Had the schema kept it, the store would have accepted and validated a
+durable owner kind nothing in this migration can resolve.
+
+The ported suite passes unchanged and covers the M1 exit gate directly, item for item:
+
+| Exit-gate property | Test |
+|---|---|
+| exactly one terminal under duplicates | deduplicates cross-stream delivery and persists exactly one terminal |
+| under reorder and gaps | reconciles a causal gap through the snapshot port without applying across it; discards both occupants of a causal conflict |
+| under cancellation races | keeps one cancellation terminal when acknowledgement races explicit completion |
+| under unload | closes admission synchronously and classifies unconfirmed work during bounded shutdown; persists a shutdown checkpoint before a hung recovery port can settle |
+| under reconnect | rotates the live incarnation only after recovery evidence; replays a persisted resolving interaction on a fresh registry |
+| required results cannot succeed on activity alone | does not treat thinking, tools, or progress as a required result |
+| iterator end is not a terminal | classifies an omitted terminal through recovery instead of stream completion |
+| state reduction is idempotent | `RunProjection` is referentially idempotent for duplicate, stale, and wrong-run envelopes |
+
+Also proven there: a rejected cancellation with unknown effects becomes `indeterminate` rather than
+cancelled, an accepted running attempt is never relabelled `invalidated`, a backend cannot report a
+terminal kind and reason that contradict each other, and reconciliation appends without rewriting an
+indeterminate terminal.
+
+Gates: unit 420 suites / 7281 tests passed, `typecheck` clean, `lint` clean, `build:release` passed
+with no artifact drift. Parity manifest: four more modules join `execution-platform-dark`; the
+registry and projection are held to the strict boundary rule.
+
 ## Current blocker
 
-M1 is in progress on `providers-migration`. Contracts, the ingestor, and the persistence substrate
-have landed dark. The next action is `ExecutionLifecycleRegistry` from v1 `1220271a` — 2183 lines
-with a 1109-line suite, the largest single harvest in the migration — followed by the deterministic
-fake backend and its fault matrix, then the local-shell backend. The registry harvest must carry the
-same work-graph removal applied to the contracts, and be reconciled with the UTF-8 stream decoding
-and Grok transcript recovery fixes that landed on `main` after the v1 baseline.
+M1 is in progress on `providers-migration`. The lifecycle kernel is complete and dark. Remaining for
+the milestone: the local-shell internal backend (`LocalShellBackend` plus its Node process adapter
+and the process-ownership integration suite, v1 `1220271a`), and a `windows-latest` CI job for the
+execution-contract suites — not an M1 blocker while CI runs Ubuntu only, but a hard prerequisite of
+M2-flips that the plan says to add during M1 or M2-proofs rather than waive.
+
+Note for the M2 harvest, not yet acted on: the provider backends must absorb the UTF-8 stream
+decoding and Grok transcript recovery semantics that landed on `main` after the v1 baseline. The
+kernel harvested so far is provider-neutral and unaffected by both.
 
 M0a is complete, including the post-review corrections above. The old
 runtime path is frozen for new product features: no new methods on `ChatRuntime` — the freeze test

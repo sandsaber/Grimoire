@@ -18,10 +18,10 @@ import type {
 } from './ExecutionControlRecords';
 import { requireTerminalReason } from './ExecutionTerminalPolicy';
 
+/** Mirrors `ExecutionOwnerKind`; `work-graph` is excluded per harvest ban 2. */
 const OWNER_KINDS = new Set([
   'conversation',
   'agent-instance',
-  'work-graph',
   'auxiliary-operation',
   'internal-service',
 ]);

@@ -24,9 +24,11 @@ const STRICT_MODULES = [
   DESCRIPTOR_PATH,
   'src/core/execution/ExecutionContracts.ts',
   'src/core/execution/ExecutionEventIngestor.ts',
+  'src/core/execution/ExecutionLifecycleRegistry.ts',
   'src/core/execution/ExecutionEvents.ts',
   'src/core/execution/ExecutionIds.ts',
   'src/core/execution/ExecutionTerminalPolicy.ts',
+  'src/core/execution/RunProjection.ts',
 ];
 
 /**
