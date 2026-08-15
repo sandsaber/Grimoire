@@ -534,12 +534,55 @@ Open for the rest of M1: the lifecycle kernel itself (`feat: establish execution
 ingestor, the fake backend and its fault matrix, and the kernel race suites — then narrow kernel
 persistence records when the kernel first needs them.
 
+### M1 — kernel contracts and the event ingestor (this commit)
+
+Second M1 checkpoint, still dark: `build:release` again produced byte-identical artifacts.
+
+The v1 kernel commit (`1220271a`) is 8219 lines across 30 files. Porting it as one commit would
+reproduce the v1 failure shape at a smaller scale — a large slab nobody can review — so it is split
+by dependency. This checkpoint takes the contract layer and the ingestor; the registry, the
+deterministic fake backend, and the local-shell backend follow.
+
+Harvested and reconciled:
+
+- `ExecutionIds.ts` — branded opaque ids validated by shape, so a caller cannot pass a run id where
+  a session id belongs;
+- `ExecutionContracts.ts` — backend, session, run, owner, terminal, interaction, and recovery
+  contracts. **Reconciled against harvest ban 2:** the v1 `ExecutionOwnerKind` included
+  `'work-graph'`, which this migration deliberately does not deliver. It is removed, with the reason
+  stated in the file, because harvesting an owner kind nothing can produce or resolve would leave a
+  state the kernel cannot reach or clear;
+- `ExecutionEvents.ts` — adapter-owned ingress events and the core envelope that carries the
+  assigned sequence;
+- `ExecutionTerminalPolicy.ts` — which terminal reasons are legal for which terminal kind, so
+  `succeeded` cannot be recorded with a failure reason;
+- `ExecutionEventIngestor.ts` — the single-writer authority: bounded dedupe, causal buffering,
+  typed gaps rather than silent skipping, quarantine, generation and instance fencing, and
+  checkpoint/restore so a failed durable apply does not consume a sequence number.
+
+The v1 suite for the ingestor ported and passed unchanged (8 tests). It left the harder edges
+unexercised, so eight more were added on this branch, each pinning something the M1 exit gate
+depends on: the two untested scope rejections (`wrong-backend`, `wrong-session`), monotonic
+generation advance, dedupe memory clearing on generation advance, **bounded** dedupe — a delivery
+evicted from the window is accepted again, which is the trade-off that forces adapters without
+stable replay identity to reconcile rather than trust the ingestor's memory — gap flushing with
+quarantine, resuming a quarantined stream through a reconnect rebase, and identifier validation.
+
+Parity manifest: the five new kernel modules join the `execution-platform-dark` pending surface, and
+all seven are now held to the strict boundary rule — zero plugin, provider, feature, Obsidian, DOM,
+or `child_process` imports, with no allowlist.
+
+Gates: unit 413 suites / 7225 tests passed, `typecheck` clean, `lint` clean, `build:release` passed
+with no artifact drift.
+
 ## Current blocker
 
-M1 is in progress on `providers-migration`. Composition boundaries and the provider module contract
-have landed dark; the next action is the lifecycle kernel, harvested from v1 `1220271a` and
-reconciled with the UTF-8 stream decoding and Grok transcript recovery fixes that landed on `main`
-after that baseline.
+M1 is in progress on `providers-migration`. Kernel contracts and the ingestor have landed dark. The
+next action is `ExecutionLifecycleRegistry` from the same v1 commit — 2183 lines with a 1109-line
+suite, the largest single harvest in the migration — followed by the deterministic fake backend and
+its fault matrix, then the local-shell backend. The registry harvest must be reconciled with the
+same work-graph removal applied here, and with the UTF-8 stream decoding and Grok transcript
+recovery fixes that landed on `main` after the v1 baseline.
 
 M0a is complete, including the post-review corrections above. The old
 runtime path is frozen for new product features: no new methods on `ChatRuntime` — the freeze test

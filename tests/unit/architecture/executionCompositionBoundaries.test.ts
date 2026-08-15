@@ -18,8 +18,16 @@ import { listAllSourceModules } from '@test/helpers/moduleReachability';
 const MODULE_PATH = 'src/core/providers/ProviderModule.ts';
 const DESCRIPTOR_PATH = 'src/core/execution/ExecutionBackendDescriptor.ts';
 
-/** New composition code, held to the rule with no exemptions. */
-const STRICT_MODULES = [MODULE_PATH, DESCRIPTOR_PATH];
+/** New composition and kernel code, held to the rule with no exemptions. */
+const STRICT_MODULES = [
+  MODULE_PATH,
+  DESCRIPTOR_PATH,
+  'src/core/execution/ExecutionContracts.ts',
+  'src/core/execution/ExecutionEventIngestor.ts',
+  'src/core/execution/ExecutionEvents.ts',
+  'src/core/execution/ExecutionIds.ts',
+  'src/core/execution/ExecutionTerminalPolicy.ts',
+];
 
 /**
  * Pre-existing violations of `src/core/**` → plugin. Each is removed when the

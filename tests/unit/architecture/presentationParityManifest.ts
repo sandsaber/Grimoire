@@ -573,6 +573,11 @@ export const PARITY_SURFACES: ParitySurface[] = [
     owner: 'M2 — becomes reachable when the first provider flip wires the adapter over its backend.',
     modules: [
       'src/core/execution/ExecutionBackendDescriptor.ts',
+      'src/core/execution/ExecutionContracts.ts',
+      'src/core/execution/ExecutionEventIngestor.ts',
+      'src/core/execution/ExecutionEvents.ts',
+      'src/core/execution/ExecutionIds.ts',
+      'src/core/execution/ExecutionTerminalPolicy.ts',
       'src/core/providers/ProviderModule.ts',
     ],
   },
