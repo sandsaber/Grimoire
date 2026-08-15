@@ -144,8 +144,30 @@ Open items, all owned by M0a: the import-graph walker is not checked in (WP1), t
 and its fitness test do not exist (WP2), the contribution-inventory fitness test does not exist
 (WP3), the adapter specification is unwritten (WP4).
 
+### M0a — import-graph walker checked in (this commit)
+
+`tests/helpers/moduleReachability.ts` is now in the tree, ported from
+`origin/codex/provider-architecture-research` and generalized to accept a source root and base
+directory so its own resolution rules can be tested against fixtures. Reported paths and default
+behavior are unchanged: it walks `src/main.ts` and reports repository-relative paths.
+
+- `tests/unit/architecture/moduleReachability.test.ts` — 8 tests pinning each resolution form
+  (relative, `@/*` alias, side-effect import, `export * from`, dynamic `import()`, `require()`,
+  directory-to-`index.ts`), the exclusion of ambient `.d.ts` files and bare package specifiers,
+  orphan reporting, and the documented blind spot that a computed `require()` specifier is not
+  followed;
+- checked-in walker reproduces the baseline probe exactly: 536 modules, 527 reachable, 9 orphaned;
+- gates: `npm run test -- --selectProjects unit --testPathPatterns moduleReachability` (8 passed),
+  `npm run typecheck` clean, `npm run lint` clean.
+
+Parity manifest state: still not created. Contribution inventory rows moved: none. Deleted: nothing.
+
+Open items unchanged: parity manifest and fitness test (WP2), contribution-inventory fitness test
+(WP3), adapter specification (WP4).
+
 ## Current blocker
 
-M0a is in progress on `providers-migration`. The baseline gate is recorded; the next action is
-checking in the import-graph walker as `tests/helpers/moduleReachability.ts` with its own test,
-ported from `origin/codex/provider-architecture-research`.
+M0a is in progress on `providers-migration`. The walker is checked in; the next action is the
+presentation parity manifest and its bidirectional fitness test, seeded from the surface inventory
+in `provider-execution-presentation-parity.md` on the archived branch, including an explicit verdict
+for each of the nine orphaned modules listed above.
