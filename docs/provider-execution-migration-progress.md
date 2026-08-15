@@ -276,12 +276,40 @@ render surface.
 
 Gates: unit suite, `typecheck`, `lint` all exit 0.
 
+### M0a — the two contract suites (this commit)
+
+The UI-facing behavior the adapter must reproduce is now executable, in two suites that disagree by
+design.
+
+`tests/unit/features/chat/runtime/chatRuntimeCharacterization.test.ts` (8 tests) drives the **real**
+`InputController` against a fake runtime and pins what happens today, defect included:
+
+- a generator that ends is finalized as `completed`, saved, and its message stamped with a
+  completion time, with no terminal fact consulted anywhere;
+- **a generator that yields nothing at all is treated exactly the same** — a provider process that
+  dies silently is today indistinguishable from one that answered;
+- `consumeTurnMetadata()` is called exactly once per turn, including when the generator throws;
+- `cancel()` is called synchronously, nothing confirms the provider stopped, and the turn finalizes
+  as `blocked` only once the generator happens to yield again.
+
+`tests/unit/features/chat/runtime/adapterContractTarget.test.ts` (12 tests) pins the target
+semantics against a spec-level double: the generator closes only on a terminal, stays open across
+`disconnected`/`recovering` and across a cancel request, maps `failed` to the existing `error` chunk
+and `indeterminate` to a warning `notice`, accepts exactly one terminal and drops everything after
+it, and consumes turn metadata once. Passing proves the specification is coherent and executable, not
+that an adapter exists; `createSubject` is the single seam re-pointed at the real adapter in
+M2-adapter.
+
+To let the characterization suite drive the real controller rather than a re-implementation of it,
+the existing `InputController.test.ts` harness (mock deps, mock agent service, mock stream) was
+extracted to `tests/helpers/inputControllerHarness.ts`. That file's 142 tests pass unchanged.
+
+Gates: unit and integration suites, `typecheck`, and `lint` all exit 0.
+
 ## Current blocker
 
-M0a is in progress on `providers-migration`. The three mechanical gates and the adapter
-specification are green and enforced. The next action is WP5: the two deliberately separate contract
-suites — a characterization suite pinning today's controller-observable behavior including
-generator-end-as-completion, and a target suite pinning the adapter semantics where the generator
-closes only on a terminal fact, executable now against a spec-level double and re-pointed at the
-real adapter in M2-adapter. After that: WP6 capability/topology and shared-resource records, WP7
-persisted-state fixtures, WP8 the persistence and retention decision record.
+M0a is in progress on `providers-migration`. Gates and both contract suites are green. The next
+action is WP6: per-provider capability and topology records plus the machine-readable
+shared-resource inventory (ports, locks, session files, sockets, daemons shared between the chat and
+auxiliary paths) that the M2 flip's auxiliary-contention check verifies against. Then WP7
+persisted-state fixtures and WP8 the persistence and retention decision record.
