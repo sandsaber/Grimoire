@@ -726,6 +726,30 @@ Deliberately not landed yet: `executionSemanticFreeze.test.ts`. It asserts acros
 modules, so it belongs at the end of M2-proofs, not at proof one — and it needs rewriting against
 the M1 `ProviderModule` contract rather than the v1 one it was written for.
 
+### M2-proofs — Windows CI failure, fixed (this commit)
+
+The cross-platform job added at the end of M1 did its job on its first run and immediately caught
+something — though not what it was aimed at.
+
+`validate`, `ubuntu-latest`, and `macos-latest` passed; `windows-latest` failed in half a second
+with no test output. The cause is not a platform defect in the kernel: the job selected suites by
+passing POSIX-style paths as positional arguments, and Jest matches those as **regular expressions
+against absolute paths**. On Windows those paths contain backslashes, nothing matched, and Jest
+exited 1 with "No tests found".
+
+Both steps now use `--testPathPatterns` with a `[\\/]` character class that matches either
+separator, verified locally against the same suites the job runs.
+
+The more useful half of the finding is what nearly happened. Jest only failed because
+`--passWithNoTests` was absent. Had it been set — a natural thing to add when a job looks like it is
+"failing for no reason" — Windows would have reported a **green** gate while running zero tests, on
+the one platform the whole job exists to cover. That is the shape of failure this migration is
+built around, arriving in the migration's own CI. The reasoning is recorded in the workflow next to
+the flag so the next person does not reach for it.
+
+Windows process-tree conformance still is not claimed. The job now runs the right suites there; the
+result of that run is the evidence, and it is a hard prerequisite of M2-flips either way.
+
 ## Current blocker
 
 M2-proofs is in progress on `providers-migration`. Proof 1 of 4 (Antigravity) is landed and dark.

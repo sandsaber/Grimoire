@@ -96,8 +96,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Patterns, not paths. Jest matches positional arguments as regular
+      # expressions against absolute paths, so a POSIX-style path selects
+      # nothing on Windows and the job fails having run no tests. The character
+      # class matches either separator. Without --passWithNoTests, a pattern
+      # that stops matching fails loudly instead of reporting a green gate that
+      # measured nothing.
       - name: Verify execution contracts
-        run: npm run test -- --selectProjects unit --runInBand tests/unit/core/execution tests/unit/app/execution
+        run: npm run test -- --selectProjects unit --runInBand --testPathPatterns "tests[\\/]unit[\\/](core|app)[\\/]execution"
 
       - name: Verify host process ownership
-        run: npm run test -- --selectProjects integration --runInBand tests/integration/app/execution/local/LocalShellProcessOwnership.integration.test.ts
+        run: npm run test -- --selectProjects integration --runInBand --testPathPatterns "LocalShellProcessOwnership"
