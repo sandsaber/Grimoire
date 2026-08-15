@@ -82,5 +82,35 @@
       "result:projection",
       "terminal:succeeded:completed"
     ]
+  },
+  "agentEvidence": {
+    "definitions": "provider-files",
+    "spawnOrigin": [
+      "provider-native"
+    ],
+    "stableIdentity": true,
+    "progressObservation": "aggregate",
+    "resultExtraction": true,
+    "cancellation": false,
+    "statusQuery": false,
+    "reattachment": false,
+    "source": "parent-collaboration-events",
+    "eventCase": "nativeAgentResult",
+    "cancellationCase": null
+  },
+  "eventCases": {
+    "nativeAgentResult": [
+      "run-started",
+      "native-agent-observed:native-agent-7",
+      "native-agent-status:native-agent-7:running",
+      "native-agent-activity:native-agent-7:input-sent",
+      "native-agent-activity:native-agent-7:wait-observed",
+      "native-agent-result:native-agent-7:projection",
+      "native-agent-status:native-agent-7:completed",
+      "native-agent-activity:native-agent-7:close-observed",
+      "native-agent-status:native-agent-7:closed",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ]
   }
 }

@@ -167,8 +167,15 @@ const claudeCapabilities: ProviderCapabilityDescriptor = {
     perRunSelection: 'grimoire',
   },
   agents: {
-    definitions: 'provider-files',
-    spawnOrigin: ['grimoire', 'provider-native'],
+    // `native` rather than `provider-files`: Claude ships built-in agent types
+    // the CLI knows without any file, and `.claude/agents/` only adds to that
+    // inventory. Codex and OpenCode have files and nothing else, which is the
+    // distinction the two values exist to draw.
+    definitions: 'native',
+    // Grimoire writes the definitions under `.claude/agents/`, but the CLI's
+    // own tool is what launches one — writing a definition is not a spawn
+    // origin, and claiming it would tell the UI it can start a subagent itself.
+    spawnOrigin: ['provider-native'],
     stableIdentity: true,
     progressObservation: 'full',
     resultExtraction: true,

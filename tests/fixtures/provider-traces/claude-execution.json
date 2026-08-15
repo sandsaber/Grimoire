@@ -106,5 +106,23 @@
       "recovery-started",
       "terminal:indeterminate:effects-unknown"
     ]
+  },
+  "agentEvidence": {
+    "definitions": "native",
+    "spawnOrigin": [
+      "provider-native"
+    ],
+    "stableIdentity": true,
+    "progressObservation": "full",
+    "resultExtraction": true,
+    "cancellation": true,
+    "statusQuery": false,
+    "reattachment": false,
+    "source": "native-task-notifications",
+    "eventCase": "backgroundAgentLateResult",
+    "cancellationCase": [
+      "stopTask:task-1",
+      "native-agent-status:task-1:closed"
+    ]
   }
 }

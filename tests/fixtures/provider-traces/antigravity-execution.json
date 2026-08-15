@@ -10,19 +10,17 @@
   "resultExpectation": "required",
   "agentObservation": "none",
   "agentEvidence": {
-    "definitionInventory": "none",
-    "spawnOrigins": [],
+    "definitions": "none",
+    "spawnOrigin": [],
     "stableIdentity": false,
-    "observation": "none",
-    "resultExtraction": "unsupported",
-    "cancellation": "unsupported",
-    "statusQuery": "unsupported",
-    "reattachment": "unsupported",
+    "progressObservation": "none",
+    "resultExtraction": false,
+    "cancellation": false,
+    "statusQuery": false,
+    "reattachment": false,
     "source": "none",
     "eventCase": null,
-    "cancellationCase": null,
-    "statusQueryCase": null,
-    "reattachmentCase": null
+    "cancellationCase": null
   },
   "identity": {
     "backendGeneration": 1,

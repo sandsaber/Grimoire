@@ -1044,6 +1044,61 @@ This also validated the coverage gate added in the same milestone: the integrati
 suite by the literal name `LocalShellProcessOwnership`, so before that change the Codex ownership
 test would not have run on Windows at all, and the job would have reported green.
 
+### M2-proofs — topology proof 4 of 4: OpenCode, and the semantic freeze (this commit)
+
+Managed ACP subprocess, the last topology and the one that generalizes: MiMoCode, Kimi Code, Grok,
+Qwen, and Gemini all reach production through the same shared `src/providers/acp/` transport this
+backend uses, so the five providers without a proof of their own inherit this one's argument.
+
+As the journal predicted one commit earlier, OpenCode's harvested backend carried the same stale
+`turnId` run-scope field. Four backends, four times — it was a systematic property of the v1 harvest,
+and TypeScript caught it here only because the OpenCode test happened to read `scope.turnId`
+directly rather than through a spread.
+
+One structural difference the codec had to respect: `OpencodeProviderSettings` extends the persisted
+shape with `availableModes` and `discoveredModels`, which are **discovery state, not settings**.
+Encoding them would write a cached CLI catalogue into the settings file and let it outlive the
+process that produced it, so `encode` omits them, `decode` reports them as an issue when an older
+build stored them, and `reconcile` carries them through untouched.
+
+**The three-field MCP split earned itself here.** OpenCode's live record says
+`supportsMcpTools: false`, which reads as "no MCP" — but that boolean only gates the chat tab's
+per-run server selector. Grimoire still owns `.grimoire/mcp/opencode.json` and still injects those
+servers into the ACP session. The descriptor says what is true: `ownership: 'grimoire'`,
+`sessionConfiguration: 'grimoire'`, `perRunSelection: 'unsupported'`.
+
+**M2-proofs exit gate: `executionSemanticFreeze.test.ts`.** Written against the M1 contract, not
+harvested — the v1 suite asserts a vocabulary this contract replaced (`observation`, `controls`,
+support strings where these are booleans), so harvesting it would have frozen the wrong shape. Its
+per-provider agent evidence is real observation, so that data was translated into the fixtures rather
+than re-derived.
+
+It binds each module to its trace — identity, backend descriptor, topology, session boundary, resume,
+and every agent field — and asserts the set-level properties that four proofs exist to establish:
+four materially distinct topologies, distinct backend ids, a spread of answers on resume, history
+ownership, MCP ownership, command discovery, and security enforcement, and the rule that an
+observation label never implies an agent action. Verified by injection: changing Codex's
+`progressObservation` from `aggregate` to `full` fails it.
+
+**The freeze immediately caught two overclaims, both mine, in modules committed hours earlier:**
+
+- Claude declared `spawnOrigin: ['grimoire', 'provider-native']`. Grimoire writes agent definitions
+  under `.claude/agents/`, but the CLI's tool is what launches one; writing a definition is not a
+  spawn origin, and claiming it tells the UI it can start a subagent itself. Now `['provider-native']`;
+- OpenCode declared `spawnOrigin: ['provider-native']` while its recorded evidence has no agent
+  events at all. A spawn origin on a provider whose subagent lifecycle never reaches Grimoire
+  promises an agent the UI can never observe. Now `[]`.
+
+Claude's `agents.definitions` also moved from `provider-files` to `native`: it ships built-in agent
+types the CLI knows without any file, and `.claude/agents/` only adds to that inventory. Codex and
+OpenCode have files and nothing else, which is the distinction the two values exist to draw.
+
+Gates: unit 450 suites / 7661 tests, integration 6 suites / 220 tests, `typecheck`, `lint`,
+`build:release` clean, and no OpenCode execution code in the bundle.
+
+**M2-proofs is complete.** Four topologies, four modules, one shared conformance suite, four traces,
+and a freeze over all of it.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1056,14 +1111,22 @@ topology and shared-resource records, persistence decisions) and **M1** (executi
 control-record persistence, local-shell internal backend, cross-platform CI with Windows
 process-tree conformance green).
 
-In progress: **M2-proofs — 3 of 4.** Antigravity (stateless process-per-run), Codex (persistent
-daemon, multiplexed sessions), and Claude (persistent SDK stream, serial runs) each have an execution
-backend and a `ProviderModule`, all dark.
+Completed: **M2-proofs.** Four topologies proven dark — Antigravity (stateless process-per-run),
+Codex (persistent daemon, multiplexed sessions), Claude (persistent SDK stream, serial runs), and
+OpenCode (managed ACP subprocess) — each with an execution backend, a `ProviderModule` on the M1
+contract, a settings codec, a capability descriptor, the shared conformance suite, and a trace
+fixture, with `executionSemanticFreeze.test.ts` binding modules to traces as the exit gate.
 
-**Next action:** topology proof 4, OpenCode (`cb631f53`) — managed ACP subprocess — with backend,
-module on the M1 contract, settings codec, capability descriptor, shared conformance, and its trace
-fixture. Expect its harvested backend to carry the same stale `turnId` run-scope field the Codex and
-Claude backends did; the conformance suite catches it. Only after all four pass is the semantic freeze recorded,
+The four proofs cost the M1 contract four defects, none of which review had found: a settings-blind
+model presentation, a `reconcile` result no provider could fill, a rewind capability with no port,
+and static feature contributions that made context-dependent ports unfillable. Each was invisible
+until a provider that needed it was written, which is the argument for four proofs rather than one.
+
+**Next action:** **M2-adapter** — the `ChatRuntime` adapter over the kernel, still dark, with
+`createSubject` in `adapterContractTarget.test.ts` grown to cover `prepareTurn`, `steer`,
+`setResumeCheckpoint`, `buildSessionUpdates`, and `consumeSessionInvalidation`, which remain paper
+mappings. **M0b is still open and blocks the first flip, not the adapter:** the checked-in traces are
+semantic case catalogues, not sanitized wire recordings. Only after all four pass is the semantic freeze recorded,
 and its suite (`892eec78`) must be **rewritten** against the M1 `ProviderModule` contract rather
 than harvested, since it was written for the v1 contract.
 

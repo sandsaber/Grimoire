@@ -157,7 +157,10 @@ async function runPersistentForm(
   let descendantPid: number | undefined;
   try {
     adapter.start();
-    descendantPid = await waitForPidFile(pidPath, 10_000);
+    // Each launch form pays its own `Add-Type` compile of the guardian, and
+    // this case runs four of them in sequence, so the budget is per form and
+    // matches the one the first case uses.
+    descendantPid = await waitForPidFile(pidPath, 15_000);
     expect(isProcessRunning(descendantPid)).toBe(true);
     const response = nextLine(adapter.stdout, 10_000);
     adapter.stdin.write(`${JSON.stringify({ id: 8, method: 'ping' })}\n`);

@@ -572,6 +572,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
     state: 'pending',
     owner: 'M2 — becomes reachable when the first provider flip wires the adapter over its backend.',
     modules: [
+      'src/app/execution/acp/NodeManagedAcpProcessLauncher.ts',
       'src/app/execution/antigravity/NodeAntigravityProcessTransport.ts',
       'src/app/execution/codex/NodeCodexExecutionProcess.ts',
       'src/app/execution/local/NodeLocalShellProcessAdapter.ts',
@@ -603,6 +604,9 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/antigravity/execution/AntigravityExecutionBackend.ts',
       'src/providers/antigravity/runtime/AntigravityPrintProcessRunner.ts',
       'src/providers/antigravity/runtime/AntigravityPrintProtocol.ts',
+      'src/providers/acp/execution/AcpManagedClientAdapter.ts',
+      'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
+      'src/providers/acp/execution/ManagedAcpClient.ts',
       'src/providers/antigravity/runtime/AntigravityTranscriptRecovery.ts',
       'src/providers/claude/ClaudeProviderModule.ts',
       'src/providers/claude/execution/ClaudeAuxiliaryQuery.ts',
@@ -614,6 +618,10 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/codex/execution/CodexExecutionBackend.ts',
       'src/providers/codex/execution/CodexExecutionTurnReconciler.ts',
       'src/providers/codex/runtime/CodexExecutionConnection.ts',
+      'src/providers/opencode/OpencodeProviderModule.ts',
+      'src/providers/opencode/execution/OpencodeAcpDynamicConfig.ts',
+      'src/providers/opencode/execution/OpencodeAcpFileSystem.ts',
+      'src/providers/opencode/execution/OpencodeExecutionBackend.ts',
     ],
   },
 ];
