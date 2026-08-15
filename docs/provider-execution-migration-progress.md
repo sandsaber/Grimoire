@@ -726,7 +726,7 @@ Deliberately not landed yet: `executionSemanticFreeze.test.ts`. It asserts acros
 modules, so it belongs at the end of M2-proofs, not at proof one — and it needs rewriting against
 the M1 `ProviderModule` contract rather than the v1 one it was written for.
 
-### M2-proofs — Windows CI failure, fixed (this commit)
+### M2-proofs — Windows CI: three failures, and process-tree conformance proven (`9b1958d`, `6127df3`, `96eb9c8`)
 
 The cross-platform job added at the end of M1 did its job on its first run and immediately caught
 something — though not what it was aimed at.
@@ -747,8 +747,27 @@ the one platform the whole job exists to cover. That is the shape of failure thi
 built around, arriving in the migration's own CI. The reasoning is recorded in the workflow next to
 the flag so the next person does not reach for it.
 
-Windows process-tree conformance still is not claimed. The job now runs the right suites there; the
-result of that run is the evidence, and it is a hard prerequisite of M2-flips either way.
+That was the first of three. Two more followed, each hiding the next:
+
+- **the job could not report.** Every PowerShell step on the Windows runner captured no child
+  output at all — including the `npm ci` that succeeded — while the bash steps in the same job
+  printed normally. A platform gate that returns an exit code and nothing else is not usable
+  evidence, so all its steps now run through bash, which exists on the Windows runner and removes
+  the quoting difference as a side effect;
+- **with output visible, the real failure appeared, and it was the fixture rather than the kernel.**
+  The contract suites passed on Windows. The ownership test compared file contents to an exact
+  string, and `cmd` includes the space before `&` in the echoed line, so the file held
+  `"hello world" ` with a trailing space. Fixed at the cause — the space is gone from the command —
+  rather than by loosening the comparison, because the point of that test is that a quoted path and
+  a command group survive the launch path verbatim.
+
+**Windows process-tree conformance is now green** (run `31898748705`): `validate`, `ubuntu-latest`,
+`macos-latest`, and `windows-latest` all pass, including the Job Object guardian killing Windows
+descendants when the root process exits. The plan makes this a hard prerequisite of M2-flips and
+explicitly refuses a waiver; it is now satisfied by evidence rather than deferred.
+
+Three failures, none of them the thing the job was aimed at, and each only visible once the previous
+one was fixed. The job was added at the end of M1 as a formality — it repaid that immediately.
 
 ## Current blocker
 
