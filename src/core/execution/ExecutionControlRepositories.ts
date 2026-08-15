@@ -1,11 +1,3 @@
-import {
-  EXECUTION_INTERACTIONS_PATH,
-  EXECUTION_RECONCILIATIONS_PATH,
-  EXECUTION_RUNS_PATH,
-  EXECUTION_SESSIONS_PATH,
-  SETTINGS_TRANSITIONS_PATH,
-  SHUTDOWN_CHECKPOINTS_PATH,
-} from '../bootstrap/StoragePaths';
 import { validateControlRecordPayload } from '../persistence/ControlRecordPayloadPolicy';
 import type { DurableStorage } from '../persistence/DurableStorage';
 import type {
@@ -14,6 +6,14 @@ import type {
   VersionedRecordReadResult,
 } from '../persistence/VersionedRecord';
 import { VersionedRepository } from '../persistence/VersionedRepository';
+import {
+  EXECUTION_INTERACTIONS_PATH,
+  EXECUTION_RECONCILIATIONS_PATH,
+  EXECUTION_RUNS_PATH,
+  EXECUTION_SESSIONS_PATH,
+  SETTINGS_TRANSITIONS_PATH,
+  SHUTDOWN_CHECKPOINTS_PATH,
+} from './ExecutionControlPaths';
 import type {
   ExecutionInteractionRecord,
   ExecutionReconciliationRecord,

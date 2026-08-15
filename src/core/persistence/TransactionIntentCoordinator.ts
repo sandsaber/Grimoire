@@ -1,4 +1,4 @@
-import { TRANSACTION_INTENTS_PATH } from '../bootstrap/StoragePaths';
+import { TRANSACTION_INTENTS_PATH } from '../execution/ExecutionControlPaths';
 import { validateControlRecordPayload } from './ControlRecordPayloadPolicy';
 import type { DurableStorage } from './DurableStorage';
 import type { RecordSchema, VersionedRecord } from './VersionedRecord';

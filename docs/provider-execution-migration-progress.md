@@ -206,7 +206,7 @@ wired; product decision), `codex/runtime/CodexSessionFileTail.ts` (legacy tail p
 i18n work, outside this migration).
 
 Gates: unit 401 suites / 6966 tests passed, integration 4 suites / 216 tests passed, `typecheck`
-clean, `lint` clean, `build:release` passed with no artifact drift.
+clean, `lint` clean, `build:release` passed (see the correction below on what that did and did not prove).
 
 Contribution inventory rows moved: none.
 
@@ -405,7 +405,7 @@ the documentation guard fail.
 | Existing provider-native data byte-preserved by the harness | `tests/unit/core/storage/persistedStateCharacterization.test.ts` — byte preservation holds for session metadata and `providerState`; settings and tab state are characterized as normalized state, see the correction entry below |
 
 Checkpoint gate: unit 408 suites / 7090 tests passed, integration 4 suites / 216 tests passed,
-`typecheck` clean, `lint` clean, `build:release` passed with no artifact drift, `git diff --check`
+`typecheck` clean, `lint` clean, `build:release` passed (see the correction below on what that did and did not prove), `git diff --check`
 clean.
 
 Deleted across the milestone: five orphaned re-export barrels and one duplicated test. Contribution
@@ -488,7 +488,7 @@ attributed the two new Grok modules without complaint, meaning they are reachabl
 rather than orphaned, and no inventory, topology, or contract record needed changing.
 
 Gates after the sync: unit 411 suites / 7165 tests passed, integration 4 suites / 216 tests passed,
-`typecheck` clean, `lint` clean, `build:release` passed with no artifact drift. Plugin version on the
+`typecheck` clean, `lint` clean, `build:release` passed (see the correction below on what that did and did not prove). Plugin version on the
 branch is now 1.1.7.
 
 Divergence from `main` after this sync: zero commits behind.
@@ -614,7 +614,7 @@ with no artifact drift. Parity manifest: ten more modules join `execution-platfo
 
 Fourth M1 checkpoint. The largest single harvest in the migration: `ExecutionLifecycleRegistry`
 (2183 lines) with its 1109-line suite, plus `RunProjection` and the `DeterministicFakeBackend` the
-suite drives. Still dark, release build still byte-identical. The kernel now stands at 5561 lines
+suite drives. Still dark (see the correction below on how darkness is actually verified). The kernel now stands at 5561 lines
 across `src/core/execution/` and `src/core/persistence/`, none of it reachable.
 
 **The work-graph reconciliation had two more sites than the contracts commit found.** The registry's
@@ -667,7 +667,7 @@ Locally on Linux the process-ownership integration suite passes; macOS and Windo
 from CI on the next push.
 
 Gates: unit 422 suites / 7313 tests passed, integration 5 suites / 218 tests passed, `typecheck`
-clean, `lint` clean, `build:release` passed with no artifact drift.
+clean, `lint` clean, `build:release` passed (see the correction below on what that did and did not prove).
 
 **M1 exit gate, item by item:**
 
@@ -772,7 +772,7 @@ one was fixed. The job was added at the end of M1 as a formality — it repaid t
 ### M2-proofs — Antigravity provider module (this commit)
 
 The first real module written against the M1 `ProviderModule` contract, and the first evidence that
-the contract is usable rather than merely complete. Dark; the release build stayed byte-identical.
+the contract is usable rather than merely complete. Dark (see the correction below on how darkness is actually verified).
 
 Not harvested. The v1 module targets the contract harvest ban 1 excludes, and its shape does not
 survive the redesign: capability fields differ, feature ports were bare `object`, and the module
@@ -810,37 +810,94 @@ and both halves of the workspace lifecycle.
 Gates: unit 429 suites / 7377 tests passed, `typecheck` clean, `lint` clean, `build:release` with no
 artifact drift.
 
+
+### Correction — "byte-identical release build" proved nothing (this commit)
+
+Every M1 and M2-proofs checkpoint above claimed the release build produced byte-identical artifacts,
+on the evidence of `git status --short main.js` coming back empty. **`main.js` is listed in
+`.gitignore` on this branch.** That command reports clean no matter what the file contains, so the
+check measured nothing and the claim was vacuous each time it was made.
+
+It is the precise failure this migration exists to prevent — a gate that cannot fail, reported as
+evidence — and it appeared in the migration's own journal. Correcting it, not just the wording:
+
+- **the paths leaked.** With a real check, `.grimoire/control` directory strings *were* present in
+  the shipped bundle: `StoragePaths.ts` is reachable from `src/main.ts`, so declaring the control
+  paths there compiled them into `main.js` even though nothing read them. They now live in
+  `src/core/execution/ExecutionControlPaths.ts`, which is dark;
+- **the check is now real.** `tests/unit/architecture/darkBundle.test.ts` asserts against the built
+  bundle: no control-store paths, no registry internals, no backend descriptor, and no class name
+  belonging to a `pending` parity surface. It skips rather than lies when the bundle is absent or
+  older than `src/main.ts`;
+- **it was verified by injection.** Re-exporting one control path from the reachable `StoragePaths`
+  and rebuilding fails two assertions; reverting restores green.
+
+Everything else the checkpoints claimed — unreachability from `src/main.ts`, suite counts, typecheck,
+lint — was measured by gates that do fail, and stands.
+
+### Correction — three more findings from an external review (this commit)
+
+- **the composition fitness gate did not understand `@/`.** It matched only relative specifiers,
+  while the repository imports through the alias — as the Antigravity backend does. A core module
+  could have imported a concrete provider by alias and the gate would have stayed green. Fixed, and
+  it immediately surfaced **eight** pre-existing `src/core/**` → provider imports, now enumerated
+  with owners (M3 for registry and bootstrap, M5 for the auxiliary services) and checked in both
+  directions like the plugin-import list;
+- **persistence decision D5 was documented but not implemented.** `VersionedRepository` classifies a
+  future or corrupt record, but every startup read went through a helper that threw, so one record
+  from a newer build made `start()` fail — the exact path a user takes when a shipped flip is
+  reverted. The registry now enters a `migration-required` state: it starts, refuses new work,
+  leaves the record untouched, and exposes the requirement for the host to present.
+  `ExecutionControlMigrationRequired.test.ts` covers all four behaviors;
+- **the trace fixtures are not golden traces.** They are semantic case catalogues, not sanitized wire
+  recordings. The checkpoint text implied M0b was partly satisfied; the status table always said
+  otherwise. The resume pointer now states it explicitly.
+
 ## Current blocker
 
-M2-proofs is in progress on `providers-migration`. Proof 1 of 4 (Antigravity) is landed and dark,
-backend and module both.
+**Single resume pointer. Everything below this line is the current state; nothing above it
+overrides it.**
 
-Next: proofs 2–4 — Codex (`309f1558`), Claude (`9dda0ebc`), OpenCode (`cb631f53`), each with
-backend, module, settings codec, capability descriptor, conformance, and its sanitized trace. The
-semantic freeze suite is recorded only after all four pass, and must be rewritten against the M1
-`ProviderModule` contract rather than the v1 one it was written for. The UTF-8 stream decoding and
-Grok transcript recovery semantics must be absorbed by the backends that carry them.
+Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
-M1 is complete: the execution kernel, its narrow persistence substrate, and the local-shell internal
-backend are landed and dark, none of it reachable from `src/main.ts`.
+Completed: **M0a** (parity gate, contribution inventory, adapter contract, the two contract suites,
+topology and shared-resource records, persistence decisions) and **M1** (execution kernel, narrow
+control-record persistence, local-shell internal backend, cross-platform CI with Windows
+process-tree conformance green).
 
-The next action is **M2-proofs**: four topology proofs, still dark — Antigravity (`07939092`), Codex
-(`309f1558`), Claude (`9dda0ebc`), and OpenCode (`cb631f53`), plus the semantic freeze suites
-(`892eec78`). Two obligations attach to that harvest and have not been acted on yet: the backends
-must absorb the UTF-8 stream decoding (`utf8Stream`) and Grok transcript recovery semantics that
-landed on `main` after the v1 baseline, and M0b golden traces for those four providers must exist
-before the semantic freeze. The kernel harvested so far is provider-neutral and unaffected by both.
+In progress: **M2-proofs — 1 of 4.** Antigravity has its execution backend and its `ProviderModule`,
+both dark.
 
-M0a is complete, including the post-review corrections above. The old
-runtime path is frozen for new product features: no new methods on `ChatRuntime` — the freeze test
-enforces the member set — and bug fixes must be absorbed by later harvested slices.
+**Next action:** topology proof 2, Codex (`309f1558`), then Claude (`9dda0ebc`), then OpenCode
+(`cb631f53`) — each with backend, module on the M1 contract, settings codec, capability descriptor,
+shared conformance, and its trace fixture. Only after all four pass is the semantic freeze recorded,
+and its suite (`892eec78`) must be **rewritten** against the M1 `ProviderModule` contract rather
+than harvested, since it was written for the v1 contract.
 
-Branch policy, per the owner's decision: milestones are **not** merged to `main`; all work stays on
-`providers-migration`. The plan's mitigation is mandatory — sync `main` into the branch at every
-milestone gate and whenever `main` ships a release, and record the synced `main` commit in that
-checkpoint's entry, so divergence stays a measured number.
+Open obligations, each with an owner:
 
-The next action is M1, the execution kernel dark-launched, harvested per the plan's source map
-(Phase 1 `1ae6a620`, Phase 2 `347586ff` narrow kernel records only, Phase 3 `1220271a`), with the
-`ProviderModule` contract designed against the contribution inventory rather than harvested from v1.
-M0b runs alongside and blocks nothing until the M2-proofs freeze.
+- **M0b is not done.** The checked-in `tests/fixtures/provider-traces/*.json` are semantic case
+  catalogues — topology, identity, event cases, cancellation, empty-required-result — not sanitized
+  wire recordings. They are enough to pin backend semantics; they are not the golden traces the plan
+  requires before the freeze, and recording those needs live CLIs. Owner: M0b, before the M2-proofs
+  freeze;
+- the provider backends that carry them must absorb the UTF-8 stream decoding (`utf8Stream`) and
+  Grok transcript recovery semantics that landed on `main` after the v1 baseline. Owner: the Grok
+  and ACP backends, at their harvest;
+- D7 (diagnostic redaction) has no automated guard. Owner: M1 follow-up, once the kernel emits log
+  records;
+- the target contract suite covers `query`, `cancel`, terminals, and turn metadata only.
+  `prepareTurn`, `steer`, `setResumeCheckpoint`, `buildSessionUpdates`, and
+  `consumeSessionInvalidation` remain paper mappings until `createSubject` grows. Owner:
+  M2-adapter;
+- eight `src/core/**` modules import a concrete provider and three import the plugin type, all
+  enumerated in `executionCompositionBoundaries.test.ts`. Owners: M3 for the registry and bootstrap
+  entries, M5 for the auxiliary services.
+
+Standing rules that outlive any milestone:
+
+- the old runtime path is frozen for new product features; `ChatRuntime` gains no members, enforced
+  by the freeze test. Bug fixes are allowed and must be absorbed by later harvested slices;
+- milestones are **not** merged to `main`, per the owner's decision. The mandatory mitigation is to
+  sync `main` into the branch at every milestone gate and whenever `main` ships a release, recording
+  the synced commit in that checkpoint's entry.

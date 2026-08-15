@@ -34,6 +34,16 @@ const STRICT_MODULES = [
   'src/core/execution/ResultCommit.ts',
   'src/providers/antigravity/execution/AntigravityExecutionBackend.ts',
   'src/providers/antigravity/AntigravityProviderModule.ts',
+  'src/core/execution/ExecutionControlPaths.ts',
+  'src/core/execution/ExecutionControlRecords.ts',
+  'src/core/execution/ExecutionControlRepositories.ts',
+  'src/core/execution/ExecutionControlSchemas.ts',
+  'src/core/execution/ExecutionControlTransactionCoordinator.ts',
+  'src/core/persistence/ControlRecordPayloadPolicy.ts',
+  'src/core/persistence/DurableStorage.ts',
+  'src/core/persistence/TransactionIntentCoordinator.ts',
+  'src/core/persistence/VersionedRecord.ts',
+  'src/core/persistence/VersionedRepository.ts',
 ];
 
 /**
@@ -45,6 +55,25 @@ const LEGACY_CORE_PLUGIN_IMPORTS = [
   'src/core/providers/ProviderRegistry.ts',
   'src/core/providers/ProviderWorkspaceRegistry.ts',
   'src/core/providers/types.ts',
+];
+
+/**
+ * Pre-existing violations of `src/core/**` → a concrete provider.
+ *
+ * Invisible until this gate learned the `@/` alias, which is how the repository
+ * actually imports. Each is removed when the provider catalog replaces the
+ * split registries at M3, except the auxiliary services, which move with their
+ * owners at M5. The list may shrink but never grow.
+ */
+const LEGACY_CORE_PROVIDER_IMPORTS = [
+  'src/core/auxiliary/QueryBackedInlineEditService.ts',
+  'src/core/auxiliary/QueryBackedInstructionRefineService.ts',
+  'src/core/auxiliary/QueryBackedTitleGenerationService.ts',
+  'src/core/bootstrap/SessionStorage.ts',
+  'src/core/bootstrap/storage.ts',
+  'src/core/commands/builtInCommands.ts',
+  'src/core/prompt/inlineEdit.ts',
+  'src/core/runtime/ChatRuntime.ts',
 ];
 
 /**
@@ -61,6 +90,18 @@ function importsPlugin(source: string): boolean {
   return /from '(\.\.\/)+main'|from '@\/main'/.test(source);
 }
 
+/**
+ * Matches both import styles.
+ *
+ * The first version of this gate only matched relative specifiers, while the
+ * repository imports through the `@/` alias — the Antigravity backend does. A
+ * core module could have imported a concrete provider by alias and the gate
+ * would have stayed green.
+ */
+function importsFrom(source: string, area: 'providers' | 'features'): boolean {
+  return new RegExp(`from '((\\.\\./)+|@/)${area}/`).test(source);
+}
+
 function launchesProcess(source: string): boolean {
   return /from '(node:)?child_process'|require\('(node:)?child_process'\)/.test(source);
 }
@@ -69,6 +110,31 @@ describe('execution composition boundaries', () => {
   const modules = listAllSourceModules();
 
   describe('forbidden dependency directions', () => {
+    it('adds no new provider import under src/core, by relative path or alias', () => {
+      const offenders = modules
+        .filter(module => module.startsWith('src/core/'))
+        .filter(module => importsFrom(read(module), 'providers'))
+        .filter(module => !LEGACY_CORE_PROVIDER_IMPORTS.includes(module));
+
+      expect(offenders).toEqual([]);
+    });
+
+    it('keeps the legacy provider-import list from growing back', () => {
+      const stale = LEGACY_CORE_PROVIDER_IMPORTS.filter(
+        module => !importsFrom(read(module), 'providers'),
+      );
+
+      expect(stale).toEqual([]);
+    });
+
+    it('adds no feature import under src/core, by relative path or alias', () => {
+      const offenders = modules
+        .filter(module => module.startsWith('src/core/'))
+        .filter(module => importsFrom(read(module), 'features'));
+
+      expect(offenders).toEqual([]);
+    });
+
     it('adds no new plugin import under src/core', () => {
       const offenders = modules
         .filter(module => module.startsWith('src/core/'))
@@ -100,8 +166,7 @@ describe('execution composition boundaries', () => {
 
       expect(importsPlugin(source)).toBe(false);
       expect(launchesProcess(source)).toBe(false);
-      expect(source).not.toMatch(/from '(\.\.\/)+providers\//);
-      expect(source).not.toMatch(/from '(\.\.\/)+features\//);
+      expect(importsFrom(source, 'features')).toBe(false);
       expect(source).not.toMatch(/from 'obsidian'/);
       expect(source).not.toMatch(/\bHTMLElement\b|\bdocument\b/);
     });

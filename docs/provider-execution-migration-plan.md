@@ -1,7 +1,7 @@
 # Full Execution Architecture Migration Plan
 
-Status: revised plan (v2) for the `providers-migration` branch. **M0a is complete; M0b and M1 are
-the open work.** The authoritative, per-checkpoint state is
+Status: revised plan (v2) for the `providers-migration` branch. **M0a and M1 are complete; M2-proofs
+is in progress and M0b is open.** The authoritative, per-checkpoint state is
 [`provider-execution-migration-progress.md`](provider-execution-migration-progress.md) — this line
 records only which milestone the reader should expect to find in the tree, and the log's
 "Current blocker" is the resume pointer. The first attempt executed the v1 plan through its cutover on

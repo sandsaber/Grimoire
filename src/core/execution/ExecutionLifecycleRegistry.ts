@@ -58,7 +58,20 @@ import {
   requireTerminalReason,
 } from './ExecutionTerminalPolicy';
 
-type RegistryState = 'initializing' | 'accepting' | 'quiescing' | 'closed';
+type RegistryState =
+  | 'initializing'
+  | 'accepting'
+  | 'quiescing'
+  | 'closed'
+  /**
+   * Startup found a control record this build cannot read — a newer
+   * `schemaVersion`, or one that failed to decode. Persistence decision D5:
+   * such a record opens read-only and surfaces a migration-required state; it
+   * is never guessed at, downgraded, or discarded. The registry therefore
+   * starts, refuses new work, and leaves the store untouched, which is what
+   * makes reverting to an older build after a flip survivable.
+   */
+  | 'migration-required';
 type BackendState = 'stable' | 'draining' | 'disposed';
 
 export interface BackendLifecycleRegistration {
@@ -182,6 +195,7 @@ export class ExecutionLifecycleRegistry {
   private readonly eventTasks = new Set<Promise<void>>();
   private readonly admissionWaiters = new Set<() => void>();
   private state: RegistryState = 'initializing';
+  private migrationRequired: UnreadableControlRecordError | null = null;
   private activeAdmissions = 0;
 
   constructor(options: ExecutionLifecycleRegistryOptions) {
@@ -227,12 +241,31 @@ export class ExecutionLifecycleRegistry {
     if (this.state !== 'initializing') {
       throw new Error('Execution lifecycle registry can only be started once.');
     }
-    await this.controlTransactions.recoverPending();
-    await this.loadPersistedControls();
-    await this.recoverPersistedInteractions();
-    await this.recoverPersistedRuns();
-    await this.completeRecoveredShutdownCheckpoints();
+    try {
+      await this.controlTransactions.recoverPending();
+      await this.loadPersistedControls();
+      await this.recoverPersistedInteractions();
+      await this.recoverPersistedRuns();
+      await this.completeRecoveredShutdownCheckpoints();
+    } catch (error) {
+      // Only unreadable records take this path. Anything else is a real defect
+      // and must keep propagating rather than being disguised as a migration.
+      if (!(error instanceof UnreadableControlRecordError)) {
+        throw error;
+      }
+      this.migrationRequired = error;
+      this.state = 'migration-required';
+      return;
+    }
     this.state = 'accepting';
+  }
+
+  /**
+   * The record that made startup stop, or `null` when the store is readable.
+   * The host presents this instead of the registry failing to construct.
+   */
+  getMigrationRequirement(): UnreadableControlRecordError | null {
+    return this.migrationRequired;
   }
 
   async createSession(command: CreateExecutionSessionCommand): Promise<ExecutionSessionId> {
@@ -1827,6 +1860,11 @@ export class ExecutionLifecycleRegistry {
   }
 
   private requireAccepting(): void {
+    if (this.state === 'migration-required') {
+      throw new Error(
+        'Execution control store requires migration; the registry is read-only.',
+      );
+    }
     if (this.state !== 'accepting') {
       throw new Error('Execution lifecycle registry is not accepting new work.');
     }
@@ -2149,6 +2187,18 @@ function write(
   };
 }
 
+/**
+ * A control record this build cannot read: written by a newer schema version,
+ * or undecodable. Distinct from a programming error so startup can fail closed
+ * on it without swallowing real defects.
+ */
+export class UnreadableControlRecordError extends Error {
+  constructor(readonly recordKind: 'future' | 'corrupt', readonly detail: string) {
+    super(`Control record is unreadable (${recordKind}): ${detail}`);
+    this.name = 'UnreadableControlRecordError';
+  }
+}
+
 async function requireCurrent<TRecord>(
   read: Promise<
     | { readonly kind: 'absent' }
@@ -2166,6 +2216,12 @@ async function requireCurrent<TRecord>(
   const result = await read;
   if (result.kind === 'current' || result.kind === 'migrated') {
     return result.record;
+  }
+  if (result.kind === 'future') {
+    throw new UnreadableControlRecordError('future', `schemaVersion ${result.schemaVersion}`);
+  }
+  if (result.kind === 'corrupt') {
+    throw new UnreadableControlRecordError('corrupt', result.error);
   }
   throw new Error(`Expected current control record, received ${result.kind}.`);
 }

@@ -1,6 +1,6 @@
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
-import { TRANSACTION_INTENTS_PATH } from '@/core/bootstrap/StoragePaths';
+import { TRANSACTION_INTENTS_PATH } from '@/core/execution/ExecutionControlPaths';
 import {
   type TransactionCrashPoint,
   TransactionIntentCoordinator,

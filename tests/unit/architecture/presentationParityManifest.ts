@@ -577,6 +577,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/app/storage/VaultDurableStorage.ts',
       'src/core/execution/ExecutionBackendDescriptor.ts',
       'src/core/execution/ExecutionContracts.ts',
+      'src/core/execution/ExecutionControlPaths.ts',
       'src/core/execution/ExecutionControlRecords.ts',
       'src/core/execution/ExecutionControlRepositories.ts',
       'src/core/execution/ExecutionControlSchemas.ts',

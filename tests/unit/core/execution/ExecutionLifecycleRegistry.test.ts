@@ -1,7 +1,7 @@
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
-import { SETTINGS_TRANSITIONS_PATH } from '@/core/bootstrap/StoragePaths';
 import type { ResultRef } from '@/core/execution/ExecutionContracts';
+import { SETTINGS_TRANSITIONS_PATH } from '@/core/execution/ExecutionControlPaths';
 import { ExecutionControlRepositories } from '@/core/execution/ExecutionControlRepositories';
 import { ExecutionControlTransactionCoordinator } from '@/core/execution/ExecutionControlTransactionCoordinator';
 import type { RunId } from '@/core/execution/ExecutionIds';

@@ -46,9 +46,10 @@ describe('persistence decisions', () => {
   });
 
   describe('coupling to the code', () => {
-    // These pass trivially today because the control store does not exist yet.
-    // That is the point: they fire the moment it does, at the checkpoint where
-    // forgetting them is easiest.
+    // No longer trivial. The control store paths exist, and the documentation
+    // guard already fired once — that is how AGENTS.md got its row. They stay
+    // conditional because the paths now live in a dark module: when the first
+    // flip makes them reachable, both assertions become live again.
     const sourceModules = [...findReachableModules()];
 
     /**
