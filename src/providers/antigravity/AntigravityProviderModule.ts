@@ -99,10 +99,17 @@ export interface AntigravityWorkspaceContext {
  */
 export type AntigravityWorkspace = ProviderWorkspaceSlots;
 
-const antigravityChatUi: ProviderChatUiContribution = {
+const antigravityChatUi: ProviderChatUiContribution<AntigravityProviderSettings> = {
   modelPresentation: {
-    ownsModel: (modelId: string) => modelId.startsWith('antigravity:'),
-    label: (modelId: string) => modelId.replace(/^antigravity:/, ''),
+    // Antigravity's own models are prefixed; a model the user added by hand or
+    // discovered from `agy models` is owned too, which is why the settings are
+    // consulted rather than the prefix alone.
+    ownsModel: (modelId, settings) => modelId.startsWith('antigravity:')
+      || normalizeAntigravityVisibleModels(settings.visibleModels).includes(modelId)
+      || normalizeDiscoveredModels(settings.discoveredModels)
+        .some(model => model.rawId === modelId),
+    label: (modelId, settings) => normalizeAntigravityModelAliases(settings.modelAliases)[modelId]
+      ?? modelId.replace(/^antigravity:/, ''),
     contextWindow: () => undefined,
   },
   reasoningControl: { kind: 'effort', tiers: ['low', 'medium', 'high'] },
@@ -207,9 +214,9 @@ export const antigravitySettingsCodec: ProviderSettingsCodec<AntigravityProvider
       // `JSON.stringify` comparison reports every reconciliation as a change
       // purely from key ordering, and a settings write would follow every load.
       changed: !deepEqual(normalized, settings),
-      // No resumable session exists, so no conversation can be invalidated by
-      // reconciliation: the next run simply starts a fresh process.
-      invalidatedConversationIds: [],
+      // No resumable session exists, so there is nothing reconciliation could
+      // invalidate: the next run simply starts a fresh process.
+      invalidatesSessions: false,
     };
   },
 };

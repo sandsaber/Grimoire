@@ -100,8 +100,19 @@ export type ProviderSettingsReconcileReason = 'load' | 'environment-change' | 'm
 export interface ProviderSettingsReconcileResult<TSettings extends object> {
   readonly settings: TSettings;
   readonly changed: boolean;
-  /** Conversations whose provider session the reconciliation invalidated. */
-  readonly invalidatedConversationIds: readonly string[];
+  /**
+   * Whether the reconciliation makes this provider's existing sessions
+   * unusable.
+   *
+   * It first read `invalidatedConversationIds`, which no provider could ever
+   * fill: `reconcile` receives settings, not the conversation list, so the ids
+   * were unknowable from inside the module. Antigravity hid the flaw by having
+   * no resumable session to invalidate; Codex, which resumes by native thread
+   * id, exposed it. The host owns conversations and applies this to its own
+   * list — which is exactly what the legacy reconciler does when it walks every
+   * conversation of the provider.
+   */
+  readonly invalidatesSessions: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +246,7 @@ export interface ProviderSettingsPresentationPort<THost = unknown> {
 // Feature contributions — inventory rows 5, 8, 14, 15, 16
 // ---------------------------------------------------------------------------
 
-export interface ProviderFeatureContributions {
+export interface ProviderFeatureContributions<TSettings extends object = Record<string, unknown>> {
   readonly providerId: ProviderId;
   /** Provider-preloaded context file names. Inventory row 5. */
   readonly context?: ProviderContextPort;
@@ -244,7 +255,7 @@ export interface ProviderFeatureContributions {
    * split into named members here because losing the model picker inside a
    * "migrated" chatUIConfig is the precise shape of the v1 failure.
    */
-  readonly chatUI: ProviderChatUiContribution;
+  readonly chatUI: ProviderChatUiContribution<TSettings>;
   /** Hydration, fork state, session resolution, deletion. Inventory row 14. */
   readonly history?: ProviderHistoryPort;
   /** Provider task and tool result interpretation. Inventory row 15. */
@@ -257,17 +268,27 @@ export interface ProviderContextPort {
   preloadedFileNames(): readonly string[];
 }
 
-export interface ProviderChatUiContribution {
-  readonly modelPresentation: ProviderModelPresentation;
+export interface ProviderChatUiContribution<TSettings extends object = Record<string, unknown>> {
+  readonly modelPresentation: ProviderModelPresentation<TSettings>;
   readonly reasoningControl: ProviderReasoningControl;
   readonly permissionToggles: readonly ProviderPermissionToggle[];
   readonly icon: string;
 }
 
-export interface ProviderModelPresentation {
-  ownsModel(modelId: string): boolean;
-  label(modelId: string): string;
-  contextWindow(modelId: string): number | undefined;
+/**
+ * Model ownership and labelling.
+ *
+ * Each method takes the provider's decoded settings, because a user-configured
+ * or environment-supplied model is owned by the provider just as much as a
+ * built-in one. The first version of this slot omitted the parameter; writing
+ * the second module surfaced it, since the live chat UI config has always
+ * consulted settings and a settings-blind port would have silently disowned
+ * every custom model. Providers that need no settings can ignore the argument.
+ */
+export interface ProviderModelPresentation<TSettings extends object = Record<string, unknown>> {
+  ownsModel(modelId: string, settings: TSettings): boolean;
+  label(modelId: string, settings: TSettings): string;
+  contextWindow(modelId: string, settings: TSettings): number | undefined;
 }
 
 export type ProviderReasoningControl =
@@ -444,5 +465,5 @@ export interface ProviderModule<
   readonly execution: ExecutionBackendFactory<TExecutionContext>;
   readonly auxiliary: ProviderAuxiliaryContributions<TExecutionContext>;
   readonly capabilities: ProviderCapabilityDescriptor;
-  readonly features: ProviderFeatureContributions;
+  readonly features: ProviderFeatureContributions<TSettings>;
 }

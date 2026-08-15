@@ -604,6 +604,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/antigravity/runtime/AntigravityPrintProcessRunner.ts',
       'src/providers/antigravity/runtime/AntigravityPrintProtocol.ts',
       'src/providers/antigravity/runtime/AntigravityTranscriptRecovery.ts',
+      'src/providers/codex/CodexProviderModule.ts',
       'src/providers/codex/execution/CodexExecutionBackend.ts',
       'src/providers/codex/execution/CodexExecutionTurnReconciler.ts',
       'src/providers/codex/runtime/CodexExecutionConnection.ts',

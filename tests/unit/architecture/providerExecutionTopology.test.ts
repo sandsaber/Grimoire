@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { PROVIDER_EXECUTION_TOPOLOGY } from '@test/fixtures/providerExecutionTopology';
@@ -140,6 +140,56 @@ describe('provider execution topology', () => {
 
     it('names the fixture as the source of truth', () => {
       expect(document).toContain('tests/fixtures/providerExecutionTopology.ts');
+    });
+  });
+
+  describe('trace fixtures agree with this record', () => {
+    /**
+     * The per-provider trace fixtures carry a header describing the topology
+     * they were captured against, and until now nothing read it. Both existing
+     * headers had drifted into private vocabularies — `per-run-process` and
+     * `persistent-app-server` against this record's `process-per-run` and
+     * `persistent-daemon` — so a fixture could claim any topology at all. That
+     * matters at the semantic freeze, which uses these fixtures as the anchor
+     * for what each topology is allowed to do.
+     */
+    const TRACE_DIRECTORY = 'tests/fixtures/provider-traces';
+
+    const traces = readdirSync(resolve(process.cwd(), TRACE_DIRECTORY))
+      .filter(entry => entry.endsWith('-execution.json'))
+      .map(entry => ({
+        file: `${TRACE_DIRECTORY}/${entry}`,
+        header: JSON.parse(
+          readFileSync(resolve(process.cwd(), TRACE_DIRECTORY, entry), 'utf8'),
+        ) as Record<string, unknown>,
+      }));
+
+    it('has at least one trace to check', () => {
+      // Guards the guard: an empty directory would make every case below vacuous.
+      expect(traces.length).toBeGreaterThan(0);
+    });
+
+    it.each(traces)('$file matches the topology record', ({ header }) => {
+      const record = byId.get(header.providerId as string);
+
+      expect(record).toBeDefined();
+      expect(header.backendId).toBe(`provider-${header.providerId as string}`);
+      expect(header.topology).toBe(record?.topology);
+      expect(header.sessionBoundary).toBe(record?.sessionBoundary);
+      expect(header.resume).toBe(record?.resume);
+    });
+
+    it('has a trace for every provider with an execution backend', () => {
+      // A proof without its trace is a proof that cannot be replayed.
+      const proven = PROVIDER_EXECUTION_TOPOLOGY
+        .map(record => record.providerId)
+        .filter(providerId => existsSync(resolve(
+          process.cwd(),
+          `src/providers/${providerId}/execution`,
+        )));
+      const traced = traces.map(trace => trace.header.providerId as string);
+
+      expect(proven.filter(providerId => !traced.includes(providerId))).toEqual([]);
     });
   });
 

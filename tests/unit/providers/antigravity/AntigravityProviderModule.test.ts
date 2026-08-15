@@ -135,7 +135,7 @@ describe('Antigravity provider module', () => {
         'environment-change',
       );
 
-      expect(result.invalidatedConversationIds).toEqual([]);
+      expect(result.invalidatesSessions).toBe(false);
       expect(result.changed).toBe(false);
     });
 

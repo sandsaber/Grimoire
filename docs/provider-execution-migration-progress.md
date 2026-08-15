@@ -914,6 +914,62 @@ Gates: unit 436 suites / 7471 tests, integration 6 suites / 220 tests, `typechec
 Not in this commit: the Codex `ProviderModule`. v1's version targets the v1 contract and is rewritten
 against the M1 one, as Antigravity's was.
 
+### M2-proofs — Codex provider module (this commit)
+
+The wide module. Antigravity exercised the contract's floor — one execution slot, two workspace
+slots, everything else honestly absent. Codex fills seven workspace slots, native resume, native
+interactions, three auxiliary workflows, and a settings codec over twelve fields. That difference is
+the reason it is proof two, and it earned its keep: **both defects the M1 contract has needed so far
+were found by writing this module, not by reviewing the contract.**
+
+**Defect 1: `ProviderModelPresentation` was settings-blind.** Its methods took only a model id, while
+the live `codexChatUIConfig.ownsModel(model, settings)` has always consulted settings — that is how a
+model typed into the custom-models box, or supplied through `OPENAI_MODEL`, is recognized as the
+provider's own. A module built on the narrow signature would have disowned every custom model, and
+the failure would have appeared as a model silently belonging to no provider. The slot now takes the
+decoded settings, generic over the module's settings type. Antigravity's module gained the same
+fidelity in passing: it now recognizes discovered and visible models, and labels through its aliases,
+rather than matching a prefix.
+
+**Defect 2: `reconcile` was required to return something it could not know.** The result carried
+`invalidatedConversationIds`, but `reconcile` receives settings — not the conversation list — so no
+provider could ever fill it. Antigravity concealed this by having no resumable session; Codex, which
+resumes by native thread id, could not. It is now `invalidatesSessions: boolean`, decided by the
+module and applied by the host, which owns conversations. No fidelity is lost: the legacy reconciler
+already invalidates *every* conversation of the provider when the environment changes.
+
+Two things the module states more precisely than the code it replaces:
+
+- **environment invalidation is three named keys**, `OPENAI_MODEL`, `OPENAI_BASE_URL`, and
+  `OPENAI_API_KEY`, as `CodexSettingsReconciler` computes them — not the registration's
+  `/^OPENAI_/i` and `/^CODEX_/i` patterns, which invalidate a session when any matching variable
+  changes, including ones the daemon never reads. A test covers `OPENAI_LOG_LEVEL` not invalidating;
+- **`security.enforcement` is `native`**, where Antigravity's is `grimoire`. Codex's CLI owns its
+  approval and sandbox policy; Grimoire owns only the process boundary.
+
+**One divergence found in the shipped application, recorded rather than reconciled.** Codex registers
+a command catalog through `CodexWorkspaceServices` and can list skills through a short-lived
+app-server, but its capability record says `supportsProviderCommands: false`, so `TabManager` never
+asks for that catalog. The two statements are about different things — what the provider can do
+versus what the UI currently requests — and which one the module means is a flip decision, not a
+migration decision. `CodexProviderModule.test.ts` asserts both values so the question cannot be lost.
+
+**A second observation, outside this migration's scope.** `src/providers/codex/AGENTS.md` states
+"Codex is opt-in; `isEnabled()` defaults to false", while `DEFAULT_CODEX_PROVIDER_SETTINGS.enabled`
+is `true` and is what `getBuiltInProviderDefaultConfigs()` ships. Both have been that way since the
+initial release commit, so one of them has always been wrong. The module mirrors the code, because
+changing a shipped default is not a migration's call. Flagged for the owner to settle.
+
+Also in this commit: the trace fixture headers were reconciled with the canonical topology record.
+Both had drifted into private vocabularies — `per-run-process` and `persistent-app-server` against
+`process-per-run` and `persistent-daemon` — and **nothing read those headers at all**, so a fixture
+could have claimed any topology. `providerExecutionTopology.test.ts` now checks each fixture's
+topology, session boundary, resume, and backend id against the record, and requires a trace for every
+provider that has an execution backend, so a proof cannot land without one.
+
+Gates: unit 437 suites / 7496 tests, integration 6 suites / 220 tests, `typecheck`, `lint`,
+`build:release` clean, and the bundle assertions still find no Codex execution code in `main.js`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -926,12 +982,12 @@ topology and shared-resource records, persistence decisions) and **M1** (executi
 control-record persistence, local-shell internal backend, cross-platform CI with Windows
 process-tree conformance green).
 
-In progress: **M2-proofs — 1 of 4.** Antigravity has its execution backend and its `ProviderModule`,
-both dark.
+In progress: **M2-proofs — 2 of 4.** Antigravity (stateless process-per-run) and Codex (persistent
+daemon, multiplexed sessions) each have an execution backend and a `ProviderModule`, all dark.
 
-**Next action:** topology proof 2, Codex (`309f1558`), then Claude (`9dda0ebc`), then OpenCode
-(`cb631f53`) — each with backend, module on the M1 contract, settings codec, capability descriptor,
-shared conformance, and its trace fixture. Only after all four pass is the semantic freeze recorded,
+**Next action:** topology proof 3, Claude (`9dda0ebc`), then OpenCode (`cb631f53`) — each with
+backend, module on the M1 contract, settings codec, capability descriptor, shared conformance, and
+its trace fixture. Only after all four pass is the semantic freeze recorded,
 and its suite (`892eec78`) must be **rewritten** against the M1 `ProviderModule` contract rather
 than harvested, since it was written for the v1 contract.
 
