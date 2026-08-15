@@ -64,6 +64,9 @@ function createDriver(
       owner: { kind: 'conversation', ownerId: 'conformance-owner' },
       backendGeneration: 1,
     },
+    // Print mode is one process per run with no provider-side run identity, so
+    // there is nothing to address after a crash beyond the process itself.
+    expectedNativeRunRef: () => null,
     completeEmpty: () => process.complete({ exitCode: 0, stdout: '', stderr: '' }),
     completeSuccess: () => process.complete({ exitCode: 0, stdout: 'result', stderr: '' }),
     fireAllTimers: () => scheduler.fireAll(),

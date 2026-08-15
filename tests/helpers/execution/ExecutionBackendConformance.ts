@@ -29,6 +29,18 @@ export interface ExecutionBackendConformanceDriver {
   readonly backend: ExecutionBackend;
   readonly request: ExecutionRequest;
   readonly sessionConfig: ExecutionSessionConfig;
+  /**
+   * The provider's own identifier for the dispatched run, or `null` when the
+   * backend genuinely has none.
+   *
+   * Required rather than optional on purpose. The kernel reads this reference
+   * off run-scoped event scopes to fence a mismatched native run and to make
+   * crash recovery addressable, and TypeScript cannot check it: backends build
+   * the scope with a conditional spread, and spreads bypass excess-property
+   * checking, so a misspelled key type-checks and silently disables both.
+   * Making every provider state its answer is what turns that into a failure.
+   */
+  expectedNativeRunRef(): string | null;
   completeEmpty(): void;
   completeSuccess(): void;
   fireAllTimers(): void;
@@ -238,6 +250,23 @@ export function defineExecutionBackendConformance(
         },
       })).resolves.toEqual({ kind: 'ignored-post-terminal' });
       expect(registry.getRun(driver.request.runId)?.lastSequence).toBe(3);
+      await driver.backend.dispose();
+    });
+
+    it('reports its native run reference to the kernel under the contract name', async () => {
+      const driver = createDriver();
+      const registry = await createRegistry(driver);
+      await registry.createSession({
+        backendId: driver.backend.descriptor.backendId,
+        executionSessionId: driver.sessionConfig.executionSessionId,
+        owner: driver.sessionConfig.owner,
+      });
+      await registry.startRun(driver.sessionConfig.executionSessionId, driver.request);
+      await driver.waitForDispatch();
+      await waitForRegistryRun(registry, driver.request.runId, state => state === 'running');
+
+      expect(registry.getRun(driver.request.runId)?.nativeRunRef ?? null)
+        .toBe(driver.expectedNativeRunRef());
       await driver.backend.dispose();
     });
 

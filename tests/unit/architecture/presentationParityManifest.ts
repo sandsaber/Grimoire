@@ -573,6 +573,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
     owner: 'M2 — becomes reachable when the first provider flip wires the adapter over its backend.',
     modules: [
       'src/app/execution/antigravity/NodeAntigravityProcessTransport.ts',
+      'src/app/execution/codex/NodeCodexExecutionProcess.ts',
       'src/app/execution/local/NodeLocalShellProcessAdapter.ts',
       'src/app/storage/VaultDurableStorage.ts',
       'src/core/execution/ExecutionBackendDescriptor.ts',
@@ -603,6 +604,9 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/antigravity/runtime/AntigravityPrintProcessRunner.ts',
       'src/providers/antigravity/runtime/AntigravityPrintProtocol.ts',
       'src/providers/antigravity/runtime/AntigravityTranscriptRecovery.ts',
+      'src/providers/codex/execution/CodexExecutionBackend.ts',
+      'src/providers/codex/execution/CodexExecutionTurnReconciler.ts',
+      'src/providers/codex/runtime/CodexExecutionConnection.ts',
     ],
   },
 ];

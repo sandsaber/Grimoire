@@ -853,6 +853,67 @@ lint — was measured by gates that do fail, and stands.
   recordings. The checkpoint text implied M0b was partly satisfied; the status table always said
   otherwise. The resume pointer now states it explicitly.
 
+### M2-proofs — topology proof 2 of 4: Codex (this commit)
+
+Persistent app-server, multiplexed sessions over one JSON-RPC connection — the opposite end of the
+topology range from proof one, which is why it is second. Dark: `darkBundle.test.ts` now also asserts
+the Codex backend descriptor and the connection's identifiers are absent from the built `main.js`.
+
+Slice: `CodexExecutionBackend`, `CodexExecutionTurnReconciler`, the provider-owned
+`CodexExecutionConnection`, and the app-owned `NodeCodexExecutionProcess` that owns the process tree
+and the stdin pipe. The local shell layer gained `stdin: 'pipe'`, including through the Windows job
+guardian, because a persistent daemon needs a writable pipe where a print-mode run does not.
+
+**Three findings, in descending order of how quietly they would have shipped.**
+
+**1. A harvested field name survived a kernel rename because a spread hid it.** The backend builds a
+run-scoped event as `{ kind: 'run', runId, ...(turnId ? { turnId } : {}) }`. This branch renamed that
+field to `nativeRunRef` during M1. TypeScript does not excess-property-check spread properties, so
+the stale name type-checked, and all 703 Codex tests passed. The consequences were not cosmetic: the
+registry reads `scope.nativeRunRef` to fence a mismatched native run and to persist the run's
+provider-side identity, so Codex would have had **no addressable run after a crash** — its recovery
+port queries by exactly that reference — and the fencing check would never have fired.
+
+The fix is one word. The guard is the point: `ExecutionBackendConformance` now requires every driver
+to answer `expectedNativeRunRef()`, with `null` as an explicit statement that the backend has no
+provider-side run identity, and asserts the registry's run record matches. Not optional, because an
+optional member is opted out of by silence. Verified by re-introducing `turnId`: typecheck stays
+clean, the conformance test fails. Antigravity answers `null` (print mode owns no run identity), the
+deterministic fake answers `null`, Codex answers its app-server turn ID. The two harvested unit
+assertions that pinned the old name were updated to the contract name.
+
+**2. The cross-platform matrix was covering less than it looked.** It selects suites by regular
+expression, and the integration step matched the literal `LocalShellProcessOwnership` — so the new
+Codex process-ownership test would have been skipped on all three platforms while the job reported
+green. Both steps now select by directory, and `executionPlatformCoverage.test.ts` asserts the
+patterns still cover every suite under the platform-sensitive roots, match under both path
+separators, do not widen into unrelated suites, and that `--passWithNoTests` never appears in an
+executable line. Scope is stated rather than assumed: the matrix is for process ownership and
+platform primitives; provider protocol state machines are platform-independent and stay in
+`validate`.
+
+**3. The live JSON-RPC transport was changed, deliberately and partially.** v1 generalized
+`CodexRpcTransport` in this same commit so both paths could share it. It has five live consumers
+including `CodexChatRuntime`, so it was taken in pieces rather than wholesale:
+
+- **taken**, type-level: the constructor now accepts a `CodexRpcProcessPort` instead of the concrete
+  `CodexAppServerProcess`. Structural, no behavior change, and it is what avoids a second copy of the
+  protocol drifting against the first;
+- **taken**, as a bug fix the frozen-path rule allows: a broken stdin pipe now settles the transport
+  and rejects in-flight requests instead of surfacing an unhandled stream `error` while every caller
+  waits out a 30-second timeout. `onConnectionLost` is additive — nothing on the chat runtime path
+  subscribes, and the execution backend must, since a run whose transport died has to settle as
+  indeterminate rather than hang;
+- **refused**: v1's `dispose()` rewrite, which would have replaced a live error message for no
+  benefit to the dark path, and would have overwritten the more specific failure reason. Four new
+  transport tests cover the loss path; the existing 654 Codex tests were unchanged by the edit.
+
+Gates: unit 436 suites / 7471 tests, integration 6 suites / 220 tests, `typecheck`, `lint`,
+`build:release` all clean. Parity manifest: 34 modules dark under `execution-platform-dark`.
+
+Not in this commit: the Codex `ProviderModule`. v1's version targets the v1 contract and is rewritten
+against the M1 one, as Antigravity's was.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

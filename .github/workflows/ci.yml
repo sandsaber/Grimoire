@@ -110,6 +110,10 @@ jobs:
         shell: bash
         run: npm run test -- --selectProjects unit --runInBand --testPathPatterns "tests[\\/]unit[\\/](core|app)[\\/]execution"
 
+      # Selected by directory rather than by suite name, so a new owned-process
+      # proof is covered by where it is filed instead of by remembering to
+      # extend this line. `executionPlatformCoverage.test.ts` asserts that both
+      # patterns still cover every suite under those directories.
       - name: Verify host process ownership
         shell: bash
-        run: npm run test -- --selectProjects integration --runInBand --testPathPatterns "LocalShellProcessOwnership"
+        run: npm run test -- --selectProjects integration --runInBand --testPathPatterns "tests[\\/]integration[\\/]app[\\/]execution"

@@ -43,6 +43,8 @@ function createDriver(
       owner: { kind: 'conversation', ownerId: 'fake-conformance' },
       backendGeneration: 1,
     },
+    // The fake stands in for a backend with no provider-side run identity.
+    expectedNativeRunRef: () => null,
     completeEmpty: () => backend.completeRun(targetRunId, false),
     completeSuccess: () => backend.completeRun(targetRunId, true),
     fireAllTimers: () => undefined,

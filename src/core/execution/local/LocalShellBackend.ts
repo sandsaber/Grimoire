@@ -37,6 +37,8 @@ export interface LocalShellLaunchSpec {
   readonly cwd?: string;
   readonly environment?: Readonly<Record<string, string>>;
   readonly terminationKind: LocalShellTerminationTarget['kind'];
+  /** Application-owned protocol daemons may request a writable stdin pipe. */
+  readonly stdin?: 'ignore' | 'pipe';
   /** Windows-only wrapper for executable forms that CreateProcess cannot invoke directly. */
   readonly windowsInvocationMode?: 'direct' | 'argument-array';
 }

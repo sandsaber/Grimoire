@@ -29,6 +29,8 @@ const DARK_MARKERS = [
   { marker: 'Expected current control record', why: 'lifecycle registry internals' },
   { marker: 'Execution owner kind is invalid', why: 'lifecycle registry validation' },
   { marker: 'provider-antigravity', why: 'the Antigravity execution backend descriptor' },
+  { marker: 'provider-codex', why: 'the Codex execution backend descriptor' },
+  { marker: 'Codex execution connection is not initialized', why: 'the Codex execution connection' },
 ];
 
 function readBundle(): string | null {
