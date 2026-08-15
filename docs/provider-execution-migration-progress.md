@@ -208,9 +208,37 @@ clean, `lint` clean, `build:release` passed with no artifact drift.
 
 Contribution inventory rows moved: none.
 
+### M0a — contribution inventory made executable (this commit)
+
+[`provider-contribution-inventory.md`](provider-contribution-inventory.md) is no longer prose that
+can drift. `tests/unit/architecture/providerContributionInventory.test.ts` (26 tests) asserts it
+against reality from two directions:
+
+- the markdown tables are parsed and compared to the interface members declared in
+  `src/core/providers/types.ts`, read through the TypeScript AST by the new
+  `tests/helpers/interfaceMembers.ts` (interfaces are erased at runtime, so a table cannot be
+  checked against a type any other way) — exact set equality for the 16 `ProviderRegistration`
+  fields and the 11 `ProviderWorkspaceServices` members, plus the advertised counts;
+- all nine registration objects are imported and checked to supply every required field and no
+  undocumented one, so a provider cannot smuggle in a contribution the inventory does not know.
+
+The three app-level rows are anchored individually: `workspaceCapabilities` on
+`ProviderWorkspaceRegistration`, `getBuiltInProviderDefaultConfigs()` covering all nine providers,
+and the row's claim that workspace init exists while dispose does not — pinned as
+`initializeAll` present, `disposeAll` absent, so the day a dispose contract lands the row must move
+with it.
+
+Verified by injection: adding an undocumented optional field to `ProviderRegistration` fails
+`documents exactly the declared fields`.
+
+Gates: unit suite, `typecheck`, and `lint` all exit 0. Parity manifest state: unchanged.
+Contribution inventory rows moved: none — the table is now enforced at its current state.
+
 ## Current blocker
 
-M0a is in progress on `providers-migration`. The parity gate is enforced; the next action is the
-contribution-inventory fitness test (WP3) that asserts the 16 + 11 + 3 rows of
-[`provider-contribution-inventory.md`](provider-contribution-inventory.md) against the real
-`ProviderRegistration`, `ProviderWorkspaceServices`, and registration-hub shapes.
+M0a is in progress on `providers-migration`. The three mechanical gates (walker, parity manifest,
+contribution inventory) are green and enforced. The next action is WP4, the presentation adapter
+specification: a method-by-method mapping of all 31 `ChatRuntime` members
+(`src/core/runtime/ChatRuntime.ts:20-67`) to a session/run operation, a capability port, or an
+explicit absence, with the synchronous-`cancel()`/generator-end question and the real
+`InputController` dependencies resolved on paper.
