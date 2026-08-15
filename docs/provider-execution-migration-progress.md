@@ -71,7 +71,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | Consistency pass: inventory completed (+3 rows), WorkGraph removed from operational target, stop condition aligned with mixed-authority rule, harvest source map, resumability rules | Complete | `da05d8e` |
 | Third review applied: kernel-in-production-at-first-flip owned (interim kernel host, storage docs, revert safety, unload), adapter bound to the lifecycle registry, capability-driven flip smoke, providerState parity gate, release-train rules, shared-resource inventory in M0a | Complete | `6df5658` |
 | UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | this commit |
-| M0a — parity gate and adapter contract | Not started | — |
+| M0a — parity gate and adapter contract | In progress — baseline recorded | this commit |
 | M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Not started | — |
 | M1 — execution kernel, dark-launched | Not started | — |
 | M2-proofs — four topology proofs, dark | Not started | — |
@@ -96,6 +96,56 @@ Every checkpoint recorded here must use this shape — executed evidence only:
 - What remains open, as concrete items with an owning milestone.
 ```
 
+## Checkpoints
+
+### M0a — baseline gate recorded (this commit)
+
+Gate commands run on `b94a588` (branch tip before this commit), after `npm ci`:
+
+| Command | Result |
+|---|---|
+| `npm run test -- --selectProjects unit` | 400 suites, 6963 tests, all passed (7.4 s) |
+| `npm run test -- --selectProjects integration` | 4 suites, 216 tests, all passed (3.2 s) |
+| `npm run typecheck` | clean |
+| `npm run lint` | clean |
+| `npm run build:release` | passed, including `review:source`, `review:css`, `review:deps`, release-metadata validation, and both release verifiers (`verify-release-load`, `verify-release-smoke`); working tree stayed clean, so generated artifacts match source output |
+
+Reachability probe (the M0a walker run ad hoc from the archived branch's
+`tests/helpers/moduleReachability.ts`, not yet checked in): 536 modules under `src/`, 527 reachable
+from `src/main.ts`, **9 unreachable**. None of the nine is referenced anywhere in `src/`; each is
+kept alive only by its own unit test. They are listed below and must all carry an explicit manifest
+verdict before the parity gate can be bidirectional.
+
+- `src/features/chat/rendering/TodoListRenderer.ts`, `src/providers/claude/storage/GrimoireSettingsStorage.ts`,
+  `src/providers/claude/storage/SessionStorage.ts` — re-export barrels whose targets are reachable;
+- `src/providers/gemini/types/index.ts`, `src/providers/qwen/types/index.ts` — `*ProviderState`
+  helpers with zero consumers;
+- `src/providers/acp/history/sqliteModule.ts` (28 lines), `src/core/context/ContextIngestionService.ts`
+  (93 lines), `src/providers/codex/runtime/CodexSessionFileTail.ts` (792 lines) — real
+  implementations with tests and no production consumer; each needs an evidence-backed decision;
+- `src/i18n/constants.ts` — belongs to staged i18n work (`origin/pr/01-i18n-foundation`), not to
+  this migration.
+
+Parity manifest state: not created yet (M0a work item). Contribution inventory rows moved: none.
+Deleted: nothing.
+
+Two environment facts worth carrying to another machine:
+
+- `npm ci` is mandatory before trusting the gate. A stale `node_modules` (here: `obsidian` 1.12.3
+  against lockfile 1.13.1) produces nine phantom `typecheck` errors in
+  `src/features/settings/GrimoireSettings.ts` and `ClaudeDynamicUpdates.ts` that vanish after a
+  clean install. They are not real defects;
+- running Jest concurrently with `tsc` produced one spurious `database is locked` suite failure in
+  `tests/unit/providers/claude/stream/transformSDKMessage.test.ts`. The suite passes alone and in a
+  serial full run. Per the repository testing rules this is an environment restriction, not a test
+  defect — run the gate commands serially.
+
+Open items, all owned by M0a: the import-graph walker is not checked in (WP1), the parity manifest
+and its fitness test do not exist (WP2), the contribution-inventory fitness test does not exist
+(WP3), the adapter specification is unwritten (WP4).
+
 ## Current blocker
 
-M0a has not started (active branch: `providers-migration`). Nothing else may start first.
+M0a is in progress on `providers-migration`. The baseline gate is recorded; the next action is
+checking in the import-graph walker as `tests/helpers/moduleReachability.ts` with its own test,
+ported from `origin/codex/provider-architecture-research`.
