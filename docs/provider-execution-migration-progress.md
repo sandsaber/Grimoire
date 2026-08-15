@@ -970,6 +970,53 @@ provider that has an execution backend, so a proof cannot land without one.
 Gates: unit 437 suites / 7496 tests, integration 6 suites / 220 tests, `typecheck`, `lint`,
 `build:release` clean, and the bundle assertions still find no Codex execution code in `main.js`.
 
+### M2-proofs — topology proof 3 of 4: Claude (this commit)
+
+Persistent SDK stream, serial runs — persistent like Codex but one turn at a time, the third distinct
+topology. Backend, adapters, task-output loader, auxiliary query, module, and trace, all dark.
+
+**The conformance guard added at proof two paid for itself immediately.** Claude's harvested backend
+carried the same stale `turnId` in its run scope, so the field-name defect was systematic across v1's
+backends rather than a Codex accident. It failed on the first run of the suite. OpenCode should be
+assumed to carry it too.
+
+Claude is the only provider that fills every remaining slot, and it found the contract's last two
+gaps:
+
+**Defect 3: `capabilities.conversation.rewind` had no port to land on.** Fork, steering, and
+compaction are runs and travel through the execution backend as requests; rewind is not a run — it
+edits the transcript and can restore files. The adapter contract already mapped `ChatRuntime` member
+20 to "a rewind port; only Claude declares it today", and that port did not exist, so a provider
+could declare `rewind: 'native'` with no way for the host to perform it. `ProviderRewindPort` now
+exists. Its outcome type is deliberately not `ChatRewindResult`: that type reports `canRewind`, which
+conflates "the rewind happened" with "a rewind would be possible", leaving callers to read `error` to
+tell them apart.
+
+**Defect 4: `features` was a static object, so context-dependent ports were unfillable.** History
+hydration, session deletion, and rewind all need vault-facing services. Antigravity did not notice,
+having none of them — but **Codex's module shipped one commit ago without its history port and
+without saying so**, which is exactly the silent contribution loss this migration exists to prevent,
+committed by the migration itself. `features` is now a factory over the same context the workspace
+initializes from; Codex gained its history and native-agent ports, and Claude contributes history,
+rewind, task results, and native agents.
+
+Both defects have the same shape as defect 2 from proof two: a slot that looks filled in review and
+cannot be filled in practice. Three of the four were invisible until a provider that needed them was
+written, which is the argument for four proofs rather than one.
+
+Claude-only slots, each asserted with real behavior rather than declaration: Grimoire-owned MCP
+(load, save, start, stop), transcript rewind, static *and* session command discovery, and subagent
+cancellation — the one provider so far that can stop a running subagent, still with `statusQuery` and
+`reattachment` false, because the three are separate fields on purpose.
+
+One behavior worth recording: Claude folds the project-settings hash into its environment hash when
+`respectProjectSettings` is on, so a changed `.claude/settings.json` invalidates sessions like an
+environment change. The snapshot hash is derived from the model and environment rather than stored, so
+a stale hash from an older write is recomputed instead of trusted.
+
+Gates: unit 441 suites / 7564 tests, integration 6 suites / 220 tests, `typecheck`, `lint`,
+`build:release` clean, bundle assertions find no Claude execution code in `main.js`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -982,12 +1029,14 @@ topology and shared-resource records, persistence decisions) and **M1** (executi
 control-record persistence, local-shell internal backend, cross-platform CI with Windows
 process-tree conformance green).
 
-In progress: **M2-proofs — 2 of 4.** Antigravity (stateless process-per-run) and Codex (persistent
-daemon, multiplexed sessions) each have an execution backend and a `ProviderModule`, all dark.
+In progress: **M2-proofs — 3 of 4.** Antigravity (stateless process-per-run), Codex (persistent
+daemon, multiplexed sessions), and Claude (persistent SDK stream, serial runs) each have an execution
+backend and a `ProviderModule`, all dark.
 
-**Next action:** topology proof 3, Claude (`9dda0ebc`), then OpenCode (`cb631f53`) — each with
-backend, module on the M1 contract, settings codec, capability descriptor, shared conformance, and
-its trace fixture. Only after all four pass is the semantic freeze recorded,
+**Next action:** topology proof 4, OpenCode (`cb631f53`) — managed ACP subprocess — with backend,
+module on the M1 contract, settings codec, capability descriptor, shared conformance, and its trace
+fixture. Expect its harvested backend to carry the same stale `turnId` run-scope field the Codex and
+Claude backends did; the conformance suite catches it. Only after all four pass is the semantic freeze recorded,
 and its suite (`892eec78`) must be **rewritten** against the M1 `ProviderModule` contract rather
 than harvested, since it was written for the v1 contract.
 

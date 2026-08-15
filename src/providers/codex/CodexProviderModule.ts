@@ -2,8 +2,10 @@ import type {
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandDescriptor,
+  ProviderHistoryHydration,
   ProviderModelDescriptor,
   ProviderModule,
+  ProviderNativeAgentDisplay,
   ProviderSettingsCodec,
   ProviderSettingsReconcileResult,
   ProviderUsageSnapshot,
@@ -50,6 +52,8 @@ import { DEFAULT_CODEX_MODEL_SET, formatCodexModelLabel } from './types/models';
  *   is deliberately a no-op, since Grimoire's async task system does not apply
  *   to Codex. Contributing it would be a present-but-empty slot, which the
  *   contract forbids precisely because the UI cannot tell the difference;
+ * - **no rewind.** Codex forks and compacts through the execution backend, both
+ *   of which are runs; it has no transcript rewind;
  * - **no context files.** Codex preloads none through Grimoire.
  */
 
@@ -95,6 +99,12 @@ export interface CodexWorkspaceContext {
   readPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   shouldKeepWarm(): boolean;
   renderSettingsTab(host: unknown): void;
+  hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
+  deleteConversationSession(conversationId: string): Promise<void>;
+  resolveSessionId(conversationId: string): string | null;
+  isPendingFork(conversationId: string): boolean;
+  recognizesSubagentTool(toolName: string): boolean;
+  parseSubagentDisplay(payload: unknown): ProviderNativeAgentDisplay | null;
   /** Releases the skill storage, agent mention provider, and usage store. */
   dispose(): Promise<void>;
 }
@@ -329,10 +339,20 @@ CodexProviderSettings
 
   capabilities: codexCapabilities,
 
-  features: {
+  features: context => ({
     providerId: 'codex',
     chatUI: codexChatUi,
-  },
+    history: {
+      hydrate: conversationId => context.hydrateConversation(conversationId),
+      deleteSession: conversationId => context.deleteConversationSession(conversationId),
+      resolveSessionId: conversationId => context.resolveSessionId(conversationId),
+      isPendingFork: conversationId => context.isPendingFork(conversationId),
+    },
+    nativeAgents: {
+      recognizesToolName: toolName => context.recognizesSubagentTool(toolName),
+      parseDisplay: payload => context.parseSubagentDisplay(payload),
+    },
+  }),
 };
 
 function createDefaultSettings(): CodexProviderSettings {

@@ -54,9 +54,14 @@ describe('Antigravity provider module', () => {
     });
 
     it('omits feature ports it has nothing to put in', () => {
-      const features = antigravityProviderModule.features;
+      const features = antigravityProviderModule.features({
+        resolveCliPath: async () => null,
+        listModels: async () => [],
+        refreshModels: async () => [],
+      });
 
       expect(features.history).toBeUndefined();
+      expect(features.rewind).toBeUndefined();
       expect(features.taskResults).toBeUndefined();
       expect(features.nativeAgents).toBeUndefined();
       // chatUI is not optional: every provider renders somewhere.

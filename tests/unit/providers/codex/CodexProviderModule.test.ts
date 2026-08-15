@@ -26,8 +26,18 @@ describe('Codex provider module', () => {
       readPlanUsage: async () => ({ label: 'Plus', usedFraction: 0.25 }),
       shouldKeepWarm: () => true,
       renderSettingsTab: () => undefined,
+      hydrateConversation: async () => ({ outcome: 'complete' as const }),
+      deleteConversationSession: async () => undefined,
+      resolveSessionId: () => 'thread-1',
+      isPendingFork: () => false,
+      recognizesSubagentTool: toolName => toolName === 'Agent',
+      parseSubagentDisplay: () => ({ agentId: 'sub-1', label: 'Reviewer' }),
       dispose: async () => undefined,
     };
+  }
+
+  function features(): ReturnType<typeof codexProviderModule.features> {
+    return codexProviderModule.features(createContext());
   }
 
   it('declares its identity and ordering from the registration it replaces', () => {
@@ -110,7 +120,7 @@ describe('Codex provider module', () => {
     it('omits the deliberately no-op task result interpreter', () => {
       // Present-but-empty is the one shape the contract forbids: the UI cannot
       // tell it apart from a working port.
-      expect(codexProviderModule.features.taskResults).toBeUndefined();
+      expect(features().taskResults).toBeUndefined();
     });
 
     it('omits runtime command discovery, which Codex does through a separate process', async () => {
@@ -249,7 +259,7 @@ describe('Codex provider module', () => {
         ...codexSettingsCodec.defaults(),
         customModels: 'internal-review-model\nsecond-model',
       };
-      const presentation = codexProviderModule.features.chatUI.modelPresentation;
+      const presentation = features().chatUI.modelPresentation;
 
       expect(presentation.ownsModel('internal-review-model', settings)).toBe(true);
       expect(presentation.ownsModel('gpt-5.5', settings)).toBe(true);
@@ -258,7 +268,7 @@ describe('Codex provider module', () => {
 
     it('gives no context window to a model it does not own', () => {
       const settings = codexSettingsCodec.defaults();
-      const presentation = codexProviderModule.features.chatUI.modelPresentation;
+      const presentation = features().chatUI.modelPresentation;
 
       expect(presentation.contextWindow('gpt-5.5', settings)).toBe(200_000);
       expect(presentation.contextWindow('claude-opus-5', settings)).toBeUndefined();

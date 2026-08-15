@@ -258,6 +258,16 @@ export interface ProviderFeatureContributions<TSettings extends object = Record<
   readonly chatUI: ProviderChatUiContribution<TSettings>;
   /** Hydration, fork state, session resolution, deletion. Inventory row 14. */
   readonly history?: ProviderHistoryPort;
+  /**
+   * Transcript rewind. Adapter contract member 20.
+   *
+   * A slot the first version lacked. Fork, steering, and compaction are runs
+   * and travel through the execution backend as requests; rewind is not a run —
+   * it edits the transcript and can restore files — so it had nowhere to land,
+   * and `capabilities.conversation.rewind` could say `native` with no way for
+   * the host to perform it. Only Claude declares it today.
+   */
+  readonly rewind?: ProviderRewindPort;
   /** Provider task and tool result interpretation. Inventory row 15. */
   readonly taskResults?: ProviderTaskResultPort;
   /** Subagent tool-name recognition and display parsing. Inventory row 16. */
@@ -321,6 +331,36 @@ export type ProviderHistoryHydration =
   | { readonly outcome: 'stale'; readonly reason: string }
   | { readonly outcome: 'corrupt'; readonly reason: string }
   | { readonly outcome: 'recovered'; readonly reason: string };
+
+export interface ProviderRewindPort {
+  rewind(input: ProviderRewindRequest): Promise<ProviderRewindOutcome>;
+}
+
+export interface ProviderRewindRequest {
+  readonly executionSessionId: string;
+  readonly userMessageId: string;
+  readonly assistantMessageId: string;
+  /** Same vocabulary as the neutral `ChatRewindMode` this replaces. */
+  readonly mode: 'conversation' | 'code-and-conversation';
+}
+
+/**
+ * Deliberately not `ChatRewindResult`.
+ *
+ * That type reports `canRewind`, which conflates "the rewind happened" with
+ * "a rewind would be possible" — the legacy call sites have to read `error` to
+ * tell the two apart. An outcome that says which one occurred is the whole
+ * reason for restating it here.
+ */
+export type ProviderRewindOutcome =
+  | {
+    readonly outcome: 'rewound';
+    readonly filesChanged: readonly string[];
+    readonly insertions?: number;
+    readonly deletions?: number;
+  }
+  | { readonly outcome: 'unavailable'; readonly reason: string }
+  | { readonly outcome: 'failed'; readonly reason: string };
 
 export interface ProviderTaskResultPort {
   interpret(toolName: string, payload: unknown): ProviderTaskResultSummary | null;
@@ -465,5 +505,16 @@ export interface ProviderModule<
   readonly execution: ExecutionBackendFactory<TExecutionContext>;
   readonly auxiliary: ProviderAuxiliaryContributions<TExecutionContext>;
   readonly capabilities: ProviderCapabilityDescriptor;
-  readonly features: ProviderFeatureContributions<TSettings>;
+  /**
+   * A factory over the same context the workspace initializes from.
+   *
+   * It was a plain object at first, which made every context-dependent port
+   * unfillable: history hydration, session deletion, and rewind all need
+   * vault-facing services, so a static object could carry only the chat UI.
+   * Antigravity did not notice, having none of them; Codex and Claude both have
+   * real history services that would have been dropped at their flip — the
+   * exact loss this migration exists to prevent. Synchronous on purpose: these
+   * are ports, and constructing a port must not do work.
+   */
+  features(context: TWorkspaceContext): ProviderFeatureContributions<TSettings>;
 }

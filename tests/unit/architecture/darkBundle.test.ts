@@ -31,6 +31,7 @@ const DARK_MARKERS = [
   { marker: 'provider-antigravity', why: 'the Antigravity execution backend descriptor' },
   { marker: 'provider-codex', why: 'the Codex execution backend descriptor' },
   { marker: 'Codex execution connection is not initialized', why: 'the Codex execution connection' },
+  { marker: 'provider-claude', why: 'the Claude execution backend descriptor' },
 ];
 
 function readBundle(): string | null {
