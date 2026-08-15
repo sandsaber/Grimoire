@@ -306,10 +306,41 @@ extracted to `tests/helpers/inputControllerHarness.ts`. That file's 142 tests pa
 
 Gates: unit and integration suites, `typecheck`, and `lint` all exit 0.
 
+### M0a — capability, topology, and shared-resource records (this commit)
+
+Every provider now has an execution record, machine-readable so the M2 flip's auxiliary-contention
+check verifies against something instead of against a recollection.
+
+- `tests/fixtures/providerExecutionTopology.ts` — the source of truth: process topology, session
+  boundary, resume, concurrency, auxiliary execution owner, and the shared-resource inventory, with
+  the modules each claim was read from;
+- `docs/provider-capability-topology.md` — the readable rendering;
+- `tests/unit/architecture/providerExecutionTopology.test.ts` (51 tests) — asserts coverage against
+  the registration hub itself, that every cited module exists, that the document agrees with the
+  fixture, and that no provider declares a `contended` resource.
+
+Findings that matter for the flip order:
+
+- **Antigravity, Gemini, and Qwen register no-op auxiliary services.** They cannot produce
+  auxiliary contention at all, which makes them the cheapest providers to flip on that axis;
+- the six providers with real auxiliary execution isolate it by construction, verified in code:
+  Claude runs auxiliary queries cold with `persistSession: false`; Codex starts its own app-server
+  process and thread; the managed-ACP four give each auxiliary runner its own subprocess, transport,
+  session id, and artifact subdirectory under `.grimoire/<provider>/auxiliary/<purpose>/`, with
+  Grok additionally deriving a separate `GROK_HOME`;
+- **no provider declares a contended resource today**, so no flip is blocked on this condition. The
+  claim is read from code, not from live runs — trace evidence is M0b's job.
+
+Sharing is classified `read-only`, `partitioned`, or `contended`; a single `contended` entry is a
+flip stop condition. Providers with no auxiliary execution still carry an explicit row saying so,
+because an empty list reads as an unexamined claim and the test rejects it.
+
+Gates: unit suite, `typecheck`, `lint` all exit 0.
+
 ## Current blocker
 
-M0a is in progress on `providers-migration`. Gates and both contract suites are green. The next
-action is WP6: per-provider capability and topology records plus the machine-readable
-shared-resource inventory (ports, locks, session files, sockets, daemons shared between the chat and
-auxiliary paths) that the M2 flip's auxiliary-contention check verifies against. Then WP7
-persisted-state fixtures and WP8 the persistence and retention decision record.
+M0a is in progress on `providers-migration`. The next action is WP7: characterization fixtures for
+persisted state — `.grimoire/grimoire-settings.json`, `.grimoire/sessions/*.meta.json`, persisted
+tab state, and per-provider conversation `providerState` — proving provider-native data is
+byte-preserved by the harness. Then WP8, the persistence and retention decision record covering the
+durable control store that reaches production at the first M2 flip.
