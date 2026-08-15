@@ -1,0 +1,21 @@
+{
+  "openTabs": [
+    {
+      "tabId": "tab-1",
+      "conversationId": "session-m0a-fixture",
+      "draftModel": "gpt-5.3-codex",
+      "draftSettings": {
+        "reasoningEffort": "high",
+        "providerOwnedDraftField": "kept verbatim"
+      },
+      "orchestratorMode": false
+    },
+    {
+      "tabId": "tab-2",
+      "conversationId": null,
+      "draftModel": null,
+      "draftSettings": null
+    }
+  ],
+  "activeTabId": "tab-1"
+}

@@ -337,10 +337,34 @@ because an empty list reads as an unexamined claim and the test rejects it.
 
 Gates: unit suite, `typecheck`, `lint` all exit 0.
 
+### M0a — persisted-state characterization fixtures (this commit)
+
+The compatibility promise now has evidence instead of a claim.
+`tests/unit/core/storage/persistedStateCharacterization.test.ts` (14 tests) runs real storage code
+against checked-in fixtures under `tests/fixtures/persisted-state/`, through a new
+`tests/helpers/inMemoryVaultAdapter.ts` that actually holds written bytes — a mocked `write` cannot
+prove preservation, only that it was called.
+
+Each fixture deliberately carries fields this build does not model, as a newer build would have
+written them. Confirmed: session metadata survives a load-save cycle with unknown top-level fields,
+the whole `providerState` bag, and the fork source intact, through both `loadMetadata` and
+`listMetadata`.
+
+Two behaviors were characterized rather than endorsed, both relevant to later milestones:
+
+- **a session whose `providerId` is not registered is silently dropped** — it vanishes from history
+  with no error and no trace (`isSupportedSessionMetadata` at
+  `src/core/bootstrap/SessionStorage.ts:81`). This is precisely what the plan's typed hydration
+  outcomes (`absent`, `partial`, `stale`, `corrupt`, `recovered`) exist to replace;
+- **`providerState` accessors are unvalidated passthroughs**: `getCodexState` and `getClaudeState`
+  return whatever was on disk, so a corrupt bag reaches provider code unchanged. Validation belongs
+  at M4's versioned persistence boundary, where a bad record becomes a typed outcome.
+
+Gates: unit suite, `typecheck`, `lint` all exit 0.
+
 ## Current blocker
 
-M0a is in progress on `providers-migration`. The next action is WP7: characterization fixtures for
-persisted state — `.grimoire/grimoire-settings.json`, `.grimoire/sessions/*.meta.json`, persisted
-tab state, and per-provider conversation `providerState` — proving provider-native data is
-byte-preserved by the harness. Then WP8, the persistence and retention decision record covering the
-durable control store that reaches production at the first M2 flip.
+M0a is in progress on `providers-migration`. The next action is WP8, the last work package before
+the milestone gate: the persistence and retention decision record — lifecycle and result retention,
+user deletion, schema versions, diagnostic redaction — covering the durable control store
+explicitly, because the kernel reaches production at the first M2 flip rather than at M4.
