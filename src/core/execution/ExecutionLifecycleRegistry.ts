@@ -621,6 +621,12 @@ export class ExecutionLifecycleRegistry {
           executionSessionId: executionSessionId(session.record.executionSessionId),
           sessionInstanceId: sessionInstanceId(session.record.sessionInstanceId),
           runId,
+          ...(session.record.nativeSessionRef
+            ? { nativeSessionRef: session.record.nativeSessionRef }
+            : {}),
+          ...(current.record.nativeRunRef
+            ? { nativeRunRef: current.record.nativeRunRef }
+            : {}),
           cancellationRequested: current.record.cancellationRequested,
           resultExpectation: current.record.resultExpectation,
         },
@@ -977,6 +983,9 @@ export class ExecutionLifecycleRegistry {
           executionSessionId: typedSessionId,
           owner: current.payload.owner,
           backendGeneration: current.payload.backendGeneration,
+          ...(current.payload.nativeSessionRef
+            ? { nativeSessionRef: current.payload.nativeSessionRef }
+            : {}),
         });
       } catch {
         continue;
@@ -1163,12 +1172,24 @@ export class ExecutionLifecycleRegistry {
     if (run.record.terminal) {
       return { kind: 'ignored-post-terminal' };
     }
+    const nativeRunRef = envelope.scope.kind === 'run'
+      ? envelope.scope.nativeRunRef
+      : undefined;
+    if (nativeRunRef
+      && run.record.nativeRunRef
+      && nativeRunRef !== run.record.nativeRunRef) {
+      return { kind: 'ignored-invalid-scope' };
+    }
     const reduced = reduceRun(run.record, envelope.event, envelope.occurredAt);
     if (!reduced) {
       return { kind: 'ignored-invalid-scope' };
     }
+    const currentSnapshot = session.session.getSnapshot();
     const desiredSession: ExecutionSessionRecord = {
       ...session.record,
+      ...(currentSnapshot.nativeSessionRef
+        ? { nativeSessionRef: currentSnapshot.nativeSessionRef }
+        : {}),
       status: sessionStatusForEvent(session.record.status, envelope.event),
       lastSequence: envelope.sequence,
       acceptedEventIds: [...session.ingestor.getRecentDeliveryIds()],
@@ -1176,6 +1197,7 @@ export class ExecutionLifecycleRegistry {
     };
     const desiredRun: ExecutionRunRecord = {
       ...reduced,
+      ...(nativeRunRef ? { nativeRunRef } : {}),
       lastSequence: envelope.sequence,
       updatedAt: this.now(),
     };
@@ -1371,8 +1393,12 @@ export class ExecutionLifecycleRegistry {
     const activeRuns = session.record.runIds
       .map(id => this.runs.get(runId(id)))
       .filter((run): run is RunEntry => run !== undefined && !run.record.terminal);
+    const currentSnapshot = session.session.getSnapshot();
     const desiredSession: ExecutionSessionRecord = {
       ...session.record,
+      ...(currentSnapshot.nativeSessionRef
+        ? { nativeSessionRef: currentSnapshot.nativeSessionRef }
+        : {}),
       status: sessionStatusForEvent(session.record.status, envelope.event),
       lastSequence: envelope.sequence,
       acceptedEventIds: [...session.ingestor.getRecentDeliveryIds()],
@@ -2032,6 +2058,8 @@ function reduceRun(
       return reduceTerminal(record, event, occurredAt);
     case 'native-agent-observed':
     case 'native-agent-result':
+    case 'native-agent-activity':
+    case 'native-agent-status':
       return record;
   }
 }

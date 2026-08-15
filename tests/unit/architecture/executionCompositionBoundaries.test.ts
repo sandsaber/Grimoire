@@ -30,6 +30,9 @@ const STRICT_MODULES = [
   'src/core/execution/ExecutionTerminalPolicy.ts',
   'src/core/execution/RunProjection.ts',
   'src/core/execution/local/LocalShellBackend.ts',
+  'src/core/execution/ExecutionEventQueue.ts',
+  'src/core/execution/ResultCommit.ts',
+  'src/providers/antigravity/execution/AntigravityExecutionBackend.ts',
 ];
 
 /**

@@ -128,6 +128,8 @@ export function reduceRunProjection(
     }
     case 'native-agent-observed':
     case 'native-agent-result':
+    case 'native-agent-activity':
+    case 'native-agent-status':
       return {
         ...base,
         nativeAgentKeys: appendUnique(base.nativeAgentKeys, envelope.event.nativeAgentKey),

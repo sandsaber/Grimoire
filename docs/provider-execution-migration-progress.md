@@ -75,8 +75,8 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | `b94a588` |
 | M0a — parity gate and adapter contract | Complete | `3273321` … `401a1b8`, plus post-review corrections in this commit |
 | M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Not started | — |
-| M1 — execution kernel, dark-launched | Complete | `dca2f84`, `cc6081e`, `ec1303f`, `86f0585`, this commit |
-| M2-proofs — four topology proofs, dark | Not started | — |
+| M1 — execution kernel, dark-launched | Complete | `dca2f84`, `cc6081e`, `ec1303f`, `86f0585`, `a689af8` |
+| M2-proofs — four topology proofs, dark | In progress — 1 of 4 (Antigravity) | this commit |
 | M2-adapter — presentation seam, proven without a flip | Not started | — |
 | M2-flips — nine production flips with legacy deletion | Not started | — |
 | M3 — provider control plane | Not started | — |
@@ -645,7 +645,7 @@ Gates: unit 420 suites / 7281 tests passed, `typecheck` clean, `lint` clean, `bu
 with no artifact drift. Parity manifest: four more modules join `execution-platform-dark`; the
 registry and projection are held to the strict boundary rule.
 
-### M1 — local shell backend and cross-platform CI (this commit)
+### M1 — local shell backend and cross-platform CI (`a689af8`)
 
 Final M1 checkpoint. `LocalShellBackend` lands as an internal backend — a run with an owner and a
 terminal like any other, with no provider association and no UI route yet — alongside its Node
@@ -683,11 +683,62 @@ clean, `lint` clean, `build:release` passed with no artifact drift.
 Windows process-tree conformance is explicitly **not** claimed as passing yet — the job exists, its
 first run happens on push. It is not an M1 blocker and is a hard prerequisite of M2-flips.
 
+### M2-proofs — topology proof 1 of 4: Antigravity (this commit)
+
+Stateless process-per-run, the smallest topology and the first flip wave. Dark; release build
+byte-identical.
+
+**The kernel was upgraded to its post-proof state first.** The Phase 3 kernel harvested during M1
+predates the four topology proofs, and the conformance suite immediately exposed the gap: it expects
+`nativeRunRef` on the run record, which v1 added while proving the backends. Rather than back-port
+deltas one field at a time, the kernel files were re-taken from the semantic-freeze commit
+(`892eec78`) — records, schemas, registry, contracts, events, ingestor, projection — which is the
+mature state after all four topologies proved out. It also brought `ExecutionEventQueue` and
+`ResultCommit`, two small helpers the backends need.
+
+**The work-graph reconciliation had to be re-applied**, in all three places, because the newer files
+carry it again. Verified absent afterwards: no `'work-graph'` remains anywhere in
+`src/core/execution/`.
+
+Antigravity slice: `AntigravityExecutionBackend`, the print-process runner, print protocol, and
+transcript recovery, plus the app-level `NodeAntigravityProcessTransport` that owns spawning. The
+legacy `AntigravityChatRuntime` is **untouched** — v1 refactored it to share the extracted helpers,
+but M2-proofs' exit gate says production is untouched, and the byte-identical release build is the
+evidence. The cost is bounded duplication between the legacy runtime and the new backend, deleted at
+the Antigravity flip.
+
+Conformance and traces:
+
+- `tests/helpers/execution/ExecutionBackendConformance.ts` — the shared suite every backend runs;
+- the deterministic fake backend passes it (`DeterministicFakeExecutionConformance.test.ts`);
+- Antigravity passes it (`AntigravityExecutionConformance.test.ts`), plus its own backend, lifecycle,
+  print-runner, and transport suites;
+- `tests/fixtures/provider-traces/antigravity-execution.json` — the sanitized golden trace. **This
+  resolves an M0b dependency that looked like a blocker:** the four topology providers need traces
+  before the semantic freeze, and recording them here would need live CLIs and credentials. v1
+  already recorded and sanitized them, so they are harvested rather than re-recorded.
+
+Gates: unit 428 suites / 7359 tests passed, integration 5 suites / 218 tests, `typecheck` clean,
+`lint` clean, `build:release` with no artifact drift. Parity manifest: 29 modules now dark under
+`execution-platform-dark`.
+
+Deliberately not landed yet: `executionSemanticFreeze.test.ts`. It asserts across all four provider
+modules, so it belongs at the end of M2-proofs, not at proof one — and it needs rewriting against
+the M1 `ProviderModule` contract rather than the v1 one it was written for.
+
 ## Current blocker
 
-M1 is complete on `providers-migration`. The execution kernel, its narrow persistence substrate, and
-the local-shell internal backend are landed and dark: 22 modules, none reachable from `src/main.ts`,
-every release build byte-identical.
+M2-proofs is in progress on `providers-migration`. Proof 1 of 4 (Antigravity) is landed and dark.
+
+Next, in order: the Antigravity `ProviderModule` contribution — settings codec, capability
+descriptor, and module wiring written against the M1 contract, since the v1 module targets the
+defective contract that harvest ban 1 excludes — then proofs 2–4: Codex (`309f1558`), Claude
+(`9dda0ebc`), OpenCode (`cb631f53`). The semantic freeze suite is recorded only after all four pass,
+and the UTF-8 stream decoding and Grok transcript recovery semantics must be absorbed by the
+backends that carry them.
+
+M1 is complete: the execution kernel, its narrow persistence substrate, and the local-shell internal
+backend are landed and dark, none of it reachable from `src/main.ts`.
 
 The next action is **M2-proofs**: four topology proofs, still dark — Antigravity (`07939092`), Codex
 (`309f1558`), Claude (`9dda0ebc`), and OpenCode (`cb631f53`), plus the semantic freeze suites

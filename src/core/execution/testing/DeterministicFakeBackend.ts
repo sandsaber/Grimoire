@@ -47,6 +47,10 @@ export interface FakeDeliveryOptions {
 export interface DeterministicFakeBackendOptions {
   readonly sessionInstanceIdFactory: () => SessionInstanceId;
   readonly now?: () => number;
+  readonly automaticLifecycle?: {
+    readonly dispatchGate?: Promise<void>;
+    readonly termination: 'confirmed' | 'unconfirmed';
+  };
 }
 
 const descriptor: ExecutionBackendDescriptor = {
@@ -98,6 +102,7 @@ export class DeterministicFakeBackend implements ExecutionBackend, InteractionPo
   interactionResolutionError: Error | undefined;
   interactionCancellationError: Error | undefined;
   disposeCount = 0;
+  automaticResultCount = 0;
   private disposed = false;
   private deliveryOrdinal = 0;
 
@@ -202,6 +207,26 @@ export class DeterministicFakeBackend implements ExecutionBackend, InteractionPo
     this.dispatchAttempts.set(runId, (this.dispatchAttempts.get(runId) ?? 0) + 1);
   }
 
+  completeRun(runId: RunId, withResult: boolean): void {
+    this.requireRun(runId).completeAutomatic(withResult);
+  }
+
+  signalAutomaticTimeout(runId: RunId): void {
+    this.requireRun(runId).terminateAutomatic('failed', 'timeout');
+  }
+
+  signalAutomaticOutputLimit(runId: RunId): void {
+    this.requireRun(runId).terminateAutomatic('failed', 'output-limit');
+  }
+
+  get automaticLifecycle() {
+    return this.options.automaticLifecycle;
+  }
+
+  recordAutomaticResult(): void {
+    this.automaticResultCount += 1;
+  }
+
   private requireSession(executionSessionId: ExecutionSessionId): DeterministicFakeSession {
     const session = this.sessions.get(executionSessionId);
     if (!session) {
@@ -253,6 +278,10 @@ export class DeterministicFakeSession implements ExecutionSession {
     }
     const run = new DeterministicFakeRun(this.backend, this, request);
     this.runs.set(request.runId, run);
+    if (this.backend.automaticLifecycle) {
+      run.startAutomatic(this.backend.automaticLifecycle.dispatchGate ?? Promise.resolve());
+      return run;
+    }
     this.backend.recordDispatchAttempt(request.runId);
     if (this.backend.dispatchMode === 'lose-acknowledgement') {
       throw new Error('Fake dispatch acknowledgement was lost.');
@@ -298,6 +327,8 @@ export class DeterministicFakeRun implements ExecutionRun {
   readonly cancellationReasons: CancellationReason[] = [];
   private readonly queue = new ControllableAsyncQueue<ProviderExecutionEvent>();
   private closed = false;
+  private dispatched = false;
+  private terminal = false;
 
   constructor(
     private readonly backend: DeterministicFakeBackend,
@@ -313,6 +344,19 @@ export class DeterministicFakeRun implements ExecutionRun {
 
   async cancel(reason: CancellationReason = { code: 'user' }): Promise<void> {
     this.cancellationReasons.push(reason);
+    const automatic = this.backend.automaticLifecycle;
+    if (automatic) {
+      if (this.terminal) return;
+      if (!this.dispatched) {
+        this.finishAutomatic('cancelled', 'cancellation-confirmed', true);
+      } else if (automatic.termination === 'unconfirmed') {
+        this.finishAutomatic('indeterminate', 'cancellation-unknown');
+      } else {
+        this.emit({ kind: 'cancellation-acknowledged' });
+        this.finishAutomatic('cancelled', 'cancellation-confirmed');
+      }
+      return;
+    }
     if (this.backend.cancellationMode === 'reject') {
       throw new Error('Fake cancellation was rejected.');
     }
@@ -349,6 +393,54 @@ export class DeterministicFakeRun implements ExecutionRun {
     }
     this.closed = true;
     this.queue.fail(error);
+  }
+
+  startAutomatic(gate: Promise<void>): void {
+    void gate.then(
+      () => {
+        if (this.terminal) return;
+        this.dispatched = true;
+        this.backend.recordDispatchAttempt(this.runId);
+        this.emit({ kind: 'run-started' });
+      },
+      () => this.finishAutomatic('invalidated', 'pre-dispatch-rejected', true),
+    );
+  }
+
+  completeAutomatic(withResult: boolean): void {
+    if (!this.backend.automaticLifecycle || this.terminal || !this.dispatched) return;
+    if (withResult) {
+      this.backend.recordAutomaticResult();
+      this.emit({
+        kind: 'result',
+        result: { resultId: `fake-result-${this.runId}`, storage: 'projection' },
+      });
+    }
+    if (!withResult && this.request.resultExpectation === 'required') {
+      this.finishAutomatic('failed', 'missing-required-result');
+    } else {
+      this.finishAutomatic('succeeded', 'completed');
+    }
+  }
+
+  terminateAutomatic(
+    terminal: 'failed',
+    reason: 'timeout' | 'output-limit',
+  ): void {
+    if (!this.backend.automaticLifecycle || this.terminal || !this.dispatched) return;
+    this.finishAutomatic(terminal, reason);
+  }
+
+  private finishAutomatic(
+    terminal: 'succeeded' | 'failed' | 'cancelled' | 'invalidated' | 'indeterminate',
+    reason: 'completed' | 'missing-required-result' | 'cancellation-confirmed'
+      | 'cancellation-unknown' | 'pre-dispatch-rejected' | 'timeout' | 'output-limit',
+    sideEffectFree = false,
+  ): void {
+    if (this.terminal) return;
+    this.terminal = true;
+    this.emit({ kind: 'terminal', terminal, reason, sideEffectFree });
+    this.closeStream();
   }
 }
 

@@ -346,6 +346,49 @@ describe('ExecutionLifecycleRegistry', () => {
     });
   });
 
+  it('persists native run identity, fences mismatches, and supplies both native refs to recovery', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, { kind: 'run-started' }, {
+      deliveryId: 'native-turn-started',
+      scope: { kind: 'run', runId: RUN_ID, nativeRunRef: 'native-turn-1' },
+    });
+    await settle(fixture.registry);
+
+    expect(fixture.registry.getRun(RUN_ID)?.nativeRunRef).toBe('native-turn-1');
+    const nativeSession = fixture.backend.sessions.get(SESSION_ID);
+    if (!nativeSession) {
+      throw new Error('Expected a fake native session.');
+    }
+    const mismatched = fixture.backend.createDelivery(
+      nativeSession,
+      { kind: 'run', runId: RUN_ID, nativeRunRef: 'native-turn-2' },
+      { kind: 'thinking-activity' },
+      { deliveryId: 'mismatched-native-turn' },
+    );
+    await expect(fixture.registry.ingest(mismatched)).resolves.toEqual({
+      kind: 'ignored-invalid-scope',
+    });
+    expect(fixture.registry.getRun(RUN_ID)?.nativeRunRef).toBe('native-turn-1');
+
+    fixture.backend.nativeStatusRecovery.setEvidence(RUN_ID, {
+      kind: 'running',
+      sessionInstanceId: nativeSession.sessionInstanceId,
+    });
+    fixture.backend.emit(RUN_ID, { kind: 'connection-lost' }, {
+      deliveryId: 'native-turn-disconnected',
+      scope: { kind: 'run', runId: RUN_ID, nativeRunRef: 'native-turn-1' },
+    });
+    await settle(fixture.registry, 12);
+
+    expect(fixture.backend.nativeStatusRecovery.queries).toEqual([
+      expect.objectContaining({
+        nativeSessionRef: `fake-session-${SESSION_ID}`,
+        nativeRunRef: 'native-turn-1',
+      }),
+    ]);
+  });
+
   it('reconciles a causal gap through the snapshot port without applying across it', async () => {
     const fixture = await startedFixture(undefined, { recovery: 'snapshot' });
     await startDefaultRun(fixture);
@@ -849,6 +892,8 @@ describe('ExecutionLifecycleRegistry', () => {
       terminal: { kind: 'succeeded' },
       resultRef: RESULT,
     });
+    expect(restored.backend.sessions.get(SESSION_ID)?.config.nativeSessionRef)
+      .toBe(`fake-session-${SESSION_ID}`);
     expect(restored.backend.getRun(RUN_ID)).toBeNull();
   });
 

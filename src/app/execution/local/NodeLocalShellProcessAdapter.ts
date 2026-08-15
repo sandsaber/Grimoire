@@ -236,6 +236,7 @@ function spawnWindowsGuardian(
   const suffix = ownershipId.replaceAll('-', '_');
   const executableVariable = `GRIMOIRE_JOB_EXECUTABLE_${suffix}`;
   const argumentsVariable = `GRIMOIRE_JOB_ARGUMENTS_${suffix}`;
+  const childLaunch = createWindowsGuardianChildLaunch(spec, suffix);
   const command = [
     `$source=@'\r\n${WINDOWS_JOB_GUARDIAN_SOURCE}\r\n'@`,
     'Add-Type -TypeDefinition $source -Language CSharp',
@@ -256,12 +257,65 @@ function spawnWindowsGuardian(
     cwd: spec.cwd,
     env: {
       ...(spec.environment ? { ...spec.environment } : process.env),
-      [executableVariable]: encodeBase64(spec.executable),
-      [argumentsVariable]: encodeBase64(windowsCommandArguments(spec)),
+      ...childLaunch.environment,
+      [executableVariable]: encodeBase64(childLaunch.executable),
+      [argumentsVariable]: encodeBase64(childLaunch.arguments),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
+}
+
+interface WindowsGuardianChildLaunch {
+  readonly executable: string;
+  readonly arguments: string;
+  readonly environment: Readonly<Record<string, string>>;
+}
+
+function createWindowsGuardianChildLaunch(
+  spec: LocalShellLaunchSpec,
+  suffix: string,
+): WindowsGuardianChildLaunch {
+  if (spec.windowsInvocationMode !== 'argument-array') {
+    return {
+      executable: spec.executable,
+      arguments: windowsProcessArguments(spec),
+      environment: {},
+    };
+  }
+  const targetVariable = `GRIMOIRE_JOB_TARGET_${suffix}`;
+  const targetArgumentsVariable = `GRIMOIRE_JOB_TARGET_ARGUMENTS_${suffix}`;
+  const invocation = [
+    `$target=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:${targetVariable}))`,
+    `$targetArgumentsJson=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:${targetArgumentsVariable}))`,
+    '$targetArguments=@([string[]](ConvertFrom-Json $targetArgumentsJson))',
+    `[Environment]::SetEnvironmentVariable('${targetVariable}',$null,'Process')`,
+    `[Environment]::SetEnvironmentVariable('${targetArgumentsVariable}',$null,'Process')`,
+    '$ErrorActionPreference="Stop"',
+    'try {',
+    '  $global:LASTEXITCODE=$null',
+    '  & $target @targetArguments',
+    '  if ($null -eq $LASTEXITCODE) { exit 126 }',
+    '  exit $LASTEXITCODE',
+    '} catch {',
+    '  [Console]::Error.WriteLine("Windows argument-array target failed to launch.")',
+    '  exit 127',
+    '}',
+  ].join('\r\n');
+  return {
+    executable: 'powershell.exe',
+    arguments: windowsDirectProcessArguments([
+      '-NoLogo',
+      '-NoProfile',
+      '-NonInteractive',
+      '-EncodedCommand',
+      Buffer.from(invocation, 'utf16le').toString('base64'),
+    ]),
+    environment: {
+      [targetVariable]: encodeBase64(spec.executable),
+      [targetArgumentsVariable]: encodeBase64(JSON.stringify(spec.arguments)),
+    },
+  };
 }
 
 function filterGuardianReadiness(
@@ -355,6 +409,36 @@ export function windowsCommandArguments(spec: LocalShellLaunchSpec): string {
     throw new Error('Windows local shell launch must use cmd.exe /d /s /c with one raw command.');
   }
   return `/d /s /c ${command}`;
+}
+
+export function windowsDirectProcessArguments(argumentsValue: readonly string[]): string {
+  return argumentsValue.map(quoteWindowsDirectArgument).join(' ');
+}
+
+function windowsProcessArguments(spec: LocalShellLaunchSpec): string {
+  return spec.executable.toLowerCase() === 'cmd.exe'
+    ? windowsCommandArguments(spec)
+    : windowsDirectProcessArguments(spec.arguments);
+}
+
+function quoteWindowsDirectArgument(value: string): string {
+  if (value.length > 0 && !/[\s"]/u.test(value)) {
+    return value;
+  }
+  let quoted = '"';
+  let backslashes = 0;
+  for (const character of value) {
+    if (character === '\\') {
+      backslashes += 1;
+    } else if (character === '"') {
+      quoted += '\\'.repeat(backslashes * 2 + 1) + '"';
+      backslashes = 0;
+    } else {
+      quoted += '\\'.repeat(backslashes) + character;
+      backslashes = 0;
+    }
+  }
+  return `${quoted}${'\\'.repeat(backslashes * 2)}"`;
 }
 
 function isNoSuchProcess(error: unknown): boolean {

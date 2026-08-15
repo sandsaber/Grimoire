@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "providerId": "antigravity",
+  "backendId": "provider-antigravity",
+  "topology": "per-run-process",
+  "concurrency": "serial-runs",
+  "sessionIdentity": "grimoire-only",
+  "historyOwnership": "grimoire-projection",
+  "resultExpectation": "required",
+  "agentObservation": "none",
+  "agentEvidence": {
+    "definitionInventory": "none",
+    "spawnOrigins": [],
+    "stableIdentity": false,
+    "observation": "none",
+    "resultExtraction": "unsupported",
+    "cancellation": "unsupported",
+    "statusQuery": "unsupported",
+    "reattachment": "unsupported",
+    "source": "none",
+    "eventCase": null,
+    "cancellationCase": null,
+    "statusQueryCase": null,
+    "reattachmentCase": null
+  },
+  "identity": {
+    "backendGeneration": 1,
+    "executionSessionId": "es-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sessionInstanceId": "si-dddddddddddddddddddddddddddddddd",
+    "runId": "run-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "eventCases": {},
+  "cases": {
+    "stdoutSuccess": [
+      "run-started",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ],
+    "transcriptRecovery": [
+      "run-started",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ],
+    "emptyRequiredResult": [
+      "run-started",
+      "terminal:failed:missing-required-result"
+    ],
+    "nonzeroExit": [
+      "run-started",
+      "terminal:failed:nonzero-exit"
+    ],
+    "safeModePreDispatch": [
+      "terminal:invalidated:pre-dispatch-rejected"
+    ]
+  }
+}
