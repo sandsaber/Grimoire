@@ -52,7 +52,10 @@ describe('local shell process ownership on the host OS', () => {
       '',
     ].join('\r\n'), 'utf8');
     const command = [
-      `(echo "hello world" & echo nested)> "${outputPath}"`,
+      // No space before `&`: cmd includes it in the echoed line, so
+      // `echo "hello world" &` writes a trailing space the assertion below
+      // would have to tolerate. Removing the cause keeps the assertion exact.
+      `(echo "hello world"& echo nested)> "${outputPath}"`,
       `start "" /b powershell.exe -NoLogo -NoProfile -NonInteractive -File "${workerPath}"`,
       `powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$deadline=(Get-Date).AddSeconds(5); while (-not (Test-Path -LiteralPath '${escapedPidPath}')) { if ((Get-Date) -gt $deadline) { exit 7 }; Start-Sleep -Milliseconds 25 }"`,
       'ping -n 3 127.0.0.1 >nul',
