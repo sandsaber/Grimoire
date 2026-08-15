@@ -1099,6 +1099,44 @@ Gates: unit 450 suites / 7661 tests, integration 6 suites / 220 tests, `typechec
 **M2-proofs is complete.** Four topologies, four modules, one shared conformance suite, four traces,
 and a freeze over all of it.
 
+### Session end — Windows CI red on one launch form, diagnosed (this commit)
+
+Stopping point recorded for a fresh session. Everything below the resume pointer is current; this
+entry is the one thing that is not green.
+
+**Where it stands.** The guardian flush fix worked: on Windows, `keeps JSONL stdin usable and
+terminates the complete descendant tree` now passes, along with three of the four launch forms in
+the shim case. **One form fails: `com`** — a copy of `cmd.exe` renamed to `codex shim.com` and
+invoked with `/d /s /c "<command>"`. The diagnostic added for exactly this reported it by name on
+its first run.
+
+**Cause, verified locally rather than inferred.** `windowsProcessArguments` chooses its quoting by
+`spec.executable.toLowerCase() === 'cmd.exe'` — an exact string a renamed copy at an absolute path
+never matches. The `com` form therefore takes the direct MSVCRT path, and rendering its arguments
+through `windowsDirectProcessArguments` produces:
+
+```
+/d /s /c "\"C:\node.exe\" \"C:\dir\persistent app server.js\" \"C:\dir\com.pid\""
+```
+
+`cmd.exe` does not understand `\"`; that is MSVCRT convention. It reads a literal backslash followed
+by a quote, so the command line it tries to execute is malformed, the child never launches, and no
+pid is ever published — precisely the observed failure. Reproduced on Linux by rendering the same
+arguments through the exported helper, so no Windows machine is needed to work on it.
+
+**Two candidate resolutions, deliberately not chosen at the end of a session:**
+
+- **product.** Dispatch on the argument *shape* rather than the executable string.
+  `windowsCommandArguments` already requires the exact `/d /s /c` triple, one raw command, and
+  `windows-process-tree` termination, and throws otherwise — so keying the dispatch on that shape is
+  narrow, and it would make any cmd-compatible executable get cmd quoting;
+- **test.** Decide the `com` case is synthetic. No real Codex installation is a renamed copy of
+  `cmd.exe`, and the case that matters for a real install — the `.cmd` and `.bat` shims, which take
+  the `argument-array` path — passes. Then the case should be restated rather than deleted.
+
+The first is the likelier answer, and it is a production change to Windows launch behaviour, which
+is why it starts a session rather than ends one.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1107,11 +1145,11 @@ overrides it.**
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
 Completed: **M0a** (parity gate, contribution inventory, adapter contract, the two contract suites,
-topology and shared-resource records, persistence decisions) and **M1** (execution kernel, narrow
+topology and shared-resource records, persistence decisions), **M1** (execution kernel, narrow
 control-record persistence, local-shell internal backend, cross-platform CI with Windows
-process-tree conformance green).
+process-tree conformance green), and **M2-proofs**.
 
-Completed: **M2-proofs.** Four topologies proven dark — Antigravity (stateless process-per-run),
+**M2-proofs.** Four topologies proven dark — Antigravity (stateless process-per-run),
 Codex (persistent daemon, multiplexed sessions), Claude (persistent SDK stream, serial runs), and
 OpenCode (managed ACP subprocess) — each with an execution backend, a `ProviderModule` on the M1
 contract, a settings codec, a capability descriptor, the shared conformance suite, and a trace
@@ -1122,21 +1160,29 @@ model presentation, a `reconcile` result no provider could fill, a rewind capabi
 and static feature contributions that made context-dependent ports unfillable. Each was invisible
 until a provider that needed it was written, which is the argument for four proofs rather than one.
 
-**Next action:** **M2-adapter** — the `ChatRuntime` adapter over the kernel, still dark, with
+**CI is red on one case and that is the first thing to fix.** `windows-latest` fails the `com` launch
+form in `CodexPersistentProcessOwnership.integration.test.ts`; ubuntu, macOS, and `validate` are
+green, and the local gate is green. The cause is diagnosed with reproduced evidence in the entry
+directly above this section, together with the two candidate resolutions. Do not start the next
+milestone with a red gate.
+
+**Next action after that:** **M2-adapter** — the `ChatRuntime` adapter over the kernel, still dark, with
 `createSubject` in `adapterContractTarget.test.ts` grown to cover `prepareTurn`, `steer`,
 `setResumeCheckpoint`, `buildSessionUpdates`, and `consumeSessionInvalidation`, which remain paper
 mappings. **M0b is still open and blocks the first flip, not the adapter:** the checked-in traces are
-semantic case catalogues, not sanitized wire recordings. Only after all four pass is the semantic freeze recorded,
-and its suite (`892eec78`) must be **rewritten** against the M1 `ProviderModule` contract rather
-than harvested, since it was written for the v1 contract.
+semantic case catalogues, not sanitized wire recordings.
 
 Open obligations, each with an owner:
 
 - **M0b is not done.** The checked-in `tests/fixtures/provider-traces/*.json` are semantic case
   catalogues — topology, identity, event cases, cancellation, empty-required-result — not sanitized
-  wire recordings. They are enough to pin backend semantics; they are not the golden traces the plan
-  requires before the freeze, and recording those needs live CLIs. Owner: M0b, before the M2-proofs
-  freeze;
+  wire recordings. They are enough to pin backend semantics and to anchor the semantic freeze, which
+  has already landed; they are not the golden traces the plan requires, and recording those needs
+  live CLIs. Owner: M0b, **before the first flip**;
+- **awaiting an owner decision: redo.** Recorded as D9 in the persistence decisions. Re-running a
+  request is free and needs no new state; undoing a rewind cannot be built on the control store,
+  because D2 forbids a second copy of a provider transcript without exception, and the file backup
+  is discarded after a successful rewind. Which of the two the product wants is the open question;
 - the provider backends that carry them must absorb the UTF-8 stream decoding (`utf8Stream`) and
   Grok transcript recovery semantics that landed on `main` after the v1 baseline. Owner: the Grok
   and ACP backends, at their harvest;
