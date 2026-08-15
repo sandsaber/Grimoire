@@ -14,7 +14,10 @@ import { NodeCodexExecutionProcess } from '@/app/execution/codex/NodeCodexExecut
 import { localShellPlatformForNode } from '@/app/execution/local/NodeLocalShellProcessAdapter';
 
 describe('Codex persistent process ownership on the host OS', () => {
-  jest.setTimeout(25_000);
+  // Generous because of the Windows guardian compile described below, not
+  // because the assertions are slow: every wait inside has its own bound, so a
+  // hang still fails with a specific message rather than a suite timeout.
+  jest.setTimeout(45_000);
 
   it('keeps JSONL stdin usable and terminates the complete descendant tree', async () => {
     const platform = localShellPlatformForNode(process.platform);
@@ -34,7 +37,12 @@ describe('Codex persistent process ownership on the host OS', () => {
     let descendantPid: number | undefined;
     try {
       processAdapter.start();
-      descendantPid = await waitForPidFile(pidPath, 5_000);
+      // Windows pays a startup cost the other platforms do not: the job
+      // guardian is C# that PowerShell compiles with `Add-Type` at every
+      // launch, which on a cold runner takes seconds before the child is even
+      // spawned. Budgeted rather than hidden, because it is real latency a
+      // Codex daemon start will pay on Windows.
+      descendantPid = await waitForPidFile(pidPath, platform === 'windows' ? 15_000 : 5_000);
       expect(isProcessRunning(descendantPid)).toBe(true);
 
       const response = nextLine(processAdapter.stdout, 5_000);

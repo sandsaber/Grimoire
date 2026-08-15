@@ -1017,6 +1017,33 @@ a stale hash from an older write is recomputed instead of trusted.
 Gates: unit 441 suites / 7564 tests, integration 6 suites / 220 tests, `typecheck`, `lint`,
 `build:release` clean, bundle assertions find no Claude execution code in `main.js`.
 
+### M2-proofs — Windows CI: the stdin pipe never worked (this commit)
+
+The cross-platform job failed on `windows-latest` for proof two, and it caught a defect that would
+have reached users at the Codex flip. Ubuntu and macOS were green, which is the whole argument for
+the matrix.
+
+Both Windows failures come from the job guardian, the C# that owns the process tree inside a Windows
+job object:
+
+- **the real defect: neither pipe direction was flushed.** The guardian copied streams with
+  `Stream.CopyToAsync`, whose destination `FileStream` buffers and delivers its last partial buffer
+  at close. That is correct for a process that exits — which is every case the guardian had until
+  now — and wrong for a persistent daemon, which never closes: a JSON-RPC request sat in the buffer
+  and never reached the app-server, and its reply sat in the other buffer and never reached us. The
+  test failed as a ping with no pong. Both directions are now explicit pumps that flush every chunk,
+  on threads rather than `async` so the source still compiles under the CodeDom compiler `Add-Type`
+  uses;
+- **the second failure was a budget, not a bug.** The pid wait allowed five seconds, and on Windows
+  the guardian is compiled by `Add-Type` at every launch, which on a cold runner takes seconds before
+  the child is spawned. The wait is now platform-aware with the reason named, rather than bumped.
+  Worth carrying forward: **starting a Codex or Claude daemon on Windows pays a C# compile first**,
+  which is a real latency the flip will have to answer for.
+
+This also validated the coverage gate added in the same milestone: the integration step selected its
+suite by the literal name `LocalShellProcessOwnership`, so before that change the Codex ownership
+test would not have run on Windows at all, and the job would have reported green.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

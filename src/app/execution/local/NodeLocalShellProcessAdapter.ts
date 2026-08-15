@@ -484,11 +484,43 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 public static class GrimoireJobGuardian
 {
     private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
+
+    // Copies one pipe to another, flushing every chunk.
+    //
+    // This replaced Stream.CopyToAsync, which is correct only for a process
+    // that exits: the destination FileStream buffers, and the flush that
+    // delivers the last partial buffer happens at close. A persistent daemon
+    // never closes, so a JSON-RPC line sat in the buffer and both directions
+    // stalled - the request never reached the app-server, and its reply never
+    // reached us. Threads rather than async so the source compiles under the
+    // CodeDom compiler Add-Type uses.
+    private static Thread StartPump(Stream source, Stream destination)
+    {
+        Thread pump = new Thread(delegate()
+        {
+            byte[] buffer = new byte[4096];
+            try
+            {
+                int read;
+                while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    destination.Write(buffer, 0, read);
+                    destination.Flush();
+                }
+            }
+            catch (IOException) { }
+            catch (ObjectDisposedException) { }
+        });
+        pump.IsBackground = true;
+        pump.Start();
+        return pump;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct JOBOBJECT_BASIC_LIMIT_INFORMATION
@@ -586,15 +618,13 @@ public static class GrimoireJobGuardian
                     throw new InvalidOperationException("The guarded process did not start.");
                 Console.Error.WriteLine("__GRIMOIRE_JOB_READY__");
                 Console.Error.Flush();
-                Task stdout = process.StandardOutput.BaseStream.CopyToAsync(Console.OpenStandardOutput());
-                Task stderr = process.StandardError.BaseStream.CopyToAsync(Console.OpenStandardError());
-                Task stdin = pipeInput
-                    ? Console.OpenStandardInput().CopyToAsync(process.StandardInput.BaseStream)
-                    : Task.CompletedTask;
+                Thread stdout = StartPump(process.StandardOutput.BaseStream, Console.OpenStandardOutput());
+                Thread stderr = StartPump(process.StandardError.BaseStream, Console.OpenStandardError());
+                if (pipeInput) StartPump(Console.OpenStandardInput(), process.StandardInput.BaseStream);
                 process.WaitForExit();
                 if (pipeInput) process.StandardInput.Close();
-                try { Task.WaitAll(new Task[] { stdout, stderr }, 250); }
-                catch (AggregateException) { }
+                stdout.Join(250);
+                stderr.Join(250);
                 Environment.Exit(process.ExitCode);
                 return process.ExitCode;
             }
