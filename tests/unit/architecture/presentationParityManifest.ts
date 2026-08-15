@@ -597,6 +597,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/core/persistence/VersionedRecord.ts',
       'src/core/persistence/VersionedRepository.ts',
       'src/core/providers/ProviderModule.ts',
+      'src/providers/antigravity/AntigravityProviderModule.ts',
       'src/providers/antigravity/execution/AntigravityExecutionBackend.ts',
       'src/providers/antigravity/runtime/AntigravityPrintProcessRunner.ts',
       'src/providers/antigravity/runtime/AntigravityPrintProtocol.ts',

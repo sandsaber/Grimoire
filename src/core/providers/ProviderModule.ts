@@ -424,13 +424,25 @@ export interface ProviderCapabilityDescriptor {
 // The module
 // ---------------------------------------------------------------------------
 
-export interface ProviderModule<TContext = unknown, TSettings extends object = Record<string, unknown>> {
+/**
+ * Workspace and execution take separate context types on purpose.
+ *
+ * Writing the first real module showed why: a workspace initializes from
+ * vault-facing services, while a backend is composed from a request resolver,
+ * a process runner, a result sink, and a scheduler. Forcing both through one
+ * type would push a union into every provider.
+ */
+export interface ProviderModule<
+  TWorkspaceContext = unknown,
+  TExecutionContext = unknown,
+  TSettings extends object = Record<string, unknown>,
+> {
   readonly manifest: ProviderManifest;
   readonly settings: ProviderSettingsCodec<TSettings>;
-  readonly workspace: ProviderWorkspaceContribution<TContext>;
+  readonly workspace: ProviderWorkspaceContribution<TWorkspaceContext>;
   /** Chat execution. Inventory row 10 — the only row an M2 flip moves. */
-  readonly execution: ExecutionBackendFactory<TContext>;
-  readonly auxiliary: ProviderAuxiliaryContributions<TContext>;
+  readonly execution: ExecutionBackendFactory<TExecutionContext>;
+  readonly auxiliary: ProviderAuxiliaryContributions<TExecutionContext>;
   readonly capabilities: ProviderCapabilityDescriptor;
   readonly features: ProviderFeatureContributions;
 }

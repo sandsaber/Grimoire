@@ -33,6 +33,7 @@ const STRICT_MODULES = [
   'src/core/execution/ExecutionEventQueue.ts',
   'src/core/execution/ResultCommit.ts',
   'src/providers/antigravity/execution/AntigravityExecutionBackend.ts',
+  'src/providers/antigravity/AntigravityProviderModule.ts',
 ];
 
 /**

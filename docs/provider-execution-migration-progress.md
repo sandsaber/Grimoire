@@ -769,16 +769,57 @@ explicitly refuses a waiver; it is now satisfied by evidence rather than deferre
 Three failures, none of them the thing the job was aimed at, and each only visible once the previous
 one was fixed. The job was added at the end of M1 as a formality — it repaid that immediately.
 
+### M2-proofs — Antigravity provider module (this commit)
+
+The first real module written against the M1 `ProviderModule` contract, and the first evidence that
+the contract is usable rather than merely complete. Dark; the release build stayed byte-identical.
+
+Not harvested. The v1 module targets the contract harvest ban 1 excludes, and its shape does not
+survive the redesign: capability fields differ, feature ports were bare `object`, and the module
+took a single context type for both workspace and execution. Only the settings decode/encode
+validation is reused as material — it is real validation with a real preserved-unknown path.
+
+Three findings, each from writing the module rather than from reading the contract:
+
+- **the contract needed a second context type.** A workspace initializes from vault-facing services;
+  a backend is composed from a request resolver, process runner, result sink, and scheduler. One
+  shared `TContext` would push a union into every provider, so `ProviderModule` now takes
+  `TWorkspaceContext` and `TExecutionContext` separately;
+- **workspace slots must not carry their own `dispose`.** The first draft had the slots object expose
+  teardown, which makes every consumer of a single slot responsible for lifecycle it does not own.
+  Teardown belongs to the contribution's `dispose`, which closes over what it created;
+- **a `JSON.stringify` comparison in `reconcile` reported every reconciliation as a change**, purely
+  from key ordering, which would have meant a settings write after every load. Caught by its own
+  test and replaced with an order-insensitive structural compare.
+
+The module also demonstrates the contract's "absent means unsupported" rule on a real provider:
+Antigravity contributes **no** auxiliary execution, because its title, refine, and inline-edit
+services are registered today as no-ops — contributing three present-but-empty slots is the lie the
+rule exists to prevent — and omits history, task-result, and native-agent ports it has nothing to
+put in.
+
+One production change was attempted and reverted. v1 added the settings normalizers to
+`settings.ts` and rewired two existing accessors to use them; applying that patch changes reachable
+code and would have broken the "production untouched" exit gate. The normalizers are local to the
+dark module until the Antigravity flip makes it the settings authority.
+
+`tests/unit/providers/antigravity/AntigravityProviderModule.test.ts` — 17 tests over identity,
+honest absences, the settings codec including preserved-unknown round-trips and typed decode issues,
+and both halves of the workspace lifecycle.
+
+Gates: unit 429 suites / 7377 tests passed, `typecheck` clean, `lint` clean, `build:release` with no
+artifact drift.
+
 ## Current blocker
 
-M2-proofs is in progress on `providers-migration`. Proof 1 of 4 (Antigravity) is landed and dark.
+M2-proofs is in progress on `providers-migration`. Proof 1 of 4 (Antigravity) is landed and dark,
+backend and module both.
 
-Next, in order: the Antigravity `ProviderModule` contribution — settings codec, capability
-descriptor, and module wiring written against the M1 contract, since the v1 module targets the
-defective contract that harvest ban 1 excludes — then proofs 2–4: Codex (`309f1558`), Claude
-(`9dda0ebc`), OpenCode (`cb631f53`). The semantic freeze suite is recorded only after all four pass,
-and the UTF-8 stream decoding and Grok transcript recovery semantics must be absorbed by the
-backends that carry them.
+Next: proofs 2–4 — Codex (`309f1558`), Claude (`9dda0ebc`), OpenCode (`cb631f53`), each with
+backend, module, settings codec, capability descriptor, conformance, and its sanitized trace. The
+semantic freeze suite is recorded only after all four pass, and must be rewritten against the M1
+`ProviderModule` contract rather than the v1 one it was written for. The UTF-8 stream decoding and
+Grok transcript recovery semantics must be absorbed by the backends that carry them.
 
 M1 is complete: the execution kernel, its narrow persistence substrate, and the local-shell internal
 backend are landed and dark, none of it reachable from `src/main.ts`.
