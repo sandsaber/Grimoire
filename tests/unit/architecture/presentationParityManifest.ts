@@ -572,6 +572,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
     state: 'pending',
     owner: 'M2 — becomes reachable when the first provider flip wires the adapter over its backend.',
     modules: [
+      'src/app/execution/ExecutionKernelHost.ts',
       'src/app/execution/acp/NodeManagedAcpProcessLauncher.ts',
       'src/app/execution/antigravity/NodeAntigravityProcessTransport.ts',
       'src/app/execution/codex/NodeCodexExecutionProcess.ts',

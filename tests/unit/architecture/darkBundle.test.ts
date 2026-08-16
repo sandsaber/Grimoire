@@ -33,6 +33,7 @@ const DARK_MARKERS = [
   { marker: 'Codex execution connection is not initialized', why: 'the Codex execution connection' },
   { marker: 'provider-claude', why: 'the Claude execution backend descriptor' },
   { marker: 'provider-opencode', why: 'the OpenCode execution backend descriptor' },
+  { marker: 'Execution lifecycle registry is not accepting shutdown', why: 'the kernel host' },
   {
     marker: 'The provider ended the turn without producing a result',
     why: 'the presentation adapter\'s failure messages',

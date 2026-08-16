@@ -1586,6 +1586,35 @@ before their own flips, which is what the plan already schedules.
 
 Gates: unit 455 suites / 7740 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
 
+### M2-flips — the kernel host, before the flip (this commit)
+
+The first flip owns three things besides the provider switch: an application-scoped kernel host, the
+control store appearing under `.grimoire/`, and revert safety. The host is built first and separately,
+because it is the piece that can be got wrong quietly, and because building it inside a flip would
+mean debugging two things at once.
+
+`ExecutionKernelHost` is **one explicit object**, not a module singleton — a singleton outlives the
+plugin instance a reload replaces, and two registries over one control store would each believe they
+own every run in it. It is the seed of `ApplicationRuntime` at M5, not a parallel structure.
+
+**Obsidian's `onunload` does not await, which splits the shutdown guarantee.** The acceptance gate
+closes **synchronously** — verified in the registry rather than assumed: `state = 'quiescing'` is set
+before the first `await` in `shutdown()`, so calling it without awaiting still shuts the door the
+instant unload begins. The bounded cancellation and cleanup run after, recording the checkpoint the
+next startup recovers from. Waiting inside `onunload` would freeze the application on a CLI that
+never answers.
+
+**A defect caught by checking rather than trusting the typecheck.** The default shutdown checkpoint id
+was `shutdown-<uuid>`, and the registry requires the opaque form `sd-` plus thirty-two hex digits. It
+would have thrown — and since the host reports shutdown failures rather than raising them, so that a
+void `onunload` cannot get a rejection, **the shutdown would simply never have happened**, silently,
+on every unload. The two properties that hide each other are worth naming: a validated id and a
+swallowed error.
+
+Still dark: nothing constructs the host, and the bundle assertions now include one of its strings.
+
+Gates: unit 456 suites / 7746 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
