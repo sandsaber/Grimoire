@@ -35,8 +35,9 @@ Journal rules that keep this true:
 - Migration branch: `providers-migration`
 - Baseline: `main` at 1.1.6 (`b08e4bd`)
 - Last synced with `main`: 1.1.7 (`0f84b41`), merged at the M0a gate
-- M0a and M1 are complete. Landed checkpoints are listed below; every later milestone row in the
-  status table is still untouched.
+- M0a, M0b (for the four proof providers), M1, M2-proofs, and M2-adapter are complete; M2-flips is in
+  progress. The status table below carries the checkpoint commits; the **Current blocker** section at
+  the bottom is the single resume pointer and overrides anything above it.
 
 ## Prior attempt (reference only)
 
@@ -74,11 +75,11 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | Third review applied: kernel-in-production-at-first-flip owned (interim kernel host, storage docs, revert safety, unload), adapter bound to the lifecycle registry, capability-driven flip smoke, providerState parity gate, release-train rules, shared-resource inventory in M0a | Complete | `6df5658` |
 | UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | `b94a588` |
 | M0a — parity gate and adapter contract | Complete | `3273321` … `401a1b8`, plus post-review corrections in this commit |
-| M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Not started | — |
+| M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Complete for the four proof providers; five remain, each at its own flip | `7f8dfaa` |
 | M1 — execution kernel, dark-launched | Complete | `dca2f84`, `cc6081e`, `ec1303f`, `86f0585`, `a689af8` |
-| M2-proofs — four topology proofs, dark | In progress — 1 of 4 (Antigravity) | this commit |
-| M2-adapter — presentation seam, proven without a flip | Not started | — |
-| M2-flips — nine production flips with legacy deletion | Not started | — |
+| M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
+| M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
+| M2-flips — nine production flips with legacy deletion | In progress — wave 1 (Antigravity); kernel host built and still dark | `e06417b`, `416b129` |
 | M3 — provider control plane | Not started | — |
 | M4 — revisioned persistence in production | Not started | — |
 | M5 — presentation evolution and seam deletion | Not started | — |
@@ -1666,7 +1667,8 @@ Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`)
 Completed: **M0a** (parity gate, contribution inventory, adapter contract, the two contract suites,
 topology and shared-resource records, persistence decisions), **M1** (execution kernel, narrow
 control-record persistence, local-shell internal backend, cross-platform CI with Windows
-process-tree conformance green), and **M2-proofs**.
+process-tree conformance green), **M2-proofs**, **M2-adapter**, and **M0b** for the four proof
+providers. In progress: **M2-flips**, wave 1.
 
 **M2-proofs.** Four topologies proven dark — Antigravity (stateless process-per-run),
 Codex (persistent daemon, multiplexed sessions), Claude (persistent SDK stream, serial runs), and
