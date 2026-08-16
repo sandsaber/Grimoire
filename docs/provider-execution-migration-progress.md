@@ -1527,9 +1527,12 @@ Also fixed from the suggestions: the `ensureReady` race, where two overlapping c
 session id and orphaned the first with nothing left holding its id to dispose it, and the stale line
 in this document that still called M2-adapter in progress.
 
-Not done: trimming the long explanatory comments in the kernel and adapter. Several are essays where
-a sentence would do, and the reviewer is right that harvest history belongs here rather than in the
-source. Left for a focused pass so it does not hide behind five behaviour fixes.
+Also done, in a separate pass so it did not ride along with the behaviour fixes: branch history moved
+out of the source and into this log. Eight comment blocks narrated what v1 did, which review found
+the gap, or what a previous entry got wrong — none of which a future editor needs, while the
+constraint each one guards does. The constraints stayed and the narration went; the files lost about
+twenty comment lines, not two hundred, because most of them explain non-obvious intent, which is what
+they are for.
 
 Gates: unit 454 suites / 7732 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
 

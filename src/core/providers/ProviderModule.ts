@@ -4,18 +4,13 @@ import type { ProviderId } from '../types/provider';
 /**
  * The contract a built-in provider contributes to the application.
  *
- * Designed against `docs/provider-contribution-inventory.md`, not harvested.
- * The first attempt's module had slots for execution, settings, workspace
- * lifecycle, capabilities, and ten feature ports typed as bare `object` — and
- * nothing else. Its cutover then replaced exactly one contribution and silently
- * dropped the rest, because there was nowhere for them to go. Every row of the
- * inventory therefore has a typed slot here, even where the consumer does not
- * move until M3 or M5.
+ * Every row of `docs/provider-contribution-inventory.md` has a typed slot here,
+ * even where the consumer does not move until M3 or M5, because a contribution
+ * with nowhere to go is a contribution silently dropped at a cutover.
  *
  * Two rules keep it honest:
  *
- * - **no bare `object` slots.** A reserved name is not a contract; it is the
- *   defect that produced the v1 cutover;
+ * - **no bare `object` slots.** A reserved name is not a contract;
  * - **absent means unsupported.** An optional slot left out is a provider
  *   declaring it cannot do the thing, which the UI can read. A present slot
  *   that no-ops is a lie the UI cannot detect.
@@ -104,13 +99,11 @@ export interface ProviderSettingsReconcileResult<TSettings extends object> {
    * Whether the reconciliation makes this provider's existing sessions
    * unusable.
    *
-   * It first read `invalidatedConversationIds`, which no provider could ever
-   * fill: `reconcile` receives settings, not the conversation list, so the ids
-   * were unknowable from inside the module. Antigravity hid the flaw by having
-   * no resumable session to invalidate; Codex, which resumes by native thread
-   * id, exposed it. The host owns conversations and applies this to its own
-   * list — which is exactly what the legacy reconciler does when it walks every
-   * conversation of the provider.
+   * A boolean rather than a list of conversation ids: `reconcile` receives
+   * settings, not the conversation list, so the ids are unknowable from inside
+   * the module. The host owns conversations and applies this to its own list,
+   * which is what the legacy reconciler does when it walks every conversation
+   * of the provider.
    */
   readonly invalidatesSessions: boolean;
 }
@@ -124,8 +117,7 @@ export interface ProviderSettingsReconcileResult<TSettings extends object> {
  *
  * Every member is optional because a provider may genuinely not have the
  * capability — but each has a real type, and `initialize`/`dispose` are both
- * mandatory. Shipping init without dispose is app-level inventory row 3, and
- * repeating it is called out there as the v1 defect recurring.
+ * mandatory: shipping init without dispose is app-level inventory row 3.
  */
 export interface ProviderWorkspaceContribution<TContext = unknown, TWorkspace extends ProviderWorkspaceSlots = ProviderWorkspaceSlots> {
   readonly providerId: ProviderId;
@@ -251,9 +243,8 @@ export interface ProviderFeatureContributions<TSettings extends object = Record<
   /** Provider-preloaded context file names. Inventory row 5. */
   readonly context?: ProviderContextPort;
   /**
-   * Chat UI configuration. Inventory row 8 — one row, a wide object. It is
-   * split into named members here because losing the model picker inside a
-   * "migrated" chatUIConfig is the precise shape of the v1 failure.
+   * Chat UI configuration. Inventory row 8 — one row, a wide object, split into
+   * named members so a migrated config cannot quietly lose the model picker.
    */
   readonly chatUI: ProviderChatUiContribution<TSettings>;
   /** Hydration, fork state, session resolution, deletion. Inventory row 14. */
@@ -290,10 +281,8 @@ export interface ProviderChatUiContribution<TSettings extends object = Record<st
  *
  * Each method takes the provider's decoded settings, because a user-configured
  * or environment-supplied model is owned by the provider just as much as a
- * built-in one. The first version of this slot omitted the parameter; writing
- * the second module surfaced it, since the live chat UI config has always
- * consulted settings and a settings-blind port would have silently disowned
- * every custom model. Providers that need no settings can ignore the argument.
+ * built-in one, and a settings-blind port would disown every custom model.
+ * Providers that need no settings can ignore the argument.
  */
 export interface ProviderModelPresentation<TSettings extends object = Record<string, unknown>> {
   ownsModel(modelId: string, settings: TSettings): boolean;

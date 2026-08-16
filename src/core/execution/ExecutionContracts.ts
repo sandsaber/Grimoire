@@ -15,10 +15,9 @@ export type ResultExpectation = 'required' | 'optional' | 'none';
 /**
  * Every run has exactly one durable owner.
  *
- * The v1 kernel also had a `work-graph` owner. It is deliberately absent here:
- * the dependency graph and synthesis runs are a post-migration extension, not a
- * migration contract, and harvesting the owner kind now would create a state
- * nothing in this migration can produce or resolve.
+ * A `work-graph` owner is deliberately absent: the dependency graph and
+ * synthesis runs are a post-migration extension, so the kind would name a state
+ * nothing here can produce or resolve.
  */
 export type ExecutionOwnerKind =
   | 'conversation'
@@ -92,11 +91,7 @@ export interface ExecutionRequest {
    * has a checkpoint to offer.
    *
    * Opaque to core, like `requestRef`: only the provider knows what one of its
-   * checkpoints means. The adapter contract maps `setResumeCheckpoint` onto this
-   * field, and the field did not exist — the adapter's first attempt to set it
-   * type-checked anyway, because it was added through a conditional spread and
-   * TypeScript does not excess-property-check those. The same hole that let a
-   * stale field name survive a rename in all four harvested backends.
+   * checkpoints means.
    */
   readonly resumeCheckpoint?: string;
 }

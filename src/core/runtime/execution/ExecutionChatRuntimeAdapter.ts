@@ -218,9 +218,8 @@ export class ExecutionRunStream {
  * Projects the descriptor onto the capability record the UI reads today.
  *
  * Exists only until M3 moves the gating onto the descriptor. Every field is
- * derived from something the descriptor states, which is what forced `input`
- * and `planArtifactPrefix` onto it: without them the adapter would have had to
- * invent two answers and quietly disable an image button.
+ * derived from something the descriptor states, so a missing answer is a
+ * missing descriptor field rather than an invented default.
  */
 export function toLegacyCapabilities(
   descriptor: ProviderCapabilityDescriptor,
