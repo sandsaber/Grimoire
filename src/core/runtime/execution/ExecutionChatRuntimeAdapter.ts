@@ -13,10 +13,17 @@ import type { ExecutionLifecycleRegistry } from '../../execution/ExecutionLifecy
 import type {
   CapabilitySupport,
   ProviderCapabilityDescriptor,
+  ProviderFeatureContributions,
 } from '../../providers/ProviderModule';
 import type { ProviderCapabilities } from '../../providers/types';
-import type { StreamChunk } from '../../types/chat';
-import type { ChatTurnMetadata } from '../types';
+import type { ChatMessage, StreamChunk } from '../../types/chat';
+import type { ProviderId } from '../../types/provider';
+import type {
+  ChatRuntimeQueryOptions,
+  ChatTurnMetadata,
+  ChatTurnRequest,
+  PreparedChatTurn,
+} from '../types';
 
 /**
  * The presentation adapter: one `ChatRuntime`-shaped view of the execution
@@ -347,4 +354,184 @@ export function dispatchCancellation(
     // the run still owes a terminal, and it will be `indeterminate` if nobody
     // can prove otherwise.
   });
+}
+
+/**
+ * What the adapter needs that no `ProviderModule` slot carries yet.
+ *
+ * `prepareTurn` is mapped in the adapter contract as a **module contribution**,
+ * and `ProviderModule` has no slot for it — the fifth gap the contract has shown
+ * since the proofs began. It is routed through the host rather than invented
+ * here, because prompt encoding is real provider behaviour that lives in the
+ * legacy runtimes today: giving it a slot means moving four encoders, which is
+ * M3 work, not a line in this file. Recorded so the slot is added deliberately
+ * rather than discovered missing again at the flip.
+ */
+export interface ExecutionChatRuntimeHostPorts {
+  prepareTurn(request: ChatTurnRequest): PreparedChatTurn;
+  /**
+   * Encodes a prepared turn into the opaque reference the backend resolves.
+   *
+   * Core never learns what is inside it; that is the whole point of
+   * `requestRef` being a string the provider round-trips.
+   */
+  encodeRequestRef(
+    turn: PreparedChatTurn,
+    history?: ChatMessage[],
+    options?: ChatRuntimeQueryOptions,
+  ): string;
+  readonly reasoningControl: ProviderCapabilities['reasoningControl'];
+  /** Provider-native session id, read from the session snapshot at M3. */
+  currentSessionId(): string | null;
+}
+
+/**
+ * The provider-neutral `ChatRuntime` over the execution kernel.
+ *
+ * Every member either delegates to the registry, to a module contribution, or
+ * to a host port. It holds no protocol knowledge of its own, and the members it
+ * cannot serve are **absent** rather than present and inert — an optional member
+ * the UI can test for is a capability, while one that always fails is a
+ * capability the UI cannot tell from a defect.
+ */
+export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<string, unknown>> {
+  private readonly session: ExecutionAdapterSession;
+  private readonly readyListeners = new Set<(ready: boolean) => void>();
+  private executionSessionId: ExecutionSessionId | null = null;
+  private active: { runId: RunId; stream: ExecutionRunStream; release: () => void } | null = null;
+  private lastCompleted: ExecutionRunStream | null = null;
+
+  constructor(
+    private readonly context: ExecutionChatRuntimeAdapterContext,
+    private readonly ports: ExecutionChatRuntimeHostPorts,
+    private readonly features: ProviderFeatureContributions<TSettings>,
+  ) {
+    this.session = new ExecutionAdapterSession(context.capabilities);
+  }
+
+  get providerId(): ProviderId {
+    return this.context.capabilities.providerId;
+  }
+
+  getCapabilities(): Readonly<ProviderCapabilities> {
+    return toLegacyCapabilities(this.context.capabilities, this.ports.reasoningControl);
+  }
+
+  prepareTurn(request: ChatTurnRequest): PreparedChatTurn {
+    // Synchronous on purpose: the controller writes the prepared content onto
+    // the user message before sending, so turning this into a lifecycle
+    // round-trip would reorder the UI against the run.
+    return this.ports.prepareTurn(request);
+  }
+
+  onReadyStateChange(listener: (ready: boolean) => void): () => void {
+    this.readyListeners.add(listener);
+    return () => this.readyListeners.delete(listener);
+  }
+
+  setResumeCheckpoint(checkpointId: string | undefined): void {
+    this.session.setResumeCheckpoint(checkpointId);
+  }
+
+  async ensureReady(): Promise<boolean> {
+    if (this.executionSessionId) {
+      return true;
+    }
+    const executionSessionId = this.context.nextExecutionSessionId();
+    await this.context.registry.createSession({
+      backendId: this.context.backendId,
+      executionSessionId,
+      owner: this.context.owner,
+    });
+    this.executionSessionId = executionSessionId;
+    this.announceReady(true);
+    return true;
+  }
+
+  isReady(): boolean {
+    return this.executionSessionId !== null;
+  }
+
+  getSessionId(): string | null {
+    return this.ports.currentSessionId();
+  }
+
+  consumeSessionInvalidation(): boolean {
+    return this.session.consumeSessionInvalidation();
+  }
+
+  async *query(
+    turn: PreparedChatTurn,
+    conversationHistory?: ChatMessage[],
+    queryOptions?: ChatRuntimeQueryOptions,
+  ): AsyncGenerator<StreamChunk> {
+    await this.ensureReady();
+    const executionSessionId = this.executionSessionId;
+    if (!executionSessionId) {
+      throw new Error('Execution session is not established.');
+    }
+    const started = await startExecutionRun(
+      this.context,
+      executionSessionId,
+      { requestRef: this.ports.encodeRequestRef(turn, conversationHistory, queryOptions) },
+      this.session,
+    );
+    this.active = started;
+    try {
+      yield* started.stream.chunks();
+    } finally {
+      started.release();
+      this.lastCompleted = started.stream;
+      this.active = null;
+    }
+  }
+
+  cancel(): void {
+    const active = this.active;
+    if (!active) {
+      return;
+    }
+    dispatchCancellation(this.context, active.runId, active.stream);
+  }
+
+  consumeTurnMetadata(): ChatTurnMetadata {
+    // Read after the generator closed, from `finally` in the controller, which
+    // is why the finished turn is kept rather than the active one.
+    return (this.active?.stream ?? this.lastCompleted)?.consumeTurnMetadata() ?? {};
+  }
+
+  /** Present only where the provider can steer; absent otherwise, by contract. */
+  get steer(): ((turn: PreparedChatTurn) => Promise<boolean>) | undefined {
+    return this.session.supportsSteering()
+      ? async () => {
+        throw new Error('Steering dispatch arrives with the provider request resolver at M3.');
+      }
+      : undefined;
+  }
+
+  async cleanup(): Promise<void> {
+    // Until M5 this disposes the session, preserving today's behaviour that
+    // closing a tab cancels its work. At M5 it becomes detach-only.
+    const executionSessionId = this.executionSessionId;
+    this.executionSessionId = null;
+    this.announceReady(false);
+    if (executionSessionId) {
+      await this.context.registry.disposeSession(executionSessionId);
+    }
+  }
+
+  /** History, rewind, and native-agent members exist only where the module has them. */
+  get history(): ProviderFeatureContributions<TSettings>['history'] {
+    return this.features.history;
+  }
+
+  get rewind(): ProviderFeatureContributions<TSettings>['rewind'] {
+    return this.features.rewind;
+  }
+
+  private announceReady(ready: boolean): void {
+    for (const listener of [...this.readyListeners]) {
+      listener(ready);
+    }
+  }
 }

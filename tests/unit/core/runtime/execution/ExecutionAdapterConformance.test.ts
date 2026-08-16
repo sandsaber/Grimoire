@@ -18,14 +18,20 @@ import { DeterministicFakeBackend } from '@/core/execution/testing/Deterministic
 import {
   dispatchCancellation,
   ExecutionAdapterSession,
+  ExecutionChatRuntimeAdapter,
   type ExecutionChatRuntimeAdapterContext,
   startExecutionRun,
   toLegacyCapabilities,
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type {
+  ChatTurnRequest,
+  PreparedChatTurn,
+} from '@/core/runtime/types';
 import type { StreamChunk } from '@/core/types/chat';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
+import type { CodexProviderSettings } from '@/providers/codex/settings';
 import { opencodeProviderModule } from '@/providers/opencode/OpencodeProviderModule';
 
 /**
@@ -48,7 +54,7 @@ interface Harness {
   dispatched(runId: RunId): ExecutionRequest | undefined;
 }
 
-async function createHarness(): Promise<Harness> {
+async function createHarness(options: { ownSession?: boolean } = {}): Promise<Harness> {
   let clock = 100;
   let ordinal = 0;
   let runOrdinal = 0;
@@ -73,11 +79,15 @@ async function createHarness(): Promise<Harness> {
   registry.registerBackend({ backend });
   await registry.start();
   const owner = { kind: 'conversation' as const, ownerId: 'adapter-conformance' };
-  await registry.createSession({
-    backendId: backend.descriptor.backendId,
-    executionSessionId: SESSION_ID,
-    owner,
-  });
+  if (!options.ownSession) {
+    // The assembled adapter creates its own session through `ensureReady`; the
+    // lower-level cases need one to already exist.
+    await registry.createSession({
+      backendId: backend.descriptor.backendId,
+      executionSessionId: SESSION_ID,
+      owner,
+    });
+  }
   return {
     registry,
     context: {
@@ -291,5 +301,126 @@ describe('execution adapter over the registry', () => {
 
       expect(withPrefix).toEqual([{ id: 'claude', prefix: '/.claude/plans/' }]);
     });
+  });
+});
+
+describe('the assembled ChatRuntime adapter', () => {
+  function createAdapter(harness: Harness): ExecutionChatRuntimeAdapter<CodexProviderSettings> {
+    return new ExecutionChatRuntimeAdapter(
+      harness.context,
+      {
+        prepareTurn: (request: ChatTurnRequest) => ({
+          request,
+          persistedContent: request.text,
+          prompt: request.text,
+          isCompact: false,
+          mcpMentions: new Set<string>(),
+        }),
+        encodeRequestRef: (turn: PreparedChatTurn) => `encoded:${turn.prompt}`,
+        reasoningControl: 'effort',
+        currentSessionId: () => 'native-session',
+      },
+      codexProviderModule.features({
+        listSkills: async () => [],
+        listAgentMentions: async () => [],
+        refreshAgentMentions: async () => undefined,
+        resolveCliPath: async () => null,
+        listModels: async () => [],
+        refreshModels: async () => [],
+        readPlanUsage: async () => null,
+        shouldKeepWarm: () => false,
+        renderSettingsTab: () => undefined,
+        hydrateConversation: async () => ({ outcome: 'complete' as const }),
+        deleteConversationSession: async () => undefined,
+        resolveSessionId: () => 'thread-1',
+        isPendingFork: () => false,
+        recognizesSubagentTool: () => false,
+        parseSubagentDisplay: () => null,
+        dispose: async () => undefined,
+      }),
+    );
+  }
+
+  it('establishes a session on first use and reports readiness once', async () => {
+    const harness = await createHarness({ ownSession: true });
+    const adapter = createAdapter(harness);
+    const ready: boolean[] = [];
+    adapter.onReadyStateChange((state: boolean) => ready.push(state));
+
+    expect(adapter.isReady()).toBe(false);
+    expect(await adapter.ensureReady()).toBe(true);
+    // Idempotent: a second call must not create a second session for one
+    // conversation, which would give the same tab two owners.
+    expect(await adapter.ensureReady()).toBe(true);
+
+    expect(adapter.isReady()).toBe(true);
+    expect(ready).toEqual([true]);
+  });
+
+  it('streams a turn and closes only on the terminal', async () => {
+    const harness = await createHarness({ ownSession: true });
+    const adapter = createAdapter(harness);
+    const turn = adapter.prepareTurn({ text: 'hello' });
+    const collected = drain(adapter.query(turn));
+    const runId = toRunId(`run-${'1'.padStart(32, '0')}`);
+    // The generator body runs on the microtask queue, so the run is not
+    // dispatched the moment `query` is called. Waiting on the dispatch itself
+    // is the only signal that does not race.
+    for (let attempt = 0; attempt < 200 && !harness.dispatched(runId); attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    await harness.emit(
+      runId,
+      { kind: 'output-delta', channel: 'assistant', text: 'answer' },
+      'd-1',
+    );
+    await harness.emit(runId, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, 'd-2');
+
+    expect(await collected).toEqual([{ type: 'text', content: 'answer' }]);
+    expect(harness.dispatched(runId)?.requestRef).toBe('encoded:hello');
+    expect(adapter.consumeTurnMetadata()).toEqual({ wasSent: true });
+  });
+
+  it('projects the capability record the UI reads', async () => {
+    const adapter = createAdapter(await createHarness({ ownSession: true }));
+
+    expect(adapter.getCapabilities().providerId).toBe('codex');
+    expect(adapter.getCapabilities().supportsTurnSteer).toBe(true);
+  });
+
+  it('exposes steer only where the provider steers', async () => {
+    const harness = await createHarness({ ownSession: true });
+
+    expect(createAdapter(harness).steer).toBeDefined();
+    expect(new ExecutionChatRuntimeAdapter(
+      { ...harness.context, capabilities: antigravityProviderModule.capabilities },
+      {
+        prepareTurn: (request: ChatTurnRequest) => ({
+          request,
+          persistedContent: request.text,
+          prompt: request.text,
+          isCompact: false,
+          mcpMentions: new Set<string>(),
+        }),
+        encodeRequestRef: () => 'encoded',
+        reasoningControl: 'effort',
+        currentSessionId: () => null,
+      },
+      antigravityProviderModule.features({
+        resolveCliPath: async () => null,
+        listModels: async () => [],
+        refreshModels: async () => [],
+      }),
+    ).steer).toBeUndefined();
+  });
+
+  it('releases the session on cleanup, preserving today\'s tab-close behaviour', async () => {
+    const harness = await createHarness({ ownSession: true });
+    const adapter = createAdapter(harness);
+    await adapter.ensureReady();
+
+    await adapter.cleanup();
+
+    expect(adapter.isReady()).toBe(false);
   });
 });

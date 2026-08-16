@@ -1318,6 +1318,32 @@ at all.
 Gates: unit 453 suites / 7693 tests, integration 6 / 220, typecheck, lint, `build:release` clean;
 CI green on the previous commit.
 
+### M2-adapter — the adapter assembled (this commit)
+
+`ExecutionChatRuntimeAdapter` is the class the milestone asked for: one provider-neutral view of the
+kernel where every member delegates to the registry, to a module contribution, or to a host port, and
+holds no protocol knowledge of its own. It establishes its session on first use and idempotently —
+a second `ensureReady` must not give one conversation two owners — streams a turn that closes only on
+a terminal, dispatches cancellation without waiting, and disposes the session on `cleanup`, which
+preserves today's behaviour that closing a tab cancels its work until M5 makes it detach-only.
+
+`steer` is a getter returning `undefined` where the provider cannot steer, so the member is genuinely
+absent rather than present and failing. Codex has it; Antigravity does not, and the test asserts both
+directions.
+
+**A fifth contract gap, recorded rather than papered over.** The adapter contract maps `prepareTurn`
+to a **module contribution**, and `ProviderModule` has no slot for it. It is routed through a host
+port here instead of being invented: prompt encoding is real provider behaviour that lives in the
+four legacy runtimes today, so giving it a slot means moving four encoders, which is M3 work and not
+a line in this file. Owner: M3, and it is in the open obligations below so it is added deliberately
+rather than discovered missing at a flip.
+
+The adapter is generic over its settings type for the same reason the contract became generic at
+proof three: a module's feature contributions are typed by its settings, and erasing that would push
+a cast into every provider.
+
+Gates: unit 453 suites / 7698 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1372,9 +1398,12 @@ Open obligations, each with an owner:
   and ACP backends, at their harvest;
 - D7 (diagnostic redaction) has no automated guard. Owner: M1 follow-up, once the kernel emits log
   records;
-- the remaining `ChatRuntime` members are mapped but not yet assembled into one class: session
-  lifecycle, interactions, and the optional history and subagent ports. The run stream, the five
-  formerly-paper mappings, and the capability projection are done. Owner: M2-adapter;
+- `ProviderModule` has no slot for `prepareTurn`, which the adapter contract maps as a module
+  contribution. The adapter routes it through a host port meanwhile. Owner: M3, when the four legacy
+  prompt encoders move;
+- the adapter's interaction callbacks and optional subagent loaders are still to be wired; the run
+  stream, session lifecycle, capability projection, and the five formerly-paper mappings are done.
+  Owner: M2-adapter;
 - three `src/core/**` modules import the plugin type, enumerated in
   `executionCompositionBoundaries.test.ts`. Owner: M3, when the provider catalog replaces the split
   registries. **The eight core→provider imports previously listed here did not exist** — they were an
