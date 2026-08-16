@@ -1344,6 +1344,27 @@ a cast into every provider.
 
 Gates: unit 453 suites / 7698 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
 
+### M2-adapter — interactions bridged (this commit)
+
+The four interaction callbacks map onto one bridge, and building it made the boundary explicit: the
+kernel carries an interaction as identity plus an **opaque `presentationRef`** and a set of response
+ids. It does not carry the tool name, input, or description the approval callback expects, because
+those are provider payload and core does not decode payload. So rendering needs a provider-owned
+presenter, and the adapter's whole part is: ask, then resolve through the registry with the chosen
+response id.
+
+Three behaviours are worth stating because each could plausibly have gone the other way:
+
+- **a dismissal leaves the interaction unresolved.** Returning `null` is not choosing the first
+  option, and flattening the two would make the UI decide on the user's behalf — the one thing an
+  approval prompt must never do. The provider times it out or cancels it;
+- **a redelivered interaction is presented once.** Idempotent resolution is the registry's, which
+  owns interaction ownership; the bridge only has to avoid asking the user twice;
+- **a presenter that throws settles as a dismissal** rather than leaving the bridge unable to
+  present anything afterwards.
+
+Gates: unit 453 suites / 7702 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1401,9 +1422,10 @@ Open obligations, each with an owner:
 - `ProviderModule` has no slot for `prepareTurn`, which the adapter contract maps as a module
   contribution. The adapter routes it through a host port meanwhile. Owner: M3, when the four legacy
   prompt encoders move;
-- the adapter's interaction callbacks and optional subagent loaders are still to be wired; the run
-  stream, session lifecycle, capability projection, and the five formerly-paper mappings are done.
-  Owner: M2-adapter;
+- the adapter's optional subagent loaders are still to be wired, and the conformance suite runs over
+  the deterministic fake rather than all four proof backends. The run stream, session lifecycle,
+  capability projection, interactions, and the five formerly-paper mappings are done. Owner:
+  M2-adapter;
 - three `src/core/**` modules import the plugin type, enumerated in
   `executionCompositionBoundaries.test.ts`. Owner: M3, when the provider catalog replaces the split
   registries. **The eight core→provider imports previously listed here did not exist** — they were an

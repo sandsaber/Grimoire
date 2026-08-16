@@ -1,4 +1,20 @@
-import { ExecutionAdapterSession } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
+import { executionBackendId } from '@/core/execution/ExecutionBackendDescriptor';
+import type {
+  InteractionRequest,
+  InteractionResolution,
+} from '@/core/execution/ExecutionContracts';
+import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
+import {
+  executionSessionId,
+  interactionId as toInteractionId,
+  runId as toRunId,
+  sessionInstanceId,
+} from '@/core/execution/ExecutionIds';
+import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
+import {
+  ExecutionAdapterSession,
+  ExecutionInteractionBridge,
+} from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
 
@@ -73,3 +89,112 @@ describe('adapter session state', () => {
     });
   });
 });
+
+describe('interaction bridge', () => {
+  function createRequest(interactionId: string): InteractionRequest {
+    return {
+      interactionId: toInteractionId(interactionId),
+      runId: toRunId(`run-${'c'.repeat(32)}`),
+      kind: 'approval',
+      presentationRef: 'opaque-presentation',
+      responseIds: ['allow', 'deny'],
+    };
+  }
+
+  function envelopeFor(request: InteractionRequest): ExecutionEventEnvelope {
+    return {
+      schemaVersion: 1,
+      backendId: executionBackendId('provider-fake'),
+      backendGeneration: 1,
+      executionSessionId: executionSessionId(`es-${'c'.repeat(32)}`),
+      sessionInstanceId: sessionInstanceId(`si-${'c'.repeat(32)}`),
+      eventId: `event-${request.interactionId}`,
+      sequence: 1,
+      occurredAt: 1,
+      scope: { kind: 'run', runId: request.runId },
+      event: { kind: 'interaction-opened', interaction: request },
+    };
+  }
+
+  function createRegistry(): {
+    registry: ExecutionLifecycleRegistry;
+    resolutions: InteractionResolution[];
+  } {
+    const resolutions: InteractionResolution[] = [];
+    const registry = {
+      resolveInteraction: async (resolution: InteractionResolution) => {
+        resolutions.push(resolution);
+      },
+    } as unknown as ExecutionLifecycleRegistry;
+    return { registry, resolutions };
+  }
+
+  it('resolves with the response the presenter chose', async () => {
+    const { registry, resolutions } = createRegistry();
+    const bridge = new ExecutionInteractionBridge(registry, {
+      present: async () => 'deny',
+    }, () => 7);
+
+    bridge.accept(envelopeFor(createRequest(`ix-${'1'.repeat(32)}`)));
+    await flush();
+
+    expect(resolutions).toEqual([{
+      interactionId: `ix-${'1'.repeat(32)}`,
+      responseId: 'deny',
+      resolvedAt: 7,
+    }]);
+  });
+
+  it('leaves a dismissed interaction unresolved rather than answering for the user', async () => {
+    // The one thing an approval prompt must never do is decide on the user's
+    // behalf. A dismissal is the provider's to time out or cancel.
+    const { registry, resolutions } = createRegistry();
+    const bridge = new ExecutionInteractionBridge(registry, { present: async () => null });
+
+    bridge.accept(envelopeFor(createRequest(`ix-${'2'.repeat(32)}`)));
+    await flush();
+
+    expect(resolutions).toEqual([]);
+  });
+
+  it('presents a redelivered interaction once', async () => {
+    const { registry, resolutions } = createRegistry();
+    let presentations = 0;
+    const bridge = new ExecutionInteractionBridge(registry, {
+      present: async () => {
+        presentations += 1;
+        return 'allow';
+      },
+    });
+    const envelope = envelopeFor(createRequest(`ix-${'3'.repeat(32)}`));
+
+    bridge.accept(envelope);
+    bridge.accept(envelope);
+    await flush();
+
+    expect(presentations).toBe(1);
+    expect(resolutions).toHaveLength(1);
+  });
+
+  it('survives a presenter that throws', async () => {
+    // A view that fails to render must not leave the bridge in a state where
+    // later interactions are lost.
+    const { registry, resolutions } = createRegistry();
+    const bridge = new ExecutionInteractionBridge(registry, {
+      present: async () => {
+        throw new Error('render failed');
+      },
+    });
+
+    bridge.accept(envelopeFor(createRequest(`ix-${'4'.repeat(32)}`)));
+    await flush();
+
+    expect(resolutions).toEqual([]);
+  });
+});
+
+async function flush(turns = 8): Promise<void> {
+  for (let turn = 0; turn < turns; turn += 1) {
+    await Promise.resolve();
+  }
+}

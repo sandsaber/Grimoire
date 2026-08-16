@@ -2,6 +2,7 @@ import type { ExecutionBackendId } from '../../execution/ExecutionBackendDescrip
 import type {
   CancellationReason,
   ExecutionOwner,
+  InteractionRequest,
   RunTerminalReason,
 } from '../../execution/ExecutionContracts';
 import type { ExecutionEventEnvelope } from '../../execution/ExecutionEvents';
@@ -533,5 +534,70 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     for (const listener of [...this.readyListeners]) {
       listener(ready);
     }
+  }
+}
+
+/**
+ * Turns an opened interaction into the UI's answer.
+ *
+ * The kernel carries an interaction as identity plus an opaque
+ * `presentationRef` and a set of response ids — never the tool name, input, or
+ * description the approval callback expects, because those are provider payload
+ * and core does not decode payload. Rendering therefore needs a provider-owned
+ * presenter, and the adapter's whole part is: ask, then resolve through the
+ * registry with the chosen response id.
+ *
+ * Returning `null` means the user dismissed it without choosing, which is not
+ * the same as choosing the first option and must not be flattened into one.
+ */
+export interface ExecutionInteractionPresenter {
+  present(request: InteractionRequest): Promise<string | null>;
+}
+
+/**
+ * Routes opened interactions to the presenter and resolves them exactly once.
+ *
+ * Idempotence lives in the registry, which owns interaction ownership and
+ * resolution; this only has to avoid presenting the same interaction twice
+ * after a redelivery, which is why the seen set exists.
+ */
+export class ExecutionInteractionBridge {
+  private readonly presented = new Set<string>();
+
+  constructor(
+    private readonly registry: ExecutionLifecycleRegistry,
+    private readonly presenter: ExecutionInteractionPresenter,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  accept(envelope: ExecutionEventEnvelope): void {
+    const event = envelope.event;
+    if (event.kind !== 'interaction-opened') {
+      return;
+    }
+    const request = event.interaction;
+    if (this.presented.has(request.interactionId)) {
+      return;
+    }
+    this.presented.add(request.interactionId);
+    void this.settle(request);
+  }
+
+  private async settle(request: InteractionRequest): Promise<void> {
+    const responseId = await this.presenter.present(request).catch(() => null);
+    if (responseId === null) {
+      // A dismissal is the provider's problem to time out or cancel. Resolving
+      // it with an invented answer would be the UI deciding on the user's
+      // behalf, which is the one thing an approval prompt must never do.
+      return;
+    }
+    await this.registry.resolveInteraction({
+      interactionId: request.interactionId,
+      responseId,
+      resolvedAt: this.now(),
+    }).catch(() => {
+      // Already resolved, expired, or fenced: the registry is the authority on
+      // which of those happened, and it has already recorded it.
+    });
   }
 }
