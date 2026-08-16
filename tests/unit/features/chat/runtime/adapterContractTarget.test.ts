@@ -1,3 +1,12 @@
+import { executionBackendId } from '@/core/execution/ExecutionBackendDescriptor';
+import type { RunTerminalReason } from '@/core/execution/ExecutionContracts';
+import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
+import {
+  executionSessionId,
+  runId as toRunId,
+  sessionInstanceId,
+} from '@/core/execution/ExecutionIds';
+import { ExecutionRunStream } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatTurnMetadata } from '@/core/runtime/types';
 import type { StreamChunk } from '@/core/types/chat';
 
@@ -10,10 +19,18 @@ import type { StreamChunk } from '@/core/types/chat';
  * closes when the provider stops yielding, and here it closes only on a
  * terminal fact.
  *
- * It runs against a spec-level double, so passing proves the specification in
- * `docs/provider-execution-adapter-contract.md` is coherent and executable —
- * not that an adapter exists. At M2-adapter, `createSubject` is re-pointed at
- * the real adapter and every assertion below must hold unchanged.
+ * It first ran against a spec-level double, which proved the specification in
+ * `docs/provider-execution-adapter-contract.md` was coherent and executable but
+ * not that anything implemented it. At M2-adapter `createSubject` was re-pointed
+ * at the real `ExecutionRunStream`. **Eleven of the twelve assertions held
+ * unchanged; one did not, and it was the specification that was wrong** — it
+ * assumed the provider's error string reaches the UI, which the kernel does not
+ * carry. That is recorded at the assertion itself rather than quietly amended.
+ *
+ * Ingress is still fed directly rather than through the registry, on purpose:
+ * these assertions are about one turn's lifetime, and routing them through
+ * session creation and dispatch would test the registry twice and this once.
+ * The registry path is covered by the adapter conformance suite.
  */
 
 type RunOutcome =
@@ -29,7 +46,7 @@ type IngressEvent =
   | { kind: 'chunk'; chunk: StreamChunk }
   | { kind: 'disconnected' }
   | { kind: 'recovering' }
-  | { kind: 'terminal'; outcome: RunOutcome; error?: string };
+  | { kind: 'terminal'; outcome: RunOutcome; reason?: RunTerminalReason };
 
 interface Subject {
   query(): AsyncGenerator<StreamChunk>;
@@ -41,91 +58,60 @@ interface Subject {
   cancelDispatched(): boolean;
 }
 
-/**
- * Minimal implementation of the specified adapter semantics.
- *
- * Replaced at M2-adapter by the production adapter over
- * `ExecutionLifecycleRegistry`. Everything it does here is a restatement of the
- * mapping table in the adapter contract, deliberately with no other behavior.
- */
+const RUN_ID = toRunId(`run-${'a'.repeat(32)}`);
+
+/** Wraps one ingress event in the envelope the registry would have delivered. */
+function envelope(event: IngressEvent, sequence: number): ExecutionEventEnvelope {
+  const inner = ((): ExecutionEventEnvelope['event'] => {
+    if (event.kind === 'chunk') {
+      const chunk = event.chunk;
+      if (chunk.type !== 'text' && chunk.type !== 'thinking') {
+        throw new Error(`This suite only feeds streamed content, got "${chunk.type}".`);
+      }
+      return {
+        kind: 'output-delta',
+        channel: chunk.type === 'thinking' ? 'reasoning' : 'assistant',
+        text: chunk.content,
+      };
+    }
+    if (event.kind === 'disconnected') {
+      return { kind: 'connection-lost' };
+    }
+    if (event.kind === 'recovering') {
+      return { kind: 'recovery-started' };
+    }
+    return {
+      kind: 'terminal',
+      terminal: event.outcome,
+      reason: event.reason ?? (event.outcome === 'failed' ? 'provider-failure' : 'completed'),
+    };
+  })();
+  return {
+    schemaVersion: 1,
+    backendId: executionBackendId('provider-target'),
+    backendGeneration: 1,
+    executionSessionId: executionSessionId(`es-${'a'.repeat(32)}`),
+    sessionInstanceId: sessionInstanceId(`si-${'a'.repeat(32)}`),
+    eventId: `target-${sequence}`,
+    sequence,
+    occurredAt: sequence,
+    scope: { kind: 'run', runId: RUN_ID },
+    event: inner,
+  };
+}
+
+/** The production stream, wearing the shape these assertions were written for. */
 function createSubject(): Subject {
-  const pending: StreamChunk[] = [];
-  let waiting: (() => void) | null = null;
-  let terminal: RunOutcome | null = null;
-  let cancelRequested = false;
-  let metadataConsumed = false;
-
-  function wake(): void {
-    waiting?.();
-    waiting = null;
-  }
-
-  function push(chunk: StreamChunk): void {
-    pending.push(chunk);
-    wake();
-  }
-
+  const stream = new ExecutionRunStream(RUN_ID);
+  let sequence = 0;
   return {
     deliver(event: IngressEvent): void {
-      // Exactly one terminal: everything after it is dropped, never rewritten.
-      if (terminal !== null) {
-        return;
-      }
-
-      if (event.kind === 'chunk') {
-        push(event.chunk);
-        return;
-      }
-
-      // Transport loss is non-terminal. The generator stays open while
-      // status query, reattach, or checkpoint recovery remains possible.
-      if (event.kind === 'disconnected' || event.kind === 'recovering') {
-        return;
-      }
-
-      terminal = event.outcome;
-      if (event.outcome === 'failed') {
-        push({ type: 'error', content: event.error ?? 'Run failed' });
-      } else if (event.outcome === 'indeterminate') {
-        push({
-          type: 'notice',
-          level: 'warning',
-          content: 'Grimoire could not establish whether this run completed.',
-        });
-      }
-      wake();
+      stream.accept(envelope(event, ++sequence));
     },
-
-    cancel(): void {
-      // Dispatch only. The run decides when, and whether, it stopped.
-      cancelRequested = true;
-    },
-
-    cancelDispatched(): boolean {
-      return cancelRequested;
-    },
-
-    consumeTurnMetadata(): ChatTurnMetadata {
-      if (metadataConsumed) {
-        return {};
-      }
-      metadataConsumed = true;
-      return { wasSent: terminal !== null && terminal !== 'invalidated' };
-    },
-
-    async *query(): AsyncGenerator<StreamChunk> {
-      for (;;) {
-        while (pending.length > 0) {
-          yield pending.shift() as StreamChunk;
-        }
-        if (terminal !== null) {
-          return;
-        }
-        await new Promise<void>(resolve => {
-          waiting = resolve;
-        });
-      }
-    },
+    cancel: () => stream.requestCancel(),
+    cancelDispatched: () => stream.cancelDispatched(),
+    consumeTurnMetadata: () => stream.consumeTurnMetadata(),
+    query: () => stream.chunks(),
   };
 }
 
@@ -193,9 +179,18 @@ describe('adapter contract (target semantics)', () => {
     const subject = createSubject();
     const collected = collect(subject);
 
-    subject.deliver({ kind: 'terminal', outcome: 'failed', error: 'process died' });
+    subject.deliver({ kind: 'terminal', outcome: 'failed', reason: 'nonzero-exit' });
 
-    expect(await collected).toEqual([{ type: 'error', content: 'process died' }]);
+    // The one assertion that changed when this suite was re-pointed at the real
+    // stream, and it changed because the spec was wrong: it assumed the
+    // provider's own error string reaches the UI. The kernel classifies instead
+    // — `RunTerminalReason` is a closed set of sixteen causes — so the chunk
+    // names the cause rather than echoing a string the kernel never carries.
+    // The behaviour being specified, that a failure is reported through the
+    // existing error chunk, is unchanged.
+    expect(await collected).toEqual([
+      { type: 'error', content: 'The provider process exited with an error.' },
+    ]);
   });
 
   it('reports an indeterminate run honestly instead of as success', async () => {
@@ -226,7 +221,7 @@ describe('adapter contract (target semantics)', () => {
     const collected = collect(subject);
 
     subject.deliver({ kind: 'terminal', outcome: 'succeeded' });
-    subject.deliver({ kind: 'terminal', outcome: 'failed', error: 'late failure' });
+    subject.deliver({ kind: 'terminal', outcome: 'failed', reason: 'provider-failure' });
     subject.deliver({ kind: 'chunk', chunk: { type: 'text', content: 'late text' } });
 
     expect(await collected).toEqual([]);

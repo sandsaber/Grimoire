@@ -1250,6 +1250,44 @@ turn was readable while it ran; it now names `output-delta`, and both its record
 
 Gates: unit 451 suites / 7675 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
 
+### M2-adapter — the run stream, over the registry (this commit)
+
+`ExecutionRunStream` is the turn's view of a run, and `startExecutionRun` acquires that run **through
+the registry** — never a backend, because ingestion, ordering, deduplication, and terminal policy are
+the registry's job and a second opinion about any of them is how the two disagree in production.
+
+**The target suite was re-pointed at it, and eleven of the twelve assertions held unchanged.** That
+is the value of having written them at M0a against a double. The twelfth did not hold, and **the
+specification was the thing that was wrong**: it asserted the error chunk carries the provider's own
+error string, and the kernel does not carry one. `RunTerminalReason` is a closed set of sixteen
+causes, so the adapter renders the cause. That is a deliberate trade — a classified cause can be
+rendered, counted, and reasoned about, where a raw provider string is diagnostic content, often a
+stack trace, that D7 would have to redact before it could be shown. All sixteen have a sentence, so a
+new reason is a compile error rather than a run that fails with no explanation. The changed assertion
+says so at the assertion, not in a commit message.
+
+Observation is established **before** `startRun` resolves. A run that dispatches quickly can emit
+first, and an event observed one line too late is indistinguishable from one that never happened.
+
+Two capability fields were added to the descriptor because the adapter had to answer
+`getCapabilities()` with the record the UI reads today and had no source for them: `input`
+(image attachments, instruction mode) and `interactions.planArtifactPrefix`. Without them the adapter
+would have invented two answers and silently disabled an image button. `supportsMcpTools` maps from
+`mcp.perRunSelection` rather than from ownership — that boolean gates the per-run selector and
+nothing else, which is the distinction proof four found.
+
+**A correction to this journal.** The M0a review found that the composition gate did not understand
+the `@/` alias, and fixing it appeared to expose *eight* `src/core/**` modules importing a concrete
+provider. That claim, recorded here and carried in the resume pointer since, **was wrong.** The
+fixed gate still matched specifiers as text, and text cannot tell `src/core/providers/` — core's own
+neutral contracts, which all eight import — from `src/providers/`. The gate now resolves each
+specifier against the importing file, and the exemption list is **empty**: `src/core/` has never
+imported a concrete provider. The rule was right; the measurement was not, twice, and the second time
+it invented eight violations that did not exist. A case pinning both confusions now guards the guard.
+
+Gates: unit 452 suites / 7686 tests, integration 6 / 220, typecheck, lint, `build:release` clean,
+adapter absent from the bundle.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1308,9 +1346,10 @@ Open obligations, each with an owner:
   `prepareTurn`, `steer`, `setResumeCheckpoint`, `buildSessionUpdates`, and
   `consumeSessionInvalidation` remain paper mappings until `createSubject` grows. Owner:
   M2-adapter;
-- eight `src/core/**` modules import a concrete provider and three import the plugin type, all
-  enumerated in `executionCompositionBoundaries.test.ts`. Owners: M3 for the registry and bootstrap
-  entries, M5 for the auxiliary services.
+- three `src/core/**` modules import the plugin type, enumerated in
+  `executionCompositionBoundaries.test.ts`. Owner: M3, when the provider catalog replaces the split
+  registries. **The eight core→provider imports previously listed here did not exist** — they were an
+  artifact of a gate that matched specifiers as text; see the M2-adapter correction above.
 
 Standing rules that outlive any milestone:
 

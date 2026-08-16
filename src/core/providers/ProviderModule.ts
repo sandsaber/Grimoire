@@ -465,10 +465,24 @@ export interface ProviderCapabilityDescriptor {
     readonly statusQuery: boolean;
     readonly reattachment: boolean;
   };
+  /**
+   * What a turn may carry in.
+   *
+   * Added while writing the adapter, which has to answer `getCapabilities()`
+   * with the record the UI reads today: these two had no source in the
+   * descriptor, so the adapter would have had to invent them or drop them —
+   * and dropping them silently disables the image button and instruction mode.
+   */
+  readonly input: {
+    readonly imageAttachments: CapabilitySupport;
+    readonly instructionMode: CapabilitySupport;
+  };
   readonly interactions: {
     readonly approvals: CapabilitySupport;
     readonly questions: CapabilitySupport;
     readonly planMode: CapabilitySupport;
+    /** Vault prefix where the provider writes plan files, when it writes them. */
+    readonly planArtifactPrefix?: string;
   };
   readonly conversation: {
     readonly fork: CapabilitySupport;

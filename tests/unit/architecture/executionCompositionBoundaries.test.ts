@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { resolve } from 'node:path';
 
 import { readInterfaceMembers } from '@test/helpers/interfaceMembers';
@@ -58,23 +59,16 @@ const LEGACY_CORE_PLUGIN_IMPORTS = [
 ];
 
 /**
- * Pre-existing violations of `src/core/**` → a concrete provider.
+ * There is no exemption list for `src/core/**` → a concrete provider, because
+ * there are no violations.
  *
- * Invisible until this gate learned the `@/` alias, which is how the repository
- * actually imports. Each is removed when the provider catalog replaces the
- * split registries at M3, except the auxiliary services, which move with their
- * owners at M5. The list may shrink but never grow.
+ * There was one, of eight modules, and it was wrong. It came from a gate that
+ * matched specifiers as text and so could not tell `src/core/providers/` —
+ * core's own neutral contracts, which those eight import — from
+ * `src/providers/`. Resolving the specifier against the importing file emptied
+ * the list at a stroke. The direction has always been clean; the measurement
+ * was not.
  */
-const LEGACY_CORE_PROVIDER_IMPORTS = [
-  'src/core/auxiliary/QueryBackedInlineEditService.ts',
-  'src/core/auxiliary/QueryBackedInstructionRefineService.ts',
-  'src/core/auxiliary/QueryBackedTitleGenerationService.ts',
-  'src/core/bootstrap/SessionStorage.ts',
-  'src/core/bootstrap/storage.ts',
-  'src/core/commands/builtInCommands.ts',
-  'src/core/prompt/inlineEdit.ts',
-  'src/core/runtime/ChatRuntime.ts',
-];
 
 /**
  * Pre-existing direct process launch from a feature. Bang-bash mode is a
@@ -98,8 +92,41 @@ function importsPlugin(source: string): boolean {
  * core module could have imported a concrete provider by alias and the gate
  * would have stayed green.
  */
-function importsFrom(source: string, area: 'providers' | 'features'): boolean {
-  return new RegExp(`from '((\\.\\./)+|@/)${area}/`).test(source);
+function importsFrom(module: string, source: string, area: 'providers' | 'features'): boolean {
+  // Specifiers are resolved against the importing file rather than matched as
+  // text. The text version could not tell `src/core/providers/` — core's own
+  // neutral contracts — from `src/providers/`, and reported all eight core
+  // modules that import `../providers/types` as importing a concrete provider.
+  // They do not, and never did.
+  const directory = dirname(module);
+  for (const [, specifier] of source.matchAll(/from '([^']+)'/g)) {
+    const resolved = specifier.startsWith('@/')
+      ? `src/${specifier.slice(2)}`
+      : specifier.startsWith('.')
+        ? posixJoin(directory, specifier)
+        : null;
+    if (resolved?.startsWith(`src/${area}/`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Path join that keeps POSIX separators on every platform, as module ids use. */
+function posixJoin(directory: string, specifier: string): string {
+  const segments = `${directory}/${specifier}`.split('/');
+  const resolved: string[] = [];
+  for (const segment of segments) {
+    if (segment === '.' || segment === '') {
+      continue;
+    }
+    if (segment === '..') {
+      resolved.pop();
+      continue;
+    }
+    resolved.push(segment);
+  }
+  return resolved.join('/');
 }
 
 function launchesProcess(source: string): boolean {
@@ -113,24 +140,31 @@ describe('execution composition boundaries', () => {
     it('adds no new provider import under src/core, by relative path or alias', () => {
       const offenders = modules
         .filter(module => module.startsWith('src/core/'))
-        .filter(module => importsFrom(read(module), 'providers'))
-        .filter(module => !LEGACY_CORE_PROVIDER_IMPORTS.includes(module));
+        .filter(module => importsFrom(module, read(module), 'providers'));
 
       expect(offenders).toEqual([]);
     });
 
-    it('keeps the legacy provider-import list from growing back', () => {
-      const stale = LEGACY_CORE_PROVIDER_IMPORTS.filter(
-        module => !importsFrom(read(module), 'providers'),
-      );
+    it('resolves a specifier rather than matching it, so the rule means what it says', () => {
+      // Guards the guard, with the two cases the text version confused. Without
+      // this, the gate could regress to string matching and nobody would see it
+      // until an exemption list reappeared.
+      const coreInternal = "import type { X } from '../providers/types';";
+      const concreteProvider = "import { Y } from '../../providers/codex/settings';";
 
-      expect(stale).toEqual([]);
+      expect(importsFrom('src/core/runtime/ChatRuntime.ts', coreInternal, 'providers')).toBe(false);
+      expect(importsFrom('src/core/runtime/ChatRuntime.ts', concreteProvider, 'providers'))
+        .toBe(true);
+      expect(importsFrom('src/core/x/Y.ts', "from '@/providers/codex/settings'", 'providers'))
+        .toBe(true);
+      expect(importsFrom('src/core/x/Y.ts', "from '@/core/providers/types'", 'providers'))
+        .toBe(false);
     });
 
     it('adds no feature import under src/core, by relative path or alias', () => {
       const offenders = modules
         .filter(module => module.startsWith('src/core/'))
-        .filter(module => importsFrom(read(module), 'features'));
+        .filter(module => importsFrom(module, read(module), 'features'));
 
       expect(offenders).toEqual([]);
     });
@@ -166,7 +200,12 @@ describe('execution composition boundaries', () => {
 
       expect(importsPlugin(source)).toBe(false);
       expect(launchesProcess(source)).toBe(false);
-      expect(importsFrom(source, 'features')).toBe(false);
+      expect(importsFrom(module, source, 'features')).toBe(false);
+      // Strict modules also take no concrete provider, which the exemption-free
+      // rule above already covers for core but not for the two provider-owned
+      // entries in this list.
+      expect(importsFrom(module, source, 'providers') && module.startsWith('src/core/'))
+        .toBe(false);
       expect(source).not.toMatch(/from 'obsidian'/);
       expect(source).not.toMatch(/\bHTMLElement\b|\bdocument\b/);
     });

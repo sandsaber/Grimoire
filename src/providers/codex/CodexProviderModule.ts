@@ -175,6 +175,10 @@ const codexCapabilities: ProviderCapabilityDescriptor = {
     statusQuery: false,
     reattachment: false,
   },
+  input: {
+    imageAttachments: 'native',
+    instructionMode: 'native',
+  },
   interactions: {
     approvals: 'native',
     questions: 'native',

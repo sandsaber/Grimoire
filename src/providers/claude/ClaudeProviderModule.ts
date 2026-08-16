@@ -186,10 +186,17 @@ const claudeCapabilities: ProviderCapabilityDescriptor = {
     statusQuery: false,
     reattachment: false,
   },
+  input: {
+    imageAttachments: 'native',
+    instructionMode: 'native',
+  },
   interactions: {
     approvals: 'native',
     questions: 'native',
     planMode: 'native',
+    // The only provider that writes plan files, and the only one whose plan
+    // mode has a vault artifact the UI links to.
+    planArtifactPrefix: '/.claude/plans/',
   },
   conversation: {
     fork: 'native',

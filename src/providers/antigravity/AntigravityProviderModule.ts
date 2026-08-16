@@ -146,6 +146,10 @@ const antigravityCapabilities: ProviderCapabilityDescriptor = {
     statusQuery: false,
     reattachment: false,
   },
+  input: {
+    imageAttachments: 'unsupported',
+    instructionMode: 'unsupported',
+  },
   interactions: {
     approvals: 'unsupported',
     questions: 'unsupported',

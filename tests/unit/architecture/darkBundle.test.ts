@@ -33,6 +33,10 @@ const DARK_MARKERS = [
   { marker: 'Codex execution connection is not initialized', why: 'the Codex execution connection' },
   { marker: 'provider-claude', why: 'the Claude execution backend descriptor' },
   { marker: 'provider-opencode', why: 'the OpenCode execution backend descriptor' },
+  {
+    marker: 'The provider ended the turn without producing a result',
+    why: 'the presentation adapter\'s failure messages',
+  },
 ];
 
 function readBundle(): string | null {
