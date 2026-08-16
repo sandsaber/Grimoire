@@ -1149,8 +1149,10 @@ The second defect was hidden behind the first: with the dispatch fixed, the form
 failed, and the fix would have looked wrong.
 
 Local gates green (unit 450 suites / 7666 tests, integration 6 / 220, typecheck, lint,
-`build:release`). The Windows leg is what confirms the second half of the diagnosis, since `/s`
-stripping cannot be reproduced off Windows.
+`build:release`), and **CI is green on all four jobs including `windows-latest`** — which is the
+confirmation of the second half, since `/s` stripping cannot be reproduced off Windows. The two
+fixes compose as intended: the form now takes cmd quoting, which passes the tail through raw, and
+`/s` strips the pair the tail carries for exactly that purpose.
 
 ## Current blocker
 
@@ -1175,9 +1177,9 @@ model presentation, a `reconcile` result no provider could fill, a rewind capabi
 and static feature contributions that made context-dependent ports unfillable. Each was invisible
 until a provider that needed it was written, which is the argument for four proofs rather than one.
 
-**The Windows gate was red and is now fixed pending confirmation.** Two defects, one production and
-one in the test, both recorded in the entry directly above. Check that leg before starting the next
-milestone; everything else is green.
+Every gate is green, CI included, on all four jobs. The Windows failure that closed the previous
+session is fixed and confirmed; it was two defects, one production and one in the test, recorded in
+the entry directly above.
 
 **Next action:** **M2-adapter** — the `ChatRuntime` adapter over the kernel, still dark, with
 `createSubject` in `adapterContractTarget.test.ts` grown to cover `prepareTurn`, `steer`,
