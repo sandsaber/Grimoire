@@ -85,6 +85,7 @@
   "eventCases": {
     "persistentTurn": [
       "run-started",
+      "output-delta",
       "result:projection",
       "terminal:succeeded:completed"
     ],

@@ -48,6 +48,11 @@ describe('ClaudeExecutionBackend', () => {
     const firstEvents = collectEvents(session.createRun(request('1', 'first')));
     await waitFor(() => fixture.query.received.length === 1);
     fixture.query.emit(initMessage('native-session'));
+    // The SDK reports the answer twice, as deltas and then whole in the result.
+    // Emitting one delta here is what exercises the streaming path at all: the
+    // scenario previously jumped straight to the result, so the backend's
+    // delta handling was never run by any test.
+    fixture.query.emit(textDeltaMessage('first '));
     fixture.query.emit(resultMessage('message-1', 'first result', 'result-1'));
     const firstCaptured = await firstEvents;
     expectTerminal(firstCaptured, 'succeeded', 'completed');
@@ -1174,6 +1179,19 @@ function userMessage(uuid: string): SDKUserMessage {
   } as SDKUserMessage;
 }
 
+function textDeltaMessage(text: string, sessionId = 'native-session'): SDKMessage {
+  return {
+    type: 'stream_event',
+    session_id: sessionId,
+    uuid: `delta-${text}`,
+    event: {
+      type: 'content_block_delta',
+      index: 0,
+      delta: { type: 'text_delta', text },
+    },
+  } as unknown as SDKMessage;
+}
+
 function initMessage(sessionId: string): SDKMessage {
   return {
     type: 'system',
@@ -1309,9 +1327,13 @@ function summarizeEvents(events: readonly ProviderExecutionEvent[]): string[] {
       return [];
     }
     if (event.kind === 'run-started'
+      || event.kind === 'output-delta'
       || event.kind === 'cancellation-acknowledged'
       || event.kind === 'connection-lost'
       || event.kind === 'recovery-started') {
+      // Streamed output is a recorded semantic. This summarizer drops what it
+      // does not name, so omitting it would keep the trace silent about whether
+      // a turn was readable while it ran.
       return [event.kind];
     }
     if (event.kind === 'result') {

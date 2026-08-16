@@ -5,7 +5,10 @@ import type {
   InteractionRequest,
   RunTerminalReason,
 } from '../../execution/ExecutionContracts';
-import type { ExecutionEventEnvelope } from '../../execution/ExecutionEvents';
+import type {
+  ExecutionEvent,
+  ExecutionEventEnvelope,
+} from '../../execution/ExecutionEvents';
 import type {
   ExecutionSessionId,
   RunId,
@@ -599,5 +602,43 @@ export class ExecutionInteractionBridge {
       // Already resolved, expired, or fenced: the registry is the authority on
       // which of those happened, and it has already recorded it.
     });
+  }
+}
+
+/**
+ * What the adapter does with each kind of event.
+ *
+ * Exported so the classification is checkable rather than implied by a switch.
+ * `ignored` is a decision, not a gap: most kernel events are facts about a run
+ * that the current chat UI has no surface for, and saying so in a list is what
+ * keeps "we do not render this" distinguishable from "we forgot this".
+ */
+export type ExecutionEventPresentation = 'chunk' | 'terminal' | 'ignored';
+
+export function classifyForPresentation(kind: ExecutionEvent['kind']): ExecutionEventPresentation {
+  switch (kind) {
+    case 'output-delta':
+      return 'chunk';
+    case 'terminal':
+      return 'terminal';
+    case 'run-started':
+    case 'thinking-activity':
+    case 'tool-activity':
+    case 'progress':
+    case 'result':
+    case 'interaction-opened':
+    case 'interaction-resolved':
+    case 'connection-lost':
+    case 'recovery-started':
+    case 'recovered':
+    case 'cancellation-acknowledged':
+    case 'native-agent-observed':
+    case 'native-agent-result':
+    case 'native-agent-activity':
+    case 'native-agent-status':
+      // Facts, not content. Tool and native-agent rendering needs the provider
+      // payload the kernel deliberately does not carry, so those surfaces move
+      // with the chat projections at M5 rather than being guessed at here.
+      return 'ignored';
   }
 }

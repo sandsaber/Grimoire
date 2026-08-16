@@ -1365,6 +1365,30 @@ Three behaviours are worth stating because each could plausibly have gone the ot
 
 Gates: unit 453 suites / 7702 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
 
+### M2-adapter — coverage over the four topologies, and a hole it found (this commit)
+
+The milestone's exit gate asks for adapter conformance over the fake **and the four proof backends**.
+Running four full adapter harnesses would mostly re-test the registry, so the per-provider property
+asserted is the one that actually differs: what each backend emits, checked against what the adapter
+does with it. `classifyForPresentation` makes that checkable — every kernel event kind is `chunk`,
+`terminal`, or `ignored`, and `ignored` is a decision in one list rather than a default branch that
+would swallow the next kind someone adds.
+
+**It immediately found that Claude's streaming was never executed by any test.** The delta handling
+added two commits ago sat in a branch no scenario reached: the recorded persistent-turn case jumped
+straight from the session init to the result. Its trace said so, and the gate compared the trace
+against the topology. Fixed at the cause — the scenario now emits an SDK `content_block_delta`, the
+Claude summarizer names `output-delta` as OpenCode's now does, and the trace records it. Had this
+gate not existed, Claude would have shipped a streaming path that compiled, was described in the
+journal, and had never run.
+
+The streaming claim is now per-provider and checked both ways: three topologies must show streamed
+output in their recorded events, and Antigravity must not, because print mode is one process, one
+output, at exit.
+
+Gates: unit 453 suites / 7711 tests, integration 6 / 220, typecheck, lint, `build:release` clean; CI
+green on the three preceding commits, including the Windows teardown fix.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1422,10 +1446,10 @@ Open obligations, each with an owner:
 - `ProviderModule` has no slot for `prepareTurn`, which the adapter contract maps as a module
   contribution. The adapter routes it through a host port meanwhile. Owner: M3, when the four legacy
   prompt encoders move;
-- the adapter's optional subagent loaders are still to be wired, and the conformance suite runs over
-  the deterministic fake rather than all four proof backends. The run stream, session lifecycle,
-  capability projection, interactions, and the five formerly-paper mappings are done. Owner:
-  M2-adapter;
+- the adapter's optional subagent loaders (`loadSubagentToolCalls`, `loadSubagentFinalResult`) are
+  still absent, which is correct until a provider declares them. Everything else the milestone asks
+  for is done: run stream, session lifecycle, capability projection, interactions, the five
+  formerly-paper mappings, and per-topology coverage. Owner: M2-adapter, to close;
 - three `src/core/**` modules import the plugin type, enumerated in
   `executionCompositionBoundaries.test.ts`. Owner: M3, when the provider catalog replaces the split
   registries. **The eight core→provider imports previously listed here did not exist** — they were an

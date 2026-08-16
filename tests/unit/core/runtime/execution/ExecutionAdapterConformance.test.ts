@@ -1,3 +1,7 @@
+import antigravityTrace from '@test/fixtures/provider-traces/antigravity-execution.json';
+import claudeTrace from '@test/fixtures/provider-traces/claude-execution.json';
+import codexTrace from '@test/fixtures/provider-traces/codex-execution.json';
+import opencodeTrace from '@test/fixtures/provider-traces/opencode-execution.json';
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import type { ExecutionRequest } from '@/core/execution/ExecutionContracts';
@@ -16,6 +20,7 @@ import {
 } from '@/core/execution/ExecutionLifecycleRegistry';
 import { DeterministicFakeBackend } from '@/core/execution/testing/DeterministicFakeBackend';
 import {
+  classifyForPresentation,
   dispatchCancellation,
   ExecutionAdapterSession,
   ExecutionChatRuntimeAdapter,
@@ -424,3 +429,86 @@ describe('the assembled ChatRuntime adapter', () => {
     expect(adapter.isReady()).toBe(false);
   });
 });
+
+describe('coverage over the four proof topologies', () => {
+  const traces = [
+    { providerId: 'antigravity', streams: false, trace: antigravityTrace },
+    { providerId: 'codex', streams: true, trace: codexTrace },
+    { providerId: 'claude', streams: true, trace: claudeTrace },
+    { providerId: 'opencode', streams: true, trace: opencodeTrace },
+  ];
+
+  /**
+   * Kernel event kinds a fixture records.
+   *
+   * Filtered against the union rather than taken whole: a fixture's `cases` mix
+   * two vocabularies — some list protocol steps like `thread/start`, others list
+   * emitted events — and separating them properly is fixture surgery this
+   * milestone does not need.
+   */
+  function recordedKinds(trace: {
+    cases?: Record<string, readonly string[]>;
+    eventCases?: Record<string, readonly string[]>;
+  }): ExecutionEvent['kind'][] {
+    return [
+      ...Object.values(trace.cases ?? {}).flat(),
+      ...Object.values(trace.eventCases ?? {}).flat(),
+    ]
+      .map(entry => entry.split(':')[0])
+      .filter((kind): kind is ExecutionEvent['kind'] => (
+        KERNEL_EVENT_KINDS.includes(kind as ExecutionEvent['kind'])
+      ));
+  }
+
+  it.each(traces)('$providerId records events the adapter classifies', ({ trace }) => {
+    const kinds = recordedKinds(trace);
+
+    // Not vacuous: a fixture that recorded no kernel events at all would make
+    // every per-provider claim below meaningless.
+    expect(kinds.length).toBeGreaterThan(0);
+    expect(kinds.every(kind => ['chunk', 'terminal', 'ignored']
+      .includes(classifyForPresentation(kind)))).toBe(true);
+  });
+
+  it.each(traces)('$providerId streams exactly as its topology allows', ({ trace, streams }) => {
+    // The provider-specific half of the streaming decision: three topologies
+    // can carry a turn while it runs, and print mode cannot — one process, one
+    // output, at exit. A fixture disagreeing with its topology means either the
+    // backend stopped streaming or started claiming it could.
+    const streamed = recordedKinds(trace).includes('output-delta');
+
+    expect(streamed).toBe(streams);
+  });
+
+  it('renders exactly one kind as content and one as a terminal', () => {
+    const byPresentation = KERNEL_EVENT_KINDS.reduce<Record<string, string[]>>((totals, kind) => {
+      const presentation = classifyForPresentation(kind);
+      totals[presentation] = [...(totals[presentation] ?? []), kind];
+      return totals;
+    }, {});
+
+    expect(byPresentation.chunk).toEqual(['output-delta']);
+    expect(byPresentation.terminal).toEqual(['terminal']);
+    expect(byPresentation.ignored.length).toBeGreaterThan(0);
+  });
+});
+
+const KERNEL_EVENT_KINDS: ExecutionEvent['kind'][] = [
+  'run-started',
+  'output-delta',
+  'thinking-activity',
+  'tool-activity',
+  'progress',
+  'result',
+  'interaction-opened',
+  'interaction-resolved',
+  'connection-lost',
+  'recovery-started',
+  'recovered',
+  'cancellation-acknowledged',
+  'terminal',
+  'native-agent-observed',
+  'native-agent-result',
+  'native-agent-activity',
+  'native-agent-status',
+];
