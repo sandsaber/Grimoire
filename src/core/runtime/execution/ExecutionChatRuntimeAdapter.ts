@@ -17,21 +17,21 @@ import type { ExecutionLifecycleRegistry } from '../../execution/ExecutionLifecy
 import type {
   CapabilitySupport,
   ProviderCapabilityDescriptor,
-  ProviderCommandDescriptor,
   ProviderFeatureContributions,
-  ProviderRewindOutcome,
-  ProviderRewindRequest,
-  ProviderSessionPatch,
   ProviderWorkspaceSlots,
 } from '../../providers/ProviderModule';
 import type { ProviderCapabilities } from '../../providers/types';
 import type { ChatMessage, StreamChunk } from '../../types/chat';
 import type { ProviderId } from '../../types/provider';
+import type { SlashCommand } from '../../types/settings';
 import type {
+  ChatRewindMode,
+  ChatRewindResult,
   ChatRuntimeQueryOptions,
   ChatTurnMetadata,
   ChatTurnRequest,
   PreparedChatTurn,
+  SessionUpdateResult,
 } from '../types';
 
 /**
@@ -74,6 +74,9 @@ export interface ExecutionRunRequestSpec {
   readonly resultExpectation?: 'required' | 'optional' | 'none';
 }
 
+/** How long a tab close waits for its run to settle before giving up on it. */
+const CLEANUP_TERMINAL_WAIT_MS = 2_000;
+
 type RunOutcome =
   | 'succeeded'
   | 'failed'
@@ -95,6 +98,9 @@ export class ExecutionRunStream {
   private terminalError: string | undefined;
   private cancelRequested = false;
   private metadataConsumed = false;
+  private nativeRunRef: string | undefined;
+  private assistantMessageId: string | undefined;
+  private planCompleted = false;
   private wake: (() => void) | null = null;
 
   constructor(private readonly runId: RunId) {}
@@ -105,6 +111,17 @@ export class ExecutionRunStream {
       return;
     }
     const event = envelope.event;
+    if (envelope.scope.kind === 'run' && envelope.scope.nativeRunRef) {
+      // Carried on every run-scoped envelope, so the identity survives even if
+      // the turn ends on a path that emits nothing else.
+      this.nativeRunRef = envelope.scope.nativeRunRef;
+    }
+    if (event.kind === 'result') {
+      this.assistantMessageId = event.result.resultId;
+    }
+    if (event.kind === 'interaction-resolved') {
+      this.planCompleted = this.planCompleted || event.responseId.includes('plan');
+    }
     if (event.kind === 'output-delta') {
       this.push(event.channel === 'reasoning'
         ? { type: 'thinking', content: event.text }
@@ -140,14 +157,27 @@ export class ExecutionRunStream {
     return this.cancelRequested;
   }
 
+  settled(): boolean {
+    return this.terminal !== null;
+  }
+
   consumeTurnMetadata(): ChatTurnMetadata {
     if (this.metadataConsumed) {
       return {};
     }
     this.metadataConsumed = true;
-    // `invalidated` is the one terminal that means the turn never reached the
-    // provider, so it is the one that must not be reported as sent.
-    return { wasSent: this.terminal !== null && this.terminal !== 'invalidated' };
+    return {
+      // `invalidated` is the one terminal that means the turn never reached the
+      // provider, so it is the one that must not be reported as sent.
+      wasSent: this.terminal !== null && this.terminal !== 'invalidated',
+      // The native message identities the run was addressed by. The controller
+      // copies these onto the messages, and rewind refuses to run without the
+      // user one — so omitting them degrades rewind and resume silently, which
+      // is worse than failing, because the turn still looks complete.
+      ...(this.nativeRunRef ? { userMessageId: this.nativeRunRef } : {}),
+      ...(this.assistantMessageId ? { assistantMessageId: this.assistantMessageId } : {}),
+      ...(this.planCompleted ? { planCompleted: true } : {}),
+    };
   }
 
   failureReason(): string | undefined {
@@ -395,6 +425,16 @@ export interface ExecutionChatRuntimeHostPorts {
   readonly reasoningControl: ProviderCapabilities['reasoningControl'];
   /** Provider-native session id, read from the session snapshot at M3. */
   currentSessionId(): string | null;
+  /** Reports a cleanup that could not complete; never rethrown to the caller. */
+  reportCleanupFailure?(error: unknown): void;
+  now?(): number;
+  /**
+   * Renders an opened interaction and returns the chosen response id.
+   *
+   * Absent means the host installed no presenter yet, in which case
+   * interactions are left for the provider to time out — never auto-answered.
+   */
+  readonly interactionPresenter?: ExecutionInteractionPresenter;
 }
 
 /**
@@ -411,7 +451,9 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   private readonly readyListeners = new Set<(ready: boolean) => void>();
   private executionSessionId: ExecutionSessionId | null = null;
   private boundSessionId: string | null | undefined;
-  private readonly callbacks: Record<string, unknown> = {};
+  private readonly callbacks: { autoTurn?: (runId: unknown) => void } & Record<string, unknown> = {};
+  private sideChannels: (() => void) | null = null;
+  private establishing: Promise<boolean> | undefined;
   private active: { runId: RunId; stream: ExecutionRunStream; release: () => void } | null = null;
   private lastCompleted: ExecutionRunStream | null = null;
 
@@ -452,6 +494,18 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     if (this.executionSessionId) {
       return true;
     }
+    // Held in flight, not just checked on entry: two overlapping calls would
+    // each see no session, each mint an id, and the first session would be
+    // orphaned with nothing left holding its id to dispose it.
+    this.establishing ??= this.establish();
+    try {
+      return await this.establishing;
+    } finally {
+      this.establishing = undefined;
+    }
+  }
+
+  private async establish(): Promise<boolean> {
     const executionSessionId = this.context.nextExecutionSessionId();
     await this.context.registry.createSession({
       backendId: this.context.backendId,
@@ -492,6 +546,12 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
       this.session,
     );
     this.active = started;
+    // Interactions and backend-initiated turns arrive on the same stream as the
+    // content, so they are routed here rather than through a second
+    // subscription that could disagree about ordering. Storing the callbacks
+    // without ever consuming them is how approvals and auto-turns would have
+    // silently stopped working at a flip.
+    this.attachSideChannels(executionSessionId);
     try {
       yield* started.stream.chunks();
     } finally {
@@ -524,14 +584,54 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
       : undefined;
   }
 
+  /**
+   * Closes the tab's work, in that order: cancel, wait, dispose.
+   *
+   * `disposeSession` refuses a session with a live run, and a tab is closed
+   * mid-turn all the time — today's `destroyTab` sets a flag, calls `cancel()`
+   * fire-and-forget, and calls `cleanup()` immediately, with the legacy
+   * runtimes cancelling inside `cleanup`. An adapter that only disposed would
+   * therefore reject on the common path, leak the session, and — since
+   * `ChatRuntime.cleanup()` returns void — do it as an unhandled rejection.
+   *
+   * Failures are reported, never thrown: a tab that cannot be closed is worse
+   * than a session that outlives it, and the shutdown path terminalizes what is
+   * left.
+   */
   async cleanup(): Promise<void> {
-    // Until M5 this disposes the session, preserving today's behaviour that
-    // closing a tab cancels its work. At M5 it becomes detach-only.
     const executionSessionId = this.executionSessionId;
     this.executionSessionId = null;
     this.announceReady(false);
-    if (executionSessionId) {
+    this.sideChannels?.();
+    this.sideChannels = null;
+    if (!executionSessionId) {
+      return;
+    }
+    const active = this.active;
+    if (active) {
+      dispatchCancellation(this.context, active.runId, active.stream);
+      await this.awaitTerminal(active.stream);
+    }
+    try {
       await this.context.registry.disposeSession(executionSessionId);
+    } catch (error) {
+      this.ports.reportCleanupFailure?.(error);
+    }
+  }
+
+  /**
+   * Waits for the run to settle, with a bound.
+   *
+   * Unbounded would make closing a tab depend on a provider answering, which is
+   * exactly the coupling cancellation is meant to break. On timeout the session
+   * is left to the shutdown path, which terminalizes before disposing.
+   */
+  private async awaitTerminal(stream: ExecutionRunStream): Promise<void> {
+    const deadline = (this.ports.now?.() ?? Date.now()) + CLEANUP_TERMINAL_WAIT_MS;
+    while (!stream.settled() && (this.ports.now?.() ?? Date.now()) < deadline) {
+      await new Promise<void>(resolve => {
+        window.setTimeout(resolve, 10);
+      });
     }
   }
 
@@ -551,6 +651,25 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     this.boundSessionId = next;
   }
 
+  /**
+   * Drops the session so the next turn establishes a fresh one.
+   *
+   * The coverage gate listed this as absent with "no production call site",
+   * which was simply false — `main.ts` calls it when settings change. Written
+   * out, and synchronous like the contract, so the disposal it triggers cannot
+   * make a settings change wait on a provider.
+   */
+  resetSession(): void {
+    const executionSessionId = this.executionSessionId;
+    this.executionSessionId = null;
+    this.boundSessionId = undefined;
+    this.announceReady(false);
+    if (executionSessionId) {
+      void this.context.registry.disposeSession(executionSessionId)
+        .catch(error => this.ports.reportCleanupFailure?.(error));
+    }
+  }
+
   async reloadMcpServers(): Promise<void> {
     const mcp = this.workspace?.mcp;
     if (!mcp) {
@@ -561,7 +680,7 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     await mcp.loadServers();
   }
 
-  async getSupportedCommands(): Promise<readonly ProviderCommandDescriptor[]> {
+  async getSupportedCommands(): Promise<SlashCommand[]> {
     if (this.context.capabilities.commands.chatSurface === 'unsupported') {
       // The provider may well discover commands; this asks whether the chat
       // input surfaces them, which for Codex is no.
@@ -571,7 +690,15 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     const runtime = sessionId ? this.workspace?.runtimeCommands : undefined;
     const fromSession = runtime ? await runtime.listForSession(sessionId as string) : [];
     const fromCatalog = this.workspace?.commands ? await this.workspace.commands.list() : [];
-    return [...fromCatalog, ...fromSession];
+    // Translated at the boundary: the caller wants slash commands, which carry
+    // an id and a prompt template the port's descriptor does not have. An empty
+    // template is the honest value — the provider owns the expansion.
+    return [...fromCatalog, ...fromSession].map(descriptor => ({
+      id: `${this.context.capabilities.providerId}:${descriptor.name}`,
+      name: descriptor.name,
+      content: '',
+      ...(descriptor.description === undefined ? {} : { description: descriptor.description }),
+    }));
   }
 
   /**
@@ -585,39 +712,57 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   async rewind(
     userMessageId: string,
     assistantMessageId: string,
-    mode: ProviderRewindRequest['mode'] = 'conversation',
-  ): Promise<ProviderRewindOutcome> {
+    mode: ChatRewindMode = 'conversation',
+  ): Promise<ChatRewindResult> {
     const port = this.features.rewind;
     if (!port) {
-      return { outcome: 'unavailable', reason: 'This provider cannot rewind a conversation.' };
+      return { canRewind: false, error: 'This provider cannot rewind a conversation.' };
     }
-    return port.rewind({
+    const outcome = await port.rewind({
       executionSessionId: this.executionSessionId ?? '',
       userMessageId,
       assistantMessageId,
       mode,
     });
+    // Translated at the boundary rather than leaked: the caller reads
+    // `canRewind` and `error`, so returning the richer outcome verbatim made a
+    // successful rewind read as "this provider cannot rewind".
+    return outcome.outcome === 'rewound'
+      ? { canRewind: true, filesChanged: [...outcome.filesChanged],
+        ...(outcome.insertions === undefined ? {} : { insertions: outcome.insertions }),
+        ...(outcome.deletions === undefined ? {} : { deletions: outcome.deletions }) }
+      : { canRewind: false, error: outcome.reason };
   }
 
   buildSessionUpdates(params: {
-    conversationId: string;
+    conversation: { id: string } | null;
     sessionInvalidated: boolean;
-  }): ProviderSessionPatch {
+  }): SessionUpdateResult {
     const history = this.features.history;
-    if (!history) {
+    if (!history || !params.conversation) {
       // No native history means no binding to patch, and inventing one would
       // write a session id the provider will not recognize.
-      return { sessionId: null };
+      return { updates: {} };
     }
-    return history.buildSessionPatch({
-      conversationId: params.conversationId,
+    const patch = history.buildSessionPatch({
+      conversationId: params.conversation.id,
       sessionInvalidated: params.sessionInvalidated,
       nativeSessionRef: this.ports.currentSessionId(),
     });
+    // The caller applies `updates` to the conversation, so the patch is named
+    // there rather than returned in the port's own shape.
+    return {
+      updates: {
+        sessionId: patch.sessionId,
+        ...(patch.providerState === undefined ? {} : { providerState: patch.providerState }),
+      },
+    } as SessionUpdateResult;
   }
 
-  resolveSessionIdForFork(conversationId: string): string | null {
-    return this.features.history?.resolveSessionId(conversationId) ?? null;
+  resolveSessionIdForFork(conversation: { id: string } | null): string | null {
+    return conversation
+      ? this.features.history?.resolveSessionId(conversation.id) ?? null
+      : null;
   }
 
   // The five interaction callbacks and the two observation hooks are stored
@@ -649,12 +794,49 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   }
 
   setAutoTurnCallback(callback: unknown): void {
-    this.callbacks.autoTurn = callback;
+    this.callbacks.autoTurn = callback as ((runId: unknown) => void) | undefined;
   }
 
   /** What the host presenter needs, in one place rather than seven getters. */
   interactionCallbacks(): Readonly<Record<string, unknown>> {
     return { ...this.callbacks };
+  }
+
+  /**
+   * Routes the run's non-content events to the callbacks the host installed.
+   *
+   * One subscription per session, established once: an interaction opened
+   * during turn three must reach the same presenter as one opened during turn
+   * one, and a backend-initiated turn belongs to the conversation rather than
+   * to any turn in it.
+   */
+  private attachSideChannels(executionSessionId: ExecutionSessionId): void {
+    if (this.sideChannels) {
+      return;
+    }
+    const presenter = this.ports.interactionPresenter;
+    const bridge = presenter
+      // Wrapped rather than passed by reference: the host's clock is a method
+      // on its own object, and handing it over bare would rebind `this`.
+      ? new ExecutionInteractionBridge(
+        this.context.registry,
+        presenter,
+        () => this.ports.now?.() ?? Date.now(),
+      )
+      : null;
+    this.sideChannels = this.context.registry.observe(executionSessionId, envelope => {
+      bridge?.accept(envelope);
+      if (envelope.event.kind === 'run-started' && !this.ownsRun(envelope)) {
+        // A run this adapter did not start, owned by this conversation: the
+        // backend began a turn of its own, which the UI has to be told about
+        // because nothing in it asked for one.
+        this.callbacks.autoTurn?.(envelope.scope.kind === 'session' ? null : envelope.scope.runId);
+      }
+    });
+  }
+
+  private ownsRun(envelope: ExecutionEventEnvelope): boolean {
+    return envelope.scope.kind !== 'session' && envelope.scope.runId === this.active?.runId;
   }
 
   private announceReady(ready: boolean): void {

@@ -1767,6 +1767,23 @@ export class ExecutionLifecycleRegistry {
     this.scheduleInteractionCancellations(interactionIds);
     const session = this.sessions.get(executionSessionId(run.record.executionSessionId));
     if (session) {
+      // A terminal reached from this side - pre-dispatch rejection, recovery,
+      // shutdown - never passed through the ingestor, so nothing published it.
+      // Observers close a turn on the terminal and on nothing else, so without
+      // this the control store holds a settled run while the reader waits for
+      // it forever. Synthesized rather than ingested, and marked as such.
+      this.publishEnvelope(session, {
+        schemaVersion: 1,
+        backendId: session.backend.backend.descriptor.backendId,
+        backendGeneration: session.record.backendGeneration,
+        executionSessionId: executionSessionId(session.record.executionSessionId),
+        sessionInstanceId: sessionInstanceId(session.record.sessionInstanceId),
+        eventId: `terminalized:${run.record.runId}`,
+        sequence: run.record.lastSequence,
+        occurredAt,
+        scope: { kind: 'run', runId: runId(run.record.runId) },
+        event: { kind: 'terminal', terminal: kind, reason },
+      });
       await this.markBackendTransitionsQuiescent(session.backend);
     }
   }

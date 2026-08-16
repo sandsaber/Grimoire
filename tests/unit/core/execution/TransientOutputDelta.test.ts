@@ -366,3 +366,54 @@ describe('envelope delivery under a storage fault', () => {
     expect(registry.getRun(RUN_ID)?.terminal).toBeUndefined();
   });
 });
+
+/**
+ * A terminal the registry produces itself must reach observers too.
+ *
+ * Pre-dispatch rejection, recovery, and shutdown all settle a run without any
+ * backend event, so nothing passes through the ingestor to publish. The reader
+ * closes a turn on the terminal and on nothing else, which makes an unpublished
+ * one a permanent hang with a settled record — the worst pair, because the
+ * control store looks correct.
+ */
+describe('registry-produced terminals', () => {
+  it('publishes a pre-dispatch rejection to observers', async () => {
+    let clock = 10;
+    let ordinal = 0;
+    const now = (): number => ++clock;
+    const storage = new TestDurableStorage();
+    const repositories = new ExecutionControlRepositories(storage, now);
+    const registry = new ExecutionLifecycleRegistry({
+      repositories,
+      controlTransactions: new ExecutionControlTransactionCoordinator(storage, repositories, { now }),
+      nextTransactionId: () => `tx-${(++ordinal).toString(16).padStart(32, '0')}`,
+      now,
+      scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
+    });
+    const backend = new DeterministicFakeBackend({
+      sessionInstanceIdFactory: () => INSTANCE_ID,
+      now,
+    });
+    backend.dispatchMode = 'reject-side-effect-free';
+    registry.registerBackend({ backend });
+    await registry.start();
+    await registry.createSession({
+      backendId: backend.descriptor.backendId,
+      executionSessionId: SESSION_ID,
+      owner: { kind: 'conversation', ownerId: 'terminalized' },
+    });
+    const seen: string[] = [];
+    registry.observe(SESSION_ID, envelope => seen.push(envelope.event.kind));
+
+    await registry.startRun(SESSION_ID, {
+      runId: RUN_ID,
+      owner: { kind: 'conversation', ownerId: 'terminalized' },
+      resultExpectation: 'optional',
+      requestRef: 'opaque-request',
+    }).catch(() => undefined);
+    await registry.waitForIdle();
+
+    expect(registry.getRun(RUN_ID)?.terminal).toBeDefined();
+    expect(seen).toContain('terminal');
+  });
+});

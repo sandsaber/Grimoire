@@ -19,6 +19,7 @@ import {
   ExecutionAdapterSession,
   ExecutionChatRuntimeAdapter,
   ExecutionInteractionBridge,
+  ExecutionRunStream,
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
@@ -206,15 +207,16 @@ async function flush(turns = 8): Promise<void> {
 }
 
 describe('adapter members that were missing until the coverage gate found them', () => {
-  it('reports a rewind the provider cannot do as unavailable, not as a failure', async () => {
-    // `unavailable` and `failed` are different answers: one says the provider
-    // has no rewind, the other says a rewind was attempted and did not work.
-    // The legacy `ChatRewindResult` conflated them behind `canRewind: false`.
+  it('answers a rewind the provider cannot do in the caller\'s own shape', async () => {
+    // The port distinguishes `unavailable` from `failed`; the caller reads
+    // `canRewind` and `error`, so the translation happens at the boundary.
+    // Returning the port's outcome verbatim made a successful rewind read as
+    // "this provider cannot rewind".
     const adapter = createBareAdapter(antigravityProviderModule.capabilities, {});
 
     await expect(adapter.rewind('user-1', 'assistant-1')).resolves.toEqual({
-      outcome: 'unavailable',
-      reason: 'This provider cannot rewind a conversation.',
+      canRewind: false,
+      error: 'This provider cannot rewind a conversation.',
     });
   });
 
@@ -234,8 +236,11 @@ describe('adapter members that were missing until the coverage gate found them',
       commands: { list: async () => [{ name: 'review', source: 'project' as const }] },
     });
 
+    // Slash commands, not port descriptors: the caller needs an id and a
+    // prompt template, and an empty template is the honest value because the
+    // provider owns the expansion.
     expect(await adapter.getSupportedCommands()).toEqual([
-      { name: 'review', source: 'project' },
+      { id: 'claude:review', name: 'review', content: '' },
     ]);
   });
 
@@ -296,3 +301,66 @@ function createBareAdapter(
     workspace,
   );
 }
+
+describe('turn metadata carries the native identities', () => {
+  it('reports the run reference the controller needs for rewind', () => {
+    // The controller copies these onto the messages, and rewind refuses to run
+    // without the user one. Omitting them degrades rewind and resume silently,
+    // which is worse than failing: the turn still looks complete.
+    const stream = new ExecutionRunStream(toRunId(`run-${'e'.repeat(32)}`));
+    const base = {
+      schemaVersion: 1 as const,
+      backendId: executionBackendId('provider-fake'),
+      backendGeneration: 1,
+      executionSessionId: executionSessionId(`es-${'e'.repeat(32)}`),
+      sessionInstanceId: sessionInstanceId(`si-${'e'.repeat(32)}`),
+      occurredAt: 1,
+      scope: {
+        kind: 'run' as const,
+        runId: toRunId(`run-${'e'.repeat(32)}`),
+        nativeRunRef: 'native-message-1',
+      },
+    };
+
+    stream.accept({ ...base, eventId: 'e-1', sequence: 1, event: { kind: 'run-started' } });
+    stream.accept({
+      ...base,
+      eventId: 'e-2',
+      sequence: 2,
+      event: { kind: 'result', result: { resultId: 'assistant-1', storage: 'projection' } },
+    });
+    stream.accept({
+      ...base,
+      eventId: 'e-3',
+      sequence: 3,
+      event: { kind: 'terminal', terminal: 'succeeded', reason: 'completed' },
+    });
+
+    expect(stream.consumeTurnMetadata()).toEqual({
+      wasSent: true,
+      userMessageId: 'native-message-1',
+      assistantMessageId: 'assistant-1',
+    });
+  });
+
+  it('reports no identity it never observed', () => {
+    // Guards against filling the field with something invented: a provider with
+    // no native run reference must report none rather than a synthesized id the
+    // provider would not recognize.
+    const stream = new ExecutionRunStream(toRunId(`run-${'f'.repeat(32)}`));
+    stream.accept({
+      schemaVersion: 1,
+      backendId: executionBackendId('provider-fake'),
+      backendGeneration: 1,
+      executionSessionId: executionSessionId(`es-${'f'.repeat(32)}`),
+      sessionInstanceId: sessionInstanceId(`si-${'f'.repeat(32)}`),
+      eventId: 'e-1',
+      sequence: 1,
+      occurredAt: 1,
+      scope: { kind: 'run', runId: toRunId(`run-${'f'.repeat(32)}`) },
+      event: { kind: 'terminal', terminal: 'succeeded', reason: 'completed' },
+    });
+
+    expect(stream.consumeTurnMetadata()).toEqual({ wasSent: true });
+  });
+});

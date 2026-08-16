@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 import { readInterfaceMembers } from '@test/helpers/interfaceMembers';
 
+import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
 import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 
 /**
@@ -25,9 +26,6 @@ const ADAPTER_PATH = 'src/core/runtime/execution/ExecutionChatRuntimeAdapter.ts'
  * from `docs/provider-execution-adapter-contract.md`.
  */
 const DECLARED_ABSENCES: Readonly<Record<string, string>> = {
-  // Row 13: no production call site. Re-establishing a session is what
-  // `cleanup` followed by `ensureReady` already does.
-  resetSession: 'no production call site; disposal and re-establishment cover it',
   // Row 8: no production call site, and optional in the contract.
   reloadWorkspaceResources: 'optional, and no production call site declares it',
   // Row 18: model routing is a workspace port, and the adapter has no
@@ -39,7 +37,58 @@ const DECLARED_ABSENCES: Readonly<Record<string, string>> = {
   loadSubagentFinalResult: 'optional; no provider declares subagent result loading',
 };
 
+/**
+ * Assignability, checked by the compiler rather than by this file.
+ *
+ * The name comparison below is a coarse net; it passed while `rewind` was a
+ * getter returning a capability port, and while four other members had
+ * signatures the caller could not use. This declaration is what actually holds
+ * the adapter to the contract: it fails `npm run typecheck`, not a test run, if
+ * any member's shape drifts.
+ *
+ * Written as a type-level assertion rather than `implements` on the class so
+ * the adapter stays constructible in tests without a full plugin host.
+ */
+type AdapterSatisfiesContract = ExecutionChatRuntimeAdapter extends Pick<
+ChatRuntime,
+| 'providerId'
+| 'getCapabilities'
+| 'prepareTurn'
+| 'onReadyStateChange'
+| 'setResumeCheckpoint'
+| 'syncConversationState'
+| 'reloadMcpServers'
+| 'ensureReady'
+| 'query'
+| 'cancel'
+| 'resetSession'
+| 'getSessionId'
+| 'consumeSessionInvalidation'
+| 'isReady'
+| 'getSupportedCommands'
+| 'cleanup'
+| 'rewind'
+| 'setApprovalCallback'
+| 'setApprovalDismisser'
+| 'setAskUserQuestionCallback'
+| 'setExitPlanModeCallback'
+| 'setPermissionModeSyncCallback'
+| 'setSubagentHookProvider'
+| 'setAutoTurnCallback'
+| 'consumeTurnMetadata'
+| 'buildSessionUpdates'
+| 'resolveSessionIdForFork'
+> ? true : false;
+
+const ADAPTER_IS_ASSIGNABLE: AdapterSatisfiesContract = true;
+
 describe('adapter member coverage', () => {
+  it('is assignable to the contract, which the compiler decides', () => {
+    // The assertion above is the real check; this only keeps the constant used
+    // so the file cannot drift into being type-only and stop being compiled.
+    expect(ADAPTER_IS_ASSIGNABLE).toBe(true);
+  });
+
   const contractMembers = readInterfaceMembers('src/core/runtime/ChatRuntime.ts', 'ChatRuntime');
   const adapterMembers = new Set([
     ...Object.getOwnPropertyNames(ExecutionChatRuntimeAdapter.prototype),

@@ -1475,6 +1475,64 @@ shipped bundle.
 
 Gates: unit 454 suites / 7726 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
 
+### M2-adapter — five defects from an external review, all confirmed (this commit)
+
+An external review of the branch found five bugs, and every one of them was real. Two were hangs or
+leaks on the most ordinary path there is. None would have been caught by the gates as they stood,
+which is the part worth keeping.
+
+**1. `terminalizeRun` published nothing.** It writes the durable terminal, refreshes the run, and
+cancels open interactions — and never publishes an envelope. That path settles a run without any
+backend event: pre-dispatch rejection, recovery, shutdown. Since a reader closes a turn on the
+terminal and on nothing else, the control store would hold a settled run while the UI waited on it
+forever — the worst pairing, because the record looks correct. **This is the sibling of the
+`recoverBlockedIngestion` defect found in my own review two commits ago, and I missed it while
+looking directly at that class of bug.** Fixed, and pinned with a `reject-side-effect-free` dispatch;
+verified by disabling the publish and watching the test fail.
+
+**2. `cleanup()` broke on a live run.** `disposeSession` refuses a session with a non-terminal run,
+and closing a tab mid-turn is routine — `destroyTab` sets a flag, calls `cancel()` fire-and-forget,
+then `cleanup()` immediately, with the legacy runtimes cancelling inside `cleanup`. The adapter did
+neither, so the common path rejected, leaked the session, and did it as an unhandled rejection
+because `ChatRuntime.cleanup()` returns void. Now: cancel, wait for the terminal under a bound, then
+dispose, reporting failures instead of throwing. The wait is bounded because closing a tab must not
+depend on a provider answering — which is what cancellation exists to break.
+
+**3. The adapter was not a `ChatRuntime`.** It was documented as one and never declared as one, and
+five members had shapes the caller could not use: `rewind` returned the port's outcome where the
+caller reads `canRewind`, so a *successful* rewind read as "this provider cannot rewind";
+`buildSessionUpdates` and `resolveSessionIdForFork` took the wrong inputs; `getSupportedCommands`
+returned port descriptors rather than slash commands; and `resetSession` was listed in the coverage
+gate as having **no production call site**, which was simply false — `main.ts` calls it on a settings
+change. Every signature is translated at the boundary now, and the false claim is gone.
+
+**The gate was the reason all of this passed.** It compared member *names*, which is how a getter
+called `rewind` satisfied `rewind(userId, assistantId, mode)` — a false green I found and fixed one
+commit earlier without asking what else the same weakness was hiding. It now asserts **assignability
+to `ChatRuntime`**, decided by the compiler rather than by a test, and verified by giving one member
+a wrong parameter type and watching `typecheck` fail.
+
+**4. Interactions and auto-turns went nowhere.** All seven setters stored their callback and nothing
+consumed them: the bridge was never constructed, and no auto-turn was ever delivered. Approvals and
+backend-initiated turns would have stopped working at the first Claude flip. They are routed on the
+run's own stream now, not a second subscription, so ordering cannot disagree.
+
+**5. Turn metadata carried no native identities.** It reported `wasSent` alone, while the controller
+copies `userMessageId` and `assistantMessageId` onto messages and rewind refuses to run without the
+first. Rewind and resume would have degraded *silently*, which is worse than failing, because the
+turn still looks complete. The identities are taken from the run scope and result, and a provider
+with none reports none rather than a synthesized id it would not recognize.
+
+Also fixed from the suggestions: the `ensureReady` race, where two overlapping calls each minted a
+session id and orphaned the first with nothing left holding its id to dispose it, and the stale line
+in this document that still called M2-adapter in progress.
+
+Not done: trimming the long explanatory comments in the kernel and adapter. Several are essays where
+a sentence would do, and the reviewer is right that harvest history belongs here rather than in the
+source. Left for a focused pass so it does not hide behind five behaviour fixes.
+
+Gates: unit 454 suites / 7732 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1502,7 +1560,7 @@ Every gate is green, CI included, on all four jobs. The Windows failure that clo
 session is fixed and confirmed; it was two defects, one production and one in the test, recorded in
 the entry directly above.
 
-**M2-adapter is in progress.** Its stop condition — the kernel had no channel for streamed output —
+**M2-adapter is complete.** Its stop condition — the kernel had no channel for streamed output —
 was decided by the owner in favour of a transient content event, and that is built: `output-delta`,
 excluded from persistence, projection, and deduplication, plus `registry.observe()` so the adapter
 can be a client of the registry. Three backends stream through it.
@@ -1532,9 +1590,12 @@ Open obligations, each with an owner:
 - `ProviderModule` has no slot for `prepareTurn`, which the adapter contract maps as a module
   contribution. The adapter routes it through a host port meanwhile. Owner: M3, when the four legacy
   prompt encoders move;
-- five `ChatRuntime` members are absent by contract, each with its reason in
-  `adapterMemberCoverage.test.ts`: `resetSession`, `reloadWorkspaceResources`, `getAuxiliaryModel`,
-  and the two subagent loaders. Owner: whoever declares a call site for one;
+- four `ChatRuntime` members are absent by contract, each with its reason in
+  `adapterMemberCoverage.test.ts`: `reloadWorkspaceResources`, `getAuxiliaryModel`, and the two
+  subagent loaders. `resetSession` was on that list with a false reason and is now implemented.
+  Owner: whoever declares a call site for one of the four;
+- the kernel and adapter carry long explanatory comments where a sentence would do. Owner: a focused
+  pass, so it does not ride along with behaviour changes;
 - three `src/core/**` modules import the plugin type, enumerated in
   `executionCompositionBoundaries.test.ts`. Owner: M3, when the provider catalog replaces the split
   registries. **The eight core→provider imports previously listed here did not exist** — they were an

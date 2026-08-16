@@ -444,6 +444,32 @@ describe('the assembled ChatRuntime adapter', () => {
     ).steer).toBeUndefined();
   });
 
+  it('cancels and waits before disposing, because tabs close mid-turn', async () => {
+    // disposeSession refuses a session with a live run, and today's destroyTab
+    // calls cancel fire-and-forget then cleanup immediately. An adapter that
+    // only disposed would reject on the common path, leak the session, and do
+    // it as an unhandled rejection, since ChatRuntime.cleanup returns void.
+    const harness = await createHarness({ ownSession: true });
+    const adapter = createAdapter(harness);
+    const turn = adapter.prepareTurn({ text: 'hello' });
+    const collected = drain(adapter.query(turn));
+    const runId = toRunId(`run-${'1'.padStart(32, '0')}`);
+    for (let attempt = 0; attempt < 200 && !harness.dispatched(runId); attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+
+    const cleanup = adapter.cleanup();
+    await harness.emit(
+      runId,
+      { kind: 'terminal', terminal: 'cancelled', reason: 'cancellation-confirmed' },
+      'd-1',
+    );
+
+    await expect(cleanup).resolves.toBeUndefined();
+    await collected;
+    expect(adapter.isReady()).toBe(false);
+  });
+
   it('releases the session on cleanup, preserving today\'s tab-close behaviour', async () => {
     const harness = await createHarness({ ownSession: true });
     const adapter = createAdapter(harness);
@@ -551,5 +577,45 @@ describe('the classification covers the union it claims to', () => {
     const unclassified = KERNEL_EVENT_KINDS.filter(kind => !['chunk', 'terminal', 'ignored']
       .includes(classifyForPresentation(kind)));
     expect(unclassified).toEqual([]);
+  });
+});
+
+describe('concurrent readiness', () => {
+  it('establishes one session for overlapping callers', async () => {
+    // Two overlapping calls each saw no session, each minted an id, and the
+    // first session was orphaned with nothing left holding its id to dispose
+    // it. The sequential idempotence test could not see that.
+    const harness = await createHarness({ ownSession: true });
+    let minted = 0;
+    const adapter = new ExecutionChatRuntimeAdapter(
+      {
+        ...harness.context,
+        nextExecutionSessionId: () => {
+          minted += 1;
+          return executionSessionId(`es-${String(minted).repeat(32).slice(0, 32)}`);
+        },
+      },
+      {
+        prepareTurn: (request: ChatTurnRequest) => ({
+          request,
+          persistedContent: request.text,
+          prompt: request.text,
+          isCompact: false,
+          mcpMentions: new Set<string>(),
+        }),
+        encodeRequestRef: () => 'encoded',
+        reasoningControl: 'effort',
+        currentSessionId: () => null,
+      },
+      antigravityProviderModule.features({
+        resolveCliPath: async () => null,
+        listModels: async () => [],
+        refreshModels: async () => [],
+      }),
+    );
+
+    await Promise.all([adapter.ensureReady(), adapter.ensureReady(), adapter.ensureReady()]);
+
+    expect(minted).toBe(1);
   });
 });
