@@ -1288,6 +1288,36 @@ it invented eight violations that did not exist. A case pinning both confusions 
 Gates: unit 452 suites / 7686 tests, integration 6 / 220, typecheck, lint, `build:release` clean,
 adapter absent from the bundle.
 
+### M2-adapter — the five paper mappings, executed (this commit)
+
+`prepareTurn`, `steer`, `setResumeCheckpoint`, `buildSessionUpdates`, and `consumeSessionInvalidation`
+each had a verdict in the M0a contract and nothing running behind it. Three carry real state and now
+have it, with the behaviour the mapping table specifies rather than the behaviour that is easiest:
+
+- **the resume checkpoint is cleared by the dispatch, not by being read.** A dispatch that throws has
+  resumed nothing, and dropping the checkpoint there would quietly turn the retry into a fresh
+  conversation;
+- **session invalidation is one-shot.** The caller that reads the fence owns the consequence, so a
+  second reader must not act on it again;
+- **steering follows the capability.** The contract is explicit that `steer` is absent when
+  unsupported rather than present and returning `false`: the UI can test for an absent member, and
+  cannot tell a member that always fails from a broken one.
+
+**The spread hole bit again, this time in my own code.** `setResumeCheckpoint` maps onto the next
+`ExecutionRequest`, and that field did not exist on the contract — yet the adapter's first attempt to
+set it type-checked, because it was added through a conditional spread and TypeScript does not
+excess-property-check those. This is the third occurrence on this branch, after the stale run-scope
+field in all four harvested backends. Caught by checking the contract rather than trusting a green
+typecheck. `ExecutionRequest.resumeCheckpoint` now exists, opaque to core like `requestRef`, and a
+conformance case asserts the value actually arrives at the backend rather than the object merely
+compiling.
+
+The deterministic fake records what each run was dispatched with, which is what let that be asserted
+at all.
+
+Gates: unit 453 suites / 7693 tests, integration 6 / 220, typecheck, lint, `build:release` clean;
+CI green on the previous commit.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1342,10 +1372,9 @@ Open obligations, each with an owner:
   and ACP backends, at their harvest;
 - D7 (diagnostic redaction) has no automated guard. Owner: M1 follow-up, once the kernel emits log
   records;
-- the target contract suite covers `query`, `cancel`, terminals, and turn metadata only.
-  `prepareTurn`, `steer`, `setResumeCheckpoint`, `buildSessionUpdates`, and
-  `consumeSessionInvalidation` remain paper mappings until `createSubject` grows. Owner:
-  M2-adapter;
+- the remaining `ChatRuntime` members are mapped but not yet assembled into one class: session
+  lifecycle, interactions, and the optional history and subagent ports. The run stream, the five
+  formerly-paper mappings, and the capability projection are done. Owner: M2-adapter;
 - three `src/core/**` modules import the plugin type, enumerated in
   `executionCompositionBoundaries.test.ts`. Owner: M3, when the provider catalog replaces the split
   registries. **The eight core→provider imports previously listed here did not exist** — they were an

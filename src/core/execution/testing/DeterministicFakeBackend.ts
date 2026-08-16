@@ -97,6 +97,8 @@ export class DeterministicFakeBackend implements ExecutionBackend, InteractionPo
   readonly cancelledInteractions: InteractionId[] = [];
   readonly sessions = new Map<ExecutionSessionId, DeterministicFakeSession>();
   readonly dispatchAttempts = new Map<RunId, number>();
+  /** What each run was actually dispatched with, for callers that build requests. */
+  readonly dispatchedRequests = new Map<RunId, ExecutionRequest>();
   dispatchMode: FakeDispatchMode = 'accept';
   cancellationMode: FakeCancellationMode = 'acknowledge';
   interactionResolutionError: Error | undefined;
@@ -277,6 +279,7 @@ export class DeterministicFakeSession implements ExecutionSession {
       throw new ExecutionDispatchError('Fake dispatch rejected before side effects.', true);
     }
     const run = new DeterministicFakeRun(this.backend, this, request);
+    this.backend.dispatchedRequests.set(request.runId, request);
     this.runs.set(request.runId, run);
     if (this.backend.automaticLifecycle) {
       run.startAutomatic(this.backend.automaticLifecycle.dispatchGate ?? Promise.resolve());

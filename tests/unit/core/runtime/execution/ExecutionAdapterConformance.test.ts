@@ -1,5 +1,6 @@
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
+import type { ExecutionRequest } from '@/core/execution/ExecutionContracts';
 import { ExecutionControlRepositories } from '@/core/execution/ExecutionControlRepositories';
 import { ExecutionControlTransactionCoordinator } from '@/core/execution/ExecutionControlTransactionCoordinator';
 import type { ExecutionEvent, ProviderExecutionEvent } from '@/core/execution/ExecutionEvents';
@@ -16,6 +17,7 @@ import {
 import { DeterministicFakeBackend } from '@/core/execution/testing/DeterministicFakeBackend';
 import {
   dispatchCancellation,
+  ExecutionAdapterSession,
   type ExecutionChatRuntimeAdapterContext,
   startExecutionRun,
   toLegacyCapabilities,
@@ -43,6 +45,7 @@ interface Harness {
   readonly registry: ExecutionLifecycleRegistry;
   readonly context: ExecutionChatRuntimeAdapterContext;
   emit(runId: RunId, event: ExecutionEvent, deliveryId: string): Promise<unknown>;
+  dispatched(runId: RunId): ExecutionRequest | undefined;
 }
 
 async function createHarness(): Promise<Harness> {
@@ -85,6 +88,7 @@ async function createHarness(): Promise<Harness> {
       nextExecutionSessionId: () => SESSION_ID,
       nextRunId: () => toRunId(`run-${(++runOrdinal).toString().padStart(32, '0')}`),
     },
+    dispatched: runId => backend.dispatchedRequests.get(runId),
     emit(runId, event, deliveryId) {
       const delivery: ProviderExecutionEvent = {
         backendId: backend.descriptor.backendId,
@@ -211,6 +215,26 @@ describe('execution adapter over the registry', () => {
       'd-1',
     );
     expect(await collected).toEqual([]);
+    release();
+  });
+
+  it('carries a resume checkpoint into the request and clears it after dispatch', async () => {
+    // The field this needed did not exist on `ExecutionRequest`, and the first
+    // attempt to set it type-checked anyway because it was added through a
+    // conditional spread. This asserts the value actually arrives.
+    const harness = await createHarness();
+    const session = new ExecutionAdapterSession(codexProviderModule.capabilities);
+    session.setResumeCheckpoint('thread-checkpoint-1');
+
+    const { runId, release } = await startExecutionRun(
+      harness.context,
+      SESSION_ID,
+      { requestRef: 'opaque-request', resultExpectation: 'optional' },
+      session,
+    );
+
+    expect(harness.dispatched(runId)?.resumeCheckpoint).toBe('thread-checkpoint-1');
+    expect(session.pendingResumeCheckpoint()).toBeUndefined();
     release();
   });
 

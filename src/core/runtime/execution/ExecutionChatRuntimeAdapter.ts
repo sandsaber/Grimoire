@@ -242,6 +242,64 @@ function describeFailure(reason: RunTerminalReason): string {
 }
 
 /**
+ * The per-conversation state the five remaining `ChatRuntime` members need.
+ *
+ * They were paper mappings in the M0a contract — named with a verdict, never
+ * executed. Each one here has the behaviour the mapping table specifies, and a
+ * test, because a mapping nobody ran is a mapping nobody has checked.
+ */
+export class ExecutionAdapterSession {
+  private resumeCheckpoint: string | undefined;
+  private invalidated = false;
+
+  constructor(private readonly capabilities: ProviderCapabilityDescriptor) {}
+
+  /** Held until the next dispatch, then cleared. Mapping row 5. */
+  setResumeCheckpoint(checkpointId: string | undefined): void {
+    this.resumeCheckpoint = checkpointId;
+  }
+
+  /**
+   * Takes the checkpoint for a dispatch that is about to happen.
+   *
+   * Cleared by `confirmDispatched` rather than here: a dispatch that throws has
+   * not resumed anything, and dropping the checkpoint would silently turn the
+   * retry into a fresh conversation.
+   */
+  pendingResumeCheckpoint(): string | undefined {
+    return this.resumeCheckpoint;
+  }
+
+  confirmDispatched(): void {
+    this.resumeCheckpoint = undefined;
+  }
+
+  /** Set when a generation fence invalidates this conversation's session. */
+  markInvalidated(): void {
+    this.invalidated = true;
+  }
+
+  /** One-shot: the caller that reads it owns the consequence. Mapping row 15. */
+  consumeSessionInvalidation(): boolean {
+    const invalidated = this.invalidated;
+    this.invalidated = false;
+    return invalidated;
+  }
+
+  /**
+   * Whether this provider exposes steering at all.
+   *
+   * The contract is explicit that `steer` is **absent** when unsupported rather
+   * than present and returning `false`: an optional member the UI can test for
+   * is a capability, while a member that always fails is a capability the UI
+   * cannot tell from a broken one.
+   */
+  supportsSteering(): boolean {
+    return this.capabilities.conversation.steering !== 'unsupported';
+  }
+}
+
+/**
  * Starts one turn and returns its stream.
  *
  * Observation is established **before** the run starts, because a run that
@@ -252,23 +310,27 @@ export async function startExecutionRun(
   context: ExecutionChatRuntimeAdapterContext,
   executionSessionId: ExecutionSessionId,
   spec: ExecutionRunRequestSpec,
+  session?: ExecutionAdapterSession,
 ): Promise<{ runId: RunId; stream: ExecutionRunStream; release: () => void }> {
   const runId = context.nextRunId();
   const stream = new ExecutionRunStream(runId);
   const unsubscribe = context.registry.observe(executionSessionId, envelope => {
     stream.accept(envelope);
   });
+  const resumeCheckpoint = session?.pendingResumeCheckpoint();
   try {
     await context.registry.startRun(executionSessionId, {
       runId,
       owner: context.owner,
       resultExpectation: spec.resultExpectation ?? 'required',
       requestRef: spec.requestRef,
+      ...(resumeCheckpoint ? { resumeCheckpoint } : {}),
     });
   } catch (error) {
     unsubscribe();
     throw error;
   }
+  session?.confirmDispatched();
   return { runId, stream, release: unsubscribe };
 }
 

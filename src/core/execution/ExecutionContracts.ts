@@ -87,6 +87,18 @@ export interface ExecutionRequest {
   readonly owner: ExecutionOwner;
   readonly resultExpectation: ResultExpectation;
   readonly requestRef: string;
+  /**
+   * Where the provider should resume this conversation from, when the caller
+   * has a checkpoint to offer.
+   *
+   * Opaque to core, like `requestRef`: only the provider knows what one of its
+   * checkpoints means. The adapter contract maps `setResumeCheckpoint` onto this
+   * field, and the field did not exist — the adapter's first attempt to set it
+   * type-checked anyway, because it was added through a conditional spread and
+   * TypeScript does not excess-property-check those. The same hole that let a
+   * stale field name survive a rename in all four harvested backends.
+   */
+  readonly resumeCheckpoint?: string;
 }
 
 export interface CancellationReason {
