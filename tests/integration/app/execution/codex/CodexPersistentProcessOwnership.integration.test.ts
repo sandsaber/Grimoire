@@ -64,7 +64,7 @@ describe('Codex persistent process ownership on the host OS', () => {
           // The independently tracked descendant already exited.
         }
       }
-      rmSync(directory, { recursive: true, force: true });
+      await removeWhenReleased(directory);
     }
   });
 
@@ -154,7 +154,7 @@ describe('Codex persistent process ownership on the host OS', () => {
       expect(missingExit.code).not.toBe(0);
       await missing.shutdown();
     } finally {
-      rmSync(directory, { recursive: true, force: true });
+      await removeWhenReleased(directory);
     }
   }, 60_000);
 });
@@ -231,6 +231,29 @@ function nextLine(stream: NodeJS.ReadableStream, timeoutMs: number): Promise<str
       resolve(line);
     });
   });
+}
+
+/**
+ * Removes the working directory once Windows has released its handles.
+ *
+ * Confirmed termination and released handles are not the same instant on
+ * Windows: the process object is gone while the directory it ran in is still
+ * locked, and `rmSync` answers `EBUSY`. Bounded rather than swallowed — a
+ * directory still held after two seconds is a leak, and this still fails on it.
+ */
+async function removeWhenReleased(directory: string): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  for (;;) {
+    try {
+      rmSync(directory, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (Date.now() >= deadline) {
+        throw error;
+      }
+      await delay(50);
+    }
+  }
 }
 
 async function waitForPidFile(path: string, timeoutMs: number, form: string): Promise<number> {
