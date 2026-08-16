@@ -356,6 +356,9 @@ CodexProviderSettings
       deleteSession: conversationId => context.deleteConversationSession(conversationId),
       resolveSessionId: conversationId => context.resolveSessionId(conversationId),
       isPendingFork: conversationId => context.isPendingFork(conversationId),
+      buildSessionPatch: input => ({
+        sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
+      }),
     },
     nativeAgents: {
       recognizesToolName: toolName => context.recognizesSubagentTool(toolName),

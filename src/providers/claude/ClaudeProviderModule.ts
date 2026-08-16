@@ -358,6 +358,9 @@ ClaudeProviderSettings
       deleteSession: conversationId => context.deleteConversationSession(conversationId),
       resolveSessionId: conversationId => context.resolveSessionId(conversationId),
       isPendingFork: conversationId => context.isPendingFork(conversationId),
+      buildSessionPatch: input => ({
+        sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
+      }),
     },
     rewind: { rewind: input => context.rewind(input) },
     taskResults: {

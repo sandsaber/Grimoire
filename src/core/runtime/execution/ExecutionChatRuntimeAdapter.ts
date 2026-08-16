@@ -17,7 +17,12 @@ import type { ExecutionLifecycleRegistry } from '../../execution/ExecutionLifecy
 import type {
   CapabilitySupport,
   ProviderCapabilityDescriptor,
+  ProviderCommandDescriptor,
   ProviderFeatureContributions,
+  ProviderRewindOutcome,
+  ProviderRewindRequest,
+  ProviderSessionPatch,
+  ProviderWorkspaceSlots,
 } from '../../providers/ProviderModule';
 import type { ProviderCapabilities } from '../../providers/types';
 import type { ChatMessage, StreamChunk } from '../../types/chat';
@@ -405,6 +410,8 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   private readonly session: ExecutionAdapterSession;
   private readonly readyListeners = new Set<(ready: boolean) => void>();
   private executionSessionId: ExecutionSessionId | null = null;
+  private boundSessionId: string | null | undefined;
+  private readonly callbacks: Record<string, unknown> = {};
   private active: { runId: RunId; stream: ExecutionRunStream; release: () => void } | null = null;
   private lastCompleted: ExecutionRunStream | null = null;
 
@@ -412,6 +419,7 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     private readonly context: ExecutionChatRuntimeAdapterContext,
     private readonly ports: ExecutionChatRuntimeHostPorts,
     private readonly features: ProviderFeatureContributions<TSettings>,
+    private readonly workspace?: ProviderWorkspaceSlots,
   ) {
     this.session = new ExecutionAdapterSession(context.capabilities);
   }
@@ -527,13 +535,126 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     }
   }
 
-  /** History, rewind, and native-agent members exist only where the module has them. */
-  get history(): ProviderFeatureContributions<TSettings>['history'] {
-    return this.features.history;
+  /**
+   * Session configuration changed.
+   *
+   * A change to what the provider was launched with fences the backend
+   * generation, which is the registry's job; the adapter's job is to notice
+   * that the conversation's native binding no longer matches and say so once
+   * through `consumeSessionInvalidation`.
+   */
+  syncConversationState(state: { sessionId?: string | null } | null): void {
+    const next = state?.sessionId ?? null;
+    if (this.boundSessionId !== undefined && this.boundSessionId !== next) {
+      this.session.markInvalidated();
+    }
+    this.boundSessionId = next;
   }
 
-  get rewind(): ProviderFeatureContributions<TSettings>['rewind'] {
-    return this.features.rewind;
+  async reloadMcpServers(): Promise<void> {
+    const mcp = this.workspace?.mcp;
+    if (!mcp) {
+      // Absent, not silent: a provider without Grimoire-owned MCP has nothing
+      // to reload, and pretending otherwise would hide a missing contribution.
+      return;
+    }
+    await mcp.loadServers();
+  }
+
+  async getSupportedCommands(): Promise<readonly ProviderCommandDescriptor[]> {
+    if (this.context.capabilities.commands.chatSurface === 'unsupported') {
+      // The provider may well discover commands; this asks whether the chat
+      // input surfaces them, which for Codex is no.
+      return [];
+    }
+    const sessionId = this.ports.currentSessionId();
+    const runtime = sessionId ? this.workspace?.runtimeCommands : undefined;
+    const fromSession = runtime ? await runtime.listForSession(sessionId as string) : [];
+    const fromCatalog = this.workspace?.commands ? await this.workspace.commands.list() : [];
+    return [...fromCatalog, ...fromSession];
+  }
+
+  /**
+   * Rewinds through the capability port, in the contract's own signature.
+   *
+   * A getter returning the port satisfied the member-coverage gate by name
+   * while having the wrong shape entirely — the gate compares names, so a
+   * property called `rewind` looked like an implementation of
+   * `rewind(userId, assistantId, mode)`. Written out so the two agree.
+   */
+  async rewind(
+    userMessageId: string,
+    assistantMessageId: string,
+    mode: ProviderRewindRequest['mode'] = 'conversation',
+  ): Promise<ProviderRewindOutcome> {
+    const port = this.features.rewind;
+    if (!port) {
+      return { outcome: 'unavailable', reason: 'This provider cannot rewind a conversation.' };
+    }
+    return port.rewind({
+      executionSessionId: this.executionSessionId ?? '',
+      userMessageId,
+      assistantMessageId,
+      mode,
+    });
+  }
+
+  buildSessionUpdates(params: {
+    conversationId: string;
+    sessionInvalidated: boolean;
+  }): ProviderSessionPatch {
+    const history = this.features.history;
+    if (!history) {
+      // No native history means no binding to patch, and inventing one would
+      // write a session id the provider will not recognize.
+      return { sessionId: null };
+    }
+    return history.buildSessionPatch({
+      conversationId: params.conversationId,
+      sessionInvalidated: params.sessionInvalidated,
+      nativeSessionRef: this.ports.currentSessionId(),
+    });
+  }
+
+  resolveSessionIdForFork(conversationId: string): string | null {
+    return this.features.history?.resolveSessionId(conversationId) ?? null;
+  }
+
+  // The five interaction callbacks and the two observation hooks are stored
+  // rather than acted on: the kernel carries an interaction as an opaque
+  // presentation reference, so turning one into an approval prompt needs the
+  // provider-owned presenter the host builds from exactly these.
+  setApprovalCallback(callback: unknown): void {
+    this.callbacks.approval = callback;
+  }
+
+  setApprovalDismisser(dismisser: unknown): void {
+    this.callbacks.approvalDismisser = dismisser;
+  }
+
+  setAskUserQuestionCallback(callback: unknown): void {
+    this.callbacks.question = callback;
+  }
+
+  setExitPlanModeCallback(callback: unknown): void {
+    this.callbacks.planDecision = callback;
+  }
+
+  setPermissionModeSyncCallback(callback: unknown): void {
+    this.callbacks.permissionModeSync = callback;
+  }
+
+  setSubagentHookProvider(getState: unknown): void {
+    this.callbacks.subagentState = getState;
+  }
+
+  setAutoTurnCallback(callback: unknown): void {
+    this.callbacks.autoTurn = callback;
+  }
+
+  /** What the host presenter needs, in one place rather than seven getters. */
+  interactionCallbacks(): Readonly<Record<string, unknown>> {
+    return { ...this.callbacks };
   }
 
   private announceReady(ready: boolean): void {

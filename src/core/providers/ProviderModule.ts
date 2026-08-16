@@ -316,6 +316,29 @@ export interface ProviderHistoryPort {
   deleteSession(conversationId: string): Promise<void>;
   resolveSessionId(conversationId: string): string | null;
   isPendingFork(conversationId: string): boolean;
+  /**
+   * The patch a finished turn makes to the conversation's session binding.
+   *
+   * Adapter contract row 29, which mapped to "a history port producing the
+   * conversation patch" — a port method that did not exist. Deliberately not
+   * `Partial<Conversation>`: that is a feature type, and `providerState` stays
+   * opaque to core, which is the whole reason this returns two named fields
+   * instead of a bag the adapter would be tempted to read.
+   */
+  buildSessionPatch(input: ProviderSessionPatchInput): ProviderSessionPatch;
+}
+
+export interface ProviderSessionPatchInput {
+  readonly conversationId: string;
+  readonly sessionInvalidated: boolean;
+  /** The provider-native session id observed on the run, when there was one. */
+  readonly nativeSessionRef: string | null;
+}
+
+export interface ProviderSessionPatch {
+  readonly sessionId: string | null;
+  /** Opaque provider state; core stores and returns it without reading it. */
+  readonly providerState?: unknown;
 }
 
 /**

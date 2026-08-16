@@ -11,11 +11,17 @@ import {
   sessionInstanceId,
 } from '@/core/execution/ExecutionIds';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
+import type {
+  ProviderCapabilityDescriptor,
+  ProviderWorkspaceSlots,
+} from '@/core/providers/ProviderModule';
 import {
   ExecutionAdapterSession,
+  ExecutionChatRuntimeAdapter,
   ExecutionInteractionBridge,
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
+import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
 
 /**
@@ -197,4 +203,96 @@ async function flush(turns = 8): Promise<void> {
   for (let turn = 0; turn < turns; turn += 1) {
     await Promise.resolve();
   }
+}
+
+describe('adapter members that were missing until the coverage gate found them', () => {
+  it('reports a rewind the provider cannot do as unavailable, not as a failure', async () => {
+    // `unavailable` and `failed` are different answers: one says the provider
+    // has no rewind, the other says a rewind was attempted and did not work.
+    // The legacy `ChatRewindResult` conflated them behind `canRewind: false`.
+    const adapter = createBareAdapter(antigravityProviderModule.capabilities, {});
+
+    await expect(adapter.rewind('user-1', 'assistant-1')).resolves.toEqual({
+      outcome: 'unavailable',
+      reason: 'This provider cannot rewind a conversation.',
+    });
+  });
+
+  it('surfaces no commands where the chat input does not ask for them', async () => {
+    // Codex discovers commands through a short-lived process and the chat input
+    // never requests them. Mapping from discovery instead would have turned
+    // that on at its flip.
+    const adapter = createBareAdapter(codexProviderModule.capabilities, {
+      commands: { list: async () => [{ name: 'review', source: 'project' as const }] },
+    });
+
+    expect(await adapter.getSupportedCommands()).toEqual([]);
+  });
+
+  it('surfaces the catalog where the chat input does ask', async () => {
+    const adapter = createBareAdapter(claudeProviderModule.capabilities, {
+      commands: { list: async () => [{ name: 'review', source: 'project' as const }] },
+    });
+
+    expect(await adapter.getSupportedCommands()).toEqual([
+      { name: 'review', source: 'project' },
+    ]);
+  });
+
+  it('invalidates the session when the conversation binding changes underneath it', () => {
+    const adapter = createBareAdapter(codexProviderModule.capabilities, {});
+
+    adapter.syncConversationState({ sessionId: 'thread-1' });
+    expect(adapter.consumeSessionInvalidation()).toBe(false);
+
+    adapter.syncConversationState({ sessionId: 'thread-2' });
+    expect(adapter.consumeSessionInvalidation()).toBe(true);
+    // One-shot, as the contract requires.
+    expect(adapter.consumeSessionInvalidation()).toBe(false);
+  });
+
+  it('reloads nothing when the provider has no Grimoire-owned MCP', async () => {
+    const adapter = createBareAdapter(codexProviderModule.capabilities, {});
+
+    await expect(adapter.reloadMcpServers()).resolves.toBeUndefined();
+  });
+});
+
+function createBareAdapter(
+  capabilities: ProviderCapabilityDescriptor,
+  workspace: ProviderWorkspaceSlots,
+): ExecutionChatRuntimeAdapter {
+  return new ExecutionChatRuntimeAdapter(
+    {
+      registry: {} as never,
+      backendId: executionBackendId('provider-fake'),
+      capabilities,
+      owner: { kind: 'conversation', ownerId: 'bare' },
+      nextExecutionSessionId: () => executionSessionId(`es-${'d'.repeat(32)}`),
+      nextRunId: () => toRunId(`run-${'d'.repeat(32)}`),
+    },
+    {
+      prepareTurn: request => ({
+        request,
+        persistedContent: request.text,
+        prompt: request.text,
+        isCompact: false,
+        mcpMentions: new Set<string>(),
+      }),
+      encodeRequestRef: () => 'encoded',
+      reasoningControl: 'effort',
+      currentSessionId: () => null,
+    },
+    { providerId: capabilities.providerId, chatUI: {
+      modelPresentation: {
+        ownsModel: () => false,
+        label: modelId => modelId,
+        contextWindow: () => undefined,
+      },
+      reasoningControl: { kind: 'none' },
+      permissionToggles: [],
+      icon: 'test',
+    } },
+    workspace,
+  );
 }

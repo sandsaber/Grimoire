@@ -1437,6 +1437,44 @@ into `undefined` at runtime. Verified by adding a kind to the union and watching
 
 Gates: unit 453 suites / 7717 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
 
+### M2-adapter — complete, and a journal entry that was wrong (this commit)
+
+The exit gate the milestone actually asks for is that the adapter answers the whole `ChatRuntime`
+contract, since "a deviation that needs a new member is a stop condition" means nothing unless
+coverage of the existing thirty-two is checked. `adapterMemberCoverage.test.ts` checks it.
+
+**It immediately contradicted this journal.** The previous entry said only the two optional subagent
+loaders remained. The gate found **twelve** members uncovered: `syncConversationState`,
+`reloadMcpServers`, `getSupportedCommands`, all five interaction callbacks, the two observation
+hooks, `buildSessionUpdates`, and `resolveSessionIdForFork`. The note was written from memory of what
+I had built rather than from a comparison, which is exactly the habit the gates exist to replace.
+
+All twelve are implemented. Two needed decisions rather than delegation:
+
+- **`buildSessionUpdates` had no port to call.** Row 29 maps it to "a history port producing the
+  conversation patch", and `ProviderHistoryPort` had no such method — the sixth contract gap the
+  proofs have surfaced. Added as `buildSessionPatch`, returning two named fields rather than a
+  `Partial<Conversation>`: that is a feature type, and `providerState` staying opaque is the reason
+  core gets named fields it cannot be tempted to read;
+- **`getSupportedCommands` reads `chatSurface`, not `discovery`.** The distinction found in the
+  review earlier today, applied where it matters: Codex discovers commands and its chat input does
+  not ask for them, so the adapter returns none.
+
+**A false green found and fixed in the gate itself.** The coverage check compares member *names*, and
+the adapter had a `rewind` getter returning the capability port — which satisfied the name while
+having nothing to do with `rewind(userId, assistantId, mode)`. Rewritten in the contract's own
+signature. Worth remembering: a name-based gate can be satisfied by a name.
+
+Rewind also distinguishes `unavailable` from `failed`, which the legacy `ChatRewindResult` collapsed
+behind `canRewind: false` — one says the provider has no rewind, the other that a rewind was
+attempted and did not work.
+
+**M2-adapter is complete.** The adapter is a client of the registry, covers the contract, passes the
+twelve target assertions, projects the capability record field for field, and is absent from the
+shipped bundle.
+
+Gates: unit 454 suites / 7726 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1470,10 +1508,10 @@ excluded from persistence, projection, and deduplication, plus `registry.observe
 can be a client of the registry. Three backends stream through it.
 
 **Next action:** the adapter itself — a `ChatRuntime` implementation over the kernel, still dark, with
-`createSubject` in `adapterContractTarget.test.ts` grown to cover `prepareTurn`, `steer`,
-`setResumeCheckpoint`, `buildSessionUpdates`, and `consumeSessionInvalidation`, which remain paper
-mappings. **M0b is still open and blocks the first flip, not the adapter:** the checked-in traces are
-semantic case catalogues, not sanitized wire recordings.
+`darkBundle.test.ts` stops being the right gate for the flipped provider.
+
+**M0b is still open and blocks the first flip:** the checked-in traces are semantic case catalogues,
+not sanitized wire recordings, and recording those needs live CLIs.
 
 Open obligations, each with an owner:
 
@@ -1494,10 +1532,9 @@ Open obligations, each with an owner:
 - `ProviderModule` has no slot for `prepareTurn`, which the adapter contract maps as a module
   contribution. The adapter routes it through a host port meanwhile. Owner: M3, when the four legacy
   prompt encoders move;
-- the adapter's optional subagent loaders (`loadSubagentToolCalls`, `loadSubagentFinalResult`) are
-  still absent, which is correct until a provider declares them. Everything else the milestone asks
-  for is done: run stream, session lifecycle, capability projection, interactions, the five
-  formerly-paper mappings, and per-topology coverage. Owner: M2-adapter, to close;
+- five `ChatRuntime` members are absent by contract, each with its reason in
+  `adapterMemberCoverage.test.ts`: `resetSession`, `reloadWorkspaceResources`, `getAuxiliaryModel`,
+  and the two subagent loaders. Owner: whoever declares a call site for one;
 - three `src/core/**` modules import the plugin type, enumerated in
   `executionCompositionBoundaries.test.ts`. Owner: M3, when the provider catalog replaces the split
   registries. **The eight core→provider imports previously listed here did not exist** — they were an
