@@ -60,6 +60,7 @@
     ],
     "earlyNotificationCompletion": [
       "run-started",
+      "output-delta",
       "result:projection",
       "terminal:succeeded:completed"
     ],
@@ -71,6 +72,7 @@
     ],
     "nativeAgentResult": [
       "run-started",
+      "output-delta",
       "native-agent-observed:native-agent-7",
       "native-agent-status:native-agent-7:running",
       "native-agent-activity:native-agent-7:input-sent",

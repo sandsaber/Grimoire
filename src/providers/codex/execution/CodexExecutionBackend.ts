@@ -1371,6 +1371,10 @@ class CodexExecutionRun implements ExecutionRun {
       return;
     }
     this.assistantOutput = next;
+    // Emitted only once the delta is inside the byte bound, so what a reader
+    // sees is always a prefix of what will be committed. The accumulated buffer
+    // remains the durable answer; this is the live view of it.
+    this.emit({ kind: 'output-delta', channel: 'assistant', text: delta });
   }
 
   private replaceAssistantOutput(output: string): void {

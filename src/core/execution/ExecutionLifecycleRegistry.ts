@@ -35,11 +35,12 @@ import {
   type ExecutionEventIngestorCheckpoint,
   type IngestResult,
 } from './ExecutionEventIngestor';
-import type {
-  ExecutionEvent,
-  ExecutionEventEnvelope,
-  ExecutionGapDiagnostic,
-  ProviderExecutionEvent,
+import {
+  type ExecutionEvent,
+  type ExecutionEventEnvelope,
+  type ExecutionGapDiagnostic,
+  isTransientExecutionEvent,
+  type ProviderExecutionEvent,
 } from './ExecutionEvents';
 import type {
   ExecutionSessionId,
@@ -138,6 +139,9 @@ interface BackendEntry {
   disposed: boolean;
 }
 
+/** Receives every accepted envelope for a session, durable and transient alike. */
+export type ExecutionEnvelopeObserver = (envelope: ExecutionEventEnvelope) => void;
+
 interface SessionEntry {
   readonly session: ExecutionSession;
   readonly backend: BackendEntry;
@@ -192,6 +196,10 @@ export class ExecutionLifecycleRegistry {
   private readonly interactions = new Map<InteractionId, InteractionEntry>();
   private readonly leases = new Map<LifecycleLeaseId, LeaseEntry>();
   private readonly sessionQueues = new Map<ExecutionSessionId, Promise<void>>();
+  private readonly envelopeObservers = new Map<
+  ExecutionSessionId,
+  Set<ExecutionEnvelopeObserver>
+  >();
   private readonly eventTasks = new Set<Promise<void>>();
   private readonly admissionWaiters = new Set<() => void>();
   private state: RegistryState = 'initializing';
@@ -460,6 +468,17 @@ export class ExecutionLifecycleRegistry {
       let currentCheckpoint = checkpoint;
       let envelope: ExecutionEventEnvelope | undefined = result.envelopes[0];
       while (envelope) {
+        // Transient content goes straight to observers. It writes no control
+        // record, advances no state machine, and runs no post-commit hook —
+        // there is nothing about it to commit, and a transaction per token
+        // would be the cost of persisting a transcript nobody may keep.
+        if (isTransientExecutionEvent(envelope.event)) {
+          this.publishEnvelope(session, envelope);
+          accepted.push(envelope);
+          currentCheckpoint = session.ingestor.createCheckpoint();
+          envelope = session.ingestor.drainReady() ?? undefined;
+          continue;
+        }
         const applied = await this.applyAcceptedEnvelope(
           session,
           envelope,
@@ -468,12 +487,62 @@ export class ExecutionLifecycleRegistry {
         if (applied.kind !== 'accepted') {
           return applied;
         }
+        // Durable envelopes reach observers only after they are committed, so
+        // nothing is rendered that a failed commit would have to take back.
+        this.publishEnvelope(session, envelope);
         accepted.push(envelope);
         currentCheckpoint = session.ingestor.createCheckpoint();
         envelope = session.ingestor.drainReady() ?? undefined;
       }
       return { kind: 'accepted', envelopes: accepted };
     });
+  }
+
+  /**
+   * Observes accepted envelopes for one session, in the order they were
+   * accepted.
+   *
+   * This is what makes a presentation adapter a client of the registry rather
+   * than of a backend: without it the only way to see a run's events would be
+   * to subscribe to the session the registry owns, which would mean two
+   * consumers of one stream and two opinions about ordering.
+   */
+  observe(
+    executionSessionId: ExecutionSessionId,
+    observer: ExecutionEnvelopeObserver,
+  ): () => void {
+    const observers = this.envelopeObservers.get(executionSessionId)
+      ?? new Set<ExecutionEnvelopeObserver>();
+    observers.add(observer);
+    this.envelopeObservers.set(executionSessionId, observers);
+    return () => {
+      const current = this.envelopeObservers.get(executionSessionId);
+      if (!current) {
+        return;
+      }
+      current.delete(observer);
+      if (current.size === 0) {
+        this.envelopeObservers.delete(executionSessionId);
+      }
+    };
+  }
+
+  private publishEnvelope(session: SessionEntry, envelope: ExecutionEventEnvelope): void {
+    const observers = this.envelopeObservers.get(
+      executionSessionId(session.record.executionSessionId),
+    );
+    if (!observers) {
+      return;
+    }
+    for (const observer of [...observers]) {
+      // One failing observer must not stop the others, and must never fail
+      // ingestion: presentation is downstream of the record, not part of it.
+      try {
+        observer(envelope);
+      } catch {
+        // Deliberately swallowed; a presentation fault is not a control fault.
+      }
+    }
   }
 
   async flushGaps(executionSessionId: ExecutionSessionId): Promise<ExecutionGapDiagnostic[]> {
@@ -2045,6 +2114,13 @@ function reduceRun(
   occurredAt: number,
 ): ExecutionRunRecord | null {
   if (record.terminal) {
+    return null;
+  }
+  if (isTransientExecutionEvent(event)) {
+    // Unreachable in practice — the ingest loop routes transient content to
+    // observers without reaching a record — and stated anyway so the switch
+    // below stays exhaustive rather than acquiring a default that would
+    // swallow the next event kind someone adds.
     return null;
   }
   switch (event.kind) {

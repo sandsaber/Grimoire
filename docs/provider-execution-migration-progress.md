@@ -1207,6 +1207,49 @@ lifecycle, capability ports, interactions, terminal semantics, and the twelve ta
 `adapterContractTarget.test.ts` — does not depend on the answer, since those concern terminals and
 generator lifetime rather than content.
 
+### M2-adapter — the transient content channel (this commit)
+
+The stop condition above is resolved: the owner chose the transient content event. This commit is
+that decision built, and nothing else — the adapter itself follows.
+
+`ExecutionEvent` gains one variant, `output-delta`, with a `channel` of `assistant` or `reasoning`.
+It is the only content-bearing event and the only transient one, and `isTransientExecutionEvent` is
+the single predicate the three exclusions read:
+
+- **the ingestor** neither remembers its delivery id nor consumes a sequence number. A run's
+  `lastSequence` therefore still counts what happened rather than how much was said, and a turn's
+  worth of token-rate traffic cannot evict the bounded set that protects the events which do need
+  deduplication. A transient envelope carries the position it follows, which keeps it ordered
+  without claiming a place;
+- **the run projection** returns unchanged. The check sits *before* the sequence guard on purpose:
+  an envelope carrying the position it follows would otherwise read as a replay;
+- **the registry** routes it straight to observers — no control record, no state machine, no
+  post-commit hook. D2 forbids a second copy of a provider transcript, and a stream of deltas is
+  exactly that, so the guard is that this path writes nothing at all. The test asserts the control
+  directory is byte-for-byte unchanged and that no written record contains the text.
+
+Deduplication is deliberately absent rather than forgotten: a backend emits each delta once, and
+recovery replays facts, not text. That is stated in a test, so the assumption is visible.
+
+**The registry gained `observe(sessionId, observer)`**, which is what makes a presentation adapter a
+client of the registry rather than of a backend. Durable envelopes reach observers only after they
+commit, so nothing is rendered that a failed commit would take back; transient ones go straight
+through. An observer that throws cannot fail ingestion — presentation is downstream of the record.
+
+Three of the four backends now stream, at the point where each already had the text and had been
+throwing it away into an accumulator: Codex per app-server delta, OpenCode per ACP
+`agent_message_chunk`, Claude per SDK `content_block_delta` — including `thinking_delta` on the
+reasoning channel, and excluding subagent deltas, since a nested agent's text is not the
+conversation's. Each emits only after its byte-bound check, so a reader always sees a prefix of what
+will be committed. Antigravity does not stream because print mode has nothing to stream: one process,
+one output, at exit.
+
+**The trace fixtures record it**, which is what made two of them fail first. OpenCode's summarizer
+silently dropped event kinds it did not name, so the trace would have stayed silent about whether a
+turn was readable while it ran; it now names `output-delta`, and both its recorded cases carry it.
+
+Gates: unit 451 suites / 7675 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1234,12 +1277,12 @@ Every gate is green, CI included, on all four jobs. The Windows failure that clo
 session is fixed and confirmed; it was two defects, one production and one in the test, recorded in
 the entry directly above.
 
-**Blocked on one decision, recorded in the entry directly above:** the kernel has no channel for
-streamed output, so an adapter over it can only deliver the answer at the terminal, and today's
-providers stream per delta. Three options with costs are written up; the recommendation is a
-transient content event. The rest of M2-adapter is unaffected and can proceed either way.
+**M2-adapter is in progress.** Its stop condition — the kernel had no channel for streamed output —
+was decided by the owner in favour of a transient content event, and that is built: `output-delta`,
+excluded from persistence, projection, and deduplication, plus `registry.observe()` so the adapter
+can be a client of the registry. Three backends stream through it.
 
-**Next action:** **M2-adapter** — the `ChatRuntime` adapter over the kernel, still dark, with
+**Next action:** the adapter itself — a `ChatRuntime` implementation over the kernel, still dark, with
 `createSubject` in `adapterContractTarget.test.ts` grown to cover `prepareTurn`, `steer`,
 `setResumeCheckpoint`, `buildSessionUpdates`, and `consumeSessionInvalidation`, which remain paper
 mappings. **M0b is still open and blocks the first flip, not the adapter:** the checked-in traces are

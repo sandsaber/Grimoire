@@ -1,8 +1,9 @@
 import type { ExecutionBackendId } from './ExecutionBackendDescriptor';
-import type {
-  ExecutionEventEnvelope,
-  ExecutionGapDiagnostic,
-  ProviderExecutionEvent,
+import {
+  type ExecutionEventEnvelope,
+  type ExecutionGapDiagnostic,
+  isTransientExecutionEvent,
+  type ProviderExecutionEvent,
 } from './ExecutionEvents';
 import type {
   ExecutionSessionId,
@@ -288,6 +289,26 @@ export class ExecutionEventIngestor {
   }
 
   private accept(event: ProviderExecutionEvent): ExecutionEventEnvelope {
+    // Transient content neither consumes a sequence number nor enters the
+    // bounded delivery-id set: the sequence space belongs to durable facts, so
+    // a run's `lastSequence` still counts what actually happened, and a turn's
+    // worth of deltas cannot evict the ids that protect against redelivery.
+    // It is stamped with the position it follows, which keeps it ordered
+    // against the surrounding events without claiming one of their places.
+    if (isTransientExecutionEvent(event.event)) {
+      return {
+        schemaVersion: 1,
+        backendId: event.backendId,
+        backendGeneration: event.backendGeneration,
+        executionSessionId: event.executionSessionId,
+        sessionInstanceId: event.sessionInstanceId,
+        eventId: event.deliveryId,
+        sequence: this.nextSequence - 1,
+        occurredAt: event.occurredAt,
+        scope: event.scope,
+        event: event.event,
+      };
+    }
     this.rememberDeliveryId(event.deliveryId);
     return {
       schemaVersion: 1,

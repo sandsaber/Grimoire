@@ -1590,6 +1590,19 @@ class ClaudeExecutionRun implements ExecutionRun {
         } else {
           this.emit({ kind: 'tool-activity', toolCallId: event.content_block.id });
         }
+      } else if (event.type === 'content_block_delta' && !message.parent_tool_use_id) {
+        // The SDK reports the answer twice: as deltas here and whole in the
+        // final result message. The result stays the durable copy; these are
+        // what let a turn be read while it is still running. Subagent deltas
+        // are excluded — a nested agent's text is not the conversation's.
+        const delta = event.delta;
+        if (delta.type === 'text_delta') {
+          this.emit({ kind: 'output-delta', channel: 'assistant', text: delta.text });
+        } else if (delta.type === 'thinking_delta') {
+          this.emit({ kind: 'output-delta', channel: 'reasoning', text: delta.thinking });
+        } else {
+          this.emit({ kind: 'thinking-activity' });
+        }
       } else if (!message.parent_tool_use_id) {
         this.emit({ kind: 'thinking-activity' });
       }

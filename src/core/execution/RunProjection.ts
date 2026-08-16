@@ -8,7 +8,7 @@ import type {
   ExecutionReconciliationRecord,
   ReconciliationEvidenceRecord,
 } from './ExecutionControlRecords';
-import type { ExecutionEventEnvelope } from './ExecutionEvents';
+import { type ExecutionEventEnvelope, isTransientExecutionEvent } from './ExecutionEvents';
 import type { RunId } from './ExecutionIds';
 
 export interface ReconciledOutcomeProjection {
@@ -58,6 +58,13 @@ export function reduceRunProjection(
   projection: RunProjection,
   envelope: ExecutionEventEnvelope,
 ): RunProjection {
+  // Transient content is not a fact about the run, so it changes nothing here.
+  // Checked before the sequence guard on purpose: a transient envelope carries
+  // the position it follows rather than a new one, which the guard below would
+  // read as a replay.
+  if (isTransientExecutionEvent(envelope.event)) {
+    return projection;
+  }
   if (projection.terminal
     || envelope.sequence <= projection.lastSequence
     || projection.recentEventIds.includes(envelope.eventId)

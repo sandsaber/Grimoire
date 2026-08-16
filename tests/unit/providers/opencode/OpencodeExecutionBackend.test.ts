@@ -166,6 +166,10 @@ describe('OpencodeExecutionBackend', () => {
     const captured = await events;
     expect(captured.map(event => event.event.kind)).toEqual([
       'run-started',
+      // The partial text reaches the reader before the connection drops, which
+      // is the point of streaming it: a turn interrupted mid-answer still shows
+      // what was said.
+      'output-delta',
       'connection-lost',
       'recovery-started',
       'result',
@@ -797,6 +801,10 @@ function summarizeEvents(events: readonly ProviderExecutionEvent[]): string[] {
     if (event.kind === 'run-started' || event.kind === 'connection-lost' || event.kind === 'recovery-started') {
       return [event.kind];
     }
+    // Streamed output is a recorded semantic, not noise. This summarizer drops
+    // what it does not name, so leaving it out would have kept the trace silent
+    // about whether a turn was readable while it ran.
+    if (event.kind === 'output-delta') return [event.kind];
     if (event.kind === 'result') return [`result:${event.result.storage}`];
     if (event.kind === 'terminal') return [`terminal:${event.terminal}:${event.reason}`];
     if (event.kind === 'interaction-opened') return [`interaction-opened:${event.interaction.kind}`];

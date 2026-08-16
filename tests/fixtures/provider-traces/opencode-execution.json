@@ -79,11 +79,13 @@
   "eventCases": {
     "success": [
       "run-started",
+      "output-delta",
       "result:projection",
       "terminal:succeeded:completed"
     ],
     "recoveryAfterOutput": [
       "run-started",
+      "output-delta",
       "connection-lost",
       "recovery-started",
       "result:provider-native",

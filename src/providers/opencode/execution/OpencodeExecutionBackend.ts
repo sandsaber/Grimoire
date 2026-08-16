@@ -821,6 +821,9 @@ class OpencodeExecutionRun implements ExecutionRun {
         return;
       }
       this.output = next;
+      // Emitted after the bound check, so a reader only ever sees a prefix of
+      // what will be committed.
+      this.emit({ kind: 'output-delta', channel: 'assistant', text: update.content.text });
       return;
     }
     if (update.sessionUpdate === 'agent_thought_chunk') {

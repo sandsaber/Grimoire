@@ -28,6 +28,23 @@ export type ExecutionEventScope =
 
 export type ExecutionEvent =
   | { readonly kind: 'run-started' }
+  /**
+   * Streamed output, as it arrives.
+   *
+   * The only content-bearing event, and the only transient one. Every other
+   * variant states a fact about the run; this one carries what the provider is
+   * saying, because the presentation adapter has to render a turn while it is
+   * still running and the committed `result` arrives only at the end.
+   *
+   * Transient means: never persisted, never reduced into a projection, and not
+   * deduplicated — see `isTransientExecutionEvent`. The durable copy of the
+   * answer is the committed result; this is the live view of it.
+   */
+  | {
+    readonly kind: 'output-delta';
+    readonly channel: 'assistant' | 'reasoning';
+    readonly text: string;
+  }
   | { readonly kind: 'thinking-activity' }
   | { readonly kind: 'tool-activity'; readonly toolCallId: string }
   | {
@@ -73,6 +90,33 @@ export type ExecutionEvent =
     readonly nativeAgentKey: string;
     readonly status: 'running' | 'waiting' | 'completed' | 'failed' | 'closed';
   };
+
+/**
+ * Whether an event is live content rather than a durable fact.
+ *
+ * Transient events are excluded from three things, each for its own reason:
+ *
+ * - **persistence**, because D2 forbids a second copy of a provider transcript
+ *   in the control store, and a stream of deltas is exactly that;
+ * - **the run projection**, because a projection records what happened, and
+ *   partial text is not a fact about the run — the committed result is;
+ * - **deduplication and causal bookkeeping**, because a backend emits each
+ *   delta once and never redelivers it. Recovery replays facts, not text. Were
+ *   they deduplicated, a turn's worth of token-rate traffic would evict the
+ *   bounded set that protects the events which do need it.
+ *
+ * Ordering is still the ingestor's, so text stays interleaved with tool and
+ * interaction events exactly as the provider produced it. That single ordering
+ * authority is why this travels the normal delivery path instead of a second
+ * channel beside it.
+ */
+export type TransientExecutionEvent = Extract<ExecutionEvent, { kind: 'output-delta' }>;
+
+export function isTransientExecutionEvent(
+  event: ExecutionEvent,
+): event is TransientExecutionEvent {
+  return event.kind === 'output-delta';
+}
 
 /** Adapter-owned normalized event before core sequence assignment. */
 export interface ProviderExecutionEvent {
