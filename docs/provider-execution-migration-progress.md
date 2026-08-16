@@ -1615,6 +1615,47 @@ Still dark: nothing constructs the host, and the bundle assertions now include o
 
 Gates: unit 456 suites / 7746 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
 
+### M2-flips — the kernel host, corrected (this commit)
+
+Review of the entry above found the host's own contract unclosed, in the same class of defect that
+entry was written about. Both findings were confirmed against the registry, not the diff.
+
+**Load and unload are not ordered, and the host assumed they were.** Obsidian's `onload` is async and
+`onunload` is neither withheld until it finishes nor awaited. Two orderings broke: an unload before
+any load, and an unload during one. In both, `registry.shutdown()` throws from `initializing`, the
+host reports that failure and memoises the resolved promise — after which the start that follows
+opens the acceptance gate and **no later `dispose()` can close it**, because `dispose()` is already
+memoised. A kernel accepting work for a plugin instance that is gone, silently, exactly the shape the
+previous commit existed to prevent.
+
+The fix serialises the two paths. `dispose()` records the unload synchronously; a start that finds it
+never opens the gate; a dispose that arrives mid-start waits for that start to settle and closes what
+it opened. The synchronous close survives for the ordinary case because `shutdown()` is still called
+before any `await` — that is the whole reason the branch exists rather than a uniform `await`.
+
+A third defect surfaced while fixing: a control store that requires migration left the registry
+read-only and never accepting, so `shutdown()` refused it and the host reported a **spurious failure
+on every unload** for exactly the user who reverts a shipped flip. The host now tracks whether the
+gate opened at all.
+
+**The larger finding is the test suite, and it was measured rather than argued.** With `dispose()`
+replaced by `Promise.resolve()`, the committed suite passed **in full** — all five tests. Every
+shutdown assertion in it was vacuous, for three separate reasons:
+
+- the gate test asked for backend `provider-fake` while the fake registers as
+  `internal-deterministic-fake`, so its bare `.rejects.toThrow()` was satisfied by
+  `Unknown execution backend` whether the gate closed or not;
+- the failure-report test drove the report path with a second `dispose()`, which memoisation makes a
+  no-op, so the reporter was never exercised;
+- the control-path test asserted `every()` over a list it never checked was non-empty.
+
+Each is now discriminating: the suite asserts the registry's exact refusal message, drives the
+reporter with a malformed checkpoint id, and requires records before checking their prefix. Proven by
+injection both ways — the four new ordering tests fail against the previous commit's host, and the
+gate test fails against a `dispose()` that does nothing, which the previous suite tolerated.
+
+Gates: unit 456 suites / 7750 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1647,8 +1688,15 @@ was decided by the owner in favour of a transient content event, and that is bui
 excluded from persistence, projection, and deduplication, plus `registry.observe()` so the adapter
 can be a client of the registry. Three backends stream through it.
 
-**Next action:** the adapter itself — a `ChatRuntime` implementation over the kernel, still dark, with
-`darkBundle.test.ts` stops being the right gate for the flipped provider.
+**In progress: M2-flips, wave 1 — Antigravity**, the smallest topology, with no resume and no agents.
+The kernel host the flip owns is built, corrected, and still dark; `agy` 1.1.13 is installed, so the
+flip can be smoke-tested against a live CLI. What remains is the wiring: the host constructed in
+`onload` and disposed in `onunload`, an Antigravity backend context, and the provider's
+`createRuntime` returning `ExecutionChatRuntimeAdapter`.
+
+That checkpoint **changes production behaviour for the first time** — the kernel enters production,
+the control store appears under `.grimoire/`, and `darkBundle.test.ts` stops being the right gate for
+the flipped provider — so it also owns revert safety.
 
 **M0b is satisfied for the four proof providers**, recorded from live CLIs on the owner's machine.
 The remaining five providers need their own recordings before their own flips.

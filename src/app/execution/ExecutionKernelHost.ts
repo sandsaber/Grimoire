@@ -9,18 +9,6 @@ import {
 } from '@/core/execution/ExecutionLifecycleRegistry';
 import type { DurableStorage } from '@/core/persistence/DurableStorage';
 
-/**
- * The application's owner of the execution kernel.
- *
- * One explicit object, constructed in `onload` and disposed in `onunload` — not
- * a module singleton, because a singleton outlives the plugin instance that a
- * reload replaces, and two registries over one control store would each believe
- * they own every run in it.
- *
- * This is the interim host the first provider flip owns. It grows into
- * `ApplicationRuntime` at M5 by absorbing the rest of composition; it is the
- * seed of that owner rather than a parallel structure to be thrown away.
- */
 export interface ExecutionKernelHostOptions {
   readonly storage: DurableStorage;
   readonly now?: () => number;
@@ -29,10 +17,25 @@ export interface ExecutionKernelHostOptions {
   reportShutdownFailure?(error: unknown): void;
 }
 
+/**
+ * The application's owner of the execution kernel.
+ *
+ * One explicit object per plugin load, not a module singleton: a singleton
+ * outlives the instance a reload replaces, and two registries over one control
+ * store would each believe they own every run in it.
+ *
+ * Load and unload are not ordered by the host's caller — Obsidian's `onload` is
+ * async and `onunload` neither waits for it nor is withheld until it finishes.
+ * So the two paths are serialized here: an unload that arrives first prevents
+ * the gate from opening, and one that arrives mid-load closes the gate the load
+ * goes on to open. Whichever order they run in, the gate is shut afterwards.
+ */
 export class ExecutionKernelHost {
   readonly registry: ExecutionLifecycleRegistry;
-  private started = false;
+  private starting: Promise<void> | undefined;
   private shuttingDown: Promise<void> | undefined;
+  private gateOpen = false;
+  private unloading = false;
 
   constructor(private readonly options: ExecutionKernelHostOptions) {
     const now = options.now ?? Date.now;
@@ -61,14 +64,26 @@ export class ExecutionKernelHost {
    * Starts the kernel, which is also when startup recovery runs.
    *
    * Idempotent because plugin load paths are not: a second call must not
-   * re-run recovery over records the first call already reconciled.
+   * re-run recovery over records the first call already reconciled. Callers
+   * share the in-flight promise rather than a flag, so a second caller waits
+   * for recovery instead of proceeding as though it had finished.
    */
   async start(): Promise<void> {
-    if (this.started) {
+    this.starting ??= this.openGate();
+    return this.starting;
+  }
+
+  private async openGate(): Promise<void> {
+    if (this.unloading) {
+      // Unload won the race. Opening the gate now would open one that the
+      // shutdown which already ran can no longer close, and the kernel would
+      // sit accepting work for a plugin instance that is gone.
       return;
     }
-    this.started = true;
     await this.registry.start();
+    // A store that requires migration leaves the registry read-only: it never
+    // accepted work, so there is no gate for shutdown to close.
+    this.gateOpen = this.registry.getMigrationRequirement() === null;
   }
 
   /**
@@ -97,10 +112,36 @@ export class ExecutionKernelHost {
    * raised, the shutdown would simply never happen.
    */
   dispose(checkpointId = `sd-${randomUUID().replaceAll('-', '')}`): Promise<void> {
-    this.shuttingDown ??= this.registry.shutdown(checkpointId)
-      .catch(error => {
+    this.unloading = true;
+    this.shuttingDown ??= this.closeGate(checkpointId);
+    return this.shuttingDown;
+  }
+
+  private closeGate(checkpointId: string): Promise<void> {
+    if (this.gateOpen) {
+      // Called here rather than after an await, because that is what makes the
+      // synchronous half true: `shutdown` leaves `accepting` before its own
+      // first await, so nothing is admitted once unload has begun.
+      return this.registry.shutdown(checkpointId).catch(error => {
         this.options.reportShutdownFailure?.(error);
       });
-    return this.shuttingDown;
+    }
+    return this.closeAfterStart(checkpointId);
+  }
+
+  private async closeAfterStart(checkpointId: string): Promise<void> {
+    try {
+      // A start still in flight has to settle first: it may open the gate after
+      // this call, and a shutdown that already ran cannot close that gate.
+      // Nothing is admitted meanwhile — the registry refuses work until start
+      // finishes — so waiting costs no guarantee.
+      await this.starting?.catch(() => undefined);
+      if (!this.gateOpen) {
+        return;
+      }
+      await this.registry.shutdown(checkpointId);
+    } catch (error) {
+      this.options.reportShutdownFailure?.(error);
+    }
   }
 }
