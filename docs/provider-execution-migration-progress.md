@@ -1154,6 +1154,59 @@ confirmation of the second half, since `/s` stripping cannot be reproduced off W
 fixes compose as intended: the form now takes cmd quoting, which passes the tail through raw, and
 `/s` strips the pair the tail carries for exactly that purpose.
 
+### M2-adapter — stop condition: the kernel has no channel for streamed output (this commit)
+
+Opening M2-adapter surfaced a blocker at the centre of it, before any adapter code was written. This
+is the milestone working as designed — "the seam, proven without a flip" — but it needs a decision
+that is not the migration's to make alone.
+
+**The chain, each link verified rather than assumed:**
+
+- `InputController` renders by `for await (const chunk of runtime.query(...))`, and today's providers
+  yield text as it arrives: `CodexNotificationRouter` emits `{ type: 'text', content: params.delta }`
+  **per delta**. Streaming is current behavior;
+- the kernel's `ExecutionEvent` union carries **no content at all**. Its variants are facts —
+  `thinking-activity`, `tool-activity` with an id, `progress`, `interaction-opened`, `terminal`,
+  the native-agent family — plus `result: ResultRef`, and `ResultRef` is
+  `{ resultId, storage, digest? }`: a pointer with no text and no partial or offset notion;
+- the four proof backends accumulate. `CodexExecutionBackend.appendAssistantOutput` concatenates each
+  delta into a buffer under a byte limit, and `storeResult` is called **once**, at the end, with the
+  whole output. Claude and OpenCode do the same.
+
+**Consequence:** an adapter built on the harvested kernel can only deliver the answer as one chunk
+when the turn terminates. A flipped provider would render nothing while it works, then everything at
+once.
+
+**Why that is a stop condition rather than a detail.** The plan's preservation boundary is explicit —
+"Until the owning milestone, current behavior is preserved exactly" — and the intentional-change list
+does not contain deferred rendering. The M2-adapter definition says "envelope events map to
+`StreamChunk` content", which presumes a content channel the kernel does not have. So this is a gap
+in the plan, not a defect in the harvest.
+
+**Three ways forward, with what each costs:**
+
+1. **A transient content event in the kernel.** A variant such as `output-delta` travelling the same
+   delivery path as every other event, so text and tool activity keep one ordering authority, but
+   classed as transient: excluded from dedupe bookkeeping, from the projection reducer, and from
+   persistence. D2 — "no second copy of any provider transcript" — then holds as an enforced
+   property rather than a structural one, testable against `ControlRecordPayloadPolicy`. Cost: the
+   event stream carries content, and the transient class has to be honoured everywhere it matters;
+2. **A separate content projection.** Backends write deltas to a projection the adapter subscribes
+   to, and the kernel stays content-free. Cost: two channels with independent ordering, so
+   interleaving of text against tool and interaction events is no longer guaranteed by the component
+   that exists to guarantee ordering;
+3. **Accept deferred rendering** and add it to the intentional-change list. Cost: a visible product
+   regression on every flipped provider, which is a product decision.
+
+Recommended: **1**, because it keeps a single ordering authority — the reason the ingestor exists —
+while the transient class answers both the persistence rule and the cost of pushing token-rate
+traffic through causal bookkeeping.
+
+Nothing was implemented for M2-adapter pending this decision. The rest of the milestone — session
+lifecycle, capability ports, interactions, terminal semantics, and the twelve target assertions in
+`adapterContractTarget.test.ts` — does not depend on the answer, since those concern terminals and
+generator lifetime rather than content.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1180,6 +1233,11 @@ until a provider that needed it was written, which is the argument for four proo
 Every gate is green, CI included, on all four jobs. The Windows failure that closed the previous
 session is fixed and confirmed; it was two defects, one production and one in the test, recorded in
 the entry directly above.
+
+**Blocked on one decision, recorded in the entry directly above:** the kernel has no channel for
+streamed output, so an adapter over it can only deliver the answer at the terminal, and today's
+providers stream per delta. Three options with costs are written up; the recommendation is a
+transient content event. The rest of M2-adapter is unaffected and can proceed either way.
 
 **Next action:** **M2-adapter** — the `ChatRuntime` adapter over the kernel, still dark, with
 `createSubject` in `adapterContractTarget.test.ts` grown to cover `prepareTurn`, `steer`,
