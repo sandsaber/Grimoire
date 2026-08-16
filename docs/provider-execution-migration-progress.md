@@ -1389,6 +1389,54 @@ output, at exit.
 Gates: unit 453 suites / 7711 tests, integration 6 / 220, typecheck, lint, `build:release` clean; CI
 green on the three preceding commits, including the Windows teardown fix.
 
+### M2-adapter — self-review, and what it found (this commit)
+
+A deliberate review of everything M2-adapter added. Five findings, two of them defects that would have
+reached users at the first flip.
+
+**1. The capability projection changed behaviour nobody had decided.** `toLegacyCapabilities`
+produced `supportsProviderCommands: true` for Codex where the live record says `false`, so the first
+Codex flip would have made `TabManager` start requesting a command catalog it has never requested.
+This is the divergence proof two *recorded as open* — and the adapter then silently resolved it in
+the descriptor's favour. Fixed the way MCP already was: `commands` is now two fields, `discovery` and
+`chatSurface`, because what a provider can do and what the UI asks for are different statements.
+Codex is `ephemeral-process` plus `unsupported`, which states the fact instead of leaving a
+contradiction between two records.
+
+The gate that let it through was mine: the projection test compared three chosen fields. It now
+compares **every field against each provider's live record**, for all four. Verified by restoring the
+old mapping and watching Codex fail.
+
+**2. A recovered envelope never reached observers.** `recoverBlockedIngestion` commits an envelope
+and runs its post-commit hooks; it did not publish. Since the adapter closes a turn on the terminal
+and on nothing else, a terminal blocked by a storage fault and later committed would have updated
+every record and left the turn's generator open **forever**. Found by tracing every path that accepts
+an envelope, not by a test.
+
+The fix is one line. Its test is the honest part: the fault I could construct lands in the
+*not-committed* branch, where publishing would be wrong — so the test asserts what that scenario
+actually proves, that an envelope which never became durable is never published and the run has no
+terminal. A phantom terminal is worse than a missing one, because nothing later contradicts it. The
+committed branch is verified by inspection, and this says so rather than implying coverage it does
+not have.
+
+**3. A test that could not fail, again.** The first version of the storage-fault test passed with and
+without the fix — I checked, which is the only reason it was not committed as evidence. It has been
+replaced rather than kept.
+
+**4. Two unbounded sets.** The interaction bridge remembered every interaction id for the life of a
+conversation, and the registry kept an observer entry per session after disposal. Both are bounded
+now — the bridge with a window that only has to outlast redelivery, the registry by releasing
+observers with the session they were watching.
+
+**5. A guard that guarded nothing.** The event-kind list in the coverage suite was hand-written, so
+it would have stopped covering the next kind added while still passing. It is derived from the union
+in the source now, and asserts that every kind classifies — exhaustiveness is a compile error only
+while the switch has no `default`, and the first person to add one would turn an unclassified event
+into `undefined` at runtime. Verified by adding a kind to the union and watching it fail.
+
+Gates: unit 453 suites / 7717 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

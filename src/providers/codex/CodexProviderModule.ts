@@ -153,7 +153,12 @@ const codexCapabilities: ProviderCapabilityDescriptor = {
     transcriptHydration: 'native',
   },
   history: { ownership: 'provider-native' },
-  commands: { discovery: 'ephemeral-process' },
+  commands: {
+    discovery: 'ephemeral-process',
+    // Codex can list its skills; the chat input does not ask. Stated as a fact
+    // rather than left as a contradiction between two records.
+    chatSurface: 'unsupported',
+  },
   mcp: {
     // Codex configures MCP itself. Grimoire neither stores nor injects servers
     // for this provider, and per-run selection has no provider surface at all.

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import antigravityTrace from '@test/fixtures/provider-traces/antigravity-execution.json';
 import claudeTrace from '@test/fixtures/provider-traces/claude-execution.json';
 import codexTrace from '@test/fixtures/provider-traces/codex-execution.json';
@@ -34,9 +37,13 @@ import type {
 } from '@/core/runtime/types';
 import type { StreamChunk } from '@/core/types/chat';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
+import { ANTIGRAVITY_PROVIDER_CAPABILITIES } from '@/providers/antigravity/capabilities';
+import { CLAUDE_PROVIDER_CAPABILITIES } from '@/providers/claude/capabilities';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
+import { CODEX_PROVIDER_CAPABILITIES } from '@/providers/codex/capabilities';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
 import type { CodexProviderSettings } from '@/providers/codex/settings';
+import { OPENCODE_PROVIDER_CAPABILITIES } from '@/providers/opencode/capabilities';
 import { opencodeProviderModule } from '@/providers/opencode/OpencodeProviderModule';
 
 /**
@@ -284,6 +291,24 @@ describe('execution adapter over the registry', () => {
       opencodeProviderModule,
     ];
 
+    const liveRecords = {
+      antigravity: ANTIGRAVITY_PROVIDER_CAPABILITIES,
+      codex: CODEX_PROVIDER_CAPABILITIES,
+      claude: CLAUDE_PROVIDER_CAPABILITIES,
+      opencode: OPENCODE_PROVIDER_CAPABILITIES,
+    } as const;
+
+    it.each(modules)('$manifest.id projects to its live record field for field', module => {
+      // Every field, not a chosen few. The three-field version of this passed
+      // while the projection reported `supportsProviderCommands: true` for
+      // Codex against a live `false` — a UI change nobody had decided, which is
+      // exactly what the preservation boundary forbids and what a partial
+      // comparison cannot catch.
+      const live = liveRecords[module.manifest.id as keyof typeof liveRecords];
+
+      expect(toLegacyCapabilities(module.capabilities, live.reasoningControl)).toEqual(live);
+    });
+
     it.each(modules)('projects $manifest.id onto the record the UI reads', module => {
       const legacy = toLegacyCapabilities(module.capabilities, 'effort');
 
@@ -493,22 +518,38 @@ describe('coverage over the four proof topologies', () => {
   });
 });
 
-const KERNEL_EVENT_KINDS: ExecutionEvent['kind'][] = [
-  'run-started',
-  'output-delta',
-  'thinking-activity',
-  'tool-activity',
-  'progress',
-  'result',
-  'interaction-opened',
-  'interaction-resolved',
-  'connection-lost',
-  'recovery-started',
-  'recovered',
-  'cancellation-acknowledged',
-  'terminal',
-  'native-agent-observed',
-  'native-agent-result',
-  'native-agent-activity',
-  'native-agent-status',
-];
+/**
+ * Every kind the union declares, read from the source rather than restated.
+ *
+ * A hand-written copy would silently stop covering the next kind someone adds,
+ * which is the exact failure the classification exists to prevent — the list
+ * would still pass while the adapter had no answer for the new event.
+ */
+const KERNEL_EVENT_KINDS = [
+  ...new Set(
+    [...readFileSync(resolve(process.cwd(), 'src/core/execution/ExecutionEvents.ts'), 'utf8')
+      .matchAll(/readonly kind: '([a-z-]+)'/g)]
+      .map(match => match[1]),
+  ),
+]
+  // The same file declares the event scopes, whose kinds are not events.
+  .filter(kind => !['session', 'run', 'agent'].includes(kind)) as ExecutionEvent['kind'][];
+
+describe('the classification covers the union it claims to', () => {
+  it('reads every kind from the source and finds no gap', () => {
+    // Guards the guard: if this list stopped matching the union, every
+    // per-provider claim above would keep passing while covering less.
+    expect(KERNEL_EVENT_KINDS.length).toBeGreaterThan(10);
+    expect(KERNEL_EVENT_KINDS).toContain('output-delta');
+    expect(KERNEL_EVENT_KINDS).toContain('terminal');
+    expect(new Set(KERNEL_EVENT_KINDS).size).toBe(KERNEL_EVENT_KINDS.length);
+
+    // The assertion that actually bites. Exhaustiveness is a compile error only
+    // while the switch has no `default`; the first person to add one would turn
+    // an unclassified event into `undefined` at runtime, and every claim above
+    // would keep passing.
+    const unclassified = KERNEL_EVENT_KINDS.filter(kind => !['chunk', 'terminal', 'ignored']
+      .includes(classifyForPresentation(kind)));
+    expect(unclassified).toEqual([]);
+  });
+});

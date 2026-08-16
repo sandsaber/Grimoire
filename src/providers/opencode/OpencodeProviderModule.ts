@@ -144,7 +144,7 @@ const opencodeCapabilities: ProviderCapabilityDescriptor = {
     transcriptHydration: 'native',
   },
   history: { ownership: 'provider-native' },
-  commands: { discovery: 'active-session' },
+  commands: { discovery: 'active-session', chatSurface: 'grimoire' },
   mcp: {
     // Grimoire owns `.grimoire/mcp/opencode.json` and injects those servers
     // into the ACP session. The per-run selector is a separate question, and

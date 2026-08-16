@@ -199,7 +199,10 @@ export function toLegacyCapabilities(
     supportsPlanMode: supported(descriptor.interactions.planMode),
     supportsRewind: supported(descriptor.conversation.rewind),
     supportsFork: supported(descriptor.conversation.fork),
-    supportsProviderCommands: descriptor.commands.discovery !== 'unsupported',
+    // From the chat surface, not from discovery: Codex can list its commands
+    // and the chat input does not ask, and mapping from discovery would turn
+    // that on at its flip without anyone deciding to.
+    supportsProviderCommands: supported(descriptor.commands.chatSurface),
     supportsImageAttachments: supported(descriptor.input.imageAttachments),
     supportsInstructionMode: supported(descriptor.input.instructionMode),
     // The boolean the UI reads gates the per-run server selector and nothing
@@ -565,7 +568,15 @@ export interface ExecutionInteractionPresenter {
  * after a redelivery, which is why the seen set exists.
  */
 export class ExecutionInteractionBridge {
+  /**
+   * Bounded for the same reason the ingestor's delivery-id set is: this lives
+   * as long as a conversation, and an unbounded set of interaction ids would
+   * grow for every approval a long session ever showed. The window only has to
+   * outlast redelivery, not the conversation.
+   */
+  private static readonly MAX_REMEMBERED = 256;
   private readonly presented = new Set<string>();
+  private readonly presentedOrder: string[] = [];
 
   constructor(
     private readonly registry: ExecutionLifecycleRegistry,
@@ -582,8 +593,19 @@ export class ExecutionInteractionBridge {
     if (this.presented.has(request.interactionId)) {
       return;
     }
-    this.presented.add(request.interactionId);
+    this.remember(request.interactionId);
     void this.settle(request);
+  }
+
+  private remember(interactionId: string): void {
+    this.presented.add(interactionId);
+    this.presentedOrder.push(interactionId);
+    while (this.presentedOrder.length > ExecutionInteractionBridge.MAX_REMEMBERED) {
+      const evicted = this.presentedOrder.shift();
+      if (evicted) {
+        this.presented.delete(evicted);
+      }
+    }
   }
 
   private async settle(request: InteractionRequest): Promise<void> {

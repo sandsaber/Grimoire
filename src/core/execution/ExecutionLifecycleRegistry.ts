@@ -939,6 +939,10 @@ export class ExecutionLifecycleRegistry {
       session.record = updated.payload;
       session.revision = updated.revision;
       this.sessions.delete(executionSessionId);
+      // Observers go with the session they were watching. Leaving them would
+      // hold a closure per disposed conversation for the life of the process,
+      // and a session id is never reused for a different session.
+      this.envelopeObservers.delete(executionSessionId);
     });
   }
 
@@ -1373,6 +1377,13 @@ export class ExecutionLifecycleRegistry {
     }
     session.blockedIngestion = undefined;
     if (committed) {
+      // Published here too, and for the same reason as on the normal path: an
+      // envelope that reaches a record must reach the observers watching that
+      // run. Without this, an envelope blocked by a storage fault and later
+      // recovered would update every record and be invisible to the
+      // presentation adapter — and if the blocked envelope were the terminal,
+      // the turn's generator would stay open forever.
+      this.publishEnvelope(session, blocked.envelope);
       try {
         await this.runEnvelopePostCommitHooks(
           session,
@@ -2060,6 +2071,7 @@ export class ExecutionLifecycleRegistry {
     session.record = updated.payload;
     session.revision = updated.revision;
     this.sessions.delete(executionSessionId(session.record.executionSessionId));
+    this.envelopeObservers.delete(executionSessionId(session.record.executionSessionId));
     for (const [leaseId, lease] of this.leases) {
       if (lease.executionSessionId === session.record.executionSessionId) {
         lease.released = true;

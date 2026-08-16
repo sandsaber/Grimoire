@@ -276,3 +276,93 @@ describe('transient output deltas', () => {
     });
   });
 });
+
+/**
+ * A terminal must reach the observers even when its commit stumbles.
+ *
+ * The presentation adapter closes a turn on the terminal and on nothing else,
+ * so an envelope that reaches a record without reaching observers does not
+ * degrade the UI — it hangs the turn forever. The recovery path committed and
+ * ran its post-commit hooks without publishing; this pins the property rather
+ * than the path, so a future refactor that moves the publish cannot lose it.
+ */
+describe('envelope delivery under a storage fault', () => {
+  /** Fails every durable write while broken, which is what blocks ingestion. */
+  class FlakyStorage extends TestDurableStorage {
+    broken = false;
+
+    override async writeAtomic(path: string, content: string): Promise<void> {
+      if (this.broken) {
+        throw new Error('storage unavailable');
+      }
+      await super.writeAtomic(path, content);
+    }
+
+    override async compareAndSwap(
+      path: string,
+      expected: string | null,
+      next: string | null,
+    ): Promise<boolean> {
+      if (this.broken) {
+        throw new Error('storage unavailable');
+      }
+      return super.compareAndSwap(path, expected, next);
+    }
+  }
+
+  it('never publishes an envelope that failed to become durable', async () => {
+    let clock = 10;
+    let ordinal = 0;
+    const now = (): number => ++clock;
+    const storage = new FlakyStorage();
+    const repositories = new ExecutionControlRepositories(storage, now);
+    const registry = new ExecutionLifecycleRegistry({
+      repositories,
+      controlTransactions: new ExecutionControlTransactionCoordinator(storage, repositories, { now }),
+      nextTransactionId: () => `tx-${(++ordinal).toString(16).padStart(32, '0')}`,
+      now,
+      scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
+    });
+    const backend = new DeterministicFakeBackend({
+      sessionInstanceIdFactory: () => INSTANCE_ID,
+      now,
+    });
+    registry.registerBackend({ backend });
+    await registry.start();
+    await registry.createSession({
+      backendId: backend.descriptor.backendId,
+      executionSessionId: SESSION_ID,
+      owner: { kind: 'conversation', ownerId: 'flaky' },
+    });
+    await registry.startRun(SESSION_ID, {
+      runId: RUN_ID,
+      owner: { kind: 'conversation', ownerId: 'flaky' },
+      resultExpectation: 'optional',
+      requestRef: 'opaque-request',
+    });
+    const seen: string[] = [];
+    registry.observe(SESSION_ID, envelope => seen.push(envelope.event.kind));
+
+    storage.broken = true;
+    await registry.ingest({
+      ...delivery('d-terminal', { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }),
+      backendId: backend.descriptor.backendId,
+    }).catch(() => undefined);
+
+    // Recovery runs at the head of the next queued session operation, so this
+    // second ingest is what drains the blocked one.
+    storage.broken = false;
+    await registry.ingest({
+      ...delivery('d-after', { kind: 'thinking-activity' }),
+      backendId: backend.descriptor.backendId,
+    }).catch(() => undefined);
+    await registry.waitForIdle();
+
+    // The write never landed, so the envelope is not durable and the ingestor
+    // restored its checkpoint for the backend to redeliver. Publishing it would
+    // close a turn the record says never ended — a phantom terminal, which is
+    // worse than the missing one, because nothing later contradicts it.
+    expect(seen).not.toContain('terminal');
+    expect(registry.getRun(RUN_ID)?.terminal).toBeUndefined();
+  });
+});

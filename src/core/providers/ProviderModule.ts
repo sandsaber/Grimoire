@@ -449,7 +449,20 @@ export interface ProviderCapabilityDescriptor {
     readonly transcriptHydration: CapabilitySupport;
   };
   readonly history: { readonly ownership: ProviderHistoryOwnership };
-  readonly commands: { readonly discovery: ProviderCommandDiscovery };
+  readonly commands: {
+    readonly discovery: ProviderCommandDiscovery;
+    /**
+     * Whether Grimoire surfaces those commands in the chat input.
+     *
+     * Split from `discovery` for the same reason `mcp` is three fields: what a
+     * provider *can* do and what the UI *asks for* are different statements,
+     * and Codex is where they differ — it registers a command catalog and can
+     * list skills through a short-lived app-server, while `TabManager` never
+     * requests them. Collapsing the two would have flipped that on at the first
+     * Codex flip, silently.
+     */
+    readonly chatSurface: CapabilitySupport;
+  };
   readonly mcp: {
     readonly ownership: CapabilitySupport;
     readonly sessionConfiguration: CapabilitySupport;

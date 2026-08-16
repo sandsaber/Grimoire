@@ -130,7 +130,7 @@ const antigravityCapabilities: ProviderCapabilityDescriptor = {
     transcriptHydration: 'unsupported',
   },
   history: { ownership: 'grimoire-projection' },
-  commands: { discovery: 'unsupported' },
+  commands: { discovery: 'unsupported', chatSurface: 'unsupported' },
   mcp: {
     ownership: 'unsupported',
     sessionConfiguration: 'unsupported',
