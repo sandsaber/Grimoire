@@ -1,0 +1,858 @@
+{
+  "schemaVersion": 1,
+  "providerId": "codex",
+  "kind": "wire-recording",
+  "recordedAgainst": "codex-cli 0.147.0",
+  "transport": "stdio JSON-RPC 2.0 (`codex app-server`)",
+  "cases": [
+    "initialize",
+    "thread/start",
+    "turn/start",
+    "turn/interrupt after completion"
+  ],
+  "serverMethodsObserved": [
+    "account/rateLimits/updated",
+    "hook/completed",
+    "hook/started",
+    "item/agentMessage/delta",
+    "item/completed",
+    "item/started",
+    "mcpServer/startupStatus/updated",
+    "rawResponse/completed",
+    "rawResponseItem/completed",
+    "remoteControl/status/changed",
+    "thread/started",
+    "thread/status/changed",
+    "thread/tokenUsage/updated",
+    "turn/completed",
+    "turn/started"
+  ],
+  "exchange": [
+    {
+      "seq": 1,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "clientInfo": {
+            "name": "grimoire-trace",
+            "version": "0.0.0"
+          },
+          "capabilities": {
+            "experimentalApi": true
+          }
+        }
+      }
+    },
+    {
+      "seq": 2,
+      "direction": "server->client",
+      "message": {
+        "id": 1,
+        "result": {
+          "userAgent": "grimoire-trace/0.147.0 (CachyOS Linux Rolling Release; x86_64) Konsole/260403 (grimoire-trace; 0.0.0)",
+          "codexHome": "<home>/.codex",
+          "platformFamily": "unix",
+          "platformOs": "linux"
+        }
+      }
+    },
+    {
+      "seq": 3,
+      "direction": "server->client",
+      "message": {
+        "method": "remoteControl/status/changed",
+        "params": {
+          "status": "disabled",
+          "serverName": "M5MinionL",
+          "installationId": "<uuid>",
+          "environmentId": null
+        },
+        "emittedAtMs": 1786907187632
+      }
+    },
+    {
+      "seq": 4,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "initialized"
+      }
+    },
+    {
+      "seq": 5,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "thread/start",
+        "params": {
+          "model": "gpt-5.4-mini",
+          "cwd": "<tmp>",
+          "approvalPolicy": "never",
+          "sandbox": "read-only",
+          "experimentalRawEvents": true
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "direction": "server->client",
+      "message": {
+        "id": 2,
+        "result": {
+          "thread": {
+            "id": "<uuid>",
+            "extra": null,
+            "sessionId": "<uuid>",
+            "forkedFromId": null,
+            "parentThreadId": null,
+            "preview": "",
+            "ephemeral": false,
+            "section": null,
+            "sectionEnteredAt": null,
+            "historyMode": "legacy",
+            "modelProvider": "openai",
+            "createdAt": 1786907191,
+            "updatedAt": 1786907191,
+            "recencyAt": 1786907191,
+            "status": {
+              "type": "idle"
+            },
+            "path": "<home>/.codex/sessions/2026/08/16/rollout-2026-08-16T22-06-31-<uuid>.jsonl",
+            "cwd": "<tmp>",
+            "cliVersion": "0.147.0",
+            "source": "vscode",
+            "canAcceptDirectInput": true,
+            "threadSource": null,
+            "agentNickname": null,
+            "agentRole": null,
+            "gitInfo": null,
+            "name": null,
+            "turns": []
+          },
+          "model": "gpt-5.4-mini",
+          "modelProvider": "openai",
+          "serviceTier": "default",
+          "cwd": "<tmp>",
+          "runtimeWorkspaceRoots": [
+            "<tmp>"
+          ],
+          "instructionSources": [
+            "<home>/.codex/AGENTS.md"
+          ],
+          "approvalPolicy": "never",
+          "approvalsReviewer": "user",
+          "sandbox": {
+            "type": "readOnly",
+            "networkAccess": false
+          },
+          "activePermissionProfile": null,
+          "reasoningEffort": "xhigh",
+          "multiAgentMode": "explicitRequestOnly"
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "direction": "server->client",
+      "message": {
+        "method": "thread/started",
+        "params": {
+          "thread": {
+            "id": "<uuid>",
+            "extra": null,
+            "sessionId": "<uuid>",
+            "forkedFromId": null,
+            "parentThreadId": null,
+            "preview": "",
+            "ephemeral": false,
+            "section": null,
+            "sectionEnteredAt": null,
+            "historyMode": "legacy",
+            "modelProvider": "openai",
+            "createdAt": 1786907191,
+            "updatedAt": 1786907191,
+            "recencyAt": 1786907191,
+            "status": {
+              "type": "idle"
+            },
+            "path": "<home>/.codex/sessions/2026/08/16/rollout-2026-08-16T22-06-31-<uuid>.jsonl",
+            "cwd": "<tmp>",
+            "cliVersion": "0.147.0",
+            "source": "vscode",
+            "canAcceptDirectInput": true,
+            "threadSource": null,
+            "agentNickname": null,
+            "agentRole": null,
+            "gitInfo": null,
+            "name": null,
+            "turns": []
+          }
+        },
+        "emittedAtMs": 1786907191908
+      }
+    },
+    {
+      "seq": 8,
+      "direction": "server->client",
+      "message": {
+        "method": "mcpServer/startupStatus/updated",
+        "params": {
+          "threadId": "<uuid>",
+          "name": "codex_apps",
+          "status": "starting",
+          "error": null,
+          "failureReason": null
+        },
+        "emittedAtMs": 1786907191908
+      }
+    },
+    {
+      "seq": 9,
+      "direction": "server->client",
+      "message": {
+        "method": "mcpServer/startupStatus/updated",
+        "params": {
+          "threadId": "<uuid>",
+          "name": "xcodebuildmcp",
+          "status": "starting",
+          "error": null,
+          "failureReason": null
+        },
+        "emittedAtMs": 1786907191908
+      }
+    },
+    {
+      "seq": 10,
+      "direction": "server->client",
+      "message": {
+        "method": "mcpServer/startupStatus/updated",
+        "params": {
+          "threadId": "<uuid>",
+          "name": "codex-security",
+          "status": "starting",
+          "error": null,
+          "failureReason": null
+        },
+        "emittedAtMs": 1786907191908
+      }
+    },
+    {
+      "seq": 11,
+      "direction": "server->client",
+      "message": {
+        "method": "mcpServer/startupStatus/updated",
+        "params": {
+          "threadId": "<uuid>",
+          "name": "codex-security",
+          "status": "ready",
+          "error": null,
+          "failureReason": null
+        },
+        "emittedAtMs": 1786907192037
+      }
+    },
+    {
+      "seq": 12,
+      "direction": "server->client",
+      "message": {
+        "method": "mcpServer/startupStatus/updated",
+        "params": {
+          "threadId": "<uuid>",
+          "name": "codex_apps",
+          "status": "ready",
+          "error": null,
+          "failureReason": null
+        },
+        "emittedAtMs": 1786907192581
+      }
+    },
+    {
+      "seq": 13,
+      "direction": "server->client",
+      "message": {
+        "method": "mcpServer/startupStatus/updated",
+        "params": {
+          "threadId": "<uuid>",
+          "name": "xcodebuildmcp",
+          "status": "ready",
+          "error": null,
+          "failureReason": null
+        },
+        "emittedAtMs": 1786907192829
+      }
+    },
+    {
+      "seq": 14,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "turn/start",
+        "params": {
+          "threadId": "<uuid>",
+          "input": [
+            {
+              "type": "text",
+              "text": "Reply with exactly: OK"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 15,
+      "direction": "server->client",
+      "message": {
+        "id": 3,
+        "result": {
+          "turn": {
+            "id": "<uuid>",
+            "items": [],
+            "itemsView": "notLoaded",
+            "status": "inProgress",
+            "error": null,
+            "startedAt": null,
+            "completedAt": null,
+            "durationMs": null
+          }
+        }
+      }
+    },
+    {
+      "seq": 16,
+      "direction": "server->client",
+      "message": {
+        "method": "thread/status/changed",
+        "params": {
+          "threadId": "<uuid>",
+          "status": {
+            "type": "active",
+            "activeFlags": []
+          }
+        },
+        "emittedAtMs": 1786907197045
+      }
+    },
+    {
+      "seq": 17,
+      "direction": "server->client",
+      "message": {
+        "method": "turn/started",
+        "params": {
+          "threadId": "<uuid>",
+          "turn": {
+            "id": "<uuid>",
+            "items": [],
+            "itemsView": "notLoaded",
+            "status": "inProgress",
+            "error": null,
+            "startedAt": 1786907196,
+            "completedAt": null,
+            "durationMs": null
+          }
+        },
+        "emittedAtMs": 1786907197045
+      }
+    },
+    {
+      "seq": 18,
+      "direction": "server->client",
+      "message": {
+        "method": "rawResponseItem/completed",
+        "params": {
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "item": {
+            "type": "message",
+            "id": "msg_01a00bf7-ffaf-7500-8ec2-cf81eb367df1",
+            "role": "developer",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "<10398 chars elided>"
+              },
+              {
+                "type": "input_text",
+                "text": "<24514 chars elided>"
+              },
+              {
+                "type": "input_text",
+                "text": "<341 chars elided>"
+              },
+              {
+                "type": "input_text",
+                "text": "<646 chars elided>"
+              },
+              {
+                "type": "input_text",
+                "text": "<1014 chars elided>"
+              }
+            ],
+            "internal_chat_message_metadata_passthrough": {
+              "turn_id": "<uuid>"
+            }
+          }
+        },
+        "emittedAtMs": 1786907197361
+      }
+    },
+    {
+      "seq": 19,
+      "direction": "server->client",
+      "message": {
+        "method": "rawResponseItem/completed",
+        "params": {
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "item": {
+            "type": "message",
+            "id": "msg_01a00bf7-ffaf-7500-8ec2-cf94fe9a66ba",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "<1692 chars elided>"
+              },
+              {
+                "type": "input_text",
+                "text": "# AGENTS.md instructions\n\n<INSTRUCTIONS>\n@<home>/.codex/RTK.md\n</INSTRUCTIONS>"
+              },
+              {
+                "type": "input_text",
+                "text": "<350 chars elided>"
+              }
+            ],
+            "internal_chat_message_metadata_passthrough": {
+              "turn_id": "<uuid>"
+            }
+          }
+        },
+        "emittedAtMs": 1786907197361
+      }
+    },
+    {
+      "seq": 20,
+      "direction": "server->client",
+      "message": {
+        "method": "rawResponseItem/completed",
+        "params": {
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "item": {
+            "type": "message",
+            "id": "msg_01a00bf7-ffd8-7282-bb15-9b5b08cc1572",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Reply with exactly: OK"
+              }
+            ],
+            "internal_chat_message_metadata_passthrough": {
+              "turn_id": "<uuid>"
+            }
+          }
+        },
+        "emittedAtMs": 1786907197401
+      }
+    },
+    {
+      "seq": 21,
+      "direction": "server->client",
+      "message": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "<uuid>",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Reply with exactly: OK",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "startedAtMs": 1786907197400
+        },
+        "emittedAtMs": 1786907197401
+      }
+    },
+    {
+      "seq": 22,
+      "direction": "server->client",
+      "message": {
+        "method": "item/completed",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "<uuid>",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Reply with exactly: OK",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "completedAtMs": 1786907197400
+        },
+        "emittedAtMs": 1786907197401
+      }
+    },
+    {
+      "seq": 23,
+      "direction": "server->client",
+      "message": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "reasoning",
+            "id": "rs_0d70f060ba1730e7016a820a404a1c8191ac4058972a31473c",
+            "summary": [],
+            "content": []
+          },
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "startedAtMs": 1786907200319
+        },
+        "emittedAtMs": 1786907200319
+      }
+    },
+    {
+      "seq": 24,
+      "direction": "server->client",
+      "message": {
+        "method": "item/completed",
+        "params": {
+          "item": {
+            "type": "reasoning",
+            "id": "rs_0d70f060ba1730e7016a820a404a1c8191ac4058972a31473c",
+            "summary": [],
+            "content": []
+          },
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "completedAtMs": 1786907201124
+        },
+        "emittedAtMs": 1786907201124
+      }
+    },
+    {
+      "seq": 25,
+      "direction": "server->client",
+      "message": {
+        "method": "rawResponseItem/completed",
+        "params": {
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "item": {
+            "type": "reasoning",
+            "id": "rs_0d70f060ba1730e7016a820a404a1c8191ac4058972a31473c",
+            "summary": [],
+            "encrypted_content": "<1592 chars elided>",
+            "internal_chat_message_metadata_passthrough": {
+              "turn_id": "<uuid>"
+            }
+          }
+        },
+        "emittedAtMs": 1786907201124
+      }
+    },
+    {
+      "seq": 26,
+      "direction": "server->client",
+      "message": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "agentMessage",
+            "id": "msg_0d70f060ba1730e7016a820a4114bc8191b3460af79ecd9454",
+            "text": "",
+            "phase": "final_answer",
+            "memoryCitation": null
+          },
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "startedAtMs": 1786907201153
+        },
+        "emittedAtMs": 1786907201154
+      }
+    },
+    {
+      "seq": 27,
+      "direction": "server->client",
+      "message": {
+        "method": "item/agentMessage/delta",
+        "params": {
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "itemId": "msg_0d70f060ba1730e7016a820a4114bc8191b3460af79ecd9454",
+          "delta": "OK"
+        },
+        "emittedAtMs": 1786907201205
+      }
+    },
+    {
+      "seq": 28,
+      "direction": "server->client",
+      "message": {
+        "method": "item/completed",
+        "params": {
+          "item": {
+            "type": "agentMessage",
+            "id": "msg_0d70f060ba1730e7016a820a4114bc8191b3460af79ecd9454",
+            "text": "OK",
+            "phase": "final_answer",
+            "memoryCitation": null
+          },
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "completedAtMs": 1786907201332
+        },
+        "emittedAtMs": 1786907201332
+      }
+    },
+    {
+      "seq": 29,
+      "direction": "server->client",
+      "message": {
+        "method": "rawResponseItem/completed",
+        "params": {
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "item": {
+            "type": "message",
+            "id": "msg_0d70f060ba1730e7016a820a4114bc8191b3460af79ecd9454",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "OK"
+              }
+            ],
+            "phase": "final_answer",
+            "internal_chat_message_metadata_passthrough": {
+              "turn_id": "<uuid>"
+            }
+          }
+        },
+        "emittedAtMs": 1786907201332
+      }
+    },
+    {
+      "seq": 30,
+      "direction": "server->client",
+      "message": {
+        "method": "rawResponse/completed",
+        "params": {
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "responseId": "resp_0d70f060ba1730e7016a820a3e1ec481918e65d06d2664925a",
+          "usage": {
+            "totalTokens": 18266,
+            "inputTokens": 18205,
+            "cachedInputTokens": 4480,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 61,
+            "reasoningOutputTokens": 54
+          }
+        },
+        "emittedAtMs": 1786907201370
+      }
+    },
+    {
+      "seq": 31,
+      "direction": "server->client",
+      "message": {
+        "method": "thread/tokenUsage/updated",
+        "params": {
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "tokenUsage": {
+            "total": {
+              "totalTokens": 18266,
+              "inputTokens": 18205,
+              "cachedInputTokens": 4480,
+              "cacheWriteInputTokens": 0,
+              "outputTokens": 61,
+              "reasoningOutputTokens": 54
+            },
+            "last": {
+              "totalTokens": 18266,
+              "inputTokens": 18205,
+              "cachedInputTokens": 4480,
+              "cacheWriteInputTokens": 0,
+              "outputTokens": 61,
+              "reasoningOutputTokens": 54
+            },
+            "modelContextWindow": 258400
+          }
+        },
+        "emittedAtMs": 1786907201373
+      }
+    },
+    {
+      "seq": 32,
+      "direction": "server->client",
+      "message": {
+        "method": "account/rateLimits/updated",
+        "params": {
+          "rateLimits": {
+            "limitId": "codex",
+            "limitName": null,
+            "primary": {
+              "usedPercent": 0,
+              "windowDurationMins": 43200,
+              "resetsAt": 1789499198
+            },
+            "secondary": null,
+            "credits": {
+              "hasCredits": false,
+              "unlimited": false,
+              "balance": null
+            },
+            "individualLimit": null,
+            "spendControlReached": null,
+            "planType": "free",
+            "rateLimitReachedType": null
+          }
+        },
+        "emittedAtMs": 1786907201373
+      }
+    },
+    {
+      "seq": 33,
+      "direction": "server->client",
+      "message": {
+        "method": "hook/started",
+        "params": {
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "run": {
+            "id": "stop:0:<home>/.codex/plugins/cache/claude-plugins-official/ralph-loop/1.0.0/hooks/hooks.json",
+            "eventName": "stop",
+            "handlerType": "command",
+            "executionMode": "sync",
+            "scope": "turn",
+            "sourcePath": "<home>/.codex/plugins/cache/claude-plugins-official/ralph-loop/1.0.0/hooks/hooks.json",
+            "source": "plugin",
+            "displayOrder": 0,
+            "status": "running",
+            "statusMessage": null,
+            "startedAt": 1786907201,
+            "completedAt": null,
+            "durationMs": null,
+            "entries": []
+          }
+        },
+        "emittedAtMs": 1786907201374
+      }
+    },
+    {
+      "seq": 34,
+      "direction": "server->client",
+      "message": {
+        "method": "hook/completed",
+        "params": {
+          "threadId": "<uuid>",
+          "turnId": "<uuid>",
+          "run": {
+            "id": "stop:0:<home>/.codex/plugins/cache/claude-plugins-official/ralph-loop/1.0.0/hooks/hooks.json",
+            "eventName": "stop",
+            "handlerType": "command",
+            "executionMode": "sync",
+            "scope": "turn",
+            "sourcePath": "<home>/.codex/plugins/cache/claude-plugins-official/ralph-loop/1.0.0/hooks/hooks.json",
+            "source": "plugin",
+            "displayOrder": 0,
+            "status": "completed",
+            "statusMessage": null,
+            "startedAt": 1786907201,
+            "completedAt": 1786907201,
+            "durationMs": 3,
+            "entries": []
+          }
+        },
+        "emittedAtMs": 1786907201383
+      }
+    },
+    {
+      "seq": 35,
+      "direction": "server->client",
+      "message": {
+        "method": "thread/status/changed",
+        "params": {
+          "threadId": "<uuid>",
+          "status": {
+            "type": "idle"
+          }
+        },
+        "emittedAtMs": 1786907201383
+      }
+    },
+    {
+      "seq": 36,
+      "direction": "server->client",
+      "message": {
+        "method": "turn/completed",
+        "params": {
+          "threadId": "<uuid>",
+          "turn": {
+            "id": "<uuid>",
+            "items": [
+              {
+                "type": "agentMessage",
+                "id": "msg_0d70f060ba1730e7016a820a4114bc8191b3460af79ecd9454",
+                "text": "OK",
+                "phase": "final_answer",
+                "memoryCitation": null
+              }
+            ],
+            "itemsView": "summary",
+            "status": "completed",
+            "error": null,
+            "startedAt": 1786907196,
+            "completedAt": 1786907201,
+            "durationMs": 4548
+          }
+        },
+        "emittedAtMs": 1786907201383
+      }
+    },
+    {
+      "seq": 37,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "turn/interrupt",
+        "params": {
+          "threadId": "<uuid>"
+        }
+      }
+    },
+    {
+      "seq": 38,
+      "direction": "server->client",
+      "message": {
+        "error": {
+          "code": -32600,
+          "message": "Invalid request: missing field `turnId`"
+        },
+        "id": 4
+      }
+    }
+  ],
+  "payloadPolicy": "Strings over 200 characters are elided: the recording is evidence of protocol shape, not of content."
+}

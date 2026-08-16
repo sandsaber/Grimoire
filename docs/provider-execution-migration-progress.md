@@ -1536,6 +1536,56 @@ they are for.
 
 Gates: unit 454 suites / 7732 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
 
+### M0b — real wire recordings, and what they contradict (this commit)
+
+The owner authorized recording against their own CLIs, so the four proof providers now have
+recordings taken from live processes rather than from the archived branch's fixtures:
+`tests/fixtures/provider-traces/wire/`, one per provider, each naming the CLI version it came from.
+Codex `app-server` and OpenCode `acp` over stdio JSON-RPC, Claude as `--output-format stream-json`,
+Antigravity as print-mode stdout. `agy` was installed mid-session, which is why the fourth exists.
+
+The owner also suggested reading each provider's documentation, and for Codex that turned out to be
+better than prose: the CLI generates the **JSON Schema of its own protocol**, version-exact. It
+declares roughly 166 methods.
+
+**Our execution connection subscribes to eleven.** One trivial turn produced **nine notification
+methods it does not list**, and the ones it drops are not decoration:
+
+- `account/rateLimits/updated` — the provider's own instructions say Codex plan indicators come from
+  exactly this notification;
+- `thread/tokenUsage/updated` — usage display;
+- `rawResponseItem/completed` and `rawResponse/completed` — the instructions say
+  `experimentalRawEvents: true` exists so raw response items can be projected into stream chunks,
+  and the recording shows five of them in one turn;
+- `mcpServer/startupStatus/updated` — a failed MCP server would never reach the user;
+- `hook/started`, `hook/completed`, `thread/started`, `remoteControl/status/changed`.
+
+The schema names more that this turn did not trigger and a real session would:
+`turn/plan/updated`, `item/commandExecution/outputDelta`, `item/fileChange/patchUpdated`,
+`thread/compacted`, `thread/environment/disconnected`, `process/exited`, `model/rerouted`.
+
+OpenCode shows the same shape in miniature: `available_commands_update` and `usage_update` arrive and
+the backend handles neither. Claude's stream carries `rate_limit_event` and three `system` subtypes
+the backend ignores — and notably **no** `stream_event` at all in print mode, so the streaming path
+added for it only runs when partial messages are requested.
+
+None of this is fixed here. Subscribing to a notification is provider-backend work owned by each
+flip, and doing it now would be nine guesses instead of one decision. What is fixed is that the gap
+is **visible**: `wireVocabularyCoverage.test.ts` pins the observed-but-unmodelled list per provider,
+so it can shrink but cannot grow without a recording that justifies it, and no flip can claim
+coverage it does not have.
+
+Two things the recordings deliberately do not contain. Long strings are elided at capture — the
+evidence wanted is protocol shape, and the payloads carry provider prompt material and model output
+that has no business in a repository fixture. Identifiers, home paths, session ids, and anything
+key-shaped are replaced. A test asserts both, so a refreshed recording cannot quietly reintroduce
+either.
+
+**M0b is satisfied for the four proof providers.** The remaining five need their own recordings
+before their own flips, which is what the plan already schedules.
+
+Gates: unit 455 suites / 7740 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1571,16 +1621,17 @@ can be a client of the registry. Three backends stream through it.
 **Next action:** the adapter itself — a `ChatRuntime` implementation over the kernel, still dark, with
 `darkBundle.test.ts` stops being the right gate for the flipped provider.
 
-**M0b is still open and blocks the first flip:** the checked-in traces are semantic case catalogues,
-not sanitized wire recordings, and recording those needs live CLIs.
+**M0b is satisfied for the four proof providers**, recorded from live CLIs on the owner's machine.
+The remaining five providers need their own recordings before their own flips.
 
 Open obligations, each with an owner:
 
-- **M0b is not done.** The checked-in `tests/fixtures/provider-traces/*.json` are semantic case
-  catalogues — topology, identity, event cases, cancellation, empty-required-result — not sanitized
-  wire recordings. They are enough to pin backend semantics and to anchor the semantic freeze, which
-  has already landed; they are not the golden traces the plan requires, and recording those needs
-  live CLIs. Owner: M0b, **before the first flip**;
+- **the wire recordings show nine Codex notifications, two OpenCode session updates, and four Claude
+  message types that no backend consumes**, including the ones carrying plan indicators, token usage,
+  and raw response items. Pinned in `wireVocabularyCoverage.test.ts` so the gap cannot grow. Owner:
+  each provider's flip;
+- **five providers still need wire recordings** — MiMoCode, Kimi Code, Grok, Qwen, Gemini — each
+  before its own flip. Owner: M2-flips, per provider;
 - **awaiting an owner decision: redo.** Recorded as D9 in the persistence decisions. Re-running a
   request is free and needs no new state; undoing a rewind cannot be built on the control store,
   because D2 forbids a second copy of a provider transcript without exception, and the file backup

@@ -1,0 +1,641 @@
+{
+  "schemaVersion": 1,
+  "providerId": "opencode",
+  "kind": "wire-recording",
+  "recordedAgainst": "opencode 1.18.18",
+  "transport": "stdio JSON-RPC 2.0 (`opencode acp`)",
+  "cases": [
+    "initialize",
+    "session/new",
+    "session/prompt"
+  ],
+  "sessionUpdatesObserved": [
+    "agent_message_chunk",
+    "agent_thought_chunk",
+    "available_commands_update",
+    "usage_update"
+  ],
+  "exchange": [
+    {
+      "seq": 1,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": 1,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 2,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": true,
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "promptCapabilities": {
+              "embeddedContext": true,
+              "image": true
+            },
+            "sessionCapabilities": {
+              "close": {},
+              "fork": {},
+              "list": {},
+              "resume": {}
+            }
+          },
+          "authMethods": [
+            {
+              "description": "Run `opencode auth login` in the terminal",
+              "name": "Login with opencode",
+              "id": "opencode-login"
+            }
+          ],
+          "agentInfo": {
+            "name": "OpenCode",
+            "version": "1.18.18"
+          }
+        }
+      }
+    },
+    {
+      "seq": 3,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/new",
+        "params": {
+          "cwd": "<tmp>",
+          "mcpServers": []
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "sessionId": "<session-id>",
+          "configOptions": [
+            {
+              "id": "model",
+              "name": "Model",
+              "category": "model",
+              "type": "select",
+              "currentValue": "opencode/big-pickle",
+              "options": [
+                {
+                  "value": "zai-coding-plan/glm-4.7",
+                  "name": "Z.AI Coding Plan/GLM-4.7"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5-turbo",
+                  "name": "Z.AI Coding Plan/GLM-5-Turbo"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.2",
+                  "name": "Z.AI Coding Plan/GLM-5.2"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.2-highspeed",
+                  "name": "Z.AI Coding Plan/GLM-5.2 Highspeed"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.3",
+                  "name": "Z.AI Coding Plan/GLM-5.3"
+                },
+                {
+                  "value": "minimax-coding-plan/MiniMax-M2",
+                  "name": "MiniMax Token Plan (minimax.io)/MiniMax-M2"
+                },
+                {
+                  "value": "minimax-coding-plan/MiniMax-M2.1",
+                  "name": "MiniMax Token Plan (minimax.io)/MiniMax-M2.1"
+                },
+                {
+                  "value": "minimax-coding-plan/MiniMax-M2.5",
+                  "name": "MiniMax Token Plan (minimax.io)/MiniMax-M2.5"
+                },
+                {
+                  "value": "minimax-coding-plan/MiniMax-M2.5-highspeed",
+                  "name": "MiniMax Token Plan (minimax.io)/MiniMax-M2.5-highspeed"
+                },
+                {
+                  "value": "minimax-coding-plan/MiniMax-M2.7",
+                  "name": "MiniMax Token Plan (minimax.io)/MiniMax-M2.7"
+                },
+                {
+                  "value": "minimax-coding-plan/MiniMax-M2.7-highspeed",
+                  "name": "MiniMax Token Plan (minimax.io)/MiniMax-M2.7-highspeed"
+                },
+                {
+                  "value": "minimax-coding-plan/MiniMax-M3",
+                  "name": "MiniMax Token Plan (minimax.io)/MiniMax-M3"
+                },
+                {
+                  "value": "xiaomi-token-plan-ams/mimo-v2-tts",
+                  "name": "Xiaomi Token Plan (Europe)/MiMo-V2-TTS"
+                },
+                {
+                  "value": "xiaomi-token-plan-ams/mimo-v2.5",
+                  "name": "Xiaomi Token Plan (Europe)/MiMo-V2.5"
+                },
+                {
+                  "value": "xiaomi-token-plan-ams/mimo-v2.5-pro",
+                  "name": "Xiaomi Token Plan (Europe)/MiMo-V2.5-Pro"
+                },
+                {
+                  "value": "xiaomi-token-plan-ams/mimo-v2.5-tts",
+                  "name": "Xiaomi Token Plan (Europe)/MiMo-V2.5-TTS"
+                },
+                {
+                  "value": "xiaomi-token-plan-ams/mimo-v2.5-tts-voiceclone",
+                  "name": "Xiaomi Token Plan (Europe)/MiMo-V2.5-TTS-VoiceClone"
+                },
+                {
+                  "value": "xiaomi-token-plan-ams/mimo-v2.5-tts-voicedesign",
+                  "name": "Xiaomi Token Plan (Europe)/MiMo-V2.5-TTS-VoiceDesign"
+                },
+                {
+                  "value": "openai/gpt-5.3-codex-spark",
+                  "name": "OpenAI/GPT-5.3 Codex Spark"
+                },
+                {
+                  "value": "openai/gpt-5.4",
+                  "name": "OpenAI/GPT-5.4"
+                },
+                {
+                  "value": "openai/gpt-5.4-fast",
+                  "name": "OpenAI/GPT-5.4 Fast"
+                },
+                {
+                  "value": "openai/gpt-5.4-mini",
+                  "name": "OpenAI/GPT-5.4 mini"
+                },
+                {
+                  "value": "openai/gpt-5.4-mini-fast",
+                  "name": "OpenAI/GPT-5.4 mini Fast"
+                },
+                {
+                  "value": "openai/gpt-5.5",
+                  "name": "OpenAI/GPT-5.5"
+                },
+                {
+                  "value": "openai/gpt-5.5-fast",
+                  "name": "OpenAI/GPT-5.5 Fast"
+                },
+                {
+                  "value": "openai/gpt-5.6-luna",
+                  "name": "OpenAI/GPT-5.6 Luna"
+                },
+                {
+                  "value": "openai/gpt-5.6-luna-fast",
+                  "name": "OpenAI/GPT-5.6 Luna Fast"
+                },
+                {
+                  "value": "openai/gpt-5.6-sol",
+                  "name": "OpenAI/GPT-5.6 Sol"
+                },
+                {
+                  "value": "openai/gpt-5.6-sol-fast",
+                  "name": "OpenAI/GPT-5.6 Sol Fast"
+                },
+                {
+                  "value": "openai/gpt-5.6-terra",
+                  "name": "OpenAI/GPT-5.6 Terra"
+                },
+                {
+                  "value": "openai/gpt-5.6-terra-fast",
+                  "name": "OpenAI/GPT-5.6 Terra Fast"
+                },
+                {
+                  "value": "opencode/big-pickle",
+                  "name": "OpenCode Zen/Big Pickle"
+                },
+                {
+                  "value": "opencode/deepseek-v4-flash-free",
+                  "name": "OpenCode Zen/DeepSeek V4 Flash Free"
+                },
+                {
+                  "value": "opencode/hy3-free",
+                  "name": "OpenCode Zen/Hy3 Free"
+                },
+                {
+                  "value": "opencode/laguna-s-2.1-free",
+                  "name": "OpenCode Zen/Laguna S 2.1 Free"
+                },
+                {
+                  "value": "opencode/mimo-v2.5-free",
+                  "name": "OpenCode Zen/MiMo V2.5 Free"
+                },
+                {
+                  "value": "opencode/nemotron-3-ultra-free",
+                  "name": "OpenCode Zen/Nemotron 3 Ultra Free"
+                },
+                {
+                  "value": "opencode/nemotron-3.5-lightning-free",
+                  "name": "OpenCode Zen/Nemotron 3.5 Lightning Free"
+                }
+              ]
+            },
+            {
+              "id": "mode",
+              "name": "Session Mode",
+              "category": "mode",
+              "type": "select",
+              "currentValue": "build",
+              "options": [
+                {
+                  "value": "build",
+                  "name": "build",
+                  "description": "The default agent. Executes tools based on configured permissions."
+                },
+                {
+                  "value": "plan",
+                  "name": "plan",
+                  "description": "Plan mode. Disallows all edit tools."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "brainstorming",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+              },
+              {
+                "name": "coding-guidelines",
+                "description": "<272 chars elided>"
+              },
+              {
+                "name": "customize-opencode",
+                "description": "<386 chars elided>"
+              },
+              {
+                "name": "dispatching-parallel-agents",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies"
+              },
+              {
+                "name": "domain-cli",
+                "description": "<262 chars elided>"
+              },
+              {
+                "name": "domain-cloud-native",
+                "description": "<202 chars elided>"
+              },
+              {
+                "name": "domain-embedded",
+                "description": "<261 chars elided>"
+              },
+              {
+                "name": "domain-fintech",
+                "description": "Use when building fintech apps. Keywords: fintech, trading, decimal, currency, financial, money, transaction, ledger, payment, exchange rate, precision, rounding, accounting, \u91d1\u878d, \u4ea4\u6613\u7cfb\u7edf, \u8d27\u5e01, \u652f\u4ed8"
+              },
+              {
+                "name": "domain-iot",
+                "description": "Use when building IoT apps. Keywords: IoT, Internet of Things, sensor, MQTT, device, edge computing, telemetry, actuator, smart home, gateway, protocol, \u7269\u8054\u7f51, \u4f20\u611f\u5668, \u8fb9\u7f18\u8ba1\u7b97, \u667a\u80fd\u5bb6\u5c45"
+              },
+              {
+                "name": "domain-ml",
+                "description": "Use when building ML/AI apps in Rust. Keywords: machine learning, ML, AI, tensor, model, inference, neural network, deep learning, training, prediction, ndarray, tch-rs, burn, candle, \u673a\u5668\u5b66\u4e60, \u4eba\u5de5\u667a\u80fd, \u6a21\u578b\u63a8\u7406"
+              },
+              {
+                "name": "domain-web",
+                "description": "<304 chars elided>"
+              },
+              {
+                "name": "executing-plans",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints"
+              },
+              {
+                "name": "find-skills",
+                "description": "<303 chars elided>"
+              },
+              {
+                "name": "finishing-a-development-branch",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup"
+              },
+              {
+                "name": "init",
+                "description": "guided AGENTS.md setup"
+              },
+              {
+                "name": "karpathy-guidelines",
+                "description": "<553 chars elided>"
+              },
+              {
+                "name": "m01-ownership",
+                "description": "<280 chars elided>"
+              },
+              {
+                "name": "m02-resource",
+                "description": "<229 chars elided>"
+              },
+              {
+                "name": "m03-mutability",
+                "description": "<203 chars elided>"
+              },
+              {
+                "name": "m04-zero-cost",
+                "description": "<234 chars elided>"
+              },
+              {
+                "name": "m05-type-driven",
+                "description": "<213 chars elided>"
+              },
+              {
+                "name": "m06-error-handling",
+                "description": "<205 chars elided>"
+              },
+              {
+                "name": "m07-concurrency",
+                "description": "<218 chars elided>"
+              },
+              {
+                "name": "m09-domain",
+                "description": "CRITICAL: Use for domain modeling. Triggers: domain model, DDD, domain-driven design, entity, value object, aggregate, repository pattern, business rules, validation, invariant, \u9886\u57df\u6a21\u578b, \u9886\u57df\u9a71\u52a8\u8bbe\u8ba1, \u4e1a\u52a1\u89c4\u5219"
+              },
+              {
+                "name": "m10-performance",
+                "description": "CRITICAL: Use for performance optimization. Triggers: performance, optimization, benchmark, profiling, flamegraph, criterion, slow, fast, allocation, cache, SIMD, make it faster, \u6027\u80fd\u4f18\u5316, \u57fa\u51c6\u6d4b\u8bd5"
+              },
+              {
+                "name": "m11-ecosystem",
+                "description": "<382 chars elided>"
+              },
+              {
+                "name": "m12-lifecycle",
+                "description": "<357 chars elided>"
+              },
+              {
+                "name": "m13-domain-error",
+                "description": "<371 chars elided>"
+              },
+              {
+                "name": "m14-mental-model",
+                "description": "<374 chars elided>"
+              },
+              {
+                "name": "m15-anti-pattern",
+                "description": "<365 chars elided>"
+              },
+              {
+                "name": "meta-cognition-parallel",
+                "description": "EXPERIMENTAL: Three-layer parallel meta-cognition analysis. Triggers on: /meta-parallel, \u4e09\u5c42\u5206\u6790, parallel analysis, \u5e76\u884c\u5143\u8ba4\u77e5"
+              },
+              {
+                "name": "receiving-code-review",
+                "description": "<234 chars elided>"
+              },
+              {
+                "name": "requesting-code-review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements"
+              },
+              {
+                "name": "review",
+                "description": "review changes [commit|branch|pr], defaults to uncommitted"
+              },
+              {
+                "name": "rust-call-graph",
+                "description": "Visualize Rust function call graphs using LSP. Triggers on: /call-graph, call hierarchy, who calls, what calls, \u8c03\u7528\u56fe, \u8c03\u7528\u5173\u7cfb, \u8c01\u8c03\u7528\u4e86, \u8c03\u7528\u4e86\u8c01"
+              },
+              {
+                "name": "rust-code-navigator",
+                "description": "Navigate Rust code using LSP. Triggers on: /navigate, go to definition, find references, where is defined, \u8df3\u8f6c\u5b9a\u4e49, \u67e5\u627e\u5f15\u7528, \u5b9a\u4e49\u5728\u54ea, \u8c01\u7528\u4e86\u8fd9\u4e2a"
+              },
+              {
+                "name": "rust-daily",
+                "description": "CRITICAL: Use for Rust news and daily/weekly/monthly reports. Triggers on:\nrust news, rust daily, rust weekly, TWIR, rust blog,\nRust \u65e5\u62a5, Rust \u5468\u62a5, Rust \u65b0\u95fb, Rust \u52a8\u6001\n"
+              },
+              {
+                "name": "rust-deps-visualizer",
+                "description": "Visualize Rust project dependencies as ASCII art. Triggers on: /deps-viz, dependency graph, show dependencies, visualize deps, \u4f9d\u8d56\u56fe, \u4f9d\u8d56\u53ef\u89c6\u5316, \u663e\u793a\u4f9d\u8d56"
+              },
+              {
+                "name": "rust-learner",
+                "description": "<387 chars elided>"
+              },
+              {
+                "name": "rust-refactor-helper",
+                "description": "Safe Rust refactoring with LSP analysis. Triggers on: /refactor, rename symbol, move function, extract, \u91cd\u6784, \u91cd\u547d\u540d, \u63d0\u53d6\u51fd\u6570, \u5b89\u5168\u91cd\u6784"
+              },
+              {
+                "name": "rust-router",
+                "description": "<853 chars elided>"
+              },
+              {
+                "name": "rust-symbol-analyzer",
+                "description": "Analyze Rust project structure using LSP symbols. Triggers on: /symbols, project structure, list structs, list traits, list functions, \u7b26\u53f7\u5206\u6790, \u9879\u76ee\u7ed3\u6784, \u5217\u51fa\u6240\u6709, \u6709\u54ea\u4e9bstruct"
+              },
+              {
+                "name": "rust-trait-explorer",
+                "description": "Explore Rust trait implementations using LSP. Triggers on: /trait-impl, find implementations, who implements, trait \u5b9e\u73b0, \u8c01\u5b9e\u73b0\u4e86, \u5b9e\u73b0\u4e86\u54ea\u4e9btrait"
+              },
+              {
+                "name": "subagent-driven-development",
+                "description": "Use when executing implementation plans with independent tasks in the current session"
+              },
+              {
+                "name": "systematic-debugging",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes"
+              },
+              {
+                "name": "test-driven-development",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code"
+              },
+              {
+                "name": "unsafe-checker",
+                "description": "<339 chars elided>"
+              },
+              {
+                "name": "using-git-worktrees",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback"
+              },
+              {
+                "name": "using-superpowers",
+                "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions"
+              },
+              {
+                "name": "verification-before-completion",
+                "description": "<225 chars elided>"
+              },
+              {
+                "name": "writing-plans",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code"
+              },
+              {
+                "name": "writing-skills",
+                "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "<session-id>",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "Reply with exactly: OK"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "messageId": "msg_00bf93c42001tFj3QnRSAkzwND",
+            "content": {
+              "type": "text",
+              "text": "The user wants me"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "messageId": "msg_00bf93c42001tFj3QnRSAkzwND",
+            "content": {
+              "type": "text",
+              "text": " to reply with exactly"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "messageId": "msg_00bf93c42001tFj3QnRSAkzwND",
+            "content": {
+              "type": "text",
+              "text": " \"OK\"."
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 10,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "messageId": "msg_00bf93c42001tFj3QnRSAkzwND",
+            "content": {
+              "type": "text",
+              "text": "OK"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 11,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "usage_update",
+            "used": 16964,
+            "size": 200000,
+            "cost": {
+              "amount": 0,
+              "currency": "USD"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 12,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "stopReason": "end_turn",
+          "usage": {
+            "inputTokens": 15940,
+            "outputTokens": 4,
+            "totalTokens": 16979,
+            "thoughtTokens": 11,
+            "cachedReadTokens": 1024
+          },
+          "_meta": {}
+        }
+      }
+    }
+  ],
+  "payloadPolicy": "Strings over 200 characters are elided: the recording is evidence of protocol shape, not of content."
+}
