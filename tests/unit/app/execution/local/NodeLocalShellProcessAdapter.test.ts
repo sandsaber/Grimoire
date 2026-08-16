@@ -5,6 +5,7 @@ import {
   NodeLocalShellProcessAdapter,
   type SpawnedLocalProcess,
   windowsCommandArguments,
+  windowsProcessArguments,
 } from '@/app/execution/local/NodeLocalShellProcessAdapter';
 import type { LocalShellLaunchSpec } from '@/core/execution/local/LocalShellBackend';
 
@@ -39,6 +40,35 @@ describe('NodeLocalShellProcessAdapter', () => {
       arguments: ['/d', '/s', '/c', 'echo safe', 'unexpected'],
       terminationKind: 'windows-process-tree',
     })).toThrow('one raw command');
+  });
+
+  it.each([
+    'cmd.exe',
+    'C:\\Windows\\system32\\cmd.exe',
+    'C:\\Windows\\System32\\CMD.EXE',
+    'C:\\tools\\codex shim.com',
+  ])('gives the raw cmd tail to an interpreter reached as %s', executable => {
+    // Dispatch follows the argument contract, not the executable's name. It
+    // used to compare against the literal `cmd.exe`, which every one of these
+    // but the first fails — including `%ComSpec%`, the absolute path the Codex
+    // launcher actually resolves. Those invocations fell through to MSVCRT
+    // quoting, which escapes inner quotes as \" — a convention cmd does not
+    // have, so it read a literal backslash and the command never ran.
+    expect(windowsProcessArguments({
+      executable,
+      arguments: ['/d', '/s', '/c', '"C:\\node.exe" "C:\\app server.js"'],
+      terminationKind: 'windows-process-tree',
+    })).toBe('/d /s /c "C:\\node.exe" "C:\\app server.js"');
+  });
+
+  it('still quotes by MSVCRT rules when the arguments are not a cmd invocation', () => {
+    // The contract is the whole triple. Anything else is an ordinary program,
+    // even if its name looks like an interpreter.
+    expect(windowsProcessArguments({
+      executable: 'C:\\Windows\\system32\\cmd.exe',
+      arguments: ['app-server', 'C:\\app server.js'],
+      terminationKind: 'windows-process-tree',
+    })).toBe('app-server "C:\\app server.js"');
   });
 
   it('launches an isolated process and returns ownership before readiness', () => {

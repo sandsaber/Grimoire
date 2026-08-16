@@ -415,26 +415,44 @@ function encodeBase64(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64');
 }
 
-export function windowsCommandArguments(spec: LocalShellLaunchSpec): string {
+/**
+ * Recognizes a cmd invocation by its arguments rather than by its executable.
+ *
+ * The dispatch used to compare the executable against the literal `cmd.exe`,
+ * which misses every interpreter reached by path — including `%ComSpec%`, which
+ * is what the Codex launcher resolves on Windows and is normally
+ * `C:\Windows\system32\cmd.exe`. Those invocations fell through to MSVCRT
+ * quoting, whose `\"` escape cmd does not implement: it reads a literal
+ * backslash, the command line is malformed, and the child never starts. The
+ * Windows CI caught it on the launch form that copies the interpreter under
+ * another name.
+ *
+ * The triple is the contract, and it is exact — a program that merely happens
+ * to be named like a shell is still quoted by MSVCRT rules.
+ */
+function isWindowsCommandInvocation(spec: LocalShellLaunchSpec): boolean {
   const [disableAutoRun, stripQuotes, execute, command, ...extra] = spec.arguments;
-  if (spec.executable.toLowerCase() !== 'cmd.exe'
-    || spec.terminationKind !== 'windows-process-tree'
-    || disableAutoRun !== '/d'
-    || stripQuotes !== '/s'
-    || execute !== '/c'
-    || command === undefined
-    || extra.length > 0) {
+  return spec.terminationKind === 'windows-process-tree'
+    && disableAutoRun === '/d'
+    && stripQuotes === '/s'
+    && execute === '/c'
+    && command !== undefined
+    && extra.length === 0;
+}
+
+export function windowsCommandArguments(spec: LocalShellLaunchSpec): string {
+  if (!isWindowsCommandInvocation(spec)) {
     throw new Error('Windows local shell launch must use cmd.exe /d /s /c with one raw command.');
   }
-  return `/d /s /c ${command}`;
+  return `/d /s /c ${spec.arguments[3]}`;
 }
 
 export function windowsDirectProcessArguments(argumentsValue: readonly string[]): string {
   return argumentsValue.map(quoteWindowsDirectArgument).join(' ');
 }
 
-function windowsProcessArguments(spec: LocalShellLaunchSpec): string {
-  return spec.executable.toLowerCase() === 'cmd.exe'
+export function windowsProcessArguments(spec: LocalShellLaunchSpec): string {
+  return isWindowsCommandInvocation(spec)
     ? windowsCommandArguments(spec)
     : windowsDirectProcessArguments(spec.arguments);
 }

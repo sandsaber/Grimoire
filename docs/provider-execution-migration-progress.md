@@ -1124,18 +1124,33 @@ by a quote, so the command line it tries to execute is malformed, the child neve
 pid is ever published — precisely the observed failure. Reproduced on Linux by rendering the same
 arguments through the exported helper, so no Windows machine is needed to work on it.
 
-**Two candidate resolutions, deliberately not chosen at the end of a session:**
+**Resolved the next session, and the case was not synthetic after all.** The first reading was that
+no real Codex install is a renamed `cmd.exe`, so the `com` form modelled nothing. That was wrong, and
+checking rather than assuming is what found it: `CodexAppServerProcess` resolves its interpreter as
+`process.env.ComSpec`, which is normally `C:\Windows\system32\cmd.exe` — **an absolute path, never
+the bare string the dispatch compared against.** The `com` form models exactly that shape.
 
-- **product.** Dispatch on the argument *shape* rather than the executable string.
-  `windowsCommandArguments` already requires the exact `/d /s /c` triple, one raw command, and
-  `windows-process-tree` termination, and throws otherwise — so keying the dispatch on that shape is
-  narrow, and it would make any cmd-compatible executable get cmd quoting;
-- **test.** Decide the `com` case is synthetic. No real Codex installation is a renamed copy of
-  `cmd.exe`, and the case that matters for a real install — the `.cmd` and `.bat` shims, which take
-  the `argument-array` path — passes. Then the case should be restated rather than deleted.
+Two independent defects were behind one red gate, and naming the failing form is what separated them:
 
-The first is the likelier answer, and it is a production change to Windows launch behaviour, which
-is why it starts a session rather than ends one.
+- **production: the quoting dispatch keyed on the executable's name.**
+  `spec.executable.toLowerCase() === 'cmd.exe'` misses every interpreter reached by path, so those
+  invocations fell through to MSVCRT quoting, whose `\"` escape cmd does not implement. Now dispatched
+  by the argument contract — `windows-process-tree` termination plus exactly `/d /s /c <one command>`
+  — which `windowsCommandArguments` already validated and threw on. Four new cases cover the bare
+  name, two absolute paths, and a renamed interpreter, plus one that holds an ordinary program to
+  MSVCRT rules. Verified by restoring the name comparison: three of the four fail;
+- **the test built a command line `cmd /s` cannot run.** `/s` strips the first and last quote
+  character of the tail, so `"node" "server" "pid"` lost one quote from each end and became a command
+  nobody wrote. No quoting strategy could rescue it. The tail now carries its own enclosing pair,
+  exactly as `CodexAppServerProcess` wraps for the same reason — which is the corroboration for the
+  `/s` rule, alongside cmd's own documentation.
+
+The second defect was hidden behind the first: with the dispatch fixed, the form would still have
+failed, and the fix would have looked wrong.
+
+Local gates green (unit 450 suites / 7666 tests, integration 6 / 220, typecheck, lint,
+`build:release`). The Windows leg is what confirms the second half of the diagnosis, since `/s`
+stripping cannot be reproduced off Windows.
 
 ## Current blocker
 
@@ -1160,13 +1175,11 @@ model presentation, a `reconcile` result no provider could fill, a rewind capabi
 and static feature contributions that made context-dependent ports unfillable. Each was invisible
 until a provider that needed it was written, which is the argument for four proofs rather than one.
 
-**CI is red on one case and that is the first thing to fix.** `windows-latest` fails the `com` launch
-form in `CodexPersistentProcessOwnership.integration.test.ts`; ubuntu, macOS, and `validate` are
-green, and the local gate is green. The cause is diagnosed with reproduced evidence in the entry
-directly above this section, together with the two candidate resolutions. Do not start the next
-milestone with a red gate.
+**The Windows gate was red and is now fixed pending confirmation.** Two defects, one production and
+one in the test, both recorded in the entry directly above. Check that leg before starting the next
+milestone; everything else is green.
 
-**Next action after that:** **M2-adapter** — the `ChatRuntime` adapter over the kernel, still dark, with
+**Next action:** **M2-adapter** — the `ChatRuntime` adapter over the kernel, still dark, with
 `createSubject` in `adapterContractTarget.test.ts` grown to cover `prepareTurn`, `steer`,
 `setResumeCheckpoint`, `buildSessionUpdates`, and `consumeSessionInvalidation`, which remain paper
 mappings. **M0b is still open and blocks the first flip, not the adapter:** the checked-in traces are

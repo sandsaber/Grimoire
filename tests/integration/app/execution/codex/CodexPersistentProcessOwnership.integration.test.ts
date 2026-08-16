@@ -104,13 +104,20 @@ describe('Codex persistent process ownership on the host OS', () => {
           args: (pidPath: string) => [process.execPath, serverPath, pidPath],
         },
         {
+          // A command interpreter reached under another name, which is what
+          // `%ComSpec%` is: an absolute path, never the bare string `cmd.exe`.
           name: 'com',
           command: comPath,
           args: (pidPath: string) => [
             '/d',
             '/s',
             '/c',
-            `"${process.execPath}" "${serverPath}" "${pidPath}"`,
+            // The whole command carries its own enclosing quote pair, because
+            // `/s` strips the first and last quote character of the tail.
+            // Without it cmd removes one quote from each end of the real
+            // command line and runs something that was never written.
+            // `CodexAppServerProcess` wraps for the same reason.
+            `""${process.execPath}" "${serverPath}" "${pidPath}""`,
           ],
         },
       ];
@@ -119,6 +126,7 @@ describe('Codex persistent process ownership on the host OS', () => {
         // Named, because the failure this case is most likely to report is
         // "the descendant did not publish its pid" and the four forms fail for
         // different reasons — a `.cmd` shim is not a `.com` copy of cmd.exe.
+        // Naming the form is what turned one CI log into two distinct defects.
         await runPersistentForm({
           command: form.command,
           args: form.args(pidPath),
