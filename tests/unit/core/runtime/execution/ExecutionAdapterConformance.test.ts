@@ -328,6 +328,16 @@ describe('execution adapter over the registry', () => {
       type: 'error',
       content: 'The turn was rejected before it started, so nothing ran.',
     }]);
+    // A presenter reads live settings, so it can throw — and it is called while
+    // a terminal is being recorded. Letting that escape abandons the terminal
+    // mid-flight and the generator never closes: the turn simply never ends,
+    // which is worse than any wording. Observed as a hung turn.
+    expect(await rejected(() => {
+      throw new Error('settings are not available');
+    })).toEqual([{
+      type: 'error',
+      content: 'The turn was rejected before it started, so nothing ran.',
+    }]);
   });
 
   describe('capability projection over the four proof topologies', () => {

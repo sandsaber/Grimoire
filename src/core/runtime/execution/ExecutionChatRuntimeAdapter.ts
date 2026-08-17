@@ -159,10 +159,7 @@ export class ExecutionRunStream {
     // adapter exists to fix, one terminal over.
     if (event.terminal === 'failed' || event.terminal === 'invalidated') {
       this.terminalError = event.reason;
-      this.push({
-        type: 'error',
-        content: this.describeProviderFailure?.(event.reason) ?? describeFailure(event.reason),
-      });
+      this.push({ type: 'error', content: this.describe(event.reason) });
     } else if (event.terminal === 'indeterminate') {
       this.push({
         type: 'notice',
@@ -171,6 +168,22 @@ export class ExecutionRunStream {
       });
     }
     this.notify();
+  }
+
+  /**
+   * The sentence for a failure, with the provider's wording where it has one.
+   *
+   * The provider's presenter reads live settings, so it can throw, and this is
+   * the one call in `accept` that runs while a terminal is being recorded. A
+   * throw here would abandon the terminal mid-flight and leave the generator
+   * open forever — the turn never ends, which is worse than any wording.
+   */
+  private describe(reason: RunTerminalReason): string {
+    try {
+      return this.describeProviderFailure?.(reason) ?? describeFailure(reason);
+    } catch {
+      return describeFailure(reason);
+    }
   }
 
   /** Records the intent. The run decides when, and whether, it stopped. */

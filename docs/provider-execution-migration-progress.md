@@ -1844,6 +1844,41 @@ Reproduced against real fish before and after, and the fix is in the vault build
 
 Gates: unit 457 suites / 7756 tests, typecheck, lint, and `build:release` clean.
 
+### M2-flips — the provider was reading another provider's permission mode (this commit)
+
+Step 1 of the smoke matrix passed: `normal` gives the safe-mode refusal, no process starts. Step 2
+did not — switching the tab's toggle to Auto-approve changed nothing, and every turn kept coming back
+refused in 35 ms. The vault settings named the cause on sight:
+
+```
+settingsProvider           : codex
+permissionMode (top level) : normal
+savedProviderPermissionMode: { antigravity: "full_access", codex: "normal", ... }
+```
+
+The toolbar toggle writes into `savedProviderPermissionMode[providerId]` and only copies to the
+top-level `permissionMode` when the provider happens to be the one the settings tab is showing.
+Reading the top level therefore reads **whatever the settings provider is set to** — Codex, on
+`normal`. Antigravity refused every turn while its own toggle read Auto-approve, and would have
+launched unsupervised in the mirror case where the two disagreed the other way.
+
+Inherited verbatim: the legacy runtime read `plugin.settings.permissionMode` too, so Antigravity's
+effective mode has always been a coin flip on another provider's setting. It only looked fine because
+the two agreed. The resolver now reads the same projection the tab UI renders the toggle from, so what
+the user sees is what the run gets.
+
+**A second defect, found by the first one's test run.** The provider's failure presenter reads live
+settings, so it can throw — and it is called from inside `accept`, while a terminal is being recorded.
+The throw escaped, the terminal was abandoned mid-flight, and the generator never closed: **the turn
+simply never ended**. A hung turn is worse than any wording, so the presenter is now wrapped and falls
+back to the neutral sentence. Found because the test harness had no provider registry, which is
+exactly the kind of accident worth keeping a test for.
+
+Both proven by injection. Gates: unit 457 suites / 7757 tests, typecheck, lint, and `build:release`
+clean, with the build installed in the owner's test vault.
+
+Smoke matrix: step 1 (fail-closed) passes, step 2 (new session) is the next thing to re-check.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

@@ -1,3 +1,5 @@
+import '@/providers';
+
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import {
@@ -121,6 +123,27 @@ describe('Antigravity execution composition', () => {
     expect(runtime.consumeTurnMetadata().wasSent).toBe(true);
   });
 
+  it('reads the permission mode this provider was given, not another provider\'s', async () => {
+    // Recorded from a real vault. The toolbar toggle writes the mode into
+    // `savedProviderPermissionMode[providerId]`, and only copies it to the
+    // top-level `permissionMode` when the provider happens to be the one the
+    // settings tab is showing. Reading the top-level value therefore reads
+    // whatever the *settings* provider is set to — here Codex, on `normal` —
+    // so Antigravity refused every turn while its own toggle said Auto-approve.
+    const plugin = createPlugin({
+      settingsProvider: 'codex',
+      permissionMode: 'normal',
+      savedProviderPermissionMode: { antigravity: 'full_access', codex: 'normal' },
+    });
+    const { runtime, runner } = await createTurnHarness(plugin);
+
+    const chunks = await drain(runtime.query(turn('go')));
+
+    expect(runner.invocations).toHaveLength(1);
+    expect(runner.invocations[0]?.permissionMode).toBe('full_access');
+    expect(chunks).toEqual([{ type: 'text', content: 'the answer' }]);
+  });
+
   it('renders the safe-mode refusal as the chunk the chat surface shows', async () => {
     // The shipped permission mode is `normal` and `agy --print` cannot request
     // approvals, so this is the first thing an Antigravity user sees. The
@@ -128,6 +151,7 @@ describe('Antigravity execution composition', () => {
     // cannot name the setting to change.
     const { runtime, runner } = await createTurnHarness(createPlugin({
       permissionMode: 'normal',
+      savedProviderPermissionMode: { antigravity: 'normal' },
     }));
 
     const chunks = await drain(runtime.query(turn('go')));

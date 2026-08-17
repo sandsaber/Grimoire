@@ -4,6 +4,7 @@ import { NodeAntigravityProcessTransport } from '@/app/execution/antigravity/Nod
 import type { RunTerminalReason } from '@/core/execution/ExecutionContracts';
 import { executionSessionId, runId, sessionInstanceId } from '@/core/execution/ExecutionIds';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
+import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
 import {
   ExecutionChatRuntimeAdapter,
@@ -175,9 +176,7 @@ export class AntigravityExecution {
       // Reported as configured, not normalized: the backend is where fail-closed
       // lives, because `agy --print` exposes no approval hook and anything short
       // of full access must be refused before a process exists.
-      permissionMode: typeof plugin.settings.permissionMode === 'string'
-        ? plugin.settings.permissionMode
-        : 'normal',
+      permissionMode: antigravityPermissionMode(plugin),
       prompt: request.prompt,
     };
   }
@@ -211,10 +210,28 @@ export function describeAntigravityFailure(
   if (!getAntigravityProviderSettings(plugin.settings).enabled) {
     return t('chat.ui.errors.provider.antigravityDisabled');
   }
-  if (plugin.settings.permissionMode !== 'full_access') {
+  if (antigravityPermissionMode(plugin) !== 'full_access') {
     return t('chat.ui.errors.provider.antigravitySafeModeUnavailable');
   }
   return undefined;
+}
+
+/**
+ * The permission mode **this** provider was given.
+ *
+ * Not `settings.permissionMode`, which is the projection of whichever provider
+ * the settings tab is showing. The toolbar toggle writes into
+ * `savedProviderPermissionMode[providerId]` and only copies to the top level
+ * when those two happen to coincide, so reading the top level reads another
+ * provider's mode — observed in a real vault as Antigravity refusing every turn
+ * while its own toggle read Auto-approve. This is the same projection the tab
+ * UI renders the toggle from, so what the user sees is what the run gets.
+ */
+function antigravityPermissionMode(plugin: GrimoirePlugin): string {
+  const projected = ProviderSettingsCoordinator
+    .getProviderSettingsSnapshot(plugin.settings, 'antigravity')
+    .permissionMode;
+  return typeof projected === 'string' && projected ? projected : 'normal';
 }
 
 /** What one turn decides, before it becomes an opaque reference. */
