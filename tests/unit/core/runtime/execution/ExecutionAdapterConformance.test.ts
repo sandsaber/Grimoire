@@ -283,6 +283,33 @@ describe('execution adapter over the registry', () => {
     release();
   });
 
+  it('closes on an acknowledged cancellation, which the registry treats as terminal', async () => {
+    // The registry reduces `cancellation-acknowledged` to a `cancelled`
+    // terminal, and then drops the explicit `terminal` the backend sends next
+    // as post-terminal. A stream that waited only for `terminal` therefore
+    // waited forever: the generator never closed and the turn never ended.
+    // Observed as a hung cancel on the first flipped provider; Claude's
+    // recorded trace has the same shape, so it would have hit that flip too.
+    const harness = await createHarness();
+    const { runId, stream, release } = await startExecutionRun(
+      harness.context,
+      SESSION_ID,
+      { requestRef: 'opaque-request' },
+    );
+    const collected = drain(stream.chunks());
+
+    await harness.emit(runId, { kind: 'run-started' }, 'd-1');
+    dispatchCancellation(harness.context, runId, stream);
+    await harness.emit(runId, { kind: 'cancellation-acknowledged' }, 'd-2');
+
+    // Closes, and renders nothing: the controller's cancel path already says
+    // the turn was interrupted.
+    expect(await collected).toEqual([]);
+    expect(stream.settled()).toBe(true);
+    expect(stream.consumeTurnMetadata().wasSent).toBe(true);
+    release();
+  });
+
   it('renders a turn that never reached the provider, in its words where it has them', async () => {
     // Two claims, both found by the first flip.
     //

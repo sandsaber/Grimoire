@@ -145,6 +145,17 @@ export class ExecutionRunStream {
         : { type: 'text', content: event.text });
       return;
     }
+    if (event.kind === 'cancellation-acknowledged') {
+      // A terminal in everything but name. The registry accepts this only for a
+      // run whose cancellation it requested, and reduces it to `cancelled` —
+      // after which the explicit `terminal` the backend sends next is dropped as
+      // post-terminal. A stream waiting only for `terminal` therefore waits
+      // forever, and the turn never ends. No chunk: the controller's cancel path
+      // renders "Interrupted" already.
+      this.terminal = 'cancelled';
+      this.notify();
+      return;
+    }
     // Transport loss is not a terminal. The turn stays open while status query,
     // reattachment, or checkpoint recovery is still possible — the alternative
     // is rendering a dropped connection as a finished answer.

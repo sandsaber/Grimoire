@@ -1909,6 +1909,42 @@ returned text under Auto-approve. Steps 3 (cancel mid-run), 4 (model selection),
 replay across turns) have **no evidence yet** — no interrupted turn appears in any log. Wave 1 is
 therefore two-fifths certified, and that is the gate standing between here and wave 2.
 
+### M2-flips — cancel never ended the turn (this commit)
+
+Three of the five smoke-matrix items turn out to be automatable, so they were automated rather than
+left to a click. Two were already covered by the end-to-end turn test — model selection asserts the
+invocation's `--model`, history replay asserts the replayed prompt. The third, cancel, was not, and
+writing it found a defect in **core**, not in the provider.
+
+The registry reduces `cancellation-acknowledged` into a `cancelled` terminal, and then drops the
+explicit `terminal` the backend sends next as `ignored-post-terminal` — correctly, the record is
+already terminal. The presentation adapter closed only on `terminal`. So the stream saw an event it
+ignored, then never saw another: **the generator stayed open forever and the turn never ended.**
+Traced by intercepting `registry.ingest` on a hung cancel:
+
+```
+run-started               -> accepted
+cancellation-acknowledged -> accepted        (record becomes terminal here)
+terminal:cancellation-confirmed -> ignored-post-terminal
+```
+
+The adapter now treats an acknowledged cancellation as the terminal the registry already made it, and
+renders no chunk, because the controller's cancel path says "Interrupted" on its own.
+
+**Not an Antigravity bug.** Claude's recorded trace has the same shape —
+`run-started, cancellation-acknowledged, terminal:cancelled:cancellation-confirmed` — so wave 3 would
+have hit it identically. It survived M2-adapter because the adapter's own suites deliver a `terminal`
+directly and never route a cancellation through the registry's reduction; the two halves agreed with
+each other and disagreed with the kernel.
+
+Proven by injection. Gates: unit 457 suites / 7759 tests, integration 6 / 220, typecheck, lint, and
+`build:release` clean.
+
+**Smoke matrix now stands at four of five automated or observed**: fail-closed refusal and a real
+answered turn are timestamped in the vault log; model selection, history replay, and cancel are
+automated gates. What no unit test can prove remains the OS half of cancel — that the `agy` process
+tree is actually gone — which needs the live CLI.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

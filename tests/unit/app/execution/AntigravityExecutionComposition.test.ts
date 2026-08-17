@@ -57,16 +57,27 @@ describe('Antigravity execution composition', () => {
   /** One `agy` run, without an `agy`. */
   class FakeRunner implements AntigravityProcessRunner {
     readonly invocations: AntigravityInvocation[] = [];
+    readonly terminations: Array<'graceful' | 'forced'> = [];
     outcome: AntigravityProcessOutcome = { exitCode: 0, stdout: 'the answer\n', stderr: '' };
+    /** Held open so a turn can be cancelled while the process is still running. */
+    hang = false;
+    private release: ((outcome: AntigravityProcessOutcome) => void) | undefined;
 
     start(invocation: AntigravityInvocation): AntigravityProcessHandle {
       this.invocations.push(invocation);
+      const completed = this.hang
+        ? new Promise<AntigravityProcessOutcome>(resolve => { this.release = resolve; })
+        : Promise.resolve(this.outcome);
       return {
         started: Promise.resolve(),
-        completed: Promise.resolve(this.outcome),
+        completed,
         outputLimitExceeded: new Promise(() => undefined),
         confirmTerminated: async () => true,
-        terminate: async () => 'confirmed' as const,
+        terminate: async mode => {
+          this.terminations.push(mode);
+          this.release?.({ exitCode: null, signal: 'SIGTERM', stdout: '', stderr: '' });
+          return 'confirmed' as const;
+        },
       };
     }
   }
@@ -84,6 +95,12 @@ describe('Antigravity execution composition', () => {
     host.registerBackend({ backend: execution.createBackend(runner) });
     await host.start();
     return { runtime: execution.createRuntime(), runner };
+  }
+
+  async function waitFor(condition: () => boolean): Promise<void> {
+    for (let attempt = 0; attempt < 200 && !condition(); attempt += 1) {
+      await new Promise(resolve => { setTimeout(resolve, 1); });
+    }
   }
 
   async function drain(chunks: AsyncGenerator<StreamChunk>): Promise<StreamChunk[]> {
@@ -120,6 +137,32 @@ describe('Antigravity execution composition', () => {
     expect(runner.invocations[0]?.command).toBe('/usr/local/bin/agy');
     expect(runner.invocations[0]?.cwd).toBe('/vault');
     expect(chunks).toEqual([{ type: 'text', content: 'the answer' }]);
+    expect(runtime.consumeTurnMetadata().wasSent).toBe(true);
+  });
+
+  it('cancels a running turn by terminating the process, and closes the turn', async () => {
+    // Smoke-matrix step 3, as a gate rather than a click. The legacy runtime
+    // cancelled by sending SIGTERM to a child it held; the kernel path dispatches
+    // a cancellation the run answers for, so the two things worth pinning are
+    // that the process is actually terminated and that the generator closes —
+    // a cancel that leaves the turn open is how a tab never becomes idle again.
+    const { runtime, runner } = await createTurnHarness(createPlugin());
+    runner.hang = true;
+
+    const chunks: StreamChunk[] = [];
+    const turnDone = (async () => {
+      for await (const chunk of runtime.query(turn('go'))) {
+        chunks.push(chunk);
+      }
+    })();
+    await waitFor(() => runner.invocations.length === 1);
+    runtime.cancel();
+    await turnDone;
+
+    expect(runner.terminations[0]).toBe('graceful');
+    expect(chunks).toEqual([]);
+    // `wasSent` stays true: the turn did reach the provider, which is what
+    // separates a cancellation from a pre-dispatch rejection.
     expect(runtime.consumeTurnMetadata().wasSent).toBe(true);
   });
 
