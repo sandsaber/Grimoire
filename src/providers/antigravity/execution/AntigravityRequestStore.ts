@@ -18,11 +18,16 @@ const DEFAULT_LIMIT = 64;
 /**
  * References the kernel can carry, and the requests behind them.
  *
- * `requestRef` is a constrained identifier — 128 characters, no whitespace —
- * because the kernel persists it in dispatch intents and control records, where
- * D2 forbids prompts outright. So the reference names the request and this
- * store holds it; a prompt encoded *into* the reference is rejected by the
- * registry before a run ever starts, which is how this shape was found.
+ * `requestRef` is validated as a constrained identifier — 128 characters, no
+ * whitespace — so the reference names the request and this store holds it. A
+ * prompt encoded *into* the reference is rejected by the registry before a run
+ * starts, which is how this shape was found.
+ *
+ * The rule is a contract rather than a storage constraint: checked against the
+ * first production control records, nothing persists a `requestRef` — not the
+ * run record, not the dispatch intent. Core carries references because it is
+ * not a carrier of provider payloads, which is the same line D2 draws for what
+ * it stores.
  *
  * In memory on purpose. A reference that outlived a restart would promise a
  * re-dispatch this provider cannot make: print mode has no resume, and D3 says

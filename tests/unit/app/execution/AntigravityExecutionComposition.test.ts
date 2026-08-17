@@ -220,10 +220,9 @@ describe('Antigravity execution composition', () => {
 /**
  * The store behind the reference, on its own.
  *
- * `requestRef` is a constrained identifier the kernel persists into dispatch
- * intents, where D2 forbids prompts outright — so the reference names the
- * request and the store holds it. Its bound matters too: a turn rejected before
- * dispatch never comes back for its request.
+ * The registry validates `requestRef` as a constrained identifier, so the
+ * reference names the request and the store holds it. Its bound matters too: a
+ * turn rejected before dispatch never comes back for its request.
  */
 describe('Antigravity request store', () => {
   it('hands a request back exactly once', () => {

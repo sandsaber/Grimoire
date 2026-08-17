@@ -1767,8 +1767,10 @@ Every gate in the entry above was green and the flip was broken. Writing the fir
 one whole turn — tab to CLI invocation and back — found it in a minute, and then found two more.
 
 **The request reference cannot carry the request.** `requestRef` is validated as a constrained
-identifier, 128 characters and no whitespace, because the kernel persists it into dispatch intents
-and control records where D2 forbids prompts outright. The flip encoded the prompt into it as JSON,
+identifier, 128 characters and no whitespace, because core carries references rather than provider
+payloads — the same line D2 draws for what it stores. (This entry first said the kernel *persists* it
+into dispatch intents; the first production control records disprove that, and the correction is in
+the entry below.) The flip encoded the prompt into it as JSON,
 so `startRun` threw `request ref must be a constrained identifier` on the very first send. Every
 suite passed because each half stubs the other: the backend's tests hand it a literal `opaque`
 string, the adapter's tests hand the registry a fake, and nothing composed the two.
@@ -1878,6 +1880,34 @@ Both proven by injection. Gates: unit 457 suites / 7757 tests, typecheck, lint, 
 clean, with the build installed in the owner's test vault.
 
 Smoke matrix: step 1 (fail-closed) passes, step 2 (new session) is the next thing to re-check.
+
+### M2-flips — the first production control records, read (this commit)
+
+The flip's own claims, checked against what it actually wrote rather than what it was designed to
+write. Two turns and their bookkeeping now exist in a real vault: 2 session records, 7 run records,
+20 transaction intents under `.grimoire/control/`.
+
+**D2 holds.** A run record carries run and session ids, owner, result expectation, state, dispatch
+state, terminal with its reason and time, open interaction ids, and sequence. No prompt, no output,
+no reference to either. Searching the whole control store for prompt text, `User:`, or the request
+reference prefix returns nothing. The line D2 draws — sufficient to establish what happened and who
+owns it, insufficient to reconstruct what was said — is where the records fall.
+
+**And one claim of mine was wrong.** Three places said the request reference must be short because
+the kernel persists it into dispatch intents and control records. It does not: `requestRef` appears
+exactly once in the kernel, in `startRun`'s validation, and in no schema or record. The constraint is
+a contract — core carries references, not provider payloads — not a storage rule. The store design is
+unchanged and still correct; only the reason given for it was unsupported, and it is corrected in the
+source comment, its test, and the entry above.
+
+Also visible: the owner id reaching production as `agytab-…`, which is the per-runtime owner the
+composition mints because the construction call site has no conversation to give until M3.
+
+**Smoke matrix, with evidence rather than impression.** Steps 1 and 2 pass, timestamped in the vault
+log: a turn refused in 29 ms with `wasSent: false` under Blocked, and a turn that ran 7.6 s and
+returned text under Auto-approve. Steps 3 (cancel mid-run), 4 (model selection), and 5 (history
+replay across turns) have **no evidence yet** — no interrupted turn appears in any log. Wave 1 is
+therefore two-fifths certified, and that is the gate standing between here and wave 2.
 
 ## Current blocker
 
