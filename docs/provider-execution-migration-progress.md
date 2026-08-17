@@ -2165,6 +2165,16 @@ The remaining five providers need their own recordings before their own flips.
 
 Open obligations, each with an owner:
 
+- **the Windows process-ownership gate is flaky, and a flaky gate is worth less than none.**
+  `CodexPersistentProcessOwnership.integration.test.ts` failed on a **documentation-only commit**
+  (`634fe7c`) — the descendant did not publish its pid within 15s — and passed on re-run of the same
+  commit, with the three commits before it green on identical code. So it is timing on a shared
+  Windows runner, not a regression. Worth noting before changing the number: this bound is 15s while
+  the local-shell equivalent waits 5s, so raising it further without measuring what the wait actually
+  costs would be guessing. The gate this weakens is the one M2-flips depends on most — process
+  ownership on every desktop platform — and treating a red Windows job as noise is how a real
+  failure gets waved through. Owner: wave 2, before the Codex flip, since that is the provider whose
+  ownership this test covers;
 - **the wire recordings show nine Codex notifications, two OpenCode session updates, and four Claude
   message types that no backend consumes**, including the ones carrying plan indicators, token usage,
   and raw response items. Pinned in `wireVocabularyCoverage.test.ts` so the gap cannot grow. Owner:
