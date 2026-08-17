@@ -79,7 +79,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M1 — execution kernel, dark-launched | Complete | `dca2f84`, `cc6081e`, `ec1303f`, `86f0585`, `a689af8` |
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
-| M2-flips — nine production flips with legacy deletion | In progress — wave 1 (Antigravity) wired, automated gates green, manual smoke matrix outstanding | `e06417b`, `416b129`, `77977c2`, `ce93588`, this commit |
+| M2-flips — nine production flips with legacy deletion | In progress — wave 1 (Antigravity) shipped, one manual check outstanding; wave 2 (Codex) under way | wave 1: `e06417b` … `a725a27`; wave 2: `0151961`, `1f34df6`, `e056871` |
 | M3 — provider control plane | Not started | — |
 | M4 — revisioned persistence in production | Not started | — |
 | M5 — presentation evolution and seam deletion | Not started | — |
@@ -2091,7 +2091,8 @@ Completed: **M0a** (parity gate, contribution inventory, adapter contract, the t
 topology and shared-resource records, persistence decisions), **M1** (execution kernel, narrow
 control-record persistence, local-shell internal backend, cross-platform CI with Windows
 process-tree conformance green), **M2-proofs**, **M2-adapter**, and **M0b** for the four proof
-providers. In progress: **M2-flips**, wave 1.
+providers. In progress: **M2-flips** — wave 1 (Antigravity) shipped and running in production, wave 2
+(Codex) under way.
 
 **M2-proofs.** Four topologies proven dark — Antigravity (stateless process-per-run),
 Codex (persistent daemon, multiplexed sessions), Claude (persistent SDK stream, serial runs), and
@@ -2128,10 +2129,32 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is under way.** The survey is done and its first gap is closed: steering now has a
-path through the kernel, which it did not have at all. What remains is the request resolver with its
-three thread intents, the interaction bridge for approvals and questions, the history port, images
-and instruction mode, then the flip itself and the deletion of `CodexChatRuntime`.
+**Wave 2 (Codex) is under way, and the next action is the turn input builder.**
+
+Done so far, each still dark and each proven by injection:
+
+| Piece | Where |
+|---|---|
+| A steering path through the kernel — it had none, and the adapter's `steer` threw | `ExecutionSession.steer?`, `registry.steerRun`, adapter `steer` |
+| The conversation binding the next turn depends on, and the host port that carries it | `CodexConversationBinding.ts`, `ports.syncConversation?` |
+| What a turn may write, extracted from the legacy runtime, which now delegates to it | `CodexTurnSandboxPolicy.ts` |
+
+**Next, in this order.** First the turn input builder — prompt, images, and skill inputs into
+`UserInput[]`, plus `collaborationMode` with plan mode and orchestrator developer instructions,
+effort, service tier, and reasoning summary. It is the last large piece of provider logic still
+private to `CodexChatRuntime`, and like the sandbox policy the legacy runtime should delegate to it
+rather than keep a second copy. Then the connection factory over `NodeCodexExecutionProcess`, the
+result sink, and the interaction bridge — approvals, questions and plan decisions become reachable
+for the first time, through the adapter's `interactionPresenter` host port. Then the composition
+object holding what the backend and every tab runtime must share, an end-to-end turn test over a fake
+connection **written before the flip rather than after**, and only then the flip itself: registration,
+`main.ts`, the parity manifest, the `darkBundle` markers, and the deletion of `CodexChatRuntime`.
+
+Two things to carry into that work. Codex declares `supportsImageAttachments` and
+`supportsInstructionMode`; no flip has exercised either, so neither has ever been proven through the
+adapter. And the wave-1 lesson holds: **a seam both sides stub is not covered** — the end-to-end
+composition test is what found every fatal defect in wave 1, and it found them only because it ran
+before the flip was trusted.
 Antigravity declares no resume, plan mode, rewind, fork, images, provider commands, MCP tools, or
 steering, so those five items are the whole matrix. Until it passes, wave 1 is wired but not
 certified, and **wave 2 (Codex) must not start** — the point of one provider per checkpoint is that
