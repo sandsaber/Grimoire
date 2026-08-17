@@ -616,7 +616,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/antigravity/AntigravityProviderModule.ts',
       'src/providers/antigravity/execution/AntigravityExecutionBackend.ts',
       'src/providers/antigravity/execution/AntigravityProjectionResultSink.ts',
-      'src/providers/antigravity/execution/AntigravityRequestCodec.ts',
+      'src/providers/antigravity/execution/AntigravityRequestStore.ts',
       'src/providers/antigravity/runtime/AntigravityPrintProcessRunner.ts',
       'src/providers/antigravity/runtime/AntigravityPrintProtocol.ts',
       'src/providers/antigravity/runtime/AntigravityPromptComposer.ts',

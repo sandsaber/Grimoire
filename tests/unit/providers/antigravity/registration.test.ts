@@ -2,6 +2,7 @@ import '@/providers';
 
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
+import { AntigravityExecution } from '@/app/execution/antigravity/AntigravityExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
@@ -39,11 +40,10 @@ describe('Antigravity provider registration', () => {
       storage: new TestDurableStorage(),
       scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
     });
+    const plugin = { settings: {} } as any;
+    plugin.getAntigravityExecution = () => new AntigravityExecution(plugin, host.registry);
 
-    const runtime = ProviderRegistry.createChatRuntime({
-      plugin: { getExecutionKernel: () => host, settings: {} } as any,
-      providerId: 'antigravity',
-    });
+    const runtime = ProviderRegistry.createChatRuntime({ plugin, providerId: 'antigravity' });
 
     expect(runtime).toBeInstanceOf(ExecutionChatRuntimeAdapter);
     expect(runtime.providerId).toBe('antigravity');

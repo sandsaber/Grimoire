@@ -11,7 +11,7 @@ import { shouldShowWhatsNew } from './app/changelog/display';
 import { parseChangelogRelease } from './app/changelog/parser';
 import { readBundledChangelog } from './app/changelog/source';
 import type { ChangelogRelease } from './app/changelog/types';
-import { createAntigravityExecutionBackend } from './app/execution/antigravity/AntigravityExecutionComposition';
+import { AntigravityExecution } from './app/execution/antigravity/AntigravityExecutionComposition';
 import { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
@@ -94,6 +94,7 @@ export default class GrimoirePlugin extends Plugin {
   storage!: SharedAppStorage;
   private conversations: Conversation[] = [];
   private executionKernelHost: ExecutionKernelHost | null = null;
+  private antigravityExecution: AntigravityExecution | null = null;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
   private pendingWhatsNewRelease: ChangelogRelease | null = null;
@@ -351,6 +352,22 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   /**
+   * Antigravity's chat execution, held here for the duration of one load.
+   *
+   * A provider name on the plugin surface is not where this belongs, and it
+   * does not stay: M3's provider catalog owns runtime construction and takes
+   * this with it. Until then the registration needs one object per load — the
+   * request store the backend and every tab runtime must share — and this is
+   * the only place with that lifetime.
+   */
+  getAntigravityExecution(): AntigravityExecution {
+    if (!this.antigravityExecution) {
+      throw new Error('Antigravity execution is not available before plugin load.');
+    }
+    return this.antigravityExecution;
+  }
+
+  /**
    * Brings the kernel up before anything can ask it for work.
    *
    * A kernel that cannot start must not take the plugin down with it: the only
@@ -371,7 +388,8 @@ export default class GrimoirePlugin extends Plugin {
         });
       },
     });
-    host.registerBackend({ backend: createAntigravityExecutionBackend(this) });
+    this.antigravityExecution = new AntigravityExecution(this, host.registry);
+    host.registerBackend({ backend: this.antigravityExecution.createBackend() });
     this.executionKernelHost = host;
     try {
       await host.start();

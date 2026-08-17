@@ -79,7 +79,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M1 — execution kernel, dark-launched | Complete | `dca2f84`, `cc6081e`, `ec1303f`, `86f0585`, `a689af8` |
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
-| M2-flips — nine production flips with legacy deletion | In progress — wave 1 (Antigravity) wired, automated gates green, manual smoke matrix outstanding | `e06417b`, `416b129`, `77977c2`, this commit |
+| M2-flips — nine production flips with legacy deletion | In progress — wave 1 (Antigravity) wired, automated gates green, manual smoke matrix outstanding | `e06417b`, `416b129`, `77977c2`, `ce93588`, this commit |
 | M3 — provider control plane | Not started | — |
 | M4 — revisioned persistence in production | Not started | — |
 | M5 — presentation evolution and seam deletion | Not started | — |
@@ -1751,12 +1751,65 @@ until M5, since the adapter renders the event stream directly.
 Gates: unit 457 suites / 7747 tests, integration 6 / 220, typecheck, lint, and `build:release` clean,
 with `darkBundle` run against the fresh bundle.
 
+**Not yet true when written:** the entry below corrects this one. The flip as committed could not
+run a single turn.
+
 **Not done, and owned:** the capability-driven manual smoke matrix. Antigravity declares no resume,
 no plan mode, no rewind, no fork, no images, no provider commands, no MCP tools, and no steering, so
 its matrix is four items — new session, cancel mid-run, model selection, and history replay across
 turns — plus the fail-closed check that a non-`full_access` permission mode is refused before a
 process starts. That runs against the built plugin in a real vault with `agy` 1.1.13, and it is the
 one gate this checkpoint cannot self-certify.
+
+### M2-flips — the flip could not run a turn, and three reasons why (this commit)
+
+Every gate in the entry above was green and the flip was broken. Writing the first test that drives
+one whole turn — tab to CLI invocation and back — found it in a minute, and then found two more.
+
+**The request reference cannot carry the request.** `requestRef` is validated as a constrained
+identifier, 128 characters and no whitespace, because the kernel persists it into dispatch intents
+and control records where D2 forbids prompts outright. The flip encoded the prompt into it as JSON,
+so `startRun` threw `request ref must be a constrained identifier` on the very first send. Every
+suite passed because each half stubs the other: the backend's tests hand it a literal `opaque`
+string, the adapter's tests hand the registry a fake, and nothing composed the two.
+
+Fixed by making the reference a reference. `AntigravityRequestStore` holds prompt and model in
+memory, hands out `agyreq-` plus 32 hex, and gives the request back exactly once — removed on
+resolve, because holding a prompt after its run dispatched is retention nobody asked for, and
+bounded at 64, because a turn rejected before dispatch never comes back for its request. In memory
+on purpose: a reference that outlived a restart would promise a re-dispatch print mode cannot make,
+and D3 already says an unknown dispatch must never launch again on its own.
+
+That store is why the composition is now one object per plugin load rather than free functions. The
+backend and every tab runtime must share it; a reference minted against one store and resolved
+against another resolves to nothing.
+
+**An `invalidated` terminal rendered nothing at all.** The adapter contract mapped it to "nothing",
+justified by today's `wasInvalidated` path — but that flag means the *presentation* moved on (tab
+closed, conversation switched), while the terminal means the turn was rejected before anything ran.
+Two different facts under one word, and the paper mapping took the second's justification for the
+first. The result is an empty assistant message with no explanation: the same silent empty answer
+this adapter exists to prevent, one terminal over. For Antigravity it was the **default first turn** —
+the shipped permission mode is `normal` and `agy --print` cannot request approvals, so the fail-closed
+refusal is exactly this terminal. The contract, its target test, and the adapter changed together.
+
+**The neutral sentence could not name the setting.** With `invalidated` rendering, a user in safe mode
+got "The turn was rejected before it started, so nothing ran." The legacy runtime told them *why* and
+what to change, localized. The kernel classifies causes rather than forwarding provider text, and
+rightly so, but a classification is translatable: the host may now supply `describeFailure(reason)`
+returning better wording for a cause the kernel already decided, or `undefined` to keep the neutral
+one. No provider diagnostics travel, so D7 is untouched. Antigravity restores all three of its
+messages — safe mode, disabled, and empty output — and defers on everything else.
+
+Proven by injection in three places: suppressing the presenter, making `invalidated` silent again,
+and — the one that started it — an end-to-end turn that fails outright if the reference is not
+something the registry will accept.
+
+The lesson is the same one M2-proofs recorded and this commit had to learn again: **a seam that both
+sides stub is not covered.** The composition module is where the two halves meet, and it had no test
+until the flip was already pushed.
+
+Gates: unit 457 suites / 7749 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
 
 ## Current blocker
 
@@ -1796,6 +1849,11 @@ constructed at load and disposed at unload, chat execution for Antigravity runs 
 over its backend, and the legacy runtime is deleted. This is the first checkpoint that **changes
 production behaviour**: the kernel is in the bundle, the control store is written under `.grimoire/`,
 and revert safety now has a test rather than an argument.
+
+A whole turn is now covered end to end — the runtime stores a request, the registry dispatches its
+reference, the backend resolves it into an `agy` invocation, and the print output comes back as a
+chunk — over a fake process runner. That test found three defects the per-half suites could not, one
+of them fatal to every turn; they are in the entry above.
 
 **One gate remains, and it is manual.** The capability-driven smoke matrix runs against the built
 plugin in a real vault with `agy` 1.1.13 installed: new session, cancel mid-run, model selection,

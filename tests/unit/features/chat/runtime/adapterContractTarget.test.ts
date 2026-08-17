@@ -204,7 +204,7 @@ describe('adapter contract (target semantics)', () => {
     ]);
   });
 
-  it.each(['succeeded', 'cancelled', 'interrupted', 'invalidated'] as const)(
+  it.each(['succeeded', 'cancelled', 'interrupted'] as const)(
     'adds no chunk for a %s terminal',
     async outcome => {
       const subject = createSubject();
@@ -215,6 +215,28 @@ describe('adapter contract (target semantics)', () => {
       expect(await collected).toEqual([]);
     },
   );
+
+  it('says so when a turn never reached the provider', async () => {
+    // The second assertion in this suite where the specification was wrong.
+    // The contract table mapped `invalidated` to "nothing", justified by
+    // today's `wasInvalidated` path — but that flag means the *UI* moved on
+    // (tab closed, conversation switched), while this terminal means the turn
+    // was rejected before anything ran. Two different facts under one word.
+    //
+    // Rendering nothing for the second leaves an empty assistant message where
+    // an explanation belongs, and the first provider flip made it the default
+    // first-turn experience: `agy --print` cannot request approvals, and the
+    // shipped permission mode is `normal`.
+    const subject = createSubject();
+    const collected = collect(subject);
+
+    subject.deliver({ kind: 'terminal', outcome: 'invalidated', reason: 'pre-dispatch-rejected' });
+
+    expect(await collected).toEqual([
+      { type: 'error', content: 'The turn was rejected before it started, so nothing ran.' },
+    ]);
+    expect(subject.consumeTurnMetadata().wasSent).toBe(false);
+  });
 
   it('accepts exactly one terminal and drops everything after it', async () => {
     const subject = createSubject();

@@ -7,7 +7,7 @@ import codexTrace from '@test/fixtures/provider-traces/codex-execution.json';
 import opencodeTrace from '@test/fixtures/provider-traces/opencode-execution.json';
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
-import type { ExecutionRequest } from '@/core/execution/ExecutionContracts';
+import type { ExecutionRequest, RunTerminalReason } from '@/core/execution/ExecutionContracts';
 import { ExecutionControlRepositories } from '@/core/execution/ExecutionControlRepositories';
 import { ExecutionControlTransactionCoordinator } from '@/core/execution/ExecutionControlTransactionCoordinator';
 import type { ExecutionEvent, ProviderExecutionEvent } from '@/core/execution/ExecutionEvents';
@@ -281,6 +281,53 @@ describe('execution adapter over the registry', () => {
       content: 'The provider ended the turn without producing a result.',
     }]);
     release();
+  });
+
+  it('renders a turn that never reached the provider, in its words where it has them', async () => {
+    // Two claims, both found by the first flip.
+    //
+    // An `invalidated` terminal used to render nothing at all — the turn ended
+    // with an empty assistant message and no explanation, which is the silent
+    // empty answer this adapter exists to prevent, one terminal over. For print
+    // mode it is the *default* first turn: the permission mode ships as
+    // `normal` and `agy --print` cannot ask for approvals.
+    //
+    // And the neutral sentence for that classification cannot name the setting
+    // to change, so a provider with a better one supplies it. Provider error
+    // *text* still never travels; this is a translation of a cause the kernel
+    // already decided, which is why it can be localized and acted on.
+    const rejected = async (present?: (reason: RunTerminalReason) => string | undefined) => {
+      const harness = await createHarness();
+      const started = await startExecutionRun(
+        harness.context,
+        SESSION_ID,
+        { requestRef: 'opaque-request' },
+        undefined,
+        present,
+      );
+      const collected = drain(started.stream.chunks());
+      await harness.emit(
+        started.runId,
+        {
+          kind: 'terminal',
+          terminal: 'invalidated',
+          reason: 'pre-dispatch-rejected',
+          sideEffectFree: true,
+        },
+        'd-1',
+      );
+      const chunks = await collected;
+      started.release();
+      return chunks;
+    };
+
+    expect(await rejected(
+      reason => (reason === 'pre-dispatch-rejected' ? 'Switch the permission mode.' : undefined),
+    )).toEqual([{ type: 'error', content: 'Switch the permission mode.' }]);
+    expect(await rejected(() => undefined)).toEqual([{
+      type: 'error',
+      content: 'The turn was rejected before it started, so nothing ran.',
+    }]);
   });
 
   describe('capability projection over the four proof topologies', () => {

@@ -78,12 +78,25 @@ metadata field is added:
 | `succeeded` | nothing; the generator closes |
 | `failed` | `{ type: 'error', content }` — the same surface the current `catch` renders |
 | `cancelled`, `interrupted` | nothing; the controller's existing cancel path already renders "Interrupted" |
-| `invalidated` | nothing; matches today's `wasInvalidated` path, which skips finalization |
+| `invalidated` | `{ type: 'error', content }` — the turn never reached the provider, and saying nothing about that renders an empty assistant message where the explanation belongs |
 | `indeterminate` | `{ type: 'notice', level: 'warning', content }` stating the run's fate is unknown — the honest form of the outcome that today is silently rendered as success |
 
 Richer presentation of `indeterminate` and of later reconciliation is an M5 projection concern, not
 an adapter concern. The adapter's obligation is that the outcome is never *misrepresented*, not that
 it is fully rendered.
+
+The `invalidated` row read "nothing" until the first provider flip, justified by today's
+`wasInvalidated` path. That was a mapping error: `wasInvalidated` means the *presentation* moved on —
+the tab closed or the conversation switched — while this terminal means the turn was rejected before
+anything ran. Two different facts wearing one word, and the second one needs saying. Antigravity made
+it visible because its fail-closed permission check is `pre-dispatch-rejected` on the shipped default
+mode, so "nothing" was the answer a user got on their very first turn.
+
+**Provider wording for a classified failure.** The kernel refuses to forward provider error text, and
+its neutral sentence per cause cannot name a provider's own setting. So the host may supply a
+`describeFailure(reason)` port that returns better wording for a classification the kernel already
+made, or `undefined` to keep the neutral one. This carries no provider diagnostics and so raises no
+D7 redaction question; it is a translation of a decided cause, which is also why it can be localized.
 
 **Consequence for `consumeTurnMetadata()`.** The controller already calls it in `finally` on every
 turn, which makes it the one existing channel that carries per-turn facts back to the UI. The

@@ -1,4 +1,3 @@
-import { createAntigravityChatRuntime } from '../../app/execution/antigravity/AntigravityExecutionComposition';
 import type { ProviderRegistration } from '../../core/providers/types';
 import {
   AntigravityInlineEditService,
@@ -21,10 +20,7 @@ export const antigravityProviderRegistration: ProviderRegistration = {
   // The first provider flip: chat execution runs through the kernel. Only this
   // row moves — workspace services, settings, auxiliary services, and every
   // other registration stay exactly as they were.
-  createRuntime: ({ plugin }) => createAntigravityChatRuntime(
-    plugin,
-    plugin.getExecutionKernel().registry,
-  ),
+  createRuntime: ({ plugin }) => plugin.getAntigravityExecution().createRuntime(),
   createTitleGenerationService: () => new AntigravityTitleGenerationService(),
   displayName: 'Antigravity',
   environmentKeyPatterns: [/^ANTIGRAVITY_/i, /^GOOGLE_/i, /^GEMINI_/i, /^VERTEX_/i],

@@ -74,6 +74,20 @@ export interface ExecutionRunRequestSpec {
   readonly resultExpectation?: 'required' | 'optional' | 'none';
 }
 
+/**
+ * Provider wording for a classified failure, where the provider has a better
+ * sentence than the neutral one and returning `undefined` where it does not.
+ *
+ * Not a channel for provider error text — that is exactly what the kernel
+ * refuses to forward, and D7 would have to redact it. What travels here is a
+ * translation of a *classification* the kernel already made, which is why the
+ * provider can localize it and say what to do about it. Print mode is the case
+ * that forced it: `pre-dispatch-rejected` is the terminal a user in the default
+ * permission mode sees on their very first turn, and the neutral sentence for
+ * it cannot mention the setting they need to change.
+ */
+export type FailurePresenter = (reason: RunTerminalReason) => string | undefined;
+
 /** How long a tab close waits for its run to settle before giving up on it. */
 const CLEANUP_TERMINAL_WAIT_MS = 2_000;
 
@@ -103,7 +117,10 @@ export class ExecutionRunStream {
   private planCompleted = false;
   private wake: (() => void) | null = null;
 
-  constructor(private readonly runId: RunId) {}
+  constructor(
+    private readonly runId: RunId,
+    private readonly describeProviderFailure?: FailurePresenter,
+  ) {}
 
   /** Feeds one accepted envelope in. Anything after a terminal is dropped. */
   accept(envelope: ExecutionEventEnvelope): void {
@@ -135,9 +152,17 @@ export class ExecutionRunStream {
       return;
     }
     this.terminal = event.terminal;
-    if (event.terminal === 'failed') {
+    // `invalidated` renders too. It means the turn never reached the provider —
+    // a rejected permission mode, a session the provider no longer has — and
+    // saying nothing about that leaves an empty assistant message where an
+    // explanation belongs, which is the same silent-empty-answer defect this
+    // adapter exists to fix, one terminal over.
+    if (event.terminal === 'failed' || event.terminal === 'invalidated') {
       this.terminalError = event.reason;
-      this.push({ type: 'error', content: describeFailure(event.reason) });
+      this.push({
+        type: 'error',
+        content: this.describeProviderFailure?.(event.reason) ?? describeFailure(event.reason),
+      });
     } else if (event.terminal === 'indeterminate') {
       this.push({
         type: 'notice',
@@ -359,9 +384,10 @@ export async function startExecutionRun(
   executionSessionId: ExecutionSessionId,
   spec: ExecutionRunRequestSpec,
   session?: ExecutionAdapterSession,
+  describeProviderFailure?: FailurePresenter,
 ): Promise<{ runId: RunId; stream: ExecutionRunStream; release: () => void }> {
   const runId = context.nextRunId();
-  const stream = new ExecutionRunStream(runId);
+  const stream = new ExecutionRunStream(runId, describeProviderFailure);
   const unsubscribe = context.registry.observe(executionSessionId, envelope => {
     stream.accept(envelope);
   });
@@ -426,6 +452,11 @@ export interface ExecutionChatRuntimeHostPorts {
   currentSessionId(): string | null;
   /** Reports a cleanup that could not complete; never rethrown to the caller. */
   reportCleanupFailure?(error: unknown): void;
+  /**
+   * Provider wording for a classified failure. Absent, or `undefined` for a
+   * given reason, leaves the neutral sentence in place.
+   */
+  readonly describeFailure?: FailurePresenter;
   now?(): number;
   /**
    * Renders an opened interaction and returns the chosen response id.
@@ -543,6 +574,7 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
       executionSessionId,
       { requestRef: this.ports.encodeRequestRef(turn, conversationHistory, queryOptions) },
       this.session,
+      this.ports.describeFailure,
     );
     this.active = started;
     // Interactions and backend-initiated turns arrive on the same stream as the
