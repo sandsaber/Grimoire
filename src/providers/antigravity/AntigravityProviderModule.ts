@@ -29,8 +29,8 @@ import {
  * were bare `object`. The settings decode and encode logic is reused as
  * material, because it is real validation with a real preserved-unknown path.
  *
- * Dark: nothing constructs this yet. The legacy `registration.ts` is still the
- * only wiring, and stays so until the Antigravity flip.
+ * In production: `AntigravityExecution` builds the backend from
+ * `execution.create` and the chat runtime from `features`.
  *
  * Honest absences, per the contract's "absent means unsupported" rule:
  * Antigravity has no resume, no native history, no commands, no MCP, no

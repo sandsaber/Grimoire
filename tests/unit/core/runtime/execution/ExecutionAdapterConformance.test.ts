@@ -7,10 +7,15 @@ import codexTrace from '@test/fixtures/provider-traces/codex-execution.json';
 import opencodeTrace from '@test/fixtures/provider-traces/opencode-execution.json';
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
+import { executionBackendId } from '@/core/execution/ExecutionBackendDescriptor';
 import type { ExecutionRequest, RunTerminalReason } from '@/core/execution/ExecutionContracts';
 import { ExecutionControlRepositories } from '@/core/execution/ExecutionControlRepositories';
 import { ExecutionControlTransactionCoordinator } from '@/core/execution/ExecutionControlTransactionCoordinator';
-import type { ExecutionEvent, ProviderExecutionEvent } from '@/core/execution/ExecutionEvents';
+import type {
+  ExecutionEvent,
+  ExecutionEventEnvelope,
+  ProviderExecutionEvent,
+} from '@/core/execution/ExecutionEvents';
 import {
   executionSessionId,
   type RunId,
@@ -28,6 +33,7 @@ import {
   ExecutionAdapterSession,
   ExecutionChatRuntimeAdapter,
   type ExecutionChatRuntimeAdapterContext,
+  ExecutionRunStream,
   startExecutionRun,
   toLegacyCapabilities,
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
@@ -617,7 +623,7 @@ describe('coverage over the four proof topologies', () => {
     expect(recordedKinds(trace)).toContain('output-delta');
   });
 
-  it('renders exactly one kind as content and one as a terminal', () => {
+  it('classifies exactly one kind as content and two as terminals', () => {
     const byPresentation = KERNEL_EVENT_KINDS.reduce<Record<string, string[]>>((totals, kind) => {
       const presentation = classifyForPresentation(kind);
       totals[presentation] = [...(totals[presentation] ?? []), kind];
@@ -625,8 +631,28 @@ describe('coverage over the four proof topologies', () => {
     }, {});
 
     expect(byPresentation.chunk).toEqual(['output-delta']);
-    expect(byPresentation.terminal).toEqual(['terminal']);
+    // Two, because the registry reduces an acknowledged cancellation into a
+    // terminal and then drops the explicit one that follows. This list said
+    // `['terminal']` while `accept` had already been taught otherwise, and a
+    // classifier that disagrees with the code it describes is how the hung
+    // cancel would come back through the next refactor that trusts it.
+    expect([...byPresentation.terminal].sort())
+      .toEqual(['cancellation-acknowledged', 'terminal']);
     expect(byPresentation.ignored.length).toBeGreaterThan(0);
+  });
+
+  it('classifies every kind the stream closes on as a terminal', () => {
+    // The agreement itself, rather than a list that has to be kept in step by
+    // hand: whatever `accept` settles on must classify as `terminal`.
+    const terminalKinds = KERNEL_EVENT_KINDS
+      .filter(kind => classifyForPresentation(kind) === 'terminal');
+
+    for (const kind of KERNEL_EVENT_KINDS) {
+      const stream = new ExecutionRunStream(CLASSIFIER_RUN_ID);
+      stream.accept(envelopeFor(kind));
+
+      expect(stream.settled()).toBe(terminalKinds.includes(kind));
+    }
   });
 });
 
@@ -637,6 +663,43 @@ describe('coverage over the four proof topologies', () => {
  * which is the exact failure the classification exists to prevent — the list
  * would still pass while the adapter had no answer for the new event.
  */
+const CLASSIFIER_RUN_ID = toRunId(`run-${'e'.repeat(32)}`);
+
+/** A minimal accepted envelope for one kind, so the stream can be fed each one. */
+function envelopeFor(kind: ExecutionEvent['kind']): ExecutionEventEnvelope {
+  const payloads: Partial<Record<ExecutionEvent['kind'], Record<string, unknown>>> = {
+    'output-delta': { channel: 'assistant', text: 'x' },
+    'tool-activity': { toolCallId: 'tool-1' },
+    progress: { progressId: 'progress-1' },
+    result: { result: { resultId: 'result-1', storage: 'projection' } },
+    'interaction-opened': {
+      interaction: { interactionId: 'ix-1', kind: 'approval', options: [] },
+    },
+    'interaction-resolved': { interactionId: 'ix-1', responseId: 'allow' },
+    recovered: { state: 'running' },
+    terminal: { terminal: 'failed', reason: 'provider-failure' },
+    'native-agent-observed': { nativeAgentKey: 'agent-1' },
+    'native-agent-result': {
+      nativeAgentKey: 'agent-1',
+      result: { resultId: 'result-1', storage: 'projection' },
+    },
+    'native-agent-activity': { nativeAgentKey: 'agent-1', activity: 'input-sent' },
+    'native-agent-status': { nativeAgentKey: 'agent-1', status: 'running' },
+  };
+  return {
+    schemaVersion: 1,
+    backendId: executionBackendId('internal-deterministic-fake'),
+    backendGeneration: 1,
+    executionSessionId: SESSION_ID,
+    sessionInstanceId: INSTANCE_ID,
+    eventId: `${CLASSIFIER_RUN_ID}:1`,
+    sequence: 1,
+    occurredAt: 1,
+    scope: { kind: 'run', runId: CLASSIFIER_RUN_ID },
+    event: { kind, ...(payloads[kind] ?? {}) } as ExecutionEvent,
+  };
+}
+
 const KERNEL_EVENT_KINDS = [
   ...new Set(
     [...readFileSync(resolve(process.cwd(), 'src/core/execution/ExecutionEvents.ts'), 'utf8')

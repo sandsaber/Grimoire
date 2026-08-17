@@ -11,11 +11,9 @@ import type { AntigravityResultSink } from './AntigravityExecutionBackend';
  * and the copy is the assistant message the chat surface persists from the
  * content the run emitted.
  *
- * That is why this commits without writing. D2 forbids a second copy of a
- * transcript in the control store without exception, and the conversation is
- * the only other durable place; a sink that wrote the output anywhere else
- * would be creating exactly the duplicate the boundary exists to prevent. What
- * is persisted is the reference, which is what D2 permits.
+ * That is why this commits without writing: D2 forbids a second copy of a
+ * transcript, and the conversation is the only other durable place. What is
+ * persisted is the reference, which is what D2 permits.
  *
  * The abort signal is still honoured, because a cancellation that arrives
  * during the commit window must not produce a result the run then has to

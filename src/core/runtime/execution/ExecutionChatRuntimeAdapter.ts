@@ -54,8 +54,8 @@ import type {
  *   it had already had effects, is the run's answer to give — asynchronously,
  *   as `cancelled` or `indeterminate`.
  *
- * Dark: nothing constructs this. It becomes reachable at the first provider
- * flip, which is also when the kernel enters production.
+ * In production for Antigravity since the first provider flip; every other
+ * provider still runs its legacy runtime until its own flip.
  */
 
 /** What the adapter needs from its host to serve one conversation. */
@@ -78,13 +78,10 @@ export interface ExecutionRunRequestSpec {
  * Provider wording for a classified failure, where the provider has a better
  * sentence than the neutral one and returning `undefined` where it does not.
  *
- * Not a channel for provider error text — that is exactly what the kernel
- * refuses to forward, and D7 would have to redact it. What travels here is a
- * translation of a *classification* the kernel already made, which is why the
- * provider can localize it and say what to do about it. Print mode is the case
- * that forced it: `pre-dispatch-rejected` is the terminal a user in the default
- * permission mode sees on their very first turn, and the neutral sentence for
- * it cannot mention the setting they need to change.
+ * Not a channel for provider error text — the kernel refuses to forward that,
+ * and D7 would have to redact it. What travels here is a translation of a
+ * *classification* the kernel already made, which is why a provider can
+ * localize it and name the setting the neutral sentence cannot.
  */
 export type FailurePresenter = (reason: RunTerminalReason) => string | undefined;
 
@@ -999,7 +996,13 @@ export function classifyForPresentation(kind: ExecutionEvent['kind']): Execution
   switch (kind) {
     case 'output-delta':
       return 'chunk';
+    // `cancellation-acknowledged` counts, because the registry has already
+    // reduced it to a terminal and drops the explicit one that follows as
+    // post-terminal. Classifying it apart from `terminal` would put this
+    // function at odds with `accept`, and a refactor trusting it would bring
+    // back a turn that never ends.
     case 'terminal':
+    case 'cancellation-acknowledged':
       return 'terminal';
     case 'run-started':
     case 'thinking-activity':
@@ -1011,7 +1014,6 @@ export function classifyForPresentation(kind: ExecutionEvent['kind']): Execution
     case 'connection-lost':
     case 'recovery-started':
     case 'recovered':
-    case 'cancellation-acknowledged':
     case 'native-agent-observed':
     case 'native-agent-result':
     case 'native-agent-activity':

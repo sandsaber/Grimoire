@@ -1945,6 +1945,42 @@ answered turn are timestamped in the vault log; model selection, history replay,
 automated gates. What no unit test can prove remains the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
+### M2-flips — external review of wave 1: one bug, four suggestions, all confirmed (this commit)
+
+**The bug is the one the host was written to prevent, one layer up.** `ExecutionKernelHost`
+serializes start against unload, and that is enough only once the host exists. It does not exist for
+the whole of `await loadSettings()`, and `onunload` is not withheld until `onload` finishes. An unload
+landing in that window found `executionKernelHost` still null, disposed nothing, and the load that
+followed opened an acceptance gate for a plugin instance that was already gone — after which the next
+reload puts a second registry on the same control store. Exactly the dual ownership the host exists
+to prevent, arriving through the gap in front of it.
+
+Fixed with a synchronous flag on the plugin, set first thing in `onunload`, checked before the host is
+constructed. `main.ts` gets its first test in the process, which is itself worth recording: the
+composition root had no coverage at all, and this is the hazard it most needed.
+
+The four suggestions were all real:
+
+- **the classifier contradicted the code it describes.** `classifyForPresentation` still called
+  `cancellation-acknowledged` ignored after `accept` had been taught to close on it. The exported
+  function is documented as what the adapter does with each kind, so the next refactor trusting it
+  would have restored the hung cancel. Both now say terminal, and a new test asserts the *agreement*
+  rather than a hand-kept list: whatever the stream settles on must classify as `terminal`;
+- **comments still said "dark".** The adapter's header claimed nothing constructs it, and the nested
+  `src/providers/antigravity/AGENTS.md` still pointed at the deleted `AntigravityChatRuntime`. Both
+  corrected, and the Antigravity instructions gained the two constraints this wave paid for: read the
+  permission mode from the provider's own projection, and pick the login shell's argument-forwarding
+  syntax per shell;
+- **production comments had turned into a journal.** Several explained how a shape was found and which
+  earlier claim was wrong. That belongs here, not in the source; trimmed to the constraint;
+- **deleting the legacy runtime deleted coverage with it.** Its suite was the only thing asserting
+  that a turn carries current note, context files, excluded folders, and editor, browser and canvas
+  selections, and that a prior turn's note is rebuilt from history metadata. The composition suite
+  covered only bare text replay, so a regression dropping every context surface would have passed.
+  Both cases are ported onto the real invocation and proven by injection.
+
+Gates: unit 458 suites / 7764 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

@@ -95,6 +95,7 @@ export default class GrimoirePlugin extends Plugin {
   private conversations: Conversation[] = [];
   private executionKernelHost: ExecutionKernelHost | null = null;
   private antigravityExecution: AntigravityExecution | null = null;
+  private unloading = false;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
   private pendingWhatsNewRelease: ChangelogRelease | null = null;
@@ -324,6 +325,13 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   onunload(): void {
+    // Recorded before anything else, and synchronously. `onload` is async and
+    // this is not withheld until it finishes, so unload can land while settings
+    // are still loading — before the kernel exists to be told. Without this the
+    // load that follows would open an acceptance gate for a plugin instance
+    // that is gone, and the next reload would put a second registry on the same
+    // control store: the dual ownership the host exists to prevent.
+    this.unloading = true;
     this.recordDebugLog({
       event: 'unload',
       level: 'info',
@@ -377,6 +385,11 @@ export default class GrimoirePlugin extends Plugin {
    * Grimoire in it.
    */
   private async startExecutionKernel(): Promise<void> {
+    if (this.unloading) {
+      // Unload won the race with settings loading. A host built now would open
+      // a gate that the shutdown which already ran can no longer close.
+      return;
+    }
     const host = new ExecutionKernelHost({
       storage: new VaultDurableStorage(this.storage.getAdapter()),
       reportShutdownFailure: error => {

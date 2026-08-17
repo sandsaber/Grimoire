@@ -185,17 +185,15 @@ export class AntigravityExecution {
 /**
  * Antigravity's wording for the failures it can explain.
  *
- * The kernel classifies a failure into a closed set of causes, and its neutral
- * sentence for `pre-dispatch-rejected` — the turn was rejected before it
- * started — is the one a user in the default permission mode sees on their very
- * first turn, with nothing in it about the setting to change. The legacy runtime
- * said exactly that, localized, and losing it at the flip would have been a
- * product regression the plan does not license.
+ * The kernel's neutral sentence for `pre-dispatch-rejected` cannot name the
+ * setting that caused it, and that terminal is what a user meets on their first
+ * turn: the shipped permission mode is `normal` and `agy --print` cannot request
+ * approvals.
  *
  * The cause is not carried on the terminal, so it is re-read from the same
- * settings the resolver read moments earlier. Where neither reachable cause
- * holds — an unresolvable request reference, which is a defect rather than a
- * user situation — this returns nothing and the neutral sentence stands.
+ * settings the resolver read. Where neither reachable cause holds — an
+ * unresolvable request reference, a defect rather than a user situation — this
+ * returns nothing and the neutral sentence stands.
  */
 export function describeAntigravityFailure(
   plugin: GrimoirePlugin,

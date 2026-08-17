@@ -140,6 +140,76 @@ describe('Antigravity execution composition', () => {
     expect(runtime.consumeTurnMetadata().wasSent).toBe(true);
   });
 
+  it('carries every context surface into the persisted turn and the CLI prompt', async () => {
+    // Print mode has no session, no MCP, and no file-reading tools of its own,
+    // so everything Grimoire knows about the note, the selection and the pinned
+    // files exists in the turn only if it was composed into the prompt. This was
+    // covered by the legacy runtime's suite until that runtime was deleted with
+    // it; the replacement asserts the same surfaces against the real invocation.
+    const { runtime, runner } = await createTurnHarness(createPlugin());
+
+    const prepared = runtime.prepareTurn({
+      browserSelection: {
+        selectedText: 'Browser quote',
+        source: 'browser:https://example.com',
+        title: 'Example',
+        url: 'https://example.com',
+      },
+      canvasSelection: { canvasPath: 'board.canvas', nodeIds: ['node-1', 'node-2'] },
+      contextFiles: ['notes/instructions.md'],
+      currentNotePath: 'notes/today.md',
+      excludedFolders: ['Climate'],
+      editorSelection: {
+        mode: 'selection',
+        notePath: 'notes/today.md',
+        selectedText: 'Selected text',
+        startLine: 4,
+        lineCount: 2,
+      },
+      text: 'Summarize this',
+    } as never);
+    await drain(runtime.query(prepared));
+
+    const surfaces = [
+      '<current_note>',
+      'notes/today.md',
+      '<context_files>',
+      'notes/instructions.md',
+      '<excluded_folders>',
+      '<folder>Climate</folder>',
+      '<editor_selection path="notes/today.md" lines="4-5">',
+      'Selected text',
+      '<browser_selection source="browser:https://example.com" title="Example" url="https://example.com">',
+      '<canvas_selection path="board.canvas">',
+    ];
+    for (const surface of surfaces) {
+      // Both halves: what the conversation stores, and what `agy` is asked.
+      expect(prepared.persistedContent).toContain(surface);
+      expect(runner.invocations[0]?.prompt).toContain(surface);
+    }
+  });
+
+  it('rebuilds a prior turn\'s note context from conversation history', async () => {
+    // The note a past turn was asked about is metadata on the message, not part
+    // of its text, so replaying history without it silently drops the context
+    // the earlier answer depended on.
+    const { runtime, runner } = await createTurnHarness(createPlugin());
+
+    await drain(runtime.query(turn('Continue'), [{
+      content: 'Earlier request',
+      currentNote: 'notes/prior.md',
+      id: 'user-1',
+      role: 'user',
+      timestamp: 1,
+    }]));
+
+    const prompt = runner.invocations[0]?.prompt ?? '';
+    expect(prompt).toContain('<current_note>');
+    expect(prompt).toContain('notes/prior.md');
+    expect(prompt).toContain('Earlier request');
+    expect(prompt).toContain('User: Continue');
+  });
+
   it('cancels a running turn by terminating the process, and closes the turn', async () => {
     // Smoke-matrix step 3, as a gate rather than a click. The legacy runtime
     // cancelled by sending SIGTERM to a child it held; the kernel path dispatches
