@@ -11,8 +11,11 @@ import { shouldShowWhatsNew } from './app/changelog/display';
 import { parseChangelogRelease } from './app/changelog/parser';
 import { readBundledChangelog } from './app/changelog/source';
 import type { ChangelogRelease } from './app/changelog/types';
+import { createAntigravityExecutionBackend } from './app/execution/antigravity/AntigravityExecutionComposition';
+import { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
+import { VaultDurableStorage } from './app/storage/VaultDurableStorage';
 import {
   applyAssistantResponseMetadataToMessages,
   applyVaultSearchContextsToMessages,
@@ -90,6 +93,7 @@ export default class GrimoirePlugin extends Plugin {
   settings!: GrimoireSettings;
   storage!: SharedAppStorage;
   private conversations: Conversation[] = [];
+  private executionKernelHost: ExecutionKernelHost | null = null;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
   private pendingWhatsNewRelease: ChangelogRelease | null = null;
@@ -100,6 +104,7 @@ export default class GrimoirePlugin extends Plugin {
   async onload() {
     try {
       await this.loadSettings();
+      await this.startExecutionKernel();
       await ProviderWorkspaceRegistry.initializeAll(this);
       await this.writeDebugLog({
         data: {
@@ -323,7 +328,74 @@ export default class GrimoirePlugin extends Plugin {
       level: 'info',
       scope: 'plugin',
     });
+    // Not awaited, because `onunload` returns void. The kernel's contract is
+    // built for exactly that: the acceptance gate closes synchronously, so
+    // nothing is admitted from here on, and the bounded cancellation and
+    // cleanup that follow record a checkpoint the next startup recovers from.
+    void this.executionKernelHost?.dispose();
     void this.persistOpenTabStates();
+  }
+
+  /**
+   * The execution kernel this plugin instance owns.
+   *
+   * One per load, held here rather than in a module singleton: a singleton
+   * outlives the instance a reload replaces, and two registries over one
+   * control store would each believe they own every run in it.
+   */
+  getExecutionKernel(): ExecutionKernelHost {
+    if (!this.executionKernelHost) {
+      throw new Error('Execution kernel is not available before plugin load.');
+    }
+    return this.executionKernelHost;
+  }
+
+  /**
+   * Brings the kernel up before anything can ask it for work.
+   *
+   * A kernel that cannot start must not take the plugin down with it: the only
+   * provider running through it is Antigravity, and every other surface is
+   * unaffected. The registry refuses work it never accepted, so a failed start
+   * surfaces as a refused turn for that provider rather than a vault without
+   * Grimoire in it.
+   */
+  private async startExecutionKernel(): Promise<void> {
+    const host = new ExecutionKernelHost({
+      storage: new VaultDurableStorage(this.storage.getAdapter()),
+      reportShutdownFailure: error => {
+        this.recordDebugLog({
+          error,
+          event: 'execution.shutdown.failed',
+          level: 'warn',
+          scope: 'plugin',
+        });
+      },
+    });
+    host.registerBackend({ backend: createAntigravityExecutionBackend(this) });
+    this.executionKernelHost = host;
+    try {
+      await host.start();
+    } catch (error) {
+      this.recordDebugLog({
+        error,
+        event: 'execution.start.failed',
+        level: 'error',
+        scope: 'plugin',
+      });
+      return;
+    }
+    const migration = host.migrationRequirement();
+    if (migration) {
+      // Persistence decision D5: a control record this build cannot read opens
+      // the store read-only rather than being guessed at or discarded. Recorded
+      // so the reason a provider refuses work is answerable.
+      this.recordDebugLog({
+        data: { recordKind: migration.recordKind },
+        event: 'execution.migrationRequired',
+        level: 'warn',
+        scope: 'plugin',
+      });
+    }
   }
 
   async writeDebugLog(event: DebugLogEvent): Promise<void> {

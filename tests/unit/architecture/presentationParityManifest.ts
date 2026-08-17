@@ -544,7 +544,6 @@ export const PARITY_SURFACES: ParitySurface[] = [
     state: 'wired',
     modules: [
       'src/core/runtime/ChatRuntime.ts',
-      'src/providers/antigravity/runtime/AntigravityChatRuntime.ts',
       'src/providers/claude/runtime/ClaudeChatRuntime.ts',
       'src/providers/codex/runtime/CodexChatRuntime.ts',
       'src/providers/gemini/runtime/GeminiChatRuntime.ts',
@@ -564,18 +563,21 @@ export const PARITY_SURFACES: ParitySurface[] = [
   // stays unreachable, which is what proves the new platform is not leaking
   // into releases while it is being built.
   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // The execution kernel, in production
+  //
+  // Reachable from `main.ts` since the first provider flip. What lit up is the
+  // platform plus exactly one provider's backend; every other provider's
+  // backend stays in the pending surface below until its own flip.
+  // -------------------------------------------------------------------------
   {
-    id: 'execution-platform-dark',
+    id: 'execution-platform',
     area: 'shell',
     description:
-      'Execution composition boundaries and the provider module contract, built beside the running application.',
-    state: 'pending',
-    owner: 'M2 — becomes reachable when the first provider flip wires the adapter over its backend.',
+      'The execution kernel, its durable control store, and the presentation adapter, constructed by the plugin at load and shut down at unload.',
+    state: 'wired',
     modules: [
       'src/app/execution/ExecutionKernelHost.ts',
-      'src/app/execution/acp/NodeManagedAcpProcessLauncher.ts',
-      'src/app/execution/antigravity/NodeAntigravityProcessTransport.ts',
-      'src/app/execution/codex/NodeCodexExecutionProcess.ts',
       'src/app/execution/local/NodeLocalShellProcessAdapter.ts',
       'src/app/storage/VaultDurableStorage.ts',
       'src/core/execution/ExecutionBackendDescriptor.ts',
@@ -592,9 +594,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/core/execution/ExecutionLifecycleRegistry.ts',
       'src/core/execution/ExecutionTerminalPolicy.ts',
       'src/core/execution/ResultCommit.ts',
-      'src/core/execution/RunProjection.ts',
       'src/core/execution/local/LocalShellBackend.ts',
-      'src/core/execution/testing/DeterministicFakeBackend.ts',
       'src/core/persistence/ControlRecordPayloadPolicy.ts',
       'src/core/persistence/DurableStorage.ts',
       'src/core/persistence/TransactionIntentCoordinator.ts',
@@ -602,14 +602,50 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/core/persistence/VersionedRepository.ts',
       'src/core/providers/ProviderModule.ts',
       'src/core/runtime/execution/ExecutionChatRuntimeAdapter.ts',
+    ],
+  },
+  {
+    id: 'provider-antigravity-execution',
+    area: 'provider',
+    description:
+      'Antigravity chat execution over the kernel: the backend, its process transport, and the composition that resolves a request reference back into an `agy --print` invocation.',
+    state: 'wired',
+    modules: [
+      'src/app/execution/antigravity/AntigravityExecutionComposition.ts',
+      'src/app/execution/antigravity/NodeAntigravityProcessTransport.ts',
       'src/providers/antigravity/AntigravityProviderModule.ts',
       'src/providers/antigravity/execution/AntigravityExecutionBackend.ts',
+      'src/providers/antigravity/execution/AntigravityProjectionResultSink.ts',
+      'src/providers/antigravity/execution/AntigravityRequestCodec.ts',
       'src/providers/antigravity/runtime/AntigravityPrintProcessRunner.ts',
       'src/providers/antigravity/runtime/AntigravityPrintProtocol.ts',
+      'src/providers/antigravity/runtime/AntigravityPromptComposer.ts',
+    ],
+  },
+  {
+    id: 'execution-run-projection',
+    area: 'shell',
+    description:
+      'The run projection reducer: what happened to a run, derived from its accepted events.',
+    state: 'pending',
+    owner:
+      'M5 — chat rendering moves from generator consumption to projection consumption, which is this reducer\'s first production consumer. The first flip did not light it up: the adapter renders the event stream directly.',
+    modules: ['src/core/execution/RunProjection.ts'],
+  },
+  {
+    id: 'execution-platform-dark',
+    area: 'shell',
+    description:
+      'Provider backends built and proven ahead of their own flips, still unreachable from the running application.',
+    state: 'pending',
+    owner: 'M2-flips — each module becomes reachable at its own provider\'s flip.',
+    modules: [
+      'src/app/execution/acp/NodeManagedAcpProcessLauncher.ts',
+      'src/app/execution/codex/NodeCodexExecutionProcess.ts',
+      'src/core/execution/testing/DeterministicFakeBackend.ts',
       'src/providers/acp/execution/AcpManagedClientAdapter.ts',
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
       'src/providers/acp/execution/ManagedAcpClient.ts',
-      'src/providers/antigravity/runtime/AntigravityTranscriptRecovery.ts',
       'src/providers/claude/ClaudeProviderModule.ts',
       'src/providers/claude/execution/ClaudeAuxiliaryQuery.ts',
       'src/providers/claude/execution/ClaudeExecutionBackend.ts',

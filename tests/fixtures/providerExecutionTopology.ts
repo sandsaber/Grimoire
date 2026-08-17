@@ -133,7 +133,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     capabilities: ANTIGRAVITY_PROVIDER_CAPABILITIES,
     isolationEvidence: 'TitleGenerationService',
     evidence: [
-      'src/providers/antigravity/runtime/AntigravityChatRuntime.ts',
+      'src/providers/antigravity/execution/AntigravityExecutionBackend.ts',
       'src/providers/antigravity/auxiliary/AntigravityNoopServices.ts',
       'src/providers/antigravity/capabilities.ts',
     ],

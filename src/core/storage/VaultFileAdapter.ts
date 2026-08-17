@@ -12,6 +12,17 @@ export class VaultFileAdapter {
 
   constructor(private app: App) {}
 
+  /**
+   * Stable identity of the live vault behind this adapter.
+   *
+   * Durable writers serialize per path against this, so two adapter instances
+   * over the same vault must agree on it — otherwise each would queue against
+   * its own map and their recoveries could interleave on one file.
+   */
+  get coordinationKey(): object {
+    return this.app.vault;
+  }
+
   async exists(path: string): Promise<boolean> {
     return this.app.vault.adapter.exists(path);
   }

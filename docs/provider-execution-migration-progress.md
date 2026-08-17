@@ -79,7 +79,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M1 — execution kernel, dark-launched | Complete | `dca2f84`, `cc6081e`, `ec1303f`, `86f0585`, `a689af8` |
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
-| M2-flips — nine production flips with legacy deletion | In progress — wave 1 (Antigravity); kernel host built and still dark | `e06417b`, `416b129` |
+| M2-flips — nine production flips with legacy deletion | In progress — wave 1 (Antigravity) wired, automated gates green, manual smoke matrix outstanding | `e06417b`, `416b129`, `77977c2`, this commit |
 | M3 — provider control plane | Not started | — |
 | M4 — revisioned persistence in production | Not started | — |
 | M5 — presentation evolution and seam deletion | Not started | — |
@@ -1700,6 +1700,64 @@ conformance suite. Gates: unit 456 suites / 7751 tests, integration 6 / 220, typ
 Still dark — nothing constructs the backend, and `build:release` left the generated `main.js` and
 `styles.css` byte-identical, which is the same fact stated by the build rather than by a test.
 
+### M2-flips — wave 1: Antigravity in production (this commit)
+
+**The kernel is production code.** `main.ts` constructs `ExecutionKernelHost` over
+`VaultDurableStorage` after settings load and disposes it in `onunload`; Antigravity's
+`createRuntime` returns `ExecutionChatRuntimeAdapter` over the backend; `AntigravityChatRuntime` and
+its test are deleted. Nothing else in that registration moved — workspace services, settings,
+auxiliary no-ops, history, and UI config are untouched, which is the mixed-authority rule the plan
+requires until M5.
+
+Three pieces had to exist that no proof needed, because a proof never dispatches:
+
+- a **request resolver**, which turns the kernel's opaque `requestRef` back into an `agy` invocation.
+  The reference carries only what the turn decided — prompt and model. The CLI path, vault
+  directory, environment, and permission mode are read at dispatch, so a turn queued before a
+  settings change launches what the user has configured now;
+- a **result sink**, which commits a reference without writing. `ResultRef` is an identity and a
+  storage kind, never a payload; the answer's durable copy is the conversation, and D2 forbids a
+  second one without exception. A sink that wrote the output anywhere else would be creating exactly
+  the duplicate the boundary exists to prevent;
+- the **prompt composer**, moved out of the deleted runtime rather than rewritten. Print mode keeps
+  no session, so conversation continuity exists only as replayed history inside the prompt, and
+  losing that would lose the conversation while every test stayed green.
+
+**A kernel that cannot start does not take the plugin with it.** A failed start is recorded and
+returns; the registry then refuses work it never accepted, so the failure surfaces as a refused
+Antigravity turn rather than a vault without Grimoire in it. A control store requiring migration (D5)
+is recorded the same way and leaves the store read-only.
+
+**Revert safety has a test, not an argument.** A vault seeded with control records is opened by the
+readers a reverted build would use — `SessionStorage` and `GrimoireSettingsStorage` — and must return
+the same conversations and settings *and never read a control record while doing it*. The second half
+is the one that matters: returning the right answers while parsing kernel bookkeeping is still a
+build coupled to files it must not know about. Proven by injection — a session reader made recursive
+over the storage root fails all three cases.
+
+**`darkBundle.test.ts` was the wrong gate and is now the right one.** It asserted absence only, which
+was correct while everything was dark and became false at this commit. It now names both directions:
+seven markers that must be *present*, so a flip that silently failed to reach the bundle fails here,
+and five that must stay absent for the providers still dark. One of the original markers was
+vacuous — `.grimoire/control` is composed by template from the storage root, so no such literal has
+ever been in a bundle and it could not have fired in either direction. Its two composed children are
+real literals and are what the live list keeps.
+
+The parity manifest splits accordingly: `execution-platform` and `provider-antigravity-execution` are
+wired, the remaining backends stay pending under `execution-platform-dark`, and `RunProjection.ts`
+gets its own pending row — it was covered by the old blanket entry and has no production consumer
+until M5, since the adapter renders the event stream directly.
+
+Gates: unit 457 suites / 7747 tests, integration 6 / 220, typecheck, lint, and `build:release` clean,
+with `darkBundle` run against the fresh bundle.
+
+**Not done, and owned:** the capability-driven manual smoke matrix. Antigravity declares no resume,
+no plan mode, no rewind, no fork, no images, no provider commands, no MCP tools, and no steering, so
+its matrix is four items — new session, cancel mid-run, model selection, and history replay across
+turns — plus the fail-closed check that a non-`full_access` permission mode is refused before a
+process starts. That runs against the built plugin in a real vault with `agy` 1.1.13, and it is the
+one gate this checkpoint cannot self-certify.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1733,20 +1791,19 @@ was decided by the owner in favour of a transient content event, and that is bui
 excluded from persistence, projection, and deduplication, plus `registry.observe()` so the adapter
 can be a client of the registry. Three backends stream through it.
 
-**In progress: M2-flips, wave 1 — Antigravity**, the smallest topology, with no resume and no agents.
-The kernel host the flip owns is built, corrected, and still dark; `agy` 1.1.13 is installed, so the
-flip can be smoke-tested against a live CLI. The backend now delivers its answer as content the
-adapter can render, which it did not before wiring began — see the entry above.
+**M2-flips wave 1 — Antigravity — is wired and every automated gate is green.** The kernel is
+constructed at load and disposed at unload, chat execution for Antigravity runs through the adapter
+over its backend, and the legacy runtime is deleted. This is the first checkpoint that **changes
+production behaviour**: the kernel is in the bundle, the control store is written under `.grimoire/`,
+and revert safety now has a test rather than an argument.
 
-What remains is the wiring: the host constructed in `onload` and disposed in `onunload`, an
-Antigravity backend context — a request resolver that turns an opaque `requestRef` back into an
-invocation, a production result sink, and the process runner over `NodeAntigravityProcessTransport`,
-which already exists — and the provider's `createRuntime` returning `ExecutionChatRuntimeAdapter`,
-followed by deleting `AntigravityChatRuntime` and its dead helpers.
-
-That checkpoint **changes production behaviour for the first time** — the kernel enters production,
-the control store appears under `.grimoire/`, and `darkBundle.test.ts` stops being the right gate for
-the flipped provider — so it also owns revert safety.
+**One gate remains, and it is manual.** The capability-driven smoke matrix runs against the built
+plugin in a real vault with `agy` 1.1.13 installed: new session, cancel mid-run, model selection,
+history replay across turns, and the fail-closed refusal of any permission mode short of full access.
+Antigravity declares no resume, plan mode, rewind, fork, images, provider commands, MCP tools, or
+steering, so those five items are the whole matrix. Until it passes, wave 1 is wired but not
+certified, and **wave 2 (Codex) must not start** — the point of one provider per checkpoint is that
+the first one is proven against a live CLI before the pattern is repeated eight times.
 
 **M0b is satisfied for the four proof providers**, recorded from live CLIs on the owner's machine.
 The remaining five providers need their own recordings before their own flips.

@@ -1,3 +1,4 @@
+import { createAntigravityChatRuntime } from '../../app/execution/antigravity/AntigravityExecutionComposition';
 import type { ProviderRegistration } from '../../core/providers/types';
 import {
   AntigravityInlineEditService,
@@ -8,7 +9,6 @@ import {
 import { ANTIGRAVITY_PROVIDER_CAPABILITIES } from './capabilities';
 import { antigravitySettingsReconciler } from './env/AntigravitySettingsReconciler';
 import { AntigravityConversationHistoryService } from './history/AntigravityConversationHistoryService';
-import { AntigravityChatRuntime } from './runtime/AntigravityChatRuntime';
 import { getAntigravityProviderSettings, updateAntigravityProviderSettings } from './settings';
 import { antigravityChatUIConfig } from './ui/AntigravityChatUIConfig';
 
@@ -18,7 +18,13 @@ export const antigravityProviderRegistration: ProviderRegistration = {
   chatUIConfig: antigravityChatUIConfig,
   createInlineEditService: () => new AntigravityInlineEditService(),
   createInstructionRefineService: () => new AntigravityInstructionRefineService(),
-  createRuntime: ({ plugin }) => new AntigravityChatRuntime(plugin),
+  // The first provider flip: chat execution runs through the kernel. Only this
+  // row moves — workspace services, settings, auxiliary services, and every
+  // other registration stay exactly as they were.
+  createRuntime: ({ plugin }) => createAntigravityChatRuntime(
+    plugin,
+    plugin.getExecutionKernel().registry,
+  ),
   createTitleGenerationService: () => new AntigravityTitleGenerationService(),
   displayName: 'Antigravity',
   environmentKeyPatterns: [/^ANTIGRAVITY_/i, /^GOOGLE_/i, /^GEMINI_/i, /^VERTEX_/i],

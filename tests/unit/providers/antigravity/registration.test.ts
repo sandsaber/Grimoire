@@ -1,8 +1,11 @@
 import '@/providers';
 
+import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
+
+import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
+import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { antigravityWorkspaceRegistration } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
-import { AntigravityChatRuntime } from '@/providers/antigravity/runtime/AntigravityChatRuntime';
 import { discoverAntigravityModels } from '@/providers/antigravity/runtime/AntigravityModelDiscovery';
 import {
   getAntigravityProviderSettings,
@@ -28,14 +31,23 @@ describe('Antigravity provider registration', () => {
     expect(ProviderRegistry.isEnabled('antigravity', settings)).toBe(true);
   });
 
-  it('creates an Antigravity runtime through the provider registry', () => {
+  it('creates a kernel-backed Antigravity runtime through the provider registry', () => {
+    // The flip, at the only row it moves. A runtime that is not a client of the
+    // execution kernel means chat execution never left the legacy path, which
+    // no other assertion in this file would notice.
+    const host = new ExecutionKernelHost({
+      storage: new TestDurableStorage(),
+      scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
+    });
+
     const runtime = ProviderRegistry.createChatRuntime({
-      plugin: {} as any,
+      plugin: { getExecutionKernel: () => host, settings: {} } as any,
       providerId: 'antigravity',
     });
 
-    expect(runtime).toBeInstanceOf(AntigravityChatRuntime);
+    expect(runtime).toBeInstanceOf(ExecutionChatRuntimeAdapter);
     expect(runtime.providerId).toBe('antigravity');
+    expect(runtime.getCapabilities().reasoningControl).toBe('effort');
   });
 
   it('creates Antigravity workspace services', async () => {

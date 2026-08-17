@@ -4,14 +4,19 @@ import { resolve } from 'node:path';
 import { PARITY_SURFACES } from './presentationParityManifest';
 
 /**
- * Asserts that dark migration code is absent from the built bundle.
+ * Asserts what the built bundle does and does not contain, in both directions.
  *
- * This replaces a check that measured nothing. Earlier checkpoints claimed the
+ * It began as an absence-only check, and that was right while the whole kernel
+ * was dark. The first provider flip ends that: the kernel, its control store,
+ * the presentation adapter, and one provider's backend are now production code,
+ * and the rest is still dark. So the gate now names both — a flip that silently
+ * failed to reach the bundle fails here just as loudly as a dark module that
+ * leaked into it.
+ *
+ * It replaces an earlier check that measured nothing. Checkpoints claimed the
  * release build produced "byte-identical artifacts" on the evidence of
  * `git status main.js` — but `main.js` is listed in `.gitignore`, so that
- * command reports clean no matter what the file contains. A gate that cannot
- * fail is exactly the shape of failure this migration exists to prevent, and it
- * appeared in the migration's own evidence.
+ * command reports clean no matter what the file contains.
  *
  * The bundle is a build artifact, so this suite skips when it is absent or
  * older than the sources it is meant to describe. Run `npm run build:release`
@@ -21,23 +26,36 @@ import { PARITY_SURFACES } from './presentationParityManifest';
 
 const BUNDLE_PATH = 'main.js';
 
-/** Strings that appear in the bundle only if a dark module was pulled into it. */
-const DARK_MARKERS = [
-  { marker: '.grimoire/control', why: 'durable control store paths' },
-  { marker: 'execution-runs', why: 'control record directory' },
-  { marker: 'transaction-intents', why: 'transaction intent directory' },
-  { marker: 'Expected current control record', why: 'lifecycle registry internals' },
+/**
+ * Strings the first flip put into the bundle, and must keep there.
+ *
+ * Every one is a literal that survives bundling. A composed path is not: the
+ * original list opened with `.grimoire/control`, which the control-path module
+ * builds by template from the shared storage root, so no such literal has ever
+ * existed in the bundle and that marker could never have fired — in either
+ * direction. Its two composed children below are real literals, which is why
+ * they are the ones kept.
+ */
+const LIVE_MARKERS = [
+  { marker: 'execution-runs', why: 'the control record directory' },
+  { marker: 'transaction-intents', why: 'the transaction intent directory' },
+  { marker: 'Expected current control record', why: 'the lifecycle registry' },
   { marker: 'Execution owner kind is invalid', why: 'lifecycle registry validation' },
-  { marker: 'provider-antigravity', why: 'the Antigravity execution backend descriptor' },
+  { marker: 'Execution lifecycle registry is not accepting shutdown', why: 'the kernel host' },
+  { marker: 'provider-antigravity', why: 'the flipped Antigravity execution backend' },
+  {
+    marker: 'The provider ended the turn without producing a result',
+    why: 'the presentation adapter',
+  },
+];
+
+/** Strings that appear in the bundle only if a still-dark module was pulled in. */
+const DARK_MARKERS = [
   { marker: 'provider-codex', why: 'the Codex execution backend descriptor' },
   { marker: 'Codex execution connection is not initialized', why: 'the Codex execution connection' },
   { marker: 'provider-claude', why: 'the Claude execution backend descriptor' },
   { marker: 'provider-opencode', why: 'the OpenCode execution backend descriptor' },
-  { marker: 'Execution lifecycle registry is not accepting shutdown', why: 'the kernel host' },
-  {
-    marker: 'The provider ended the turn without producing a result',
-    why: 'the presentation adapter\'s failure messages',
-  },
+  { marker: 'internal-deterministic-fake', why: 'the test-only fake backend' },
 ];
 
 function readBundle(): string | null {
@@ -52,6 +70,14 @@ function readBundle(): string | null {
 
 describe('dark code stays out of the shipped bundle', () => {
   const bundle = readBundle();
+
+  it.each(LIVE_MARKERS)('the bundle contains $why', ({ marker }) => {
+    if (bundle === null) {
+      return;
+    }
+
+    expect(bundle).toContain(marker);
+  });
 
   it.each(DARK_MARKERS)('the bundle contains no $why', ({ marker }) => {
     if (bundle === null) {
