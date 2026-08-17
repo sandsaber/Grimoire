@@ -2020,6 +2020,37 @@ by a flip yet.
 Gates: unit 458 suites / 7765 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
 The steering guards are proven by injection.
 
+### M2-flips — the conversation the host could not see (this commit)
+
+The second wave-2 gap, found where the first one was: writing the piece that needs it.
+
+Codex's next dispatch depends on what the conversation remembers — a thread to resume, a fork still
+to take — and **the host had no way to learn it.** The adapter's `syncConversationState` narrowed its
+argument to `{ sessionId }`, absorbed it for invalidation, and forwarded nothing; `providerState` is
+opaque to core by design, so `currentSessionId()` alone cannot express "bound to a thread" against
+"carrying a fork that has not been taken yet". Antigravity never noticed: print mode has no session
+at all, so its port returns `null` and means it.
+
+`ExecutionChatRuntimeHostPorts.syncConversation?` now forwards the conversation as the caller gave
+it. Core still does not read `providerState` — it hands it back to the provider's own host code,
+which is the only party that knows what is inside.
+
+**The decision itself is ported rather than reinvented**, because getting it wrong is not a visible
+error: a fork downgraded to a resume answers on the wrong thread, and a resume downgraded to a new
+thread loses the conversation while looking like a perfectly good reply. `readCodexConversationBinding`
+reads the same two places the legacy runtime read, in the same order — a fork counts as pending only
+while the conversation has no thread of its own, or a fork already taken would be taken again on every
+turn, rolling back to the same checkpoint and answering on a thread the user has never seen. That case
+is the one the test suite exists for, and it fails against the obvious wrong version.
+
+`toCodexThreadIntent` stops there. The legacy runtime had a third branch — thread bound and already
+loaded in this daemon, so start a turn without resuming — and the backend owns that now, tracking
+which thread its own session loaded. Reproducing it here would be a second opinion about state this
+module cannot see, and the two would disagree the first time a daemon restarted under a live tab.
+
+Still dark. Gates: unit 459 suites / 7771 tests, integration 6 / 220, typecheck, lint, and
+`build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

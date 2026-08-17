@@ -85,6 +85,18 @@ export interface ExecutionRunRequestSpec {
  */
 export type FailurePresenter = (reason: RunTerminalReason) => string | undefined;
 
+/**
+ * What the adapter knows about the conversation a runtime serves.
+ *
+ * `providerState` stays `unknown`-shaped on purpose: core carries it without
+ * reading it, and only the provider's own host code knows what is inside.
+ */
+export interface BoundConversation {
+  readonly id?: string;
+  readonly sessionId?: string | null;
+  readonly providerState?: Record<string, unknown>;
+}
+
 /** How long a tab close waits for its run to settle before giving up on it. */
 const CLEANUP_TERMINAL_WAIT_MS = 2_000;
 
@@ -479,6 +491,15 @@ export interface ExecutionChatRuntimeHostPorts {
   readonly reasoningControl: ProviderCapabilities['reasoningControl'];
   /** Provider-native session id, read from the session snapshot at M3. */
   currentSessionId(): string | null;
+  /**
+   * The conversation this runtime is now bound to, as the caller supplied it.
+   *
+   * Absent for a provider with nothing per-conversation to track. Present for
+   * one whose next dispatch depends on what the conversation remembers, since
+   * `providerState` is opaque to core and `currentSessionId` cannot express a
+   * pending fork or a thread that is bound but not yet loaded.
+   */
+  syncConversation?(conversation: BoundConversation | null): void;
   /** Reports a cleanup that could not complete; never rethrown to the caller. */
   reportCleanupFailure?(error: unknown): void;
   /**
@@ -716,12 +737,17 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
    * that the conversation's native binding no longer matches and say so once
    * through `consumeSessionInvalidation`.
    */
-  syncConversationState(state: { sessionId?: string | null } | null): void {
+  syncConversationState(state: BoundConversation | null): void {
     const next = state?.sessionId ?? null;
     if (this.boundSessionId !== undefined && this.boundSessionId !== next) {
       this.session.markInvalidated();
     }
     this.boundSessionId = next;
+    // Forwarded rather than absorbed: a provider whose next dispatch depends on
+    // what the conversation remembers — a native thread to resume, a fork to
+    // complete — cannot read that from `currentSessionId` alone, and core is not
+    // the place to learn what a provider keeps in `providerState`.
+    this.ports.syncConversation?.(state);
   }
 
   /**
