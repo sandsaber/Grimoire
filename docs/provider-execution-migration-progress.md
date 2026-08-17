@@ -1811,6 +1811,39 @@ until the flip was already pushed.
 
 Gates: unit 457 suites / 7749 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
 
+### M2-flips — the smoke matrix found a bug older than the flip (this commit)
+
+The manual matrix stopped at step zero: Antigravity would not enable at all, on the owner's machine,
+with `agy` 1.1.13 working perfectly from a terminal. Debug logging in the vault answered it in one
+read — which is the first time D7's logging has paid for itself.
+
+`buildAntigravityProcessLaunch` wraps every `agy` call in the user's login shell and forwards the
+arguments separately, so a prompt containing `&&` or a quote cannot become shell syntax:
+
+```
+$SHELL -lc 'exec "$0" "$@"' <command> <args...>
+```
+
+That expression is POSIX. The owner's shell is **fish**, which has neither `$0` nor `$@` and says so:
+`fish: $@ is not supported. In fish, please use $argv.` The CLI never runs, `agy models` exits 127 in
+70 ms, and enabling the provider **silently reverts** — a model-catalog refresh that rejects turns
+the toggle back off by design.
+
+Now per shell: `exec $argv` for fish, `exec "$0" "$@"` for the POSIX family, and for anything else —
+nushell, xonsh, csh — a **direct launch with no login shell at all**. Guessing a shell's syntax trades
+the user's profile for a provider that cannot start; losing the profile is the smaller loss, and the
+environment is already assembled before this point.
+
+**Older than the flip, and not found by it.** `AntigravityProcessLaunch.ts` dates from the original
+provider, so `agy` has been unusable for every fish user since it shipped. Nothing caught it because
+the launch test pinned `SHELL: '/bin/zsh'` and asserted the exact POSIX string — a test that fixes
+one shell cannot notice a second. The flip did make it worse in one direction: this builder is also
+what the new print runner uses, so the same syntax error would have failed every turn as well.
+
+Reproduced against real fish before and after, and the fix is in the vault build.
+
+Gates: unit 457 suites / 7756 tests, typecheck, lint, and `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1858,6 +1891,8 @@ of them fatal to every turn; they are in the entry above.
 **One gate remains, and it is manual.** The capability-driven smoke matrix runs against the built
 plugin in a real vault with `agy` 1.1.13 installed: new session, cancel mid-run, model selection,
 history replay across turns, and the fail-closed refusal of any permission mode short of full access.
+Its first attempt did not reach step one — the provider would not enable, for a login-shell reason
+older than the flip; see the entry above.
 Antigravity declares no resume, plan mode, rewind, fork, images, provider commands, MCP tools, or
 steering, so those five items are the whole matrix. Until it passes, wave 1 is wired but not
 certified, and **wave 2 (Codex) must not start** — the point of one provider per checkpoint is that
