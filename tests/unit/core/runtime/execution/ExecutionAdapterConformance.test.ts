@@ -483,10 +483,10 @@ describe('the assembled ChatRuntime adapter', () => {
 
 describe('coverage over the four proof topologies', () => {
   const traces = [
-    { providerId: 'antigravity', streams: false, trace: antigravityTrace },
-    { providerId: 'codex', streams: true, trace: codexTrace },
-    { providerId: 'claude', streams: true, trace: claudeTrace },
-    { providerId: 'opencode', streams: true, trace: opencodeTrace },
+    { providerId: 'antigravity', trace: antigravityTrace },
+    { providerId: 'codex', trace: codexTrace },
+    { providerId: 'claude', trace: claudeTrace },
+    { providerId: 'opencode', trace: opencodeTrace },
   ];
 
   /**
@@ -521,14 +521,16 @@ describe('coverage over the four proof topologies', () => {
       .includes(classifyForPresentation(kind)))).toBe(true);
   });
 
-  it.each(traces)('$providerId streams exactly as its topology allows', ({ trace, streams }) => {
-    // The provider-specific half of the streaming decision: three topologies
-    // can carry a turn while it runs, and print mode cannot — one process, one
-    // output, at exit. A fixture disagreeing with its topology means either the
-    // backend stopped streaming or started claiming it could.
-    const streamed = recordedKinds(trace).includes('output-delta');
-
-    expect(streamed).toBe(streams);
+  it.each(traces)('$providerId delivers content the adapter can render', ({ trace }) => {
+    // `output-delta` is the only kind the adapter renders as text, so a
+    // topology recording none renders every answered turn as an empty one.
+    //
+    // This assertion used to read the other way for print mode: it required
+    // Antigravity to emit no content, on the reasoning that a process-per-run
+    // topology cannot stream. Cannot stream *incrementally* is true and stays
+    // recorded as the fixture's `topology`; cannot carry content was the wrong
+    // conclusion from it, and it survived only while the backend was dark.
+    expect(recordedKinds(trace)).toContain('output-delta');
   });
 
   it('renders exactly one kind as content and one as a terminal', () => {

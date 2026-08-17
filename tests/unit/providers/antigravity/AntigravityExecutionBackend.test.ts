@@ -54,6 +54,7 @@ describe('AntigravityExecutionBackend', () => {
 
     await expect(events).resolves.toMatchObject([
       { event: { kind: 'run-started' } },
+      { event: { kind: 'output-delta', channel: 'assistant', text: 'Antigravity result' } },
       { event: { kind: 'result', result: { storage: 'projection' } } },
       { event: { kind: 'terminal', terminal: 'succeeded', reason: 'completed' } },
     ]);
@@ -71,6 +72,36 @@ describe('AntigravityExecutionBackend', () => {
       scope: expect.objectContaining({ runId: trace.identity.runId }),
     }));
     expect((await events).filter(event => event.event.kind === 'terminal')).toHaveLength(1);
+  });
+
+  it('carries the answer only once the result is durable', async () => {
+    // `output-delta` is the kernel's only content-bearing event, and the
+    // presentation adapter renders nothing else as text. A backend that
+    // committed a result and said nothing would render an answered turn as an
+    // empty one — invisible while this provider was dark, and the whole turn
+    // at its flip.
+    //
+    // Published with the committed result rather than on process exit, because
+    // an exit whose commit never settles is `indeterminate`: showing the text
+    // there would present an answer Grimoire cannot promise it kept.
+    const unknownCommit = createFixture();
+    unknownCommit.resultSink.deferForever();
+    const unknownProcess = unknownCommit.runner.enqueue();
+    const unknownSession = await createSession(unknownCommit.backend);
+    const unknownRun = unknownSession.createRun(request(RUN_ID));
+    const unknownEvents = collectEvents(unknownRun);
+
+    unknownProcess.complete({ exitCode: 0, stdout: 'answer with unknown commit', stderr: '' });
+    await waitFor(() => unknownCommit.resultSink.inputs.length === 1);
+    const cancellation = unknownRun.cancel();
+    await flushPromises();
+    unknownCommit.scheduler.fireAll();
+    await cancellation;
+
+    expect(summarizeEvents(await unknownEvents)).toEqual([
+      'run-started',
+      'terminal:indeterminate:effects-unknown',
+    ]);
   });
 
   it('uses provider transcript recovery only when stdout is empty', async () => {
@@ -410,7 +441,7 @@ describe('AntigravityExecutionBackend', () => {
     process.complete({ exitCode: 0, stdout: 'plain result', stderr: '' });
 
     const kinds = (await events).map(event => event.event.kind);
-    expect(kinds).toEqual(['run-started', 'result', 'terminal']);
+    expect(kinds).toEqual(['run-started', 'output-delta', 'result', 'terminal']);
   });
 });
 
@@ -639,6 +670,9 @@ async function collectEvents(run: ExecutionRun): Promise<ProviderExecutionEvent[
 
 function summarizeEvents(events: readonly ProviderExecutionEvent[]): string[] {
   return events.map(event => {
+    if (event.event.kind === 'output-delta') {
+      return `output-delta:${event.event.channel}`;
+    }
     if (event.event.kind === 'result') {
       return `result:${event.event.result.storage}`;
     }

@@ -1657,6 +1657,49 @@ gate test fails against a `dispose()` that does nothing, which the previous suit
 
 Gates: unit 456 suites / 7750 tests, integration 6 / 220, typecheck, lint, `build:release` clean.
 
+### M2-flips — the answer had nowhere to go (this commit)
+
+Wiring the Antigravity flip began by reading what the adapter would render, and the answer was
+nothing. `output-delta` is the kernel's only content-bearing event and the only kind the adapter
+turns into text; the Antigravity backend never emitted one. It committed a result and finished. A
+`ResultRef` is `resultId`, `storage`, `digest` — an identity, not a payload — so the flip as planned
+would have shipped a provider whose every successful turn rendered **empty**.
+
+Invisible until now for a specific reason: the backend's own suite asserts the events it emits, the
+conformance suite asserts they are classifiable, and nothing asserted that a turn a user can read
+comes out the other end. Dark code cannot fail that way, which is why the proof providers passed.
+
+The backend now publishes the committed output as one `output-delta` on the assistant channel,
+immediately before the `result`. Three things follow from where it is placed:
+
+- **with the result, not on process exit.** An exit whose commit never settles is `indeterminate`;
+  showing the text there presents an answer Grimoire cannot promise it kept. The negative half is
+  a test: a never-settling sink yields `run-started` then `terminal:indeterminate:effects-unknown`,
+  with no content;
+- **transient, so D2 holds.** The durable copy is the committed result. A second one in the control
+  store is exactly what D2 forbids without exception;
+- **one delta, not a stream.** Print mode answers in one piece. That is what the topology says, and
+  the whole output is a legitimate single delta.
+
+The trace fixture and the backend were edited together, which is what the semantic freeze is for.
+
+**A conformance claim was wrong and is retired.** `ExecutionAdapterConformance` asserted per
+provider whether its fixture records `output-delta`, with Antigravity declared `streams: false` on
+the reasoning that a process-per-run topology cannot stream. Cannot stream *incrementally* is true
+and stays recorded as the fixture's `topology`; cannot carry content was the wrong conclusion drawn
+from it, and the gate froze the defect in place instead of catching it. The assertion now requires
+every proof topology to record content the adapter can render — the property that actually protects
+a user-visible turn. An adjacency rule was tried first as a replacement claim and dropped: the
+fixtures cannot express it, since the streaming providers' success cases also place their delta next
+to the result.
+
+Proven by injection: with the emission suppressed, three tests fail across the backend suite and the
+conformance suite. Gates: unit 456 suites / 7751 tests, integration 6 / 220, typecheck, lint, and
+`build:release` clean.
+
+Still dark — nothing constructs the backend, and `build:release` left the generated `main.js` and
+`styles.css` byte-identical, which is the same fact stated by the build rather than by a test.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -1692,9 +1735,14 @@ can be a client of the registry. Three backends stream through it.
 
 **In progress: M2-flips, wave 1 — Antigravity**, the smallest topology, with no resume and no agents.
 The kernel host the flip owns is built, corrected, and still dark; `agy` 1.1.13 is installed, so the
-flip can be smoke-tested against a live CLI. What remains is the wiring: the host constructed in
-`onload` and disposed in `onunload`, an Antigravity backend context, and the provider's
-`createRuntime` returning `ExecutionChatRuntimeAdapter`.
+flip can be smoke-tested against a live CLI. The backend now delivers its answer as content the
+adapter can render, which it did not before wiring began — see the entry above.
+
+What remains is the wiring: the host constructed in `onload` and disposed in `onunload`, an
+Antigravity backend context — a request resolver that turns an opaque `requestRef` back into an
+invocation, a production result sink, and the process runner over `NodeAntigravityProcessTransport`,
+which already exists — and the provider's `createRuntime` returning `ExecutionChatRuntimeAdapter`,
+followed by deleting `AntigravityChatRuntime` and its dead helpers.
 
 That checkpoint **changes production behaviour for the first time** — the kernel enters production,
 the control store appears under `.grimoire/`, and `darkBundle.test.ts` stops being the right gate for

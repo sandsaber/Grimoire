@@ -32,11 +32,13 @@
   "cases": {
     "stdoutSuccess": [
       "run-started",
+      "output-delta:assistant",
       "result:projection",
       "terminal:succeeded:completed"
     ],
     "transcriptRecovery": [
       "run-started",
+      "output-delta:assistant",
       "result:projection",
       "terminal:succeeded:completed"
     ],

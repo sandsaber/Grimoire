@@ -227,6 +227,7 @@ class AntigravityExecutionRun implements ExecutionRun {
   private resultCommit: Promise<ResultCommitSettlement> | undefined;
   private resultCommitAbort: AbortController | undefined;
   private committedResult: ResultRef | undefined;
+  private committedOutput: string | undefined;
   private resultPublished = false;
 
   constructor(
@@ -437,6 +438,7 @@ class AntigravityExecutionRun implements ExecutionRun {
     }
     const abort = new AbortController();
     this.resultCommitAbort = abort;
+    this.committedOutput = output;
     const commit = Promise.resolve().then(() => {
       if (abort.signal.aborted) {
         return { kind: 'aborted' } as const;
@@ -478,6 +480,18 @@ class AntigravityExecutionRun implements ExecutionRun {
       return;
     }
     this.resultPublished = true;
+    if (this.committedOutput) {
+      // Print mode answers in one piece, so this is the whole turn rather than
+      // a delta. It is still the transient event, because the durable copy is
+      // the committed result and a second one in the control store is what D2
+      // forbids. Emitted here, with the result, so text never appears for a run
+      // whose commit stayed unknown.
+      this.emit({
+        kind: 'output-delta',
+        channel: 'assistant',
+        text: this.committedOutput,
+      });
+    }
     this.emit({ kind: 'result', result });
     this.finish('succeeded', 'completed');
   }
