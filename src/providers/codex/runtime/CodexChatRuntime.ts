@@ -33,6 +33,7 @@ import { getVaultPath } from '../../../utils/path';
 import { buildContextFromHistory } from '../../../utils/session';
 import { codexPlanUsageStore } from '../app/CodexPlanUsageStore';
 import { CODEX_PROVIDER_CAPABILITIES } from '../capabilities';
+import { buildCodexTurnSandboxPolicy } from '../execution/CodexTurnSandboxPolicy';
 import {
   deriveCodexMemoriesDirFromSessionsRoot,
   deriveCodexSessionsRootFromSessionPath,
@@ -1010,51 +1011,30 @@ export class CodexChatRuntime implements ChatRuntime {
     transcriptRootTargetHint?: string | null,
     sessionFilePathHint?: string | null,
   ): SandboxPolicy | undefined {
-    if (sandboxMode === 'danger-full-access') {
-      return { type: 'dangerFullAccess' };
-    }
-
-    if (sandboxMode === 'read-only') {
-      return {
-        type: 'readOnly',
-        access: { type: 'fullAccess' },
-        networkAccess: false,
-      };
-    }
-
-    if (sandboxMode !== 'workspace-write') {
-      return undefined;
-    }
-
-    const mappedExternalContextPaths = this.mapRequiredHostPathsToTarget(
+    // Delegated so the flip and the runtime it replaces cannot drift apart on
+    // the one decision whose mistakes are not recoverable.
+    return buildCodexTurnSandboxPolicy({
+      sandboxMode,
       externalContextPaths,
-      'external context path',
-    );
-    const memoriesDirTarget = deriveCodexMemoriesDirFromSessionsRoot(transcriptRootTargetHint)
-      ?? this.resolveMemoriesDirTarget(sessionFilePathHint)
-      ?? (
-        this.launchSpec?.target.method === 'wsl'
-          ? null
-          : path.join(os.homedir(), '.codex', 'memories')
-      );
-
-    const writableRoots = [
-      this.launchSpec?.targetCwd ?? getVaultPath(this.plugin.app),
-      ...mappedExternalContextPaths,
-      memoriesDirTarget,
-      this.mapHostPathToTarget(os.tmpdir()),
-      this.launchSpec?.target.platformFamily === 'unix' ? '/tmp' : null,
-      this.mapHostPathToTarget(process.env.TMPDIR),
-    ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
-
-    return {
-      type: 'workspaceWrite',
-      writableRoots: [...new Set(writableRoots)],
-      readOnlyAccess: { type: 'fullAccess' },
-      networkAccess: false,
-      excludeTmpdirEnvVar: false,
-      excludeSlashTmp: false,
-    };
+      transcriptRootTarget: transcriptRootTargetHint,
+      target: {
+        workspaceRoot: this.launchSpec?.targetCwd ?? getVaultPath(this.plugin.app),
+        toTargetPath: (hostPath: string | null | undefined) => {
+          if (!hostPath) {
+            return null;
+          }
+          // Strict where a target exists: `null` means the target genuinely
+          // cannot see it, which the policy raises rather than substituting a
+          // path that would not resolve there.
+          return this.launchSpec
+            ? this.launchSpec.pathMapper.toTargetPath(hostPath)
+            : hostPath;
+        },
+        posixTarget: this.launchSpec?.target.platformFamily === 'unix',
+        remoteTarget: this.launchSpec?.target.method === 'wsl',
+        memoriesDirTarget: this.resolveMemoriesDirTarget(sessionFilePathHint),
+      },
+    });
   }
 
   private handleServerRequestResolved(params: ServerRequestResolvedNotification): void {
@@ -1433,20 +1413,6 @@ export class CodexChatRuntime implements ChatRuntime {
     }
 
     return this.launchSpec?.pathMapper.toTargetPath(hostPath) ?? hostPath;
-  }
-
-  private mapRequiredHostPathsToTarget(hostPaths: string[], label: string): string[] {
-    if (!this.launchSpec) {
-      return hostPaths;
-    }
-
-    return hostPaths.map((hostPath) => {
-      const targetPath = this.launchSpec!.pathMapper.toTargetPath(hostPath);
-      if (!targetPath) {
-        throw new Error(`Codex cannot access ${label} from the selected target: ${hostPath}`);
-      }
-      return targetPath;
-    });
   }
 
   private resolveTranscriptRootHost(sessionFilePath?: string | null): string | null {

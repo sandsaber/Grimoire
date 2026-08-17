@@ -2051,6 +2051,35 @@ module cannot see, and the two would disagree the first time a daemon restarted 
 Still dark. Gates: unit 459 suites / 7771 tests, integration 6 / 220, typecheck, lint, and
 `build:release` clean.
 
+### M2-flips — what a Codex turn may write, extracted and tested (this commit)
+
+The sandbox policy decides which directories a turn can write to, and it lived inside the legacy
+runtime as a private method with **no direct test** — reachable only by driving a whole turn through
+a daemon. It is the one decision in a turn whose mistakes are not recoverable in either direction: a
+writable root too many hands the model a directory the user never offered it, and one too few breaks
+editing in a way that reads as the model refusing to work.
+
+`buildCodexTurnSandboxPolicy` is now a pure function with the launch target behind a small port, and
+**the legacy runtime delegates to it**. One implementation, not two: an extraction the flip uses
+while the runtime keeps its own copy is a drift waiting for the checkpoint that changes one of them.
+
+Extracting it found two ways to get it subtly wrong, both caught before they shipped:
+
+- **the "is this machine POSIX" flag is not the "is this machine local" flag.** The memories
+  directory falls back to this process's home only where the target *is* this machine. A single
+  flag loses a case each way: a local Windows target is not POSIX but its home is ours, and a WSL
+  target is POSIX and its home is not. Written as one flag first, caught by asking what each case
+  actually needs;
+- **strict and lenient path mapping are not the same port.** The runtime had two helpers — one
+  returning the host path when the target mapping says nothing, one raising — and the first draft
+  routed everything through the lenient one. That turns a pinned context path the target cannot see
+  into a path that will not resolve there, and the turn answers about files it never read. The
+  legacy suite caught it: its WSL test went from the specific error to a crash further along.
+  Temp directories keep the lenient fallback, because a missing scratch directory is a degradation
+  and a missing pinned file is not.
+
+Gates: unit 460 suites / 7778 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
