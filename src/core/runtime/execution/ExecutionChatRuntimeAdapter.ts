@@ -468,6 +468,14 @@ export interface ExecutionChatRuntimeHostPorts {
     history?: ChatMessage[],
     options?: ChatRuntimeQueryOptions,
   ): string;
+  /**
+   * Encodes input for a run that is already going.
+   *
+   * Absent for a provider that cannot take it, which is what makes `steer`
+   * absent too — a capability the UI can test for, rather than one that is
+   * present and always fails.
+   */
+  encodeSteerRef?(turn: PreparedChatTurn): string;
   readonly reasoningControl: ProviderCapabilities['reasoningControl'];
   /** Provider-native session id, read from the session snapshot at M3. */
   currentSessionId(): string | null;
@@ -629,11 +637,24 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
 
   /** Present only where the provider can steer; absent otherwise, by contract. */
   get steer(): ((turn: PreparedChatTurn) => Promise<boolean>) | undefined {
-    return this.session.supportsSteering()
-      ? async () => {
-        throw new Error('Steering dispatch arrives with the provider request resolver at M3.');
+    // Absent unless the provider declares it *and* the host can encode an
+    // input for it. Present-but-failing would read to the UI as a capability,
+    // since it tests for the member's existence to offer the affordance.
+    if (!this.session.supportsSteering() || !this.ports.encodeSteerRef) {
+      return undefined;
+    }
+    return async (turn: PreparedChatTurn) => {
+      const active = this.active;
+      if (!active) {
+        // Nothing is running, so there is nothing to steer. The controller
+        // falls back to queueing the message, which is what the user wants.
+        return false;
       }
-      : undefined;
+      return this.context.registry.steerRun(
+        active.runId,
+        this.ports.encodeSteerRef?.(turn) ?? '',
+      );
+    };
   }
 
   /**

@@ -122,6 +122,19 @@ export interface ExecutionSession {
   getSnapshot(): ExecutionSessionSnapshot;
   subscribe(listener: ExecutionIngressEventListener): Unsubscribe;
   dispose(): Promise<void>;
+  /**
+   * Adds input to whichever run of this session is still going.
+   *
+   * Absent where the provider cannot take input mid-turn, which is most of
+   * them: a dispatched turn is normally closed. `false` means the provider
+   * declined — no run was open, or it was past the point of accepting — and is
+   * not an error.
+   *
+   * On the session rather than the run because the provider decides which run
+   * an input belongs to; and opaque for the same reason `requestRef` is, since
+   * only the provider knows what one of its inputs looks like.
+   */
+  steer?(requestRef: string): Promise<boolean>;
 }
 
 export interface ExecutionSessionConfig {

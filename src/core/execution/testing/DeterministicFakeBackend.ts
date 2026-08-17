@@ -249,6 +249,7 @@ export class DeterministicFakeBackend implements ExecutionBackend, InteractionPo
 export class DeterministicFakeSession implements ExecutionSession {
   readonly runs = new Map<RunId, DeterministicFakeRun>();
   readonly config: ExecutionSessionConfig;
+  readonly steeredRefs: string[] = [];
   disposeCount = 0;
   private readonly listeners = new Set<(event: ProviderExecutionEvent) => void>();
   private instanceId: SessionInstanceId;
@@ -290,6 +291,19 @@ export class DeterministicFakeSession implements ExecutionSession {
       throw new Error('Fake dispatch acknowledgement was lost.');
     }
     return run;
+  }
+
+  /**
+   * Records steered input, so the kernel's steering path has something real to
+   * land on. Declines once the session is disposed, which is the shape a
+   * provider past the point of accepting input answers with.
+   */
+  async steer(requestRef: string): Promise<boolean> {
+    if (this.disposed) {
+      return false;
+    }
+    this.steeredRefs.push(requestRef);
+    return true;
   }
 
   getSnapshot(): ExecutionSessionSnapshot {

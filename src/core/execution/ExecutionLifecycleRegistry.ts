@@ -607,6 +607,36 @@ export class ExecutionLifecycleRegistry {
     }
   }
 
+  /**
+   * Adds input to a run that is still going.
+   *
+   * Answers `false` rather than throwing for every reason a steer cannot land —
+   * unknown run, already terminal, cancellation under way, a provider that
+   * cannot take input mid-turn. The caller is a UI affordance the user pressed,
+   * and "it did not go through" is the whole of what it needs to know.
+   *
+   * Nothing is persisted. Steering is provider input, which D2 keeps out of the
+   * control store, and it changes no state machine position: the run was
+   * running before and is running after.
+   */
+  async steerRun(runId: RunId, requestRef: string): Promise<boolean> {
+    requireIdentifier(requestRef, 'steer request ref');
+    const run = this.runs.get(runId);
+    if (!run || run.record.terminal || run.record.cancellationRequested) {
+      return false;
+    }
+    const session = this.sessions.get(executionSessionId(run.record.executionSessionId));
+    if (!session?.session.steer) {
+      return false;
+    }
+    // Deliberately outside the session queue: this mutates no record, and
+    // queueing it behind the session's other work would delay input the user is
+    // typing at a run that is answering right now. A steer that races
+    // terminalization is answered by the provider, which is the only party that
+    // knows whether its turn could still take it.
+    return session.session.steer(requestRef);
+  }
+
   async resolveInteraction(resolution: InteractionResolution): Promise<void> {
     const interaction = this.requireInteraction(resolution.interactionId);
     const run = this.requireRun(runId(interaction.record.runId));

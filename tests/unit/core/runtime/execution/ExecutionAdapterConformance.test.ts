@@ -70,6 +70,7 @@ interface Harness {
   readonly context: ExecutionChatRuntimeAdapterContext;
   emit(runId: RunId, event: ExecutionEvent, deliveryId: string): Promise<unknown>;
   dispatched(runId: RunId): ExecutionRequest | undefined;
+  steeredRefs(): readonly string[];
 }
 
 async function createHarness(options: { ownSession?: boolean } = {}): Promise<Harness> {
@@ -117,6 +118,7 @@ async function createHarness(options: { ownSession?: boolean } = {}): Promise<Ha
       nextRunId: () => toRunId(`run-${(++runOrdinal).toString().padStart(32, '0')}`),
     },
     dispatched: runId => backend.dispatchedRequests.get(runId),
+    steeredRefs: () => [...backend.sessions.values()].flatMap(session => session.steeredRefs),
     emit(runId, event, deliveryId) {
       const delivery: ProviderExecutionEvent = {
         backendId: backend.descriptor.backendId,
@@ -437,6 +439,7 @@ describe('the assembled ChatRuntime adapter', () => {
           mcpMentions: new Set<string>(),
         }),
         encodeRequestRef: (turn: PreparedChatTurn) => `encoded:${turn.prompt}`,
+        encodeSteerRef: (turn: PreparedChatTurn) => `steer:${turn.prompt}`,
         reasoningControl: 'effort',
         currentSessionId: () => 'native-session',
       },
@@ -508,10 +511,46 @@ describe('the assembled ChatRuntime adapter', () => {
     expect(adapter.getCapabilities().supportsTurnSteer).toBe(true);
   });
 
-  it('exposes steer only where the provider steers', async () => {
+  it('exposes steer only where the provider steers and the host can encode input', async () => {
     const harness = await createHarness({ ownSession: true });
 
     expect(createAdapter(harness).steer).toBeDefined();
+    // A steering provider whose host cannot encode an input has no steer
+    // either: the controller offers the affordance by testing for the member,
+    // so one that is present and always fails reads to the user as a capability.
+    expect(new ExecutionChatRuntimeAdapter(
+      harness.context,
+      {
+        prepareTurn: (request: ChatTurnRequest) => ({
+          request,
+          persistedContent: request.text,
+          prompt: request.text,
+          isCompact: false,
+          mcpMentions: new Set<string>(),
+        }),
+        encodeRequestRef: () => 'encoded',
+        reasoningControl: 'effort',
+        currentSessionId: () => null,
+      },
+      codexProviderModule.features({
+        listSkills: async () => [],
+        listAgentMentions: async () => [],
+        refreshAgentMentions: async () => undefined,
+        resolveCliPath: async () => null,
+        listModels: async () => [],
+        refreshModels: async () => [],
+        readPlanUsage: async () => null,
+        shouldKeepWarm: () => false,
+        renderSettingsTab: () => undefined,
+        hydrateConversation: async () => ({ outcome: 'complete' as const }),
+        deleteConversationSession: async () => undefined,
+        resolveSessionId: () => 'thread-1',
+        isPendingFork: () => false,
+        recognizesSubagentTool: () => false,
+        parseSubagentDisplay: () => null,
+        dispose: async () => undefined,
+      }),
+    ).steer).toBeUndefined();
     expect(new ExecutionChatRuntimeAdapter(
       { ...harness.context, capabilities: antigravityProviderModule.capabilities },
       {
@@ -532,6 +571,50 @@ describe('the assembled ChatRuntime adapter', () => {
         refreshModels: async () => [],
       }),
     ).steer).toBeUndefined();
+  });
+
+  it('steers a running turn through the registry, and declines when it cannot', async () => {
+    // The first thing Codex needs that Antigravity did not, and the kernel had
+    // no path for it at all: `steer` was a stub that threw. It answers `false`
+    // rather than throwing for every reason an input cannot land, because the
+    // caller is a button the user pressed and the controller falls back to
+    // queueing the message instead.
+    const harness = await createHarness();
+    const adapter = createAdapter(harness);
+    const steer = adapter.steer;
+    if (!steer) {
+      throw new Error('Codex capabilities declare steering.');
+    }
+    const turn: PreparedChatTurn = {
+      request: { text: 'meanwhile' },
+      persistedContent: 'meanwhile',
+      prompt: 'meanwhile',
+      isCompact: false,
+      mcpMentions: new Set<string>(),
+    };
+
+    // Nothing running: nothing to add input to, and no throw on the way out.
+    expect(await steer(turn)).toBe(false);
+
+    const started = await startExecutionRun(harness.context, SESSION_ID, {
+      requestRef: 'opaque-request',
+    });
+    // The adapter steers its own active run, so it has to be the one that
+    // started it; this drives the same registry path the adapter uses.
+    const accepted = await harness.registry.steerRun(started.runId, 'steer:meanwhile');
+    await harness.emit(
+      started.runId,
+      { kind: 'terminal', terminal: 'succeeded', reason: 'completed' },
+      'd-1',
+    );
+    started.release();
+
+    expect(accepted).toBe(true);
+    expect(harness.steeredRefs()).toEqual(['steer:meanwhile']);
+    // And once the run is terminal the same input is declined rather than
+    // handed to a provider that has nothing left to add it to.
+    expect(await harness.registry.steerRun(started.runId, 'steer:too-late')).toBe(false);
+    expect(harness.steeredRefs()).toEqual(['steer:meanwhile']);
   });
 
   it('cancels and waits before disposing, because tabs close mid-turn', async () => {

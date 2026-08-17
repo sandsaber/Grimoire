@@ -1981,6 +1981,45 @@ The four suggestions were all real:
 
 Gates: unit 458 suites / 7764 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
 
+### M2-flips — wave 2 survey, and the kernel gap it found (this commit)
+
+Codex is a much larger flip than Antigravity, and the survey is the first deliverable: it names what
+has to exist before any wiring, and it found a capability the kernel does not have.
+
+**Steering has no path through the kernel.** Codex declares `supportsTurnSteer: true`, the backend
+implements `steer(executionSessionId, requestRef)` and resolves it into `turn/steer`, and the
+presentation adapter's `steer` was a stub that **threw** — "arrives with the provider request resolver
+at M3". Between them, nothing. The registry had no steering concept at all: no method, no contract
+member, no mention. Flipping Codex with that stub would have made a declared capability a thrown
+error the moment a user pressed it, and the controller offers the affordance by testing for the
+member's presence.
+
+Built end to end in this commit:
+
+- `ExecutionSession.steer?(requestRef)`, optional, opaque. On the session rather than the run because
+  the provider decides which run an input belongs to — and because Codex's backend already had
+  exactly that method, with that signature. Putting it on `ExecutionRun` collided with its own
+  provider-shaped `steer(UserInput[])`, which is how the session turned out to be the right home;
+- `registry.steerRun(runId, requestRef)`, which answers `false` for every reason an input cannot
+  land — unknown run, terminal, cancelling, provider without the port — because the caller is a
+  button and the controller falls back to queueing. It persists nothing and moves no state machine:
+  steering is provider input, which D2 keeps out of the control store, and the run was running before
+  and after. Deliberately outside the session queue, so input to a run that is answering now is not
+  held behind that session's other work;
+- the adapter's `steer`, present only when the provider declares steering **and** the host can encode
+  an input. Present-but-failing is the shape the UI cannot tell from a capability.
+
+The rest of the wave-2 survey, recorded so the sequence is not rediscovered: the request resolver
+must produce Codex's three thread intents (`new`, `resume`, `fork` with rollback), and the backend
+already dedupes "thread already loaded" through its own session state, so the legacy three-way branch
+does not need reproducing. The interaction bridge — approvals, questions, plan decisions — becomes
+reachable for the first time. `features` needs a real history port, unlike Antigravity's empty one.
+`supportsImageAttachments` and `supportsInstructionMode` are both true and neither has been exercised
+by a flip yet.
+
+Gates: unit 458 suites / 7765 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
+The steering guards are proven by injection.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2025,11 +2064,14 @@ reference, the backend resolves it into an `agy` invocation, and the print outpu
 chunk — over a fake process runner. That test found three defects the per-half suites could not, one
 of them fatal to every turn; they are in the entry above.
 
-**One gate remains, and it is manual.** The capability-driven smoke matrix runs against the built
-plugin in a real vault with `agy` 1.1.13 installed: new session, cancel mid-run, model selection,
-history replay across turns, and the fail-closed refusal of any permission mode short of full access.
-Its first attempt did not reach step one — the provider would not enable, for a login-shell reason
-older than the flip; see the entry above.
+**Wave 1's remaining gate is one manual check.** Four of the five smoke-matrix items are automated
+gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
+tree is actually gone — which needs the live CLI.
+
+**Wave 2 (Codex) is under way.** The survey is done and its first gap is closed: steering now has a
+path through the kernel, which it did not have at all. What remains is the request resolver with its
+three thread intents, the interaction bridge for approvals and questions, the history port, images
+and instruction mode, then the flip itself and the deletion of `CodexChatRuntime`.
 Antigravity declares no resume, plan mode, rewind, fork, images, provider commands, MCP tools, or
 steering, so those five items are the whole matrix. Until it passes, wave 1 is wired but not
 certified, and **wave 2 (Codex) must not start** — the point of one provider per checkpoint is that
