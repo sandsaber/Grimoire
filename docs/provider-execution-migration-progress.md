@@ -2080,6 +2080,57 @@ Extracting it found two ways to get it subtly wrong, both caught before they shi
 
 Gates: unit 460 suites / 7778 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
 
+### M2-flips — what a Codex turn carries, and what it asks for (this commit)
+
+The turn input builder was the last large piece of provider logic private to `CodexChatRuntime`:
+prompt, images and skills into `UserInput[]`, plus the parameters that decide what the model is for
+this turn — plan mode, orchestrator instructions, effort, service tier, reasoning summary. Neither
+half had a direct test. The bundle wrote real files into a real temp directory and could only be
+reached by driving a whole turn through a daemon; the parameters are settings the user chose and
+expects honoured on the very next turn.
+
+`buildCodexTurnInput` and `buildCodexTurnParameters` are now pure functions — the temp directory
+behind a small port, the target mapping behind a callback — and **the legacy runtime delegates to
+both**, as it does for the sandbox policy. One implementation, not two.
+
+Three things the extraction turned up:
+
+- **the attachment filename has never been read.** The helper reads `filename`; every caller hands
+  it a core `ImageAttachment`, which carries `name`. So every image Codex has ever been given was
+  written as `1-image-1.png` — the name the user attached it under never reached the model. Kept
+  exactly as it was, because what this checkpoint buys is parity between the two paths, not an
+  improvement to one of them; it is an open item below, owned by the flip;
+- **"the instructions already went out" had no test.** The legacy suite covers the direction where
+  orchestrator rules ride on the turn, and not the direction where they must not — a query that
+  already sent them as base instructions on a thread start or resume. That is the branch that
+  silently states the worker-plan contract twice in one conversation, and it is now pinned;
+- **behind a port, cleanup is no longer free to run twice.** The legacy version re-ran `rmSync` on
+  every call and got away with it through `force: true`. A port has no such guarantee, so the bundle
+  discards its directory once however often it is asked.
+
+Every new gate was proven by breaking it: sending the prompt before the images, dropping the
+"already sent" guard, silently skipping an image the target cannot see, and moving the effort
+fallback off `medium` each failed exactly one test, named. The delegation itself is held by the
+legacy runtime's own suite, which already covers `turn/start` parameters and image inputs and stayed
+green through the swap.
+
+Deleted from the runtime: `EFFORT_MAP`, its copy of `resolveCodexServiceTier`, `toAttachmentFilename`
+and its `_toAttachmentFilename` export, the local `ImageAttachment` and `CodexInputBundle` types, and
+the three node imports that only the bundle used — 123 lines out, 41 in.
+
+Parity manifest: `CodexTurnInput.ts` is recorded on the `provider-chat-execution` surface beside the
+sandbox policy. Worth knowing that this row is documentation rather than a gate — deleting it fails
+nothing, because the manifest checks the modules it lists and cannot miss one it does not. What
+actually binds the two paths is the legacy suite. No contribution-inventory row moved: row 10 moves
+at the flip, not before it.
+
+Gates: unit 461 suites / 7792 tests, integration 6 / 220, typecheck, lint, and `build:release`
+clean, review gates and the bundle load/open smoke included. One environment note for whoever
+resumes this on another machine: on Node 25 the runtime exposes a `localStorage` object without
+`getItem`, which fails 57 unit suites at `getHostnameKey` until jest is run with
+`--localstorage-file`. It is not a gate failure, and the new test mocks `@/utils/env` the way the
+provider settings suites already do.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2129,26 +2180,28 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is under way, and the next action is the turn input builder.**
+**Wave 2 (Codex) is under way, and the next action is the connection factory.**
 
-Done so far, each still dark and each proven by injection:
+Done so far. The first two are dark and proven by injection; the last two are shared, with the
+legacy runtime delegating to them, so they are already in the production bundle:
 
 | Piece | Where |
 |---|---|
 | A steering path through the kernel — it had none, and the adapter's `steer` threw | `ExecutionSession.steer?`, `registry.steerRun`, adapter `steer` |
 | The conversation binding the next turn depends on, and the host port that carries it | `CodexConversationBinding.ts`, `ports.syncConversation?` |
 | What a turn may write, extracted from the legacy runtime, which now delegates to it | `CodexTurnSandboxPolicy.ts` |
+| What a turn carries and what it asks the model to be, extracted the same way | `CodexTurnInput.ts` |
 
-**Next, in this order.** First the turn input builder — prompt, images, and skill inputs into
-`UserInput[]`, plus `collaborationMode` with plan mode and orchestrator developer instructions,
-effort, service tier, and reasoning summary. It is the last large piece of provider logic still
-private to `CodexChatRuntime`, and like the sandbox policy the legacy runtime should delegate to it
-rather than keep a second copy. Then the connection factory over `NodeCodexExecutionProcess`, the
-result sink, and the interaction bridge — approvals, questions and plan decisions become reachable
+**Next, in this order.** First the connection factory over `NodeCodexExecutionProcess`, then the
+result sink, then the interaction bridge — approvals, questions and plan decisions become reachable
 for the first time, through the adapter's `interactionPresenter` host port. Then the composition
 object holding what the backend and every tab runtime must share, an end-to-end turn test over a fake
 connection **written before the flip rather than after**, and only then the flip itself: registration,
 `main.ts`, the parity manifest, the `darkBundle` markers, and the deletion of `CodexChatRuntime`.
+One small piece of turn logic is still private to the runtime and belongs with the composition:
+`resolveCodexSandboxConfig`, which turns the permission mode into an approval policy and the sandbox
+mode the extracted policy reads. It is two branches, and a second copy of two branches is still a
+second copy.
 
 Two things to carry into that work. Codex declares `supportsImageAttachments` and
 `supportsInstructionMode`; no flip has exercised either, so neither has ever been proven through the
@@ -2165,6 +2218,11 @@ The remaining five providers need their own recordings before their own flips.
 
 Open obligations, each with an owner:
 
+- **an image attachment's name has never reached Codex.** The turn input builder reads `filename`
+  and every caller passes an `ImageAttachment`, which carries `name`, so attachments arrive as
+  `1-image-1.png` regardless of what the user attached. Extracted unchanged rather than fixed,
+  because a parity extraction is the wrong commit to change behaviour in; it is one word and one
+  test. Owner: wave 2, with the composition;
 - **the Windows process-ownership gate is flaky, and a flaky gate is worth less than none.**
   `CodexPersistentProcessOwnership.integration.test.ts` failed on a **documentation-only commit**
   (`634fe7c`) — the descendant did not publish its pid within 15s — and passed on re-run of the same

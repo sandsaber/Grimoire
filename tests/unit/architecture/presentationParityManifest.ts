@@ -546,8 +546,9 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/core/runtime/ChatRuntime.ts',
       'src/providers/claude/runtime/ClaudeChatRuntime.ts',
       'src/providers/codex/runtime/CodexChatRuntime.ts',
-      // Shared with the flip: the legacy runtime delegates to it, so the two
-      // cannot drift on what a turn may write.
+      // Shared with the flip: the legacy runtime delegates to them, so the two
+      // cannot drift on what a turn carries, asks for, or may write.
+      'src/providers/codex/execution/CodexTurnInput.ts',
       'src/providers/codex/execution/CodexTurnSandboxPolicy.ts',
       'src/providers/gemini/runtime/GeminiChatRuntime.ts',
       'src/providers/grok/runtime/GrokChatRuntime.ts',

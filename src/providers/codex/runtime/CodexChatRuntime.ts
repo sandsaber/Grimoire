@@ -1,11 +1,6 @@
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-
 import {
   buildSystemPrompt,
   computeSystemPromptKey,
-  getOrchestratorModeInstructions,
   type SystemPromptSettings,
 } from '../../../core/prompt/mainAgent';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
@@ -33,6 +28,13 @@ import { getVaultPath } from '../../../utils/path';
 import { buildContextFromHistory } from '../../../utils/session';
 import { codexPlanUsageStore } from '../app/CodexPlanUsageStore';
 import { CODEX_PROVIDER_CAPABILITIES } from '../capabilities';
+import {
+  buildCodexTurnInput,
+  buildCodexTurnParameters,
+  type CodexTurnImageAttachment,
+  type CodexTurnInputBundle,
+  resolveCodexServiceTier,
+} from '../execution/CodexTurnInput';
 import { buildCodexTurnSandboxPolicy } from '../execution/CodexTurnSandboxPolicy';
 import {
   deriveCodexMemoriesDirFromSessionsRoot,
@@ -42,14 +44,11 @@ import {
 import { updateCodexModelDiscoveryState } from '../modelDiscoveryState';
 import { encodeCodexTurn } from '../prompt/encodeCodexTurn';
 import {
-  getEffectiveCodexReasoningSummary,
-} from '../settings';
-import {
   extractExplicitCodexSkillNames,
   findPreferredCodexSkillByName,
 } from '../skills/CodexSkillListingService';
 import { type CodexProviderState, getCodexState } from '../types';
-import { DEFAULT_CODEX_PRIMARY_MODEL, FAST_TIER_CODEX_MODEL } from '../types/models';
+import { DEFAULT_CODEX_PRIMARY_MODEL } from '../types/models';
 import { CodexAppServerProcess } from './CodexAppServerProcess';
 import {
   initializeCodexAppServerTransport,
@@ -70,7 +69,6 @@ import type {
   TurnStartedNotification,
   TurnStartResult,
   TurnSteerResult,
-  UserInput,
 } from './codexAppServerTypes';
 import type { CodexLaunchSpec } from './codexLaunchTypes';
 import { listCodexModelsViaTransport } from './CodexModelListingService';
@@ -89,20 +87,6 @@ function resolveCodexSandboxConfig(permissionMode: string): { approvalPolicy: st
   }
   return { approvalPolicy: 'on-request', sandbox: 'read-only' };
 }
-
-function resolveCodexServiceTier(serviceTier: unknown, model: string | undefined): string | null {
-  if (model !== FAST_TIER_CODEX_MODEL) {
-    return null;
-  }
-  return serviceTier === 'fast' ? 'fast' : null;
-}
-
-const EFFORT_MAP: Record<string, string> = {
-  low: 'low',
-  medium: 'medium',
-  high: 'high',
-  xhigh: 'xhigh',
-};
 
 const COMPLETION_RECOVERY_GRACE_MS = 400;
 const COMPLETION_RECOVERY_RETRY_BASE_MS = 250;
@@ -138,7 +122,7 @@ export class CodexChatRuntime implements ChatRuntime {
   private chunkResolve: (() => void) | null = null;
 
   private approvalDismisser: (() => void) | null = null;
-  private activeInputBundles = new Set<CodexInputBundle>();
+  private activeInputBundles = new Set<CodexTurnInputBundle>();
 
   // Fork state
   private pendingFork: ForkSource | null = null;
@@ -426,10 +410,16 @@ export class CodexChatRuntime implements ChatRuntime {
         this.registerActiveInputBundle(turnInputBundle);
 
         // Start turn
-        const providerSettings = this.getProviderSettings();
-        const effort = EFFORT_MAP[providerSettings.effortLevel as string] ?? 'medium';
-        const resolvedModel = model ?? DEFAULT_CODEX_PRIMARY_MODEL;
-        const isPlanMode = providerSettings.permissionMode === 'plan';
+        // Delegated so the flip and the runtime it replaces cannot drift apart
+        // on what this turn asks the model to be.
+        const turnParameters = buildCodexTurnParameters({
+          settings: this.getProviderSettings(),
+          model,
+          orchestratorMode,
+          baseInstructionsAlreadySent: sentBaseInstructionsThisQuery,
+        });
+        const resolvedModel = turnParameters.model;
+        const isPlanMode = turnParameters.collaborationMode.mode === 'plan';
         const externalContextPaths = this.resolveExternalContextPaths(turn, queryOptions);
         const permissionMode = this.resolveSandboxConfig();
         const transcriptRootTarget = this.runtimeContext?.sessionsDirTarget
@@ -442,20 +432,6 @@ export class CodexChatRuntime implements ChatRuntime {
           sessionFilePathHint,
         );
 
-        const collaborationMode = {
-          mode: isPlanMode ? 'plan' as const : 'default' as const,
-          settings: {
-            model: resolvedModel,
-            reasoning_effort: effort,
-            developer_instructions: orchestratorMode && !sentBaseInstructionsThisQuery
-              ? getOrchestratorModeInstructions()
-              : null,
-          },
-        };
-
-        const summary = getEffectiveCodexReasoningSummary(providerSettings, resolvedModel);
-        const serviceTier = resolveCodexServiceTier(providerSettings.serviceTier, resolvedModel);
-
         // Configure router plan state before turn/start so buffered notifications
         // that arrive before currentTurnId is set already see the correct state.
         this.notificationRouter?.beginTurn({ isPlanTurn: isPlanMode });
@@ -465,11 +441,11 @@ export class CodexChatRuntime implements ChatRuntime {
           input: turnInputBundle.input,
           approvalPolicy: permissionMode.approvalPolicy,
           model: resolvedModel,
-          serviceTier,
-          effort,
-          summary,
+          serviceTier: turnParameters.serviceTier,
+          effort: turnParameters.effort,
+          summary: turnParameters.summary,
           sandboxPolicy,
-          collaborationMode,
+          collaborationMode: turnParameters.collaborationMode,
         });
         this.currentTurnId = turnResult.turn.id;
         this.recordTurnMetadata({
@@ -766,11 +742,11 @@ export class CodexChatRuntime implements ChatRuntime {
     this.serverRequestRouter.abortPendingAskUser();
   }
 
-  private registerActiveInputBundle(bundle: CodexInputBundle): void {
+  private registerActiveInputBundle(bundle: CodexTurnInputBundle): void {
     this.activeInputBundles.add(bundle);
   }
 
-  private disposeInputBundle(bundle: CodexInputBundle): void {
+  private disposeInputBundle(bundle: CodexTurnInputBundle): void {
     if (this.activeInputBundles.delete(bundle)) {
       bundle.cleanup();
       return;
@@ -1327,53 +1303,19 @@ export class CodexChatRuntime implements ChatRuntime {
     }
   }
 
-  private buildInput(text: string, images?: ImageAttachment[], skills?: SkillInput[]): CodexInputBundle {
-    const input: UserInput[] = [];
-    let tempDir: string | null = null;
-
-    const cleanup = (): void => {
-      if (!tempDir) {
-        return;
-      }
-
-      try {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      } catch {
-        // best-effort cleanup
-      }
-    };
-
-    try {
-      if (images && images.length > 0) {
-        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'grimoire-codex-images-'));
-        for (let i = 0; i < images.length; i++) {
-          const img = images[i];
-          if (!img.mediaType.startsWith('image/')) continue;
-
-          const filename = toAttachmentFilename(img, i);
-          const filePath = path.join(tempDir, `${i + 1}-${filename}`);
-          fs.writeFileSync(filePath, Buffer.from(img.data, 'base64'));
-          const targetFilePath = this.mapHostPathToTarget(filePath);
-          if (!targetFilePath) {
-            throw new Error(`Codex cannot access image attachment path from the selected target: ${filePath}`);
-          }
-          input.push({ type: 'localImage', path: targetFilePath });
-        }
-      }
-
-      if (text) {
-        input.push({ type: 'text', text, text_elements: [] });
-      }
-
-      if (skills && skills.length > 0) {
-        input.push(...skills);
-      }
-
-      return { input, cleanup };
-    } catch (error) {
-      cleanup();
-      throw error;
-    }
+  private buildInput(
+    text: string,
+    images?: readonly CodexTurnImageAttachment[],
+    skills?: readonly SkillInput[],
+  ): CodexTurnInputBundle {
+    // Delegated so the flip and the runtime it replaces cannot drift apart on
+    // what a turn actually carries, or on where its attachments are written.
+    return buildCodexTurnInput({
+      text,
+      images,
+      skills,
+      toTargetPath: hostPath => this.mapHostPathToTarget(hostPath),
+    });
   }
 
   private toHostSessionPath(targetPath: string | null | undefined): string | null {
@@ -1449,31 +1391,6 @@ export class CodexChatRuntime implements ChatRuntime {
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// Image attachment helpers
-// ---------------------------------------------------------------------------
-
-interface ImageAttachment {
-  data: string;
-  mediaType: string;
-  filename?: string;
-}
-
-interface CodexInputBundle {
-  input: UserInput[];
-  cleanup: () => void;
-}
-
-function toAttachmentFilename(attachment: ImageAttachment, index: number): string {
-  const base = (attachment.filename ?? '').trim().replace(/[^A-Za-z0-9._-]/g, '_') || `image-${index + 1}`;
-  if (base.includes('.')) return base;
-  const subtype = attachment.mediaType.split('/')[1] ?? 'img';
-  const extension = subtype === 'jpeg' ? 'jpg' : subtype;
-  return `${base}.${extension}`;
-}
-
-export { toAttachmentFilename as _toAttachmentFilename };
 
 // ---------------------------------------------------------------------------
 // Interrupt kind classification (preserved for history parsing)
