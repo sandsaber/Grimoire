@@ -33,6 +33,26 @@ about the path, not about the answer.
 supported when using Codex with a ChatGPT account"), and the refusal is worth knowing for row 21 —
 it arrives as a `thread/status/changed: systemError` and an `error` notification.
 
+## The half that runs itself
+
+Eight rows are driven headlessly by
+`tests/integration/app/execution/codex/CodexLiveSmoke.integration.test.ts`, against a real
+`codex app-server`. It is skipped unless asked for, because it starts a CLI and spends the account's
+tokens:
+
+```bash
+GRIMOIRE_CODEX_LIVE=1 npx jest --selectProjects=integration \
+  --runTestsByPath tests/integration/app/execution/codex/CodexLiveSmoke.integration.test.ts
+```
+
+`GRIMOIRE_CODEX_TRACE=1` adds the daemon's own notifications and every RPC beside the chunks, which
+is how each of the defects it found was read rather than guessed. `GRIMOIRE_CODEX_CLI` points at a
+binary other than `codex` on `PATH`, and `GRIMOIRE_CODEX_MODEL` overrides the model.
+
+It covers rows 1, 2, 6, 8, 12, 14, 16 and 21 — all green as of `875a45d`. **The rows below that it
+does not cover are the ones a person has to look at**: whether the tool card, the diff, the plan, the
+badges and the two-tab behaviour actually render.
+
 ## The matrix
 
 | # | What to do | What must happen |

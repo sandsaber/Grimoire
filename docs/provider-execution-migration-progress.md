@@ -3066,10 +3066,26 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is flipped and uncertified. Eight rows of its matrix run live and all eight pass.
-What remains is the half a person has to look at — the rendering rows of
-[`docs/codex-flip-smoke-matrix.md`](codex-flip-smoke-matrix.md), in a vault, with the release build —
-and wave 1's single remaining row with them.**
+**Wave 2 (Codex) is flipped and uncertified. Eight rows of its matrix run live and all eight pass;
+the command that runs them is in the matrix document under "the half that runs itself".**
+
+**Next, in order:**
+
+1. **the rendering rows** — everything in [`docs/codex-flip-smoke-matrix.md`](codex-flip-smoke-matrix.md)
+   that the live harness cannot answer: whether the tool card, the diff, the plan, the plan-limit and
+   context badges, and two tabs side by side actually *look* right in a vault on a release build.
+   That is what certifies wave 2;
+2. **wave 1's last row** — that the `agy` process tree is gone after a cancel, which needs the live
+   CLI and certifies wave 1;
+3. **the Windows job guardian**, measured two entries above: it compiles on every launch, which is
+   latency the product pays and the reason that gate is flaky. Its own checkpoint, before the next
+   persistent-daemon provider flips;
+4. **then M2-flips wave 3** — the next provider, with the five recordings and the wire-vocabulary
+   obligations that come with it.
+
+Two open items carried from the reviews: a plan turn that produces nothing reads as a silent success
+(the expectation is declared before `sawPlanDelta` is known), and a Codex result reference cannot be
+resolved back to the turn that produced it (M5, with result provenance).
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:
