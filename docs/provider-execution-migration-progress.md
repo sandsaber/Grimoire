@@ -2197,6 +2197,54 @@ with the unit suite re-run after the build so the `darkBundle` markers were chec
 gate was proven by breaking it: one identity per run, the key embedded verbatim, no digest, and
 committing through the cancellation window each failed exactly the tests that claim those properties.
 
+### M2-flips — external review of the Codex wave: one bug, eight more, all confirmed (this commit)
+
+Nine findings against `a725a27..cb5a3c7`, every one of them checked against the code before anything
+was changed, and every one real. Three were defects rather than polish.
+
+**The bug: a test that only passed on this machine.** The sandbox suite asserted the whole writable
+root list — `['/mnt/c/vault', '/tmp']` — while the policy also appends the host `os.tmpdir()` and
+`$TMPDIR`, deliberately leniently. On Linux with the default temp those collapse into `/tmp` and the
+assertion is accidentally green; re-run with `TMPDIR=/var/tmp/elsewhere` and it fails, which is what
+a macOS or Windows job would have hit. It now asserts what the case is about: the workspace is
+writable, POSIX `/tmp` is, and no home-derived memories path was invented.
+
+**The launch spec was retired by any process exit, including one that had already been replaced.**
+The backend swaps a lost connection without waiting for the old process to die, so the retired
+daemon's exit arrives *after* its replacement is running — on the same spec. Clearing it there means
+the next path mapping resolves a fresh spec while the live daemon runs on the old one: the host/WSL
+split `CodexActiveLaunchSpec` exists to prevent. It now counts daemons per spec and retires one only
+when the last launched from it is gone, and a release belongs to its own spec so a late one cannot
+retire a newer.
+
+**The adapter's `steer` was never driven on a live run.** The test that reads as if it did started
+the run through the registry and then called `registry.steerRun` directly, so `this.active` plus the
+host encoder — the production path — was covered only for the idle `false` case. Driving it properly
+failed immediately, and for the reason the reviewer predicted: the conformance host encoded
+`steer:${turn.prompt}` and the registry accepts only `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`, so a real
+queued message with a space in it throws out of `steerRun` — which `InputController` reports as a
+failure notice instead of the documented "not accepted, put it back in the queue". The host now mints
+an opaque reference the way a real one does, both encode ports say so in their contract, and the
+adapter's `?? ''` fallback is gone: the only value it could ever supply is one the registry refuses.
+
+The rest, each fixed:
+
+- the extracted attachment type read `filename` while the chat surface sets `name`. Recorded as an
+  open item last checkpoint; fixed here instead, because leaving it would have let the flip inherit
+  the mismatch as a contract. Images now reach Codex under the name the user attached them with;
+- the factory test used one path for both `spawnCwd` and `targetCwd`, so nothing would have caught
+  spawning the daemon in the target path. They differ now, and swapping them fails the test;
+- the resume pointer said wave 2 was under way while a paragraph below it still said wave 2 "must not
+  start". The rule is restated as **no second flip may land** until wave 1 is certified, with dark
+  preparation named as what proceeds meanwhile;
+- three "delegated so the two cannot drift" comments in the legacy runtime narrated the extraction
+  rather than constraining the code around them. Dropped; the invariant now sits once in each
+  extracted module, where the reader who might duplicate it is standing;
+- the deterministic fake always had a `steer`, so the registry's "this backend cannot take mid-turn
+  input" branch had no test. The fake can be a non-steering provider now, and that branch is covered.
+
+Gates: unit 463 suites / 7809 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2276,10 +2324,14 @@ Two things to carry into that work. Codex declares `supportsImageAttachments` an
 adapter. And the wave-1 lesson holds: **a seam both sides stub is not covered** — the end-to-end
 composition test is what found every fatal defect in wave 1, and it found them only because it ran
 before the flip was trusted.
+
 Antigravity declares no resume, plan mode, rewind, fork, images, provider commands, MCP tools, or
 steering, so those five items are the whole matrix. Until it passes, wave 1 is wired but not
-certified, and **wave 2 (Codex) must not start** — the point of one provider per checkpoint is that
-the first one is proven against a live CLI before the pattern is repeated eight times.
+certified, and **no second flip may land** — the point of one provider per checkpoint is that the
+first one is proven against a live CLI before the pattern is repeated eight times. What proceeds
+meanwhile is wave 2's dark preparation, which changes no production behaviour and is revertible as
+commits; the Codex flip waits on wave 1's certification. An earlier version of this sentence said
+wave 2 "must not start", which the wave-2 table above contradicted.
 
 **M0b is satisfied for the four proof providers**, recorded from live CLIs on the owner's machine.
 The remaining five providers need their own recordings before their own flips.
@@ -2291,11 +2343,6 @@ Open obligations, each with an owner:
   locate the answer, and the backend holds the thread and turn ids it would take, but does not pass
   them. Nothing resolves a result reference today, which is why this is recorded rather than built.
   Owner: M5, with result provenance;
-- **an image attachment's name has never reached Codex.** The turn input builder reads `filename`
-  and every caller passes an `ImageAttachment`, which carries `name`, so attachments arrive as
-  `1-image-1.png` regardless of what the user attached. Extracted unchanged rather than fixed,
-  because a parity extraction is the wrong commit to change behaviour in; it is one word and one
-  test. Owner: wave 2, with the composition;
 - **the Windows process-ownership gate is flaky, and a flaky gate is worth less than none.**
   `CodexPersistentProcessOwnership.integration.test.ts` failed on a **documentation-only commit**
   (`634fe7c`) — the descendant did not publish its pid within 15s — and passed on re-run of the same

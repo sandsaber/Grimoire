@@ -11,7 +11,8 @@ import { DEFAULT_CODEX_PRIMARY_MODEL, FAST_TIER_CODEX_MODEL } from '../types/mod
 export interface CodexTurnImageAttachment {
   readonly data: string;
   readonly mediaType: string;
-  readonly filename?: string;
+  /** The name the user attached it under, which is `ImageAttachment.name`. */
+  readonly name?: string;
 }
 
 /**
@@ -74,6 +75,9 @@ export interface CodexTurnInputBundle {
  * An image the target cannot see is an error rather than a silent omission —
  * the alternative sends a prompt that talks about a picture that was never
  * attached, which reads as the model ignoring it.
+ *
+ * There is one implementation: the legacy runtime delegates here until the flip
+ * deletes it, so the two paths cannot compose a turn differently.
  */
 export function buildCodexTurnInput(sources: CodexTurnInputSources): CodexTurnInputBundle {
   const scratch = sources.scratch ?? nodeCodexAttachmentScratch;
@@ -128,7 +132,7 @@ export function toCodexAttachmentFilename(
   attachment: CodexTurnImageAttachment,
   index: number,
 ): string {
-  const base = (attachment.filename ?? '').trim().replace(/[^A-Za-z0-9._-]/g, '_') || `image-${index + 1}`;
+  const base = (attachment.name ?? '').trim().replace(/[^A-Za-z0-9._-]/g, '_') || `image-${index + 1}`;
   if (base.includes('.')) return base;
   const subtype = attachment.mediaType.split('/')[1] ?? 'img';
   const extension = subtype === 'jpeg' ? 'jpg' : subtype;

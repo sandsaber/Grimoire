@@ -115,7 +115,12 @@ describe('Codex turn sandbox policy', () => {
     });
 
     const roots = policy?.type === 'workspaceWrite' ? policy.writableRoots : [];
-    expect(roots).toEqual(['/mnt/c/vault', '/tmp']);
+    expect(roots).toContain('/mnt/c/vault');
+    expect(roots).toContain('/tmp');
+    // The properties, not the list: the temp fallbacks are deliberately lenient
+    // and name this machine's directories, so asserting the whole list would be
+    // asserting what `os.tmpdir()` happens to be on the machine running it.
+    expect(roots.some(root => root.includes('.codex'))).toBe(false);
   });
 
   it('prefers the memories directory the caller already resolved', () => {

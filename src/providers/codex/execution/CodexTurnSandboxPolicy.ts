@@ -55,6 +55,9 @@ export interface CodexTurnSandboxInputs {
  * An external context path the target cannot see is an error rather than a
  * silent omission — the user pinned it, and a turn that quietly cannot read it
  * answers about files it never saw.
+ *
+ * There is one implementation: the legacy runtime delegates here until the flip
+ * deletes it, so the two paths cannot answer this differently.
  */
 export function buildCodexTurnSandboxPolicy(
   inputs: CodexTurnSandboxInputs,

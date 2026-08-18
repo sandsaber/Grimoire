@@ -474,6 +474,11 @@ export interface ExecutionChatRuntimeHostPorts {
    *
    * Core never learns what is inside it; that is the whole point of
    * `requestRef` being a string the provider round-trips.
+   *
+   * It must be a constrained identifier — `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`,
+   * enforced by the registry — so it is a minted id with the turn kept in a
+   * store, never the prompt in a wrapper: a message with a space in it is not
+   * an identifier, and every real message has one.
    */
   encodeRequestRef(
     turn: PreparedChatTurn,
@@ -486,8 +491,16 @@ export interface ExecutionChatRuntimeHostPorts {
    * Absent for a provider that cannot take it, which is what makes `steer`
    * absent too — a capability the UI can test for, rather than one that is
    * present and always fails.
+   *
+   * Minted under the same rule as `encodeRequestRef`, and for a sharper reason:
+   * a reference the registry refuses throws out of `steerRun`, and the input
+   * controller reads a throw as a failure notice rather than as the documented
+   * "not accepted, put it back in the queue".
+   *
+   * Declared as a property rather than a method because the adapter captures it
+   * once, at the point where it decides whether `steer` exists at all.
    */
-  encodeSteerRef?(turn: PreparedChatTurn): string;
+  readonly encodeSteerRef?: (turn: PreparedChatTurn) => string;
   readonly reasoningControl: ProviderCapabilities['reasoningControl'];
   /** Provider-native session id, read from the session snapshot at M3. */
   currentSessionId(): string | null;
@@ -661,7 +674,8 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     // Absent unless the provider declares it *and* the host can encode an
     // input for it. Present-but-failing would read to the UI as a capability,
     // since it tests for the member's existence to offer the affordance.
-    if (!this.session.supportsSteering() || !this.ports.encodeSteerRef) {
+    const encodeSteerRef = this.ports.encodeSteerRef;
+    if (!this.session.supportsSteering() || !encodeSteerRef) {
       return undefined;
     }
     return async (turn: PreparedChatTurn) => {
@@ -671,10 +685,10 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
         // falls back to queueing the message, which is what the user wants.
         return false;
       }
-      return this.context.registry.steerRun(
-        active.runId,
-        this.ports.encodeSteerRef?.(turn) ?? '',
-      );
+      // The encoder is captured above rather than re-read here: read through
+      // the port it needs a fallback, and the only value a fallback could
+      // supply — an empty string — is one the registry refuses.
+      return this.context.registry.steerRun(active.runId, encodeSteerRef(turn));
     };
   }
 

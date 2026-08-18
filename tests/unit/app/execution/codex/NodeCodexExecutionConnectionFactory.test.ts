@@ -37,9 +37,54 @@ describe('Codex active launch spec', () => {
       () => ({ ...launchSpec(), command: commands.shift() ?? '/exhausted' }),
     );
 
-    expect(active.current().command).toBe('/old/codex');
-    active.invalidate();
+    const daemon = active.attach();
+    expect(daemon.spec.command).toBe('/old/codex');
+    daemon.release();
+
     expect(active.current().command).toBe('/new/codex');
+  });
+
+  it('keeps the spec while a daemon launched from it is still running', () => {
+    // The backend replaces a connection without waiting for the old process to
+    // die, so the retired one's exit arrives after the replacement is already
+    // running on the same spec. Retiring it there would answer the next path
+    // mapping for a target no live daemon is on.
+    let resolutions = 0;
+    const active = new CodexActiveLaunchSpec(() => {
+      resolutions += 1;
+      return launchSpec();
+    });
+
+    const retired = active.attach();
+    const live = active.attach();
+    expect(live.spec).toBe(retired.spec);
+
+    retired.release();
+
+    expect(active.current()).toBe(live.spec);
+    expect(resolutions).toBe(1);
+
+    live.release();
+    active.current();
+    expect(resolutions).toBe(2);
+  });
+
+  it('ignores a release from a daemon whose spec is already retired', () => {
+    let resolutions = 0;
+    const active = new CodexActiveLaunchSpec(() => {
+      resolutions += 1;
+      return launchSpec();
+    });
+
+    const first = active.attach();
+    first.release();
+    const second = active.attach();
+    expect(resolutions).toBe(2);
+
+    first.release();
+
+    expect(active.current()).toBe(second.spec);
+    expect(resolutions).toBe(2);
   });
 
   it('does not remember a resolution that failed', () => {
@@ -86,6 +131,7 @@ describe('Codex execution connection factory', () => {
       expect.objectContaining({
         executable: '/usr/local/bin/codex',
         arguments: ['app-server', '--listen', 'stdio://'],
+        // The host path, not `targetCwd`.
         cwd: '/vault',
         environment: { CODEX_HOME: '/codex' },
       }),
@@ -122,12 +168,39 @@ describe('Codex execution connection factory', () => {
     await connection.initialize();
     expect(resolutions).toBe(1);
 
-    system.stdin.emit('error', Object.assign(new Error('broken daemon pipe'), { code: 'EPIPE' }));
+    system.processes[0].stdin.emit('error', Object.assign(new Error('broken daemon pipe'), { code: 'EPIPE' }));
     await flushPromises();
 
     await factory.create().initialize();
 
     expect(resolutions).toBe(2);
+  });
+
+  it('does not retire the spec a live daemon is running on when an older one exits', async () => {
+    const system = new FakeProcessSystem();
+    let resolutions = 0;
+    const factory = new NodeCodexExecutionConnectionFactory({
+      activeLaunchSpec: new CodexActiveLaunchSpec(() => {
+        resolutions += 1;
+        return launchSpec();
+      }),
+      system,
+      platform: 'posix',
+    });
+
+    const retired = factory.create();
+    await retired.initialize();
+    const live = factory.create();
+    await live.initialize();
+    expect(resolutions).toBe(1);
+
+    system.processes[0].stdin.emit('error', new Error('retired daemon pipe closed'));
+    await flushPromises();
+
+    await factory.create().initialize();
+
+    // Still one resolution: the live daemon's spec was not retired under it.
+    expect(resolutions).toBe(1);
   });
 
   it('gives every connection its own process', async () => {
@@ -158,8 +231,11 @@ function launchSpec(): CodexLaunchSpec {
     target,
     command: '/usr/local/bin/codex',
     args: ['app-server', '--listen', 'stdio://'],
+    // Deliberately different: for a WSL target the process is spawned in a host
+    // directory while the daemon's workspace is the target path, and spawning
+    // in the target path would put the daemon somewhere that does not exist.
     spawnCwd: '/vault',
-    targetCwd: '/vault',
+    targetCwd: '/mnt/wsl/vault',
     env: { CODEX_HOME: '/codex' },
     pathMapper: {
       target,
@@ -173,17 +249,20 @@ function launchSpec(): CodexLaunchSpec {
 
 class FakeProcessSystem implements LocalProcessSystem {
   readonly launches: Array<Parameters<LocalProcessSystem['spawn']>[0]> = [];
-  readonly stdin = new PassThrough();
-  readonly stdout = new PassThrough();
-  readonly stderr = new PassThrough();
+  /** One entry per spawn, so two daemons can be driven independently. */
+  readonly processes: Array<{ stdin: PassThrough; stdout: PassThrough }> = [];
   terminated = false;
 
   spawn(spec: Parameters<LocalProcessSystem['spawn']>[0]): SpawnedLocalProcess {
     this.launches.push(spec);
-    this.stdin.on('data', chunk => {
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    this.processes.push({ stdin, stdout });
+    stdin.on('data', chunk => {
       const message = JSON.parse(String(chunk)) as { id?: unknown; method?: string };
       if (message.method === 'initialize') {
-        this.stdout.write(`${JSON.stringify({
+        stdout.write(`${JSON.stringify({
           jsonrpc: '2.0',
           id: message.id,
           result: { userAgent: 'codex-fake' },
@@ -192,11 +271,11 @@ class FakeProcessSystem implements LocalProcessSystem {
     });
     return {
       termination: { pid: 42, kind: 'posix-process-group' },
-      stdin: this.stdin,
-      stdout: this.stdout,
-      stderr: this.stderr,
-      stdoutReadable: this.stdout,
-      stderrReadable: this.stderr,
+      stdin,
+      stdout,
+      stderr,
+      stdoutReadable: stdout,
+      stderrReadable: stderr,
       started: Promise.resolve(),
       exited: new Promise(() => undefined),
     };

@@ -84,13 +84,15 @@ describe('Codex turn input', () => {
     ]);
   });
 
-  it('writes each attachment decoded, under a name derived from the one it came with', () => {
+  it('writes each attachment decoded, under the name the chat surface gave it', () => {
     const { scratch, created, written } = recordingScratch();
 
     const bundle = buildCodexTurnInput({
       text: '',
       images: [
-        { data: Buffer.from('payload').toString('base64'), mediaType: 'image/png', filename: 'my diagram' },
+        // `name` is the field on the attachment the composer builds; a builder
+        // that reads anything else silently names every image after its index.
+        { data: Buffer.from('payload').toString('base64'), mediaType: 'image/png', name: 'my diagram' },
       ],
       toTargetPath: identityTarget,
       scratch,
@@ -109,7 +111,7 @@ describe('Codex turn input', () => {
     const bundle = buildCodexTurnInput({
       text: 'read this',
       images: [
-        { data: Buffer.from('pdf').toString('base64'), mediaType: 'application/pdf', filename: 'notes.pdf' },
+        { data: Buffer.from('pdf').toString('base64'), mediaType: 'application/pdf', name: 'notes.pdf' },
       ],
       toTargetPath: identityTarget,
       scratch,

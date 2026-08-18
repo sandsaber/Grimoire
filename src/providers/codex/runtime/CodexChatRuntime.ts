@@ -410,8 +410,6 @@ export class CodexChatRuntime implements ChatRuntime {
         this.registerActiveInputBundle(turnInputBundle);
 
         // Start turn
-        // Delegated so the flip and the runtime it replaces cannot drift apart
-        // on what this turn asks the model to be.
         const turnParameters = buildCodexTurnParameters({
           settings: this.getProviderSettings(),
           model,
@@ -987,8 +985,6 @@ export class CodexChatRuntime implements ChatRuntime {
     transcriptRootTargetHint?: string | null,
     sessionFilePathHint?: string | null,
   ): SandboxPolicy | undefined {
-    // Delegated so the flip and the runtime it replaces cannot drift apart on
-    // the one decision whose mistakes are not recoverable.
     return buildCodexTurnSandboxPolicy({
       sandboxMode,
       externalContextPaths,
@@ -1308,8 +1304,6 @@ export class CodexChatRuntime implements ChatRuntime {
     images?: readonly CodexTurnImageAttachment[],
     skills?: readonly SkillInput[],
   ): CodexTurnInputBundle {
-    // Delegated so the flip and the runtime it replaces cannot drift apart on
-    // what a turn actually carries, or on where its attachments are written.
     return buildCodexTurnInput({
       text,
       images,

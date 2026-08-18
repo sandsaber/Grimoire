@@ -67,6 +67,7 @@ const INSTANCE_ID = sessionInstanceId(`si-${'b'.repeat(32)}`);
 
 interface Harness {
   readonly registry: ExecutionLifecycleRegistry;
+  readonly backend: DeterministicFakeBackend;
   readonly context: ExecutionChatRuntimeAdapterContext;
   emit(runId: RunId, event: ExecutionEvent, deliveryId: string): Promise<unknown>;
   dispatched(runId: RunId): ExecutionRequest | undefined;
@@ -109,6 +110,7 @@ async function createHarness(options: { ownSession?: boolean } = {}): Promise<Ha
   }
   return {
     registry,
+    backend,
     context: {
       registry,
       backendId: backend.descriptor.backendId,
@@ -427,6 +429,25 @@ describe('execution adapter over the registry', () => {
 });
 
 describe('the assembled ChatRuntime adapter', () => {
+  /**
+   * What a host mints, and where the payload it stands for is kept.
+   *
+   * Opaque on purpose: the registry accepts only a constrained identifier, so a
+   * reference built out of the prompt is one space away from throwing. Real
+   * hosts mint an id and keep the turn in a store, which is what this imitates.
+   */
+  const refPayloads = new Map<string, string>();
+
+  function mintRef(prefix: string, turn: PreparedChatTurn): string {
+    const ref = `${prefix}-${refPayloads.size + 1}`;
+    refPayloads.set(ref, turn.prompt);
+    return ref;
+  }
+
+  function readRef(ref: string | undefined): string | undefined {
+    return ref === undefined ? undefined : refPayloads.get(ref);
+  }
+
   function createAdapter(harness: Harness): ExecutionChatRuntimeAdapter<CodexProviderSettings> {
     return new ExecutionChatRuntimeAdapter(
       harness.context,
@@ -438,8 +459,8 @@ describe('the assembled ChatRuntime adapter', () => {
           isCompact: false,
           mcpMentions: new Set<string>(),
         }),
-        encodeRequestRef: (turn: PreparedChatTurn) => `encoded:${turn.prompt}`,
-        encodeSteerRef: (turn: PreparedChatTurn) => `steer:${turn.prompt}`,
+        encodeRequestRef: (turn: PreparedChatTurn) => mintRef('req', turn),
+        encodeSteerRef: (turn: PreparedChatTurn) => mintRef('steer', turn),
         reasoningControl: 'effort',
         currentSessionId: () => 'native-session',
       },
@@ -500,7 +521,7 @@ describe('the assembled ChatRuntime adapter', () => {
     await harness.emit(runId, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, 'd-2');
 
     expect(await collected).toEqual([{ type: 'text', content: 'answer' }]);
-    expect(harness.dispatched(runId)?.requestRef).toBe('encoded:hello');
+    expect(readRef(harness.dispatched(runId)?.requestRef)).toBe('hello');
     expect(adapter.consumeTurnMetadata()).toEqual({ wasSent: true });
   });
 
@@ -615,6 +636,52 @@ describe('the assembled ChatRuntime adapter', () => {
     // handed to a provider that has nothing left to add it to.
     expect(await harness.registry.steerRun(started.runId, 'steer:too-late')).toBe(false);
     expect(harness.steeredRefs()).toEqual(['steer:meanwhile']);
+  });
+
+  it('declines input for a backend that cannot take it mid-turn', async () => {
+    // The registry decides by whether the session has a `steer` at all. That
+    // branch had no test, because the double always had one — a double that
+    // cannot represent the provider it stands for proves less than it appears.
+    const harness = await createHarness();
+    harness.backend.steerMode = 'unsupported';
+    const started = await startExecutionRun(harness.context, SESSION_ID, {
+      requestRef: 'opaque-request',
+    });
+
+    const accepted = await harness.registry.steerRun(started.runId, 'steer:anything');
+
+    await harness.emit(
+      started.runId,
+      { kind: 'terminal', terminal: 'succeeded', reason: 'completed' },
+      'd-1',
+    );
+    started.release();
+
+    expect(accepted).toBe(false);
+    expect(harness.steeredRefs()).toEqual([]);
+  });
+
+  it('adds input to the run it started, through its own steer', async () => {
+    // The production path, which the registry-level test above does not reach:
+    // `adapter.steer` finds its own active run, asks the host to encode the
+    // input, and hands the reference to the registry. The prompt has a space in
+    // it because a real queued message does, and the reference the host mints
+    // has to survive the registry's identifier rule either way.
+    const harness = await createHarness({ ownSession: true });
+    const adapter = createAdapter(harness);
+    const collected = drain(adapter.query(adapter.prepareTurn({ text: 'hello' })));
+    const runId = toRunId(`run-${'1'.padStart(32, '0')}`);
+    for (let attempt = 0; attempt < 200 && !harness.dispatched(runId); attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+
+    const steered = await adapter.steer?.(adapter.prepareTurn({ text: 'do this instead' }));
+
+    await harness.emit(runId, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, 'd-1');
+    await collected;
+
+    expect(steered).toBe(true);
+    expect(harness.steeredRefs().map(readRef)).toEqual(['do this instead']);
   });
 
   it('cancels and waits before disposing, because tabs close mid-turn', async () => {

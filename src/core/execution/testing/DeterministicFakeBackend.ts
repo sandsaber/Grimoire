@@ -34,6 +34,8 @@ import type {
 
 export type FakeDispatchMode = 'accept' | 'reject-side-effect-free' | 'lose-acknowledgement';
 export type FakeCancellationMode = 'acknowledge' | 'silent' | 'reject';
+/** `unsupported` leaves `steer` absent, which is how a provider that cannot take mid-turn input answers. */
+export type FakeSteerMode = 'accept' | 'unsupported';
 export type FakeDeliveryDestination = 'run' | 'session' | 'both';
 
 export interface FakeDeliveryOptions {
@@ -101,6 +103,7 @@ export class DeterministicFakeBackend implements ExecutionBackend, InteractionPo
   readonly dispatchedRequests = new Map<RunId, ExecutionRequest>();
   dispatchMode: FakeDispatchMode = 'accept';
   cancellationMode: FakeCancellationMode = 'acknowledge';
+  steerMode: FakeSteerMode = 'accept';
   interactionResolutionError: Error | undefined;
   interactionCancellationError: Error | undefined;
   disposeCount = 0;
@@ -297,13 +300,22 @@ export class DeterministicFakeSession implements ExecutionSession {
    * Records steered input, so the kernel's steering path has something real to
    * land on. Declines once the session is disposed, which is the shape a
    * provider past the point of accepting input answers with.
+   *
+   * Absent under `unsupported`, because the registry reads the capability off
+   * this member's presence: a double that always has one cannot stand for a
+   * provider that cannot take mid-turn input at all.
    */
-  async steer(requestRef: string): Promise<boolean> {
-    if (this.disposed) {
-      return false;
+  get steer(): ((requestRef: string) => Promise<boolean>) | undefined {
+    if (this.backend.steerMode === 'unsupported') {
+      return undefined;
     }
-    this.steeredRefs.push(requestRef);
-    return true;
+    return async (requestRef: string) => {
+      if (this.disposed) {
+        return false;
+      }
+      this.steeredRefs.push(requestRef);
+      return true;
+    };
   }
 
   getSnapshot(): ExecutionSessionSnapshot {
