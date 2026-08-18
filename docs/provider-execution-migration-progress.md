@@ -2447,6 +2447,40 @@ than in it: the script that appends it failed on a stale anchor and the commit w
 amended into the same commit, which is what the rule asks for, and the lesson is that a journal
 appended by a script needs the script's exit code checked.
 
+### M2-flips — the runtime half, and the defect the end-to-end turn found (this commit)
+
+`createRuntime` puts the adapter over this composition: `encodeCodexTurn` for the prompt, the request
+and steer references into the shared store, the conversation held per tab, the interaction presenter
+reading its callbacks late, and the bound thread as `currentSessionId`. With it, a whole Codex turn
+runs through the kernel over a fake connection — the runtime stores the turn, the backend starts a
+thread and a turn, the answer streams back, and the second turn joins the thread the first one bound.
+
+**And that test found what the flip would otherwise have shipped: approvals reach the surface, are
+answered, and the answer never gets back to Codex.** `CodexExecutionBackend` is also the interaction
+and recovery port, and `registerBackend({ backend })` wires neither. The registry then refuses the
+resolution with "backend has no interaction resolution port", the presentation adapter swallows that
+refusal by design — the registry is the authority on why a resolution failed — and the daemon waits
+forever on a request the user already answered. Wave 1 never met it: Antigravity has no interactions
+and no recovery.
+
+The fix is `createBackendRegistration`, which returns the backend and both ports together, so the
+flip has one call to make and nothing to remember. The test that found it is the first thing in this
+wave to drive an approval end to end: the daemon raises it, the surface is asked, the answer becomes
+a response id, and `{ decision: 'accept' }` reaches the fake.
+
+Three more mutations were run against the runtime half, and all three initially **survived** — the
+first version of the end-to-end test proved only the happy path. Each now has a test: the conversation
+must reach the store (or a bound tab silently starts a new thread), the prompt must be the prepared
+one and not the persisted text (they differ whenever a turn carries context), and the presenter must
+read its callbacks late (the tab installs them after the runtime exists).
+
+Gates: unit 467 suites / 7863 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
+
+**What remains before the flip**: the module's workspace context — the sixteen methods
+`codexProviderModule.features` needs, built from the workspace services — and then the flip itself.
+`createRuntime` takes the contributions as a parameter for exactly that reason: what the provider
+contributes to the UI is registration's business, not execution's.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2496,7 +2530,7 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is under way, and the next action is the runtime half of the composition.**
+**Wave 2 (Codex) is under way, and the next action is the module's workspace context.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:
@@ -2512,14 +2546,13 @@ Done so far. **Dark** means unreachable from the running application and proven 
 | What the user is asked, and what Codex is told they said | `CodexInteractionBridge.ts` | dark |
 | What a queued turn becomes at dispatch, and the reference the kernel carries for it | `CodexExecutionRequests.ts` | dark |
 | How an opened interaction reaches the surface, and comes back as an id the run can record | `CodexInteractionPresenter.ts` | dark |
-| What the backend and every tab runtime share, assembled from the running plugin | `CodexExecutionComposition.ts` | dark |
+| What the backend and every tab runtime share, and the runtime over it | `CodexExecutionComposition.ts` | dark |
 
-**Next, in this order.** First the runtime half of the composition: `createRuntime`, the host ports
-over it — `prepareTurn`, the request and steer references, `syncConversation`, the interaction
-presenter, `describeFailure` — and the module's workspace context, which the flip's registration has
-to build from the workspace services. Then an end-to-end turn test over a fake connection **written
-before the flip rather than after**, and only then the flip itself: registration, `main.ts`, the
-parity manifest, the `darkBundle` markers, and the deletion of `CodexChatRuntime`.
+**Next, in this order.** First the module's workspace context, which the flip's registration builds
+from the workspace services — sixteen methods, nearly all delegation. Then the flip itself:
+registration, `main.ts`, the parity manifest, the `darkBundle` markers, and the deletion of
+`CodexChatRuntime`. The end-to-end turn is written and green, which is the order this wave promised:
+before the flip, not after.
 
 One loose end remains from the request resolver: a turn's scratch directory is discarded when the
 next turn has one, rather than when its run ends. The composition now has the presenter subscription
