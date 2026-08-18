@@ -77,7 +77,7 @@ export class CodexInteractionPresenter {
     this.open.set(request.presentationRef, abort);
     try {
       return presentation.kind === 'approval'
-        ? await this.presentApproval(request, presentation)
+        ? await this.presentApproval(request, presentation, abort.signal)
         : await this.presentQuestion(request, presentation, abort.signal);
     } finally {
       this.open.delete(request.presentationRef);
@@ -115,6 +115,7 @@ export class CodexInteractionPresenter {
   private async presentApproval(
     request: InteractionRequest,
     presentation: Extract<CodexInteractionPresentation, { kind: 'approval' }>,
+    signal: AbortSignal,
   ): Promise<string | null> {
     const approval = this.callbacks().approval;
     // A missing callback is answered rather than left open, which is what the
@@ -139,7 +140,10 @@ export class CodexInteractionPresenter {
             : {}),
         },
       );
-      return toResponseId(decision, request);
+      // A dismissed prompt resolves with nothing, which the surface reports as
+      // `cancel` — and cancelling aborts the whole turn. An interaction that
+      // ended somewhere else is not the user choosing that, so it says nothing.
+      return signal.aborted ? null : toResponseId(decision, request);
     } catch {
       // A surface that could not ask — a detached view, a render that failed —
       // is not an answer, and upstream reads a rejection as a dismissal and

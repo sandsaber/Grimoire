@@ -227,19 +227,46 @@ describe('Codex execution requests', () => {
     ]);
   });
 
-  it('discards a turn\'s scratch once the next turn has one, and on shutdown', async () => {
+  it('discards a tab\'s scratch once that tab\'s next turn has one, and on shutdown', async () => {
     const scratch = recordingScratch();
     const requests = store({ scratch, conversation: { sessionId: 'thread-7' } });
     const image = { data: Buffer.from('one').toString('base64'), mediaType: 'image/png', name: 'a.png' };
 
-    await requests.resolve(requests.reference(request({ images: [image] })));
+    await requests.resolve(requests.reference(request({ images: [image], scope: 'tab-a' })));
     expect(scratch.removed).toEqual([]);
 
-    await requests.resolve(requests.reference(request({ images: [image] })));
+    await requests.resolve(requests.reference(request({ images: [image], scope: 'tab-a' })));
     expect(scratch.removed).toEqual([scratch.created[0]]);
 
     requests.dispose();
     expect(scratch.removed).toEqual(scratch.created);
+  });
+
+  it('keeps a turn\'s images while the user steers the turn that is reading them', async () => {
+    // Steering joins a turn that is still running, and the daemon is still
+    // reading the pictures it was given. Freeing them here is a turn that ends
+    // up answering about files that vanished mid-answer.
+    const scratch = recordingScratch();
+    const requests = store({ scratch, conversation: { sessionId: 'thread-7' } });
+    const image = { data: Buffer.from('one').toString('base64'), mediaType: 'image/png', name: 'a.png' };
+
+    await requests.resolve(requests.reference(request({ images: [image], scope: 'tab-a' })));
+    await requests.resolveSteer(requests.reference(request({ scope: 'tab-a', text: 'wait' })));
+
+    expect(scratch.removed).toEqual([]);
+  });
+
+  it('leaves another tab\'s images alone', async () => {
+    // One store serves every tab, so a plain text turn in one tab must not free
+    // the pictures a turn in another tab is still being answered from.
+    const scratch = recordingScratch();
+    const requests = store({ scratch, conversation: { sessionId: 'thread-7' } });
+    const image = { data: Buffer.from('one').toString('base64'), mediaType: 'image/png', name: 'a.png' };
+
+    await requests.resolve(requests.reference(request({ images: [image], scope: 'tab-a' })));
+    await requests.resolve(requests.reference(request({ scope: 'tab-b' })));
+
+    expect(scratch.removed).toEqual([]);
   });
 
   it('lets a reference be dispatched once, and holds nothing after that', async () => {

@@ -328,6 +328,36 @@ describe('Codex execution composition', () => {
     execution.dispose();
   });
 
+  it('gives the turn the writable roots the daemon itself reported', async () => {
+    // The daemon reports its own home in the handshake. Guessing `~/.codex`
+    // instead is wrong for a custom CODEX_HOME and impossible for a target that
+    // is not this machine, and a memories directory the model cannot write is a
+    // Codex that silently forgets.
+    const plugin = createPlugin({ permissionMode: 'plan' });
+    const host = new ExecutionKernelHost({
+      storage: new TestDurableStorage(),
+      scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
+    });
+    const execution = new CodexExecution(plugin, host.registry);
+    const connection = new FakeConnection();
+    connection.initializeResult = {
+      userAgent: 'codex-fake',
+      platformFamily: process.platform === 'win32' ? 'windows' : 'unix',
+      platformOs: hostPlatformOs(),
+      codexHome: path.normalize('/elsewhere/codex'),
+    };
+    host.registerBackend(execution.createBackendRegistration({ create: () => connection as never }));
+    await host.start();
+    const runtime = execution.createRuntime();
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'remember this' })));
+
+    const turnStart = connection.calls.find(call => call.method === 'turn/start');
+    expect(turnStart?.params.sandboxPolicy.writableRoots)
+      .toContain(path.join(path.normalize('/elsewhere/codex'), 'memories'));
+    execution.dispose();
+  });
+
   it('resolves a reference the runtime minted through the backend it built', async () => {
     // One store, or the reference resolves to nothing: this is the seam the
     // first wave's end-to-end turn failed on.

@@ -85,6 +85,7 @@ export class CodexExecution {
   );
   private readonly presenters = new Set<CodexInteractionPresenter>();
   private workspaceSlots: ProviderWorkspaceSlots | undefined;
+  private runtimeContext: ReturnType<typeof createCodexRuntimeContext> | undefined;
   private readonly disposers: Array<() => void> = [];
 
   constructor(
@@ -114,7 +115,7 @@ export class CodexExecution {
           // The daemon reports where it keeps transcripts as part of its
           // handshake, so the reader is built per connection rather than from a
           // path guessed before one exists.
-          new CodexJsonlExecutionTranscriptReader(this.sessionsRootHost(connection)),
+          new CodexJsonlExecutionTranscriptReader(this.rememberRuntimeContext(connection)),
         ),
       },
       // What a thread has to be resumed with when the backend has no turn of
@@ -167,6 +168,9 @@ export class CodexExecution {
   ): ChatRuntime {
     let conversation: BoundConversation | null = null;
     let adapter: ExecutionChatRuntimeAdapter<CodexProviderSettings> | undefined;
+    // One store serves every tab, so each turn says which tab queued it: the
+    // scratch a turn holds is freed by that tab's next turn and by no other's.
+    const scope = opaqueId('codextab');
     const boundConversation = (): BoundConversation | null => conversation;
     // Read late: the surface installs its callbacks on the runtime after this
     // constructs, so a presenter that captured them now would capture nothing.
@@ -181,6 +185,7 @@ export class CodexExecution {
       ) => this.requests.reference({
         ...turnRequest(turn, options),
         conversation: boundConversation,
+        scope,
         ...(history ? { history } : {}),
       }),
       // Steering carries the input and nothing else: the turn it joins was
@@ -188,6 +193,7 @@ export class CodexExecution {
       encodeSteerRef: (turn: PreparedChatTurn) => this.requests.reference({
         ...turnRequest(turn),
         conversation: boundConversation,
+        scope,
       }),
       reasoningControl: CODEX_PROVIDER_CAPABILITIES.reasoningControl,
       // The thread this conversation is bound to, which is what the legacy
@@ -223,7 +229,7 @@ export class CodexExecution {
         capabilities: codexProviderModule.capabilities,
         // Minted per runtime because the construction call site has no
         // conversation to bind one to; it moves to the catalog at M3.
-        owner: { kind: 'conversation', ownerId: opaqueId('codextab') },
+        owner: { kind: 'conversation', ownerId: scope },
         nextExecutionSessionId: () => executionSessionId(opaqueId('es')),
         nextRunId: () => runId(opaqueId('run')),
       },
@@ -314,24 +320,36 @@ export class CodexExecution {
         userName: this.plugin.settings.userName,
       }, { orchestratorMode }),
       listSkills: () => this.skills.listSkills(),
+      // Absent until the first handshake, which is also the first moment it is
+      // knowable: the policy then falls back to this machine's home, and says
+      // nothing at all for a target that is not this machine. The memories
+      // directory is derived from this root by the policy itself, so passing
+      // both would be two answers to one question.
+      ...(this.runtimeContext?.sessionsDirTarget
+        ? { transcriptRootTarget: this.runtimeContext.sessionsDirTarget }
+        : {}),
     };
   }
 
-  private sessionsRootHost(connection: { readonly initializeResult: unknown }): string {
+  /**
+   * Where the daemon in front of us keeps its transcripts and memories.
+   *
+   * The daemon reports its own home in the handshake, which is the only source
+   * that is right for a custom `CODEX_HOME` and the only one at all for a WSL
+   * target. Remembered here because two callers need it: the transcript reader
+   * built per connection, and every turn's writable-root policy.
+   */
+  private rememberRuntimeContext(connection: { readonly initializeResult: unknown }): string {
     const initializeResult = connection.initializeResult;
-    const launchSpec = this.activeLaunchSpec.current();
     if (initializeResult) {
-      const context = createCodexRuntimeContext(
-        launchSpec,
+      this.runtimeContext = createCodexRuntimeContext(
+        this.activeLaunchSpec.current(),
         initializeResult as Parameters<typeof createCodexRuntimeContext>[1],
       );
-      if (context.sessionsDirHost) {
-        return context.sessionsDirHost;
-      }
     }
     // The reader treats an unreadable root as "no replay available", which is
     // the same answer it gives for a transcript that is not there.
-    return '';
+    return this.runtimeContext?.sessionsDirHost ?? '';
   }
 }
 

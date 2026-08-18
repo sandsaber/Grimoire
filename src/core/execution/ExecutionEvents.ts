@@ -31,10 +31,12 @@ export type ExecutionEvent =
   /**
    * Streamed output, as it arrives.
    *
-   * The only content-bearing event, and the only transient one. Every other
-   * variant states a fact about the run; this one carries what the provider is
-   * saying, because the presentation adapter has to render a turn while it is
-   * still running and the committed `result` arrives only at the end.
+   * One of the two content-bearing events, which are also the two transient
+   * ones — the other is `provider-content`, for the items a surface renders as
+   * something other than text. Every remaining variant states a fact about the
+   * run; these two carry what the provider is saying, because the presentation
+   * adapter has to render a turn while it is still running and the committed
+   * `result` arrives only at the end.
    *
    * Transient means: never persisted, never reduced into a projection, and not
    * deduplicated — see `isTransientExecutionEvent`. The durable copy of the

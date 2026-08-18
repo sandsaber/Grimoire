@@ -63,6 +63,14 @@ export interface CodexExecutionRequest {
    * between the send and the dispatch by the turn before it.
    */
   readonly conversation?: () => BoundConversation | null;
+  /**
+   * The tab this turn belongs to.
+   *
+   * One store serves every tab, and a turn's scratch directory is freed when
+   * *that tab* starts its next turn — never when another tab starts one, whose
+   * daemon is still reading the pictures this one was given.
+   */
+  readonly scope?: string;
 }
 
 export interface CodexInvocationEnvironment {
@@ -97,13 +105,15 @@ const DEFAULT_LIMIT = 64;
 export class CodexExecutionRequests implements CodexExecutionRequestResolver {
   private readonly pending = new Map<string, CodexExecutionRequest>();
   /**
-   * The scratch directories of turns already dispatched.
+   * The scratch directories of turns already dispatched, per tab.
    *
-   * Held until the next turn has its own, because the daemon reads the images
-   * while the turn runs and nothing here observes when it ends. Bounded by that
-   * rule plus `dispose`, which is what the plugin's unload calls.
+   * Freed when that tab dispatches its next turn, because the daemon reads the
+   * images while the turn runs and nothing here observes when it ends — the
+   * same rule the legacy runtime followed, which cleared its bundles at the
+   * start of each query. Steering adds to the set instead of replacing it: it
+   * joins a turn that is still being answered from those files.
    */
-  private readonly liveBundles: CodexTurnInputBundle[] = [];
+  private readonly liveBundles = new Map<string, CodexTurnInputBundle[]>();
 
   constructor(
     private readonly nextReference: () => string,
@@ -164,7 +174,7 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
       toTargetPath: hostPath => environment.launchSpec.pathMapper.toTargetPath(hostPath),
       ...(environment.scratch ? { scratch: environment.scratch } : {}),
     });
-    this.retainBundle(bundle);
+    this.retainBundle(request, bundle, 'replaces-the-previous-turn');
 
     const parameters = buildCodexTurnParameters({
       settings,
@@ -214,15 +224,18 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
       toTargetPath: hostPath => environment.launchSpec.pathMapper.toTargetPath(hostPath),
       ...(environment.scratch ? { scratch: environment.scratch } : {}),
     });
-    this.retainBundle(bundle);
+    this.retainBundle(request, bundle, 'joins-the-running-turn');
     return bundle.input;
   }
 
   /** Discards every scratch directory still held; the plugin's unload calls it. */
   dispose(): void {
-    for (const bundle of this.liveBundles.splice(0)) {
-      bundle.cleanup();
+    for (const bundles of this.liveBundles.values()) {
+      for (const bundle of bundles) {
+        bundle.cleanup();
+      }
     }
+    this.liveBundles.clear();
     this.pending.clear();
   }
 
@@ -240,11 +253,22 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
     return request;
   }
 
-  private retainBundle(bundle: CodexTurnInputBundle): void {
-    for (const previous of this.liveBundles.splice(0)) {
-      previous.cleanup();
+  private retainBundle(
+    request: CodexExecutionRequest,
+    bundle: CodexTurnInputBundle,
+    retention: 'replaces-the-previous-turn' | 'joins-the-running-turn',
+  ): void {
+    // Turns without a tab share one slot, which is what a caller that does not
+    // say which tab it is asking for has told us it wants.
+    const scope = request.scope ?? '';
+    const held = this.liveBundles.get(scope) ?? [];
+    if (retention === 'replaces-the-previous-turn') {
+      for (const previous of held.splice(0)) {
+        previous.cleanup();
+      }
     }
-    this.liveBundles.push(bundle);
+    held.push(bundle);
+    this.liveBundles.set(scope, held);
   }
 }
 

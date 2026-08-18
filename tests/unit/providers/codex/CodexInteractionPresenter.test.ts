@@ -324,6 +324,28 @@ describe('Codex interaction presenter', () => {
     expect(dismissed).toBe(0);
   });
 
+  it('does not read a dismissed approval as the user cancelling the turn', async () => {
+    // Dismissing resolves the surface's own prompt with nothing, which the
+    // input controller reports as `cancel` — and `cancel` aborts the whole turn
+    // in Codex. An interaction that ended somewhere else is not the user
+    // choosing anything, so it answers with nothing.
+    const bridge = new CodexInteractionBridge();
+    const request = await openApproval(bridge);
+    let dismissed: (() => void) | undefined;
+    const presenter = new CodexInteractionPresenter(bridge, () => ({
+      approval: async () => new Promise(resolve => {
+        dismissed = () => resolve('cancel');
+      }),
+      approvalDismisser: () => dismissed?.(),
+    }));
+
+    const presented = presenter.present(request);
+    await Promise.resolve();
+    presenter.dismissAll();
+
+    expect(await presented).toBeNull();
+  });
+
   it('takes an approval down through the dismisser the surface installed', async () => {
     const bridge = new CodexInteractionBridge();
     let dismissed = 0;

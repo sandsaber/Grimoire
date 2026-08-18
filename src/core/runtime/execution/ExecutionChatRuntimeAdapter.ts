@@ -571,7 +571,14 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   private readonly readyListeners = new Set<(ready: boolean) => void>();
   private executionSessionId: ExecutionSessionId | null = null;
   private boundSessionId: string | null | undefined;
-  private readonly callbacks: { autoTurn?: (runId: unknown) => void } & Record<string, unknown> = {};
+  /**
+   * What the surface installed, by the names the presenter reads back.
+   *
+   * Typed on the storing side as well as the reading one: the setters take
+   * `unknown` and write by key, so a name that only one of the two knows
+   * compiles cleanly and every approval then answers itself.
+   */
+  private readonly callbacks: MutableInteractionCallbacks = {};
   private sideChannels: (() => void) | null = null;
   private establishing: Promise<boolean> | undefined;
   private active: { runId: RunId; stream: ExecutionRunStream; release: () => void } | null = null;
@@ -911,19 +918,19 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   // presentation reference, so turning one into an approval prompt needs the
   // provider-owned presenter the host builds from exactly these.
   setApprovalCallback(callback: unknown): void {
-    this.callbacks.approval = callback;
+    this.callbacks.approval = callback as ApprovalCallback;
   }
 
   setApprovalDismisser(dismisser: unknown): void {
-    this.callbacks.approvalDismisser = dismisser;
+    this.callbacks.approvalDismisser = dismisser as () => void;
   }
 
   setAskUserQuestionCallback(callback: unknown): void {
-    this.callbacks.question = callback;
+    this.callbacks.question = callback as AskUserQuestionCallback;
   }
 
   setExitPlanModeCallback(callback: unknown): void {
-    this.callbacks.planDecision = callback;
+    this.callbacks.planDecision = callback as ExitPlanModeCallback;
   }
 
   setPermissionModeSyncCallback(callback: unknown): void {
@@ -1016,7 +1023,21 @@ export interface ExecutionInteractionCallbacks {
   readonly question?: AskUserQuestionCallback;
   readonly planDecision?: ExitPlanModeCallback;
   readonly autoTurn?: (runId: unknown) => void;
+  /**
+   * Installed by the surface and read by nothing yet.
+   *
+   * Declared because the store is typed: a key only the setter knows is a key
+   * the presenter can never find, and leaving these two out was how typing the
+   * store found them.
+   */
+  readonly permissionModeSync?: unknown;
+  readonly subagentState?: unknown;
 }
+
+/** The same names, writable, for the one object that owns them. */
+type MutableInteractionCallbacks = {
+  -readonly [K in keyof ExecutionInteractionCallbacks]: ExecutionInteractionCallbacks[K];
+};
 
 export interface ExecutionInteractionPresenter {
   present(request: InteractionRequest): Promise<string | null>;

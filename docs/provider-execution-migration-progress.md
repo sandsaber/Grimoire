@@ -2608,6 +2608,45 @@ to normalize, and the host port running that normalization — then the flip. Th
 `CodexNotificationRouter` is the thing that produces those chunks today, so the flip's job is to keep
 it, not to reimplement it.
 
+### M2-flips — second external review: one bug, four suggestions, all confirmed (this commit)
+
+**The bug: one scratch slot for the whole plugin.** A turn's images are freed when the *next* turn is
+resolved — but the store serves every tab, and steering resolved through it too. So a turn in one tab
+freed the pictures another tab's daemon was still reading, and steering a turn deleted the images of
+the very turn it was joining. The journal's "held until the next turn" hid both, and the test held
+only the case it described.
+
+Retention is per tab now, and steering adds to the set rather than replacing it — which is what the
+legacy runtime did: it cleared its bundles at the start of each query, and its query was one tab's.
+Two tests were added for the two paths that were wrong.
+
+The four suggestions, each real:
+
+- **the sandbox never learned where the daemon keeps its transcripts.** The composition computed the
+  sessions root for the reconciler and did not pass it to the turn, so a plan-mode turn invented
+  `~/.codex/memories` — wrong under a custom `CODEX_HOME`, and impossible for a WSL target, where the
+  policy then granted no memories directory at all and Codex silently forgets. The handshake's own
+  answer is now remembered once and used by both;
+- **an externally dismissed approval read as the user cancelling the turn.** Dismissing resolves the
+  surface's prompt with nothing, the input controller reports that as `cancel`, and `cancel` aborts
+  the whole turn in Codex. The approval path now watches the same abort signal the question path
+  already did, and answers with nothing;
+- **the callback store was typed on the reading side only.** Typing it on the storing side found two
+  keys the presenter could never have read — `permissionModeSync` and `subagentState` — which is
+  exactly the failure the type was added to prevent;
+- **the `output-delta` comment still said it was the only content-bearing and only transient event**,
+  one commit after `provider-content` joined it.
+
+**A method note worth more than any of the fixes.** Two mutations "survived" while proving the
+sandbox fix, and both were silent no-ops: the edit script's `replace` matched nothing and said so
+nowhere. A mutation that does not apply is a gate that reports itself green for the wrong reason —
+the same class of mistake as the parity check that measured nothing, recorded at M2-adapter. Every
+mutation edit asserts its match from here on; the two that mattered were re-run that way and both
+failed the tests, as they should have.
+
+Gates: unit 468 suites / 7875 tests, integration 6 / 220, typecheck, lint, and `build:release` clean
+on Linux; CI covers Windows and macOS.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
