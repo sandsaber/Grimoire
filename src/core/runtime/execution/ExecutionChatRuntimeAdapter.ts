@@ -543,10 +543,10 @@ export interface ExecutionChatRuntimeHostPorts {
   /**
    * What this turn is expected to produce, where that is not an answer.
    *
-   * A compaction produces none, and a turn whose output is a plan rather than a
-   * message produces one the kernel cannot see. Without this they end as
-   * "the provider ended the turn without producing a result", which is a
-   * failure notice for a turn that did exactly what was asked.
+   * For the provider-specific cases only: a compaction is handled here, because
+   * `isCompact` is a property of any prepared turn and every provider that
+   * flips would otherwise rediscover the same failure notice for a turn that
+   * did exactly what was asked.
    */
   resultExpectation?(turn: PreparedChatTurn): 'required' | 'optional' | 'none';
   /**
@@ -689,9 +689,11 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
       executionSessionId,
       {
         requestRef: this.ports.encodeRequestRef(turn, conversationHistory, queryOptions),
-        ...(this.ports.resultExpectation
-          ? { resultExpectation: this.ports.resultExpectation(turn) }
-          : {}),
+        // A compaction answers nothing anywhere, so the neutral rule is here
+        // rather than in each provider that flips.
+        resultExpectation: turn.isCompact
+          ? 'none'
+          : this.ports.resultExpectation?.(turn) ?? 'required',
       },
       this.session,
       this.ports.describeFailure,

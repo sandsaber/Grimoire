@@ -94,6 +94,8 @@ describe('Codex execution composition', () => {
     toolOnTurnStart = false;
     /** The message a failed turn reports, the way the daemon reports one. */
     failTurn: string | undefined;
+    /** A turn that answers with no agent message, the way a plan turn does. */
+    emptyTurn = false;
     approvalResponse: unknown;
     /** The thread the daemon is answering on, which its notifications are routed by. */
     private activeThreadId = 'thread-1';
@@ -140,6 +142,18 @@ describe('Codex execution composition', () => {
           },
         } as T;
       }
+      if (method === 'thread/compact/start') {
+        // A compaction has no turn of its own to return: the daemon announces
+        // it, and the turn id is established from that announcement.
+        setTimeout(() => {
+          this.notify('turn/started', { threadId: this.activeThreadId, turn: { id: 'turn-compact' } });
+          this.notify('turn/completed', {
+            threadId: this.activeThreadId,
+            turn: { id: 'turn-compact', status: 'completed', error: null, items: [] },
+          });
+        }, 0);
+        return {} as T;
+      }
       if (method === 'turn/start') {
         // Answered the way the daemon does: the response establishes the turn,
         // and everything else arrives after it. A real timer rather than a
@@ -183,6 +197,13 @@ describe('Codex execution composition', () => {
             exitCode: 0,
           },
         });
+      }
+      if (this.emptyTurn) {
+        this.notify('turn/completed', {
+          threadId: this.activeThreadId,
+          turn: { id: 'turn-1', status: 'completed', error: null, items: [] },
+        });
+        return;
       }
       this.notify('item/agentMessage/delta', {
         threadId: this.activeThreadId,
@@ -501,6 +522,45 @@ describe('Codex execution composition', () => {
       assistantMessageId: 'turn-1',
       wasSent: true,
     });
+    execution.dispose();
+  });
+
+  it('reports the thread the daemon is on, and forgets it with the conversation', async () => {
+    // A conversation learns its thread from the finished turn. Reporting only
+    // the conversation's own binding is circular — it is empty until something
+    // writes it — and reporting the daemon's thread *after* the tab moves on is
+    // worse: the new conversation is saved pointing at the old thread.
+    const { runtime, execution } = await createTurnHarness();
+    runtime.syncConversationState({ id: 'conv-1' });
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'hello' })));
+
+    expect(runtime.getSessionId()).toBe('thread-1');
+    runtime.syncConversationState(null);
+    expect(runtime.getSessionId()).toBeNull();
+    execution.dispose();
+  });
+
+  it('asks for no result from a compaction, and does not insist on one in plan mode', async () => {
+    // A compaction answers nothing by design and a plan turn answers with a
+    // plan, so demanding a result reports a turn that worked as a failure.
+    const plugin = createPlugin({ permissionMode: 'plan' });
+    const host = new ExecutionKernelHost({
+      storage: new TestDurableStorage(),
+      scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
+    });
+    const execution = new CodexExecution(plugin, host.registry);
+    const connection = new FakeConnection();
+    connection.emptyTurn = true;
+    host.registerBackend(execution.createBackendRegistration({ create: () => connection as never }));
+    await host.start();
+    const runtime = execution.createRuntime();
+
+    const planned = await drain(runtime.query(runtime.prepareTurn({ text: 'plan it' })));
+    const compacted = await drain(runtime.query(runtime.prepareTurn({ text: '/compact' })));
+
+    expect(planned.filter(chunk => chunk.type === 'error')).toEqual([]);
+    expect(compacted.filter(chunk => chunk.type === 'error')).toEqual([]);
     execution.dispose();
   });
 

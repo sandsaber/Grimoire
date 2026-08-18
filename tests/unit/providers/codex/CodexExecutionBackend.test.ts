@@ -181,6 +181,58 @@ describe('CodexExecutionBackend', () => {
     expect(methods).toContain('turn/started');
   });
 
+  it('fails the turn on a daemon error, rather than dying with it', async () => {
+    // The daemon reports a refused model as an `error` for the turn and then
+    // goes away. Treated as transport loss, the turn ends as an interruption,
+    // which the surface renders as nothing at all — the user sees a turn that
+    // simply stopped.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    const run = session.createRun(request(RUN_1, 'default'));
+    const events = collectEvents(run);
+    await fixture.connection.waitForCall('turn/start');
+
+    fixture.connection.notifyExecution('error', {
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      error: { message: 'the model is not supported' },
+      willRetry: false,
+    });
+
+    expectTerminal(await events, 'failed', 'provider-failure');
+    expect(fixture.connection.calls.filter(call => call.method === 'turn/interrupt'))
+      .toHaveLength(1);
+  });
+
+  it('waits out an error the daemon says it will retry', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    const run = session.createRun(request(RUN_1, 'default'));
+    const events = collectEvents(run);
+    await fixture.connection.waitForCall('turn/start');
+
+    fixture.connection.notifyExecution('error', {
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      error: { message: 'transient' },
+      willRetry: true,
+    });
+    fixture.connection.notifyExecution('turn/completed', {
+      threadId: 'thread-1',
+      turn: {
+        id: 'turn-1',
+        items: [{ type: 'agentMessage', id: 'message-1', text: 'recovered' }],
+        status: 'completed',
+        error: null,
+      },
+    });
+
+    expectTerminal(await events, 'succeeded', 'completed');
+    // And the daemon was never told to stop: it said it would retry, and it did.
+    expect(fixture.connection.calls.filter(call => call.method === 'turn/interrupt'))
+      .toHaveLength(0);
+  });
+
   it('streams reasoning as text, not only as a sign of life', async () => {
     // `thinking-activity` says the model is working; it does not say what it is
     // thinking, and the surface renders that.

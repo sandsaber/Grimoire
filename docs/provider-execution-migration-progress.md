@@ -2965,6 +2965,58 @@ Codex rather than anything the flip changed.
 Gates: unit 467 suites / 7,774 tests, integration 6 / 220 with the live suite green except row 14,
 typecheck, lint, and `build:release` clean on Linux.
 
+### M2-flips — a review of the live fixes, and a correction to the entry above (this commit)
+
+A review of the previous commit found fourteen things, and the first of them corrects the journal.
+
+**The correction.** The entry above says "an unscoped error now reaches the running turn and fails
+it". The fan-out that was supposed to do that is **dead code**: a run drops any notification whose
+params carry no thread id, so an unscoped error never reaches it. What actually made live row 21
+green is the other half of that change — the `error` branch in `applyNotification`, reached the
+normal way, because a real daemon error *is* scoped: the wire shows
+`{"error":{…},"willRetry":false,"threadId":"01a01670-…","turnId":"01a01670-…"}`. The fan-out is
+removed rather than repaired, for the reason the review gives: it delivered to every session, so once
+it worked it would have failed every other tab's in-flight turn on one tab's error.
+
+**Two more real defects, both fixed:**
+
+- **the thread id leaked into the next conversation.** `currentSessionId` falls back to the thread the
+  daemon is on, which is how a conversation learns its own — but the presenter never forgot it, so a
+  tab that started a new chat reported the *previous* conversation's thread, and the new conversation
+  would have been saved pointing at it and silently continued it. The presenter forgets its
+  conversation when the tab syncs a different one;
+- **a failure was rendered in the previous turn's words.** The captured message was never cleared, so
+  a turn that fails without the daemon describing it showed the last error the daemon *did* describe.
+  Cleared at `turn/started`.
+
+**And the testing rule, which the review was right to call.** Three production fixes shipped with
+their only coverage in a suite that CI never runs. They have CI tests now: a daemon error fails the
+turn and interrupts it; a retryable one does neither; the session id is reported and then forgotten
+with its conversation; and a compaction and a plan turn are not asked for a result.
+
+Two smaller ones taken: the compaction rule moved into the adapter, because `isCompact` is a
+provider-neutral property of a prepared turn and every provider that flips next would otherwise
+rediscover it; and the plan-mode predicate is written once rather than twice.
+
+The live harness was leaking: a row that threw left its daemon and its temp vault behind, and row 16
+cancelled on a wall-clock timer that could fire before the turn was dispatched. Every row now releases
+its daemon in `afterEach` and row 16 waits for the turn to actually be saying something — it cancels
+mid-count now, which is the case it exists for.
+
+**Row 14 is green.** Its failure was the harness, not the product: the first daemon still held the
+thread, so `thread/resume` answered "already has an active writer". A restart takes the daemon with
+it, which is what the harness now does — and the resumed thread remembers the word. **Eight of eight
+live rows pass.**
+
+Left open, with the review's reasoning recorded: plan mode returns a blanket `optional`, so a plan
+turn that genuinely produces nothing reads as a silent success. The renderer already tracks
+`sawPlanDelta`, which distinguishes the two, but it is known only after the turn while the
+expectation is declared before it — closing that means committing the plan itself as the result.
+Owner: the next provider that flips with a plan mode, or the projection work at M5.
+
+Gates: unit 467 suites / 7,778 tests, integration 6 / 220, the live suite 8 / 8 against a real
+daemon, typecheck, lint, and `build:release` clean on Linux.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3014,10 +3066,10 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is flipped and uncertified. Eight rows of its matrix run live and seven are green;
-row 14 — resume in a fresh daemon — is the open one and the next action, because resume is what a
-persistent-daemon provider is for. The rows a person has to look at are still unrun, and wave 1's
-single remaining row with them.**
+**Wave 2 (Codex) is flipped and uncertified. Eight rows of its matrix run live and all eight pass.
+What remains is the half a person has to look at — the rendering rows of
+[`docs/codex-flip-smoke-matrix.md`](codex-flip-smoke-matrix.md), in a vault, with the release build —
+and wave 1's single remaining row with them.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:

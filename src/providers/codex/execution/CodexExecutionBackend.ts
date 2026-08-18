@@ -481,15 +481,6 @@ ExecutionRecoveryPort {
     }
     const scope = extractScope(params);
     if (!scope) {
-      // A daemon error carries no thread of its own: it is about whatever it
-      // was asked to do, and dropping it is how a refused model ends a turn
-      // with nothing said. Sent to every session; only a run that is actually
-      // running takes it.
-      if (method === 'error') {
-        for (const session of this.sessions) {
-          session.handleNotification(method, params);
-        }
-      }
       return;
     }
     this.sessionsByThread.get(scope.threadId)?.handleNotification(method, params);
@@ -1078,20 +1069,18 @@ class CodexExecutionRun implements ExecutionRun {
       return;
     }
     if (method === 'error') {
-      const error = readRecord(readRecord(params)?.error);
       if (readRecord(params)?.willRetry === true) {
         // The daemon says it is retrying, which is not a turn that ended.
         return;
       }
-      if (error) {
-        // A provider failure, not a transport one: the message is already on
-        // its way to the surface as content, and this is what stops the turn
-        // being reported as an interruption with nothing said.
-        this.finish('failed', 'provider-failure');
-        return;
-      }
-      this.emit({ kind: 'connection-lost' });
-      this.scheduleRecovery();
+      // A provider failure, not a transport one — transport loss arrives as
+      // `handleConnectionLost` from the connection itself. Without this the
+      // turn dies with the daemon and is reported as an interruption, which
+      // the surface renders as nothing at all. The message is already on its
+      // way as content, so the terminal can be described in the daemon's own
+      // words.
+      void this.requestTurnTermination();
+      this.finish('failed', 'provider-failure');
     }
   }
 

@@ -1,6 +1,6 @@
 import '@/providers';
 
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -33,6 +33,15 @@ const live = process.env.GRIMOIRE_CODEX_LIVE === '1' ? describe : describe.skip;
 live('Codex live smoke', () => {
   jest.setTimeout(180_000);
 
+  /** Every daemon this file started, released whatever the row did. */
+  const running: Array<() => Promise<void>> = [];
+
+  afterEach(async () => {
+    for (const release of running.splice(0)) {
+      await release().catch(() => undefined);
+    }
+  });
+
   function createPlugin(vault: string, overrides: Record<string, unknown> = {}): any {
     const settings: Record<string, unknown> = {
       permissionMode: 'default',
@@ -64,8 +73,14 @@ live('Codex live smoke', () => {
     runtime: any;
     execution: CodexExecution;
     vault: string;
+    /** Shuts the daemon down, which is what a plugin unload does. */
+    shutdown(): Promise<void>;
   }> {
     const vault = reuseVault ?? mkdtempSync(join(tmpdir(), 'grimoire-codex-live-'));
+    // Recreated where a row hands its vault on: the first daemon's shutdown
+    // takes the directory with it, and the thread being resumed lives in the
+    // daemon's own sessions directory rather than here.
+    mkdirSync(vault, { recursive: true });
     writeFileSync(join(vault, 'Note.md'), '# Note\n\nThe vault has one note in it.\n');
     const host = new ExecutionKernelHost({
       storage: new TestDurableStorage(),
@@ -86,17 +101,50 @@ live('Codex live smoke', () => {
     host.registerBackend(execution.createBackendRegistration({
       create: () => {
         const connection = base.create();
+        if (process.env.GRIMOIRE_CODEX_TRACE === '1') {
+          const request = connection.request.bind(connection);
+          (connection as { request: unknown }).request = async (
+            method: string,
+            params: unknown,
+            timeoutMs?: number,
+          ) => {
+            report('RPC ->', method, JSON.stringify(params).slice(0, 160));
+            try {
+              const result = await request(method, params, timeoutMs);
+              report('RPC <-', method, JSON.stringify(result).slice(0, 160));
+              return result;
+            } catch (error) {
+              report('RPC !!', method, String(error).slice(0, 160));
+              throw error;
+            }
+          };
+        }
         connection.onNotification((method, params) => {
           if (process.env.GRIMOIRE_CODEX_TRACE === '1') {
              
-            report('WIRE', method, JSON.stringify(params).slice(0, 220));
+            report('WIRE', method, JSON.stringify(params).slice(0, 900));
           }
         });
         return connection;
       },
     }));
     await host.start();
-    return { execution, vault, runtime: execution.createRuntime() };
+    const release = async (): Promise<void> => {
+      execution.dispose();
+      await host.dispose();
+      // Only the vault this harness made: a row that hands its vault to a
+      // second daemon — a restart — must not have it deleted underneath.
+      if (!reuseVault) {
+        rmSync(vault, { force: true, recursive: true });
+      }
+    };
+    running.push(release);
+    return {
+      execution,
+      vault,
+      runtime: execution.createRuntime(),
+      shutdown: release,
+    };
   }
 
   async function drain(chunks: AsyncGenerator<StreamChunk>): Promise<StreamChunk[]> {
@@ -125,7 +173,7 @@ live('Codex live smoke', () => {
   }
 
   it('row 1: answers a plain message', async () => {
-    const { runtime, execution } = await createHarness();
+    const { runtime, shutdown } = await createHarness();
 
     const chunks = await drain(runtime.query(
       runtime.prepareTurn({ text: 'Reply with exactly: ok' }),
@@ -144,11 +192,11 @@ live('Codex live smoke', () => {
     // Live, this fails: the answer arrives three times. Kept as the evidence it
     // is until the duplication is fixed — see the journal entry for the run.
     expect(chunks.filter(chunk => chunk.type === 'text')).toHaveLength(1);
-    execution.dispose();
+    await shutdown();
   });
 
   it('row 2: runs a command and shows the call and its result', async () => {
-    const { runtime, execution } = await createHarness({ permissionMode: 'full_access' });
+    const { runtime, shutdown } = await createHarness({ permissionMode: 'full_access' });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
       text: 'Run the shell command `echo grimoire-live` and then reply with exactly: done',
@@ -159,11 +207,11 @@ live('Codex live smoke', () => {
     expect(chunks.some(chunk => (
       chunk.type === 'tool_result' && String(chunk.content).includes('grimoire-live')
     ))).toBe(true);
-    execution.dispose();
+    await shutdown();
   });
 
   it('row 6: compacts a thread, and refuses a compaction with an argument', async () => {
-    const { runtime, execution } = await createHarness();
+    const { runtime, shutdown } = await createHarness();
     await drain(runtime.query(runtime.prepareTurn({ text: 'Reply with exactly: ok' })));
 
     const compacted = await drain(runtime.query(runtime.prepareTurn({ text: '/compact' })));
@@ -174,11 +222,11 @@ live('Codex live smoke', () => {
     expect(compacted.filter(chunk => chunk.type === 'error')).toEqual([]);
     // Refused locally: the daemon compacts a thread, it does not read an argument.
     expect(refused.some(chunk => chunk.type === 'error')).toBe(true);
-    execution.dispose();
+    await shutdown();
   });
 
   it('row 8: asks for approval and runs what the user allowed', async () => {
-    const { runtime, execution } = await createHarness();
+    const { runtime, shutdown } = await createHarness();
     const asked: string[] = [];
     runtime.setApprovalCallback(async (_tool: string, _input: unknown, description: string) => {
       asked.push(description);
@@ -193,11 +241,11 @@ live('Codex live smoke', () => {
     report('ROW 8', JSON.stringify(asked), JSON.stringify(summarize(chunks)));
     expect(asked.length).toBeGreaterThan(0);
     expect(chunks.some(chunk => chunk.type === 'tool_use')).toBe(true);
-    execution.dispose();
+    await shutdown();
   });
 
   it('row 12: runs a plan turn', async () => {
-    const { runtime, execution } = await createHarness({ permissionMode: 'plan' });
+    const { runtime, shutdown } = await createHarness({ permissionMode: 'plan' });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
       text: 'Plan two short steps for tidying a note. Do not edit anything.',
@@ -206,7 +254,7 @@ live('Codex live smoke', () => {
     report('ROW 12 errors', JSON.stringify(chunks.filter(chunk => chunk.type === 'error')));
     expect(chunks.some(chunk => chunk.type === 'text' || chunk.type === 'progress')).toBe(true);
     expect(chunks.filter(chunk => chunk.type === 'error')).toEqual([]);
-    execution.dispose();
+    await shutdown();
   });
 
   it('row 14: resumes the thread a fresh daemon was told about', async () => {
@@ -215,7 +263,10 @@ live('Codex live smoke', () => {
       text: 'Remember the word violet. Reply with exactly: ok',
     })));
     const threadId = first.runtime.getSessionId();
-    first.execution.dispose();
+    // The daemon holds the thread until it exits — `thread/resume` answers
+    // "already has an active writer" otherwise, which is what a restart avoids
+    // by taking the process with it.
+    await first.shutdown();
 
     // A different composition, a different daemon: the thread is resumed by the
     // id the conversation remembers, which is what a restart does.
@@ -229,32 +280,42 @@ live('Codex live smoke', () => {
     report('ROW 14', String(threadId), JSON.stringify(summarize(chunks)));
     // The thread id is reported, which is what lets a conversation remember it.
     expect(threadId).toBeTruthy();
-    // Live, this fails: resuming the thread in a fresh daemon ends the run as
-    // indeterminate — the daemon goes idle without running the turn. Kept as
-    // the reproduction, the way row 1's duplication was.
     expect(answer.toLowerCase()).toContain('violet');
-    second.execution.dispose();
+    await second.shutdown();
   });
 
   it('row 16: cancels a running turn and leaves no daemon behind', async () => {
-    const { runtime, execution } = await createHarness();
-    const started = drain(runtime.query(runtime.prepareTurn({
-      text: 'Count slowly from one to fifty, one number per line.',
-    })));
-    await new Promise(resolve => setTimeout(resolve, 1_500));
+    const { runtime, shutdown } = await createHarness();
+    const collected: StreamChunk[] = [];
+    const started = (async () => {
+      for await (const chunk of runtime.query(runtime.prepareTurn({
+        text: 'Count slowly from one to fifty, one number per line.',
+      }))) {
+        collected.push(chunk);
+      }
+    })();
+    // Cancel once the turn is actually saying something: a wall-clock wait can
+    // cancel a turn that has not been dispatched yet, which tests the
+    // pre-dispatch path rather than the one this row is about.
+    for (let attempt = 0; attempt < 300 && !collected.some(chunk => (
+      chunk.type === 'text' || chunk.type === 'progress'
+    )); attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
 
     runtime.cancel();
-    const chunks = await started;
+    await started;
+    const chunks = collected;
 
     report('ROW 16', JSON.stringify(summarize(chunks).slice(-4)));
     // The turn ends rather than hanging; what it managed to say before the stop
     // is whatever the model had streamed.
     expect(chunks.length).toBeGreaterThan(0);
-    execution.dispose();
+    await shutdown();
   });
 
   it('row 21: reports a failed turn in the daemon\'s own words', async () => {
-    const { runtime, execution } = await createHarness({ model: 'gpt-5.3-codex-spark' });
+    const { runtime, shutdown } = await createHarness({ model: 'gpt-5.3-codex-spark' });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'Reply with exactly: ok' })));
 
@@ -265,6 +326,6 @@ live('Codex live smoke', () => {
     // One error, and the daemon's wording rather than the neutral sentence.
     expect(errors).toHaveLength(1);
     expect(String(errors[0].content)).toContain('not supported');
-    execution.dispose();
+    await shutdown();
   });
 });

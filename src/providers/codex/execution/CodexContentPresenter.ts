@@ -70,6 +70,19 @@ export class CodexContentPresenter {
   }
 
   /**
+   * Forgets everything that belonged to one conversation.
+   *
+   * The thread above all: a tab that starts a new chat must not report the
+   * previous conversation's thread as its own, or the new conversation is
+   * saved pointing at the old thread and silently continues it.
+   */
+  forgetConversation(): void {
+    this.threadId = undefined;
+    this.failure = undefined;
+    this.metadata = {};
+  }
+
+  /**
    * What the finished turn was, in the provider's own terms.
    *
    * The native id of the answer above all: the tab copies it onto the message
@@ -97,6 +110,10 @@ export class CodexContentPresenter {
     // mode is a property of the turn being started rather than of any item in
     // it.
     if (method === 'turn/started') {
+      // A new turn carries none of the last one's failure: without this a turn
+      // that fails for a reason the daemon does not describe is reported in the
+      // words of the one before it.
+      this.failure = undefined;
       this.router.beginTurn({ isPlanTurn: this.isPlanTurn() });
     }
     this.router.handleNotification(method, notification?.params);

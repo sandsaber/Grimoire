@@ -187,8 +187,9 @@ export class CodexExecution {
     // Read late: the surface installs its callbacks on the runtime after this
     // constructs, so a presenter that captured them now would capture nothing.
     const presenter = this.createInteractionPresenter(() => adapter?.interactionCallbacks() ?? {});
-    const content = new CodexContentPresenter(() => ProviderSettingsCoordinator
-      .getProviderSettingsSnapshot(this.plugin.settings, 'codex').permissionMode === 'plan');
+    const isPlanTurn = (): boolean => ProviderSettingsCoordinator
+      .getProviderSettingsSnapshot(this.plugin.settings, 'codex').permissionMode === 'plan';
+    const content = new CodexContentPresenter(isPlanTurn);
 
     const ports: ExecutionChatRuntimeHostPorts = {
       prepareTurn: (request: ChatTurnRequest) => encodeCodexTurn(request),
@@ -223,6 +224,11 @@ export class CodexExecution {
         return content.lastThreadId() ?? null;
       },
       syncConversation: next => {
+        if (next?.id !== conversation?.id) {
+          // A different conversation — or none — is a different thread, and the
+          // daemon's is only this one's while this one is bound to it.
+          content.forgetConversation();
+        }
         conversation = next;
       },
       // The daemon's own words for a failure it reported, instead of the
@@ -231,19 +237,11 @@ export class CodexExecution {
       describeFailure: reason => (
         reason === 'provider-failure' ? content.lastFailure() : undefined
       ),
-      // A compaction answers nothing by design, and a plan turn answers with a
-      // plan, which arrives as its own notification rather than as a message.
-      // Demanding a result from either reports a turn that worked as a failure.
-      resultExpectation: turn => {
-        if (turn.isCompact) {
-          return 'none';
-        }
-        return ProviderSettingsCoordinator
-          .getProviderSettingsSnapshot(this.plugin.settings, 'codex')
-          .permissionMode === 'plan'
-          ? 'optional'
-          : 'required';
-      },
+      // A plan turn answers with a plan, which arrives as its own notification
+      // rather than as a message, so the kernel sees no result to require. A
+      // compaction is the adapter's rule, not this one: `isCompact` is a
+      // provider-neutral property of the turn.
+      resultExpectation: () => (isPlanTurn() ? 'optional' : 'required'),
       consumeProviderTurnMetadata: () => content.consumeTurnMetadata(),
       interactionPresenter: presenter,
       // One per tab, because the router it runs tracks a turn's items across
