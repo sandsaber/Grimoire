@@ -2167,6 +2167,36 @@ The unit suite was re-run after the release build, so the `darkBundle` markers w
 the bundle this commit produces: `provider-codex` and the Codex connection are still absent from it,
 which is what keeps the new module dark.
 
+### M2-flips — one run, several results (this commit)
+
+The result sink looked like Antigravity's with the names changed, and it is not. A Codex run can
+commit **more than one result**: its own answer, and one for every native agent that finishes inside
+it. `result-${runId}` — the identity the only existing sink mints, and the one the backend's own test
+fake mints — would hand two different answers the same identity, inside the same run. So the identity
+is per source: the run's answer keeps `result-${runId}`, and a native agent's is derived from its key.
+
+Derived, not embedded, and that is the second thing writing it turned up. A result id the control
+store accepts is a constrained identifier — `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$` — while the agent
+key is named by the model and reaches us off the wire. `code reviewer`, a path, an emoji, or four
+hundred characters all produce a reference the store refuses, which is a run that cannot record its
+own result. The test decodes the reference through `executionRunRecordSchema`, so what it checks is
+the store's own rule rather than a copy of the regex.
+
+Third: the daemon reports a finished agent on **every** `wait` that observes it, and nothing upstream
+de-duplicates. A stable identity plus a content digest is what makes that one result observed twice
+rather than a second result quietly replacing the first — and if the content ever does differ under
+the same key, the digest is what shows it instead of hiding it.
+
+`projection` is the truthful storage even though Codex keeps a native JSONL transcript. A
+`provider-native` reference has to *locate* the answer, and the sink is told only the run — naming a
+store it cannot point into would be a claim nothing can act on. The answer is durable twice already,
+in the conversation and in Codex's own transcript, and D2 permits the reference, not a third copy.
+
+Gates: unit 463 suites / 7804 tests, integration 6 / 220, typecheck, lint, and `build:release` clean,
+with the unit suite re-run after the build so the `darkBundle` markers were checked against it. Each
+gate was proven by breaking it: one identity per run, the key embedded verbatim, no digest, and
+committing through the cancellation window each failed exactly the tests that claim those properties.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2216,7 +2246,7 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is under way, and the next action is the result sink.**
+**Wave 2 (Codex) is under way, and the next action is the interaction bridge.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:
@@ -2228,10 +2258,11 @@ Done so far. **Dark** means unreachable from the running application and proven 
 | What a turn may write, extracted from the legacy runtime, which now delegates to it | `CodexTurnSandboxPolicy.ts` | shared |
 | What a turn carries and what it asks the model to be, extracted the same way | `CodexTurnInput.ts` | shared |
 | The daemon behind a connection, and the launch spec whose terms its paths are in | `NodeCodexExecutionConnectionFactory.ts` | dark |
+| Where an answer lives once the turn is over, one identity per result rather than per run | `CodexProjectionResultSink.ts` | dark |
 
-**Next, in this order.** First the result sink, then the interaction bridge — approvals, questions
-and plan decisions become reachable for the first time, through the adapter's `interactionPresenter`
-host port. Then the composition object holding what the backend and every tab runtime must share,
+**Next, in this order.** First the interaction bridge — approvals, questions and plan decisions
+become reachable for the first time, through the adapter's `interactionPresenter` host port. Then
+the composition object holding what the backend and every tab runtime must share,
 an end-to-end turn test over a fake connection **written before the flip rather than after**, and
 only then the flip itself: registration, `main.ts`, the parity manifest, the `darkBundle` markers,
 and the deletion of `CodexChatRuntime`.
@@ -2255,6 +2286,11 @@ The remaining five providers need their own recordings before their own flips.
 
 Open obligations, each with an owner:
 
+- **a Codex result reference cannot be resolved back to the turn that produced it.** The sink is
+  given the run and nothing else, so it commits a `projection` reference; Codex's own JSONL could
+  locate the answer, and the backend holds the thread and turn ids it would take, but does not pass
+  them. Nothing resolves a result reference today, which is why this is recorded rather than built.
+  Owner: M5, with result provenance;
 - **an image attachment's name has never reached Codex.** The turn input builder reads `filename`
   and every caller passes an `ImageAttachment`, which carries `name`, so attachments arrive as
   `1-image-1.png` regardless of what the user attached. Extracted unchanged rather than fixed,
