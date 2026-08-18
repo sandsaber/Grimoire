@@ -11,6 +11,15 @@ import type {
   SessionInstanceId,
 } from './ExecutionIds';
 
+/**
+ * How many transient delivery ids to remember.
+ *
+ * Only large enough to outlast a cross-stream twin, which arrives one event
+ * later. Small on purpose: this window churns at token rate, and its whole
+ * point is that it churns somewhere the facts are not.
+ */
+const MAX_REMEMBERED_TRANSIENT_IDS = 64;
+
 export interface ExecutionEventIngestorOptions {
   readonly backendId: ExecutionBackendId;
   readonly backendGeneration: number;
@@ -64,6 +73,18 @@ export class ExecutionEventIngestor {
   private nextSequence: number;
   private readonly seenDeliveryIds = new Set<string>();
   private readonly seenDeliveryOrder: string[] = [];
+  /**
+   * Delivery ids of transient content, kept apart and kept short.
+   *
+   * Content is deduplicated for one reason only: a backend may deliver the same
+   * event on the run stream *and* the session stream, which this kernel calls
+   * cross-stream delivery and promises to deduplicate. The twin arrives
+   * immediately after its sibling, so the window only has to outlast that — and
+   * keeping it separate is what stops a turn's worth of deltas from evicting
+   * the ids that protect facts from redelivery.
+   */
+  private readonly seenTransientIds = new Set<string>();
+  private readonly seenTransientOrder: string[] = [];
   private readonly pendingDeliveryIds = new Set<string>();
   private readonly causalStreams = new Map<string, CausalStreamState>();
 
@@ -102,7 +123,8 @@ export class ExecutionEventIngestor {
     }
     requireDeliveryId(event.deliveryId);
     if (this.seenDeliveryIds.has(event.deliveryId)
-      || this.pendingDeliveryIds.has(event.deliveryId)) {
+      || this.pendingDeliveryIds.has(event.deliveryId)
+      || this.seenTransientIds.has(event.deliveryId)) {
       return { kind: 'duplicate' };
     }
     if (!event.causal) {
@@ -296,6 +318,7 @@ export class ExecutionEventIngestor {
     // It is stamped with the position it follows, which keeps it ordered
     // against the surrounding events without claiming one of their places.
     if (isTransientExecutionEvent(event.event)) {
+      this.rememberTransientId(event.deliveryId);
       return {
         schemaVersion: 1,
         backendId: event.backendId,
@@ -322,6 +345,20 @@ export class ExecutionEventIngestor {
       scope: event.scope,
       event: event.event,
     };
+  }
+
+  private rememberTransientId(deliveryId: string): void {
+    if (this.seenTransientIds.has(deliveryId)) {
+      return;
+    }
+    this.seenTransientIds.add(deliveryId);
+    this.seenTransientOrder.push(deliveryId);
+    while (this.seenTransientOrder.length > MAX_REMEMBERED_TRANSIENT_IDS) {
+      const evicted = this.seenTransientOrder.shift();
+      if (evicted !== undefined) {
+        this.seenTransientIds.delete(evicted);
+      }
+    }
   }
 
   private rememberDeliveryId(deliveryId: string): void {

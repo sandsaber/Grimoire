@@ -2883,6 +2883,40 @@ The duplication is identical on both models, so it is not a property of what the
 Gates: unit 467 suites / 7,773 tests, integration 6 / 220 plus the live suite skipped, typecheck,
 lint, and `build:release` clean on Linux.
 
+### M2-flips — the answer, once (this commit)
+
+The duplication row 1 reproduced is fixed, and it was the kernel's, not either backend's.
+
+**What the evidence said.** The daemon sends each notification once and the backend emits each event
+once, with a unique delivery id. The registry consumes a run through `consumeRunEvents` *and*
+subscribes to its session, so an event pushed to the run queue and published to the session arrives
+twice — which the kernel already knew: `deduplicates cross-stream delivery and persists exactly one
+terminal` has been a registry test since M1, and the fake backend's delivery destination defaults to
+`both`. Cross-stream delivery is a permitted backend shape, and the kernel's job is to collapse it.
+
+**What it did not do was collapse content.** Transient events skipped the delivery-id set entirely,
+on a stated assumption — "a backend emits each delta once and never redelivers it" — that
+cross-stream delivery makes false. The reason for skipping was real, though: a turn's worth of deltas
+would evict the bounded set that protects facts from redelivery.
+
+So transient content now has **its own** window, sixty-four ids deep. A cross-stream twin arrives one
+event after its sibling, so that is all the window has to outlast, and it churns at token rate
+somewhere the facts are not. Both properties are tested: the twin is refused, and two hundred deltas
+later an old delta is accepted again while the fact ids from before them are still remembered.
+
+The rule this replaces was written down, which is what made it correctable rather than folklore. The
+test that stated it now states the corrected one and says why.
+
+**Live, row 1 is green**: `["user_message_start","assistant_message_start","text:ok","usage"]` — one
+answer, one usage, against `codex app-server` on `gpt-5.4-mini`. And because the fix is in the
+kernel, **wave 1 is fixed too**: Antigravity has been publishing on both streams since its flip, so
+its streamed answer was doubling in production exactly the same way, unnoticed because print mode
+delivers its output in one delta.
+
+Gates: unit 467 suites / 7,774 tests, integration 6 / 220 with the live suite green when enabled,
+typecheck, lint, and `build:release` clean on Linux. The mutation that removes the transient window
+fails exactly the test that claims it.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2932,12 +2966,10 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is flipped, uncertified, and row 1 of its matrix fails: every content chunk is
-delivered twice. The next action is that defect — the two delivery paths in `emit`, in both flipped
-backends — and then the rest of
-[`docs/codex-flip-smoke-matrix.md`](codex-flip-smoke-matrix.md), which the live harness can now drive
-for everything except what a person has to look at. Wave 1's single remaining row is still open too,
-and it is on the same suspect line.**
+**Wave 2 (Codex) is flipped and uncertified; row 1 of its matrix is green live. The next action is
+the rest of [`docs/codex-flip-smoke-matrix.md`](codex-flip-smoke-matrix.md) — the live harness can
+drive every row except the ones a person has to look at, and each row it covers is one less thing the
+manual pass has to catch. Wave 1's single remaining row is still open.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:

@@ -133,13 +133,31 @@ describe('transient output deltas', () => {
         .toEqual({ kind: 'duplicate' });
     });
 
-    it('is delivered again when redelivered, because content is never deduplicated', () => {
-      // Stated rather than left implicit: at-most-once holds because a backend
-      // emits each delta once and recovery replays facts, not text.
+    it('accepts one copy of a delivery that arrived on both streams', () => {
+      // The rule this replaces said content is never deduplicated, on the
+      // assumption that a backend emits each delta once. A backend may deliver
+      // the same event on the run stream *and* the session stream — the kernel
+      // documents that as cross-stream delivery and deduplicates it — and both
+      // flipped providers do. The live Codex run rendered every answer three
+      // times before this was true of content as well.
       const ingestor = createIngestor();
 
       expect(accepted(ingestor.ingest(delivery('d-1', delta)))).toHaveLength(1);
-      expect(accepted(ingestor.ingest(delivery('d-1', delta)))).toHaveLength(1);
+      expect(ingestor.ingest(delivery('d-1', delta))).toEqual({ kind: 'duplicate' });
+    });
+
+    it('forgets a delta long before it could forget a fact', () => {
+      // The twin of a cross-stream delivery arrives immediately after its
+      // sibling, so the window only has to outlast that. Keeping deltas in
+      // their own window is what stops a turn's worth of them from evicting the
+      // ids that protect facts from redelivery.
+      const ingestor = createIngestor();
+      accepted(ingestor.ingest(delivery('delta-old', delta)));
+      for (let index = 0; index < 200; index += 1) {
+        accepted(ingestor.ingest(delivery(`delta-${index}`, delta)));
+      }
+
+      expect(accepted(ingestor.ingest(delivery('delta-old', delta)))).toHaveLength(1);
     });
   });
 
