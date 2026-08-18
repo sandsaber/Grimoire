@@ -1,0 +1,65 @@
+# Codex flip — manual smoke matrix
+
+The Codex flip (`10722cd`) moved chat execution onto the execution kernel and deleted
+`CodexChatRuntime`. Automated gates prove the wiring, the contracts, and one whole turn over a fake
+connection; **this is the layer they cannot reach** — the live `codex app-server` on a real vault.
+
+Run it against a release build installed in a vault (`npm run build:release`, then the plugin folder
+copy). Record the date, the Codex CLI version, and one line per row. A row that fails is a stop
+condition for the flip, not a bug report for later: the flip reverts as a single commit.
+
+## Why this matrix is bigger than wave 1's
+
+Antigravity declares no resume, plan mode, fork, images, or steering, so its matrix was five rows.
+Codex declares nearly all of them, and each is a path the kernel now serves for the first time:
+
+| Capability | Declared | Why it needs a live daemon |
+|---|---|---|
+| persistent runtime | yes | the daemon outlives a turn; the kernel owns its lifetime now |
+| native history | yes | the thread is resumed by id, and the id is written by the new path |
+| plan mode | yes | plan turns are a different `collaborationMode` and a different surface |
+| fork | yes | the fork resumes at an id the turn metadata supplies |
+| image attachments | yes | files are written host-side and read by the daemon, possibly across WSL |
+| instruction mode | yes | orchestrator instructions ride the turn rather than the thread |
+| turn steer | yes | input joins a turn that is already running |
+| interactions | yes | approvals and questions cross four processes to reach the surface |
+
+## The matrix
+
+| # | What to do | What must happen |
+|---|---|---|
+| 1 | Send a plain message | The answer streams; the turn ends; no error notice |
+| 2 | Ask for something that runs a command | The tool card appears with the command, then its output and exit status |
+| 3 | Ask for a file edit | The diff renders as a tool result, and the file changes on disk |
+| 4 | Watch the reasoning while a turn runs | Thinking text streams, and the reasoning summary shows as its widget — each once, never twice |
+| 5 | Send a message with an image attached | The model describes the image; the temp directory is gone afterwards |
+| 6 | Send `/compact`, then `/compact please` | The first compacts the thread; the second is refused with "does not accept arguments" |
+| 7 | Type a second message while a turn is running | It is added to the running turn rather than queued, and the answer accounts for it |
+| 8 | Trigger a command approval, answer **Allow once** | The command runs, the prompt closes, and the composer unlocks |
+| 9 | Trigger an approval and press **Escape** | The turn is cancelled rather than the command merely refused |
+| 10 | Trigger an approval and press **Stop** while it is showing | The prompt disappears, the composer unlocks, and the turn ends as interrupted |
+| 11 | Answer a question the model asks (`requestUserInput`) | The answers reach the model; the modal closes |
+| 12 | Turn on plan mode and send a message | The plan renders as it streams, and the plan-completion state is recorded |
+| 13 | Turn on orchestrator mode and send a message | The worker-plan JSON block is produced, once — not stated twice |
+| 14 | Reload Obsidian, reopen the conversation, send a message | The thread resumes: the model remembers the conversation without it being replayed into the prompt |
+| 15 | Fork a conversation from an earlier message and continue | The fork takes, the rollback lands on the chosen message, and the new turn answers in that context |
+| 16 | Press **Stop** mid-answer | The turn ends promptly and the `codex` process tree is gone (`ps`/Task Manager) |
+| 17 | Watch the plan-limit badge across a few turns | It shows a plan and a used fraction, and updates |
+| 18 | Watch the context-window indicator | It updates as the turn consumes tokens |
+| 19 | Open two Codex tabs and run turns in both | Answers, approvals and images land in the tab that asked; neither tab's images vanish |
+| 20 | Close a tab mid-turn | The turn is cancelled, nothing is left running, and the vault has no leftover temp directories |
+| 21 | Fail a turn deliberately (kill the daemon, or a bad model) | One error is shown, in the daemon's own words |
+| 22 | Restart Obsidian while a turn is running | The next start reconciles: the turn shows as finished or interrupted, never as still running |
+
+## Known gaps, expected to fail nothing above
+
+- **hooks, MCP startup status, remote control, whole raw responses, `thread/started`** are recorded in
+  `wireVocabularyCoverage` as notifications the connection does not consume. Nothing in the matrix
+  depends on them; if a row fails in a way that looks like one of them, that is the finding;
+- **rewind** is declared unsupported for Codex and always has been. Row 15 is fork, not rewind.
+
+## Recording the result
+
+Append the outcome to `docs/provider-execution-migration-progress.md` as a checkpoint entry: date,
+CLI version, one line per row, and — if any row failed — what was reverted or what the next action
+is. Until that entry exists, wave 2 is wired and not certified.

@@ -225,6 +225,7 @@ export class CodexExecution {
       describeFailure: reason => (
         reason === 'provider-failure' ? content.lastFailure() : undefined
       ),
+      consumeProviderTurnMetadata: () => content.consumeTurnMetadata(),
       interactionPresenter: presenter,
       // One per tab, because the router it runs tracks a turn's items across
       // notifications and two tabs are two turns.

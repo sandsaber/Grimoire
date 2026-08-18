@@ -2800,6 +2800,41 @@ with a persistent daemon flips. Until then the gate stays as it is, and a red Wi
 test is re-run **once** and investigated if it repeats — recorded here so the next person does not
 rediscover the measurement.
 
+### M2-flips — the flip broke forking, and nothing failed (this commit)
+
+Looking for what the smoke matrix would hit first turned up a live defect the flip shipped:
+**`assistantMessageId` stopped being an id the daemon knows.**
+
+The tab copies that field onto the assistant message, and a fork asks Codex to resume at it. The
+legacy runtime reported the native turn id; the adapter derives it from the committed result
+reference instead — `result-run-…`, minted by the result sink. So a fork forks the thread, looks for
+its checkpoint among the thread's turns, finds nothing, and throws. Every automated gate stayed green,
+because each half is right on its own terms: the sink mints a truthful reference, and the adapter
+reports the identity it has.
+
+The fix is a host port, `consumeProviderTurnMetadata`, merged over what the adapter derives. Some of
+a turn's identity is not the kernel's to know: the native id is what the provider's own fork and
+rewind address. Codex fills it from the renderer, which already reports the turn id and whether a
+plan turn completed — the listener that had nowhere to go when the flip landed, recorded then as
+"turn metadata is lost". It is not lost now, and it was never only a badge.
+
+The token-usage half of that same note fixed itself with the wire: `thread/tokenUsage/updated` is
+delivered again, the renderer turns it into the `usage` chunk the context indicator reads, and the
+presenter passes it through untouched.
+
+Two mutations, two caught — the adapter ignoring the provider's reading, and the presenter never
+listening for it.
+
+**And the matrix itself is written**: [`docs/codex-flip-smoke-matrix.md`](codex-flip-smoke-matrix.md).
+Twenty-two rows derived from what Codex declares — persistent runtime, native history, plan mode,
+fork, images, instruction mode, steering, interactions — with the reason each one needs a live daemon
+rather than a fake connection, the two known wire gaps that should explain nothing in it, and the
+instruction to record the outcome here. Fork is row 15; without this commit it would have been the
+first row to fail.
+
+Gates: unit 467 suites / 7,773 tests, integration 6 / 220, typecheck, lint, and `build:release`
+clean on Linux; CI covers Windows and macOS.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2849,8 +2884,10 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is flipped and running in production, uncertified. The next action is Codex's
-manual smoke matrix — and wave 1's, which is still open.**
+**Wave 2 (Codex) is flipped and running in production, uncertified. The next action is running
+[`docs/codex-flip-smoke-matrix.md`](codex-flip-smoke-matrix.md) against a live `codex` CLI — twenty-two
+rows, and the only layer the automated gates cannot reach. Wave 1's single remaining row is still
+open too.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:

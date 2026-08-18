@@ -540,6 +540,15 @@ export interface ExecutionChatRuntimeHostPorts {
    * provider's own normalization already produces.
    */
   readonly presentProviderContent?: ProviderContentPresenter;
+  /**
+   * What the provider knows about the turn that just ended.
+   *
+   * Merged over what the adapter derives, because some of it the kernel cannot
+   * know: the native identity of the answer is the id the provider's own fork
+   * and rewind address, and a result reference minted here names nothing the
+   * provider can act on.
+   */
+  consumeProviderTurnMetadata?(): ChatTurnMetadata;
   /** Reports a cleanup that could not complete; never rethrown to the caller. */
   reportCleanupFailure?(error: unknown): void;
   /**
@@ -701,7 +710,10 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   consumeTurnMetadata(): ChatTurnMetadata {
     // Read after the generator closed, from `finally` in the controller, which
     // is why the finished turn is kept rather than the active one.
-    return (this.active?.stream ?? this.lastCompleted)?.consumeTurnMetadata() ?? {};
+    const observed = (this.active?.stream ?? this.lastCompleted)?.consumeTurnMetadata() ?? {};
+    // The provider's own reading wins where it has one: `wasSent` is the
+    // kernel's to answer, and the native identities are not.
+    return { ...observed, ...this.ports.consumeProviderTurnMetadata?.() };
   }
 
   /** Present only where the provider can steer; absent otherwise, by contract. */

@@ -483,6 +483,22 @@ describe('Codex execution composition', () => {
     execution.dispose();
   });
 
+  it('names the turn by the id the daemon can fork from', async () => {
+    // The tab copies `assistantMessageId` onto the message, and a fork asks the
+    // daemon to resume at it. A result id minted here names nothing in the
+    // thread, so the fork fails to find its checkpoint — which is how the flip
+    // broke forking without failing a single test.
+    const { runtime, execution } = await createTurnHarness();
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'hello' })));
+
+    expect(runtime.consumeTurnMetadata()).toMatchObject({
+      assistantMessageId: 'turn-1',
+      wasSent: true,
+    });
+    execution.dispose();
+  });
+
   it('resolves a reference the runtime minted through the backend it built', async () => {
     // One store, or the reference resolves to nothing: this is the seam the
     // first wave's end-to-end turn failed on.

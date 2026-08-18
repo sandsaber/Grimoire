@@ -1,3 +1,4 @@
+import type { ChatTurnMetadata } from '../../../core/runtime/types';
 import type { StreamChunk } from '../../../core/types';
 import { CodexNotificationRouter } from '../runtime/CodexNotificationRouter';
 
@@ -31,8 +32,14 @@ const MIRRORED_BY_THE_KERNEL = new Set([
 
 export class CodexContentPresenter {
   private readonly chunks: StreamChunk[] = [];
-  private readonly router = new CodexNotificationRouter(chunk => this.chunks.push(chunk));
+  private readonly router = new CodexNotificationRouter(
+    chunk => this.chunks.push(chunk),
+    metadata => {
+      this.metadata = { ...this.metadata, ...metadata };
+    },
+  );
   private failure: string | undefined;
+  private metadata: ChatTurnMetadata = {};
 
   constructor(private readonly isPlanTurn: () => boolean) {}
 
@@ -46,6 +53,19 @@ export class CodexContentPresenter {
    */
   lastFailure(): string | undefined {
     return this.failure;
+  }
+
+  /**
+   * What the finished turn was, in the provider's own terms.
+   *
+   * The native id of the answer above all: the tab copies it onto the message
+   * and a fork asks the daemon to resume at it, so a reference minted anywhere
+   * else names nothing the daemon can find.
+   */
+  consumeTurnMetadata(): ChatTurnMetadata {
+    const metadata = this.metadata;
+    this.metadata = {};
+    return metadata;
   }
 
   present(payload: unknown): readonly StreamChunk[] {
