@@ -30,6 +30,7 @@ import type {
 } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
 import type GrimoirePlugin from '@/main';
+import { createCodexModuleContext } from '@/providers/codex/app/CodexModuleContext';
 import { CODEX_PROVIDER_CAPABILITIES } from '@/providers/codex/capabilities';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
 import { readCodexConversationBinding } from '@/providers/codex/execution/CodexConversationBinding';
@@ -83,6 +84,7 @@ export class CodexExecution {
     () => this.environment(),
   );
   private readonly presenters = new Set<CodexInteractionPresenter>();
+  private workspaceSlots: ProviderWorkspaceSlots | undefined;
   private readonly disposers: Array<() => void> = [];
 
   constructor(
@@ -160,7 +162,7 @@ export class CodexExecution {
    * property of *this* tab, read when the turn is dispatched.
    */
   createRuntime(
-    features: ProviderFeatureContributions<CodexProviderSettings>,
+    features?: ProviderFeatureContributions<CodexProviderSettings>,
     workspace?: ProviderWorkspaceSlots,
   ): ChatRuntime {
     let conversation: BoundConversation | null = null;
@@ -208,6 +210,12 @@ export class CodexExecution {
       },
     };
 
+    // Built here, not passed in: the module's history contribution answers about
+    // *this tab's* conversation, so the context has to close over the same one
+    // the ports above sync.
+    const contributions = features
+      ?? codexProviderModule.features(createCodexModuleContext(this.plugin, boundConversation));
+
     adapter = new ExecutionChatRuntimeAdapter<CodexProviderSettings>(
       {
         registry: this.registry,
@@ -220,8 +228,8 @@ export class CodexExecution {
         nextRunId: () => runId(opaqueId('run')),
       },
       ports,
-      features,
-      workspace,
+      contributions,
+      workspace ?? this.workspaceSlots,
     );
     return adapter;
   }
@@ -244,6 +252,22 @@ export class CodexExecution {
       this.presenters.delete(presenter);
     });
     return presenter;
+  }
+
+  /**
+   * The workspace slots every tab shares, initialized once.
+   *
+   * None of them depend on a conversation — commands, models, usage, the CLI,
+   * the settings tab — so they are built for the plugin rather than per tab,
+   * which is also the only way a synchronous `createRuntime` can have them.
+   */
+  async initializeWorkspace(): Promise<void> {
+    this.workspaceSlots = await codexProviderModule.workspace.initialize(
+      createCodexModuleContext(this.plugin, () => null),
+      // Nothing here awaits anything cancellable; the signal exists so a
+      // provider whose workspace does can honour an unload that overtakes it.
+      new AbortController().signal,
+    );
   }
 
   /** The store every tab runtime references its turns through. */

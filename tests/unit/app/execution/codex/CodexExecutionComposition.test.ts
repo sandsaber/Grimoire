@@ -7,7 +7,6 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 import { CodexExecution } from '@/app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import type { StreamChunk } from '@/core/types';
-import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
 import type { CodexExecutionConnectionFactory } from '@/providers/codex/execution/CodexExecutionBackend';
 import { updateCodexProviderSettings } from '@/providers/codex/settings';
 
@@ -234,7 +233,7 @@ describe('Codex execution composition', () => {
     return {
       connection,
       execution,
-      runtime: execution.createRuntime(codexProviderModule.features(workspaceContext())),
+      runtime: execution.createRuntime(),
     };
   }
 
@@ -252,7 +251,7 @@ describe('Codex execution composition', () => {
       create: () => connection as never,
     }));
     await host.start();
-    const runtime = execution.createRuntime(codexProviderModule.features(workspaceContext()));
+    const runtime = execution.createRuntime();
 
     const turn = runtime.prepareTurn({ text: 'summarise the note' });
     const chunks = await drain(runtime.query(turn));
@@ -368,27 +367,6 @@ describe('Codex execution composition', () => {
     expect(second.thread.params.baseInstructions).toContain('Michael');
     execution.dispose();
   });
-
-  function workspaceContext(): any {
-    return {
-      listSkills: async () => [],
-      listAgentMentions: async () => [],
-      refreshAgentMentions: async () => undefined,
-      resolveCliPath: async () => '/usr/local/bin/codex',
-      listModels: async () => [],
-      refreshModels: async () => [],
-      readPlanUsage: async () => null,
-      shouldKeepWarm: () => false,
-      renderSettingsTab: () => undefined,
-      hydrateConversation: async () => ({ outcome: 'complete' as const }),
-      deleteConversationSession: async () => undefined,
-      resolveSessionId: () => null,
-      isPendingFork: () => false,
-      recognizesSubagentTool: () => false,
-      parseSubagentDisplay: () => null,
-      dispose: async () => undefined,
-    };
-  }
 
   it('takes a prompt down when its interaction ends somewhere else', async () => {
     const execution = createExecution(createPlugin());

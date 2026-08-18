@@ -2505,6 +2505,39 @@ just fixing.
 Gates: unit 467 suites / 7863 tests, integration 6 / 220, typecheck, lint clean **on Linux**; the
 Windows and macOS jobs are what this commit is for, and their result is the gate.
 
+### M2-flips — what the module can answer about a tab (this commit)
+
+The last piece before the flip is the module's own context: sixteen methods that let
+`codexProviderModule` reach the provider's services without taking a plugin itself. Nearly all of it
+is delegation to things that already exist — the command catalog, the agent mentions, the model
+options, the plan usage store, the settings tab renderer — but two decisions are not.
+
+**A runtime answers for its own conversation and no other.** The history contribution is asked about
+a conversation *id*, and the only conversation a runtime has is the one the adapter syncs into it.
+Answering for another id would report a thread belonging to a different tab's daemon session, so an
+id that is not this tab's gets `null`. That is also why the context is built inside `createRuntime`,
+closing over the same conversation the ports sync — and why the workspace slots, which depend on no
+conversation, are built once per plugin load instead.
+
+**`syncConversationState` is typed as a binding and handed a whole conversation.** Core narrows it to
+an id, a session, and an opaque provider state; the object the tab passes is the conversation itself,
+and provider code may read the provider's own fields. Hydration needs the whole thing, so the context
+checks the shape rather than assuming it: a caller that really syncs a hand-built binding gets
+`absent` instead of a hydration that reads fields that are not there.
+
+Two smaller notes. The per-turn questions — the session id and whether a fork is pending — are
+answered from the conversation binding rather than from the history service, because a binding is
+exactly what a session id is and they are asked on every turn. And where the workspace services are
+not registered, every slot answers as a provider with nothing to offer: an empty list is what an
+unregistered workspace has, and it is not an error.
+
+Gates: unit 468 suites / 7869 tests, integration 6 / 220, typecheck, lint, and `build:release` clean
+**on Linux**; CI's Windows and macOS jobs are the rest of the gate. Three mutations, three caught.
+
+**Next is the flip itself**: `registration.ts` pointing `createRuntime` at the composition, `main.ts`
+constructing it and registering the backend with its interaction and recovery ports, the parity
+manifest and `darkBundle` markers moving, and `CodexChatRuntime` deleted in the same commit.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2554,7 +2587,7 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is under way, and the next action is the module's workspace context.**
+**Wave 2 (Codex) is under way, and the next action is the flip.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:
@@ -2571,12 +2604,14 @@ Done so far. **Dark** means unreachable from the running application and proven 
 | What a queued turn becomes at dispatch, and the reference the kernel carries for it | `CodexExecutionRequests.ts` | dark |
 | How an opened interaction reaches the surface, and comes back as an id the run can record | `CodexInteractionPresenter.ts` | dark |
 | What the backend and every tab runtime share, and the runtime over it | `CodexExecutionComposition.ts` | dark |
+| What the module can answer about a tab's conversation, over the running plugin | `CodexModuleContext.ts` | dark |
 
-**Next, in this order.** First the module's workspace context, which the flip's registration builds
-from the workspace services — sixteen methods, nearly all delegation. Then the flip itself:
-registration, `main.ts`, the parity manifest, the `darkBundle` markers, and the deletion of
-`CodexChatRuntime`. The end-to-end turn is written and green, which is the order this wave promised:
-before the flip, not after.
+**Next: the flip.** `registration.ts` points `createRuntime` at the composition, `main.ts`
+constructs it, initializes its workspace and registers the backend **with its interaction and
+recovery ports**, the parity manifest and the `darkBundle` markers move, and `CodexChatRuntime` is
+deleted in the same commit. The end-to-end turn is written and green, which is the order this wave
+promised: before the flip, not after. After it lands, the manual smoke matrix for Codex is what
+certifies it — and wave 1's is still open, which is what "no second flip may land" above means.
 
 One loose end remains from the request resolver: a turn's scratch directory is discarded when the
 next turn has one, rather than when its run ends. The composition now has the presenter subscription

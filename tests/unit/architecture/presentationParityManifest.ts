@@ -659,6 +659,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/claude/execution/ClaudeSdkExecutionAdapter.ts',
       'src/providers/claude/execution/ClaudeTaskOutputLoader.ts',
       'src/providers/codex/CodexProviderModule.ts',
+      'src/providers/codex/app/CodexModuleContext.ts',
       'src/providers/codex/execution/CodexConversationBinding.ts',
       'src/providers/codex/execution/CodexExecutionBackend.ts',
       'src/providers/codex/execution/CodexExecutionRequests.ts',
