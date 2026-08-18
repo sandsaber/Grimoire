@@ -1016,6 +1016,12 @@ class CodexExecutionRun implements ExecutionRun {
   }
 
   private applyNotification(method: string, params: unknown): void {
+    // Forwarded whole, before anything is read out of it: the surface renders
+    // tool calls, their results, plan updates and compaction boundaries, and
+    // none of those are a string. The kernel carries the item without reading
+    // it and the provider's own normalization turns it into chunks. Only for
+    // this run's turn — the caller has already filtered by scope.
+    this.emit({ kind: 'provider-content', payload: { method, params } });
     if (method === 'item/agentMessage/delta') {
       const notification = params as AgentMessageDeltaNotification;
       if (notification.delta) {
@@ -1033,6 +1039,12 @@ class CodexExecutionRun implements ExecutionRun {
     }
     if (method === 'item/reasoning/textDelta' || method === 'item/reasoning/summaryTextDelta') {
       this.emit({ kind: 'thinking-activity' });
+      const delta = readString(readRecord(params)?.delta);
+      if (delta) {
+        // The activity event says the model is working. This says what it is
+        // thinking, which is what the surface shows.
+        this.emit({ kind: 'output-delta', channel: 'reasoning', text: delta });
+      }
       return;
     }
     if (method === 'turn/completed') {

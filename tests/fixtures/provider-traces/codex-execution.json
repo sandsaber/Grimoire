@@ -52,27 +52,38 @@
     ],
     "providerFailure": [
       "run-started",
+      "provider-content:turn/completed",
       "terminal:failed:provider-failure"
     ],
     "providerInterruption": [
       "run-started",
+      "provider-content:turn/completed",
       "terminal:interrupted:known-process-exit"
     ],
     "earlyNotificationCompletion": [
       "run-started",
+      "provider-content:item/agentMessage/delta",
       "output-delta",
+      "provider-content:turn/completed",
       "result:projection",
       "terminal:succeeded:completed"
     ],
     "missingCompletionRecovery": [
       "run-started",
+      "provider-content:thread/status/changed",
       "recovery-started",
       "result:projection",
       "terminal:succeeded:completed"
     ],
     "nativeAgentResult": [
       "run-started",
+      "provider-content:item/completed",
+      "provider-content:item/completed",
+      "provider-content:item/completed",
+      "provider-content:item/completed",
+      "provider-content:item/agentMessage/delta",
       "output-delta",
+      "provider-content:turn/completed",
       "native-agent-observed:native-agent-7",
       "native-agent-status:native-agent-7:running",
       "native-agent-activity:native-agent-7:input-sent",

@@ -2647,6 +2647,42 @@ failed the tests, as they should have.
 Gates: unit 468 suites / 7875 tests, integration 6 / 220, typecheck, lint, and `build:release` clean
 on Linux; CI covers Windows and macOS.
 
+### M2-flips — the tool surface, carried by the code that already draws it (this commit)
+
+The Codex half of `provider-content`. The backend forwards every notification of its own turn as an
+opaque item, and the host runs `CodexNotificationRouter` — the thousand lines that already know how a
+Codex tool call, its result, a plan update and a compaction boundary are rendered — over exactly
+those items. The flip keeps that code rather than writing a second opinion about it, which is the
+same reasoning that made the sandbox policy and the turn input shared rather than reimplemented.
+
+Two things had to be decided rather than copied:
+
+- **what the kernel already carries must not be rendered twice.** The assistant's deltas and the
+  reasoning's arrive neutrally as `output-delta`, so the router's copies of those are dropped. The
+  filter is **by notification, not by chunk type**: a plan delta is also a `text` chunk and it is the
+  only copy of the plan there is, so filtering by type would have silently emptied plan mode. That is
+  the failure the by-type version had, and a test now holds it;
+- **reasoning had no text at all.** The backend emitted `thinking-activity` — a sign of life — and
+  dropped what the model was thinking. It now emits it on the reasoning channel, which is what the
+  neutral channel was for.
+
+The frozen Codex trace changed, deliberately: every case that carried a notification now shows the
+`provider-content:<method>` that carries it, immediately before whatever that notification produced.
+The summariser names the method rather than the kind, because a trace recording only
+"provider-content" would freeze the fact that something was forwarded without freezing what.
+
+Four mutations, four caught — including "filter every text chunk", which is the plan-mode failure
+above, and "let the mirrored text through", which is the doubled answer.
+
+Gates: unit 469 suites / 7882 tests, integration 6 / 220, typecheck, lint, and `build:release` clean
+on Linux; CI covers Windows and macOS.
+
+**Next is the flip**, and the surface it lands on is now the one the legacy runtime draws: an
+end-to-end turn through the kernel renders the tool call, its result, and the answer. What is still
+missing is turn metadata — usage and model — which the router reports to a listener the adapter has
+no port for; that is the "token usage" half of the wire-coverage obligation and is not a rendering
+regression.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2696,9 +2732,9 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is built; the flip waits on the tool surface. The owner chose to carry the payload
-first, the kernel half is done, and the next action is the Codex half: forward the notifications the
-legacy router normalizes, and run that normalization in the host presenter.**
+**Wave 2 (Codex) is built and the tool surface is carried: the next action is the flip itself —
+registration, `main.ts`, the parity manifest, the `darkBundle` markers, and the deletion of
+`CodexChatRuntime`.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:

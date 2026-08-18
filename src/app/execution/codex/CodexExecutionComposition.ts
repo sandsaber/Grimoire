@@ -33,6 +33,7 @@ import type GrimoirePlugin from '@/main';
 import { createCodexModuleContext } from '@/providers/codex/app/CodexModuleContext';
 import { CODEX_PROVIDER_CAPABILITIES } from '@/providers/codex/capabilities';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
+import { CodexContentPresenter } from '@/providers/codex/execution/CodexContentPresenter';
 import { readCodexConversationBinding } from '@/providers/codex/execution/CodexConversationBinding';
 import {
   CodexExecutionBackend,
@@ -175,6 +176,8 @@ export class CodexExecution {
     // Read late: the surface installs its callbacks on the runtime after this
     // constructs, so a presenter that captured them now would capture nothing.
     const presenter = this.createInteractionPresenter(() => adapter?.interactionCallbacks() ?? {});
+    const content = new CodexContentPresenter(() => ProviderSettingsCoordinator
+      .getProviderSettingsSnapshot(this.plugin.settings, 'codex').permissionMode === 'plan');
 
     const ports: ExecutionChatRuntimeHostPorts = {
       prepareTurn: (request: ChatTurnRequest) => encodeCodexTurn(request),
@@ -206,6 +209,9 @@ export class CodexExecution {
         conversation = next;
       },
       interactionPresenter: presenter,
+      // One per tab, because the router it runs tracks a turn's items across
+      // notifications and two tabs are two turns.
+      presentProviderContent: payload => content.present(payload),
       reportCleanupFailure: error => {
         this.plugin.recordDebugLog({
           error,

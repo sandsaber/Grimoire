@@ -89,6 +89,8 @@ describe('Codex execution composition', () => {
     readonly calls: Array<{ method: string; params: any }> = [];
     /** Raises a command approval from inside the turn, the way the daemon does. */
     approveOnTurnStart = false;
+    /** Runs a command inside the turn, the way a real one does. */
+    toolOnTurnStart = false;
     approvalResponse: unknown;
     /** The thread the daemon is answering on, which its notifications are routed by. */
     private activeThreadId = 'thread-1';
@@ -146,6 +148,25 @@ describe('Codex execution composition', () => {
           command: 'npm run build',
           cwd: '/vault',
         }).catch((error: unknown) => ({ failed: String(error) }));
+      }
+      if (this.toolOnTurnStart) {
+        this.notify('item/started', {
+          threadId: this.activeThreadId,
+          turnId: 'turn-1',
+          item: { type: 'commandExecution', id: 'item-1', command: 'npm test', status: 'inProgress' },
+        });
+        this.notify('item/completed', {
+          threadId: this.activeThreadId,
+          turnId: 'turn-1',
+          item: {
+            type: 'commandExecution',
+            id: 'item-1',
+            command: 'npm test',
+            status: 'completed',
+            aggregatedOutput: 'all green',
+            exitCode: 0,
+          },
+        });
       }
       this.notify('item/agentMessage/delta', {
         threadId: this.activeThreadId,
@@ -355,6 +376,24 @@ describe('Codex execution composition', () => {
     const turnStart = connection.calls.find(call => call.method === 'turn/start');
     expect(turnStart?.params.sandboxPolicy.writableRoots)
       .toContain(path.join(path.normalize('/elsewhere/codex'), 'memories'));
+    execution.dispose();
+  });
+
+  it('renders a tool call on the surface, which is what the flip must not lose', async () => {
+    // The whole reason the kernel grew a second content channel: a Codex turn
+    // is mostly tool calls, and a flip that streamed only text would ship a
+    // chat with nothing in it but the answer.
+    const { runtime, connection, execution } = await createTurnHarness();
+    connection.toolOnTurnStart = true;
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'run the tests' })));
+
+    expect(chunks).toContainEqual(expect.objectContaining({ type: 'tool_use', name: 'Bash' }));
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'tool_result',
+      content: expect.stringContaining('all green'),
+    }));
+    expect(chunks).toContainEqual({ type: 'text', content: 'the answer' });
     execution.dispose();
   });
 

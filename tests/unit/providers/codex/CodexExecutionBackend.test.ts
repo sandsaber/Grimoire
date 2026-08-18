@@ -120,6 +120,69 @@ describe('CodexExecutionBackend', () => {
     ]);
   });
 
+  it('forwards every notification of its own turn as provider content', async () => {
+    // The surface renders tool calls, results and plans, and none of those fit
+    // a string. The item travels opaquely so the provider's own normalization
+    // can produce them, and only for the turn this run owns.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    const run = session.createRun(request(RUN_1, 'default'));
+    const events = collectEvents(run);
+    await fixture.connection.waitForCall('turn/start');
+
+    fixture.connection.notifyExecution('item/completed', {
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      item: { type: 'commandExecution', id: 'item-9', command: 'ls' },
+    });
+    // A notification belonging to another turn is not this run's content.
+    fixture.connection.notifyExecution('item/completed', {
+      threadId: 'thread-1',
+      turnId: 'turn-other',
+      item: { type: 'commandExecution', id: 'item-10', command: 'rm -rf /' },
+    });
+    fixture.connection.notifyExecution('turn/completed', {
+      threadId: 'thread-1',
+      turn: { id: 'turn-1', items: [], status: 'completed', error: null },
+    });
+
+    const forwarded = (await events)
+      .map(({ event }) => event)
+      .filter((event): event is Extract<typeof event, { kind: 'provider-content' }> => (
+        event.kind === 'provider-content'
+      ))
+      .map(event => event.payload as { method: string; params: { item?: { id?: string } } });
+    expect(forwarded.map(payload => payload.method)).toContain('item/completed');
+    expect(forwarded.flatMap(payload => payload.params.item?.id ?? [])).toEqual(['item-9']);
+  });
+
+  it('streams reasoning as text, not only as a sign of life', async () => {
+    // `thinking-activity` says the model is working; it does not say what it is
+    // thinking, and the surface renders that.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    const run = session.createRun(request(RUN_1, 'default'));
+    const events = collectEvents(run);
+    await fixture.connection.waitForCall('turn/start');
+
+    fixture.connection.notifyExecution('item/reasoning/textDelta', {
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'reason-1',
+      delta: 'weighing the options',
+    });
+    fixture.connection.notifyExecution('turn/completed', {
+      threadId: 'thread-1',
+      turn: { id: 'turn-1', items: [], status: 'completed', error: null },
+    });
+
+    expect((await events).map(({ event }) => event)).toContainEqual({
+      kind: 'output-delta',
+      channel: 'reasoning',
+      text: 'weighing the options',
+    });
+  });
+
   it('creates a replacement daemon and resumes owned threads after connection loss', async () => {
     const first = new FakeCodexConnection();
     const second = new FakeCodexConnection();
@@ -1178,6 +1241,12 @@ function summarizeEvents(events: readonly ProviderExecutionEvent[]): string[] {
     }
     if (event.kind === 'native-agent-status') {
       return `native-agent-status:${event.nativeAgentKey}:${event.status}`;
+    }
+    if (event.kind === 'provider-content') {
+      // Named by the notification it carries: a trace that recorded only
+      // "provider-content" would freeze the fact that something was forwarded
+      // without freezing what.
+      return `provider-content:${(event.payload as { method: string }).method}`;
     }
     if (event.kind === 'interaction-opened') {
       return `interaction-opened:${event.interaction.kind}`;
