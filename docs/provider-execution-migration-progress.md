@@ -2773,6 +2773,33 @@ on Linux; CI covers Windows and macOS. Codex's manual smoke matrix is still what
 and this is the second time a review has found what only a live daemon would have shown — the wire
 gap would have been the first thing the matrix hit.
 
+### M2-flips — the flaky Windows gate, measured at last (this commit)
+
+The commit above went red on `windows-latest` and green on a re-run of the same commit, on the same
+test the journal has been carrying as an open obligation: the persistent process descendant did not
+publish its pid within 15s. This time it was measured rather than re-run and forgotten.
+
+**The numbers.** The whole ownership suite takes **11.2–11.8s** on a green Windows job, and it makes
+five launches — one in the first case and four launch forms in the second. So a launch typically
+costs **two to three seconds**, against a per-launch budget of 15s. The failure was therefore not a
+launch running slightly long: it was one launch stalling past five times its normal cost while the
+other four in the same run were fine. That is a shared-runner stall, and it is why raising the number
+is guessing — the journal said so before there were numbers, and the numbers agree.
+
+**Where the two seconds go, and why it is not only a test problem.** Every Windows launch compiles
+the job guardian: a C# source string handed to `Add-Type`, which runs the CodeDom compiler before the
+child is spawned at all. A Codex daemon start on Windows pays it too, once per launch, and so does
+every local-shell run. Caching the compiled assembly — `Add-Type -OutputAssembly` once, keyed by a
+hash of the source, `-Path` afterwards — would take the cost out of both the product and the test,
+and shrink the window in which a stalled runner can miss the deadline.
+
+It is **not** done here, and deliberately: it is Windows process-ownership code that cannot be
+exercised on this machine at all, so every iteration is a CI push, and getting it wrong breaks the
+one guarantee this gate exists to protect. Owner: a checkpoint of its own, before the next provider
+with a persistent daemon flips. Until then the gate stays as it is, and a red Windows job on this
+test is re-run **once** and investigated if it repeats — recorded here so the next person does not
+rediscover the measurement.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2878,7 +2905,12 @@ Open obligations, each with an owner:
   locate the answer, and the backend holds the thread and turn ids it would take, but does not pass
   them. Nothing resolves a result reference today, which is why this is recorded rather than built.
   Owner: M5, with result provenance;
-- **the Windows process-ownership gate is flaky, and a flaky gate is worth less than none.**
+- **the Windows process-ownership gate is flaky, and the cost behind it is real.** Measured in the
+  entry above: a launch costs two to three seconds against a 15s budget, and the failures are single
+  launches stalling past five times that while their siblings pass. The fix is to stop compiling the
+  job guardian on every launch — which is latency the product pays on Windows too, not just the test.
+  Owner: its own checkpoint, before the next persistent-daemon provider flips. The older reading of
+  this obligation follows:
   `CodexPersistentProcessOwnership.integration.test.ts` failed on a **documentation-only commit**
   (`634fe7c`) — the descendant did not publish its pid within 15s — and passed on re-run of the same
   commit, with the three commits before it green on identical code. So it is timing on a shared
