@@ -39,6 +39,7 @@ export class CodexContentPresenter {
     },
   );
   private failure: string | undefined;
+  private threadId: string | undefined;
   private metadata: ChatTurnMetadata = {};
 
   constructor(private readonly isPlanTurn: () => boolean) {}
@@ -53,6 +54,19 @@ export class CodexContentPresenter {
    */
   lastFailure(): string | undefined {
     return this.failure;
+  }
+
+  /**
+   * The thread the daemon is actually on.
+   *
+   * A conversation learns its thread id from the finished turn, and before the
+   * flip that id came from the runtime, which knew it. The adapter reports the
+   * conversation's own binding instead, which is empty until something writes
+   * it — so without this a new conversation never learns its thread, and every
+   * turn after the first starts a new one: no resume, and nothing to fork from.
+   */
+  lastThreadId(): string | undefined {
+    return this.threadId;
   }
 
   /**
@@ -75,6 +89,10 @@ export class CodexContentPresenter {
       return [];
     }
 
+    const threadId = (notification?.params as { threadId?: unknown } | undefined)?.threadId;
+    if (typeof threadId === 'string' && threadId) {
+      this.threadId = threadId;
+    }
     // The turn's boundaries reset what the router tracks across items, and plan
     // mode is a property of the turn being started rather than of any item in
     // it.

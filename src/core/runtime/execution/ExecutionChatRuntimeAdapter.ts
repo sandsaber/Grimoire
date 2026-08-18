@@ -541,6 +541,15 @@ export interface ExecutionChatRuntimeHostPorts {
    */
   readonly presentProviderContent?: ProviderContentPresenter;
   /**
+   * What this turn is expected to produce, where that is not an answer.
+   *
+   * A compaction produces none, and a turn whose output is a plan rather than a
+   * message produces one the kernel cannot see. Without this they end as
+   * "the provider ended the turn without producing a result", which is a
+   * failure notice for a turn that did exactly what was asked.
+   */
+  resultExpectation?(turn: PreparedChatTurn): 'required' | 'optional' | 'none';
+  /**
    * What the provider knows about the turn that just ended.
    *
    * Merged over what the adapter derives, because some of it the kernel cannot
@@ -678,7 +687,12 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     const started = await startExecutionRun(
       this.context,
       executionSessionId,
-      { requestRef: this.ports.encodeRequestRef(turn, conversationHistory, queryOptions) },
+      {
+        requestRef: this.ports.encodeRequestRef(turn, conversationHistory, queryOptions),
+        ...(this.ports.resultExpectation
+          ? { resultExpectation: this.ports.resultExpectation(turn) }
+          : {}),
+      },
       this.session,
       this.ports.describeFailure,
       this.ports.presentProviderContent,

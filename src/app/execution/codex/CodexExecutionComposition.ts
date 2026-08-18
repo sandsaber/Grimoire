@@ -214,7 +214,13 @@ export class CodexExecution {
       // runtime reported and what the history patch writes back.
       currentSessionId: () => {
         const binding = readCodexConversationBinding(conversation);
-        return binding.kind === 'thread' ? binding.threadId : null;
+        if (binding.kind === 'thread') {
+          return binding.threadId;
+        }
+        // Falling back to the thread the daemon is on, which is how a
+        // conversation learns its own: the binding is empty until a finished
+        // turn writes it, and reporting nothing would mean it never does.
+        return content.lastThreadId() ?? null;
       },
       syncConversation: next => {
         conversation = next;
@@ -225,6 +231,19 @@ export class CodexExecution {
       describeFailure: reason => (
         reason === 'provider-failure' ? content.lastFailure() : undefined
       ),
+      // A compaction answers nothing by design, and a plan turn answers with a
+      // plan, which arrives as its own notification rather than as a message.
+      // Demanding a result from either reports a turn that worked as a failure.
+      resultExpectation: turn => {
+        if (turn.isCompact) {
+          return 'none';
+        }
+        return ProviderSettingsCoordinator
+          .getProviderSettingsSnapshot(this.plugin.settings, 'codex')
+          .permissionMode === 'plan'
+          ? 'optional'
+          : 'required';
+      },
       consumeProviderTurnMetadata: () => content.consumeTurnMetadata(),
       interactionPresenter: presenter,
       // One per tab, because the router it runs tracks a turn's items across

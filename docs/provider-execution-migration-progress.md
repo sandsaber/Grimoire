@@ -2917,6 +2917,54 @@ Gates: unit 467 suites / 7,774 tests, integration 6 / 220 with the live suite gr
 typecheck, lint, and `build:release` clean on Linux. The mutation that removes the transient window
 fails exactly the test that claims it.
 
+### M2-flips — eight rows of the matrix, run live (this commit)
+
+The live harness now drives eight rows against a real `codex app-server` on `gpt-5.4-mini`. Seven are
+green; each of the three that were not found a defect the automated gates could not.
+
+| Row | What it drives | Result |
+|---|---|---|
+| 1 | a plain message | green — one answer, one usage |
+| 2 | a command | green — `tool_use:Bash`, then its output as a `tool_result` |
+| 6 | `/compact`, then `/compact please` | green — the first compacts, the second is refused locally |
+| 8 | an approval the sandbox forces | green — `Execute: /usr/bin/bash -lc "printf 'yes' > …"`, allowed, and the file written |
+| 12 | a plan turn | green — the plan streams, and nothing is reported as failed |
+| 16 | stop mid-answer | green — the turn ends rather than hanging |
+| 21 | a model the daemon refuses | green — one error, in the daemon's words |
+| 14 | resume in a fresh daemon | **open** — see below |
+
+**Three defects, each user-visible, each fixed here.**
+
+- **a compaction was reported as a failure.** The kernel demands a result of every run, and a
+  compaction answers nothing by design — so `/compact` ended with "the provider ended the turn without
+  producing a result". A plan turn failed the same way for a different reason: its answer arrives as a
+  plan notification rather than as a message, so nothing is committed as a result. `resultExpectation`
+  is a host port now: a compaction produces none, a plan turn's is optional, everything else is
+  required;
+- **a model the daemon refuses ended the turn silently.** The daemon's `error` notification carries no
+  thread id, so it was dropped before reaching any run; the turn then died with the daemon and was
+  reported as `interrupted`, which the surface renders as nothing at all. An unscoped error now
+  reaches the running turn and fails it, and the message it carries is the one shown;
+- **a conversation could never learn its thread id.** `currentSessionId` read the conversation's own
+  binding, which is empty until a finished turn writes it — and what writes it is `currentSessionId`.
+  Circular: every turn would have started a new thread, so resume and fork could never work at all.
+  It falls back to the thread the daemon is actually on, which is what the deleted runtime reported.
+
+**Row 14 stays open, with its symptom recorded.** Resuming a thread in a *fresh* daemon — a restart —
+leaves the run `indeterminate`: `thread/resume` succeeds and the thread goes active then idle without
+the turn ever running, and the surface shows "Grimoire could not establish whether this run
+completed". The assertion is left failing on purpose, the way row 1's duplication was, because it is
+the reproduction. Owner: the next checkpoint, and it is the row that matters most — resume is what a
+persistent-daemon provider is for.
+
+Two smaller observations for whoever runs the manual half: a tool result is emitted again at the end
+of a turn (the renderer flushes pending raw outputs on `turn/completed`), which the surface may or may
+not dedupe by id; and the model reaches for the vault's `AGENTS.md` unprompted, which is Codex being
+Codex rather than anything the flip changed.
+
+Gates: unit 467 suites / 7,774 tests, integration 6 / 220 with the live suite green except row 14,
+typecheck, lint, and `build:release` clean on Linux.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2966,10 +3014,10 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is flipped and uncertified; row 1 of its matrix is green live. The next action is
-the rest of [`docs/codex-flip-smoke-matrix.md`](codex-flip-smoke-matrix.md) — the live harness can
-drive every row except the ones a person has to look at, and each row it covers is one less thing the
-manual pass has to catch. Wave 1's single remaining row is still open.**
+**Wave 2 (Codex) is flipped and uncertified. Eight rows of its matrix run live and seven are green;
+row 14 — resume in a fresh daemon — is the open one and the next action, because resume is what a
+persistent-daemon provider is for. The rows a person has to look at are still unrun, and wave 1's
+single remaining row with them.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:
