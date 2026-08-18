@@ -2245,6 +2245,43 @@ The rest, each fixed:
 
 Gates: unit 463 suites / 7809 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
 
+### M2-flips — the two answers that are not a choice (this commit)
+
+The interaction bridge is where Codex's four server requests become interactions the kernel can
+carry, and writing it found the shape mismatch the wave has now met three times: **the kernel takes
+identifiers, and two of Codex's answers are not identifiers.**
+
+A command approval can be answered with a policy-amendment *object* —
+`{ acceptWithExecpolicyAmendment: … }` — and the legacy runtime carried it as the option's value by
+`JSON.stringify`. A response id must match `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`, and the interaction
+record decodes every offered id through that rule, so the legacy encoding is one the control store
+would refuse outright. A question is worse: its answer is free text the user typed, which can never
+be an id at all.
+
+So the id stands for the answer and the answer stays on the provider's side. Amendments become
+`amendment-1`, `amendment-2` with the objects held in the bridge; a question offers `answered` and
+`dismissed`, and the presenter hands its collected answers back through `submitAnswers` before it
+resolves. Both directions are covered: the amendment comes back verbatim as the decision, and the
+answers come back in Codex's own `{ id: { answers: [...] } }` shape with blanks dropped, which is the
+normalization the legacy router did.
+
+The rest is preserved from `CodexServerRequestRouter` deliberately unchanged: the offered decisions
+come from `availableDecisions` with the daemon's three-way default, a network request is described by
+the host it wants rather than by the command, an unknown response id declines, a permission grant is
+`turn` or `session` by what the user chose and empty otherwise, and every cancellation — a run
+already terminal, or Codex resolving its own request — answers with the decline payload for that
+method rather than nothing.
+
+Gates: unit 464 suites / 7820 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
+Five mutations, five caught: the amendment carried as JSON the way the legacy encoded it, an unknown
+id accepted instead of declined, a denied permission granting what was asked for, the
+provider-resolved id left out of the offered ids, and blank answers passed through.
+
+One seam is still stubbed on both sides: the backend's own suite fakes this bridge, and this suite
+asserts the backend's rules rather than running them. That is what the end-to-end composition test
+exists to close, and it is the next checkpoint — the wave-1 lesson is that a seam both sides stub is
+not covered.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2294,7 +2331,7 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is under way, and the next action is the interaction bridge.**
+**Wave 2 (Codex) is under way, and the next action is the composition object.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:
@@ -2307,13 +2344,14 @@ Done so far. **Dark** means unreachable from the running application and proven 
 | What a turn carries and what it asks the model to be, extracted the same way | `CodexTurnInput.ts` | shared |
 | The daemon behind a connection, and the launch spec whose terms its paths are in | `NodeCodexExecutionConnectionFactory.ts` | dark |
 | Where an answer lives once the turn is over, one identity per result rather than per run | `CodexProjectionResultSink.ts` | dark |
+| What the user is asked, and what Codex is told they said | `CodexInteractionBridge.ts` | dark |
 
-**Next, in this order.** First the interaction bridge — approvals, questions and plan decisions
-become reachable for the first time, through the adapter's `interactionPresenter` host port. Then
-the composition object holding what the backend and every tab runtime must share,
-an end-to-end turn test over a fake connection **written before the flip rather than after**, and
-only then the flip itself: registration, `main.ts`, the parity manifest, the `darkBundle` markers,
-and the deletion of `CodexChatRuntime`.
+**Next, in this order.** First the composition object holding what the backend and every tab runtime
+must share — the request store, the active launch spec, the bridge, and the presenter that renders it
+through the adapter's `interactionPresenter` port. Then an end-to-end turn test over a fake
+connection **written before the flip rather than after**, and only then the flip itself:
+registration, `main.ts`, the parity manifest, the `darkBundle` markers, and the deletion of
+`CodexChatRuntime`.
 One small piece of turn logic is still private to the runtime and belongs with the composition:
 `resolveCodexSandboxConfig`, which turns the permission mode into an approval policy and the sandbox
 mode the extracted policy reads. It is two branches, and a second copy of two branches is still a
