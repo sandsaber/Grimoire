@@ -461,6 +461,13 @@ describe('the assembled ChatRuntime adapter', () => {
         }),
         encodeRequestRef: (turn: PreparedChatTurn) => mintRef('req', turn),
         encodeSteerRef: (turn: PreparedChatTurn) => mintRef('steer', turn),
+        presentProviderContent: (payload: unknown) => {
+          const item = payload as { tool?: string; result?: string };
+          if (item.tool) {
+            return [{ type: 'tool_use', id: 'call-1', name: item.tool, input: {} }];
+          }
+          return item.result ? [{ type: 'tool_result', id: 'call-1', content: item.result }] : [];
+        },
         reasoningControl: 'effort',
         currentSessionId: () => 'native-session',
       },
@@ -661,6 +668,30 @@ describe('the assembled ChatRuntime adapter', () => {
     expect(harness.steeredRefs()).toEqual([]);
   });
 
+  it('renders provider content through the host, and nothing without one', async () => {
+    // Core does not model a tool call. It carries the provider's item and the
+    // host turns it into the chunks the surface already reads — which is the
+    // only way a provider whose turn is more than text can be rendered at all.
+    const harness = await createHarness({ ownSession: true });
+    const adapter = createAdapter(harness);
+    const collected = drain(adapter.query(adapter.prepareTurn({ text: 'build it' })));
+    const runId = toRunId(`run-${'1'.padStart(32, '0')}`);
+    for (let attempt = 0; attempt < 200 && !harness.dispatched(runId); attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+
+    await harness.emit(runId, { kind: 'provider-content', payload: { tool: 'Bash' } }, 'd-1');
+    await harness.emit(runId, { kind: 'provider-content', payload: { result: 'ok' } }, 'd-2');
+    // An item the host has nothing to say about is dropped rather than guessed.
+    await harness.emit(runId, { kind: 'provider-content', payload: {} }, 'd-3');
+    await harness.emit(runId, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, 'd-4');
+
+    expect(await collected).toEqual([
+      { type: 'tool_use', id: 'call-1', name: 'Bash', input: {} },
+      { type: 'tool_result', id: 'call-1', content: 'ok' },
+    ]);
+  });
+
   it('adds input to the run it started, through its own steer', async () => {
     // The production path, which the registry-level test above does not reach:
     // `adapter.steer` finds its own active run, asks the host to encode the
@@ -773,14 +804,17 @@ describe('coverage over the four proof topologies', () => {
     expect(recordedKinds(trace)).toContain('output-delta');
   });
 
-  it('classifies exactly one kind as content and two as terminals', () => {
+  it('classifies exactly two kinds as content and two as terminals', () => {
     const byPresentation = KERNEL_EVENT_KINDS.reduce<Record<string, string[]>>((totals, kind) => {
       const presentation = classifyForPresentation(kind);
       totals[presentation] = [...(totals[presentation] ?? []), kind];
       return totals;
     }, {});
 
-    expect(byPresentation.chunk).toEqual(['output-delta']);
+    // Two, because a turn says two kinds of thing: text, and the items a
+    // surface renders as tool calls, results, plans and boundaries. The second
+    // is opaque to core and reaches the surface through the host's presenter.
+    expect([...byPresentation.chunk].sort()).toEqual(['output-delta', 'provider-content']);
     // Two, because the registry reduces an acknowledged cancellation into a
     // terminal and then drops the explicit one that follows. This list said
     // `['terminal']` while `accept` had already been taught otherwise, and a

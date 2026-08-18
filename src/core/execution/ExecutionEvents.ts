@@ -45,6 +45,19 @@ export type ExecutionEvent =
     readonly channel: 'assistant' | 'reasoning';
     readonly text: string;
   }
+  /**
+   * Provider content the surface renders, carried without being read.
+   *
+   * Transient for the same reasons as `output-delta`, and opaque for the same
+   * reason as `requestRef`: a tool call, its result, a plan update and a
+   * compaction boundary are what the provider is *saying*, and only the
+   * provider's own host code knows what one of its items looks like. Core
+   * carries it to the presenter and never interprets it.
+   *
+   * It exists because `output-delta` is a string, and the second provider to
+   * flip renders four things that are not one.
+   */
+  | { readonly kind: 'provider-content'; readonly payload: unknown }
   | { readonly kind: 'thinking-activity' }
   | { readonly kind: 'tool-activity'; readonly toolCallId: string }
   | {
@@ -110,12 +123,15 @@ export type ExecutionEvent =
  * authority is why this travels the normal delivery path instead of a second
  * channel beside it.
  */
-export type TransientExecutionEvent = Extract<ExecutionEvent, { kind: 'output-delta' }>;
+export type TransientExecutionEvent = Extract<
+ExecutionEvent,
+{ kind: 'output-delta' | 'provider-content' }
+>;
 
 export function isTransientExecutionEvent(
   event: ExecutionEvent,
 ): event is TransientExecutionEvent {
-  return event.kind === 'output-delta';
+  return event.kind === 'output-delta' || event.kind === 'provider-content';
 }
 
 /** Adapter-owned normalized event before core sequence assignment. */

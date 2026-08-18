@@ -77,6 +77,16 @@ describe('transient output deltas', () => {
     text: 'partial answer',
   };
 
+  it('classifies a provider content event as transient too', () => {
+    // The second content-bearing kind, and for the same reasons: a tool call is
+    // rendered while the turn runs, the durable copy of what happened is the
+    // committed result, and a backend emits each one once.
+    expect(isTransientExecutionEvent({
+      kind: 'provider-content',
+      payload: { method: 'item/completed' },
+    })).toBe(true);
+  });
+
   it('is the only event kind classified as transient', () => {
     // Guards the classification itself: a second content event added later must
     // be a deliberate decision, not an accident of this predicate widening.

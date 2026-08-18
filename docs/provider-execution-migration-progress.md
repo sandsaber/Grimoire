@@ -2578,6 +2578,36 @@ Three ways forward, and the choice is the owner's:
 Nothing is landed by this commit. The branch state is unchanged except for this entry, which is the
 resumable form of "the flip stopped here and why".
 
+### M2-adapter reopened — a second content channel, because a turn says more than text (this commit)
+
+**Owner's decision on the flip blocker: carry the payload first.** So the contract declared complete
+at M2-adapter is reopened, which is the honest reading of a defect the fifth provider found: its one
+content channel is a string, and the surface a real provider renders is tool calls, their results,
+plan updates and compaction boundaries.
+
+`provider-content` is that channel. It carries the provider's item **opaquely** — core never reads it,
+for the same reason it never reads a `requestRef` — and reaches the surface through a new host port,
+`presentProviderContent`, which turns one item into the `StreamChunk`s the chat already renders.
+Absent for a provider whose turn is text; the item is then dropped rather than guessed at.
+
+It is transient on the same terms as `output-delta`, and that is the part worth stating: never
+persisted, never reduced into a projection, never deduplicated. A tool call is not a fact about the
+run — the committed result is — and D2's rule that a control record must stay insufficient to
+reconstruct what was said holds only if the tool payload never lands in one.
+
+What changed: the event kind, `isTransientExecutionEvent`, `classifyForPresentation` (the exhaustive
+switch caught the omission before any test did), the host port, and the run stream that consults it.
+Three mutations, three caught: persisting the item, never consulting the presenter, and classifying
+it as a fact.
+
+Gates: unit 468 suites / 7871 tests, integration 6 / 220, typecheck, lint, and `build:release` clean
+on Linux; CI covers Windows and macOS.
+
+**Next**: the Codex side of it — the backend forwarding the notifications its router already knows how
+to normalize, and the host port running that normalization — then the flip. The legacy
+`CodexNotificationRouter` is the thing that produces those chunks today, so the flip's job is to keep
+it, not to reimplement it.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2627,8 +2657,9 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is built and blocked at the flip: the kernel path renders no tool surface, and
-the owner's decision between the three options in the entry above is what unblocks it.**
+**Wave 2 (Codex) is built; the flip waits on the tool surface. The owner chose to carry the payload
+first, the kernel half is done, and the next action is the Codex half: forward the notifications the
+legacy router normalizes, and run that normalization in the host presenter.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:

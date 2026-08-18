@@ -132,6 +132,14 @@ export class ExecutionRunStream {
   constructor(
     private readonly runId: RunId,
     private readonly describeProviderFailure?: FailurePresenter,
+    /**
+     * Turns one provider content item into chunks the surface renders.
+     *
+     * Absent for a provider whose surface is text: the item is then dropped
+     * rather than guessed at, which is the same answer core gives for every
+     * other payload it does not read.
+     */
+    private readonly presentProviderContent?: ProviderContentPresenter,
   ) {}
 
   /** Feeds one accepted envelope in. Anything after a terminal is dropped. */
@@ -155,6 +163,12 @@ export class ExecutionRunStream {
       this.push(event.channel === 'reasoning'
         ? { type: 'thinking', content: event.text }
         : { type: 'text', content: event.text });
+      return;
+    }
+    if (event.kind === 'provider-content') {
+      for (const chunk of this.presentProviderContent?.(event.payload) ?? []) {
+        this.push(chunk);
+      }
       return;
     }
     if (event.kind === 'cancellation-acknowledged') {
@@ -421,9 +435,10 @@ export async function startExecutionRun(
   spec: ExecutionRunRequestSpec,
   session?: ExecutionAdapterSession,
   describeProviderFailure?: FailurePresenter,
+  presentProviderContent?: ProviderContentPresenter,
 ): Promise<{ runId: RunId; stream: ExecutionRunStream; release: () => void }> {
   const runId = context.nextRunId();
-  const stream = new ExecutionRunStream(runId, describeProviderFailure);
+  const stream = new ExecutionRunStream(runId, describeProviderFailure, presentProviderContent);
   const unsubscribe = context.registry.observe(executionSessionId, envelope => {
     stream.accept(envelope);
   });
@@ -516,6 +531,15 @@ export interface ExecutionChatRuntimeHostPorts {
    * pending fork or a thread that is bound but not yet loaded.
    */
   syncConversation?(conversation: BoundConversation | null): void;
+  /**
+   * Renders one provider content item into the chunks the surface reads.
+   *
+   * Absent for a provider whose turn is text and reasoning; present for one
+   * whose surface shows tool calls, their results, plan updates, or a
+   * compaction boundary — none of which core models, and all of which the
+   * provider's own normalization already produces.
+   */
+  readonly presentProviderContent?: ProviderContentPresenter;
   /** Reports a cleanup that could not complete; never rethrown to the caller. */
   reportCleanupFailure?(error: unknown): void;
   /**
@@ -641,6 +665,7 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
       { requestRef: this.ports.encodeRequestRef(turn, conversationHistory, queryOptions) },
       this.session,
       this.ports.describeFailure,
+      this.ports.presentProviderContent,
     );
     this.active = started;
     // Interactions and backend-initiated turns arrive on the same stream as the
@@ -983,6 +1008,8 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
  * renamed or mistyped key compiles on both sides and every approval silently
  * answers itself.
  */
+export type ProviderContentPresenter = (payload: unknown) => readonly StreamChunk[];
+
 export interface ExecutionInteractionCallbacks {
   readonly approval?: ApprovalCallback;
   readonly approvalDismisser?: () => void;
@@ -1075,6 +1102,7 @@ export type ExecutionEventPresentation = 'chunk' | 'terminal' | 'ignored';
 export function classifyForPresentation(kind: ExecutionEvent['kind']): ExecutionEventPresentation {
   switch (kind) {
     case 'output-delta':
+    case 'provider-content':
       return 'chunk';
     // `cancellation-acknowledged` counts, because the registry has already
     // reduced it to a terminal and drops the explicit one that follows as
