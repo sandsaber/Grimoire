@@ -2538,6 +2538,46 @@ Gates: unit 468 suites / 7869 tests, integration 6 / 220, typecheck, lint, and `
 constructing it and registering the backend with its interaction and recovery ports, the parity
 manifest and `darkBundle` markers moving, and `CodexChatRuntime` deleted in the same commit.
 
+### M2-flips — the Codex flip is ready except for what the surface renders (this commit)
+
+Every piece the flip needs exists and is green: the composition, the runtime over it, the backend
+with its interaction and recovery ports, and an end-to-end turn that runs through the kernel over a
+fake connection. What is not ready is the **chat surface**, and checking that before landing is the
+product invariant doing its job.
+
+The legacy runtime's notification router produces seven chunk kinds: `text`, `thinking`, `tool_use`,
+`tool_result`, `progress`, `context_compacted`, and `user_message_start`. The kernel path produces
+**one** — `output-delta`, as assistant text or reasoning. Everything else the backend observes it
+emits as a *fact*: `tool-activity` carries a tool call id and nothing else, `progress` and the
+native-agent events carry no payload, and `classifyForPresentation` marks all of them `ignored`, in
+its own words because "tool and native-agent rendering needs the provider payload the kernel
+deliberately does not carry, so those surfaces move with the chat projections at M5".
+
+So flipping Codex today would ship a Codex chat that streams the answer and the reasoning and shows
+**no tool calls, no tool results, no diffs, no plan updates, and no compaction notice** — for the
+provider whose surface is mostly those. Wave 1 never met this: `agy --print` has no tool surface at
+all, which is exactly why it was chosen first.
+
+This is the shape of the obligation already recorded above — "the wire recordings show nine Codex
+notifications that no backend consumes, including the ones carrying plan indicators, token usage, and
+raw response items. Owner: each provider's flip" — arriving at the flip that owns it. It is bigger
+than it read: it is not nine unread notifications, it is the whole tool surface.
+
+Three ways forward, and the choice is the owner's:
+
+1. **Land the flip and declare the regression.** Revertible as a commit, and the smoke matrix would
+   record what is missing. Honest, but it makes the product worse for as long as M5 takes;
+2. **Carry the payload first.** A content event that carries the provider's tool payload — the
+   kernel has one content channel by an M2-adapter decision, and this is the second provider proving
+   that channel too narrow. Then the adapter maps it to the chunks the surface already renders. This
+   reopens a contract that was declared complete, which is the honest reading of a defect the fifth
+   proof found;
+3. **Flip Codex after the projections.** Keep the legacy runtime, take M3/M5 first, and flip when the
+   surface the kernel feeds is the one the UI reads.
+
+Nothing is landed by this commit. The branch state is unchanged except for this entry, which is the
+resumable form of "the flip stopped here and why".
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2587,7 +2627,8 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is under way, and the next action is the flip.**
+**Wave 2 (Codex) is built and blocked at the flip: the kernel path renders no tool surface, and
+the owner's decision between the three options in the entry above is what unblocks it.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:
