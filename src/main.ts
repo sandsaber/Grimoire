@@ -392,11 +392,11 @@ export default class GrimoirePlugin extends Plugin {
   /**
    * Brings the kernel up before anything can ask it for work.
    *
-   * A kernel that cannot start must not take the plugin down with it: the only
-   * provider running through it is Antigravity, and every other surface is
-   * unaffected. The registry refuses work it never accepted, so a failed start
-   * surfaces as a refused turn for that provider rather than a vault without
-   * Grimoire in it.
+   * A kernel that cannot start must not take the plugin down with it: the
+   * providers running through it are Antigravity and Codex, and every other
+   * surface is unaffected. The registry refuses work it never accepted, so a
+   * failed start surfaces as refused turns for those two rather than a vault
+   * without Grimoire in it.
    */
   private async startExecutionKernel(): Promise<void> {
     if (this.unloading) {

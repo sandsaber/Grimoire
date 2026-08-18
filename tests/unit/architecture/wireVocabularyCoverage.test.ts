@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { CODEX_EXECUTION_NOTIFICATION_METHODS } from '@/providers/codex/runtime/CodexExecutionConnection';
+
 /**
  * What the providers actually send, against what the code models.
  *
@@ -35,16 +37,19 @@ interface WireRecording {
  * backends learn them; it must not grow without a recording that justifies it.
  */
 const UNMODELLED_BY_PROVIDER: Readonly<Record<string, readonly string[]>> = {
+  // Six left, down from nine: the flip took `account/rateLimits/updated`,
+  // `rawResponseItem/completed` and `thread/tokenUsage/updated`, which the
+  // connection now delivers because the renderer it kept knows what to do with
+  // them. What remains is hooks, MCP startup status, remote control, the whole
+  // raw response, and a thread-start notification the backend learns from its
+  // own RPC results.
   codex: [
-    'account/rateLimits/updated',
     'hook/completed',
     'hook/started',
     'mcpServer/startupStatus/updated',
     'rawResponse/completed',
-    'rawResponseItem/completed',
     'remoteControl/status/changed',
     'thread/started',
-    'thread/tokenUsage/updated',
   ],
   opencode: ['available_commands_update', 'usage_update'],
 };
@@ -111,14 +116,14 @@ describe('wire vocabulary coverage', () => {
 });
 
 /** The notification methods the Codex execution connection subscribes to. */
-function readModelledCodexNotifications(): string[] {
-  const source = readFileSync(
-    resolve(process.cwd(), 'src/providers/codex/runtime/CodexExecutionConnection.ts'),
-    'utf8',
-  );
-  const block = source.slice(
-    source.indexOf('NOTIFICATION_METHODS'),
-    source.indexOf('] as const', source.indexOf('NOTIFICATION_METHODS')),
-  );
-  return [...block.matchAll(/'([^']+)'/g)].map(match => match[1]);
+/**
+ * The list the connection actually subscribes with.
+ *
+ * Read as a value rather than scraped out of the source: the list is composed
+ * from the renderer's own now, and a scraper saw four literals and called the
+ * other fifteen unmodelled. A gate that reads text instead of meaning is the
+ * defect this file exists to prevent, recorded once already at M2-adapter.
+ */
+function readModelledCodexNotifications(): readonly string[] {
+  return CODEX_EXECUTION_NOTIFICATION_METHODS;
 }

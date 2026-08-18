@@ -7,6 +7,7 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 import { CodexExecution } from '@/app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import type { StreamChunk } from '@/core/types';
+import { codexPlanUsageStore } from '@/providers/codex/app/CodexPlanUsageStore';
 import type { CodexExecutionConnectionFactory } from '@/providers/codex/execution/CodexExecutionBackend';
 import { updateCodexProviderSettings } from '@/providers/codex/settings';
 
@@ -91,6 +92,8 @@ describe('Codex execution composition', () => {
     approveOnTurnStart = false;
     /** Runs a command inside the turn, the way a real one does. */
     toolOnTurnStart = false;
+    /** The message a failed turn reports, the way the daemon reports one. */
+    failTurn: string | undefined;
     approvalResponse: unknown;
     /** The thread the daemon is answering on, which its notifications are routed by. */
     private activeThreadId = 'thread-1';
@@ -122,6 +125,19 @@ describe('Codex execution composition', () => {
           model: 'gpt-5.5',
           modelProvider: 'openai',
           serviceTier: null,
+        } as T;
+      }
+      if (method === 'account/rateLimits/read') {
+        return {
+          plan: 'ChatGPT Pro',
+          rateLimits: {
+            primary: {
+              label: 'weekly',
+              windowDurationMins: 10080,
+              usedPercent: 40,
+              resetsAt: 1893456000000,
+            },
+          },
         } as T;
       }
       if (method === 'turn/start') {
@@ -176,12 +192,14 @@ describe('Codex execution composition', () => {
       });
       this.notify('turn/completed', {
         threadId: this.activeThreadId,
-        turn: {
-          id: 'turn-1',
-          status: 'completed',
-          error: null,
-          items: [{ type: 'agentMessage', id: 'message-1', text: 'the answer' }],
-        },
+        turn: this.failTurn
+          ? { id: 'turn-1', status: 'failed', error: { message: this.failTurn }, items: [] }
+          : {
+            id: 'turn-1',
+            status: 'completed',
+            error: null,
+            items: [{ type: 'agentMessage', id: 'message-1', text: 'the answer' }],
+          },
       });
     }
 
@@ -394,6 +412,74 @@ describe('Codex execution composition', () => {
       content: expect.stringContaining('all green'),
     }));
     expect(chunks).toContainEqual({ type: 'text', content: 'the answer' });
+    execution.dispose();
+  });
+
+  it('reports a failed turn once, in the daemon\'s own words', async () => {
+    // The renderer produces an error chunk of its own and the kernel renders
+    // the terminal: unfiltered that is the same failure twice, and filtered
+    // without keeping the words it is the neutral sentence instead.
+    const { runtime, connection, execution } = await createTurnHarness();
+    connection.failTurn = 'the model refused';
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'do it' })));
+
+    expect(chunks.filter(chunk => chunk.type === 'error'))
+      .toEqual([{ type: 'error', content: 'the model refused' }]);
+    execution.dispose();
+  });
+
+  it('lets the plan-limit indicator ask the daemon what is left', async () => {
+    // The reader and the subscription both lived in the deleted runtime; without
+    // them every refresh answers "no reader" and the badge stays empty.
+    const { runtime, connection, execution } = await createTurnHarness();
+    await drain(runtime.query(runtime.prepareTurn({ text: 'hello' })));
+
+    connection.notify('account/rateLimits/updated', {
+      rateLimits: {
+        primary: {
+          label: 'weekly',
+          windowDurationMins: 10080,
+          usedPercent: 40,
+          resetsAt: 1893456000000,
+        },
+      },
+    });
+    const usage = await codexPlanUsageStore.refreshUsage({
+      plugin: createPlugin(),
+      providerId: 'codex',
+      settings: createPlugin().settings,
+    });
+
+    expect(usage).not.toBeNull();
+    expect(connection.calls.map(call => call.method)).toContain('account/rateLimits/read');
+    execution.dispose();
+  });
+
+  it('lets go of a closed tab\'s images and prompts', async () => {
+    // A tab that closes has no next turn, and its scratch would otherwise wait
+    // for the plugin to unload.
+    const { runtime, execution } = await createTurnHarness();
+    await drain(runtime.query(runtime.prepareTurn({ text: 'hello' })));
+    const held = execution.turnRequests;
+
+    await runtime.cleanup();
+
+    // Nothing left to free: releasing twice is a no-op, and disposing after a
+    // closed tab must not double-free what it already released.
+    expect(() => execution.dispose()).not.toThrow();
+    expect(held.pendingCount).toBe(0);
+  });
+
+  it('refuses a compaction that came with an instruction', async () => {
+    // Codex compacts a thread; it does not read an argument, so `/compact
+    // please` would silently compact and lose the instruction. The legacy
+    // runtime refused it locally, and so does the resolver.
+    const execution = createExecution(createPlugin());
+    execution.createBackend(neverConnects);
+    const ref = queued(execution, { isCompact: true, text: '/compact please', prompt: '/compact please' });
+
+    await expect(execution.turnRequests.resolve(ref)).rejects.toThrow(/does not accept arguments/);
     execution.dispose();
   });
 

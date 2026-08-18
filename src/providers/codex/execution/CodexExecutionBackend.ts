@@ -794,6 +794,12 @@ class CodexExecutionRun implements ExecutionRun {
         ))) {
         this.establishTurn(turnId);
       }
+      if (turnId && turnId === this.turnId) {
+        // Forwarded after the turn is established, because it is what tells the
+        // renderer a new turn began: without it the item tracking of the turn
+        // before leaks into this one, and plan mode is never switched on.
+        this.emit({ kind: 'provider-content', payload: { method, params } });
+      }
       return;
     }
     const scope = extractScope(params);
@@ -1040,7 +1046,10 @@ class CodexExecutionRun implements ExecutionRun {
     if (method === 'item/reasoning/textDelta' || method === 'item/reasoning/summaryTextDelta') {
       this.emit({ kind: 'thinking-activity' });
       const delta = readString(readRecord(params)?.delta);
-      if (delta) {
+      // Only the reasoning text. A summary delta is rendered as the progress
+      // widget the surface already draws from the item itself, and mirroring it
+      // here as well would show the same summary twice, once as thinking.
+      if (delta && method === 'item/reasoning/textDelta') {
         // The activity event says the model is working. This says what it is
         // thinking, which is what the surface shows.
         this.emit({ kind: 'output-delta', channel: 'reasoning', text: delta });

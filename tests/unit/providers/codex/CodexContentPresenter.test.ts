@@ -68,6 +68,46 @@ describe('Codex content presenter', () => {
     expect(reasoning.filter((chunk: any) => chunk.type === 'thinking')).toEqual([]);
   });
 
+  it('draws a reasoning summary as the widget, since the kernel does not carry it', () => {
+    const presenter = new CodexContentPresenter(() => false);
+
+    present(presenter, 'turn/started', { threadId: 't', turn: { id: 'turn-1' } });
+    const summary = present(presenter, 'item/reasoning/summaryTextDelta', {
+      threadId: 't',
+      turnId: 'turn-1',
+      itemId: 'reason-1',
+      delta: 'checking the tests',
+    });
+
+    expect(summary.length).toBeGreaterThan(0);
+    expect(summary.filter((chunk: any) => chunk.type === 'thinking')).toEqual([]);
+  });
+
+  it('leaves the end of the turn, and the failure, to the kernel', () => {
+    // The router closes a turn with `done` and renders the daemon's own error.
+    // The kernel owns both: a `done` chunk would end the surface's turn before
+    // the result is committed, and the terminal already renders one error —
+    // the second is the same failure printed twice.
+    const presenter = new CodexContentPresenter(() => false);
+
+    present(presenter, 'turn/started', { threadId: 't', turn: { id: 'turn-1' } });
+    const completed = present(presenter, 'turn/completed', {
+      threadId: 't',
+      turn: {
+        id: 'turn-1',
+        items: [],
+        status: 'failed',
+        error: { message: 'the model refused' },
+      },
+    });
+
+    expect(completed.filter((chunk: any) => chunk.type === 'error' || chunk.type === 'done'))
+      .toEqual([]);
+    // Kept, so the terminal can be rendered in the daemon's own words instead
+    // of the neutral sentence.
+    expect(presenter.lastFailure()).toBe('the model refused');
+  });
+
   it('says nothing about a payload that is not a notification', () => {
     const presenter = new CodexContentPresenter(() => false);
 

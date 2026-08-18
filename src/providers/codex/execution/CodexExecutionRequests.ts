@@ -164,6 +164,12 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
     const thread = toCodexThreadIntent(binding, { start, resume });
 
     if (request.isCompact) {
+      // The legacy runtime refused this locally rather than sending it: the
+      // daemon compacts a thread, it does not read an argument, so `/compact
+      // please` would silently compact and lose the instruction.
+      if (request.text.trim() !== '/compact') {
+        throw new Error('/compact does not accept arguments');
+      }
       return { thread, turn: { kind: 'compact' } };
     }
 
@@ -226,6 +232,20 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
     });
     this.retainBundle(request, bundle, 'joins-the-running-turn');
     return bundle.input;
+  }
+
+  /**
+   * Discards what a tab was holding, when that tab is gone.
+   *
+   * The legacy runtime freed a turn's images when the tab's runtime cleaned up;
+   * without this they wait for the tab's next turn, which a closed tab never
+   * has, or for unload.
+   */
+  releaseScope(scope: string): void {
+    for (const bundle of this.liveBundles.get(scope) ?? []) {
+      bundle.cleanup();
+    }
+    this.liveBundles.delete(scope);
   }
 
   /** Discards every scratch directory still held; the plugin's unload calls it. */

@@ -1,22 +1,29 @@
 import type { Unsubscribe } from '@/core/execution/ExecutionContracts';
 
 import type { InitializeResult } from './codexAppServerTypes';
+import { CODEX_ROUTED_NOTIFICATION_METHODS } from './CodexNotificationRouter';
 import type { CodexRpcProcessPort } from './CodexRpcTransport';
 import { CodexRpcTransport } from './CodexRpcTransport';
 
-const NOTIFICATION_METHODS = [
-  'item/agentMessage/delta',
-  'item/started',
-  'item/completed',
-  'item/plan/delta',
-  'item/reasoning/textDelta',
-  'item/reasoning/summaryTextDelta',
-  'thread/status/changed',
+/**
+ * What this connection subscribes to.
+ *
+ * Derived from the renderer's own list rather than repeated beside it: the flip
+ * shipped eleven of the nineteen it handles, and the eight missing ones were
+ * the streamed command output, the patch updates, the raw response items, the
+ * plan updates and the token usage — most of what a turn shows.
+ *
+ * The rest are the run's own: the turn it owns, the thread's status, a request
+ * the daemon answered by itself, and the plan-limit updates the usage store
+ * reads.
+ */
+export const CODEX_EXECUTION_NOTIFICATION_METHODS = [...new Set([
+  ...CODEX_ROUTED_NOTIFICATION_METHODS,
   'turn/started',
-  'turn/completed',
+  'thread/status/changed',
   'serverRequest/resolved',
-  'error',
-] as const;
+  'account/rateLimits/updated',
+])] as const;
 
 const SERVER_REQUEST_METHODS = [
   'item/commandExecution/requestApproval',
@@ -132,7 +139,7 @@ export class CodexJsonRpcExecutionConnection implements CodexExecutionConnection
       }
     });
     transport.start();
-    for (const method of NOTIFICATION_METHODS) {
+    for (const method of CODEX_EXECUTION_NOTIFICATION_METHODS) {
       transport.onNotification(method, params => {
         for (const listener of this.notifications) {
           listener(method, params);

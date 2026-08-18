@@ -31,6 +31,7 @@ import type {
 import type { ChatMessage } from '@/core/types';
 import type GrimoirePlugin from '@/main';
 import { createCodexModuleContext } from '@/providers/codex/app/CodexModuleContext';
+import { codexPlanUsageStore } from '@/providers/codex/app/CodexPlanUsageStore';
 import { CODEX_PROVIDER_CAPABILITIES } from '@/providers/codex/capabilities';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
 import { CodexContentPresenter } from '@/providers/codex/execution/CodexContentPresenter';
@@ -53,6 +54,7 @@ import { CodexInteractionPresenter } from '@/providers/codex/execution/CodexInte
 import { CodexProjectionResultSink } from '@/providers/codex/execution/CodexProjectionResultSink';
 import { encodeCodexTurn } from '@/providers/codex/prompt/encodeCodexTurn';
 import { resolveCodexAppServerLaunchSpec } from '@/providers/codex/runtime/codexAppServerSupport';
+import type { CodexExecutionConnection } from '@/providers/codex/runtime/CodexExecutionConnection';
 import { createCodexRuntimeContext } from '@/providers/codex/runtime/CodexRuntimeContext';
 import type { CodexProviderSettings } from '@/providers/codex/settings';
 import { CodexSkillListingService } from '@/providers/codex/skills/CodexSkillListingService';
@@ -106,7 +108,16 @@ export class CodexExecution {
     connectionFactory: CodexExecutionConnectionFactory = this.createConnectionFactory(),
   ): CodexExecutionBackend {
     const context: CodexExecutionBackendContext = {
-      connectionFactory,
+      // Wrapped so every connection this composition builds also feeds the
+      // plan-limit indicator: its reader and its subscription both lived in the
+      // deleted runtime, and without them the badge is permanently empty.
+      connectionFactory: {
+        create: () => {
+          const connection = connectionFactory.create();
+          this.wirePlanUsage(connection);
+          return connection;
+        },
+      },
       requestResolver: this.requests,
       resultSink: new CodexProjectionResultSink(),
       interactionBridge: this.interactions,
@@ -168,7 +179,7 @@ export class CodexExecution {
     workspace?: ProviderWorkspaceSlots,
   ): ChatRuntime {
     let conversation: BoundConversation | null = null;
-    let adapter: ExecutionChatRuntimeAdapter<CodexProviderSettings> | undefined;
+    let adapter: CodexRuntimeAdapter | undefined;
     // One store serves every tab, so each turn says which tab queued it: the
     // scratch a turn holds is freed by that tab's next turn and by no other's.
     const scope = opaqueId('codextab');
@@ -208,6 +219,12 @@ export class CodexExecution {
       syncConversation: next => {
         conversation = next;
       },
+      // The daemon's own words for a failure it reported, instead of the
+      // neutral sentence. The error chunk itself is dropped by the presenter,
+      // so this is the only place that failure is rendered.
+      describeFailure: reason => (
+        reason === 'provider-failure' ? content.lastFailure() : undefined
+      ),
       interactionPresenter: presenter,
       // One per tab, because the router it runs tracks a turn's items across
       // notifications and two tabs are two turns.
@@ -228,7 +245,7 @@ export class CodexExecution {
     const contributions = features
       ?? codexProviderModule.features(createCodexModuleContext(this.plugin, boundConversation));
 
-    adapter = new ExecutionChatRuntimeAdapter<CodexProviderSettings>(
+    adapter = new CodexRuntimeAdapter(
       {
         registry: this.registry,
         backendId: codexProviderModule.execution.descriptor.backendId,
@@ -242,6 +259,14 @@ export class CodexExecution {
       ports,
       contributions,
       workspace ?? this.workspaceSlots,
+      // The tab closing is the only lifecycle the adapter has no port for, and
+      // it is when a tab's images and any prompt it is showing stop being
+      // anyone's. Waiting for the tab's next turn is waiting for one that never
+      // comes.
+      () => {
+        this.requests.releaseScope(scope);
+        presenter.dismissAll();
+      },
     );
     return adapter;
   }
@@ -345,6 +370,25 @@ export class CodexExecution {
    * target. Remembered here because two callers need it: the transcript reader
    * built per connection, and every turn's writable-root policy.
    */
+  /**
+   * Lets the plan-limit indicator ask the daemon what is left.
+   *
+   * The reader and the subscription both lived in the deleted runtime, and
+   * without them every refresh answers "no reader" and the badge stays empty.
+   * Rebound per connection because a reader pointed at a dead daemon answers
+   * nothing.
+   */
+  private wirePlanUsage(connection: CodexExecutionConnection): void {
+    codexPlanUsageStore.setRateLimitsReader(
+      async () => connection.request('account/rateLimits/read', {}),
+    );
+    connection.onNotification((method: string, params: unknown) => {
+      if (method === 'account/rateLimits/updated') {
+        codexPlanUsageStore.updateFromRateLimits(params);
+      }
+    });
+  }
+
   private rememberRuntimeContext(connection: { readonly initializeResult: unknown }): string {
     const initializeResult = connection.initializeResult;
     if (initializeResult) {
@@ -356,6 +400,33 @@ export class CodexExecution {
     // The reader treats an unreadable root as "no replay available", which is
     // the same answer it gives for a transcript that is not there.
     return this.runtimeContext?.sessionsDirHost ?? '';
+  }
+}
+
+/**
+ * The adapter, plus the one thing a tab's close has to release.
+ *
+ * A subclass rather than a host port: closing a tab is not a provider
+ * capability, it is this composition noticing that the scratch directories and
+ * the prompt belonging to that tab are now nobody's.
+ */
+class CodexRuntimeAdapter extends ExecutionChatRuntimeAdapter<CodexProviderSettings> {
+  constructor(
+    context: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[0],
+    ports: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[1],
+    features: ProviderFeatureContributions<CodexProviderSettings>,
+    workspace: ProviderWorkspaceSlots | undefined,
+    private readonly releaseTab: () => void,
+  ) {
+    super(context, ports, features, workspace);
+  }
+
+  override async cleanup(): Promise<void> {
+    try {
+      await super.cleanup();
+    } finally {
+      this.releaseTab();
+    }
   }
 }
 

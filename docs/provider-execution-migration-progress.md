@@ -2730,6 +2730,49 @@ Gates: unit 466 suites / 7,762 tests, integration 6 / 220, typecheck, lint, and 
 clean on Linux, with the unit suite re-run against the built bundle so the live markers were checked
 against what ships; CI covers Windows and macOS.
 
+### M2-flips — review of the flip: four bugs, and the wire it shipped with (this commit)
+
+The flip landed with a connection thinner than the runtime it replaced. Four bugs, four suggestions,
+all confirmed; the first is the one that mattered.
+
+**The live wire was cut to eleven notifications while the renderer handles nineteen.** The eight
+missing ones carry streamed command output, patch updates, raw response items, plan updates and token
+usage — most of what a Codex turn shows after its first sentence. Both halves were right about their
+own list, which is why no test noticed: the connection subscribed to what the *backend* acts on, and
+the renderer switched on what it can draw. The list is derived from the renderer's now
+(`CODEX_ROUTED_NOTIFICATION_METHODS`), so it cannot drift again, and a test states the union the
+connection must deliver.
+
+The other three:
+
+- **the plan-limit badge could not be fed.** Its reader and its `account/rateLimits/updated`
+  subscription both lived in the deleted runtime, so every refresh answered "no reader". Both are
+  rebound per connection now, which is also the only correct lifetime: a reader pointed at a dead
+  daemon answers nothing;
+- **a reasoning summary was rendered twice** — as the progress widget the router draws and again as
+  thinking text, because the backend mirrored *both* reasoning notifications onto the neutral
+  channel. Only the reasoning text is mirrored now;
+- **a failed turn printed two errors**: the daemon's own message from the renderer, and the kernel's
+  terminal. The renderer's error and its `done` are dropped — `done` would have ended the surface's
+  turn before the result was committed — and the daemon's words are kept and returned through
+  `describeFailure`, so the one error that is rendered is the one Codex sent.
+
+The suggestions, each real: `turn/started` was never forwarded, so the renderer never reset its item
+tracking between turns and plan mode was never switched on; a closed tab's scratch waited for a turn
+that never comes, which a `cleanup` override now releases along with any prompt that tab was showing;
+and `/compact please` silently compacted instead of being refused, which the resolver refuses again.
+
+**And the wire gate had the defect it exists to catch.** `wireVocabularyCoverage` scraped the
+connection's source for quoted method names; once the list was composed rather than written out, the
+scraper saw four literals and called the other fifteen unmodelled. It reads the value now. The
+recorded Codex gap drops from nine notifications to six — hooks, MCP startup status, remote control,
+the whole raw response, and a thread-start the backend learns from its own RPC results.
+
+Gates: unit 467 suites / 7,772 tests, integration 6 / 220, typecheck, lint, and `build:release` clean
+on Linux; CI covers Windows and macOS. Codex's manual smoke matrix is still what certifies the flip,
+and this is the second time a review has found what only a live daemon would have shown — the wire
+gap would have been the first thing the matrix hit.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

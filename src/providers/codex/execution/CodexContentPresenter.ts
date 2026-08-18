@@ -27,14 +27,26 @@ export interface CodexContentPayload {
 const MIRRORED_BY_THE_KERNEL = new Set([
   'item/agentMessage/delta',
   'item/reasoning/textDelta',
-  'item/reasoning/summaryTextDelta',
 ]);
 
 export class CodexContentPresenter {
   private readonly chunks: StreamChunk[] = [];
   private readonly router = new CodexNotificationRouter(chunk => this.chunks.push(chunk));
+  private failure: string | undefined;
 
   constructor(private readonly isPlanTurn: () => boolean) {}
+
+  /**
+   * What the daemon said went wrong, for the terminal to be rendered with.
+   *
+   * The error chunk itself is dropped: the kernel renders one error for a
+   * failed run, and letting this one through prints the same failure twice.
+   * Keeping the words means the run can be described in the daemon's terms
+   * rather than by the neutral sentence.
+   */
+  lastFailure(): string | undefined {
+    return this.failure;
+  }
 
   present(payload: unknown): readonly StreamChunk[] {
     const notification = payload as Partial<CodexContentPayload> | null;
@@ -55,8 +67,17 @@ export class CodexContentPresenter {
     }
 
     const chunks = this.chunks.splice(0);
+    for (const chunk of chunks) {
+      if (chunk.type === 'error') {
+        this.failure = chunk.content;
+      }
+    }
+    // `done` closes the surface's turn, and the kernel's terminal is what
+    // closes this one — a turn ended here would stop rendering before the
+    // result is committed.
+    const rendered = chunks.filter(chunk => chunk.type !== 'done' && chunk.type !== 'error');
     return MIRRORED_BY_THE_KERNEL.has(method)
-      ? chunks.filter(chunk => chunk.type !== 'text' && chunk.type !== 'thinking')
-      : chunks;
+      ? rendered.filter(chunk => chunk.type !== 'text' && chunk.type !== 'thinking')
+      : rendered;
   }
 }

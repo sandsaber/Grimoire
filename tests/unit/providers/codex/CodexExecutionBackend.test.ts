@@ -156,6 +156,31 @@ describe('CodexExecutionBackend', () => {
     expect(forwarded.flatMap(payload => payload.params.item?.id ?? [])).toEqual(['item-9']);
   });
 
+  it('tells the renderer a turn began, which is what resets its item tracking', async () => {
+    // Without it the items of the turn before leak into this one, and a plan
+    // turn is never switched into plan mode at all.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    const run = session.createRun(request(RUN_1, 'default'));
+    const events = collectEvents(run);
+    await fixture.connection.waitForCall('turn/start');
+
+    fixture.connection.notifyExecution('turn/started', {
+      threadId: 'thread-1',
+      turn: { id: 'turn-1' },
+    });
+    fixture.connection.notifyExecution('turn/completed', {
+      threadId: 'thread-1',
+      turn: { id: 'turn-1', items: [], status: 'completed', error: null },
+    });
+
+    const methods = (await events)
+      .map(({ event }) => event)
+      .filter(event => event.kind === 'provider-content')
+      .map(event => (event as { payload: { method: string } }).payload.method);
+    expect(methods).toContain('turn/started');
+  });
+
   it('streams reasoning as text, not only as a sign of life', async () => {
     // `thinking-activity` says the model is working; it does not say what it is
     // thinking, and the surface renders that.
@@ -181,6 +206,31 @@ describe('CodexExecutionBackend', () => {
       channel: 'reasoning',
       text: 'weighing the options',
     });
+  });
+
+  it('leaves a reasoning summary to the widget that draws it', async () => {
+    // The summary is rendered from the item as a progress widget. Mirroring it
+    // here as well would show the same words twice, once as thinking.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    const run = session.createRun(request(RUN_1, 'default'));
+    const events = collectEvents(run);
+    await fixture.connection.waitForCall('turn/start');
+
+    fixture.connection.notifyExecution('item/reasoning/summaryTextDelta', {
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'reason-1',
+      delta: 'checking the tests',
+    });
+    fixture.connection.notifyExecution('turn/completed', {
+      threadId: 'thread-1',
+      turn: { id: 'turn-1', items: [], status: 'completed', error: null },
+    });
+
+    expect((await events).map(({ event }) => event).filter(event => (
+      event.kind === 'output-delta'
+    ))).toEqual([]);
   });
 
   it('creates a replacement daemon and resumes owned threads after connection loss', async () => {

@@ -48,6 +48,34 @@ const COLLAB_AGENT_TOOL_MAP: Record<string, string> = {
   closeAgent: 'close_agent',
 };
 
+/**
+ * Every notification this turns into a chunk.
+ *
+ * Exported so the connection that delivers them can be built from it: the flip
+ * subscribed to eleven methods while this handled nineteen, and the eight it
+ * missed were the ones carrying streamed command output, patch updates, raw
+ * response items, plan updates and token usage. A list the deliverer derives
+ * cannot drift from the list the renderer switches on.
+ */
+export const CODEX_ROUTED_NOTIFICATION_METHODS = [
+  'item/agentMessage/delta',
+  'item/started',
+  'item/completed',
+  'item/reasoning/summaryTextDelta',
+  'item/reasoning/textDelta',
+  'item/reasoning/summaryPartAdded',
+  'item/plan/delta',
+  'item/commandExecution/outputDelta',
+  'item/fileChange/outputDelta',
+  'item/fileChange/patchUpdated',
+  'rawResponseItem/completed',
+  'event_msg',
+  'thread/tokenUsage/updated',
+  'turn/plan/updated',
+  'turn/completed',
+  'error',
+] as const;
+
 export class CodexNotificationRouter {
   private seenWebSearchIds = new Set<string>();
   private planUpdateCounter = 0;
