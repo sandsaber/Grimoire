@@ -2481,6 +2481,30 @@ Gates: unit 467 suites / 7863 tests, integration 6 / 220, typecheck, lint, and `
 `createRuntime` takes the contributions as a parameter for exactly that reason: what the provider
 contributes to the UI is registration's business, not execution's.
 
+### M2-flips — CI was red on two platforms, and the local gate could not see it (this commit)
+
+Three runs failed on `windows-latest` and one on `macos-latest`, starting at the composition
+checkpoint. Both failures are in the tests I wrote, not in what they test:
+
+- **`cwd: '/vault'`** — the launch spec expresses the vault directory the way the platform writes it,
+  so Windows produced `\vault` and the assertion wanted a POSIX path. It reads `path.normalize`
+  now, which is the same statement in a form that is true everywhere;
+- **`Codex target mismatch: expected windows, received linux`** — the fake connection reported a
+  Linux daemon while the launch spec resolved for the host, and `createCodexRuntimeContext` refuses a
+  daemon whose platform disagrees with the target it was launched for. The fake stands in for a
+  daemon launched *on this machine*, so it reports this machine. The guard it tripped is doing its
+  job: a daemon on another OS means every path in the turn is expressed for the wrong target.
+
+**The process correction matters more than either fix.** Four checkpoint entries above say "gates
+green" and mean *green on Linux*: `npm run test` here runs one platform, and this branch's CI runs
+three. The gate line in an entry will name that from now on, and the check after pushing a checkpoint
+is `gh run list`, not the local suite. Wave 1 recorded a Windows-only defect for the same reason; this
+is the second time the branch has learned it, which is what makes it worth writing down rather than
+just fixing.
+
+Gates: unit 467 suites / 7863 tests, integration 6 / 220, typecheck, lint clean **on Linux**; the
+Windows and macOS jobs are what this commit is for, and their result is the gate.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

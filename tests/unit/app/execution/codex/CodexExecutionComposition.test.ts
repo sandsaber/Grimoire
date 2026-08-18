@@ -1,5 +1,7 @@
 import '@/providers';
 
+import path from 'node:path';
+
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { CodexExecution } from '@/app/execution/codex/CodexExecutionComposition';
@@ -23,6 +25,14 @@ jest.mock('@/utils/env', () => ({
  * that knows both, which is what makes a defect here invisible to every suite
  * that proved the halves apart.
  */
+/** The vault directory as this platform writes it, which is what the daemon is given. */
+const VAULT_CWD = path.normalize('/vault');
+
+function hostPlatformOs(): string {
+  if (process.platform === 'win32') return 'windows';
+  return process.platform === 'darwin' ? 'macos' : 'linux';
+}
+
 describe('Codex execution composition', () => {
   function createPlugin(overrides: Record<string, unknown> = {}): any {
     const settings: Record<string, unknown> = {
@@ -91,7 +101,14 @@ describe('Codex execution composition', () => {
     ) => Promise<unknown>>();
 
     async initialize(): Promise<unknown> {
-      this.initializeResult ??= { userAgent: 'codex-fake', platformFamily: 'unix', platformOs: 'linux' };
+      // The daemon this stands in for was launched on this machine, so it
+      // reports this machine: the runtime context refuses a daemon whose
+      // platform disagrees with the target it was launched for.
+      this.initializeResult ??= {
+        userAgent: 'codex-fake',
+        platformFamily: process.platform === 'win32' ? 'windows' : 'unix',
+        platformOs: hostPlatformOs(),
+      };
       return this.initializeResult;
     }
 
@@ -242,7 +259,7 @@ describe('Codex execution composition', () => {
 
     expect(chunks).toContainEqual({ type: 'text', content: 'the answer' });
     const started = connection.calls.find(call => call.method === 'thread/start');
-    expect(started?.params).toMatchObject({ cwd: '/vault', sandbox: 'read-only' });
+    expect(started?.params).toMatchObject({ cwd: VAULT_CWD, sandbox: 'read-only' });
     const turnStart = connection.calls.find(call => call.method === 'turn/start');
     expect(turnStart?.params.input).toEqual([
       { type: 'text', text: 'summarise the note', text_elements: [] },
@@ -342,7 +359,7 @@ describe('Codex execution composition', () => {
     expect(first.thread.params).toMatchObject({
       approvalPolicy: 'on-request',
       sandbox: 'read-only',
-      cwd: '/vault',
+      cwd: VAULT_CWD,
     });
     expect(second.thread.params).toMatchObject({
       approvalPolicy: 'never',
