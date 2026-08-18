@@ -2871,10 +2871,14 @@ Owner: the next checkpoint, before any further rows are run. The live harness st
 duplication assertion left **failing on purpose**: it is the reproduction, and it will pass when the
 defect is fixed.
 
-The other finding, for whoever runs the matrix: `gpt-5.3-codex-spark` is refused by a ChatGPT account
-("not supported when using Codex with a ChatGPT account"), so the rows run on the account's default
-model. A model the daemon rejects surfaces as a `systemError` thread status and an `error`
-notification — and the surface showed **nothing at all** for it, which is worth a row of its own.
+The matrix runs on **`gpt-5.4-mini`**, which is what this account's `~/.codex/config.toml` already
+selects and what the harness now defaults to: the rows are about the path, not the answer, and every
+run spends tokens. `gpt-5.3-codex-spark` is not the cheap option — a ChatGPT account refuses it
+outright ("not supported when using Codex with a ChatGPT account"). The refusal was useful anyway: a
+model the daemon rejects arrives as a `systemError` thread status and an `error` notification, and
+the surface showed **nothing at all** for it. That is worth a row of its own, and row 21 now says so.
+
+The duplication is identical on both models, so it is not a property of what the model streams.
 
 Gates: unit 467 suites / 7,773 tests, integration 6 / 220 plus the live suite skipped, typecheck,
 lint, and `build:release` clean on Linux.

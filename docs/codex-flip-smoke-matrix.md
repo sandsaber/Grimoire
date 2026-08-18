@@ -24,6 +24,15 @@ Codex declares nearly all of them, and each is a path the kernel now serves for 
 | turn steer | yes | input joins a turn that is already running |
 | interactions | yes | approvals and questions cross four processes to reach the surface |
 
+## Which model to run it on
+
+`gpt-5.4-mini` — cheap, and what this account's `~/.codex/config.toml` already selects. The rows are
+about the path, not about the answer.
+
+`gpt-5.3-codex-spark` is **not** the cheap option: a ChatGPT account refuses it outright ("not
+supported when using Codex with a ChatGPT account"), and the refusal is worth knowing for row 21 —
+it arrives as a `thread/status/changed: systemError` and an `error` notification.
+
 ## The matrix
 
 | # | What to do | What must happen |

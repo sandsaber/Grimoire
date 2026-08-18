@@ -15,6 +15,7 @@ import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import type { StreamChunk } from '@/core/types';
 import { resolveCodexAppServerLaunchSpec } from '@/providers/codex/runtime/codexAppServerSupport';
 import { updateCodexProviderSettings } from '@/providers/codex/settings';
+import { DEFAULT_CODEX_MINI_MODEL } from '@/providers/codex/types/models';
 
 /**
  * The Codex flip against a real `codex app-server`.
@@ -38,7 +39,10 @@ live('Codex live smoke', () => {
       effortLevel: 'low',
       // The cheapest model this provider offers: the rows are about the path,
       // not about the answer, and every run spends the account's tokens.
-      ...(process.env.GRIMOIRE_CODEX_MODEL ? { model: process.env.GRIMOIRE_CODEX_MODEL } : {}),
+      // The mini model by default: the rows are about the path, not the answer,
+      // and every run spends the account's tokens. `gpt-5.3-codex-spark` is
+      // refused outright by a ChatGPT account, so it is not the cheap option.
+      model: process.env.GRIMOIRE_CODEX_MODEL ?? DEFAULT_CODEX_MINI_MODEL,
       systemPrompt: '',
       userName: 'Michael',
       ...overrides,
