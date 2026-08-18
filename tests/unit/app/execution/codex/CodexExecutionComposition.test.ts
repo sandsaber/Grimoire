@@ -295,7 +295,12 @@ describe('Codex execution composition', () => {
     const turn = runtime.prepareTurn({ text: 'summarise the note' });
     const chunks = await drain(runtime.query(turn));
 
-    expect(chunks).toContainEqual({ type: 'text', content: 'the answer' });
+    // Once. The run pushes each event onto its own stream and the registry also
+    // subscribes to the session, so an event published to both is ingested
+    // twice — invisible for facts, which are deduplicated by delivery id, and
+    // doubled for content, which by design is not.
+    expect(chunks.filter(chunk => chunk.type === 'text'))
+      .toEqual([{ type: 'text', content: 'the answer' }]);
     const started = connection.calls.find(call => call.method === 'thread/start');
     expect(started?.params).toMatchObject({ cwd: VAULT_CWD, sandbox: 'read-only' });
     const turnStart = connection.calls.find(call => call.method === 'turn/start');

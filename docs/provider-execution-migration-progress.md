@@ -2835,6 +2835,50 @@ first row to fail.
 Gates: unit 467 suites / 7,773 tests, integration 6 / 220, typecheck, lint, and `build:release`
 clean on Linux; CI covers Windows and macOS.
 
+### M2-flips — wave 2 against a live daemon: row 1, and what it found (this commit)
+
+The smoke matrix has two halves — what the daemon does and what a person sees — and the first half
+does not need a person. `CodexLiveSmoke.integration.test.ts` drives the flipped path against a real
+`codex app-server` (CLI 0.147.0, ChatGPT account), off unless `GRIMOIRE_CODEX_LIVE=1`, because it
+starts a CLI and spends the account's tokens. `GRIMOIRE_CODEX_TRACE=1` prints the daemon's own
+notifications beside the chunks, which is how the findings below were read rather than guessed.
+
+**Row 1 answers, and three things it proves that no fake could.** The daemon starts, the thread is
+created, the turn runs, and the answer comes back — with the reasoning summary as its widget, the
+token usage as the chunk the context indicator reads, and `assistantMessageId` equal to the **native
+turn id**, which is the fork fix from the entry above, confirmed against the real thing.
+
+**And row 1 fails, on a defect that only a real turn produces: the answer is rendered three times.**
+`["user_message_start","progress","progress","assistant_message_start","text:ok","text:ok","text:ok","usage","usage"]`
+— every content chunk doubled, and the text tripled. What is established:
+
+- the daemon sends each notification **once** (the wire trace confirms it);
+- the backend emits each event **once**, with a unique delivery id;
+- the presenter is asked to render the same notification **twice**, and every call arrives through
+  `ExecutionRunStream.accept`, which is the registry's observer;
+- the same doubling reproduces in the unit composition harness, so it is not a live-only artifact and
+  a test can hold it without a CLI;
+- transient events are deliberately **not** deduplicated by delivery id, which is why facts survive
+  this unharmed and content does not — the terminal, the result and the interactions are all correct.
+
+What is **not** established is which of the two delivery paths is the duplicate. The registry
+consumes a run through `consumeRunEvents` *and* subscribes to its session, and both flipped backends
+push each event to the run queue and publish it to the session in the same `emit`. That is the
+suspect and it is one line in each backend — but Antigravity ships the same shape, so a fix that is
+wrong here is wrong in production twice, and this session had spent its budget for a careful one.
+
+Owner: the next checkpoint, before any further rows are run. The live harness stays, with row 1's
+duplication assertion left **failing on purpose**: it is the reproduction, and it will pass when the
+defect is fixed.
+
+The other finding, for whoever runs the matrix: `gpt-5.3-codex-spark` is refused by a ChatGPT account
+("not supported when using Codex with a ChatGPT account"), so the rows run on the account's default
+model. A model the daemon rejects surfaces as a `systemError` thread status and an `error`
+notification — and the surface showed **nothing at all** for it, which is worth a row of its own.
+
+Gates: unit 467 suites / 7,773 tests, integration 6 / 220 plus the live suite skipped, typecheck,
+lint, and `build:release` clean on Linux.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2884,10 +2928,12 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is flipped and running in production, uncertified. The next action is running
-[`docs/codex-flip-smoke-matrix.md`](codex-flip-smoke-matrix.md) against a live `codex` CLI — twenty-two
-rows, and the only layer the automated gates cannot reach. Wave 1's single remaining row is still
-open too.**
+**Wave 2 (Codex) is flipped, uncertified, and row 1 of its matrix fails: every content chunk is
+delivered twice. The next action is that defect — the two delivery paths in `emit`, in both flipped
+backends — and then the rest of
+[`docs/codex-flip-smoke-matrix.md`](codex-flip-smoke-matrix.md), which the live harness can now drive
+for everything except what a person has to look at. Wave 1's single remaining row is still open too,
+and it is on the same suspect line.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:
