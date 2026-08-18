@@ -2131,6 +2131,42 @@ resumes this on another machine: on Node 25 the runtime exposes a `localStorage`
 `--localstorage-file`. It is not a gate failure, and the new test mocks `@/utils/env` the way the
 provider settings suites already do.
 
+### M2-flips — the daemon, and the terms a turn's paths are in (this commit)
+
+The connection factory is what stands between the backend and a running `codex app-server`. Writing
+it forced the question the flip cannot avoid: **which target does a turn's paths mean?** Codex runs
+either on this machine or inside a WSL distro, and those two disagree about every path there is — the
+sandbox roots, the pinned context files, the image attachments just extracted. The launch spec
+answers both halves, the CLI to run and what a path means to it, and they have to be the same answer.
+
+So `CodexActiveLaunchSpec` resolves it once and hands everyone the same one, and re-reads only when
+the daemon it described is gone — which is also what makes a changed CLI path or WSL distro take
+effect on the next connection instead of the next plugin load. A resolution that *failed* is not
+remembered: the settings behind it are ones the user can fix, and fixing them must not need a reload.
+
+`NodeCodexExecutionConnectionFactory` puts one application-owned process behind each connection, and
+reads the spec when the **process** is created rather than when the connection is. That is not a
+detail: `create()` is synchronous and the backend calls it before it has anywhere to report a
+failure, so a launch the settings cannot describe has to surface from `initialize()`, where the
+backend already retires the connection and fails the run. Moving the read one step earlier — the
+obvious shape — was tried as a mutation and failed two tests, one of them by throwing where nothing
+catches.
+
+Every gate here was proven by breaking it: dropping the memoization, never invalidating, resolving
+eagerly, and removing the exit hook each failed exactly the tests that claim those properties, named.
+
+**A correction to the entry above.** It said the parity-manifest row for `CodexTurnInput.ts` is
+"documentation rather than a gate". That is true only of a module that is already reachable. For an
+unreachable one the row is load-bearing: `presentationParity › attributes every unreachable module to
+a manifest entry` failed on this commit until the new factory was attributed to
+`execution-platform-dark`. Both halves of the manifest matter; only the reachable half is redundant
+with the import graph.
+
+Gates: unit 462 suites / 7799 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
+The unit suite was re-run after the release build, so the `darkBundle` markers were checked against
+the bundle this commit produces: `provider-codex` and the Codex connection are still absent from it,
+which is what keeps the new module dark.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2180,24 +2216,25 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is under way, and the next action is the connection factory.**
+**Wave 2 (Codex) is under way, and the next action is the result sink.**
 
-Done so far. The first two are dark and proven by injection; the last two are shared, with the
-legacy runtime delegating to them, so they are already in the production bundle:
+Done so far. **Dark** means unreachable from the running application and proven by injection;
+**shared** means the legacy runtime delegates to it, so it is in the production bundle already:
 
-| Piece | Where |
-|---|---|
-| A steering path through the kernel — it had none, and the adapter's `steer` threw | `ExecutionSession.steer?`, `registry.steerRun`, adapter `steer` |
-| The conversation binding the next turn depends on, and the host port that carries it | `CodexConversationBinding.ts`, `ports.syncConversation?` |
-| What a turn may write, extracted from the legacy runtime, which now delegates to it | `CodexTurnSandboxPolicy.ts` |
-| What a turn carries and what it asks the model to be, extracted the same way | `CodexTurnInput.ts` |
+| Piece | Where | State |
+|---|---|---|
+| A steering path through the kernel — it had none, and the adapter's `steer` threw | `ExecutionSession.steer?`, `registry.steerRun`, adapter `steer` | dark |
+| The conversation binding the next turn depends on, and the host port that carries it | `CodexConversationBinding.ts`, `ports.syncConversation?` | dark |
+| What a turn may write, extracted from the legacy runtime, which now delegates to it | `CodexTurnSandboxPolicy.ts` | shared |
+| What a turn carries and what it asks the model to be, extracted the same way | `CodexTurnInput.ts` | shared |
+| The daemon behind a connection, and the launch spec whose terms its paths are in | `NodeCodexExecutionConnectionFactory.ts` | dark |
 
-**Next, in this order.** First the connection factory over `NodeCodexExecutionProcess`, then the
-result sink, then the interaction bridge — approvals, questions and plan decisions become reachable
-for the first time, through the adapter's `interactionPresenter` host port. Then the composition
-object holding what the backend and every tab runtime must share, an end-to-end turn test over a fake
-connection **written before the flip rather than after**, and only then the flip itself: registration,
-`main.ts`, the parity manifest, the `darkBundle` markers, and the deletion of `CodexChatRuntime`.
+**Next, in this order.** First the result sink, then the interaction bridge — approvals, questions
+and plan decisions become reachable for the first time, through the adapter's `interactionPresenter`
+host port. Then the composition object holding what the backend and every tab runtime must share,
+an end-to-end turn test over a fake connection **written before the flip rather than after**, and
+only then the flip itself: registration, `main.ts`, the parity manifest, the `darkBundle` markers,
+and the deletion of `CodexChatRuntime`.
 One small piece of turn logic is still private to the runtime and belongs with the composition:
 `resolveCodexSandboxConfig`, which turns the permission mode into an approval policy and the sandbox
 mode the extracted policy reads. It is two branches, and a second copy of two branches is still a
