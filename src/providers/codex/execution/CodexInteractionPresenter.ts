@@ -85,22 +85,31 @@ export class CodexInteractionPresenter {
   }
 
   /**
-   * Takes down whatever is on screen, for interactions that ended elsewhere.
+   * Takes down one prompt, for an interaction that ended somewhere else.
    *
    * A run cancelled mid-approval and a request Codex resolved itself both
-   * settle in the backend without an answer from the user, and the legacy
-   * runtime dismissed the prompt in exactly those two cases. Without this the
-   * surface keeps a dead prompt up with the composer locked behind it.
+   * settle without an answer from the user, and the legacy runtime dismissed
+   * the prompt in exactly those two cases. Subscribe it to the bridge's
+   * `onSettled`; without it the surface keeps a dead prompt up with the
+   * composer locked behind it.
    */
-  dismissAll(): void {
-    if (this.open.size === 0) {
+  dismiss(presentationRef: string): void {
+    const abort = this.open.get(presentationRef);
+    if (!abort) {
+      // Nothing of this interaction is on screen: already answered, or never
+      // presented here.
       return;
     }
-    for (const abort of this.open.values()) {
-      abort.abort();
+    this.open.delete(presentationRef);
+    abort.abort();
+    this.callbacks().approvalDismisser?.();
+  }
+
+  /** Takes down everything on screen; the composition's shutdown calls it. */
+  dismissAll(): void {
+    for (const presentationRef of [...this.open.keys()]) {
+      this.dismiss(presentationRef);
     }
-    const dismiss = this.callbacks().approvalDismisser;
-    dismiss?.();
   }
 
   private async presentApproval(

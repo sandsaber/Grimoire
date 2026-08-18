@@ -272,6 +272,58 @@ describe('Codex interaction presenter', () => {
     expect(observed?.aborted).toBe(true);
   });
 
+  it('takes a prompt down when the interaction settles somewhere else', async () => {
+    // A run cancelled mid-approval and a request Codex resolved itself both
+    // reach the bridge's own `cancel`, and nothing else tells the surface that
+    // the prompt it is showing is dead.
+    const bridge = new CodexInteractionBridge();
+    const prepared = await bridge.prepare({
+      method: 'item/commandExecution/requestApproval',
+      params: commandApproval(),
+    });
+    let dismissed = 0;
+    const presenter = new CodexInteractionPresenter(bridge, () => ({
+      approval: async () => new Promise<never>(() => undefined),
+      approvalDismisser: () => {
+        dismissed += 1;
+      },
+    }));
+    bridge.onSettled(presentationRef => presenter.dismiss(presentationRef));
+
+    void presenter.present({
+      interactionId: interactionId(`ix-${'8'.padStart(32, '0')}`),
+      runId: RUN,
+      kind: 'approval',
+      presentationRef: prepared.presentationRef,
+      responseIds: prepared.responseIds,
+    });
+    await Promise.resolve();
+    await prepared.cancel();
+
+    expect(dismissed).toBe(1);
+  });
+
+  it('leaves other prompts alone when one of them settles', async () => {
+    const bridge = new CodexInteractionBridge();
+    const settled = await bridge.prepare({
+      method: 'item/commandExecution/requestApproval',
+      params: commandApproval(),
+    });
+    let dismissed = 0;
+    const presenter = new CodexInteractionPresenter(bridge, () => ({
+      approval: async () => new Promise<never>(() => undefined),
+      approvalDismisser: () => {
+        dismissed += 1;
+      },
+    }));
+    bridge.onSettled(presentationRef => presenter.dismiss(presentationRef));
+
+    // Nothing of this interaction is on screen, so nothing is taken down.
+    await settled.cancel();
+
+    expect(dismissed).toBe(0);
+  });
+
   it('takes an approval down through the dismisser the surface installed', async () => {
     const bridge = new CodexInteractionBridge();
     let dismissed = 0;

@@ -1,3 +1,4 @@
+import type { BoundConversation } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatMessage } from '@/core/types';
 import {
   CodexExecutionRequests,
@@ -31,24 +32,32 @@ describe('Codex execution requests', () => {
         providerConfigs: { codex: { reasoningSummary: 'detailed' } },
       },
       launchSpec: launchSpec(),
-      baseInstructions: 'You are Grimoire.',
-      conversation: null,
+      baseInstructions: (orchestratorMode: boolean) => (
+        orchestratorMode ? 'You are Grimoire, planning workers.' : 'You are Grimoire.'
+      ),
       listSkills: async () => [],
       scratch: recordingScratch(),
       ...overrides,
     };
   }
 
-  function store(overrides: Partial<CodexInvocationEnvironment> = {}): CodexExecutionRequests {
+  function store(
+    overrides: Partial<CodexInvocationEnvironment> & { conversation?: BoundConversation | null } = {},
+  ): CodexExecutionRequests {
+    const { conversation = null, ...environmentOverrides } = overrides;
+    boundConversation = conversation;
     let minted = 0;
     return new CodexExecutionRequests(
       () => `codexreq-${++minted}`,
-      async () => environment(overrides),
+      async () => environment(environmentOverrides),
     );
   }
 
+  let boundConversation: BoundConversation | null = null;
+
   function request(overrides: Record<string, unknown> = {}) {
     return {
+      conversation: () => boundConversation,
       prompt: 'summarise the note',
       text: 'summarise the note',
       isCompact: false,
@@ -132,6 +141,29 @@ describe('Codex execution requests', () => {
     const text = invocation.turn.params.input.find(item => item.type === 'text');
     expect(text).toMatchObject({ text: expect.stringContaining('third') });
     expect(text).not.toMatchObject({ text: expect.stringContaining('first') });
+  });
+
+  it('takes the base instructions the turn\'s own mode asks for', async () => {
+    // The orchestrator rules belong in the thread's base instructions when the
+    // thread is started for an orchestrator turn, and the mode is the turn's.
+    const requests = store();
+    const ref = requests.reference(request({ orchestratorMode: true }));
+
+    const invocation = await requests.resolve(ref);
+
+    if (invocation.thread.kind !== 'new') throw new Error('expected a new thread');
+    expect(invocation.thread.params.baseInstructions).toBe('You are Grimoire, planning workers.');
+  });
+
+  it('reads the conversation as it is at dispatch, not as it was at send', async () => {
+    // The turn before this one can bind the thread between the two, and the
+    // store serves every tab, so the binding cannot be frozen into the request.
+    const requests = store();
+    const ref = requests.reference(request());
+    boundConversation = { sessionId: 'thread-bound-later' };
+
+    expect((await requests.resolve(ref)).thread)
+      .toMatchObject({ kind: 'resume', threadId: 'thread-bound-later' });
   });
 
   it('asks for a compaction without composing a turn for it', async () => {

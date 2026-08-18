@@ -2410,6 +2410,43 @@ Gates: unit 466 suites / 7851 tests, integration 6 / 220, typecheck, lint, and `
 Six mutations were run against the fixes; four were caught immediately, and two — the cancel fallback
 and the throwing callback — were not, which is how the two tests that now hold them were found.
 
+### M2-flips — the composition, and two things it corrected (this commit)
+
+`CodexExecution` is the object every tab runtime and the backend share: the store behind the kernel's
+request references, the launch spec the daemon runs under and paths are expressed in, the interaction
+bridge, and the presenters subscribed to it. It lives in `src/app/` for the same reason wave 1's does
+— the backend takes no plugin and no vault, so everything ambient reaches it as a port constructed
+here.
+
+Assembling it corrected two things in the resolver, both invisible until a second caller existed:
+
+- **the conversation is per tab, and the environment is not.** One store serves every runtime, so a
+  binding read from the shared environment would answer with whatever tab was last synced. It travels
+  with the request now, as a getter rather than a value, because the turn before this one can bind
+  the thread between the send and the dispatch;
+- **base instructions depend on the turn.** The orchestrator rules belong in the base instructions of
+  a thread started for an orchestrator turn, and that is a property of the request, not of the
+  settings. The environment takes the mode and answers with the prompt.
+
+It also closes the dismissal gap the review found, and provider-side rather than by changing the
+kernel: both endings the surface cannot see — a run cancelled while its prompt is up, and a request
+Codex answered itself — reach the bridge's own `cancel`, so the bridge announces a settled
+interaction and the presenter takes that prompt down. The composition is what subscribes them.
+
+`dispose` had the order wrong on the first attempt: it dropped the subscriptions before dismissing,
+which empties the set it then iterates and leaves every prompt on screen. The test caught it, and it
+is the kind of defect that only exists once there is a composition to get wrong.
+
+Gates: unit 467 suites / 7859 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
+Four mutations were run; three were caught, and the fourth — freezing the settings snapshot at first
+use — was not, because the test changed the settings before the only dispatch. It reads two turns
+now, with the change between them.
+
+**A process note, since the journal is the record.** This entry was written after its commit rather
+than in it: the script that appends it failed on a stale anchor and the commit went out anyway. It is
+amended into the same commit, which is what the rule asks for, and the lesson is that a journal
+appended by a script needs the script's exit code checked.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2459,7 +2496,7 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is under way, and the next action is the composition object that assembles these.**
+**Wave 2 (Codex) is under way, and the next action is the runtime half of the composition.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:
@@ -2475,15 +2512,19 @@ Done so far. **Dark** means unreachable from the running application and proven 
 | What the user is asked, and what Codex is told they said | `CodexInteractionBridge.ts` | dark |
 | What a queued turn becomes at dispatch, and the reference the kernel carries for it | `CodexExecutionRequests.ts` | dark |
 | How an opened interaction reaches the surface, and comes back as an id the run can record | `CodexInteractionPresenter.ts` | dark |
+| What the backend and every tab runtime share, assembled from the running plugin | `CodexExecutionComposition.ts` | dark |
 
-**Next, in this order.** First the composition object that assembles what the backend and every tab
-runtime must share — the request store, the active launch spec, the interaction bridge, the result
-sink, and the presenter that renders an interaction through the adapter's `interactionPresenter`
-port. It also owns the loose ends the checkpoints above named: the run-terminal signal that lets a
-turn's scratch directory be discarded promptly and calls the presenter's `dismissAll`, and the base
-instructions the launch parameters carry. Then an end-to-end turn test over a fake connection **written before the flip rather than
-after**, and only then the flip itself: registration, `main.ts`, the parity manifest, the
-`darkBundle` markers, and the deletion of `CodexChatRuntime`.
+**Next, in this order.** First the runtime half of the composition: `createRuntime`, the host ports
+over it — `prepareTurn`, the request and steer references, `syncConversation`, the interaction
+presenter, `describeFailure` — and the module's workspace context, which the flip's registration has
+to build from the workspace services. Then an end-to-end turn test over a fake connection **written
+before the flip rather than after**, and only then the flip itself: registration, `main.ts`, the
+parity manifest, the `darkBundle` markers, and the deletion of `CodexChatRuntime`.
+
+One loose end remains from the request resolver: a turn's scratch directory is discarded when the
+next turn has one, rather than when its run ends. The composition now has the presenter subscription
+that shows how to do better — a signal from the thing that knows — but nothing yet watches run
+terminals.
 
 Two things to carry into that work. Codex declares `supportsImageAttachments` and
 `supportsInstructionMode`; no flip has exercised either, so neither has ever been proven through the

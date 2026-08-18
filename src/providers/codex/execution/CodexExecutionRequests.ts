@@ -55,14 +55,27 @@ export interface CodexExecutionRequest {
   readonly model?: string;
   /** Replayed into the prompt only where the thread cannot have it already. */
   readonly history?: readonly ChatMessage[];
+  /**
+   * The conversation this turn belongs to, read at dispatch.
+   *
+   * A getter and not a value, because one store serves every tab: the binding
+   * belongs to the tab that queued the turn, and it can be bound to a thread
+   * between the send and the dispatch by the turn before it.
+   */
+  readonly conversation?: () => BoundConversation | null;
 }
 
 export interface CodexInvocationEnvironment {
   /** The provider-projected settings snapshot, read at dispatch. */
   readonly settings: Record<string, unknown>;
   readonly launchSpec: CodexLaunchSpec;
-  readonly baseInstructions: string;
-  readonly conversation: BoundConversation | null;
+  /**
+   * The thread's system prompt.
+   *
+   * A function of the turn's mode, because the orchestrator rules belong in the
+   * base instructions of a thread started for an orchestrator turn.
+   */
+  baseInstructions(orchestratorMode: boolean): string;
   listSkills(): Promise<readonly SkillMetadata[]>;
   readonly transcriptRootTarget?: string | null;
   readonly memoriesDirTarget?: string | null;
@@ -118,7 +131,7 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
   async resolve(requestRef: string): Promise<CodexExecutionInvocation> {
     const request = this.take(requestRef);
     const environment = await this.environment();
-    const binding = readCodexConversationBinding(environment.conversation);
+    const binding = readCodexConversationBinding(request.conversation?.() ?? null);
     const settings = environment.settings;
     const model = request.model
       ?? (typeof settings.model === 'string' ? settings.model : undefined);
@@ -132,7 +145,7 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
       approvalPolicy: permission.approvalPolicy,
       sandbox: permission.sandbox,
       serviceTier,
-      baseInstructions: environment.baseInstructions,
+      baseInstructions: environment.baseInstructions(request.orchestratorMode),
       experimentalRawEvents: true,
       persistExtendedHistory: true,
     };

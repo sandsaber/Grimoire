@@ -645,6 +645,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
     owner: 'M2-flips — each module becomes reachable at its own provider\'s flip.',
     modules: [
       'src/app/execution/acp/NodeManagedAcpProcessLauncher.ts',
+      'src/app/execution/codex/CodexExecutionComposition.ts',
       'src/app/execution/codex/NodeCodexExecutionConnectionFactory.ts',
       'src/app/execution/codex/NodeCodexExecutionProcess.ts',
       'src/core/execution/testing/DeterministicFakeBackend.ts',

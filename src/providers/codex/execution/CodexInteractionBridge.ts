@@ -64,6 +64,7 @@ const DISMISSED = 'dismissed';
 export class CodexInteractionBridge implements CodexInteractionBridgeContract {
   private readonly presentations = new Map<string, CodexInteractionPresentation>();
   private readonly answers = new Map<string, CodexCollectedAnswers>();
+  private readonly settledListeners = new Set<(presentationRef: string) => void>();
   private minted = 0;
 
   constructor(private readonly nextPresentationRef: () => string = () => `codexix-${++this.minted}`) {}
@@ -96,6 +97,19 @@ export class CodexInteractionBridge implements CodexInteractionBridgeContract {
   /** What the presenter collected, before it resolves the question as answered. */
   submitAnswers(presentationRef: string, answers: CodexCollectedAnswers): void {
     this.answers.set(presentationRef, answers);
+  }
+
+  /**
+   * Says that an interaction is over, whoever ended it.
+   *
+   * The two endings the surface cannot see are exactly the two that reach
+   * `cancel`: a run cancelled while its prompt is up, and a request Codex
+   * resolved by itself. Without this the prompt stays on screen with the
+   * composer locked behind it.
+   */
+  onSettled(listener: (presentationRef: string) => void): () => void {
+    this.settledListeners.add(listener);
+    return () => this.settledListeners.delete(listener);
   }
 
   private prepareCommandApproval(params: CommandApprovalRequest): CodexPreparedInteraction {
@@ -296,6 +310,9 @@ export class CodexInteractionBridge implements CodexInteractionBridgeContract {
   private forget(presentationRef: string): void {
     this.presentations.delete(presentationRef);
     this.answers.delete(presentationRef);
+    for (const listener of this.settledListeners) {
+      listener(presentationRef);
+    }
   }
 }
 
