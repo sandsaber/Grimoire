@@ -7,7 +7,6 @@ import { CODEX_PROVIDER_CAPABILITIES } from './capabilities';
 import { codexSettingsReconciler } from './env/CodexSettingsReconciler';
 import { CodexConversationHistoryService } from './history/CodexConversationHistoryService';
 import { codexSubagentLifecycleAdapter } from './normalization/codexSubagentNormalization';
-import { CodexChatRuntime } from './runtime/CodexChatRuntime';
 import { getCodexProviderSettings, updateCodexProviderSettings } from './settings';
 import { codexChatUIConfig } from './ui/CodexChatUIConfig';
 
@@ -20,7 +19,11 @@ export const codexProviderRegistration: ProviderRegistration = {
   environmentKeyPatterns: [/^OPENAI_/i, /^CODEX_/i],
   chatUIConfig: codexChatUIConfig,
   settingsReconciler: codexSettingsReconciler,
-  createRuntime: ({ plugin }) => new CodexChatRuntime(plugin),
+  // The second provider flip: chat execution runs through the kernel. Only this
+  // row moves — workspace services, settings, auxiliary services, history and
+  // UI config stay exactly as they were, per the mixed-authority rule that
+  // holds until M5.
+  createRuntime: ({ plugin }) => plugin.getCodexExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new CodexTitleGenerationService(plugin),
   createInstructionRefineService: (plugin) => new CodexInstructionRefineService(plugin),
   createInlineEditService: (plugin) => new CodexInlineEditService(plugin),

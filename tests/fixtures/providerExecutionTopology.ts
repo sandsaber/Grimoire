@@ -194,7 +194,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     capabilities: CODEX_PROVIDER_CAPABILITIES,
     isolationEvidence: 'Manages its own process lifecycle',
     evidence: [
-      'src/providers/codex/runtime/CodexChatRuntime.ts',
+      'src/providers/codex/execution/CodexExecutionBackend.ts',
       'src/providers/codex/runtime/CodexAuxQueryRunner.ts',
       'src/providers/codex/runtime/CodexAppServerProcess.ts',
     ],

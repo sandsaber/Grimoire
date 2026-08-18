@@ -1,5 +1,9 @@
 import '@/providers';
 
+import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
+
+import { CodexExecution } from '@/app/execution/codex/CodexExecutionComposition';
+import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import type {
@@ -8,6 +12,7 @@ import type {
   TitleGenerationResult,
   TitleGenerationService,
 } from '@/core/providers/types';
+import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { DEFAULT_CODEX_PRIMARY_MODEL } from '@/providers/codex/types/models';
 
 describe('ProviderRegistry', () => {
@@ -23,9 +28,26 @@ describe('ProviderRegistry', () => {
     jest.restoreAllMocks();
   });
 
+  /**
+   * A plugin that can answer for its Codex execution.
+   *
+   * The default provider's chat execution runs through the kernel since the
+   * flip, and the registration asks the plugin for the one composition per load
+   * that the backend and every tab share.
+   */
+  function pluginWithCodexExecution(): any {
+    const host = new ExecutionKernelHost({
+      storage: new TestDurableStorage(),
+      scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
+    });
+    const plugin: any = { settings: {} };
+    plugin.getCodexExecution = () => new CodexExecution(plugin, host.registry);
+    return plugin;
+  }
+
   it('creates a runtime with the default provider id', () => {
     const runtime = ProviderRegistry.createChatRuntime({
-      plugin: {} as any,
+      plugin: pluginWithCodexExecution(),
     });
 
     expect(runtime.providerId).toBe('codex');
@@ -64,11 +86,16 @@ describe('ProviderRegistry', () => {
     )).toThrow('Provider "nonexistent" is not registered.');
   });
 
-  it('creates a Codex runtime', () => {
+  it('creates a Codex runtime, over the execution kernel', () => {
+    // The flip, at the only row it moves: a runtime that is not a client of the
+    // kernel means Codex chat execution never left the legacy path, which no
+    // other assertion in this file would notice.
     const runtime = ProviderRegistry.createChatRuntime({
       providerId: 'codex',
-      plugin: {} as any,
+      plugin: pluginWithCodexExecution(),
     });
+
+    expect(runtime).toBeInstanceOf(ExecutionChatRuntimeAdapter);
     expect(runtime.providerId).toBe('codex');
   });
 

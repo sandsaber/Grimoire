@@ -12,6 +12,7 @@ import { parseChangelogRelease } from './app/changelog/parser';
 import { readBundledChangelog } from './app/changelog/source';
 import type { ChangelogRelease } from './app/changelog/types';
 import { AntigravityExecution } from './app/execution/antigravity/AntigravityExecutionComposition';
+import { CodexExecution } from './app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
@@ -95,6 +96,7 @@ export default class GrimoirePlugin extends Plugin {
   private conversations: Conversation[] = [];
   private executionKernelHost: ExecutionKernelHost | null = null;
   private antigravityExecution: AntigravityExecution | null = null;
+  private codexExecution: CodexExecution | null = null;
   private unloading = false;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
@@ -341,6 +343,10 @@ export default class GrimoirePlugin extends Plugin {
     // built for exactly that: the acceptance gate closes synchronously, so
     // nothing is admitted from here on, and the bounded cancellation and
     // cleanup that follow record a checkpoint the next startup recovers from.
+    // Before the kernel, because it takes down whatever prompt is on screen and
+    // releases the scratch directories a turn was holding; the kernel's own
+    // shutdown then cancels what is still running.
+    this.codexExecution?.dispose();
     void this.executionKernelHost?.dispose();
     void this.persistOpenTabStates();
   }
@@ -375,6 +381,14 @@ export default class GrimoirePlugin extends Plugin {
     return this.antigravityExecution;
   }
 
+  /** The Codex execution this plugin instance owns; see the note above. */
+  getCodexExecution(): CodexExecution {
+    if (!this.codexExecution) {
+      throw new Error('Codex execution is not available before plugin load.');
+    }
+    return this.codexExecution;
+  }
+
   /**
    * Brings the kernel up before anything can ask it for work.
    *
@@ -403,6 +417,12 @@ export default class GrimoirePlugin extends Plugin {
     });
     this.antigravityExecution = new AntigravityExecution(this, host.registry);
     host.registerBackend({ backend: this.antigravityExecution.createBackend() });
+    this.codexExecution = new CodexExecution(this, host.registry);
+    // Registered with its interaction and recovery ports, not as a bare
+    // backend: Codex answers approvals and reconciles turns, and a backend
+    // registered without them leaves an approval the user answered with nowhere
+    // to send the answer.
+    host.registerBackend(this.codexExecution.createBackendRegistration());
     this.executionKernelHost = host;
     try {
       await host.start();
@@ -415,6 +435,16 @@ export default class GrimoirePlugin extends Plugin {
       });
       return;
     }
+    // After the gate is open, because it reaches provider services that expect
+    // a started plugin, and nothing renders a Codex tab before it resolves.
+    void this.codexExecution.initializeWorkspace().catch(error => {
+      this.recordDebugLog({
+        error,
+        event: 'execution.workspace.failed',
+        level: 'warn',
+        scope: 'codex',
+      });
+    });
     const migration = host.migrationRequirement();
     if (migration) {
       // Persistence decision D5: a control record this build cannot read opens

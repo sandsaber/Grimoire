@@ -2683,6 +2683,53 @@ missing is turn metadata — usage and model — which the router reports to a l
 no port for; that is the "token usage" half of the wire-coverage obligation and is not a rendering
 regression.
 
+### M2-flips — wave 2: Codex in production (this commit)
+
+The second flip, and the first one on a provider with a surface. `createRuntime` returns the
+presentation adapter over the Codex backend, `main.ts` constructs the composition at load and
+registers the backend **with its interaction and recovery ports**, initializes the workspace slots
+once, and disposes the composition before the kernel at unload. `CodexChatRuntime` is deleted in the
+same commit — 1,403 lines, with the 2,642-line suite that drove it — along with two helpers the flip
+orphaned: `CodexServerRequestRouter` (the interaction bridge and presenter answer server requests
+now) and `CodexSessionManager` (the backend tracks its own thread). 5,049 lines out.
+
+Only the chat-execution row moves. Workspace services, settings, the three auxiliary workflows,
+history, and the UI config are untouched, per the mixed-authority rule that holds until M5 — and
+Codex's auxiliary services each run their own app-server process, so the rule's one hard requirement,
+that the two paths never contend for the same session or process, holds by construction.
+
+**How the flip is proven, and by what.** The pieces answer different questions, and no one of them
+would have caught a flip that only half happened:
+
+- `ProviderRegistry` builds an `ExecutionChatRuntimeAdapter` for Codex — the row moved. Breaking it
+  (a registration returning a plain object) fails exactly that test and nothing else;
+- `provider-codex` and the Codex connection are **live** bundle markers now instead of dark ones.
+  Both states have been observed: absent before this commit, present after, each asserted by the same
+  gate in the direction that applied;
+- an end-to-end turn runs through the kernel over a fake connection and renders the tool call, its
+  result, and the answer — which is the whole reason the two commits before this one exist;
+- the parity manifest moves fourteen modules from `execution-platform-dark` to
+  `provider-chat-execution`, and the reachability gate found the two orphans above by itself.
+
+**Landed on the owner's instruction, before wave 1's manual certification.** The rule above says no
+second flip lands until Antigravity's smoke matrix passes; the owner directed this one anyway, and
+that is recorded here rather than quietly worked around. What it costs is that two providers now run
+on the kernel with neither certified against a live CLI, and both flips are one commit each to
+revert.
+
+**Codex's smoke matrix is the one that matters**, and it is much larger than wave 1's: resume across
+a restart, plan mode, fork with rollback, images, skills, approvals and questions, native agents,
+steering, compaction, and cancel's OS half. Until it runs, this is wired and not certified.
+
+One known gap, not a rendering regression: **turn metadata — usage and model — is still lost.** The
+router reports it to a listener the adapter has no port for, so the plan-limit indicator and the
+model line will not update from a turn. It is the "token usage" half of the wire-coverage
+obligation, and it is now the flip's own item rather than a general one.
+
+Gates: unit 466 suites / 7,762 tests, integration 6 / 220, typecheck, lint, and `build:release`
+clean on Linux, with the unit suite re-run against the built bundle so the live markers were checked
+against what ships; CI covers Windows and macOS.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2694,8 +2741,8 @@ Completed: **M0a** (parity gate, contribution inventory, adapter contract, the t
 topology and shared-resource records, persistence decisions), **M1** (execution kernel, narrow
 control-record persistence, local-shell internal backend, cross-platform CI with Windows
 process-tree conformance green), **M2-proofs**, **M2-adapter**, and **M0b** for the four proof
-providers. In progress: **M2-flips** — wave 1 (Antigravity) shipped and running in production, wave 2
-(Codex) under way.
+providers. In progress: **M2-flips** — wave 1 (Antigravity) and wave 2 (Codex) both shipped and running in
+production, neither certified against a live CLI.
 
 **M2-proofs.** Four topologies proven dark — Antigravity (stateless process-per-run),
 Codex (persistent daemon, multiplexed sessions), Claude (persistent SDK stream, serial runs), and
@@ -2732,9 +2779,8 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is built and the tool surface is carried: the next action is the flip itself —
-registration, `main.ts`, the parity manifest, the `darkBundle` markers, and the deletion of
-`CodexChatRuntime`.**
+**Wave 2 (Codex) is flipped and running in production, uncertified. The next action is Codex's
+manual smoke matrix — and wave 1's, which is still open.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:

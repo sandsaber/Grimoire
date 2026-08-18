@@ -43,6 +43,11 @@ const LIVE_MARKERS = [
   { marker: 'Execution owner kind is invalid', why: 'lifecycle registry validation' },
   { marker: 'Execution lifecycle registry is not accepting shutdown', why: 'the kernel host' },
   { marker: 'provider-antigravity', why: 'the flipped Antigravity execution backend' },
+  { marker: 'provider-codex', why: 'the flipped Codex execution backend' },
+  {
+    marker: 'Codex execution connection is not initialized',
+    why: 'the Codex execution connection the flipped backend speaks through',
+  },
   {
     marker: 'The provider ended the turn without producing a result',
     why: 'the presentation adapter',
@@ -51,8 +56,6 @@ const LIVE_MARKERS = [
 
 /** Strings that appear in the bundle only if a still-dark module was pulled in. */
 const DARK_MARKERS = [
-  { marker: 'provider-codex', why: 'the Codex execution backend descriptor' },
-  { marker: 'Codex execution connection is not initialized', why: 'the Codex execution connection' },
   { marker: 'provider-claude', why: 'the Claude execution backend descriptor' },
   { marker: 'provider-opencode', why: 'the OpenCode execution backend descriptor' },
   { marker: 'internal-deterministic-fake', why: 'the test-only fake backend' },
