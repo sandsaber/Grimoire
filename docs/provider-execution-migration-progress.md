@@ -2324,6 +2324,45 @@ Gates: unit 465 suites / 7830 tests, integration 6 / 220, typecheck, lint, and `
 Five mutations were run; four were caught and one — resolving a reference twice — was not, which was
 a property the module documented and no test held. It has one now.
 
+### M2-flips — the answer, in the surface's words and the kernel's (this commit)
+
+The presenter is where an opened interaction reaches the chat surface. The surface speaks the legacy
+callback contract — a tool name, an input, a description, a set of decision options — and the kernel
+speaks response ids, and this is the piece that holds the two together so neither learns the other's.
+
+The join is deliberately cheap: the decision options handed to the surface carry the kernel's ids as
+their **values**, so a picked option comes back as an answer the run can record without a second
+mapping table. It works because the bridge's ids were chosen to be the legacy option values already —
+`allow-once`, `allow-always`, `deny`, `cancel` — with amendments the one place where a new id had to
+be minted.
+
+Three behaviours are preserved from the legacy runtime rather than reasoned from the port's
+documentation:
+
+- **a missing callback declines.** The port says an absent presenter leaves an interaction for the
+  provider to time out, and that is right for an absent presenter. A present presenter whose surface
+  has installed no callback is a different thing: the legacy runtime answered it with a decline, and
+  leaving it open would hang the turn on a prompt nobody can see;
+- **anything the interaction cannot express is declined**, which is what the legacy mapped an
+  unrecognised decision to — and where decline is not on offer it says nothing at all;
+- **a picked option that was never offered is declined too.** The registry refuses a response id
+  outside the interaction's own list, and a refusal there leaves the approval open rather than
+  answering it. That one was found by a surviving mutation: five were run, four caught, and this was
+  the property no test held. It has one now.
+
+A question is the case the id model cannot carry on its own: `answered` says only *that* it was
+answered, and the answers go back through the bridge before the id is returned, never through the
+resolution.
+
+Gates: unit 466 suites / 7838 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
+
+One gap this opened, recorded rather than papered over: **an interaction Codex resolves itself does
+not reach the presenter.** `serverRequest/resolved` settles the pending interaction in the backend
+and emits `interaction-resolved`, but the adapter's bridge listens only for `interaction-opened`, so
+a surface that is showing the prompt keeps showing it. The legacy runtime had `approvalDismisser` and
+`abortPendingAskUser` for exactly this. Owner: the composition, which is where the dismisser is
+wired.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2388,13 +2427,14 @@ Done so far. **Dark** means unreachable from the running application and proven 
 | Where an answer lives once the turn is over, one identity per result rather than per run | `CodexProjectionResultSink.ts` | dark |
 | What the user is asked, and what Codex is told they said | `CodexInteractionBridge.ts` | dark |
 | What a queued turn becomes at dispatch, and the reference the kernel carries for it | `CodexExecutionRequests.ts` | dark |
+| How an opened interaction reaches the surface, and comes back as an id the run can record | `CodexInteractionPresenter.ts` | dark |
 
 **Next, in this order.** First the composition object that assembles what the backend and every tab
 runtime must share — the request store, the active launch spec, the interaction bridge, the result
 sink, and the presenter that renders an interaction through the adapter's `interactionPresenter`
-port. It also owns the two loose ends this checkpoint named: the run-terminal signal that lets a
-turn's scratch directory be discarded promptly, and the base instructions the launch parameters
-carry. Then an end-to-end turn test over a fake connection **written before the flip rather than
+port. It also owns the loose ends the checkpoints above named: the run-terminal signal that lets a
+turn's scratch directory be discarded promptly, the base instructions the launch parameters carry,
+and the dismisser for an interaction Codex resolved itself. Then an end-to-end turn test over a fake connection **written before the flip rather than
 after**, and only then the flip itself: registration, `main.ts`, the parity manifest, the
 `darkBundle` markers, and the deletion of `CodexChatRuntime`.
 

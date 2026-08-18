@@ -663,6 +663,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/codex/execution/CodexExecutionRequests.ts',
       'src/providers/codex/execution/CodexExecutionTurnReconciler.ts',
       'src/providers/codex/execution/CodexInteractionBridge.ts',
+      'src/providers/codex/execution/CodexInteractionPresenter.ts',
       'src/providers/codex/execution/CodexProjectionResultSink.ts',
       'src/providers/codex/runtime/CodexExecutionConnection.ts',
       'src/providers/opencode/OpencodeProviderModule.ts',
