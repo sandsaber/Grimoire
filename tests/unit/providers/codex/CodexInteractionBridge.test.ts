@@ -53,8 +53,74 @@ describe('Codex interaction bridge', () => {
       'allow-once',
       'allow-always',
       'deny',
+      'cancel',
       'provider-resolved',
     ]);
+  });
+
+  it('can always be refused, and refusing is not the same as cancelling the turn', async () => {
+    // The daemon says which decisions to *offer*; it does not decide whether the
+    // user may say no. Where it offers no refusal, dismissing the prompt has to
+    // answer something, and cancelling the turn is what the legacy runtime sent.
+    const bridge = new CodexInteractionBridge();
+    const prepared = await bridge.prepare({
+      method: 'item/commandExecution/requestApproval',
+      params: commandApproval({ availableDecisions: ['accept'] }),
+    });
+
+    expect(prepared.responseIds).toEqual(['allow-once', 'cancel', 'provider-resolved']);
+    const presentation = bridge.presentation(prepared.presentationRef);
+    // Answerable, but not something the surface renders as a button of its own.
+    expect(presentation).toMatchObject({ options: [expect.objectContaining({ responseId: 'allow-once' })] });
+    await expect(prepared.resolve('cancel')).resolves.toEqual({ decision: 'cancel' });
+  });
+
+  it('lets a file change be cancelled as well as denied', async () => {
+    const prepared = await new CodexInteractionBridge().prepare({
+      method: 'item/fileChange/requestApproval',
+      params: { threadId: 't', turnId: 'u', itemId: 'i' },
+    });
+
+    expect(prepared.responseIds).toContain('cancel');
+    await expect(prepared.resolve('cancel')).resolves.toEqual({ decision: 'cancel' });
+  });
+
+  it('gives each interaction its own amendment ids', async () => {
+    // Two approvals that both offered `amendment-1` would let a stale answer
+    // from one resolve the other into a policy change nobody chose.
+    const bridge = new CodexInteractionBridge();
+    const params = commandApproval({
+      availableDecisions: [
+        'accept',
+        { acceptWithExecpolicyAmendment: { execpolicy_amendment: ['rm'] } },
+      ],
+    });
+
+    const first = await bridge.prepare({ method: 'item/commandExecution/requestApproval', params });
+    const second = await bridge.prepare({ method: 'item/commandExecution/requestApproval', params });
+
+    const amendmentOf = (ids: readonly string[]) => ids.find(id => id.includes('amendment'));
+    expect(amendmentOf(first.responseIds)).not.toBe(amendmentOf(second.responseIds));
+  });
+
+  it('forgets a presentation once its interaction is settled', async () => {
+    // It carries the command, the working directory and the reason, and the
+    // interaction it described is over.
+    const bridge = new CodexInteractionBridge();
+    const resolved = await bridge.prepare({
+      method: 'item/commandExecution/requestApproval',
+      params: commandApproval(),
+    });
+    const cancelled = await bridge.prepare({
+      method: 'item/commandExecution/requestApproval',
+      params: commandApproval(),
+    });
+
+    await resolved.resolve('deny');
+    await cancelled.cancel();
+
+    expect(bridge.presentation(resolved.presentationRef)).toBeUndefined();
+    expect(bridge.presentation(cancelled.presentationRef)).toBeUndefined();
   });
 
   it('carries a policy amendment as an id, and answers with the amendment itself', async () => {
@@ -68,7 +134,7 @@ describe('Codex interaction bridge', () => {
       params: commandApproval({ availableDecisions: ['accept', amendment, 'decline'] }),
     });
 
-    const amendmentId = prepared.responseIds.find(id => id.startsWith('amendment'));
+    const amendmentId = prepared.responseIds.find(id => id.includes('amendment'));
     expect(amendmentId).toMatch(IDENTIFIER);
     await expect(prepared.resolve(amendmentId ?? '')).resolves.toEqual({ decision: amendment });
   });

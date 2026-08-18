@@ -103,15 +103,24 @@ export class CodexInteractionBridge implements CodexInteractionBridgeContract {
       ?? ['accept', 'acceptForSession', 'decline'];
     const options: CodexApprovalOption[] = [];
     const byResponseId = new Map<string, CommandExecutionApprovalDecision>();
+    // Scoped to this interaction, so a stale answer carrying `amendment-1` from
+    // an earlier prompt cannot resolve this one into a policy change nobody
+    // chose here.
+    const presentationRef = this.nextPresentationRef();
     let amendments = 0;
 
     for (const decision of decisions) {
-      const option = describeCommandDecision(decision, params, () => `amendment-${++amendments}`);
+      const option = describeCommandDecision(
+        decision,
+        params,
+        () => `${presentationRef}-amendment-${++amendments}`,
+      );
       options.push(option);
       byResponseId.set(option.responseId, decision);
     }
+    byResponseId.set('cancel', 'cancel');
 
-    const presentationRef = this.remember({
+    this.remember(presentationRef, {
       kind: 'approval',
       method: 'item/commandExecution/requestApproval',
       toolName: normalizeCodexToolName('command_execution'),
@@ -140,13 +149,19 @@ export class CodexInteractionBridge implements CodexInteractionBridgeContract {
 
     return {
       presentationRef,
-      responseIds: [...options.map(option => option.responseId), PROVIDER_RESOLVED],
+      responseIds: answerableIds(options, PROVIDER_RESOLVED),
       providerResolvedResponseId: PROVIDER_RESOLVED,
       // An id this interaction never offered means a defect upstream, and
       // declining is both what the legacy runtime answered and the safe way to
       // be wrong.
-      resolve: async responseId => ({ decision: byResponseId.get(responseId) ?? 'decline' }),
-      cancel: async () => ({ decision: 'decline' }),
+      resolve: async responseId => {
+        this.forget(presentationRef);
+        return { decision: byResponseId.get(responseId) ?? 'decline' };
+      },
+      cancel: async () => {
+        this.forget(presentationRef);
+        return { decision: 'decline' };
+      },
     };
   }
 
@@ -157,13 +172,14 @@ export class CodexInteractionBridge implements CodexInteractionBridgeContract {
       { responseId: 'allow-always', label: 'Always allow', presentation: 'always' },
       { responseId: 'deny', label: 'Deny', presentation: 'reject' },
     ];
-    const decisions: Record<string, 'accept' | 'acceptForSession' | 'decline'> = {
+    const decisions: Record<string, 'accept' | 'acceptForSession' | 'decline' | 'cancel'> = {
       'allow-once': 'accept',
       'allow-always': 'acceptForSession',
       deny: 'decline',
+      cancel: 'cancel',
     };
 
-    const presentationRef = this.remember({
+    const presentationRef = this.remember(this.nextPresentationRef(), {
       kind: 'approval',
       method: 'item/fileChange/requestApproval',
       toolName: normalizeCodexToolName('file_change'),
@@ -174,10 +190,16 @@ export class CodexInteractionBridge implements CodexInteractionBridgeContract {
 
     return {
       presentationRef,
-      responseIds: [...options.map(option => option.responseId), PROVIDER_RESOLVED],
+      responseIds: answerableIds(options, PROVIDER_RESOLVED),
       providerResolvedResponseId: PROVIDER_RESOLVED,
-      resolve: async responseId => ({ decision: decisions[responseId] ?? 'decline' }),
-      cancel: async () => ({ decision: 'decline' }),
+      resolve: async responseId => {
+        this.forget(presentationRef);
+        return { decision: decisions[responseId] ?? 'decline' };
+      },
+      cancel: async () => {
+        this.forget(presentationRef);
+        return { decision: 'decline' };
+      },
     };
   }
 
@@ -190,7 +212,7 @@ export class CodexInteractionBridge implements CodexInteractionBridgeContract {
       { responseId: 'deny', label: 'Deny', presentation: 'reject' },
     ];
 
-    const presentationRef = this.remember({
+    const presentationRef = this.remember(this.nextPresentationRef(), {
       kind: 'approval',
       method: 'item/permissions/requestApproval',
       toolName: 'permissions',
@@ -204,23 +226,29 @@ export class CodexInteractionBridge implements CodexInteractionBridgeContract {
     const declined = { permissions: {}, scope: 'turn' as const };
     return {
       presentationRef,
-      responseIds: [...options.map(option => option.responseId), PROVIDER_RESOLVED],
+      responseIds: answerableIds(options, PROVIDER_RESOLVED),
       providerResolvedResponseId: PROVIDER_RESOLVED,
       resolve: async responseId => {
+        this.forget(presentationRef);
         if (responseId === 'allow-once') {
           return { permissions: requested, scope: 'turn' };
         }
         if (responseId === 'allow-always') {
           return { permissions: requested, scope: 'session' };
         }
+        // Including a cancellation: this request has no turn-level cancel of
+        // its own, and granting nothing is what refusing it means.
         return declined;
       },
-      cancel: async () => declined,
+      cancel: async () => {
+        this.forget(presentationRef);
+        return declined;
+      },
     };
   }
 
   private prepareUserInput(params: UserInputRequest): CodexPreparedInteraction {
-    const presentationRef = this.remember({
+    const presentationRef = this.remember(this.nextPresentationRef(), {
       kind: 'question',
       method: 'item/tool/requestUserInput',
       questions: params.questions ?? [],
@@ -235,26 +263,59 @@ export class CodexInteractionBridge implements CodexInteractionBridgeContract {
         const collected = responseId === ANSWERED
           ? this.answers.get(presentationRef)
           : undefined;
+        this.forget(presentationRef);
         if (!collected) {
           // Dismissed, or answered without anything collected. Not the same as
           // a wrong answer: Codex reads an empty set as "the user said nothing".
           return nothing;
         }
-        this.answers.delete(presentationRef);
         return { answers: toCodexAnswers(collected) };
       },
       cancel: async () => {
-        this.answers.delete(presentationRef);
+        this.forget(presentationRef);
         return nothing;
       },
     };
   }
 
-  private remember(presentation: CodexInteractionPresentation): string {
-    const presentationRef = this.nextPresentationRef();
+  private remember(
+    presentationRef: string,
+    presentation: CodexInteractionPresentation,
+  ): string {
     this.presentations.set(presentationRef, presentation);
     return presentationRef;
   }
+
+  /**
+   * Drops what an interaction was about, once it is over.
+   *
+   * A presentation carries the command, the working directory, the reason, and
+   * whatever the user typed into a question. None of it outlives the request it
+   * described.
+   */
+  private forget(presentationRef: string): void {
+    this.presentations.delete(presentationRef);
+    this.answers.delete(presentationRef);
+  }
+}
+
+/**
+ * Every id this interaction can be answered with.
+ *
+ * A superset of what the surface renders: the daemon says which decisions to
+ * *offer*, not whether the user may refuse. Dismissing a prompt has to answer
+ * something, and where no refusal was offered the legacy runtime sent a turn
+ * cancellation rather than nothing at all.
+ */
+function answerableIds(
+  options: readonly CodexApprovalOption[],
+  providerResolved: string,
+): string[] {
+  const ids = options.map(option => option.responseId);
+  if (!ids.includes('cancel')) {
+    ids.push('cancel');
+  }
+  return [...ids, providerResolved];
 }
 
 function describeCommandApproval(params: CommandApprovalRequest): string {

@@ -2363,6 +2363,53 @@ a surface that is showing the prompt keeps showing it. The legacy runtime had `a
 `abortPendingAskUser` for exactly this. Owner: the composition, which is where the dismisser is
 wired.
 
+### M2-flips — review of the presenter: four hangs and a keying bug (this commit)
+
+Fourteen findings against the presenter, each checked against the code before anything changed. The
+serious ones share a shape: **an interaction that is never answered blocks the daemon**, and four
+separate paths reached it.
+
+- **a dismissal that nothing else can express.** The surface answers a dismissed prompt with
+  `cancel`, and where the daemon offered no refusal `cancel` was not an id this interaction had, so
+  the presenter returned nothing and upstream resolved nothing. The daemon says which decisions to
+  *offer*; it does not decide whether the user may say no. `cancel` is now always answerable — a
+  superset of what is rendered — and refusal falls back deny → cancel → nothing;
+- **a surface that throws.** `InputController` rejects when the chat view is detached, and the
+  kernel's bridge reads a rejection as a dismissal and resolves nothing. The legacy transport
+  answered the daemon with an error; this declines, which is the same outcome for the run;
+- **a prompt with nothing to take it down.** A run cancelled mid-approval and a request Codex
+  resolved itself both settle in the backend *without* emitting a resolution, so the presenter is
+  never called back and the prompt stays up with the composer locked behind it. The presenter now
+  holds what is on screen and `dismissAll()` aborts it — including the abort signal the ask-user
+  callback always took and never got, which is how the legacy runtime closed a pending question. It
+  is the composition that will call it on a run terminal;
+- **a `cancel` silently downgraded to `deny`.** Legacy mapped `cancel` to Codex's own cancel, which
+  aborts the turn rather than refusing one action. Preserved now for commands and file changes;
+  permissions have no turn-level cancel, and refusing there still grants nothing.
+
+The keying bug: `DECISION_RESPONSE_IDS` was keyed by decision and looked up by response id, so the
+Allow-once option lost its `decision` field while every other option kept it. One list read both ways
+now, which is what the reviewer asked for and what would have prevented it.
+
+Two retention fixes: a presentation is forgotten when its interaction settles — it carries the
+command, the working directory, the reason, and whatever was typed into a question — and amendment
+ids are scoped to their own interaction, so a stale `amendment-1` cannot resolve a later approval
+into a policy change nobody chose there.
+
+The callback join between the adapter and the presenter is now a named `ExecutionInteractionCallbacks`
+rather than `Record<string, unknown>` plus casts. It earned itself immediately: typing it turned a
+loose test helper into a compile error.
+
+**One finding is recorded rather than fixed.** A missing presentation still answers nothing. It is
+unanswerable by definition — there is nothing to show the user, and choosing on their behalf is the
+one thing an approval must never do — and with presentations now forgotten only at settle, the
+reachable case is an interaction that has already ended and will not be presented again. What is
+actually missing is interaction expiry in the kernel, which no provider has needed yet. Owner: M5.
+
+Gates: unit 466 suites / 7851 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
+Six mutations were run against the fixes; four were caught immediately, and two — the cancel fallback
+and the throwing callback — were not, which is how the two tests that now hold them were found.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2433,8 +2480,8 @@ Done so far. **Dark** means unreachable from the running application and proven 
 runtime must share — the request store, the active launch spec, the interaction bridge, the result
 sink, and the presenter that renders an interaction through the adapter's `interactionPresenter`
 port. It also owns the loose ends the checkpoints above named: the run-terminal signal that lets a
-turn's scratch directory be discarded promptly, the base instructions the launch parameters carry,
-and the dismisser for an interaction Codex resolved itself. Then an end-to-end turn test over a fake connection **written before the flip rather than
+turn's scratch directory be discarded promptly and calls the presenter's `dismissAll`, and the base
+instructions the launch parameters carry. Then an end-to-end turn test over a fake connection **written before the flip rather than
 after**, and only then the flip itself: registration, `main.ts`, the parity manifest, the
 `darkBundle` markers, and the deletion of `CodexChatRuntime`.
 

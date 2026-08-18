@@ -1,5 +1,6 @@
 import type { InteractionRequest } from '@/core/execution/ExecutionContracts';
 import { interactionId, runId } from '@/core/execution/ExecutionIds';
+import type { ApprovalDecision } from '@/core/types';
 import { CodexInteractionBridge } from '@/providers/codex/execution/CodexInteractionBridge';
 import { CodexInteractionPresenter } from '@/providers/codex/execution/CodexInteractionPresenter';
 import type { CommandApprovalRequest, UserInputRequest } from '@/providers/codex/runtime/codexAppServerTypes';
@@ -63,9 +64,12 @@ describe('Codex interaction presenter', () => {
       input: expect.objectContaining({ command: 'rm -rf build' }),
       options: expect.objectContaining({
         decisionOptions: [
-          expect.objectContaining({ value: 'allow-once', presentation: 'allow' }),
-          expect.objectContaining({ value: 'allow-always', presentation: 'always' }),
-          expect.objectContaining({ value: 'deny', presentation: 'reject' }),
+          // `decision` is what the surface reads to answer with a decision
+          // rather than with an option value, and the legacy runtime set it on
+          // every standard option.
+          { label: 'Allow once', value: 'allow-once', decision: 'allow', presentation: 'allow' },
+          { label: 'Always allow', value: 'allow-always', decision: 'allow-always', presentation: 'always' },
+          { label: 'Deny', value: 'deny', decision: 'deny', presentation: 'reject' },
         ],
       }),
     });
@@ -82,16 +86,17 @@ describe('Codex interaction presenter', () => {
         'decline',
       ],
     });
+    const amendmentId = request.responseIds.find(id => id.includes('amendment')) ?? '';
     const presenter = new CodexInteractionPresenter(bridge, () => ({
-      approval: async () => ({ type: 'select-option', value: 'amendment-1' }),
+      approval: async () => ({ type: 'select-option', value: amendmentId }),
     }));
 
-    expect(await presenter.present(request)).toBe('amendment-1');
+    expect(await presenter.present(request)).toBe(amendmentId);
   });
 
   it('maps the surface\'s own decisions onto the ids this interaction offered', async () => {
     const bridge = new CodexInteractionBridge();
-    const decide = async (decision: unknown): Promise<string | null> => {
+    const decide = async (decision: ApprovalDecision): Promise<string | null> => {
       const request = await openApproval(bridge, {
         availableDecisions: ['accept', 'acceptForSession', 'decline', 'cancel'],
       });
@@ -105,7 +110,195 @@ describe('Codex interaction presenter', () => {
     expect(await decide('cancel')).toBe('cancel');
     // Anything this interaction cannot express is declined rather than invented,
     // which is what the legacy runtime answered too.
-    expect(await decide('something-else')).toBe('deny');
+    expect(await decide('something-else' as ApprovalDecision)).toBe('deny');
+  });
+
+  it('renders a permission request in its own words, not a command\'s', async () => {
+    const bridge = new CodexInteractionBridge();
+    const prepared = await bridge.prepare({
+      method: 'item/permissions/requestApproval',
+      params: {
+        threadId: 't',
+        turnId: 'u',
+        itemId: 'i',
+        permissions: { network: { enabled: true } },
+        reason: 'fetch the schema',
+      },
+    });
+    const seen: unknown[] = [];
+    const presenter = new CodexInteractionPresenter(bridge, () => ({
+      approval: async (toolName: string, input: Record<string, unknown>, description: string) => {
+        seen.push({ toolName, input, description });
+        return 'allow';
+      },
+    }));
+
+    expect(await presenter.present({
+      interactionId: interactionId(`ix-${'6'.padStart(32, '0')}`),
+      runId: RUN,
+      kind: 'approval',
+      presentationRef: prepared.presentationRef,
+      responseIds: prepared.responseIds,
+    })).toBe('allow-once');
+    expect(seen[0]).toEqual({
+      toolName: 'permissions',
+      description: 'Permission request: fetch the schema',
+      input: { network: { enabled: true } },
+    });
+  });
+
+  it('renders a file change with the reason the daemon gave', async () => {
+    const bridge = new CodexInteractionBridge();
+    const prepared = await bridge.prepare({
+      method: 'item/fileChange/requestApproval',
+      params: { threadId: 't', turnId: 'u', itemId: 'i', reason: 'rewrite the note' },
+    });
+    const seen: unknown[] = [];
+    const presenter = new CodexInteractionPresenter(bridge, () => ({
+      approval: async (toolName: string, _input: Record<string, unknown>, description: string) => {
+        seen.push({ toolName, description });
+        return 'deny';
+      },
+    }));
+
+    expect(await presenter.present({
+      interactionId: interactionId(`ix-${'7'.padStart(32, '0')}`),
+      runId: RUN,
+      kind: 'approval',
+      presentationRef: prepared.presentationRef,
+      responseIds: prepared.responseIds,
+    })).toBe('deny');
+    expect(seen[0]).toEqual({
+      toolName: 'apply_patch',
+      description: 'File change: rewrite the note',
+    });
+  });
+
+  it('passes on the context the surface explains a network request with', async () => {
+    // Without these the prompt says which command wants to run but not why, or
+    // what it is reaching for — which is the whole question being asked.
+    const bridge = new CodexInteractionBridge();
+    const request = await openApproval(bridge, {
+      reason: 'the build needs the registry',
+      networkApprovalContext: { host: 'example.com', protocol: 'https' },
+      additionalPermissions: { network: { enabled: true } },
+    });
+    const seen: unknown[] = [];
+    const presenter = new CodexInteractionPresenter(bridge, () => ({
+      approval: async (_t: string, _i: Record<string, unknown>, _d: string, options?: unknown) => {
+        seen.push(options);
+        return 'allow';
+      },
+    }));
+
+    await presenter.present(request);
+
+    expect(seen[0]).toMatchObject({
+      decisionReason: 'the build needs the registry',
+      networkApprovalContext: { host: 'example.com', protocol: 'https' },
+      additionalPermissions: { network: { enabled: true } },
+    });
+  });
+
+  it('cancels the turn when the prompt is dismissed and nothing else can say no', async () => {
+    // The surface answers a dismissal with `cancel`, and where the daemon
+    // offered no refusal that is the only answer left. Leaving it unanswered
+    // would block the daemon on a request that has no UI any more.
+    const bridge = new CodexInteractionBridge();
+    const request = await openApproval(bridge, { availableDecisions: ['accept'] });
+    const presenter = new CodexInteractionPresenter(bridge, () => ({
+      approval: async () => 'cancel',
+    }));
+
+    expect(await presenter.present(request)).toBe('cancel');
+  });
+
+  it('falls back to cancelling when the answer cannot be expressed and denial is not offered', async () => {
+    // The last resort has to be an answer: an approval left open blocks the
+    // daemon on a prompt that is no longer on screen.
+    const bridge = new CodexInteractionBridge();
+    const request = await openApproval(bridge, { availableDecisions: ['accept'] });
+    const presenter = new CodexInteractionPresenter(bridge, () => ({
+      approval: async () => 'allow-always',
+    }));
+
+    expect(await presenter.present(request)).toBe('cancel');
+  });
+
+  it('declines rather than hangs when the surface throws', async () => {
+    // A detached chat view rejects instead of answering. Upstream reads a
+    // rejection as a dismissal and resolves nothing, so the daemon would wait
+    // on a prompt that no longer exists.
+    const bridge = new CodexInteractionBridge();
+    const presenter = new CodexInteractionPresenter(bridge, () => ({
+      approval: async () => {
+        throw new Error('Input container is detached from DOM');
+      },
+    }));
+
+    expect(await presenter.present(await openApproval(bridge))).toBe('deny');
+  });
+
+  it('takes a question down when the interaction is dismissed', async () => {
+    // The legacy runtime aborted the pending question on cancel and on Codex
+    // resolving the request itself; without a signal the modal stays open and
+    // its answers could arrive after the run is over.
+    const bridge = new CodexInteractionBridge();
+    const prepared = await bridge.prepare({
+      method: 'item/tool/requestUserInput',
+      params: { threadId: 't', turnId: 'u', itemId: 'i', questions: [] },
+    });
+    let observed: AbortSignal | undefined;
+    const presenter = new CodexInteractionPresenter(bridge, () => ({
+      question: async (_input: unknown, signal?: AbortSignal) => {
+        observed = signal;
+        return new Promise(resolve => {
+          signal?.addEventListener('abort', () => resolve(null));
+        });
+      },
+    }));
+
+    const presented = presenter.present({
+      interactionId: interactionId(`ix-${'5'.padStart(32, '0')}`),
+      runId: RUN,
+      kind: 'question',
+      presentationRef: prepared.presentationRef,
+      responseIds: prepared.responseIds,
+    });
+    await Promise.resolve();
+    presenter.dismissAll();
+
+    expect(await presented).toBe('dismissed');
+    expect(observed?.aborted).toBe(true);
+  });
+
+  it('takes an approval down through the dismisser the surface installed', async () => {
+    const bridge = new CodexInteractionBridge();
+    let dismissed = 0;
+    const presenter = new CodexInteractionPresenter(bridge, () => ({
+      approval: async () => new Promise<never>(() => undefined),
+      approvalDismisser: () => {
+        dismissed += 1;
+      },
+    }));
+
+    void presenter.present(await openApproval(bridge));
+    await Promise.resolve();
+    presenter.dismissAll();
+
+    expect(dismissed).toBe(1);
+  });
+
+  it('says nothing for a request whose presentation is of another kind', async () => {
+    // The kernel's view and the bridge's disagreeing is a defect, and showing a
+    // command approval as a free-text question would answer the wrong request.
+    const bridge = new CodexInteractionBridge();
+    const approval = await openApproval(bridge);
+    const presenter = new CodexInteractionPresenter(bridge, () => ({
+      question: async () => ({ any: 'thing' }),
+    }));
+
+    expect(await presenter.present({ ...approval, kind: 'question' })).toBeNull();
   });
 
   it('declines a picked option this interaction never offered', async () => {

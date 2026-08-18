@@ -25,11 +25,14 @@ import type { ChatMessage, StreamChunk } from '../../types/chat';
 import type { ProviderId } from '../../types/provider';
 import type { SlashCommand } from '../../types/settings';
 import type {
+  ApprovalCallback,
+  AskUserQuestionCallback,
   ChatRewindMode,
   ChatRewindResult,
   ChatRuntimeQueryOptions,
   ChatTurnMetadata,
   ChatTurnRequest,
+  ExitPlanModeCallback,
   PreparedChatTurn,
   SessionUpdateResult,
 } from '../types';
@@ -972,6 +975,22 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
  * Returning `null` means the user dismissed it without choosing, which is not
  * the same as choosing the first option and must not be flattened into one.
  */
+/**
+ * The callbacks a surface installs, as the presenter reads them back.
+ *
+ * Named rather than a bare record because this is a join between two modules:
+ * the setters take `unknown` and store by key, so without a shared shape a
+ * renamed or mistyped key compiles on both sides and every approval silently
+ * answers itself.
+ */
+export interface ExecutionInteractionCallbacks {
+  readonly approval?: ApprovalCallback;
+  readonly approvalDismisser?: () => void;
+  readonly question?: AskUserQuestionCallback;
+  readonly planDecision?: ExitPlanModeCallback;
+  readonly autoTurn?: (runId: unknown) => void;
+}
+
 export interface ExecutionInteractionPresenter {
   present(request: InteractionRequest): Promise<string | null>;
 }

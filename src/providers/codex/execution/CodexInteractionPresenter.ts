@@ -1,9 +1,8 @@
 import type { InteractionRequest } from '../../../core/execution/ExecutionContracts';
 import type {
-  ApprovalCallback,
-  ApprovalDecisionOption,
-  AskUserQuestionCallback,
-} from '../../../core/runtime/types';
+  ExecutionInteractionCallbacks,
+} from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type { ApprovalDecisionOption } from '../../../core/runtime/types';
 import type { ApprovalDecision } from '../../../core/types';
 import type {
   CodexApprovalOption,
@@ -18,14 +17,29 @@ import type {
  * installs them, and a tab that has not opened its approval UI yet must still
  * be able to receive one.
  */
-export type CodexInteractionCallbacks = () => Readonly<Record<string, unknown>>;
+export type CodexInteractionCallbacks = () => Readonly<ExecutionInteractionCallbacks>;
 
-const DECISION_RESPONSE_IDS: Record<string, string> = {
-  allow: 'allow-once',
-  'allow-always': 'allow-always',
-  deny: 'deny',
-  cancel: 'cancel',
-};
+/**
+ * The decisions the surface answers with, and the ids that stand for them.
+ *
+ * One list read both ways, because two hand-maintained inverses drift: the
+ * first version of this file keyed the map by decision and looked it up by
+ * response id, which quietly dropped `allow` from the Allow-once option.
+ */
+const STANDARD_DECISIONS: ReadonlyArray<readonly [ApprovalDecision, string]> = [
+  ['allow', 'allow-once'],
+  ['allow-always', 'allow-always'],
+  ['deny', 'deny'],
+  ['cancel', 'cancel'],
+];
+
+function responseIdFor(decision: ApprovalDecision): string | undefined {
+  return STANDARD_DECISIONS.find(([known]) => known === decision)?.[1];
+}
+
+function decisionFor(responseId: string): ApprovalDecision | undefined {
+  return STANDARD_DECISIONS.find(([, id]) => id === responseId)?.[0];
+}
 
 /**
  * An opened Codex interaction, rendered by the surface that already knows how.
@@ -37,6 +51,9 @@ const DECISION_RESPONSE_IDS: Record<string, string> = {
  * values, so what comes back is already an answer the run can record.
  */
 export class CodexInteractionPresenter {
+  /** What is on screen right now, so it can be taken down again. */
+  private readonly open = new Map<string, AbortController>();
+
   constructor(
     private readonly bridge: Pick<CodexInteractionBridge, 'presentation' | 'submitAnswers'>,
     private readonly callbacks: CodexInteractionCallbacks,
@@ -49,82 +66,122 @@ export class CodexInteractionPresenter {
       // their behalf, which is the one thing an approval must never do.
       return null;
     }
+    const asked = request.kind === 'question';
+    if (asked !== (presentation.kind === 'question')) {
+      // The kernel's view of this interaction and the provider's disagree. That
+      // is a defect, and rendering one as the other answers the wrong request.
+      return null;
+    }
 
-    return presentation.kind === 'approval'
-      ? this.presentApproval(request, presentation)
-      : this.presentQuestion(request, presentation);
+    const abort = new AbortController();
+    this.open.set(request.presentationRef, abort);
+    try {
+      return presentation.kind === 'approval'
+        ? await this.presentApproval(request, presentation)
+        : await this.presentQuestion(request, presentation, abort.signal);
+    } finally {
+      this.open.delete(request.presentationRef);
+    }
+  }
+
+  /**
+   * Takes down whatever is on screen, for interactions that ended elsewhere.
+   *
+   * A run cancelled mid-approval and a request Codex resolved itself both
+   * settle in the backend without an answer from the user, and the legacy
+   * runtime dismissed the prompt in exactly those two cases. Without this the
+   * surface keeps a dead prompt up with the composer locked behind it.
+   */
+  dismissAll(): void {
+    if (this.open.size === 0) {
+      return;
+    }
+    for (const abort of this.open.values()) {
+      abort.abort();
+    }
+    const dismiss = this.callbacks().approvalDismisser;
+    dismiss?.();
   }
 
   private async presentApproval(
     request: InteractionRequest,
     presentation: Extract<CodexInteractionPresentation, { kind: 'approval' }>,
   ): Promise<string | null> {
-    const approval = this.callbacks().approval as ApprovalCallback | undefined;
+    const approval = this.callbacks().approval;
     // A missing callback is answered rather than left open, which is what the
     // legacy runtime did: a prompt nobody can see would hang the turn.
     if (!approval) {
       return declined(request);
     }
 
-    const decision = await approval(
-      presentation.toolName,
-      presentation.input,
-      presentation.description,
-      {
-        decisionOptions: presentation.options.map(toDecisionOption),
-        ...(presentation.decisionReason ? { decisionReason: presentation.decisionReason } : {}),
-        ...(presentation.networkApprovalContext
-          ? { networkApprovalContext: presentation.networkApprovalContext }
-          : {}),
-        ...(presentation.additionalPermissions
-          ? { additionalPermissions: presentation.additionalPermissions }
-          : {}),
-      },
-    );
-
-    return toResponseId(decision, request);
+    try {
+      const decision = await approval(
+        presentation.toolName,
+        presentation.input,
+        presentation.description,
+        {
+          decisionOptions: presentation.options.map(toDecisionOption),
+          ...(presentation.decisionReason ? { decisionReason: presentation.decisionReason } : {}),
+          ...(presentation.networkApprovalContext
+            ? { networkApprovalContext: presentation.networkApprovalContext }
+            : {}),
+          ...(presentation.additionalPermissions
+            ? { additionalPermissions: presentation.additionalPermissions }
+            : {}),
+        },
+      );
+      return toResponseId(decision, request);
+    } catch {
+      // A surface that could not ask — a detached view, a render that failed —
+      // is not an answer, and upstream reads a rejection as a dismissal and
+      // resolves nothing. Declining is what the legacy transport answered with.
+      return declined(request);
+    }
   }
 
   private async presentQuestion(
     request: InteractionRequest,
     presentation: Extract<CodexInteractionPresentation, { kind: 'question' }>,
+    signal: AbortSignal,
   ): Promise<string | null> {
-    const ask = this.callbacks().question as AskUserQuestionCallback | undefined;
+    const ask = this.callbacks().question;
     if (!ask) {
-      return 'dismissed';
+      return offered(request, 'dismissed');
     }
 
-    const answers = await ask({ questions: [...presentation.questions] });
-    if (!answers) {
-      return 'dismissed';
+    let answers: Record<string, string | string[]> | null;
+    try {
+      answers = await ask({ questions: [...presentation.questions] }, signal);
+    } catch {
+      return offered(request, 'dismissed');
+    }
+    if (!answers || signal.aborted) {
+      return offered(request, 'dismissed');
     }
 
     // Handed over before the id is returned, because the id only says *that*
     // it was answered — the answers themselves never leave the provider.
     this.bridge.submitAnswers(request.presentationRef, answers);
-    return 'answered';
+    return offered(request, 'answered');
   }
 }
 
+/** The id, where this interaction offers it; nothing where it does not. */
+function offered(request: InteractionRequest, responseId: string): string | null {
+  return request.responseIds.includes(responseId) ? responseId : null;
+}
+
 function toDecisionOption(option: CodexApprovalOption): ApprovalDecisionOption {
+  const decision = decisionFor(option.responseId);
   return {
     label: option.label,
     // The kernel's id, so a picked option comes back as an answer the run can
     // record without a second mapping table.
     value: option.responseId,
     ...(option.description ? { description: option.description } : {}),
+    ...(decision ? { decision } : {}),
     ...(option.presentation ? { presentation: option.presentation } : {}),
-    ...(DECISION_RESPONSE_IDS[option.responseId]
-      ? { decision: legacyDecisionFor(option.responseId) }
-      : {}),
   };
-}
-
-function legacyDecisionFor(responseId: string): ApprovalDecision {
-  if (responseId === 'allow-once') return 'allow';
-  if (responseId === 'allow-always') return 'allow-always';
-  if (responseId === 'cancel') return 'cancel';
-  return 'deny';
 }
 
 function toResponseId(decision: ApprovalDecision, request: InteractionRequest): string | null {
@@ -134,19 +191,23 @@ function toResponseId(decision: ApprovalDecision, request: InteractionRequest): 
       : declined(request);
   }
 
-  const responseId = DECISION_RESPONSE_IDS[decision as string];
+  const responseId = responseIdFor(decision);
   return responseId && request.responseIds.includes(responseId)
     ? responseId
     : declined(request);
 }
 
 /**
- * Declining, where this interaction offers it.
+ * Refusing, in whatever way this interaction can express it.
  *
- * The answer for anything the interaction cannot express, which is what the
- * legacy runtime mapped an unrecognised decision to. Where decline is not on
- * offer there is nothing safe to say, so it says nothing.
+ * The answer for anything it cannot express, which is what the legacy runtime
+ * mapped an unrecognised decision to. Cancelling the turn is the fallback
+ * because an approval that offers no decline still has to be answered — leaving
+ * it open blocks the daemon on a prompt that is no longer on screen.
  */
 function declined(request: InteractionRequest): string | null {
-  return request.responseIds.includes('deny') ? 'deny' : null;
+  if (request.responseIds.includes('deny')) {
+    return 'deny';
+  }
+  return request.responseIds.includes('cancel') ? 'cancel' : null;
 }
