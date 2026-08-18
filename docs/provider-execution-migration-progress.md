@@ -2282,6 +2282,48 @@ asserts the backend's rules rather than running them. That is what the end-to-en
 exists to close, and it is the next checkpoint — the wave-1 lesson is that a seam both sides stub is
 not covered.
 
+### M2-flips — what a queued turn becomes at dispatch (this commit)
+
+`CodexExecutionRequests` is the reference store and the resolver behind it: the runtime puts a turn
+in, the kernel carries an identifier, and the backend takes back a full invocation. It is where the
+four pieces built above finally compose — the conversation binding into a thread intent, the input
+bundle, the turn parameters, and the writable-root policy — and where the rule that everything
+ambient is read *at dispatch* is actually enforced.
+
+The turn's own choices are held; the thread it is bound to, the settings, the target the daemon runs
+on, and the skills the vault offers are all read when the run resolves. That matters most for the
+prompt: a thread being **started** has read nothing, so the conversation so far is replayed into it;
+a **fork** has read up to its checkpoint, so only what came after is replayed; a **resumed** thread
+holds all of it, and replaying there would hand the model the conversation twice. Three cases, one
+place, each with a test.
+
+Two decisions worth naming:
+
+- **the orchestrator instructions are always sent with the turn.** The backend decides for itself
+  whether a bound thread still needs resuming, so the resolver cannot know whether base instructions
+  went out with it. Being wrong one way states the worker-plan rules twice in a conversation; being
+  wrong the other way sends a turn that never states them at all. It answers "not yet sent", which
+  buys the mild failure. The narrow case is orchestrator mode on the first turn after a restart;
+- **a turn's scratch directory is held until the next turn has one.** The daemon reads the images
+  while the turn runs, and nothing in the resolver observes when a run ends. `dispose` — which the
+  plugin's unload calls — is the other end of it. Prompt cleanup needs a run-terminal signal the
+  composition can subscribe to; that is the composition's checkpoint, not this one.
+
+**The parity gate caught a real leak, and it was mine.** `resolveCodexPermissionMode` was extracted
+into this module and the legacy runtime pointed at it — which made a module that imports the backend
+reachable from the shipped path, and the walker said so: the backend, the conversation binding, and
+the execution connection all became reachable in one edit. It now lives beside the sandbox policy,
+which is the file the live path already shares, and the rule it taught is worth keeping: **a module
+the flip owns cannot be imported from the path that is still live.**
+
+That move also closed the item the last checkpoint left open — `resolveCodexSandboxConfig` is no
+longer a second copy in the runtime — and the delegation is proven: mutating plan mode to ask for
+full access fails one test here and four in the legacy suite.
+
+Gates: unit 465 suites / 7830 tests, integration 6 / 220, typecheck, lint, and `build:release` clean.
+Five mutations were run; four were caught and one — resolving a reference twice — was not, which was
+a property the module documented and no test held. It has one now.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -2331,7 +2373,7 @@ of them fatal to every turn; they are in the entry above.
 gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
 tree is actually gone — which needs the live CLI.
 
-**Wave 2 (Codex) is under way, and the next action is the composition object.**
+**Wave 2 (Codex) is under way, and the next action is the composition object that assembles these.**
 
 Done so far. **Dark** means unreachable from the running application and proven by injection;
 **shared** means the legacy runtime delegates to it, so it is in the production bundle already:
@@ -2345,17 +2387,16 @@ Done so far. **Dark** means unreachable from the running application and proven 
 | The daemon behind a connection, and the launch spec whose terms its paths are in | `NodeCodexExecutionConnectionFactory.ts` | dark |
 | Where an answer lives once the turn is over, one identity per result rather than per run | `CodexProjectionResultSink.ts` | dark |
 | What the user is asked, and what Codex is told they said | `CodexInteractionBridge.ts` | dark |
+| What a queued turn becomes at dispatch, and the reference the kernel carries for it | `CodexExecutionRequests.ts` | dark |
 
-**Next, in this order.** First the composition object holding what the backend and every tab runtime
-must share — the request store, the active launch spec, the bridge, and the presenter that renders it
-through the adapter's `interactionPresenter` port. Then an end-to-end turn test over a fake
-connection **written before the flip rather than after**, and only then the flip itself:
-registration, `main.ts`, the parity manifest, the `darkBundle` markers, and the deletion of
-`CodexChatRuntime`.
-One small piece of turn logic is still private to the runtime and belongs with the composition:
-`resolveCodexSandboxConfig`, which turns the permission mode into an approval policy and the sandbox
-mode the extracted policy reads. It is two branches, and a second copy of two branches is still a
-second copy.
+**Next, in this order.** First the composition object that assembles what the backend and every tab
+runtime must share — the request store, the active launch spec, the interaction bridge, the result
+sink, and the presenter that renders an interaction through the adapter's `interactionPresenter`
+port. It also owns the two loose ends this checkpoint named: the run-terminal signal that lets a
+turn's scratch directory be discarded promptly, and the base instructions the launch parameters
+carry. Then an end-to-end turn test over a fake connection **written before the flip rather than
+after**, and only then the flip itself: registration, `main.ts`, the parity manifest, the
+`darkBundle` markers, and the deletion of `CodexChatRuntime`.
 
 Two things to carry into that work. Codex declares `supportsImageAttachments` and
 `supportsInstructionMode`; no flip has exercised either, so neither has ever been proven through the

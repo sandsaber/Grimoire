@@ -35,7 +35,10 @@ import {
   type CodexTurnInputBundle,
   resolveCodexServiceTier,
 } from '../execution/CodexTurnInput';
-import { buildCodexTurnSandboxPolicy } from '../execution/CodexTurnSandboxPolicy';
+import {
+  buildCodexTurnSandboxPolicy,
+  resolveCodexPermissionMode,
+} from '../execution/CodexTurnSandboxPolicy';
 import {
   deriveCodexMemoriesDirFromSessionsRoot,
   deriveCodexSessionsRootFromSessionPath,
@@ -77,16 +80,6 @@ import { CodexRpcTransport } from './CodexRpcTransport';
 import { type CodexRuntimeContext, createCodexRuntimeContext } from './CodexRuntimeContext';
 import { CodexServerRequestRouter } from './CodexServerRequestRouter';
 import { CodexSessionManager } from './CodexSessionManager';
-
-function resolveCodexSandboxConfig(permissionMode: string): { approvalPolicy: string; sandbox: string } {
-  if (permissionMode === 'full_access') {
-    return { approvalPolicy: 'never', sandbox: 'danger-full-access' };
-  }
-  if (permissionMode === 'plan') {
-    return { approvalPolicy: 'on-request', sandbox: 'workspace-write' };
-  }
-  return { approvalPolicy: 'on-request', sandbox: 'read-only' };
-}
 
 const COMPLETION_RECOVERY_GRACE_MS = 400;
 const COMPLETION_RECOVERY_RETRY_BASE_MS = 250;
@@ -795,7 +788,7 @@ export class CodexChatRuntime implements ChatRuntime {
 
   private resolveSandboxConfig(): { approvalPolicy: string; sandbox: string } {
     const providerSettings = this.getProviderSettings();
-    return resolveCodexSandboxConfig(providerSettings.permissionMode as string);
+    return resolveCodexPermissionMode(providerSettings.permissionMode);
   }
 
   private async startAppServer(launchSpec: CodexLaunchSpec, clientConfigKey: string): Promise<void> {

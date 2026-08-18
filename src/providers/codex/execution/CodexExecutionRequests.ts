@@ -1,0 +1,317 @@
+import type { BoundConversation } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type { ChatMessage } from '../../../core/types';
+import { buildContextFromHistory } from '../../../utils/session';
+import type {
+  SkillInput,
+  SkillMetadata,
+  ThreadResumeParams,
+  ThreadStartParams,
+  UserInput,
+} from '../runtime/codexAppServerTypes';
+import type { CodexLaunchSpec } from '../runtime/codexLaunchTypes';
+import {
+  extractExplicitCodexSkillNames,
+  findPreferredCodexSkillByName,
+} from '../skills/CodexSkillListingService';
+import { DEFAULT_CODEX_PRIMARY_MODEL } from '../types/models';
+import {
+  type CodexConversationBinding,
+  readCodexConversationBinding,
+  toCodexThreadIntent,
+} from './CodexConversationBinding';
+import type {
+  CodexExecutionInvocation,
+  CodexExecutionRequestResolver,
+} from './CodexExecutionBackend';
+import {
+  buildCodexTurnInput,
+  buildCodexTurnParameters,
+  type CodexAttachmentScratch,
+  type CodexTurnImageAttachment,
+  type CodexTurnInputBundle,
+  resolveCodexServiceTier,
+} from './CodexTurnInput';
+import {
+  buildCodexTurnSandboxPolicy,
+  resolveCodexPermissionMode,
+} from './CodexTurnSandboxPolicy';
+
+/**
+ * What one turn decided, held while the kernel carries a reference to it.
+ *
+ * Only the turn's own choices live here. Everything ambient at dispatch — the
+ * thread the conversation is bound to, the settings, the target the daemon runs
+ * on — is read when the run is resolved, because a turn queued before any of
+ * those changed must still be the turn the user would recognise.
+ */
+export interface CodexExecutionRequest {
+  readonly prompt: string;
+  readonly text: string;
+  readonly images?: readonly CodexTurnImageAttachment[];
+  readonly isCompact: boolean;
+  readonly externalContextPaths: readonly string[];
+  readonly orchestratorMode: boolean;
+  /** The model the send-time selector named, if it named one. */
+  readonly model?: string;
+  /** Replayed into the prompt only where the thread cannot have it already. */
+  readonly history?: readonly ChatMessage[];
+}
+
+export interface CodexInvocationEnvironment {
+  /** The provider-projected settings snapshot, read at dispatch. */
+  readonly settings: Record<string, unknown>;
+  readonly launchSpec: CodexLaunchSpec;
+  readonly baseInstructions: string;
+  readonly conversation: BoundConversation | null;
+  listSkills(): Promise<readonly SkillMetadata[]>;
+  readonly transcriptRootTarget?: string | null;
+  readonly memoriesDirTarget?: string | null;
+  readonly scratch?: CodexAttachmentScratch;
+}
+
+/** How many un-dispatched turns may accumulate before the oldest is dropped. */
+const DEFAULT_LIMIT = 64;
+
+/**
+ * References the kernel can carry, and the turns behind them.
+ *
+ * A reference is a minted identifier and nothing else: core carries references,
+ * not provider payloads, and the registry refuses anything that is not a
+ * constrained identifier. In memory on purpose — a reference that outlived a
+ * restart would promise a re-dispatch nobody can honour, and an unresolvable one
+ * becomes `pre-dispatch-rejected`, which is the honest answer.
+ */
+export class CodexExecutionRequests implements CodexExecutionRequestResolver {
+  private readonly pending = new Map<string, CodexExecutionRequest>();
+  /**
+   * The scratch directories of turns already dispatched.
+   *
+   * Held until the next turn has its own, because the daemon reads the images
+   * while the turn runs and nothing here observes when it ends. Bounded by that
+   * rule plus `dispose`, which is what the plugin's unload calls.
+   */
+  private readonly liveBundles: CodexTurnInputBundle[] = [];
+
+  constructor(
+    private readonly nextReference: () => string,
+    private readonly environment: () => Promise<CodexInvocationEnvironment>,
+    private readonly limit: number = DEFAULT_LIMIT,
+  ) {}
+
+  /** Holds a turn and returns the reference the kernel will carry. */
+  reference(request: CodexExecutionRequest): string {
+    // Bounded because a turn rejected before dispatch never comes back for its
+    // request, and an unbounded map of prompts is a leak made of the most
+    // sensitive thing this provider handles.
+    while (this.pending.size >= this.limit) {
+      const oldest = this.pending.keys().next();
+      if (oldest.done) {
+        break;
+      }
+      this.pending.delete(oldest.value);
+    }
+    const reference = this.nextReference();
+    this.pending.set(reference, request);
+    return reference;
+  }
+
+  async resolve(requestRef: string): Promise<CodexExecutionInvocation> {
+    const request = this.take(requestRef);
+    const environment = await this.environment();
+    const binding = readCodexConversationBinding(environment.conversation);
+    const settings = environment.settings;
+    const model = request.model
+      ?? (typeof settings.model === 'string' ? settings.model : undefined);
+    const permission = resolveCodexPermissionMode(settings.permissionMode);
+    const serviceTier = resolveCodexServiceTier(
+      settings.serviceTier,
+      model ?? DEFAULT_CODEX_PRIMARY_MODEL,
+    );
+    const launchParams = {
+      model: model ?? DEFAULT_CODEX_PRIMARY_MODEL,
+      approvalPolicy: permission.approvalPolicy,
+      sandbox: permission.sandbox,
+      serviceTier,
+      baseInstructions: environment.baseInstructions,
+      experimentalRawEvents: true,
+      persistExtendedHistory: true,
+    };
+    const start: ThreadStartParams = { ...launchParams, cwd: environment.launchSpec.targetCwd };
+    const resume: Omit<ThreadResumeParams, 'threadId'> = launchParams;
+    const thread = toCodexThreadIntent(binding, { start, resume });
+
+    if (request.isCompact) {
+      return { thread, turn: { kind: 'compact' } };
+    }
+
+    const bundle = buildCodexTurnInput({
+      text: replayedPrompt(request, binding),
+      images: request.images,
+      skills: await resolveSkillInputs(request.text, environment),
+      toTargetPath: hostPath => environment.launchSpec.pathMapper.toTargetPath(hostPath),
+      ...(environment.scratch ? { scratch: environment.scratch } : {}),
+    });
+    this.retainBundle(bundle);
+
+    const parameters = buildCodexTurnParameters({
+      settings,
+      model,
+      orchestratorMode: request.orchestratorMode,
+      // The backend decides for itself whether a bound thread still needs
+      // resuming, so this cannot know whether base instructions went out with
+      // it. It answers "not yet" on purpose: the cost of being wrong is the
+      // worker-plan rules stated twice, and the cost the other way is a turn
+      // that never states them at all.
+      baseInstructionsAlreadySent: false,
+    });
+
+    return {
+      thread,
+      turn: {
+        kind: 'start',
+        params: {
+          input: bundle.input,
+          approvalPolicy: permission.approvalPolicy,
+          model: parameters.model,
+          serviceTier: parameters.serviceTier,
+          effort: parameters.effort,
+          summary: parameters.summary,
+          collaborationMode: parameters.collaborationMode,
+          ...(sandboxPolicyFor(request, environment, permission.sandbox)
+            ? { sandboxPolicy: sandboxPolicyFor(request, environment, permission.sandbox) }
+            : {}),
+        },
+      },
+    };
+  }
+
+  /**
+   * Input for a turn that is already running.
+   *
+   * No thread, no parameters: the turn was launched with those, and the user is
+   * adding to it rather than starting it again.
+   */
+  async resolveSteer(requestRef: string): Promise<readonly UserInput[]> {
+    const request = this.take(requestRef);
+    const environment = await this.environment();
+    const bundle = buildCodexTurnInput({
+      text: request.prompt,
+      images: request.images,
+      skills: await resolveSkillInputs(request.text, environment),
+      toTargetPath: hostPath => environment.launchSpec.pathMapper.toTargetPath(hostPath),
+      ...(environment.scratch ? { scratch: environment.scratch } : {}),
+    });
+    this.retainBundle(bundle);
+    return bundle.input;
+  }
+
+  /** Discards every scratch directory still held; the plugin's unload calls it. */
+  dispose(): void {
+    for (const bundle of this.liveBundles.splice(0)) {
+      bundle.cleanup();
+    }
+    this.pending.clear();
+  }
+
+  /** Test and diagnostic view of how many turns are still waiting. */
+  get pendingCount(): number {
+    return this.pending.size;
+  }
+
+  private take(requestRef: string): CodexExecutionRequest {
+    const request = this.pending.get(requestRef);
+    if (!request) {
+      throw new Error('Codex request reference is unknown.');
+    }
+    this.pending.delete(requestRef);
+    return request;
+  }
+
+  private retainBundle(bundle: CodexTurnInputBundle): void {
+    for (const previous of this.liveBundles.splice(0)) {
+      previous.cleanup();
+    }
+    this.liveBundles.push(bundle);
+  }
+}
+
+function sandboxPolicyFor(
+  request: CodexExecutionRequest,
+  environment: CodexInvocationEnvironment,
+  sandboxMode: string,
+): ReturnType<typeof buildCodexTurnSandboxPolicy> {
+  const launchSpec = environment.launchSpec;
+  return buildCodexTurnSandboxPolicy({
+    sandboxMode,
+    externalContextPaths: [...new Set(request.externalContextPaths
+      .filter(value => typeof value === 'string' && value.trim().length > 0))],
+    transcriptRootTarget: environment.transcriptRootTarget,
+    target: {
+      workspaceRoot: launchSpec.targetCwd,
+      toTargetPath: hostPath => (hostPath ? launchSpec.pathMapper.toTargetPath(hostPath) : null),
+      posixTarget: launchSpec.target.platformFamily === 'unix',
+      remoteTarget: launchSpec.target.method === 'wsl',
+      memoriesDirTarget: environment.memoriesDirTarget,
+    },
+  });
+}
+
+/**
+ * The prompt, with whatever the thread cannot already know.
+ *
+ * A thread that is being started has read nothing, and a fork has read only up
+ * to its checkpoint; a thread that is merely being resumed holds the whole
+ * conversation, and replaying it there would hand the model everything twice.
+ */
+function replayedPrompt(
+  request: CodexExecutionRequest,
+  binding: CodexConversationBinding,
+): string {
+  const history = [...(request.history ?? [])];
+  if (binding.kind === 'thread' || history.length === 0) {
+    return request.prompt;
+  }
+
+  const replayed = binding.kind === 'fork'
+    ? history.slice(forkCheckpointIndex(history, binding.resumeAtTurnId) + 1)
+    : history;
+  if (replayed.length === 0) {
+    return request.prompt;
+  }
+
+  const context = buildContextFromHistory(replayed);
+  return context.trim() ? `${context}\n\nUser: ${request.prompt}` : request.prompt;
+}
+
+function forkCheckpointIndex(history: readonly ChatMessage[], resumeAtTurnId: string): number {
+  // `-1` where the checkpoint is not in this history: everything after "nothing"
+  // is the whole of it, which is the honest reading of a fork whose point the
+  // conversation no longer shows.
+  return history.findIndex(message => message.assistantMessageId === resumeAtTurnId);
+}
+
+async function resolveSkillInputs(
+  text: string,
+  environment: CodexInvocationEnvironment,
+): Promise<SkillInput[]> {
+  const names = extractExplicitCodexSkillNames(text);
+  if (names.length === 0) {
+    return [];
+  }
+
+  try {
+    const skills = await environment.listSkills();
+    const resolved: SkillInput[] = [];
+    for (const name of names) {
+      const skill = findPreferredCodexSkillByName([...skills], name);
+      if (skill) {
+        resolved.push({ type: 'skill', name: skill.name, path: skill.path });
+      }
+    }
+    return resolved;
+  } catch {
+    // A skill listing that failed is not a turn that should fail: the legacy
+    // runtime sent the prompt without them, and the mention stays in the text.
+    return [];
+  }
+}

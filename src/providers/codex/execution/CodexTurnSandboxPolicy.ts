@@ -37,6 +37,26 @@ export interface CodexTargetPaths {
   readonly memoriesDirTarget?: string | null;
 }
 
+/**
+ * The approval policy and sandbox mode one permission mode asks for.
+ *
+ * Here rather than with the turn's other parameters because the sandbox half is
+ * what the policy below reads, and because the legacy runtime shares this file:
+ * a module the flip owns cannot be imported from the path that is still live
+ * without dragging the backend into the shipped bundle.
+ */
+export function resolveCodexPermissionMode(
+  permissionMode: unknown,
+): { readonly approvalPolicy: string; readonly sandbox: string } {
+  if (permissionMode === 'full_access') {
+    return { approvalPolicy: 'never', sandbox: 'danger-full-access' };
+  }
+  if (permissionMode === 'plan') {
+    return { approvalPolicy: 'on-request', sandbox: 'workspace-write' };
+  }
+  return { approvalPolicy: 'on-request', sandbox: 'read-only' };
+}
+
 export interface CodexTurnSandboxInputs {
   readonly sandboxMode: string;
   readonly externalContextPaths: readonly string[];
