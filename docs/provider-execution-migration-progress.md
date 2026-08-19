@@ -3065,6 +3065,57 @@ vault log, and the last one is a gate rather than a memory of a terminal window.
 Gates: unit 467 suites / 7,778 tests, integration 6 / 220, the Antigravity live suite 2 / 2 and the
 Codex live suite untouched, typecheck, lint, and `build:release` clean on Linux.
 
+### M2-flips — the job guardian compiles once now, and CI is the only proof (this commit)
+
+The Windows guardian is C# handed to `Add-Type -TypeDefinition`, which ran the CodeDom compiler
+**before the child was spawned at all, on every launch** — measured two entries above at two to three
+seconds a launch against a 15s budget, which is latency a Codex daemon start and every local-shell
+run pay, and the reason that gate goes red on a stalled runner. It is compiled once now, to
+`%LOCALAPPDATA%\Grimoire\job-guardian\guardian-<fingerprint>.dll`, and loaded from that file
+afterwards.
+
+**The fingerprint is of the C# this build embeds**, so a guardian that changes is a different file
+rather than a stale one: the cache can never serve a guardian this build did not write. Per-user by
+preference — `LOCALAPPDATA` before `TEMP` and `TMP` — because the assembly is loaded into the process
+that owns other processes, and a path other accounts can write to would be a place to put something
+else. An environment that names none of the three yields no path at all, and that launch compiles in
+the session exactly as before.
+
+**Every step is allowed to fail, and each failure lands on today's behaviour.** A cached assembly
+that will not load, a directory that cannot be created, a compiler that does not know
+`-OutputAssembly`, a second process that won the race to the same path — the script ends with the
+same line in all of them: compile the source in this session. The one failure this may never cause is
+a guardian that did not start, because that is the guarantee the whole file exists to protect.
+
+Two details that are not decoration. The compile goes to a staging file and is *moved* into place, so
+a half-written DLL never appears at the path another launch is loading from and the loser of a race
+keeps the winner's copy. And because that move refuses to overwrite, a cached file that will not load
+is **removed** when the load fails — otherwise a corrupt assembly would make every later launch pay a
+compile and never repair itself.
+
+**What is proven, and where.** This machine cannot run the guardian and has no PowerShell to so much
+as parse the script, so the unit tests pin what is readable here: the path resolution and its
+fallbacks, the fingerprint in the file name, the order of the script, the quoting of a path with an
+apostrophe in it, and — the assertion that matters most — that the last line still compiles in the
+session. Proven by breaking it: dropping that line, or the move's own `try`, turns the suite red. The
+real question is answered by two new Windows-only cases in
+`CodexPersistentProcessOwnership.integration.test.ts`: a cold launch writes the assembly and a warm
+launch does not rewrite it — mtime, not a clock — and a junk file planted at the cache path still
+starts a guardian and is repaired. Both launches report their durations and **assert nothing about
+them**: building a gate on a shared runner's clock is the disease this checkpoint is treating.
+
+**Unverified until a Windows job runs it.** Nothing above has executed on Windows; the local gates
+are green on Linux and CI is the proof. The 15s budget in that suite stays as it is until CI says
+what a warm launch costs — raising or lowering it before there is a number would be the guessing the
+measurement entry already refused.
+
+Left alone deliberately: guardian assemblies from earlier builds stay in the directory, a few
+kilobytes each, changing about as often as the C# does. Pruning them would mean deleting a file a
+concurrently running build may have loaded, for a saving nobody can measure.
+
+Gates: unit 467 suites / 7,784 tests, integration 6 / 222, typecheck, lint, and `build:release` clean
+on Linux.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3124,9 +3175,11 @@ the command that runs them is in the matrix document under "the half that runs i
    that the live harness cannot answer: whether the tool card, the diff, the plan, the plan-limit and
    context badges, and two tabs side by side actually *look* right in a vault on a release build.
    That is what certifies wave 2;
-2. **the Windows job guardian**, measured three entries above: it compiles on every launch, which is
-   latency the product pays and the reason that gate is flaky. Its own checkpoint, before the next
-   persistent-daemon provider flips;
+2. **the Windows job guardian on CI** — it is built (entry above: compiled once, cached per user,
+   every failure falling back to today's in-session compile) and **no part of it has run on
+   Windows**. Push and read the Windows job: the two new cases in
+   `CodexPersistentProcessOwnership.integration.test.ts` report what a cold and a warm launch cost,
+   which is the number the flaky 15s budget has been waiting for;
 3. **then M2-flips wave 3** — the next provider, with the five recordings and the wire-vocabulary
    obligations that come with it.
 
@@ -3192,12 +3245,12 @@ Open obligations, each with an owner:
   locate the answer, and the backend holds the thread and turn ids it would take, but does not pass
   them. Nothing resolves a result reference today, which is why this is recorded rather than built.
   Owner: M5, with result provenance;
-- **the Windows process-ownership gate is flaky, and the cost behind it is real.** Measured in the
-  entry above: a launch costs two to three seconds against a 15s budget, and the failures are single
-  launches stalling past five times that while their siblings pass. The fix is to stop compiling the
-  job guardian on every launch — which is latency the product pays on Windows too, not just the test.
-  Owner: its own checkpoint, before the next persistent-daemon provider flips. The older reading of
-  this obligation follows:
+- **the Windows process-ownership gate is flaky, and the cost behind it is real.** Measured two
+  entries above the blocker: a launch costs two to three seconds against a 15s budget, and the
+  failures are single launches stalling past five times that while their siblings pass. The fix —
+  compiling the job guardian once and caching it per user — **is built and has never run on
+  Windows**; the checkpoint is not closed until a Windows CI job proves it and reports what a warm
+  launch costs. Owner: the next push to CI. The older reading of this obligation follows:
   `CodexPersistentProcessOwnership.integration.test.ts` failed on a **documentation-only commit**
   (`634fe7c`) — the descendant did not publish its pid within 15s — and passed on re-run of the same
   commit, with the three commits before it green on identical code. So it is timing on a shared

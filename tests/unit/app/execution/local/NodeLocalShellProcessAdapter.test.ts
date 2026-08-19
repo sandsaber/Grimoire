@@ -5,6 +5,8 @@ import {
   NodeLocalShellProcessAdapter,
   type SpawnedLocalProcess,
   windowsCommandArguments,
+  windowsJobGuardianAssemblyPath,
+  windowsJobGuardianTypeLoad,
   windowsProcessArguments,
 } from '@/app/execution/local/NodeLocalShellProcessAdapter';
 import type { LocalShellLaunchSpec } from '@/core/execution/local/LocalShellBackend';
@@ -148,6 +150,100 @@ describe('NodeLocalShellProcessAdapter', () => {
 
     expect(() => adapter.launch(launchSpec('posix-process-group')))
       .toThrow('positive safe integer');
+  });
+
+  /**
+   * The compiled guardian, on a machine that cannot run it.
+   *
+   * Whether the assembly actually loads is a Windows question, answered by
+   * `CodexPersistentProcessOwnership.integration.test.ts` on CI. What is
+   * answerable here is the shape of the script that decides it — and the
+   * property that matters most is the last line of it, because a cache that
+   * fails must cost a compile rather than a guardian.
+   */
+  describe('the Windows job guardian assembly cache', () => {
+    it('writes per user, preferring the account\'s own application data', () => {
+      const path = windowsJobGuardianAssemblyPath({
+        LOCALAPPDATA: 'C:\\Users\\Michael\\AppData\\Local',
+        TEMP: 'C:\\Windows\\Temp',
+      });
+
+      expect(path).toMatch(/^C:\\Users\\Michael\\AppData\\Local\\Grimoire\\job-guardian\\guardian-[0-9a-f]{16}\.dll$/);
+    });
+
+    it('falls back through the temp variables, and to compiling in the session', () => {
+      const temp = windowsJobGuardianAssemblyPath({ TEMP: 'C:\\Windows\\Temp' });
+      const tmp = windowsJobGuardianAssemblyPath({ TMP: 'C:\\Windows\\Temp' });
+
+      expect(temp).toBe(tmp);
+      expect(temp).toContain('C:\\Windows\\Temp\\Grimoire\\job-guardian\\');
+      // A filtered environment names nowhere to write, which is a launch that
+      // pays the compile rather than a launch that fails.
+      expect(windowsJobGuardianAssemblyPath({})).toBeNull();
+      expect(windowsJobGuardianAssemblyPath({ LOCALAPPDATA: '  ' })).toBeNull();
+      expect(windowsJobGuardianTypeLoad(null))
+        .toEqual(['Add-Type -TypeDefinition $source -Language CSharp']);
+    });
+
+    it('names the file after the guardian source, so a stale build cannot be served', () => {
+      const first = windowsJobGuardianAssemblyPath({ TEMP: 'T:' });
+      const second = windowsJobGuardianAssemblyPath({ TEMP: 'T:' });
+      const fingerprint = /guardian-([0-9a-f]{16})\.dll$/.exec(String(first))?.[1];
+
+      expect(first).toBe(second);
+      expect(fingerprint).toBeDefined();
+      // The fingerprint is of the C# this build embeds: a guardian that changed
+      // and a file name that did not is a cache serving the previous build.
+      expect(windowsJobGuardianTypeLoad(first).join('\n')).toContain(String(fingerprint));
+    });
+
+    it('loads the cache, repairs it when it will not load, and still ends compiled', () => {
+      const script = windowsJobGuardianTypeLoad('C:\\cache\\guardian-abc.dll').join('\n');
+
+      // Read in order: try the cache, otherwise compile to a staging file and
+      // move it into place, and whatever happened, end with the type loaded.
+      expect(script).toContain('if (Test-Path -LiteralPath $assembly) '
+        + '{ try { Add-Type -Path $assembly } '
+        + 'catch { Remove-Item -LiteralPath $assembly -Force -ErrorAction SilentlyContinue } }');
+      expect(script).toContain(
+        'Add-Type -TypeDefinition $source -Language CSharp -OutputAssembly $staging',
+      );
+      expect(script).toContain('$staging="$assembly.$PID.tmp"');
+      // Atomic, and the loser of a race keeps the winner's copy rather than
+      // overwriting an assembly another process may already have loaded.
+      expect(script).toContain('try { [IO.File]::Move($staging,$assembly) } catch { }');
+      expect(script.trimEnd().endsWith(
+        "if (-not (([Management.Automation.PSTypeName]'GrimoireJobGuardian').Type)) "
+        + '{ Add-Type -TypeDefinition $source -Language CSharp }',
+      )).toBe(true);
+    });
+
+    it('lets every step of the cache fail without taking the guardian with it', () => {
+      const lines = windowsJobGuardianTypeLoad('C:\\cache\\guardian-abc.dll');
+
+      // Nothing that touches the filesystem may throw out of the script: a
+      // guardian that did not start is the one failure this code must not add.
+      // Guarded means its own `try`, or a line inside the one that wraps the
+      // whole compile — the four-space indent is what being inside it looks
+      // like once the script is a list of lines.
+      const filesystem = lines.filter(line => (
+        /Add-Type -Path|New-Item|IO\.File\]::Move|Remove-Item/.test(line)
+      ));
+      const unguarded = filesystem.filter(line => (
+        !/try \{|catch \{|^\s{4}|-ErrorAction SilentlyContinue/.test(line)
+      ));
+
+      expect(filesystem.length).toBeGreaterThan(3);
+      expect(unguarded).toEqual([]);
+      expect(lines.filter(line => line.trim() === 'try {')).toHaveLength(1);
+      expect(lines.filter(line => line.trim() === '} catch { }')).toHaveLength(1);
+    });
+
+    it('quotes a path the user\'s own name made awkward', () => {
+      const script = windowsJobGuardianTypeLoad("C:\\Users\\O'Neill\\guardian.dll").join('\n');
+
+      expect(script).toContain("$assembly='C:\\Users\\O''Neill\\guardian.dll'");
+    });
   });
 
   it('settles readiness when a real spawn fails before ownership exists', async () => {

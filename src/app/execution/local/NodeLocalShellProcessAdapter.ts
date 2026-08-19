@@ -2,7 +2,8 @@ import {
   type ChildProcess,
   spawn,
 } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { win32 as windowsPath } from 'node:path';
 import { PassThrough, type Readable, type Writable } from 'node:stream';
 import { clearTimeout as clearNodeTimeout, setTimeout as setNodeTimeout } from 'node:timers';
 
@@ -247,9 +248,10 @@ function spawnWindowsGuardian(
   const executableVariable = `GRIMOIRE_JOB_EXECUTABLE_${suffix}`;
   const argumentsVariable = `GRIMOIRE_JOB_ARGUMENTS_${suffix}`;
   const childLaunch = createWindowsGuardianChildLaunch(spec, suffix);
+  const environment = spec.environment ? { ...spec.environment } : { ...process.env };
   const command = [
     `$source=@'\r\n${WINDOWS_JOB_GUARDIAN_SOURCE}\r\n'@`,
-    'Add-Type -TypeDefinition $source -Language CSharp',
+    ...windowsJobGuardianTypeLoad(windowsJobGuardianAssemblyPath(environment)),
     `$exe=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:${executableVariable}))`,
     `$arguments=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:${argumentsVariable}))`,
     `[Environment]::SetEnvironmentVariable('${executableVariable}',$null,'Process')`,
@@ -266,7 +268,7 @@ function spawnWindowsGuardian(
   ], {
     cwd: spec.cwd,
     env: {
-      ...(spec.environment ? { ...spec.environment } : process.env),
+      ...environment,
       ...childLaunch.environment,
       [executableVariable]: encodeBase64(childLaunch.executable),
       [argumentsVariable]: encodeBase64(childLaunch.arguments),
@@ -274,6 +276,86 @@ function spawnWindowsGuardian(
     stdio: [spec.stdin === 'pipe' ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
+}
+
+/**
+ * Where this build's compiled guardian lives, if the child's environment names
+ * a directory it may write to.
+ *
+ * Keyed by a fingerprint of the C# source, so a change to the guardian is a
+ * different file rather than a stale one: the cache can never serve a guardian
+ * this build did not write. Per-user by preference — `LOCALAPPDATA` before the
+ * temp directories — because the assembly is loaded into a process that owns
+ * other processes, and a path other accounts can write to would be a place to
+ * put something else. `null` when the environment names nothing writable, which
+ * is a filtered environment rather than a broken one, and which the caller
+ * answers by compiling in the session exactly as before.
+ */
+export function windowsJobGuardianAssemblyPath(
+  environment: Readonly<Record<string, string | undefined>>,
+): string | null {
+  const root = [environment.LOCALAPPDATA, environment.TEMP, environment.TMP]
+    .find(candidate => typeof candidate === 'string' && candidate.trim() !== '');
+  return root
+    ? windowsPath.join(
+      root,
+      'Grimoire',
+      'job-guardian',
+      `guardian-${windowsJobGuardianFingerprint()}.dll`,
+    )
+    : null;
+}
+
+/**
+ * The PowerShell that puts `GrimoireJobGuardian` in the session.
+ *
+ * `Add-Type -TypeDefinition` runs the CodeDom compiler before the child is
+ * spawned at all, and it ran on **every** launch: measured at two to three
+ * seconds a launch on a Windows CI runner, which is latency a Codex daemon
+ * start and every local-shell run pay, and the reason the ownership gate is
+ * flaky against its 15s budget. Compiled once to a file and loaded from it
+ * afterwards, that cost is paid by the first launch on a machine.
+ *
+ * Every step is allowed to fail. A cached assembly that will not load, a
+ * directory that cannot be created, a compiler that does not know
+ * `-OutputAssembly`, a second process that won the race to the same path — each
+ * lands on the same floor, which is today's behaviour: compile the source in
+ * this session. The guarantee this code exists to protect is process ownership,
+ * and an optimization is never allowed to be the reason a guardian did not
+ * start.
+ *
+ * The staging file plus a move is what makes a concurrent launch safe: a
+ * half-written DLL never appears at the path another process is loading from,
+ * because the move is atomic within a volume and the loser of the race keeps
+ * the winner's copy. That same move is why a cached file that will not load is
+ * removed rather than left: the move refuses to overwrite, so a broken
+ * assembly nobody can load would otherwise make every later launch pay a
+ * compile and never repair itself.
+ */
+export function windowsJobGuardianTypeLoad(assemblyPath: string | null): string[] {
+  const compileInSession = 'Add-Type -TypeDefinition $source -Language CSharp';
+  if (!assemblyPath) {
+    return [compileInSession];
+  }
+  const loaded = "([Management.Automation.PSTypeName]'GrimoireJobGuardian').Type";
+  return [
+    `$assembly='${assemblyPath.replaceAll("'", "''")}'`,
+    'if (Test-Path -LiteralPath $assembly) { try { Add-Type -Path $assembly } '
+      + 'catch { Remove-Item -LiteralPath $assembly -Force -ErrorAction SilentlyContinue } }',
+    `if (-not (${loaded})) {`,
+    '  try {',
+    '    $directory=Split-Path -LiteralPath $assembly -Parent',
+    '    New-Item -ItemType Directory -Path $directory -Force | Out-Null',
+    '    $staging="$assembly.$PID.tmp"',
+    `    ${compileInSession} -OutputAssembly $staging`,
+    '    try { [IO.File]::Move($staging,$assembly) } catch { }',
+    '    if (Test-Path -LiteralPath $staging) '
+      + '{ Remove-Item -LiteralPath $staging -Force -ErrorAction SilentlyContinue }',
+    '    Add-Type -Path $assembly',
+    '  } catch { }',
+    '}',
+    `if (-not (${loaded})) { ${compileInSession} }`,
+  ];
 }
 
 interface WindowsGuardianChildLaunch {
@@ -654,3 +736,14 @@ public static class GrimoireJobGuardian
     }
 }
 `;
+
+let guardianFingerprint: string | undefined;
+
+/** What this build's guardian is, short enough to be a file name. */
+function windowsJobGuardianFingerprint(): string {
+  guardianFingerprint ??= createHash('sha256')
+    .update(WINDOWS_JOB_GUARDIAN_SOURCE)
+    .digest('hex')
+    .slice(0, 16);
+  return guardianFingerprint;
+}

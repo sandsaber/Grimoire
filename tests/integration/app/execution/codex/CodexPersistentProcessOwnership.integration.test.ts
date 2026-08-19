@@ -1,8 +1,10 @@
 import {
   copyFileSync,
+  existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -11,7 +13,10 @@ import { createInterface } from 'node:readline';
 import { clearTimeout, setTimeout } from 'node:timers';
 
 import { NodeCodexExecutionProcess } from '@/app/execution/codex/NodeCodexExecutionProcess';
-import { localShellPlatformForNode } from '@/app/execution/local/NodeLocalShellProcessAdapter';
+import {
+  localShellPlatformForNode,
+  windowsJobGuardianAssemblyPath,
+} from '@/app/execution/local/NodeLocalShellProcessAdapter';
 
 describe('Codex persistent process ownership on the host OS', () => {
   // Generous because of the Windows guardian compile described below, not
@@ -157,7 +162,76 @@ describe('Codex persistent process ownership on the host OS', () => {
       await removeWhenReleased(directory);
     }
   }, 60_000);
+
+  it('compiles the job guardian once and launches from the cached assembly', async () => {
+    if (process.platform !== 'win32') {
+      return;
+    }
+    // The measurement this case exists for: every launch used to run the
+    // CodeDom compiler over the guardian's C# before the child was spawned at
+    // all, two to three seconds of it, which is latency the product pays and
+    // the reason this suite's 15s budget was tight enough to go red on a
+    // stalled runner. Reported rather than asserted — a shared runner's clock
+    // is exactly what this checkpoint refuses to build a gate on.
+    const assembly = windowsJobGuardianAssemblyPath(process.env);
+    expect(assembly).not.toBeNull();
+    const cachePath = String(assembly);
+    rmSync(cachePath, { force: true });
+    const directory = mkdtempSync(join(tmpdir(), 'grimoire-guardian-cache-'));
+    try {
+      const cold = await measureLaunch(directory, 'cold');
+      expect(existsSync(cachePath)).toBe(true);
+      const compiledAt = statSync(cachePath).mtimeMs;
+
+      const warm = await measureLaunch(directory, 'warm');
+
+      process.stdout.write(`guardian launch: cold ${cold}ms, warm ${warm}ms\n`);
+      // The second launch loaded what the first compiled: had it compiled
+      // again, it would have moved a freshly built assembly into this path.
+      expect(statSync(cachePath).mtimeMs).toBe(compiledAt);
+    } finally {
+      await removeWhenReleased(directory);
+    }
+  }, 90_000);
+
+  it('starts the guardian anyway when the cached assembly is unusable, and repairs it', async () => {
+    if (process.platform !== 'win32') {
+      return;
+    }
+    // The floor. A cache is an optimization, and the one failure it may never
+    // cause is a guardian that does not start — so the path is filled with
+    // something that is not an assembly and the launch must still own its tree.
+    const cachePath = String(windowsJobGuardianAssemblyPath(process.env));
+    const directory = mkdtempSync(join(tmpdir(), 'grimoire-guardian-broken-'));
+    const junk = 'this is not a .NET assembly';
+    try {
+      writeFileSync(cachePath, junk, 'utf8');
+
+      await measureLaunch(directory, 'broken-cache');
+
+      // And it repaired itself: a file that will not load is removed, so the
+      // next launch compiles into the space rather than paying forever.
+      expect(existsSync(cachePath)).toBe(true);
+      expect(readFileSync(cachePath, 'utf8')).not.toBe(junk);
+    } finally {
+      rmSync(cachePath, { force: true });
+      await removeWhenReleased(directory);
+    }
+  }, 90_000);
 });
+
+/** One guarded launch through the production path, and what it cost. */
+async function measureLaunch(directory: string, label: string): Promise<number> {
+  const pidPath = join(directory, `${label}.pid`);
+  const startedAt = Date.now();
+  await runPersistentForm({
+    command: process.execPath,
+    args: ['-e', persistentServerSource(), pidPath],
+    spawnCwd: directory,
+    env: definedEnvironment(process.env),
+  }, pidPath, label);
+  return Date.now() - startedAt;
+}
 
 async function runPersistentForm(
   launchSpec: ConstructorParameters<typeof NodeCodexExecutionProcess>[0]['launchSpec'],
