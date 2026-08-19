@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import {
   copyFileSync,
   existsSync,
@@ -16,6 +17,7 @@ import { NodeCodexExecutionProcess } from '@/app/execution/codex/NodeCodexExecut
 import {
   localShellPlatformForNode,
   windowsJobGuardianAssemblyPath,
+  windowsJobGuardianPreamble,
 } from '@/app/execution/local/NodeLocalShellProcessAdapter';
 
 describe('Codex persistent process ownership on the host OS', () => {
@@ -163,6 +165,31 @@ describe('Codex persistent process ownership on the host OS', () => {
     }
   }, 60_000);
 
+  it('writes the cached guardian assembly, and says why when it does not', () => {
+    if (process.platform !== 'win32') {
+      return;
+    }
+    // The script itself, in a real PowerShell, with its own errors read back.
+    // The first Windows run of this cache reported only its consequence — the
+    // guardian started and no file was written — because every step of the
+    // branch is deliberately caught. `$Error` still holds what was caught, so
+    // this asks for it rather than inferring the cause from a launch.
+    const cachePath = String(windowsJobGuardianAssemblyPath(process.env));
+    rmSync(cachePath, { force: true });
+
+    const cold = runGuardianPreamble(cachePath);
+    const warm = runGuardianPreamble(cachePath);
+
+    process.stdout.write(`guardian preamble: cold ${cold.elapsedMs}ms, `
+      + `warm ${warm.elapsedMs}ms\n${cold.output}`);
+    expect(cold.output).toContain('TYPE: True');
+    expect(cold.output).toContain('CACHE: True');
+    // The second run loaded what the first compiled, which is the whole point:
+    // the compile is what costs seconds, and only one run may pay it.
+    expect(warm.output).toContain('TYPE: True');
+    expect(warm.output).toContain('COMPILED: False');
+  }, 60_000);
+
   it('compiles the job guardian once and launches from the cached assembly', async () => {
     if (process.platform !== 'win32') {
       return;
@@ -231,6 +258,33 @@ async function measureLaunch(directory: string, label: string): Promise<number> 
     env: definedEnvironment(process.env),
   }, pidPath, label);
   return Date.now() - startedAt;
+}
+
+/**
+ * Runs the guardian preamble the way a launch does, and reports what it did.
+ *
+ * `COMPILED` is the fact a timing number can only suggest: whether this run
+ * reached the compile at all, or found the type already in the assembly it
+ * loaded from disk.
+ */
+function runGuardianPreamble(cachePath: string): { output: string; elapsedMs: number } {
+  const script = [
+    ...windowsJobGuardianPreamble(cachePath),
+    '[Console]::Out.WriteLine("CACHE: " + [IO.File]::Exists($assembly))',
+    '[Console]::Out.WriteLine("TYPE: " + '
+      + '[bool](([Management.Automation.PSTypeName]\'GrimoireJobGuardian\').Type))',
+    '[Console]::Out.WriteLine("COMPILED: " + $compiled)',
+    '$Error | ForEach-Object { [Console]::Out.WriteLine("PS-ERROR: " + $_.Exception.Message) }',
+  ].join('\r\n');
+  const startedAt = Date.now();
+  const output = execFileSync('powershell.exe', [
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-EncodedCommand',
+    Buffer.from(script, 'utf16le').toString('base64'),
+  ], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+  return { output, elapsedMs: Date.now() - startedAt };
 }
 
 async function runPersistentForm(

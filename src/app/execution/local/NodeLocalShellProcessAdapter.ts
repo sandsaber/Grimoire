@@ -250,8 +250,7 @@ function spawnWindowsGuardian(
   const childLaunch = createWindowsGuardianChildLaunch(spec, suffix);
   const environment = spec.environment ? { ...spec.environment } : { ...process.env };
   const command = [
-    `$source=@'\r\n${WINDOWS_JOB_GUARDIAN_SOURCE}\r\n'@`,
-    ...windowsJobGuardianTypeLoad(windowsJobGuardianAssemblyPath(environment)),
+    ...windowsJobGuardianPreamble(windowsJobGuardianAssemblyPath(environment)),
     `$exe=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:${executableVariable}))`,
     `$arguments=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:${argumentsVariable}))`,
     `[Environment]::SetEnvironmentVariable('${executableVariable}',$null,'Process')`,
@@ -324,6 +323,13 @@ export function windowsJobGuardianAssemblyPath(
  * and an optimization is never allowed to be the reason a guardian did not
  * start.
  *
+ * Written in .NET calls rather than cmdlets, and deliberately. A cmdlet that
+ * fails non-terminatingly is not caught by `try`, so the first version of this
+ * ran on past its own failure and left the whole branch silent: the Windows job
+ * reported a guardian that started and a cache file that had never been
+ * written, with nothing to say why. `[IO.File]`, `[IO.Directory]` and
+ * `-ErrorAction Stop` throw where this code says `catch`.
+ *
  * The staging file plus a move is what makes a concurrent launch safe: a
  * half-written DLL never appears at the path another process is loading from,
  * because the move is atomic within a volume and the loser of the race keeps
@@ -340,21 +346,32 @@ export function windowsJobGuardianTypeLoad(assemblyPath: string | null): string[
   const loaded = "([Management.Automation.PSTypeName]'GrimoireJobGuardian').Type";
   return [
     `$assembly='${assemblyPath.replaceAll("'", "''")}'`,
-    'if (Test-Path -LiteralPath $assembly) { try { Add-Type -Path $assembly } '
-      + 'catch { Remove-Item -LiteralPath $assembly -Force -ErrorAction SilentlyContinue } }',
+    // Whether this launch ran the compiler at all, which is the difference a
+    // clock can only hint at: a warm launch that quietly recompiled would look
+    // like a fast one on an idle machine.
+    '$compiled=$false',
+    'if ([IO.File]::Exists($assembly)) { try { Add-Type -Path $assembly -ErrorAction Stop } '
+      + 'catch { try { [IO.File]::Delete($assembly) } catch { } } }',
     `if (-not (${loaded})) {`,
+    '  $compiled=$true',
     '  try {',
-    '    $directory=Split-Path -LiteralPath $assembly -Parent',
-    '    New-Item -ItemType Directory -Path $directory -Force | Out-Null',
-    '    $staging="$assembly.$PID.tmp"',
-    `    ${compileInSession} -OutputAssembly $staging`,
+    '    [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($assembly)) | Out-Null',
+    "    $staging=$assembly + '.' + $PID + '.tmp'",
+    `    ${compileInSession} -OutputAssembly $staging -ErrorAction Stop`,
     '    try { [IO.File]::Move($staging,$assembly) } catch { }',
-    '    if (Test-Path -LiteralPath $staging) '
-      + '{ Remove-Item -LiteralPath $staging -Force -ErrorAction SilentlyContinue }',
-    '    Add-Type -Path $assembly',
+    '    if ([IO.File]::Exists($staging)) { try { [IO.File]::Delete($staging) } catch { } }',
+    '    Add-Type -Path $assembly -ErrorAction Stop',
     '  } catch { }',
     '}',
-    `if (-not (${loaded})) { ${compileInSession} }`,
+    `if (-not (${loaded})) { $compiled=$true; ${compileInSession} }`,
+  ];
+}
+
+/** The guardian's source and whatever it takes to have the type, in order. */
+export function windowsJobGuardianPreamble(assemblyPath: string | null): string[] {
+  return [
+    `$source=@'\r\n${WINDOWS_JOB_GUARDIAN_SOURCE}\r\n'@`,
+    ...windowsJobGuardianTypeLoad(assemblyPath),
   ];
 }
 

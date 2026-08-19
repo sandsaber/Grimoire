@@ -6,6 +6,7 @@ import {
   type SpawnedLocalProcess,
   windowsCommandArguments,
   windowsJobGuardianAssemblyPath,
+  windowsJobGuardianPreamble,
   windowsJobGuardianTypeLoad,
   windowsProcessArguments,
 } from '@/app/execution/local/NodeLocalShellProcessAdapter';
@@ -202,20 +203,23 @@ describe('NodeLocalShellProcessAdapter', () => {
 
       // Read in order: try the cache, otherwise compile to a staging file and
       // move it into place, and whatever happened, end with the type loaded.
-      expect(script).toContain('if (Test-Path -LiteralPath $assembly) '
-        + '{ try { Add-Type -Path $assembly } '
-        + 'catch { Remove-Item -LiteralPath $assembly -Force -ErrorAction SilentlyContinue } }');
+      expect(script).toContain('if ([IO.File]::Exists($assembly)) '
+        + '{ try { Add-Type -Path $assembly -ErrorAction Stop } '
+        + 'catch { try { [IO.File]::Delete($assembly) } catch { } } }');
       expect(script).toContain(
-        'Add-Type -TypeDefinition $source -Language CSharp -OutputAssembly $staging',
+        'Add-Type -TypeDefinition $source -Language CSharp -OutputAssembly $staging '
+        + '-ErrorAction Stop',
       );
-      expect(script).toContain('$staging="$assembly.$PID.tmp"');
+      expect(script).toContain("$staging=$assembly + '.' + $PID + '.tmp'");
       // Atomic, and the loser of a race keeps the winner's copy rather than
       // overwriting an assembly another process may already have loaded.
       expect(script).toContain('try { [IO.File]::Move($staging,$assembly) } catch { }');
       expect(script.trimEnd().endsWith(
         "if (-not (([Management.Automation.PSTypeName]'GrimoireJobGuardian').Type)) "
-        + '{ Add-Type -TypeDefinition $source -Language CSharp }',
+        + '{ $compiled=$true; Add-Type -TypeDefinition $source -Language CSharp }',
       )).toBe(true);
+      // The flag a test reads to tell a warm launch from a cold one.
+      expect(script).toContain('$compiled=$false');
     });
 
     it('lets every step of the cache fail without taking the guardian with it', () => {
@@ -225,18 +229,28 @@ describe('NodeLocalShellProcessAdapter', () => {
       // guardian that did not start is the one failure this code must not add.
       // Guarded means its own `try`, or a line inside the one that wraps the
       // whole compile — the four-space indent is what being inside it looks
-      // like once the script is a list of lines.
+      // like once the script is a list of lines. Cmdlets are avoided here for
+      // the same reason: a non-terminating cmdlet error walks straight past
+      // `try`, which is how the first Windows run wrote no cache and said
+      // nothing about it.
       const filesystem = lines.filter(line => (
-        /Add-Type -Path|New-Item|IO\.File\]::Move|Remove-Item/.test(line)
+        /Add-Type -Path|IO\.Directory\]|IO\.File\]::(Move|Delete)/.test(line)
       ));
       const unguarded = filesystem.filter(line => (
-        !/try \{|catch \{|^\s{4}|-ErrorAction SilentlyContinue/.test(line)
+        !/try \{|catch \{|^\s{4}/.test(line)
       ));
 
       expect(filesystem.length).toBeGreaterThan(3);
       expect(unguarded).toEqual([]);
       expect(lines.filter(line => line.trim() === 'try {')).toHaveLength(1);
       expect(lines.filter(line => line.trim() === '} catch { }')).toHaveLength(1);
+    });
+
+    it('carries the guardian source ahead of whatever loads the type', () => {
+      const preamble = windowsJobGuardianPreamble('C:\\cache\\guardian-abc.dll');
+
+      expect(preamble[0]).toContain('public static class GrimoireJobGuardian');
+      expect(preamble.slice(1)).toEqual(windowsJobGuardianTypeLoad('C:\\cache\\guardian-abc.dll'));
     });
 
     it('quotes a path the user\'s own name made awkward', () => {

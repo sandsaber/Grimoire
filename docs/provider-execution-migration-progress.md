@@ -3116,6 +3116,41 @@ concurrently running build may have loaded, for a saving nobody can measure.
 Gates: unit 467 suites / 7,784 tests, integration 6 / 222, typecheck, lint, and `build:release` clean
 on Linux.
 
+### M2-flips — the first Windows job, and a cache that failed in silence (this commit)
+
+The guardian cache went to CI and the Windows job answered in one round: **the assembly was never
+written**. The guardian started, every ownership assertion passed, and
+`C:\Users\runneradmin\AppData\Local\Grimoire\job-guardian\guardian-e85184f105564580.dll` did not
+exist. The floor held — which is the property the previous entry cared most about — and the
+optimization did nothing at all.
+
+**Why it could fail silently is the finding.** The branch was written in cmdlets — `Test-Path`,
+`Split-Path`, `New-Item`, `Remove-Item` — and a cmdlet that fails *non-terminatingly* is not caught
+by `try`. PowerShell writes the error to the stream and carries straight on, so the branch could
+neither succeed nor report; it ran to the end, found no type, and the last line compiled in the
+session exactly as designed. A design whose failure mode is invisible is a design that cannot be
+debugged from a CI log, and this one proved it on its first run.
+
+Rewritten in .NET calls — `[IO.File]::Exists`, `[IO.Directory]::CreateDirectory`, `[IO.File]::Move`,
+`[IO.File]::Delete` — with `-ErrorAction Stop` on the two `Add-Type` calls that remain. Those throw
+where the code says `catch`. `Split-Path` is gone, and it is the most likely author of the original
+silence: its `-LiteralPath` and `-Parent` are not obviously one parameter set, and a null directory
+explains every symptom the job showed.
+
+**And the diagnosis is now a gate rather than a guess.** A new Windows-only case runs the guardian
+preamble in a real `powershell.exe`, twice, and reads back what it did: `CACHE`, `TYPE`, `COMPILED`,
+and every message in `$Error` — including the ones the script caught, because `$Error` keeps them.
+The cold run must write the cache and have the type; the warm run must have the type **without
+compiling**, which is the fact a stopwatch can only hint at on an idle machine. Both runs report
+their duration and neither asserts on it. `$compiled` is a line in the production script for this
+reason, and it is the only thing the diagnosis added to it.
+
+The launch-based cases stay: they prove the *production launch path* uses the cache, where this one
+proves the script does.
+
+Gates: unit 467 suites / 7,785 tests, integration 6 / 223, typecheck, lint, and `build:release` clean
+on Linux. Windows CI is the proof, and this is the second push at it.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3175,11 +3210,12 @@ the command that runs them is in the matrix document under "the half that runs i
    that the live harness cannot answer: whether the tool card, the diff, the plan, the plan-limit and
    context badges, and two tabs side by side actually *look* right in a vault on a release build.
    That is what certifies wave 2;
-2. **the Windows job guardian on CI** — it is built (entry above: compiled once, cached per user,
-   every failure falling back to today's in-session compile) and **no part of it has run on
-   Windows**. Push and read the Windows job: the two new cases in
-   `CodexPersistentProcessOwnership.integration.test.ts` report what a cold and a warm launch cost,
-   which is the number the flaky 15s budget has been waiting for;
+2. **the Windows job guardian on CI** — built, pushed once, and **red on the first Windows run**:
+   the cache was never written and the failure was silent, which the entry above diagnoses and
+   rewrites. Read the next Windows job. The case to read first is "writes the cached guardian
+   assembly, and says why when it does not": it prints `CACHE`, `TYPE`, `COMPILED`, every caught
+   PowerShell error, and what a cold and a warm run cost — the number the flaky 15s budget has been
+   waiting for;
 3. **then M2-flips wave 3** — the next provider, with the five recordings and the wire-vocabulary
    obligations that come with it.
 
