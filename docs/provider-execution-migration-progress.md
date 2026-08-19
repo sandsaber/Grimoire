@@ -3476,6 +3476,12 @@ Gates: unit 465 suites / 7,557 tests, integration 5 / 145, typecheck, lint, and 
 clean. The suites lost 257 tests with the runtime they covered; what replaced them is the
 composition's end-to-end turn, the content presenter's dedup, and the interaction bridge's twelve.
 
+**The flip pushed red, on typecheck, and the reason is worth recording**: the last local round ran
+lint, the suites and `build:release` but not `npm run typecheck`, and `build:release` does not
+typecheck tests — so two `as any`-shaped stubs in `Tab.test.ts` compiled locally and failed on CI.
+The gate in `AGENTS.md` lists four commands for exactly this reason, and running three of them is not
+running it.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

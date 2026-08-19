@@ -930,7 +930,7 @@ describe('Tab - Service Initialization', () => {
       const options = createMockOptions();
       options.plugin.getClaudeExecution = () => ({
         createRuntime: () => createMockClaudeRuntime({ ensureReady: mockEnsureReady }),
-      });
+      }) as any;
       const tab = createTab(options);
 
       await initializeTabService(tab, options.plugin, options.mcpManager);
@@ -962,7 +962,7 @@ describe('Tab - Service Initialization', () => {
         createRuntime: () => createMockClaudeRuntime({
           syncConversationState: mockSyncConversationState,
         }),
-      });
+      }) as any;
 
       const options = createMockOptions({ plugin, conversation });
       const tab = createTab(options);
@@ -1581,7 +1581,7 @@ describe('Tab - Destruction', () => {
       const options = createMockOptions();
       options.plugin.getClaudeExecution = () => ({
         createRuntime: () => createMockClaudeRuntime({ onReadyStateChange: mockOnReadyStateChange }),
-      });
+      }) as any;
       const tab = createTab(options);
       initializeTabUI(tab, options.plugin);
 
