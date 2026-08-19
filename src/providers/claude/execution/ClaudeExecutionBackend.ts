@@ -192,6 +192,23 @@ export interface ClaudeExecutionScheduler {
   clearTimeout(handle: unknown): void;
 }
 
+/**
+ * A copy of what a rewind is about to overwrite, kept until it succeeds.
+ *
+ * The SDK's rewind is not transactional: it reports what it *would* change,
+ * then changes it, and a failure between those two leaves the vault half
+ * rewound. The legacy runtime took a backup between the preview and the apply
+ * and restored it when the apply failed or threw, and this is that same safety
+ * net expressed as a port — a backend cannot take one itself, because it has no
+ * vault.
+ */
+export interface ClaudeRewindBackupPort {
+  create(filesChanged: readonly string[] | undefined): Promise<{
+    restore(): Promise<void>;
+    cleanup(): Promise<void>;
+  } | null>;
+}
+
 export interface ClaudeExecutionBackendContext {
   readonly queryFactory: ClaudeExecutionQueryFactory;
   readonly requestResolver: ClaudeExecutionRequestResolver;
@@ -203,6 +220,7 @@ export interface ClaudeExecutionBackendContext {
   readonly scheduler: ClaudeExecutionScheduler;
   readonly sessionInstanceIdFactory: () => SessionInstanceId;
   readonly interactionIdFactory: () => InteractionId;
+  readonly rewindBackup?: ClaudeRewindBackupPort;
   readonly now?: () => number;
   readonly runTimeoutMs?: number;
   readonly resultCommitTimeoutMs?: number;
@@ -218,6 +236,9 @@ export type ClaudeRewindMode = 'conversation' | 'code-and-conversation';
 export interface ClaudeRewindResult {
   readonly canRewind: boolean;
   readonly filesChanged?: readonly string[];
+  /** What the preview measured, which is what the surface reports. */
+  readonly insertions?: number;
+  readonly deletions?: number;
   readonly error?: string;
 }
 
@@ -861,6 +882,7 @@ class ClaudeExecutionSession implements ExecutionSession {
     readonly mode: ClaudeRewindMode;
   }): Promise<ClaudeRewindResult> {
     let filesChanged: readonly string[] | undefined;
+    let measured: { insertions?: number; deletions?: number } = {};
     if (input.mode === 'code-and-conversation') {
       if (!this.query) {
         return { canRewind: false, error: 'Claude persistent query is not active.' };
@@ -878,27 +900,55 @@ class ClaudeExecutionSession implements ExecutionSession {
         return { canRewind: false, error: preview.error };
       }
       filesChanged = preview.filesChanged;
-      const applied = await withTimeout(
-        this.query.rewindFiles(input.userMessageId),
-        this.context.scheduler,
-        this.context.controlTimeoutMs ?? 2_000,
-      );
-      if (!applied) {
+      measured = {
+        ...(typeof preview.insertions === 'number' ? { insertions: preview.insertions } : {}),
+        ...(typeof preview.deletions === 'number' ? { deletions: preview.deletions } : {}),
+      };
+      // Taken between the preview and the apply, which is the only window where
+      // what is about to change is known and still unchanged.
+      const backup = await this.context.rewindBackup?.create(filesChanged) ?? null;
+      try {
+        const applied = await withTimeout(
+          this.query.rewindFiles(input.userMessageId),
+          this.context.scheduler,
+          this.context.controlTimeoutMs ?? 2_000,
+        );
+        if (!applied || !applied.canRewind) {
+          await backup?.restore();
+          await this.closeQuery();
+          return {
+            canRewind: false,
+            error: applied ? applied.error : 'Claude rewind acknowledgement timed out.',
+            ...(filesChanged ? { filesChanged } : {}),
+          };
+        }
+      } catch (error) {
+        // A rewind that threw with the files restored is a different fact from
+        // one that threw with them half changed, and the caller can only act on
+        // the difference if it is said.
+        try {
+          await backup?.restore();
+        } catch {
+          await this.closeQuery();
+          return {
+            canRewind: false,
+            error: 'Claude rewind failed and files could not be fully restored.',
+            ...(filesChanged ? { filesChanged } : {}),
+          };
+        }
         await this.closeQuery();
         return {
           canRewind: false,
-          error: 'Claude rewind acknowledgement timed out.',
+          error: `Claude rewind failed but files were restored: ${describeError(error)}`,
           ...(filesChanged ? { filesChanged } : {}),
         };
-      }
-      if (!applied.canRewind) {
-        await this.closeQuery();
-        return { canRewind: false, error: applied.error, ...(filesChanged ? { filesChanged } : {}) };
+      } finally {
+        await backup?.cleanup().catch(() => undefined);
       }
     }
     this.resumeAtOverride = input.assistantMessageId;
     await this.closeQuery();
-    return { canRewind: true, ...(filesChanged ? { filesChanged } : {}) };
+    return { canRewind: true, ...(filesChanged ? { filesChanged } : {}), ...measured };
   }
 
   dispose(): Promise<void> {
@@ -2174,4 +2224,8 @@ function withAbortableTimeout<T>(
     }, timeoutMs);
     void operation.then(value => finish(value), () => finish(undefined));
   });
+}
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown error';
 }

@@ -51,6 +51,7 @@ import { ClaudeTaskOutputLoader } from '@/providers/claude/execution/ClaudeTaskO
 import { createStopSubagentHook } from '@/providers/claude/hooks/SubagentHooks';
 import { encodeClaudeTurn } from '@/providers/claude/prompt/ClaudeTurnEncoder';
 import { QueryOptionsBuilder } from '@/providers/claude/runtime/ClaudeQueryOptionsBuilder';
+import { createClaudeRewindBackup } from '@/providers/claude/runtime/ClaudeRewindService';
 import type { ClaudeProviderSettings } from '@/providers/claude/settings';
 import { getClaudeState } from '@/providers/claude/types/providerState';
 import { getEnhancedPath,parseEnvironmentVariables } from '@/utils/env';
@@ -62,29 +63,21 @@ const AUXILIARY_RESULT_BYTE_LIMIT = 64_000;
 /**
  * Claude chat execution, assembled from the running plugin.
  *
- * **Dark.** Nothing constructs this yet: `registration.ts` still points
- * `createRuntime` at `ClaudeChatRuntime`, and the flip is the checkpoint after
- * this one. What is built here is the half that has to exist before a flip can
- * be attempted at all — the store behind the kernel's request references, the
- * SDK options behind its startup references, and the backend over both.
+ * One object per plugin load, holding what the backend and every tab runtime
+ * must agree on: the store behind the kernel's request references and the SDK
+ * options behind its startup references, and the bridge that turns a permission
+ * request into something a tab can show. None of these can be handed out as
+ * copies — a reference minted against one store resolves to nothing in another.
  *
- * Three things are deliberately **not** here, each because it is its own
- * increment and each named so a flip cannot land while it is missing:
+ * It lives in `src/app/` because the backend takes no plugin and no vault: it
+ * is a strict module by the composition gate, and everything ambient reaches it
+ * as a port constructed here.
  *
- * - **the runtime half.** `createRuntime` needs the provider module's feature
- *   context — history hydration, rewind, task-result interpretation — which is
- *   the tab-facing surface rather than the execution one;
- * - **the content surface.** The backend emits `output-delta` and nothing else,
- *   because it was harvested before `provider-content` existed. Until it
- *   carries tool calls, plans and results the way wave 2's does, a flipped tab
- *   would render text and nothing around it — and the native session id, which
- *   the SDK announces in a message the tab never sees, would never reach the
- *   conversation that has to resume with it;
- * - **the surface that shows an interaction.** The bridge turns Claude's
- *   permission requests into interactions the kernel can carry, and answers the
- *   two that are policy rather than questions; what is missing is the presenter
- *   that puts one on screen and hands back what the user chose, which belongs
- *   to the tab and therefore to the runtime half.
+ * Still legacy beside it, until their own checkpoints: Claude's **workspace**
+ * services — commands, agents, MCP, models, the settings tab — are registered
+ * the old way, and its **auxiliary** services (titles, refinement, inline
+ * edits) run on their own cold-start queries. Those are M5's, and a session or
+ * process conflict between them and this path is a stop condition.
  */
 export class ClaudeExecution {
   private readonly requests = new ClaudeExecutionRequests(
@@ -171,6 +164,16 @@ export class ClaudeExecution {
       scheduler: this.scheduler(),
       sessionInstanceIdFactory: () => sessionInstanceId(opaqueId('si')),
       interactionIdFactory: () => interactionId(opaqueId('ix')),
+      // The safety net the legacy runtime wrapped its rewind in: a copy of what
+      // the preview says is about to change, restored if the apply fails. The
+      // backend cannot take one itself — it has no vault — so it reaches the
+      // same helper through here.
+      rewindBackup: {
+        create: filesChanged => createClaudeRewindBackup(
+          filesChanged ? [...filesChanged] : undefined,
+          getVaultPath(this.plugin.app),
+        ),
+      },
     };
     this.backend = new ClaudeExecutionBackend(context);
     return this.backend;

@@ -12,6 +12,7 @@ import { parseChangelogRelease } from './app/changelog/parser';
 import { readBundledChangelog } from './app/changelog/source';
 import type { ChangelogRelease } from './app/changelog/types';
 import { AntigravityExecution } from './app/execution/antigravity/AntigravityExecutionComposition';
+import { ClaudeExecution } from './app/execution/claude/ClaudeExecutionComposition';
 import { CodexExecution } from './app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
@@ -97,6 +98,7 @@ export default class GrimoirePlugin extends Plugin {
   private executionKernelHost: ExecutionKernelHost | null = null;
   private antigravityExecution: AntigravityExecution | null = null;
   private codexExecution: CodexExecution | null = null;
+  private claudeExecution: ClaudeExecution | null = null;
   private unloading = false;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
@@ -347,6 +349,7 @@ export default class GrimoirePlugin extends Plugin {
     // releases the scratch directories a turn was holding; the kernel's own
     // shutdown then cancels what is still running.
     this.codexExecution?.dispose();
+    this.claudeExecution?.dispose();
     void this.executionKernelHost?.dispose();
     void this.persistOpenTabStates();
   }
@@ -389,6 +392,14 @@ export default class GrimoirePlugin extends Plugin {
     return this.codexExecution;
   }
 
+  /** The Claude execution this plugin instance owns; see the note above. */
+  getClaudeExecution(): ClaudeExecution {
+    if (!this.claudeExecution) {
+      throw new Error('Claude execution is not available before plugin load.');
+    }
+    return this.claudeExecution;
+  }
+
   /**
    * Brings the kernel up before anything can ask it for work.
    *
@@ -423,6 +434,11 @@ export default class GrimoirePlugin extends Plugin {
     // registered without them leaves an approval the user answered with nowhere
     // to send the answer.
     host.registerBackend(this.codexExecution.createBackendRegistration());
+    this.claudeExecution = new ClaudeExecution(this, host.registry);
+    // Registered the same way and for the same reason: Claude answers
+    // approvals, questions and plan decisions, and a backend registered without
+    // its interaction port leaves the SDK waiting on a permission for ever.
+    host.registerBackend(this.claudeExecution.createBackendRegistration());
     this.executionKernelHost = host;
     try {
       await host.start();

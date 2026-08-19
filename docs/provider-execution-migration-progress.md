@@ -3430,6 +3430,52 @@ is the longest of the three so far.
 Gates: unit 470 suites / 7,814 tests, integration 6 / 223, typecheck, lint, and `build:release`
 clean. The three new modules are declared dark in the parity manifest.
 
+### M2-flips wave 3 — Claude in production (this commit)
+
+`registration.ts` points `createRuntime` at the composition, `main.ts` constructs it and registers
+the backend **with its interaction and recovery ports**, and `ClaudeChatRuntime` — 1,969 lines — is
+deleted in the same commit along with the four helpers that existed only for it: the approval
+handler, the message channel, the session manager, and the dynamic-update applier. Three providers
+now execute through the kernel.
+
+**The certification order was overridden deliberately, and it is recorded rather than forgotten.**
+Wave 2 is still uncertified: its rendering rows need a person in a vault, and the rule this migration
+wrote for itself is that the pattern is not repeated until the previous provider is proven at the
+surface. The owner was told this twice and asked for the flip anyway, which is their call to make —
+so what stands in for the missing evidence is the revert: this is one commit, and reverting it puts
+`ClaudeChatRuntime` back with nothing else moved. Both matrices are now outstanding at once, and that
+is the risk being carried.
+
+**Flipping found a safety net the new path had dropped.** The legacy runtime's rewind took a backup
+of the files its preview said would change, restored it when the apply failed or threw, and reported
+"failed but files were restored" as a different fact from "failed and could not restore". The
+kernel's backend had preview-and-apply and no backup — so a rewind interrupted between the two would
+have left the vault half rewound with nothing to put it back. The backup is a port on the backend
+now, filled by the composition with the same helper and the vault path, taken in the only window
+where what is about to change is known and still unchanged. `ClaudeRewindService` survives as exactly
+that half; its orchestration moved into the backend, which owns the query that rewinds.
+
+The preview's insertions and deletions travel with the result too — the legacy surface reported them
+and the kernel's result type had no room for them.
+
+**What a tab test had to learn.** `Tab.test.ts` mocked the deleted runtime module by path and
+injected one-shot runtimes through its constructor. A tab's runtime now comes from the plugin's
+execution composition, so the stub is a `getClaudeExecution()` on the mock plugin and the one-shot
+overrides set that instead. The parity manifest moves twelve modules from `execution-platform-dark`
+to `provider-chat-execution`, the bundle marker for `provider-claude` moves from dark to live, and
+the topology fixture cites the backend where it cited the runtime.
+
+**Wave 3 is wired and uncertified.** Its matrix is
+[`docs/claude-flip-smoke-matrix.md`](claude-flip-smoke-matrix.md) — twenty-eight rows, the longest of
+the three, because Claude is the first flip with a rewind, the first with native agents, and the only
+one whose interactions come in three kinds. Rows 14–16 are the ones this commit's own change is
+about: the third of them, a rewind that fails with the files restored, is the row that would have
+failed silently before it.
+
+Gates: unit 465 suites / 7,557 tests, integration 5 / 145, typecheck, lint, and `build:release`
+clean. The suites lost 257 tests with the runtime they covered; what replaced them is the
+composition's end-to-end turn, the content presenter's dedup, and the interaction bridge's twelve.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3485,17 +3531,19 @@ the command that runs them is in the matrix document under "the half that runs i
 
 **Next, in order:**
 
-1. **the rendering rows** — everything in [`docs/codex-flip-smoke-matrix.md`](codex-flip-smoke-matrix.md)
+1. **wave 2's rendering rows** — everything in [`docs/codex-flip-smoke-matrix.md`](codex-flip-smoke-matrix.md)
    that the live harness cannot answer: whether the tool card, the diff, the plan, the plan-limit and
    context badges, and two tabs side by side actually *look* right in a vault on a release build.
    That is what certifies wave 2;
-2. **M2-flips wave 3 — Claude**, whose whole dark half is now built (four entries above): request
-   store, result sink, content surface, interactions, and the runtime over them, with one whole turn
-   proven end to end over a fake SDK. What remains is **the flip** — `registration.ts` pointing at
-   the composition, `main.ts` constructing it and registering the backend with its interaction and
-   recovery ports, `ClaudeChatRuntime` deleted in the same commit, the parity manifest and dark
-   markers moved — and then the capability-driven smoke matrix, which for Claude is the longest yet.
-   Wave 2's rendering rows are still the reason a third flip should not land first.
+2. **wave 3's rendering rows** — [`docs/claude-flip-smoke-matrix.md`](claude-flip-smoke-matrix.md),
+   twenty-eight of them, in a vault on a release build. Rows 14–16 first: Claude is the first flip
+   with a rewind, and row 16 — a rewind that fails with the files restored — is what the backup port
+   added in that entry exists for;
+3. **then M2-flips wave 4 — OpenCode**, whose backend is already dark, with the wire-vocabulary
+   obligations that come with it.
+
+**Two matrices are outstanding at once**, which is the state the owner accepted when wave 3 flipped
+ahead of wave 2's certification. Either flip reverts as a single commit.
 
 The Windows job guardian is done: compiled once, cached per user, green on `windows-latest`, and
 measured — the entry above has the numbers and what they say about the flake.

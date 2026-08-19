@@ -51,16 +51,21 @@ class MockResizeObserver {
 }
 window.ResizeObserver = MockResizeObserver;
 
-// Mock provider runtime used by ProviderRegistry
-jest.mock('@/providers/claude/runtime/ClaudeChatRuntime', () => ({
-  ClaudeChatRuntime: jest.fn().mockImplementation(() => ({
-    ensureReady: jest.fn().mockResolvedValue(true),
-    cleanup: jest.fn(),
-    isReady: jest.fn().mockReturnValue(false),
-    syncConversationState: jest.fn(),
-    onReadyStateChange: jest.fn((listener: (ready: boolean) => void) => {
-      listener(false);
-      return () => {};
+// The provider runtime `ProviderRegistry` builds for a Claude tab. Since the
+// flip that is the composition over the kernel, which a tab test has no plugin
+// to construct — so the composition is the mock rather than the deleted
+// `ClaudeChatRuntime` it replaced.
+jest.mock('@/app/execution/claude/ClaudeExecutionComposition', () => ({
+  ClaudeExecution: jest.fn().mockImplementation(() => ({
+    createRuntime: () => ({
+      ensureReady: jest.fn().mockResolvedValue(true),
+      cleanup: jest.fn(),
+      isReady: jest.fn().mockReturnValue(false),
+      syncConversationState: jest.fn(),
+      onReadyStateChange: jest.fn((listener: (ready: boolean) => void) => {
+        listener(false);
+        return () => {};
+      }),
     }),
   })),
 }));
@@ -143,7 +148,7 @@ const createMockModeSelector = () => ({
   renderOptions: jest.fn(),
 });
 
-const createMockClaudeChatRuntime = (overrides?: {
+const createMockClaudeRuntime = (overrides?: {
   ensureReady?: jest.Mock;
   syncConversationState?: jest.Mock;
   onReadyStateChange?: jest.Mock;
@@ -437,6 +442,20 @@ function createMockPlugin(overrides: Record<string, any> = {}): any {
   const claudeAgentMentionProvider = { searchAgents: jest.fn().mockReturnValue([]) };
   const codexAgentMentionProvider = { searchAgents: jest.fn().mockReturnValue([]) };
   return {
+    // Since the Claude flip a tab's runtime comes from the plugin's execution
+    // composition rather than from a constructor the registration calls.
+    getClaudeExecution: () => ({
+      createRuntime: () => ({
+        ensureReady: jest.fn().mockResolvedValue(true),
+        cleanup: jest.fn(),
+        isReady: jest.fn().mockReturnValue(false),
+        syncConversationState: jest.fn(),
+        onReadyStateChange: jest.fn((listener: (ready: boolean) => void) => {
+          listener(false);
+          return () => {};
+        }),
+      }),
+    }),
     app: {
       vault: {
         adapter: { basePath: '/test/vault' },
@@ -819,7 +838,7 @@ describe('Tab - Service Initialization', () => {
       const options = createMockOptions();
       const tab = createTab(options);
       tab.serviceInitialized = true;
-      tab.service = createMockClaudeChatRuntime() as any;
+      tab.service = createMockClaudeRuntime() as any;
 
       await initializeTabService(tab, options.plugin, options.mcpManager);
 
@@ -827,7 +846,7 @@ describe('Tab - Service Initialization', () => {
       expect(tab.service).toEqual(expect.objectContaining({ providerId: 'claude' }));
     });
 
-    it('should create ClaudeChatRuntime on first initialization', async () => {
+    it('should create the Claude runtime on first initialization', async () => {
       const options = createMockOptions();
       const tab = createTab(options);
 
@@ -839,7 +858,7 @@ describe('Tab - Service Initialization', () => {
 
     it('should create the runtime for the conversation provider', async () => {
       const createChatRuntimeSpy = jest.spyOn(ProviderRegistry, 'createChatRuntime');
-      const mockRuntime = createMockClaudeChatRuntime({ providerId: 'codex' });
+      const mockRuntime = createMockClaudeRuntime({ providerId: 'codex' });
       createChatRuntimeSpy.mockReturnValue(mockRuntime as any);
 
       const conversation = {
@@ -871,8 +890,8 @@ describe('Tab - Service Initialization', () => {
 
     it('should recreate the runtime when the conversation provider changes', async () => {
       const createChatRuntimeSpy = jest.spyOn(ProviderRegistry, 'createChatRuntime');
-      const oldService = createMockClaudeChatRuntime({ providerId: 'claude' });
-      const newService = createMockClaudeChatRuntime({ providerId: 'codex' });
+      const oldService = createMockClaudeRuntime({ providerId: 'claude' });
+      const newService = createMockClaudeRuntime({ providerId: 'codex' });
       createChatRuntimeSpy.mockReturnValue(newService as any);
 
       const conversation = {
@@ -908,10 +927,10 @@ describe('Tab - Service Initialization', () => {
 
     it('should NOT call ensureReady for blank tabs (lazy start)', async () => {
       const mockEnsureReady = jest.fn().mockResolvedValue(true);
-      const runtimeModule = jest.requireMock('@/providers/claude/runtime/ClaudeChatRuntime');
-      runtimeModule.ClaudeChatRuntime.mockImplementationOnce(() => createMockClaudeChatRuntime({ ensureReady: mockEnsureReady }));
-
       const options = createMockOptions();
+      options.plugin.getClaudeExecution = () => ({
+        createRuntime: () => createMockClaudeRuntime({ ensureReady: mockEnsureReady }),
+      });
       const tab = createTab(options);
 
       await initializeTabService(tab, options.plugin, options.mcpManager);
@@ -924,10 +943,6 @@ describe('Tab - Service Initialization', () => {
 
     it('should sync existing conversations with saved external contexts', async () => {
       const mockSyncConversationState = jest.fn();
-      const runtimeModule = jest.requireMock('@/providers/claude/runtime/ClaudeChatRuntime');
-      runtimeModule.ClaudeChatRuntime.mockImplementationOnce(() => createMockClaudeChatRuntime({
-        syncConversationState: mockSyncConversationState,
-      }));
 
       const conversation = {
         id: 'conv-1',
@@ -943,6 +958,11 @@ describe('Tab - Service Initialization', () => {
       const plugin = createMockPlugin();
       plugin.settings.persistentExternalContextPaths = ['/persistent/path'];
       plugin.getConversationById = jest.fn().mockResolvedValue(conversation);
+      plugin.getClaudeExecution = () => ({
+        createRuntime: () => createMockClaudeRuntime({
+          syncConversationState: mockSyncConversationState,
+        }),
+      });
 
       const options = createMockOptions({ plugin, conversation });
       const tab = createTab(options);
@@ -1054,7 +1074,7 @@ describe('Tab - Service Initialization', () => {
       tab.providerId = 'codex';
       tab.lifecycleState = 'blank';
 
-      const staleService = createMockClaudeChatRuntime({ providerId: 'codex' });
+      const staleService = createMockClaudeRuntime({ providerId: 'codex' });
       tab.service = staleService as any;
       tab.serviceInitialized = true;
 
@@ -1347,7 +1367,7 @@ describe('Tab - Service Initialization', () => {
       initializeTabUI(tab, plugin);
       initializeTabControllers(tab, plugin, {} as any);
 
-      const staleService = createMockClaudeChatRuntime({ providerId: 'codex' });
+      const staleService = createMockClaudeRuntime({ providerId: 'codex' });
       tab.lifecycleState = 'bound_active';
       tab.conversationId = 'conv-1';
       tab.providerId = 'codex';
@@ -1558,10 +1578,10 @@ describe('Tab - Destruction', () => {
       const unsubscribeFn = jest.fn();
       const mockOnReadyStateChange = jest.fn(() => unsubscribeFn);
 
-      const runtimeModule = jest.requireMock('@/providers/claude/runtime/ClaudeChatRuntime');
-      runtimeModule.ClaudeChatRuntime.mockImplementationOnce(() => createMockClaudeChatRuntime({ onReadyStateChange: mockOnReadyStateChange }));
-
       const options = createMockOptions();
+      options.plugin.getClaudeExecution = () => ({
+        createRuntime: () => createMockClaudeRuntime({ onReadyStateChange: mockOnReadyStateChange }),
+      });
       const tab = createTab(options);
       initializeTabUI(tab, options.plugin);
 
@@ -3147,7 +3167,7 @@ describe('Tab - Service Initialization Error Handling', () => {
 
     // Mark as already initialized
     tab.serviceInitialized = true;
-    const originalService = createMockClaudeChatRuntime() as any;
+    const originalService = createMockClaudeRuntime() as any;
     tab.service = originalService;
 
     await initializeTabService(tab, options.plugin, options.mcpManager);
@@ -4994,7 +5014,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
     const tab = createTab(createMockOptions({ plugin }));
     initializeTabUI(tab, plugin);
 
-    const staleService = createMockClaudeChatRuntime({ providerId: 'codex' });
+    const staleService = createMockClaudeRuntime({ providerId: 'codex' });
     tab.service = staleService as any;
     tab.serviceInitialized = false;
 
@@ -5069,10 +5089,8 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 describe('Tab - First Send Binding', () => {
   it('derives provider from draft model on first send (Claude)', async () => {
     const mockEnsureReady = jest.fn().mockResolvedValue(true);
-    const runtimeModule = jest.requireMock('@/providers/claude/runtime/ClaudeChatRuntime');
-    runtimeModule.ClaudeChatRuntime.mockImplementationOnce(() => createMockClaudeChatRuntime({ ensureReady: mockEnsureReady }));
     const createChatRuntimeSpy = jest.spyOn(ProviderRegistry, 'createChatRuntime')
-      .mockReturnValue(createMockClaudeChatRuntime() as any);
+      .mockReturnValue(createMockClaudeRuntime({ ensureReady: mockEnsureReady }) as any);
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -5091,7 +5109,7 @@ describe('Tab - First Send Binding', () => {
 
   it('derives provider from draft model on first send (Codex)', async () => {
     const createChatRuntimeSpy = jest.spyOn(ProviderRegistry, 'createChatRuntime')
-      .mockReturnValue(createMockClaudeChatRuntime({ providerId: 'codex' }) as any);
+      .mockReturnValue(createMockClaudeRuntime({ providerId: 'codex' }) as any);
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -5114,7 +5132,7 @@ describe('Tab - First Send Binding', () => {
     jest.spyOn(ProviderRegistry, 'createChatRuntime')
       .mockImplementation((options: any) => {
         settingsAtRuntimeCreate = { ...options.plugin.settings };
-        return createMockClaudeChatRuntime({ providerId: 'codex' }) as any;
+        return createMockClaudeRuntime({ providerId: 'codex' }) as any;
       });
 
     const plugin = createMockPlugin();
@@ -5144,7 +5162,7 @@ describe('Tab - First Send Binding', () => {
 
   it('keeps a blank tab unbound during runtime warmup', async () => {
     jest.spyOn(ProviderRegistry, 'createChatRuntime')
-      .mockReturnValue(createMockClaudeChatRuntime({ providerId: 'codex' }) as any);
+      .mockReturnValue(createMockClaudeRuntime({ providerId: 'codex' }) as any);
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -5162,7 +5180,7 @@ describe('Tab - First Send Binding', () => {
 
   it('binds an already-warmed blank runtime on first send initialization', async () => {
     const createChatRuntimeSpy = jest.spyOn(ProviderRegistry, 'createChatRuntime')
-      .mockReturnValue(createMockClaudeChatRuntime({ providerId: 'codex' }) as any);
+      .mockReturnValue(createMockClaudeRuntime({ providerId: 'codex' }) as any);
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));

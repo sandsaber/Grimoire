@@ -161,7 +161,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     capabilities: CLAUDE_PROVIDER_CAPABILITIES,
     isolationEvidence: 'persistSession',
     evidence: [
-      'src/providers/claude/runtime/ClaudeChatRuntime.ts',
+      'src/providers/claude/execution/ClaudeExecutionBackend.ts',
       'src/providers/claude/runtime/claudeColdStartQuery.ts',
       'src/providers/claude/auxiliary/ClaudeTitleGenerationService.ts',
     ],
