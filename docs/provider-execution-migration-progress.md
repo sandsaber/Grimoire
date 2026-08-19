@@ -3017,6 +3017,54 @@ Owner: the next provider that flips with a plan mode, or the projection work at 
 Gates: unit 467 suites / 7,778 tests, integration 6 / 220, the live suite 8 / 8 against a real
 daemon, typecheck, lint, and `build:release` clean on Linux.
 
+### M2-flips — wave 1's last row, and the version of it that proved nothing (this commit)
+
+Wave 1's fifth smoke-matrix item was the one no fake could answer: after a cancel, is the `agy`
+process tree **actually** gone. It is now a headless gate against the real CLI, in
+`tests/integration/app/execution/antigravity/AntigravityLiveSmoke.integration.test.ts`, skipped
+unless asked for because it starts a CLI and spends the account's tokens:
+
+```bash
+GRIMOIRE_ANTIGRAVITY_LIVE=1 node scripts/run-jest.js --selectProjects=integration \
+  --runTestsByPath tests/integration/app/execution/antigravity/AntigravityLiveSmoke.integration.test.ts
+```
+
+`GRIMOIRE_ANTIGRAVITY_CLI` points at a binary other than `agy` on `PATH`, and
+`GRIMOIRE_ANTIGRAVITY_MODEL` sends a `--model`; with neither, the CLI picks what the account is
+configured for. Nothing below the composition is stubbed — the production backend, over
+`NodeAntigravityProcessTransport`, over a real login-shell launch — and the process tree is read from
+`ps` rather than from the runner that is supposed to have killed it. Run through
+`scripts/run-jest.js`, not bare `npx jest`: the runner passes `--localstorage-file`, without which
+every suite that touches provider settings fails on this Node.
+
+**The first version of the row went green with process termination disabled.** Written the obvious
+way — ask for a long answer, cancel mid-stream, assert the tree is gone — it passed against a
+`terminate` that had been patched to signal nothing at all. `agy` had simply finished on its own
+inside the window the assertion allowed, so the row was measuring the model's speed, not the
+kernel's cancel. It would have certified wave 1 while proving nothing.
+
+The fix is to make a natural exit impossible rather than unlikely: the turn now asks for
+`sleep 120` as a tool call, so the tree that must disappear contains a descendant that will still be
+running two minutes later. That also makes the tree a tree — root plus child, the noun the row is
+about — where the earlier version only ever saw one process. Recorded live:
+`agy --dangerously-skip-permissions …` and `sleep 120` under it, both gone after the cancel.
+
+Proven by breaking it. With `NodeLocalShellProcessAdapter.terminate` returning `confirmed` without
+signalling, the row fails with `the agy tree to disappear did not happen within 20000ms`; with the
+real code it passes in ~18s. Row 1 — a plain message answered live, and nothing left running after a
+turn that ends by itself — runs beside it, so a green cancel row cannot be green because no CLI was
+ever launched.
+
+Windows is excluded and says so: ownership there is a job object rather than a process group, and
+`ps` is not how that is read. That half of the row stays a person's check, and it is the same
+guardian the open obligation below is about.
+
+**Wave 1 is certified.** All five smoke-matrix items are now automated gates or timestamped in the
+vault log, and the last one is a gate rather than a memory of a terminal window.
+
+Gates: unit 467 suites / 7,778 tests, integration 6 / 220, the Antigravity live suite 2 / 2 and the
+Codex live suite untouched, typecheck, lint, and `build:release` clean on Linux.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3062,9 +3110,10 @@ reference, the backend resolves it into an `agy` invocation, and the print outpu
 chunk — over a fake process runner. That test found three defects the per-half suites could not, one
 of them fatal to every turn; they are in the entry above.
 
-**Wave 1's remaining gate is one manual check.** Four of the five smoke-matrix items are automated
-gates or timestamped in the vault log; what is left is the OS half of cancel — that the `agy` process
-tree is actually gone — which needs the live CLI.
+**Wave 1 (Antigravity) is certified.** All five smoke-matrix items are automated gates or
+timestamped in the vault log. The last of them — that the `agy` process tree is actually gone after a
+cancel — is the live suite described in the entry above, and it is a gate that fails when
+termination is disabled rather than one that passes because the CLI finished on its own.
 
 **Wave 2 (Codex) is flipped and uncertified. Eight rows of its matrix run live and all eight pass;
 the command that runs them is in the matrix document under "the half that runs itself".**
@@ -3075,13 +3124,14 @@ the command that runs them is in the matrix document under "the half that runs i
    that the live harness cannot answer: whether the tool card, the diff, the plan, the plan-limit and
    context badges, and two tabs side by side actually *look* right in a vault on a release build.
    That is what certifies wave 2;
-2. **wave 1's last row** — that the `agy` process tree is gone after a cancel, which needs the live
-   CLI and certifies wave 1;
-3. **the Windows job guardian**, measured two entries above: it compiles on every launch, which is
+2. **the Windows job guardian**, measured three entries above: it compiles on every launch, which is
    latency the product pays and the reason that gate is flaky. Its own checkpoint, before the next
    persistent-daemon provider flips;
-4. **then M2-flips wave 3** — the next provider, with the five recordings and the wire-vocabulary
+3. **then M2-flips wave 3** — the next provider, with the five recordings and the wire-vocabulary
    obligations that come with it.
+
+Wave 1's last row is done: the `agy` process tree is proven gone after a cancel by the live suite in
+the entry above.
 
 Two open items carried from the reviews: a plan turn that produces nothing reads as a silent success
 (the expectation is declared before `sawPlanDelta` is known), and a Codex result reference cannot be
@@ -3128,7 +3178,9 @@ certified, and **no second flip may land** — the point of one provider per che
 first one is proven against a live CLI before the pattern is repeated eight times. What proceeds
 meanwhile is wave 2's dark preparation, which changes no production behaviour and is revertible as
 commits; the Codex flip waits on wave 1's certification. An earlier version of this sentence said
-wave 2 "must not start", which the wave-2 table above contradicted.
+wave 2 "must not start", which the wave-2 table above contradicted. **Wave 1 is certified as of the
+live-cancel entry above**; the rule this paragraph states is satisfied, not waived, and the Codex
+flip landed before it — which is why the certification order is written down rather than assumed.
 
 **M0b is satisfied for the four proof providers**, recorded from live CLIs on the owner's machine.
 The remaining five providers need their own recordings before their own flips.

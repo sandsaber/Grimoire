@@ -41,9 +41,14 @@ Eight rows are driven headlessly by
 tokens:
 
 ```bash
-GRIMOIRE_CODEX_LIVE=1 npx jest --selectProjects=integration \
+GRIMOIRE_CODEX_LIVE=1 node scripts/run-jest.js --selectProjects=integration \
   --runTestsByPath tests/integration/app/execution/codex/CodexLiveSmoke.integration.test.ts
 ```
+
+Through `scripts/run-jest.js` rather than bare `npx jest`: the runner passes `--localstorage-file`,
+and without it every suite that writes provider settings fails on Node 25 with
+`storage.getItem is not a function` — the hostname-keyed CLI paths read `window.localStorage`, which
+that Node defines as a half-built global unless the flag names a file.
 
 `GRIMOIRE_CODEX_TRACE=1` adds the daemon's own notifications and every RPC beside the chunks, which
 is how each of the defects it found was read rather than guessed. `GRIMOIRE_CODEX_CLI` points at a
