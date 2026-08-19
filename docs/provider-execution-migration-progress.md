@@ -3252,6 +3252,56 @@ that its first version wrote nothing at all — in the entries above.
 Gates: unit 467 suites / 7,789 tests, integration 6 / 223, the Antigravity live suite 2 / 2 and Codex
 live row 16 green against a real daemon, typecheck, lint, and `build:release` clean.
 
+### M2-flips wave 3 — Claude's dark half, and what it found missing (this commit)
+
+The backend half of Claude's composition is built and unreachable: `ClaudeExecution` binds the dark
+`ClaudeExecutionBackend` to the running plugin, `ClaudeExecutionRequests` holds what the kernel's
+references stand for, and `ClaudeProjectionResultSink` commits a reference rather than a second copy
+of a transcript. `registration.ts` still points at `ClaudeChatRuntime`; nothing constructs any of
+this.
+
+**Two reference spaces, one store**, which is the shape this provider forces. The kernel carries a
+`requestRef` and hands it back at dispatch; the SDK query factory carries a `startupRef` and hands it
+back when it actually builds `Options`. Both resolve against the same object, because a reference
+minted against one store resolves to nothing in another — the defect wave 1's end-to-end turn found
+on its first run, and the reason this checkpoint starts with that test rather than ending with it.
+
+**The restart fingerprint is `QueryOptionsBuilder.needsRestart`, expressed as a value the kernel can
+carry.** Model, permission mode and effort are deliberately outside it: those are the dynamic updates
+the SDK applies in place, and folding them in would restart the query for a change it can absorb.
+
+**One whole turn runs end to end, with the SDK's own `query` as the only fake in the path.** A
+reference minted here, dispatched by the kernel, resolved into an invocation, started as a query
+whose options were built from this vault's live settings, answered, committed, terminal. The options
+assertion is the point: `cwd` and the MCP disallow-list come from the plugin at dispatch, not from
+anything the reference carried.
+
+**What the exercise found is what is missing, and each item is now a flip blocker:**
+
+- **the backend emits `output-delta` and nothing else.** It was harvested at M2-proofs, before
+  `provider-content` existed — that channel was added during wave 2 — so a flipped Claude tab would
+  render text with no tool cards, no plans, no results around it. Wave 2 solved the same problem by
+  carrying the provider's items through the kernel opaquely, and wave 3 owes the same;
+- **and therefore the native session id never reaches the tab.** The SDK announces it in a `system`
+  message the backend consumes and keeps to itself; the session snapshot carries it into the control
+  store, but the adapter reports `currentSessionId()` *into* the registry rather than reading it out.
+  A conversation that cannot learn its session cannot resume or fork — so the content surface is not
+  cosmetic, it is what makes the provider's headline capability work;
+- **interactions are refused.** The bridge denies every tool request with a sentence that names why.
+  Fail-closed and useless, on purpose: a composition wired up before its approval surface exists must
+  refuse work rather than approve it silently;
+- **auxiliary work is refused** for the same reason — titles, refinement and inline edits still run
+  on the legacy services until M5 — and **reconciliation answers `unknown` with effects possible**,
+  which is what makes the kernel refuse to re-dispatch a run nobody watched finish.
+
+The runtime half is the next increment: `createRuntime` needs the provider module's feature context —
+history hydration, rewind, task-result interpretation — which is the tab-facing surface rather than
+the execution one.
+
+Gates: unit 468 suites / 7,791 tests, integration 6 / 223, typecheck, lint, and `build:release`
+clean. The three new modules are declared in the parity manifest as `execution-platform-dark`, so the
+gate asserts they stay out of the bundle until the flip.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3311,12 +3361,12 @@ the command that runs them is in the matrix document under "the half that runs i
    that the live harness cannot answer: whether the tool card, the diff, the plan, the plan-limit and
    context badges, and two tabs side by side actually *look* right in a vault on a release build.
    That is what certifies wave 2;
-2. **M2-flips wave 3 — Claude**, per the plan's wave order. Its backend already exists dark
-   (`src/providers/claude/execution/ClaudeExecutionBackend.ts`) and its wire recording is one of the
-   four already made; what the flip needs is the shape wave 2 needed — an `src/app/execution/claude/`
-   composition holding the request store, the `registration.ts` and `main.ts` wiring, and
-   `ClaudeChatRuntime` deleted in the same commit — plus its own capability-driven smoke matrix,
-   which for Claude is a long one.
+2. **M2-flips wave 3 — Claude**, whose dark backend half is built (entry above). What the flip still
+   needs, in the order the entry argues for: the **content surface** — `provider-content` from a
+   backend that predates it, which is also how the tab learns its native session id — then
+   **interactions**, then the **runtime half** over the module's feature context, then the flip
+   itself with `ClaudeChatRuntime` deleted in the same commit and a capability-driven smoke matrix
+   that for Claude is a long one.
 
 The Windows job guardian is done: compiled once, cached per user, green on `windows-latest`, and
 measured — the entry above has the numbers and what they say about the flake.

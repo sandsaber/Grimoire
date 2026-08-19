@@ -662,10 +662,16 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/acp/execution/AcpManagedClientAdapter.ts',
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
       'src/providers/acp/execution/ManagedAcpClient.ts',
+      // Wave 3's dark half: the composition that binds Claude's backend to the
+      // running plugin, and the two stores it needs. Reachable at the flip,
+      // which also owes the runtime half, the content surface and interactions.
+      'src/app/execution/claude/ClaudeExecutionComposition.ts',
       'src/providers/claude/ClaudeProviderModule.ts',
       'src/providers/claude/execution/ClaudeAuxiliaryQuery.ts',
       'src/providers/claude/execution/ClaudeExecutionBackend.ts',
       'src/providers/claude/execution/ClaudeExecutionMessageChannel.ts',
+      'src/providers/claude/execution/ClaudeExecutionRequests.ts',
+      'src/providers/claude/execution/ClaudeProjectionResultSink.ts',
       'src/providers/claude/execution/ClaudeSdkExecutionAdapter.ts',
       'src/providers/claude/execution/ClaudeTaskOutputLoader.ts',
       'src/providers/opencode/OpencodeProviderModule.ts',
