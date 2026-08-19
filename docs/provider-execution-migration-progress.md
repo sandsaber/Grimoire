@@ -3191,6 +3191,12 @@ writes the cache, so every timed case after it launches without a compiler in th
 longer contains the seven seconds it was flaking on. Whether that is enough is a question CI answers
 over the next several runs, not one this entry can close by assertion.
 
+**A second runner, a second number.** The next Windows job reported cold **3,217ms**, warm 391ms,
+recompiled 510ms. So the first compile is not one figure but a range — 3.2 to 6.9 seconds between two
+runners of the same image — while the warm load and the warm recompile barely move. That variance is
+the flake: a cost that swings by three and a half seconds inside a fifteen-second budget is what a
+stalled runner turns red, and it is now paid once per machine instead of once per launch.
+
 Gates: unit 467 suites / 7,785 tests, integration 6 / 223, typecheck, lint, `build:release` clean on
 Linux; CI green on all four jobs at `102c965`, Windows included.
 
