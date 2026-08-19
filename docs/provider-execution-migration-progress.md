@@ -3151,6 +3151,49 @@ proves the script does.
 Gates: unit 467 suites / 7,785 tests, integration 6 / 223, typecheck, lint, and `build:release` clean
 on Linux. Windows CI is the proof, and this is the second push at it.
 
+### M2-flips — the guardian cache is green on Windows, and the number reframes the flake (this commit)
+
+Three Windows jobs: the first found the cache silently doing nothing, the second was green with the
+rewrite, and the third measured the thing properly. From the third, on `windows-latest`:
+
+| | time |
+|---|---|
+| first compile on the machine | **6,939ms** |
+| loading the cached assembly | **402ms**, `COMPILED: False` |
+| compiling again, compiler already warm | **510ms** |
+| whole guarded launch, warm | **515–628ms** |
+
+**The second measurement was wrong and is corrected here.** The diagnostic first ran third in its
+file, after two launches had already compiled in the same runner, and reported "cold 538ms, warm
+427ms" — a warm `csc.exe` wearing the word cold. Run first, the same code reports seven seconds. The
+case now runs first for exactly this reason, and reports three numbers instead of two so the one-time
+cost cannot hide inside the per-launch one.
+
+**What the split means.** Almost all of it — about 6.4 of the 6.9 seconds — is machinery that happens
+once on a machine: `csc.exe` starting, the compiler's own assemblies loading, whatever scans a
+freshly written DLL. The compile itself, once that has happened, is ~510ms, and loading the cached
+assembly instead is ~402ms.
+
+So the cache is worth about **100ms a launch**, not the two to three seconds the entry that motivated
+it estimated — *and* it takes the compiler out of the product's path permanently after the first run,
+which is the part that actually matters: the 6.9 seconds recurs on a machine whose compiler has gone
+cold again, and a user who never compiles never pays it twice.
+
+**It also reframes the flaky gate, and this is the finding.** The suite's earlier measurement —
+11.2–11.8s for five launches, "two to three seconds each" — decomposes now as one launch paying ~7s
+and four paying ~1s. The stall that missed a 15s deadline was therefore almost certainly **the first
+launch**, the one paying the cold compiler, with 8s of margin left for a shared runner to lose. Not
+five equal launches with one unlucky.
+
+That is fixed by where the diagnostic sits rather than by the budget: running first, it compiles and
+writes the cache, so every timed case after it launches without a compiler in the path at all. The
+15s budget stays as it is — a warm launch is ~600ms against it — and it now guards a launch that no
+longer contains the seven seconds it was flaking on. Whether that is enough is a question CI answers
+over the next several runs, not one this entry can close by assertion.
+
+Gates: unit 467 suites / 7,785 tests, integration 6 / 223, typecheck, lint, `build:release` clean on
+Linux; CI green on all four jobs at `102c965`, Windows included.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3210,14 +3253,15 @@ the command that runs them is in the matrix document under "the half that runs i
    that the live harness cannot answer: whether the tool card, the diff, the plan, the plan-limit and
    context badges, and two tabs side by side actually *look* right in a vault on a release build.
    That is what certifies wave 2;
-2. **the Windows job guardian on CI** — built, pushed once, and **red on the first Windows run**:
-   the cache was never written and the failure was silent, which the entry above diagnoses and
-   rewrites. Read the next Windows job. The case to read first is "writes the cached guardian
-   assembly, and says why when it does not": it prints `CACHE`, `TYPE`, `COMPILED`, every caught
-   PowerShell error, and what a cold and a warm run cost — the number the flaky 15s budget has been
-   waiting for;
-3. **then M2-flips wave 3** — the next provider, with the five recordings and the wire-vocabulary
-   obligations that come with it.
+2. **M2-flips wave 3 — Claude**, per the plan's wave order. Its backend already exists dark
+   (`src/providers/claude/execution/ClaudeExecutionBackend.ts`) and its wire recording is one of the
+   four already made; what the flip needs is the shape wave 2 needed — an `src/app/execution/claude/`
+   composition holding the request store, the `registration.ts` and `main.ts` wiring, and
+   `ClaudeChatRuntime` deleted in the same commit — plus its own capability-driven smoke matrix,
+   which for Claude is a long one.
+
+The Windows job guardian is done: compiled once, cached per user, green on `windows-latest`, and
+measured — the entry above has the numbers and what they say about the flake.
 
 Wave 1's last row is done: the `agy` process tree is proven gone after a cancel by the live suite in
 the entry above.
@@ -3281,12 +3325,14 @@ Open obligations, each with an owner:
   locate the answer, and the backend holds the thread and turn ids it would take, but does not pass
   them. Nothing resolves a result reference today, which is why this is recorded rather than built.
   Owner: M5, with result provenance;
-- **the Windows process-ownership gate is flaky, and the cost behind it is real.** Measured two
-  entries above the blocker: a launch costs two to three seconds against a 15s budget, and the
-  failures are single launches stalling past five times that while their siblings pass. The fix —
-  compiling the job guardian once and caching it per user — **is built and has never run on
-  Windows**; the checkpoint is not closed until a Windows CI job proves it and reports what a warm
-  launch costs. Owner: the next push to CI. The older reading of this obligation follows:
+- **the Windows process-ownership gate was flaky, and the cost behind it is now measured.** The
+  guardian is compiled once and cached per user, green on `windows-latest`. The numbers are in the
+  entry above the blocker: the first compile on a machine costs ~6.9s, a later one ~0.5s, and
+  loading the cached assembly ~0.4s — so the stall that missed a 15s deadline was the launch paying
+  the cold compiler, and the suite's first case now warms the cache before anything is timed. What
+  is left is **evidence over runs**: a red on this test is re-run once and investigated if it
+  repeats, and if it repeats with a warm cache the cause is not the compile. Owner: whoever meets
+  the next red. The older reading of this obligation follows:
   `CodexPersistentProcessOwnership.integration.test.ts` failed on a **documentation-only commit**
   (`634fe7c`) — the descendant did not publish its pid within 15s — and passed on re-run of the same
   commit, with the three commits before it green on identical code. So it is timing on a shared
