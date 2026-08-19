@@ -3346,6 +3346,48 @@ Gates: unit 469 suites / 7,800 tests, integration 6 / 223, typecheck, lint, and 
 clean. The presenter is declared dark in the parity manifest; the backend's forward is proven by
 removing it and watching its test go red.
 
+### M2-flips wave 3 — Claude's interactions, and the two that are not questions (this commit)
+
+The refusing bridge is gone. `ClaudeInteractionBridge` turns Claude's tool permission requests into
+interactions the kernel can carry, and the composition wires it. Still dark.
+
+**Three kinds, which are the legacy handler's three branches kept.** `ExitPlanMode` is a plan
+decision, `AskUserQuestion` is a question, everything else is an approval. `EnterPlanMode` is absent
+because the SDK approves that tool itself and it never reaches a permission callback at all — which
+is why the content surface, one entry above, watches for it in the stream instead.
+
+**Two of the requests are policy rather than questions, and the contract now says so.** A tool
+outside the allow-list a query was started with, and a read-only MCP tool the vault trusts in normal
+mode, were both answered by the legacy handler without anyone being asked. Preparing an interaction
+for either would put a prompt on screen with exactly one possible answer, so `prepare` returns
+`{ kind: 'resolved', result }` and the backend answers with it: no interaction is opened, so nothing
+has to be shown, settled, or cancelled when the run ends. That is a change to the bridge contract,
+made because the alternative was a prompt for behaviour that has not changed.
+
+**The id stands for the answer, and the answer stays here.** The kernel accepts only constrained
+identifiers as responses, and two of Claude's answers are not: a question is answered with structured
+selections, and a refused plan carries the words it was refused with. So the presenter hands what it
+collected back through the bridge under the same reference the resolution names — the shape wave 2
+settled on for the same reason.
+
+Details worth keeping, each from the handler being replaced: an approval that is denied is **not** an
+interruption, and a plan refused with feedback is not either — the model is being told what to change
+and the turn goes on; an approved plan sets the session's mode through `updatedPermissions` *and*
+tells the surface, or the toolbar keeps showing the mode the turn started in; a response id the
+interaction never offered is denied rather than guessed; and the `Skill` tool passes an allow-list
+that does not name it, because a skill is how a query reaches the tools it was allowed.
+
+`AskUserQuestion` gets the option the SDK documents and does not inject: its own JSDoc says "Other
+will be provided automatically" and nothing adds it, so Grimoire — which renders this prompt itself —
+has to, exactly as the CLI would have shown it.
+
+What is still missing before the flip is the surface that *shows* an interaction: the presenter that
+puts one on screen and hands back what the user chose belongs to the tab, and therefore to the
+runtime half, which is the next increment.
+
+Gates: unit 470 suites / 7,812 tests, integration 6 / 223, typecheck, lint, and `build:release`
+clean. The bridge is declared dark in the parity manifest.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3405,12 +3447,11 @@ the command that runs them is in the matrix document under "the half that runs i
    that the live harness cannot answer: whether the tool card, the diff, the plan, the plan-limit and
    context badges, and two tabs side by side actually *look* right in a vault on a release build.
    That is what certifies wave 2;
-2. **M2-flips wave 3 — Claude**, whose dark backend half and content surface are built (two entries
-   above). What the flip still needs: **interactions** — approvals, questions and plan decisions,
-   where the bridge currently refuses everything — then the **runtime half** over the module's
-   feature context, which is what constructs the content presenter per tab, then the flip itself with
-   `ClaudeChatRuntime` deleted in the same commit and a capability-driven smoke matrix that for
-   Claude is a long one.
+2. **M2-flips wave 3 — Claude**, whose dark backend half, content surface and interaction bridge are
+   built (three entries above). What the flip still needs: the **runtime half** over the module's
+   feature context — the tab-facing side that constructs the content presenter, shows an interaction
+   and hands back what the user chose — then the flip itself with `ClaudeChatRuntime` deleted in the
+   same commit and a capability-driven smoke matrix that for Claude is a long one.
 
 The Windows job guardian is done: compiled once, cached per user, green on `windows-latest`, and
 measured — the entry above has the numbers and what they say about the flake.

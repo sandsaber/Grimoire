@@ -5,6 +5,7 @@ import { type Options,query as agentQuery } from '@anthropic-ai/claude-agent-sdk
 import { interactionId, sessionInstanceId } from '@/core/execution/ExecutionIds';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
+import type { PermissionMode } from '@/core/types/settings';
 import type GrimoirePlugin from '@/main';
 import { getClaudeWorkspaceServices } from '@/providers/claude/app/ClaudeWorkspaceServices';
 import { ClaudeAuxiliaryQuery } from '@/providers/claude/execution/ClaudeAuxiliaryQuery';
@@ -13,12 +14,12 @@ import {
   type ClaudeExecutionBackendContext,
   type ClaudeExecutionQueryFactory,
   type ClaudeExecutionReconciler,
-  type ClaudeInteractionBridge,
 } from '@/providers/claude/execution/ClaudeExecutionBackend';
 import {
   ClaudeExecutionRequests,
   type ClaudeInvocationEnvironment,
 } from '@/providers/claude/execution/ClaudeExecutionRequests';
+import { ClaudeInteractionBridge } from '@/providers/claude/execution/ClaudeInteractionBridge';
 import { ClaudeProjectionResultSink } from '@/providers/claude/execution/ClaudeProjectionResultSink';
 import {
   ClaudeSdkExecutionQueryFactory,
@@ -26,6 +27,7 @@ import {
 } from '@/providers/claude/execution/ClaudeSdkExecutionAdapter';
 import { ClaudeTaskOutputLoader } from '@/providers/claude/execution/ClaudeTaskOutputLoader';
 import { createStopSubagentHook } from '@/providers/claude/hooks/SubagentHooks';
+import { QueryOptionsBuilder } from '@/providers/claude/runtime/ClaudeQueryOptionsBuilder';
 import { getEnhancedPath,parseEnvironmentVariables } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
@@ -53,15 +55,39 @@ const AUXILIARY_RESULT_BYTE_LIMIT = 64_000;
  *   would render text and nothing around it — and the native session id, which
  *   the SDK announces in a message the tab never sees, would never reach the
  *   conversation that has to resume with it;
- * - **interactions.** The bridge below refuses every tool request rather than
- *   guessing an answer, which is fail-closed and useless: a flip needs the
- *   approval, question and plan-decision surfaces wired to the tab.
+ * - **the surface that shows an interaction.** The bridge turns Claude's
+ *   permission requests into interactions the kernel can carry, and answers the
+ *   two that are policy rather than questions; what is missing is the presenter
+ *   that puts one on screen and hands back what the user chose, which belongs
+ *   to the tab and therefore to the runtime half.
  */
 export class ClaudeExecution {
   private readonly requests = new ClaudeExecutionRequests(
     () => opaqueId('claudereq'),
     () => this.environment(),
   );
+
+  /**
+   * One bridge per plugin load, and it holds what the kernel must not.
+   *
+   * A control record carries an opaque reference to a presentation; the
+   * presentation itself — the command, the questions, the plan — stays here,
+   * and the surface reads it back by that reference. Shared across tabs for the
+   * same reason the request store is: a reference minted against one is
+   * unresolvable in another.
+   */
+  private readonly interactions = new ClaudeInteractionBridge({
+    // The mode *this* provider was given, not `settings.permissionMode`, which
+    // is the projection of whichever provider the settings tab is showing —
+    // the defect wave 1 found in a real vault, where Antigravity refused every
+    // turn while its own toggle read Auto-approve.
+    permissionMode: () => ProviderSettingsCoordinator
+      .getProviderSettingsSnapshot(this.plugin.settings, 'claude')
+      .permissionMode,
+    resolveSdkPermissionMode: (mode: PermissionMode) => (
+      QueryOptionsBuilder.resolveClaudeSdkPermissionMode(mode)
+    ),
+  });
 
   constructor(
     private readonly plugin: GrimoirePlugin,
@@ -94,7 +120,7 @@ export class ClaudeExecution {
     const context: ClaudeExecutionBackendContext = {
       queryFactory,
       requestResolver: this.requests,
-      interactionBridge: refusingInteractionBridge(),
+      interactionBridge: this.interactions,
       resultSink: new ClaudeProjectionResultSink(),
       taskResultLoader: new ClaudeTaskOutputLoader(),
       reconciler: unknownReconciler(),
@@ -183,27 +209,6 @@ export class ClaudeExecution {
       hooks: { Stop: [createStopSubagentHook(() => ({ hasRunning: false }))] },
     };
   }
-}
-
-/**
- * The bridge a flip must replace.
- *
- * Fail-closed rather than absent: every tool request is denied with a sentence
- * that names why, so a composition wired up before its interaction surface
- * exists refuses work instead of approving it silently.
- */
-function refusingInteractionBridge(): ClaudeInteractionBridge {
-  const refusal = 'Claude interactions are not wired to the kernel yet.';
-  return {
-    prepare: async () => ({
-      kind: 'approval',
-      presentationRef: opaqueId('ixref'),
-      responseIds: ['deny-once'],
-      providerResolvedResponseId: 'deny-once',
-      resolve: async () => ({ behavior: 'deny', message: refusal }),
-      cancel: async () => ({ behavior: 'deny', message: refusal, interrupt: true }),
-    }),
-  };
 }
 
 /**

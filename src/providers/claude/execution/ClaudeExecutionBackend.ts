@@ -129,13 +129,27 @@ export interface ClaudePreparedInteraction {
   cancel(): Promise<PermissionResult>;
 }
 
+/**
+ * A permission the provider answered itself, with nobody asked.
+ *
+ * Two of Claude's rules are policy rather than questions: a tool outside the
+ * allow-list this query was started with, and a read-only MCP tool the vault
+ * trusts. Opening an interaction for either would put a prompt on screen that
+ * has only one possible answer, so the bridge answers instead — and the shape
+ * says so, rather than a prepared interaction that resolves itself.
+ */
+export interface ClaudeResolvedPermission {
+  readonly kind: 'resolved';
+  readonly result: PermissionResult;
+}
+
 export interface ClaudeInteractionBridge {
   prepare(input: {
     readonly toolName: string;
     readonly toolInput: Readonly<Record<string, unknown>>;
     readonly options: ClaudeToolPermissionOptions;
     readonly allowedTools?: readonly string[];
-  }): Promise<ClaudePreparedInteraction>;
+  }): Promise<ClaudePreparedInteraction | ClaudeResolvedPermission>;
 }
 
 export interface ClaudeExecutionResultSink {
@@ -489,6 +503,11 @@ ExecutionRecoveryPort {
     );
     if (!prepared) {
       return { behavior: 'deny', message: 'Claude interaction preparation timed out.' };
+    }
+    if (prepared.kind === 'resolved') {
+      // Answered by policy: no interaction is opened, so nothing has to be
+      // shown, settled, or cancelled when the run ends.
+      return prepared.result;
     }
     validatePreparedInteraction(prepared);
     if (run.isTerminal || input.options.signal.aborted) {
