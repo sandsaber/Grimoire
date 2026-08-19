@@ -26,6 +26,42 @@ describe('Codex persistent process ownership on the host OS', () => {
   // hang still fails with a specific message rather than a suite timeout.
   jest.setTimeout(45_000);
 
+  it('writes the cached guardian assembly, and says why when it does not', () => {
+    if (process.platform !== 'win32') {
+      return;
+    }
+    // The script itself, in a real PowerShell, with its own errors read back.
+    // The first Windows run of this cache reported only its consequence — the
+    // guardian started and no file was written — because every step of the
+    // branch is deliberately caught. `$Error` still holds what was caught, so
+    // this asks for it rather than inferring the cause from a launch.
+    //
+    // **First in the file on purpose.** The cost this checkpoint is about is
+    // the *first* compile on a machine, which pays for `csc.exe` starting and
+    // for whatever scans a newly written DLL. A case that runs after two
+    // launches have already compiled measures none of that. Three runs
+    // separate it: cold, then warm from the file, then a recompile with the
+    // compiler already warm.
+    const cachePath = String(windowsJobGuardianAssemblyPath(process.env));
+    rmSync(cachePath, { force: true });
+
+    const cold = runGuardianPreamble(cachePath);
+    const warm = runGuardianPreamble(cachePath);
+    rmSync(cachePath, { force: true });
+    const recompiled = runGuardianPreamble(cachePath);
+
+    process.stdout.write(`guardian preamble: cold ${cold.elapsedMs}ms, warm ${warm.elapsedMs}ms, `
+      + `recompiled ${recompiled.elapsedMs}ms\n${cold.output}`);
+    expect(cold.output).toContain('TYPE: True');
+    expect(cold.output).toContain('CACHE: True');
+    expect(cold.output).toContain('COMPILED: True');
+    // The second run loaded what the first compiled, which is the whole point:
+    // the compile is what costs, and only one run may pay it.
+    expect(warm.output).toContain('TYPE: True');
+    expect(warm.output).toContain('COMPILED: False');
+    expect(recompiled.output).toContain('COMPILED: True');
+  }, 60_000);
+
   it('keeps JSONL stdin usable and terminates the complete descendant tree', async () => {
     const platform = localShellPlatformForNode(process.platform);
     const directory = mkdtempSync(join(tmpdir(), 'grimoire-codex-process-'));
@@ -163,31 +199,6 @@ describe('Codex persistent process ownership on the host OS', () => {
     } finally {
       await removeWhenReleased(directory);
     }
-  }, 60_000);
-
-  it('writes the cached guardian assembly, and says why when it does not', () => {
-    if (process.platform !== 'win32') {
-      return;
-    }
-    // The script itself, in a real PowerShell, with its own errors read back.
-    // The first Windows run of this cache reported only its consequence — the
-    // guardian started and no file was written — because every step of the
-    // branch is deliberately caught. `$Error` still holds what was caught, so
-    // this asks for it rather than inferring the cause from a launch.
-    const cachePath = String(windowsJobGuardianAssemblyPath(process.env));
-    rmSync(cachePath, { force: true });
-
-    const cold = runGuardianPreamble(cachePath);
-    const warm = runGuardianPreamble(cachePath);
-
-    process.stdout.write(`guardian preamble: cold ${cold.elapsedMs}ms, `
-      + `warm ${warm.elapsedMs}ms\n${cold.output}`);
-    expect(cold.output).toContain('TYPE: True');
-    expect(cold.output).toContain('CACHE: True');
-    // The second run loaded what the first compiled, which is the whole point:
-    // the compile is what costs seconds, and only one run may pay it.
-    expect(warm.output).toContain('TYPE: True');
-    expect(warm.output).toContain('COMPILED: False');
   }, 60_000);
 
   it('compiles the job guardian once and launches from the cached assembly', async () => {
