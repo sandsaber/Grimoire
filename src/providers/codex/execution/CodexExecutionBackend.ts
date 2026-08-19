@@ -799,6 +799,16 @@ class CodexExecutionRun implements ExecutionRun {
         // renderer a new turn began: without it the item tracking of the turn
         // before leaks into this one, and plan mode is never switched on.
         this.emit({ kind: 'provider-content', payload: { method, params } });
+        return;
+      }
+      if (turnId && this.turnId === undefined) {
+        // The daemon can announce the turn before it answers the RPC that
+        // started it, and until that answer arrives there is nothing to compare
+        // this id against. Buffered like every other scoped notification rather
+        // than dropped: `establishTurn` replays it, and by then the comparison
+        // above can be made. Establishing from it directly is what the compact
+        // path does, and only because it has a previous turn id to rule out.
+        this.bufferedNotifications.push({ method, params });
       }
       return;
     }

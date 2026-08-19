@@ -87,6 +87,19 @@ export class CodexPlanUsageStore implements ProviderPlanUsageProvider {
     this.rateLimitsReader = reader;
   }
 
+  /**
+   * Drops a reader that has outlived its connection.
+   *
+   * Identity-checked rather than unconditional: this store is process-wide and
+   * the reader is rebound per connection, so a composition tearing down must
+   * not clear a reader some later connection has already installed.
+   */
+  clearRateLimitsReader(reader: RateLimitsReader): void {
+    if (this.rateLimitsReader === reader) {
+      this.rateLimitsReader = null;
+    }
+  }
+
   reset(): void {
     this.usage = null;
     this.rateLimitsReader = null;

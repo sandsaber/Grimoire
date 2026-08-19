@@ -1,10 +1,15 @@
 import '@/providers';
 
-import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import {
+  isAlive,
+  ownedProcesses,
+  processTable,
+  processTree,
+} from '@test/helpers/execution/hostProcessTree';
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { AntigravityExecution } from '@/app/execution/antigravity/AntigravityExecutionComposition';
@@ -134,10 +139,12 @@ live('Antigravity live smoke', () => {
   }
 
   /** The `agy` invocations this process is responsible for, right now. */
-  function agyProcesses(): ProcessRow[] {
-    return processTree(processTable(), process.pid).filter(row => (
-      row.command.includes(cli) && row.command.includes('--print')
-    ));
+  function agyProcesses() {
+    return ownedProcesses(command => command.includes(cli) && command.includes('--print'));
+  }
+
+  function pause(delayMs: number): Promise<void> {
+    return new Promise(resolve => { setTimeout(resolve, delayMs); });
   }
 
   async function waitFor<T>(
@@ -239,75 +246,3 @@ live('Antigravity live smoke', () => {
     await shutdown();
   });
 });
-
-interface ProcessRow {
-  readonly pid: number;
-  readonly ppid: number;
-  readonly state: string;
-  readonly command: string;
-}
-
-/** The host's own view of what is running, read rather than remembered. */
-function processTable(): ProcessRow[] {
-  const output = execFileSync('ps', ['-eo', 'pid=,ppid=,state=,args='], {
-    encoding: 'utf8',
-    maxBuffer: 16 * 1024 * 1024,
-  });
-  const rows: ProcessRow[] = [];
-  for (const line of output.split('\n')) {
-    const parsed = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
-    if (parsed) {
-      rows.push({
-        pid: Number(parsed[1]),
-        ppid: Number(parsed[2]),
-        state: parsed[3],
-        command: parsed[4],
-      });
-    }
-  }
-  return rows;
-}
-
-/** The process and everything below it that the table still shows. */
-function processTree(rows: readonly ProcessRow[], pid: number): ProcessRow[] {
-  const byParent = new Map<number, ProcessRow[]>();
-  for (const row of rows) {
-    const siblings = byParent.get(row.ppid);
-    if (siblings) {
-      siblings.push(row);
-    } else {
-      byParent.set(row.ppid, [row]);
-    }
-  }
-  const self = rows.find(row => row.pid === pid);
-  const found: ProcessRow[] = self ? [self] : [];
-  const seen = new Set<number>([pid]);
-  const queue: number[] = [pid];
-  while (queue.length > 0) {
-    for (const child of byParent.get(queue.shift() as number) ?? []) {
-      if (seen.has(child.pid)) {
-        continue;
-      }
-      seen.add(child.pid);
-      found.push(child);
-      queue.push(child.pid);
-    }
-  }
-  return found;
-}
-
-/**
- * Alive as the OS means it.
- *
- * `kill(pid, 0)` calls a zombie alive, and a terminated child is a zombie until
- * its parent reaps it — which would make this row's assertion fail on a process
- * that is, in every sense the row cares about, gone.
- */
-function isAlive(pid: number): boolean {
-  const row = processTable().find(entry => entry.pid === pid);
-  return row !== undefined && !row.state.startsWith('Z');
-}
-
-function pause(delayMs: number): Promise<void> {
-  return new Promise(resolve => { setTimeout(resolve, delayMs); });
-}

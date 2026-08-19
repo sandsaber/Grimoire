@@ -12,13 +12,19 @@ import type {
 } from './ExecutionIds';
 
 /**
- * How many transient delivery ids to remember.
+ * How many singly-delivered transient ids to hold as a backstop.
  *
- * Only large enough to outlast a cross-stream twin, which arrives one event
- * later. Small on purpose: this window churns at token rate, and its whole
- * point is that it churns somewhere the facts are not.
+ * Not the mechanism — a transient id is forgotten the moment its twin arrives,
+ * so in the ordinary case this set holds only what has been delivered once and
+ * drains as the second stream catches up. The bound exists for a backend that
+ * delivers on one stream only, where nothing ever arrives to retire an id.
+ *
+ * It is far above any burst because the first version of it was not: sixty-four
+ * ids, sized for a twin that "arrives one event later", which is true only when
+ * the streams take turns. They do not during a synchronous burst — see the
+ * comment on `seenTransientIds`.
  */
-const MAX_REMEMBERED_TRANSIENT_IDS = 64;
+const MAX_REMEMBERED_TRANSIENT_IDS = 1_024;
 
 export interface ExecutionEventIngestorOptions {
   readonly backendId: ExecutionBackendId;
@@ -74,14 +80,26 @@ export class ExecutionEventIngestor {
   private readonly seenDeliveryIds = new Set<string>();
   private readonly seenDeliveryOrder: string[] = [];
   /**
-   * Delivery ids of transient content, kept apart and kept short.
+   * Delivery ids of transient content that has been delivered exactly once.
    *
    * Content is deduplicated for one reason only: a backend may deliver the same
    * event on the run stream *and* the session stream, which this kernel calls
-   * cross-stream delivery and promises to deduplicate. The twin arrives
-   * immediately after its sibling, so the window only has to outlast that — and
-   * keeping it separate is what stops a turn's worth of deltas from evicting
-   * the ids that protect facts from redelivery.
+   * cross-stream delivery and promises to deduplicate. Two streams means two
+   * deliveries, so the twin is the **last** copy that can arrive: an id is
+   * remembered when it is first seen and forgotten when its twin retires it.
+   *
+   * The first version of this remembered ids in a sixty-four deep ring, on the
+   * reading that a twin arrives one event later. That holds only while the two
+   * streams take turns. A backend pushes onto the run queue and publishes to
+   * the session in the same call, and the run stream is drained by an async
+   * iterator — so a synchronous burst (a buffered-notification flush, or one
+   * stdout chunk that readline turns into many lines) ingests every session
+   * copy first and the run copies a whole burst later. Anything evicted in
+   * between was accepted twice, which is the answer-duplication the set exists
+   * to prevent.
+   *
+   * Kept apart from the delivery ids that protect facts from redelivery,
+   * because a turn's worth of token-rate traffic would otherwise evict them.
    */
   private readonly seenTransientIds = new Set<string>();
   private readonly seenTransientOrder: string[] = [];
@@ -122,9 +140,15 @@ export class ExecutionEventIngestor {
       return scopeResult;
     }
     requireDeliveryId(event.deliveryId);
+    if (this.seenTransientIds.has(event.deliveryId)) {
+      // The twin, and the last copy that can arrive: this id has now been
+      // delivered on both streams, so remembering it further protects nothing
+      // and would only crowd the set that a one-stream backend depends on.
+      this.seenTransientIds.delete(event.deliveryId);
+      return { kind: 'duplicate' };
+    }
     if (this.seenDeliveryIds.has(event.deliveryId)
-      || this.pendingDeliveryIds.has(event.deliveryId)
-      || this.seenTransientIds.has(event.deliveryId)) {
+      || this.pendingDeliveryIds.has(event.deliveryId)) {
       return { kind: 'duplicate' };
     }
     if (!event.causal) {

@@ -181,6 +181,41 @@ describe('CodexExecutionBackend', () => {
     expect(methods).toContain('turn/started');
   });
 
+  it('keeps a turn/started that outran the response to turn/start', async () => {
+    // The daemon may announce the turn before it answers the RPC that started
+    // it. Until the answer arrives the run has no turn id, and `turn/started`
+    // was the one notification not buffered in that window — it was dropped,
+    // so the renderer never learned a turn began: plan mode stayed off and the
+    // previous turn's item tracking leaked into this one. Compact never hit it
+    // because its path is allowed to establish the turn from the notification.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    fixture.connection.beforeRequest = (method: string) => {
+      if (method !== 'turn/start') {
+        return undefined;
+      }
+      fixture.connection.notifyExecution('turn/started', {
+        threadId: 'thread-1',
+        turn: { id: 'turn-9' },
+      });
+      return { turn: turn('turn-9', 'inProgress') };
+    };
+    const run = session.createRun(request(RUN_1, 'default'));
+    const events = collectEvents(run);
+    await fixture.connection.waitForCall('turn/start');
+
+    fixture.connection.notifyExecution('turn/completed', {
+      threadId: 'thread-1',
+      turn: turn('turn-9', 'completed'),
+    });
+
+    const methods = (await events)
+      .map(({ event }) => event)
+      .filter(event => event.kind === 'provider-content')
+      .map(event => (event as { payload: { method: string } }).payload.method);
+    expect(methods).toContain('turn/started');
+  });
+
   it('fails the turn on a daemon error, rather than dying with it', async () => {
     // The daemon reports a refused model as an `error` for the turn and then
     // goes away. Treated as transport loss, the turn ends as an interruption,

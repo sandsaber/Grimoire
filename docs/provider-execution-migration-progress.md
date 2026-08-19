@@ -3194,6 +3194,58 @@ over the next several runs, not one this entry can close by assertion.
 Gates: unit 467 suites / 7,785 tests, integration 6 / 223, typecheck, lint, `build:release` clean on
 Linux; CI green on all four jobs at `102c965`, Windows included.
 
+### M2-flips — third external review of the flip: eight items, eight real (this commit)
+
+A review of the Codex flip slice (`21e831d`..`a65bdc9`) found three bugs, three suggestions and two
+nits. Every one held up when checked against the code, and the two most serious were reproduced as
+failing tests before anything was changed.
+
+**The transient window was sized on an assumption that is false for this backend.** Content ids were
+remembered sixty-four deep, on the reading that a cross-stream twin "arrives one event later". That
+holds only while the two streams take turns. A backend pushes onto the run queue and publishes to the
+session in the same call, and the run stream is drained by an async iterator — so a *synchronous*
+burst (a buffered-notification flush, or one stdout chunk readline turns into many lines) ingests
+every session copy first and the run copies a whole burst later. A registry test that emits two
+hundred deltas on both streams reproduced it: `burst-0` was delivered twice, which is the
+answer-duplication the window exists to stop.
+
+Fixed by making the rule exact instead of approximate. Two streams means two deliveries, so the twin
+is the **last** copy that can arrive: an id is remembered when first seen and **retired by its twin**.
+The set now holds only what has been delivered once, drains as the second stream catches up, and its
+bound — a thousand ids — is a backstop for a one-stream backend rather than the mechanism.
+
+**A `turn/started` that outran its own RPC was dropped.** It is handled before the buffer and
+forwarded only once the turn id is known; for a normal turn that id arrives with the `turn/start`
+result, and the daemon may announce the turn first. It was not buffered either, so the renderer never
+learned a turn began — plan mode stayed off and the previous turn's item tracking leaked into the new
+one. Compact never hit it because its path may establish the turn from the notification. It is
+buffered now, like every other scoped notification, and `establishTurn` replays it. The existing test
+waited for the RPC before notifying, which is exactly the case that works.
+
+**`/compact please` was refused in the resolver's words and rendered in the kernel's.** The resolver
+throws "`/compact does not accept arguments`"; the run finishes `pre-dispatch-rejected`; the adapter
+says "The turn was rejected before it started, so nothing ran." The sentence a user can act on was
+inside the throw. The store now records the refusal against the reference it was refused under, the
+tab remembers the reference it last minted, and `describeFailure` reads it back for that terminal —
+the same shape wave 1 used for its fail-closed refusal, one step earlier.
+
+The rest: the plan-usage reader is cleared on dispose (identity-checked, because the store is
+process-wide and a later connection's reader is not ours to clear); the transient comments no longer
+claim content is undeduplicated, which is the stale rule that made sixty-four look sufficient; live
+row 16 now asks `ps` whether the daemon is gone after the unload, proven by removing the shutdown and
+watching it go red; and two comments name code that no longer exists or sit on the wrong function.
+
+**Row 16 is the review's sharpest point, and it is the same lesson as wave 1's cancel row**: a row
+named for a process being gone must look at the process. It could have passed with a
+`codex app-server` still running.
+
+One item in the review is already answered: it records the Windows job guardian as unproven on a
+Windows job, which was true of the slice it read. Three CI rounds since then proved it — and found
+that its first version wrote nothing at all — in the entries above.
+
+Gates: unit 467 suites / 7,789 tests, integration 6 / 223, the Antigravity live suite 2 / 2 and Codex
+live row 16 green against a real daemon, typecheck, lint, and `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

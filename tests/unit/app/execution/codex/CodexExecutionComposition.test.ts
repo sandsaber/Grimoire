@@ -509,6 +509,49 @@ describe('Codex execution composition', () => {
     execution.dispose();
   });
 
+  it('shows the refusal in the resolver\'s words, not the neutral sentence', async () => {
+    // The resolver refuses `/compact please` with a sentence a user can act on.
+    // The run then finishes as `pre-dispatch-rejected`, and the adapter's
+    // neutral wording for that — "The turn was rejected before it started, so
+    // nothing ran." — says nothing about the argument that caused it. The smoke
+    // matrix asks for the refusal, and the live row could only see that *some*
+    // error arrived.
+    const plugin = createPlugin();
+    const host = new ExecutionKernelHost({
+      storage: new TestDurableStorage(),
+      scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
+    });
+    const execution = new CodexExecution(plugin, host.registry);
+    host.registerBackend(execution.createBackendRegistration({
+      create: () => new FakeConnection() as never,
+    }));
+    await host.start();
+    const runtime = execution.createRuntime();
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: '/compact please' })));
+
+    const errors = chunks.filter(chunk => chunk.type === 'error');
+    expect(errors).toHaveLength(1);
+    expect(String(errors[0].content)).toContain('does not accept arguments');
+    execution.dispose();
+  });
+
+  it('stops the plan-limit badge asking a connection this composition disposed', async () => {
+    // The reader is rebound per connection because one pointed at a dead daemon
+    // answers nothing. Unload is that case with no rebinding to follow it: the
+    // badge would keep calling `account/rateLimits/read` on a connection the
+    // kernel has already taken down.
+    const { runtime, execution, connection } = await createTurnHarness();
+    await drain(runtime.query(runtime.prepareTurn({ text: 'hello' })));
+    const plugin = createPlugin();
+
+    execution.dispose();
+    await codexPlanUsageStore.refreshUsage({ plugin, providerId: 'codex' } as never);
+
+    expect(connection.calls.filter(call => call.method === 'account/rateLimits/read'))
+      .toEqual([]);
+  });
+
   it('names the turn by the id the daemon can fork from', async () => {
     // The tab copies `assistantMessageId` onto the message, and a fork asks the
     // daemon to resume at it. A result id minted here names nothing in the

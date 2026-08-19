@@ -1,8 +1,10 @@
 /**
  * Shared Codex tool normalization layer.
  *
- * Used by both CodexChatRuntime (live streaming) and CodexHistoryStore (history reload)
- * to ensure tool identity parity between live and restored conversations.
+ * Used by the live path — the presenter and router the flip runs turns through —
+ * and by `CodexHistoryStore` on a history reload, so a tool has the same
+ * identity whether it was just seen or restored. `CodexChatRuntime` was the
+ * live caller until the flip deleted it.
  */
 
 // ---------------------------------------------------------------------------

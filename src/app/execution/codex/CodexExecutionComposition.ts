@@ -190,6 +190,11 @@ export class CodexExecution {
     const isPlanTurn = (): boolean => ProviderSettingsCoordinator
       .getProviderSettingsSnapshot(this.plugin.settings, 'codex').permissionMode === 'plan';
     const content = new CodexContentPresenter(isPlanTurn);
+    // The reference this tab last handed the kernel, so a rejection can be
+    // explained in the words it was rejected with. Per tab, because the store
+    // behind it serves every tab and a refusal belongs to the turn that earned
+    // it.
+    let lastRequestRef: string | undefined;
 
     const ports: ExecutionChatRuntimeHostPorts = {
       prepareTurn: (request: ChatTurnRequest) => encodeCodexTurn(request),
@@ -197,12 +202,15 @@ export class CodexExecution {
         turn: PreparedChatTurn,
         history?: ChatMessage[],
         options?: ChatRuntimeQueryOptions,
-      ) => this.requests.reference({
-        ...turnRequest(turn, options),
-        conversation: boundConversation,
-        scope,
-        ...(history ? { history } : {}),
-      }),
+      ) => {
+        lastRequestRef = this.requests.reference({
+          ...turnRequest(turn, options),
+          conversation: boundConversation,
+          scope,
+          ...(history ? { history } : {}),
+        });
+        return lastRequestRef;
+      },
       // Steering carries the input and nothing else: the turn it joins was
       // launched with the parameters, and it is not being started again.
       encodeSteerRef: (turn: PreparedChatTurn) => this.requests.reference({
@@ -234,9 +242,19 @@ export class CodexExecution {
       // The daemon's own words for a failure it reported, instead of the
       // neutral sentence. The error chunk itself is dropped by the presenter,
       // so this is the only place that failure is rendered.
-      describeFailure: reason => (
-        reason === 'provider-failure' ? content.lastFailure() : undefined
-      ),
+      //
+      // A rejection before dispatch is the same problem one step earlier: the
+      // resolver refuses `/compact please` with a sentence a user can act on,
+      // and the kernel's neutral wording for that terminal cannot name the
+      // argument that caused it.
+      describeFailure: reason => {
+        if (reason === 'provider-failure') {
+          return content.lastFailure();
+        }
+        return reason === 'pre-dispatch-rejected'
+          ? this.requests.refusalFor(lastRequestRef)
+          : undefined;
+      },
       // A plan turn answers with a plan, which arrives as its own notification
       // rather than as a message, so the kernel sees no result to require. A
       // compaction is the adapter's rule, not this one: `isCompact` is a
@@ -381,14 +399,6 @@ export class CodexExecution {
   }
 
   /**
-   * Where the daemon in front of us keeps its transcripts and memories.
-   *
-   * The daemon reports its own home in the handshake, which is the only source
-   * that is right for a custom `CODEX_HOME` and the only one at all for a WSL
-   * target. Remembered here because two callers need it: the transcript reader
-   * built per connection, and every turn's writable-root policy.
-   */
-  /**
    * Lets the plan-limit indicator ask the daemon what is left.
    *
    * The reader and the subscription both lived in the deleted runtime, and
@@ -397,16 +407,34 @@ export class CodexExecution {
    * nothing.
    */
   private wirePlanUsage(connection: CodexExecutionConnection): void {
-    codexPlanUsageStore.setRateLimitsReader(
-      async () => connection.request('account/rateLimits/read', {}),
+    const reader = async (): Promise<unknown> => connection.request(
+      'account/rateLimits/read',
+      {},
     );
-    connection.onNotification((method: string, params: unknown) => {
+    codexPlanUsageStore.setRateLimitsReader(reader);
+    const unsubscribe = connection.onNotification((method: string, params: unknown) => {
       if (method === 'account/rateLimits/updated') {
         codexPlanUsageStore.updateFromRateLimits(params);
       }
     });
+    // The store is process-wide and this composition is not: on unload there is
+    // no next connection to rebind the reader, so without this the badge keeps
+    // asking a daemon the kernel has already taken down. Identity-checked in
+    // the store, because a later connection's reader is not ours to clear.
+    this.disposers.push(() => {
+      codexPlanUsageStore.clearRateLimitsReader(reader);
+      unsubscribe();
+    });
   }
 
+  /**
+   * Where the daemon in front of us keeps its transcripts and memories.
+   *
+   * The daemon reports its own home in the handshake, which is the only source
+   * that is right for a custom `CODEX_HOME` and the only one at all for a WSL
+   * target. Remembered here because two callers need it: the transcript reader
+   * built per connection, and every turn's writable-root policy.
+   */
   private rememberRuntimeContext(connection: { readonly initializeResult: unknown }): string {
     const initializeResult = connection.initializeResult;
     if (initializeResult) {

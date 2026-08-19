@@ -146,17 +146,21 @@ describe('transient output deltas', () => {
       expect(ingestor.ingest(delivery('d-1', delta))).toEqual({ kind: 'duplicate' });
     });
 
-    it('forgets a delta long before it could forget a fact', () => {
-      // The twin of a cross-stream delivery arrives immediately after its
-      // sibling, so the window only has to outlast that. Keeping deltas in
-      // their own window is what stops a turn's worth of them from evicting the
-      // ids that protect facts from redelivery.
+    it('remembers a delta until its twin arrives, however far behind it is', () => {
+      // The rule this replaces was a sixty-four deep ring, on the reading that
+      // a twin arrives one event later. A synchronous burst puts a whole burst
+      // between the two copies, and every id evicted in between was rendered
+      // twice. Two streams means two deliveries, so the twin retires the id.
       const ingestor = createIngestor();
       accepted(ingestor.ingest(delivery('delta-old', delta)));
       for (let index = 0; index < 200; index += 1) {
         accepted(ingestor.ingest(delivery(`delta-${index}`, delta)));
       }
 
+      expect(ingestor.ingest(delivery('delta-old', delta))).toEqual({ kind: 'duplicate' });
+      // Retired by that twin rather than kept forever: a third copy cannot
+      // arrive from two streams, and a one-stream backend must still be able to
+      // fill the set without it growing without end.
       expect(accepted(ingestor.ingest(delivery('delta-old', delta)))).toHaveLength(1);
     });
   });
@@ -218,6 +222,41 @@ describe('transient output deltas', () => {
       });
       return { registry, storage, backend };
     }
+
+    it('collapses a whole burst of cross-stream content, not just its newest ids', async () => {
+      // The window this exercises was sized for a twin that "arrives one event
+      // later". That holds only when the two streams take turns. A backend
+      // emits onto the run queue and publishes to the session in the same call,
+      // and the run stream is consumed by an async iterator — so a *synchronous*
+      // burst (a buffered-notification flush, or one stdout chunk that readline
+      // turns into many lines) ingests every session-path copy first and the run
+      // -path twins arrive a whole burst later. Anything past the window is
+      // accepted a second time, which is the answer-duplication the window
+      // exists to stop.
+      const { registry, backend } = await createRegistry();
+      const seen: string[] = [];
+      registry.observe(SESSION_ID, envelope => {
+        if (isTransientExecutionEvent(envelope.event)) {
+          seen.push(envelope.eventId);
+        }
+      });
+      await registry.startRun(SESSION_ID, {
+        runId: RUN_ID,
+        owner: { kind: 'conversation', ownerId: 'transient-delta' },
+        resultExpectation: 'optional',
+        requestRef: 'opaque-request',
+      });
+
+      const emitted: string[] = [];
+      for (let index = 0; index < 200; index += 1) {
+        const deliveryId = `burst-${index}`;
+        emitted.push(deliveryId);
+        backend.emit(RUN_ID, delta, { deliveryId, destination: 'both' });
+      }
+      await registry.waitForIdle();
+
+      expect(seen).toEqual(emitted);
+    });
 
     it('reaches observers in order with the facts around it', async () => {
       const { registry, backend } = await createRegistry();

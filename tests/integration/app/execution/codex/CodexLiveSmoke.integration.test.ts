@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { ownedProcesses } from '@test/helpers/execution/hostProcessTree';
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { CodexExecution } from '@/app/execution/codex/CodexExecutionComposition';
@@ -284,7 +285,21 @@ live('Codex live smoke', () => {
     await second.shutdown();
   });
 
+  /** The `codex app-server` daemons this process is responsible for. */
+  function codexDaemons(): string[] {
+    return ownedProcesses(command => (
+      command.includes('app-server')
+      && command.includes(process.env.GRIMOIRE_CODEX_CLI ?? 'codex')
+    )).map(row => row.command);
+  }
+
   it('row 16: cancels a running turn and leaves no daemon behind', async () => {
+    if (process.platform === 'win32') {
+      // Ownership on Windows is a job object rather than a process group, and
+      // `ps` is not how that is read. That half stays a person's check there.
+      report('ROW 16 skipped: Windows job-object ownership is not observable this way');
+      return;
+    }
     const { runtime, shutdown } = await createHarness();
     const collected: StreamChunk[] = [];
     const started = (async () => {
@@ -303,6 +318,11 @@ live('Codex live smoke', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
+    // The row is named for a daemon that must be gone afterwards, so it has to
+    // have been there: a cancel that leaves `codex app-server` running would
+    // otherwise pass exactly as a cancel that cleans up.
+    expect(codexDaemons().length).toBeGreaterThan(0);
+
     runtime.cancel();
     await started;
     const chunks = collected;
@@ -311,7 +331,14 @@ live('Codex live smoke', () => {
     // The turn ends rather than hanging; what it managed to say before the stop
     // is whatever the model had streamed.
     expect(chunks.length).toBeGreaterThan(0);
+    // The daemon outlives a cancelled turn on purpose — it is persistent, and
+    // the next turn resumes on it. What must not outlive the unload is the
+    // process, which is the half of this row no assertion covered.
     await shutdown();
+    for (let attempt = 0; attempt < 100 && codexDaemons().length > 0; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    expect(codexDaemons()).toEqual([]);
   });
 
   it('row 21: reports a failed turn in the daemon\'s own words', async () => {

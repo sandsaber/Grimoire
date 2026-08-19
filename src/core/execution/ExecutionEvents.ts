@@ -38,9 +38,10 @@ export type ExecutionEvent =
    * adapter has to render a turn while it is still running and the committed
    * `result` arrives only at the end.
    *
-   * Transient means: never persisted, never reduced into a projection, and not
-   * deduplicated — see `isTransientExecutionEvent`. The durable copy of the
-   * answer is the committed result; this is the live view of it.
+   * Transient means: never persisted, never reduced into a projection, and
+   * deduplicated in a set of its own — see `isTransientExecutionEvent`. The
+   * durable copy of the answer is the committed result; this is the live view
+   * of it.
    */
   | {
     readonly kind: 'output-delta';
@@ -115,10 +116,12 @@ export type ExecutionEvent =
  *   in the control store, and a stream of deltas is exactly that;
  * - **the run projection**, because a projection records what happened, and
  *   partial text is not a fact about the run — the committed result is;
- * - **deduplication and causal bookkeeping**, because a backend emits each
- *   delta once and never redelivers it. Recovery replays facts, not text. Were
- *   they deduplicated, a turn's worth of token-rate traffic would evict the
- *   bounded set that protects the events which do need it.
+ * - **the durable id and sequence space**, because recovery replays facts, not
+ *   text: a turn's worth of token-rate traffic would evict the bounded set that
+ *   protects the events which do need it. Content is still deduplicated — a
+ *   backend delivers the same event on the run stream and the session stream —
+ *   but in a set of its own, where an id is retired by the twin that proves
+ *   both streams have delivered it.
  *
  * Ordering is still the ingestor's, so text stays interleaved with tool and
  * interaction events exactly as the provider produced it. That single ordering

@@ -93,6 +93,9 @@ export interface CodexInvocationEnvironment {
 /** How many un-dispatched turns may accumulate before the oldest is dropped. */
 const DEFAULT_LIMIT = 64;
 
+/** How many unread refusals to keep; each is read by the terminal after it. */
+const REFUSAL_LIMIT = 8;
+
 /**
  * References the kernel can carry, and the turns behind them.
  *
@@ -114,6 +117,18 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
    * joins a turn that is still being answered from those files.
    */
   private readonly liveBundles = new Map<string, CodexTurnInputBundle[]>();
+  /**
+   * Why a turn was refused before it was dispatched, by the reference it was
+   * refused under.
+   *
+   * The kernel classifies a rejection rather than carrying a provider's string,
+   * which is right — but it leaves the only sentence a user can act on inside
+   * the throw that caused it. This is where the tab reads it back, and it is
+   * kept per reference so the tab that asks gets the refusal of the turn it
+   * queued. Bounded, and small: a refusal not read by the terminal that follows
+   * it will never be read.
+   */
+  private readonly refusals = new Map<string, string>();
 
   constructor(
     private readonly nextReference: () => string,
@@ -168,7 +183,7 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
       // daemon compacts a thread, it does not read an argument, so `/compact
       // please` would silently compact and lose the instruction.
       if (request.text.trim() !== '/compact') {
-        throw new Error('/compact does not accept arguments');
+        throw this.refuse(requestRef, '/compact does not accept arguments');
       }
       return { thread, turn: { kind: 'compact' } };
     }
@@ -262,6 +277,33 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
   /** Test and diagnostic view of how many turns are still waiting. */
   get pendingCount(): number {
     return this.pending.size;
+  }
+
+  /**
+   * The wording a refused turn was refused with, if this reference has one.
+   *
+   * Read once: the terminal it explains happens once, and holding the sentence
+   * afterwards would let the next rejection of any kind inherit it.
+   */
+  refusalFor(requestRef: string | undefined): string | undefined {
+    if (requestRef === undefined) {
+      return undefined;
+    }
+    const refusal = this.refusals.get(requestRef);
+    this.refusals.delete(requestRef);
+    return refusal;
+  }
+
+  private refuse(requestRef: string, message: string): Error {
+    while (this.refusals.size >= REFUSAL_LIMIT) {
+      const oldest = this.refusals.keys().next();
+      if (oldest.done) {
+        break;
+      }
+      this.refusals.delete(oldest.value);
+    }
+    this.refusals.set(requestRef, message);
+    return new Error(message);
   }
 
   private take(requestRef: string): CodexExecutionRequest {
