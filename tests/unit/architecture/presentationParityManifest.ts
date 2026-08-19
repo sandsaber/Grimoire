@@ -677,7 +677,12 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
       'src/providers/acp/execution/ManagedAcpClient.ts',
       'src/providers/opencode/OpencodeProviderModule.ts',
+      // Wave 4's dark half: the composition that binds OpenCode's backend to
+      // the running plugin, and the two stores it needs.
+      'src/app/execution/opencode/OpencodeExecutionComposition.ts',
       'src/providers/opencode/execution/OpencodeAcpDynamicConfig.ts',
+      'src/providers/opencode/execution/OpencodeExecutionRequests.ts',
+      'src/providers/opencode/execution/OpencodeProjectionResultSink.ts',
       'src/providers/opencode/execution/OpencodeAcpFileSystem.ts',
       'src/providers/opencode/execution/OpencodeExecutionBackend.ts',
     ],

@@ -3482,6 +3482,46 @@ typecheck tests — so two `as any`-shaped stubs in `Tab.test.ts` compiled local
 The gate in `AGENTS.md` lists four commands for exactly this reason, and running three of them is not
 running it.
 
+### M2-flips wave 4 — OpenCode's dark backend half (this commit)
+
+The first ACP provider reaches the kernel. `OpencodeExecution` binds the dark `OpencodeExecutionBackend`
+to the running plugin, `OpencodeExecutionRequests` holds what its references stand for, and
+`OpencodeProjectionResultSink` commits a reference rather than a copy of a session database. Nothing
+constructs any of it; `registration.ts` still points at `OpencodeChatRuntime`.
+
+**Three reference spaces, not two, and the third is what makes this provider different.** Codex
+resolves a daemon and Claude an SDK query; an ACP session is *configured after it exists*, so a turn
+mints a `requestRef` for itself, a `startupRef` for the process the launcher will spawn, and a
+`dynamicRef` for the mode, model and effort the session is set to once it is open. One store serves
+all three, for the reason wave 1 learned the hard way: a reference minted against one store resolves
+to nothing in another.
+
+**The launch is a directory, not a command line.** OpenCode reads its config and system prompt from
+files Grimoire writes, so `environment()` prepares the launch artifacts *before* minting the startup
+reference — a process spawned before they exist runs under the previous turn's configuration. The
+restart fingerprint is the legacy runtime's launch key unchanged: command, config path, environment
+text, system prompt key, artifact key. Everything a running process cannot be told about afterwards.
+
+**How little of it is OpenCode's.** The client adapter, the JSON-RPC transport and the process
+launcher are already protocol-generic and shared with every ACP provider that follows — MiMoCode,
+Kimi Code, Grok, Qwen, Gemini. What this composition adds is the launch, the three stores and the
+sink, which is the shape the next five waves should each cost.
+
+One whole turn runs end to end with a fake ACP client as the only stand-in: the reference is
+dispatched, a session is created, the prompt is sent, the answer arrives as a session update, and the
+result commits. A second test resolves the startup reference the turn minted and asserts what a
+launcher would actually spawn — `opencode acp`, under the `OPENCODE_CONFIG` those artifacts just
+wrote. That is the assertion the three spaces exist for.
+
+Not here, each named so a flip cannot land while it is missing: **the content surface** — session
+updates are carried and nothing yet turns them into chunks, though `AcpSessionUpdateNormalizer` and
+the OpenCode tool stream adapter already know how — and **interactions**, where the bridge refuses
+every permission request. ACP asks before edits and commands, so that refusal is fail-closed and
+useless, exactly as wave 3's was at this stage.
+
+Gates: unit 465 suites / 7,560 tests, integration 5 / 145, typecheck, lint, and `build:release`
+clean. The three new modules are declared dark in the parity manifest.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3545,8 +3585,11 @@ the command that runs them is in the matrix document under "the half that runs i
    twenty-eight of them, in a vault on a release build. Rows 14–16 first: Claude is the first flip
    with a rewind, and row 16 — a rewind that fails with the files restored — is what the backup port
    added in that entry exists for;
-3. **then M2-flips wave 4 — OpenCode**, whose backend is already dark, with the wire-vocabulary
-   obligations that come with it.
+3. **M2-flips wave 4 — OpenCode**, whose backend half is now built (entry above). What the flip
+   still needs, in the order wave 3 proved: the **content surface** over
+   `AcpSessionUpdateNormalizer`, then **interactions**, then the **runtime half**, then the flip
+   itself with `OpencodeChatRuntime` deleted in the same commit. Most of what it needs after that is
+   shared: the next five ACP providers inherit the transport, the launcher and the client adapter.
 
 **Two matrices are outstanding at once**, which is the state the owner accepted when wave 3 flipped
 ahead of wave 2's certification. Either flip reverts as a single commit.
