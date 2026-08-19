@@ -3388,6 +3388,48 @@ runtime half, which is the next increment.
 Gates: unit 470 suites / 7,812 tests, integration 6 / 223, typecheck, lint, and `build:release`
 clean. The bridge is declared dark in the parity manifest.
 
+### M2-flips wave 3 — Claude's runtime half, and the port whose absence hangs a turn (this commit)
+
+`ClaudeExecution.createRuntime()` exists. A tab prepares a turn, the kernel dispatches it, the SDK
+answers, and what comes back is what the surface draws — proven by a composition test that runs a
+whole turn with the SDK's own `query` as the only fake and asserts three things at once: the text,
+the tool card the presenter makes from the message carried beside it, and the session id the tab now
+knows it is on. Still dark; `registration.ts` still points at `ClaudeChatRuntime`.
+
+**The finding is a port, and it was found by a test that hung.** A backend registered as
+`{ backend }` alone opens interactions nobody can answer: the registry refuses to resolve an
+interaction for a backend that declared no resolution port, the SDK's `canUseTool` waits on a
+permission for ever, and the turn never ends. The registration is `{ backend, interactions: backend,
+recovery: backend }` — the same three the Codex flip registers — and the approval test is what
+surfaced it, by deadlocking on its first tool rather than failing an assertion.
+
+Three per-tab objects and one shared, which is the division this provider forces. The **content
+presenter** and the **interaction presenter** are per tab, because one tracks a turn's streamed text
+and the session the tab is on, and the other owns a prompt that belongs to the tab that raised it.
+The **interaction bridge** is shared, because a control record carries an opaque reference to a
+presentation and the presentation itself is held where the reference resolves.
+
+**What a turn resumes is read at dispatch, not when it was queued** — a turn waiting behind another
+must resume the session that one created. The order is the provider's own: a fork before its first
+turn, then the conversation's session, then the session the presenter watched arrive. The last
+fallback is what makes a *new* conversation work at all: it learns its session mid-turn, and the
+record that would carry it is written only after that turn ends.
+
+The module's feature context is wired from services that already exist — history hydration, session
+resolution, pending-fork, task-result interpretation — and its rewind reaches the backend, which owns
+the SDK query the files are restored through. Its **workspace** slots are not wired and say so by
+throwing their own name: Claude's workspace is still registered the legacy way, its flip is a
+separate checkpoint, and a settings surface that silently lists nothing is worse than one that fails
+where it was wired.
+
+**Wave 3's dark half is now complete**: request store, result sink, content surface, interactions,
+and the runtime over them. What remains is the flip itself — `registration.ts` and `main.ts`,
+`ClaudeChatRuntime` deleted in the same commit, and a capability-driven smoke matrix that for Claude
+is the longest of the three so far.
+
+Gates: unit 470 suites / 7,814 tests, integration 6 / 223, typecheck, lint, and `build:release`
+clean. The three new modules are declared dark in the parity manifest.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3447,11 +3489,13 @@ the command that runs them is in the matrix document under "the half that runs i
    that the live harness cannot answer: whether the tool card, the diff, the plan, the plan-limit and
    context badges, and two tabs side by side actually *look* right in a vault on a release build.
    That is what certifies wave 2;
-2. **M2-flips wave 3 — Claude**, whose dark backend half, content surface and interaction bridge are
-   built (three entries above). What the flip still needs: the **runtime half** over the module's
-   feature context — the tab-facing side that constructs the content presenter, shows an interaction
-   and hands back what the user chose — then the flip itself with `ClaudeChatRuntime` deleted in the
-   same commit and a capability-driven smoke matrix that for Claude is a long one.
+2. **M2-flips wave 3 — Claude**, whose whole dark half is now built (four entries above): request
+   store, result sink, content surface, interactions, and the runtime over them, with one whole turn
+   proven end to end over a fake SDK. What remains is **the flip** — `registration.ts` pointing at
+   the composition, `main.ts` constructing it and registering the backend with its interaction and
+   recovery ports, `ClaudeChatRuntime` deleted in the same commit, the parity manifest and dark
+   markers moved — and then the capability-driven smoke matrix, which for Claude is the longest yet.
+   Wave 2's rendering rows are still the reason a third flip should not land first.
 
 The Windows job guardian is done: compiled once, cached per user, green on `windows-latest`, and
 measured — the entry above has the numbers and what they say about the flake.

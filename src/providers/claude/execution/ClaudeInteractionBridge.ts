@@ -200,7 +200,11 @@ export class ClaudeInteractionBridge implements ClaudeInteractionBridgeContract 
     return {
       kind: 'approval',
       presentationRef,
-      responseIds: [ALLOW_ONCE, ALLOW_ALWAYS, DENY],
+      // The cancellation is offered as well as answered with: the kernel
+      // requires the id it settles an unanswered interaction with to be one the
+      // interaction actually offers, and a dismissed prompt is the user
+      // cancelling the turn rather than denying the tool.
+      responseIds: [ALLOW_ONCE, ALLOW_ALWAYS, DENY, CANCELLED],
       providerResolvedResponseId: CANCELLED,
       resolve: async responseId => {
         this.forget(presentationRef);

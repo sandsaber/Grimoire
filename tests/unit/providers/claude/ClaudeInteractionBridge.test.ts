@@ -65,7 +65,9 @@ describe('Claude interaction bridge', () => {
     if (prepared.kind === 'resolved') {
       throw new Error('An approval must be asked, not resolved.');
     }
-    expect(prepared.responseIds).toEqual(['allow-once', 'allow-always', 'deny']);
+    // The cancellation is offered as well: the kernel settles an unanswered
+    // interaction with an id the interaction has to have offered.
+    expect(prepared.responseIds).toEqual(['allow-once', 'allow-always', 'deny', 'cancelled']);
     const presentation = bridge.presentation(prepared.presentationRef);
     expect(presentation).toMatchObject({
       kind: 'approval',
@@ -236,8 +238,10 @@ describe('Claude interaction bridge', () => {
       kind: 'resolved',
       result: { behavior: 'deny' },
     });
-    expect(outside.kind === 'resolved' && String(outside.result.message))
-      .toContain('Allowed tools: Read, Glob.');
+    const refusal = outside.kind === 'resolved' && outside.result.behavior === 'deny'
+      ? outside.result.message
+      : '';
+    expect(refusal).toContain('Allowed tools: Read, Glob.');
     expect(trusted).toMatchObject({ kind: 'resolved', result: { behavior: 'allow' } });
   });
 

@@ -1,0 +1,165 @@
+import type { BoundConversation } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type { Conversation } from '../../../core/types';
+import type GrimoirePlugin from '../../../main';
+import { getVaultPath } from '../../../utils/path';
+import type { ClaudeWorkspaceContext } from '../ClaudeProviderModule';
+import type { ClaudeRewindResult } from '../execution/ClaudeExecutionBackend';
+import { ClaudeConversationHistoryService } from '../history/ClaudeConversationHistoryService';
+import { ClaudeTaskResultInterpreter } from '../runtime/ClaudeTaskResultInterpreter';
+import { claudePlanUsageStore } from './ClaudePlanUsageStore';
+
+/**
+ * What one tab's conversation is, read when it is asked for.
+ *
+ * The module's history contribution is asked about a conversation *id*, and the
+ * only conversation a runtime can answer for is its own — the one the adapter
+ * syncs into it. An id that is not this tab's gets nothing rather than a lookup
+ * across the workspace, which would answer for a conversation this runtime does
+ * not serve.
+ */
+export type ClaudeBoundConversation = () => BoundConversation | null;
+
+export interface ClaudeModuleContextPorts {
+  /** The execution session a rewind runs against, when this tab has one. */
+  readonly executionSessionId: () => string | null;
+  /** The backend's rewind, which owns the SDK query the files are restored by. */
+  readonly rewind: (input: {
+    readonly executionSessionId: string;
+    readonly userMessageId: string;
+    readonly assistantMessageId: string;
+    readonly mode: 'conversation' | 'code-and-conversation';
+  }) => Promise<ClaudeRewindResult>;
+}
+
+/**
+ * The module's context over the running plugin, for the runtime's features.
+ *
+ * Everything the adapter reads through `claudeProviderModule.features(...)` is
+ * wired here from services that already exist. The workspace slots are not:
+ * Claude's workspace is still registered the legacy way through
+ * `ClaudeWorkspaceServices`, and its flip is a separate checkpoint — so they
+ * throw by name rather than answering emptily, because a settings surface that
+ * silently lists nothing is worse than one that fails where it was wired.
+ */
+export function createClaudeModuleContext(
+  plugin: GrimoirePlugin,
+  conversation: ClaudeBoundConversation,
+  ports: ClaudeModuleContextPorts,
+): ClaudeWorkspaceContext {
+  const history = new ClaudeConversationHistoryService();
+  const interpreter = new ClaudeTaskResultInterpreter();
+
+  return {
+    hydrateConversation: async conversationId => {
+      const bound = matching(conversation, conversationId);
+      if (!bound) {
+        return { outcome: 'absent' };
+      }
+      await history.hydrateConversationHistory(bound, getVaultPath(plugin.app));
+      return { outcome: 'complete' };
+    },
+    deleteConversationSession: async conversationId => {
+      const bound = matching(conversation, conversationId);
+      if (bound) {
+        await history.deleteConversationSession(bound, getVaultPath(plugin.app));
+      }
+    },
+    // Answered from this tab's own conversation: these two are asked on every
+    // turn, and the session a turn resumes is the one the tab is bound to.
+    resolveSessionId: conversationId => {
+      const bound = matching(conversation, conversationId);
+      return bound ? history.resolveSessionIdForConversation(bound) : null;
+    },
+    isPendingFork: conversationId => {
+      const bound = matching(conversation, conversationId);
+      return bound ? history.isPendingForkConversation(bound) : false;
+    },
+    rewind: async input => {
+      const executionSessionId = ports.executionSessionId();
+      if (!executionSessionId) {
+        return { outcome: 'unavailable', reason: 'This conversation has no active Claude session.' };
+      }
+      const result = await ports.rewind({
+        executionSessionId,
+        userMessageId: input.userMessageId,
+        assistantMessageId: input.assistantMessageId,
+        mode: input.mode,
+      });
+      if (!result.canRewind) {
+        // `unavailable` and `failed` are different facts, and the backend
+        // reports the second as an error message: a rewind the SDK refused is
+        // not a rewind that broke.
+        return result.error
+          ? { outcome: 'failed', reason: result.error }
+          : { outcome: 'unavailable', reason: 'The SDK cannot rewind to this message.' };
+      }
+      return { outcome: 'rewound', filesChanged: [...(result.filesChanged ?? [])] };
+    },
+    // Assembled from what the interpreter can actually read off a subagent's
+    // result, rather than invented: the agent it belongs to, the structured
+    // text it carried, and whether the SDK ended it as an error.
+    interpretTaskResult: payload => {
+      const detail = interpreter.extractStructuredResult(payload);
+      return {
+        title: interpreter.extractAgentId(payload) ?? 'Task',
+        ...(detail ? { detail } : {}),
+        isError: interpreter.resolveTerminalStatus(payload, 'completed') === 'error',
+      };
+    },
+    parseSubagentDisplay: payload => {
+      const agentId = interpreter.extractAgentId(payload);
+      // No id is no agent to display, which is different from an agent with no
+      // name: answering with a placeholder would put a card on screen for
+      // something that never ran.
+      return agentId ? { agentId, label: agentId } : null;
+    },
+    readPlanUsage: async () => {
+      const usage = claudePlanUsageStore.getCachedUsage({
+        plugin,
+        providerId: 'claude',
+        settings: plugin.settings,
+      });
+      return usage ? { label: usage.plan } : null;
+    },
+    resolveCliPath: async () => plugin.getResolvedProviderCliPath('claude'),
+    listCommands: () => notWired('listCommands'),
+    listSessionCommands: () => notWired('listSessionCommands'),
+    listAgentMentions: () => notWired('listAgentMentions'),
+    refreshAgentMentions: () => notWired('refreshAgentMentions'),
+    listModels: () => notWired('listModels'),
+    refreshModels: () => notWired('refreshModels'),
+    loadMcpServers: () => notWired('loadMcpServers'),
+    saveMcpServers: () => notWired('saveMcpServers'),
+    startMcpServer: () => notWired('startMcpServer'),
+    stopMcpServer: () => notWired('stopMcpServer'),
+    renderSettingsTab: () => {
+      void notWired('renderSettingsTab');
+    },
+    dispose: async () => {
+      // Nothing is created here that outlives a turn: the history service and
+      // the interpreter are stateless readers, and every other service reached
+      // above is owned by the workspace registration.
+    },
+  };
+}
+
+/** This tab's conversation, when the question is about it. */
+function matching(
+  conversation: ClaudeBoundConversation,
+  conversationId: string,
+): Conversation | null {
+  const bound = conversation();
+  if (!bound || bound.id !== conversationId) {
+    return null;
+  }
+  // The adapter's binding is the conversation, narrowed to what execution
+  // needs; the history service reads the same fields off the whole one.
+  return bound as unknown as Conversation;
+}
+
+function notWired(slot: string): Promise<never> {
+  return Promise.reject(new Error(
+    `Claude workspace slot "${slot}" is served by the legacy workspace registration, `
+    + 'not by this context.',
+  ));
+}
