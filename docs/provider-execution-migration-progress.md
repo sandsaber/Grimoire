@@ -3529,12 +3529,34 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
+### Where the session of 2026-08-19 ended
+
+Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
+
+| What | Commits |
+|---|---|
+| **wave 1 certified** — the `agy` process tree proven gone after a cancel, by a live suite that fails when termination is disabled | `5b6fc7d` |
+| **the Windows job guardian** — compiled once and cached per user; found silently writing nothing on its first CI run, then measured: 3.2–6.9s for the first compile on a machine, ~0.5s for a later one, ~0.4s to load the cache | `a65bdc9`, `22313f8`, `102c965`, `38f9f3f`, `364d7a4` |
+| **an external review of the Codex flip answered** — eight items, all real: the transient dedup window, a dropped `turn/started`, a swallowed refusal, and five smaller | `77ad8a3` |
+| **wave 3 (Claude) built and flipped** — dark half in four increments, then the flip with `ClaudeChatRuntime` deleted | `3df7a3a`, `2976714`, `fe4870d`, `b7a6424`, `f8c4ad2`, `ec519a7` |
+| **wave 4 (OpenCode) backend half** — the first ACP provider on the kernel | `3b01158` |
+
+Three providers now execute through the kernel: Antigravity, Codex, Claude.
+
+**What is owed, and by whom:**
+
+- **two smoke matrices, both needing a person in a vault** — Codex's rendering rows and Claude's
+  twenty-eight. Wave 3 flipped ahead of wave 2's certification at the owner's direction; what stands
+  in for the missing evidence is that each flip reverts as a single commit;
+- **wave 4's remaining three increments**, in the order wave 3 proved: content surface,
+  interactions, runtime half, then the flip.
+
 Completed: **M0a** (parity gate, contribution inventory, adapter contract, the two contract suites,
 topology and shared-resource records, persistence decisions), **M1** (execution kernel, narrow
 control-record persistence, local-shell internal backend, cross-platform CI with Windows
 process-tree conformance green), **M2-proofs**, **M2-adapter**, and **M0b** for the four proof
-providers. In progress: **M2-flips** — wave 1 (Antigravity) and wave 2 (Codex) both shipped and running in
-production, neither certified against a live CLI.
+providers. In progress: **M2-flips** — waves 1, 2 and 3 (Antigravity, Codex, Claude) shipped and
+running in production; wave 1 certified, waves 2 and 3 not.
 
 **M2-proofs.** Four topologies proven dark — Antigravity (stateless process-per-run),
 Codex (persistent daemon, multiplexed sessions), Claude (persistent SDK stream, serial runs), and
