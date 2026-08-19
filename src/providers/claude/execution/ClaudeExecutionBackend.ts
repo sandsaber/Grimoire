@@ -1107,6 +1107,12 @@ class ClaudeExecutionSession implements ExecutionSession {
       }
       return;
     }
+    // Before anything is read out of it, and before the branches below start
+    // consuming messages the surface would never see otherwise: a subagent's
+    // tool call, a task notification, the init that names the session. What the
+    // renderer draws is the message itself, and the kernel carries it without
+    // interpreting it.
+    this.activeRun?.presentMessage(message);
     if (message.type === 'system') {
       if (message.subtype === 'task_started') {
         this.handleTaskStarted(message);
@@ -1489,6 +1495,7 @@ class ClaudeExecutionRun implements ExecutionRun {
   private readonly queue = new ExecutionEventQueue<ProviderExecutionEvent>();
   private readonly resultCommitAborts = new Set<AbortController>();
   private readonly seenMessageIds = new Set<string>();
+  private readonly presentedMessageIds = new Set<string>();
   private terminal = false;
   private cancellation: CancellationReason | undefined;
   private nativeUserMessageId: string | undefined;
@@ -1558,6 +1565,34 @@ class ClaudeExecutionRun implements ExecutionRun {
     }
     await this.requestTermination();
     await this.finished;
+  }
+
+  /**
+   * Forwards the message the surface renders, exactly as the SDK sent it.
+   *
+   * The backend was harvested before the kernel had a content channel, so it
+   * reported facts about a turn — a tool started, a thought happened — and the
+   * answer's text, and nothing a tool card, a plan or a task could be drawn
+   * from. This is that channel: opaque to core, normalized by the provider's
+   * own presenter, which is the same code the legacy runtime rendered with.
+   *
+   * Deduplicated against its own set: `handleMessage` keeps one for the facts
+   * it derives, and sharing it would make the first reader hide the message
+   * from the second.
+   */
+  presentMessage(message: SDKMessage): void {
+    if (this.terminal) {
+      return;
+    }
+    const uuid = 'uuid' in message && typeof message.uuid === 'string' ? message.uuid : undefined;
+    if (uuid) {
+      if (this.presentedMessageIds.has(uuid)) {
+        return;
+      }
+      this.presentedMessageIds.add(uuid);
+      trimOldestSetEntries(this.presentedMessageIds, 2048);
+    }
+    this.emit({ kind: 'provider-content', payload: message });
   }
 
   handleMessage(message: SDKMessage): void {

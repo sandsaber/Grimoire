@@ -114,6 +114,37 @@ describe('ClaudeExecutionBackend', () => {
     await flushPromises();
   });
 
+  it('forwards the messages a surface draws a turn from, once each', async () => {
+    // The backend was harvested before the kernel had a content channel, so it
+    // reported facts and text and nothing a tool card, a plan or a task could
+    // be drawn from. Forwarding the message itself is what a flipped tab
+    // renders from — the same shape wave 2 settled on, opaque to core.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 'native-session');
+    const events = collectEvents(session.createRun(request('1', 'default')));
+    await waitFor(() => fixture.query.received.length === 1);
+
+    const toolCall = assistantToolMessage('tool-1', 'Read');
+    fixture.query.emit(toolCall);
+    // The same message twice is the daemon repeating itself, not two tool
+    // calls: a card drawn twice is the duplication this set exists to stop.
+    fixture.query.emit(toolCall);
+    fixture.query.emit(taskStarted('task-1', 'tool-task-1'));
+    fixture.query.emit(resultMessage('message-1', 'done', 'result-1'));
+
+    const forwarded = (await events)
+      .map(({ event }) => event)
+      .filter((event): event is Extract<typeof event, { kind: 'provider-content' }> => (
+        event.kind === 'provider-content'
+      ))
+      .map(event => event.payload as { type: string; subtype?: string; uuid?: string });
+    // A system message the session consumes itself, an assistant message, and
+    // the result: all three are things the surface draws.
+    expect(forwarded.filter(payload => payload.uuid === 'assistant-tool-1')).toHaveLength(1);
+    expect(forwarded.some(payload => payload.subtype === 'task_started')).toBe(true);
+    expect(forwarded.some(payload => payload.type === 'result')).toBe(true);
+  });
+
   it('publishes a hydrated native-agent result after the parent run is terminal', async () => {
     const fixture = createFixture({ taskOutput: 'full sidecar result' });
     const session = await createSession(fixture.backend, 'native-session');
@@ -1269,6 +1300,18 @@ function taskNotification(
     output_file: `/sdk/${taskId}.out`,
     summary: 'summary result',
     uuid: `notification-${taskId}`,
+    session_id: 'native-session',
+  } as unknown as SDKMessage;
+}
+
+function assistantToolMessage(toolCallId: string, toolName: string): SDKMessage {
+  return {
+    type: 'assistant',
+    parent_tool_use_id: null,
+    message: {
+      content: [{ type: 'tool_use', id: toolCallId, name: toolName, input: { file_path: 'a.md' } }],
+    },
+    uuid: `assistant-${toolCallId}`,
     session_id: 'native-session',
   } as unknown as SDKMessage;
 }

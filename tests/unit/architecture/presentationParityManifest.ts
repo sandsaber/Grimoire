@@ -668,6 +668,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/app/execution/claude/ClaudeExecutionComposition.ts',
       'src/providers/claude/ClaudeProviderModule.ts',
       'src/providers/claude/execution/ClaudeAuxiliaryQuery.ts',
+      'src/providers/claude/execution/ClaudeContentPresenter.ts',
       'src/providers/claude/execution/ClaudeExecutionBackend.ts',
       'src/providers/claude/execution/ClaudeExecutionMessageChannel.ts',
       'src/providers/claude/execution/ClaudeExecutionRequests.ts',

@@ -3302,6 +3302,50 @@ Gates: unit 468 suites / 7,791 tests, integration 6 / 223, typecheck, lint, and 
 clean. The three new modules are declared in the parity manifest as `execution-platform-dark`, so the
 gate asserts they stay out of the bundle until the flip.
 
+### M2-flips wave 3 — Claude's content surface (this commit)
+
+The gap the dark half found is closed. `ClaudeExecutionBackend` now forwards every message it accepts
+as `provider-content`, and `ClaudeContentPresenter` turns those messages into the chunks a tab draws.
+Both are still dark.
+
+**One call site, before anything is read out of the message.** The backend consumed several kinds
+itself — a subagent's tool call, the task notifications, the `init` that names the session — and
+those never reached the run at all, so a per-branch forward would have missed exactly the messages
+the surface most needs. It forwards at the top of `routeMessage`, after the session-identity gate,
+with its own dedup set: the one `handleMessage` keeps is for the facts it derives, and sharing it
+would make the first reader hide the message from the second.
+
+**The presenter runs the code the legacy runtime rendered with.** `transformSDKMessage` already knows
+how a Claude tool call, its result, a subagent, a plan and a usage report are drawn, proven against
+real transcripts, so the flip keeps it rather than writing a second opinion.
+
+**The answer arrives twice and is rendered once.** The SDK reports it as deltas while the turn runs
+and whole in the assistant message; the backend mirrors the deltas as `output-delta`, which is the
+copy core can read. The presenter drops the streamed text and thinking, records that they arrived,
+and drops the assistant message's copy only when they did — a turn answered in one message still
+renders. That is the provider's own documented rule, kept.
+
+**Two things no chunk carries, and both are capabilities rather than decoration:**
+
+- **the session id.** The adapter reports the tab's answer to `currentSessionId()` *into* the
+  registry rather than reading the backend's, so before this a Claude tab could not learn the session
+  the SDK put it on: no resume across a reload, and nothing to fork from. The presenter captures it
+  from `system/init` and from any message that carries one;
+- **the assistant message id**, because a fork asks the SDK to rewind to it. Wave 2's live matrix
+  found precisely this defect after its flip — a fork resuming at an id the daemon had never
+  minted — and it is recorded here before wave 3 can repeat it.
+
+`EnterPlanMode` gets a port of its own: the SDK approves that tool itself, so `canUseTool` never
+fires and the tool call in the stream is the only sign the turn began planning.
+
+Still owed before the flip: **interactions** — the bridge still refuses every request — and the
+**runtime half**, which is what constructs this presenter per tab and wires `presentProviderContent`,
+`currentSessionId` and the plan-mode callback to it.
+
+Gates: unit 469 suites / 7,800 tests, integration 6 / 223, typecheck, lint, and `build:release`
+clean. The presenter is declared dark in the parity manifest; the backend's forward is proven by
+removing it and watching its test go red.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3361,12 +3405,12 @@ the command that runs them is in the matrix document under "the half that runs i
    that the live harness cannot answer: whether the tool card, the diff, the plan, the plan-limit and
    context badges, and two tabs side by side actually *look* right in a vault on a release build.
    That is what certifies wave 2;
-2. **M2-flips wave 3 — Claude**, whose dark backend half is built (entry above). What the flip still
-   needs, in the order the entry argues for: the **content surface** — `provider-content` from a
-   backend that predates it, which is also how the tab learns its native session id — then
-   **interactions**, then the **runtime half** over the module's feature context, then the flip
-   itself with `ClaudeChatRuntime` deleted in the same commit and a capability-driven smoke matrix
-   that for Claude is a long one.
+2. **M2-flips wave 3 — Claude**, whose dark backend half and content surface are built (two entries
+   above). What the flip still needs: **interactions** — approvals, questions and plan decisions,
+   where the bridge currently refuses everything — then the **runtime half** over the module's
+   feature context, which is what constructs the content presenter per tab, then the flip itself with
+   `ClaudeChatRuntime` deleted in the same commit and a capability-driven smoke matrix that for
+   Claude is a long one.
 
 The Windows job guardian is done: compiled once, cached per user, green on `windows-latest`, and
 measured — the entry above has the numbers and what they say about the flake.
