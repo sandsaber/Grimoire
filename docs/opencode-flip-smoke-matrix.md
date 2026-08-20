@@ -42,7 +42,7 @@ client. Rows 17–19 are what four surfaces ask when nobody is in a conversation
 | 6 | Cancelling a turn stops the agent | the process stops working; the tab is usable immediately |
 | 7 | A second turn continues the same session | no history is re-sent, and the agent remembers turn 1 |
 | 8 | Reloading Obsidian resumes the conversation | the transcript hydrates and turn 3 continues it |
-| 9 | Deleting the session outside Grimoire recovers | the tab starts a new session instead of failing |
+| 9 | Deleting the session outside Grimoire is legible | OpenCode says only "service failure", so the binding is kept and the turn says what to do |
 | 10 | Two tabs run at once | neither tab's answer, model or mode appears in the other |
 | 11 | Switching the model mid-conversation applies | the next turn runs on it, and the effort list changes with it |
 | 12 | An edit asks before it writes | the prompt names the file, and Deny stops the write |
@@ -56,13 +56,31 @@ client. Rows 17–19 are what four surfaces ask when nobody is in a conversation
 
 ## The half that runs itself
 
-Nothing in this matrix runs itself. Unlike Codex, OpenCode has no live harness on this branch: the
-automated coverage stops at the fake ACP agent, and every row above needs a person, a vault, and a
-CLI. Two rows are worth running twice — 8 (reload) and 19 (spend) — because both depend on state
-written by a previous turn.
+Twelve rows are driven headlessly by
+`tests/integration/app/execution/opencode/OpencodeLiveSmoke.integration.test.ts`, against a real
+`opencode acp`. It is skipped unless asked for, because it starts a CLI and spends the account's
+tokens:
+
+```bash
+GRIMOIRE_OPENCODE_LIVE=1 node scripts/run-jest.js --selectProjects=integration \
+  --runTestsByPath tests/integration/app/execution/opencode/OpencodeLiveSmoke.integration.test.ts
+```
+
+Through `scripts/run-jest.js` rather than bare `npx jest`: the runner passes `--localstorage-file`,
+and without it every suite that writes provider settings fails with `storage.getItem is not a
+function`.
+
+`GRIMOIRE_OPENCODE_TRACE=1` prints the debug records the composition writes, `GRIMOIRE_OPENCODE_CLI`
+points at a binary other than `opencode` on `PATH`, and `GRIMOIRE_OPENCODE_MODEL` overrides the
+model.
+
+It covers rows 1, 2, 5 (the numbers, not the badge), 6, 7, 8, 9, 12, 13, 15, 17, 18 and 19. **The
+rows it does not cover are the ones a person has to look at**: whether the tool card, the diff, the
+plan and the badges actually render, two tabs side by side, switching the model from the toolbar,
+"always allow" not asking twice, and a write outside the vault.
 
 ## Record
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
-| | | | | |
+| 2026-08-20 | 1.18.18 | live: 1, 2, 5, 6, 7, 8, 9, 12, 13, 15, 17, 18, 19 | — | first live run found five defects, all fixed and pinned; see the journal entry for that run |

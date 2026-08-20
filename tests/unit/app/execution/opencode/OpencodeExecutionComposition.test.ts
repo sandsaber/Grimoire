@@ -13,6 +13,7 @@ import { executionSessionId, type InteractionId, runId } from '@/core/execution/
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { TOOL_READ } from '@/core/tools/toolNames';
 import type { StreamChunk } from '@/core/types';
+import { JsonRpcErrorResponse } from '@/providers/acp';
 import type {
   ManagedAcpClient,
   ManagedAcpClientFactory,
@@ -76,17 +77,23 @@ describe('OpenCode execution composition', () => {
   }
 
   /** One ACP agent, without an agent. */
-  function createFakeAcp(options: { asksPermission?: boolean } = {}): {
+  function createFakeAcp(options: {
+    asksPermission?: boolean;
+    sessionIsGone?: boolean;
+    sessionLoadFails?: boolean;
+  } = {}): {
     factory: ManagedAcpClientFactory;
     startupRefs: string[];
     prompts: unknown[];
     permissions: Array<Promise<AcpRequestPermissionResponse>>;
     configOptions: unknown[];
+    loadRequests: Array<{ sessionId: string }>;
   } {
     const startupRefs: string[] = [];
     const prompts: unknown[] = [];
     const permissions: Array<Promise<AcpRequestPermissionResponse>> = [];
     const configOptions: unknown[] = [];
+    const loadRequests: Array<{ sessionId: string }> = [];
     const factory: ManagedAcpClientFactory = {
       create: async (input: ManagedAcpClientFactoryInput) => {
         startupRefs.push(input.startupRef);
@@ -116,7 +123,23 @@ describe('OpenCode execution composition', () => {
               currentModeId: 'build',
             },
           }),
-          loadSession: async () => ({ sessionId: 'acp-session-1' }),
+          loadSession: async request => {
+            loadRequests.push(request);
+            if (options.sessionIsGone) {
+              throw new JsonRpcErrorResponse('session/load', -32603, 'session not found');
+            }
+            if (options.sessionLoadFails) {
+              // What OpenCode 1.18.18 actually answers for a session it does
+              // not have: nothing about the session at all.
+              throw new JsonRpcErrorResponse(
+                'session/load',
+                -32603,
+                'Internal error: OpenCode service failure',
+                { service: 'session' },
+              );
+            }
+            return { sessionId: request.sessionId };
+          },
           prompt: async request => {
             prompts.push(request);
             if (options.asksPermission) {
@@ -181,12 +204,14 @@ describe('OpenCode execution composition', () => {
         return client;
       },
     };
-    return { factory, startupRefs, prompts, permissions, configOptions };
+    return { factory, startupRefs, prompts, permissions, configOptions, loadRequests };
   }
 
   async function createHarness(options: {
     asksPermission?: boolean;
     plugin?: any;
+    sessionIsGone?: boolean;
+    sessionLoadFails?: boolean;
   } = {}): Promise<{
     execution: OpencodeExecution;
     host: ExecutionKernelHost;
@@ -194,6 +219,7 @@ describe('OpenCode execution composition', () => {
     prompts: unknown[];
     permissions: Array<Promise<AcpRequestPermissionResponse>>;
     configOptions: unknown[];
+    loadRequests: Array<{ sessionId: string }>;
     events: ExecutionEventEnvelope[];
   }> {
     const host = new ExecutionKernelHost({
@@ -204,7 +230,9 @@ describe('OpenCode execution composition', () => {
       },
     });
     const execution = new OpencodeExecution(options.plugin ?? createPlugin(), host.registry);
-    const { factory, startupRefs, prompts, permissions, configOptions } = createFakeAcp(options);
+    const {
+      factory, startupRefs, prompts, permissions, configOptions, loadRequests,
+    } = createFakeAcp(options);
     host.registerBackend(execution.createBackendRegistration(factory));
     await host.start();
     await host.registry.createSession({
@@ -214,7 +242,9 @@ describe('OpenCode execution composition', () => {
     });
     const events: ExecutionEventEnvelope[] = [];
     host.registry.observe(SESSION_ID, envelope => events.push(envelope));
-    return { execution, host, startupRefs, prompts, permissions, configOptions, events };
+    return {
+      execution, host, startupRefs, prompts, permissions, configOptions, loadRequests, events,
+    };
   }
 
   async function waitForInteraction(
@@ -405,6 +435,60 @@ describe('OpenCode execution composition', () => {
     expect(chunks.some(chunk => chunk.type === 'tool_use' && chunk.name === TOOL_READ)).toBe(true);
     // Without this a tab starts a new session every turn: no resume across a
     // reload, and nothing to hydrate from.
+    expect(runtime.getSessionId()).toBe('acp-session-1');
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('resumes the session the conversation remembers', async () => {
+    // The tab knows which ACP session this conversation is on, and the kernel
+    // session has to be created with it or the backend has nothing to load —
+    // every reload starting a new session with the conversation left behind.
+    const { execution, host, loadRequests } = await createHarness();
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({ providerState: {}, sessionId: 'acp-session-saved' });
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(loadRequests).toEqual([expect.objectContaining({ sessionId: 'acp-session-saved' })]);
+    expect(runtime.getSessionId()).toBe('acp-session-saved');
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('says what a turn that never started needs the person to do', async () => {
+    // OpenCode answers an unknown session with a generic service failure, and
+    // the resume policy keeps a binding rather than replacing it on an error
+    // that vague — so without provider wording the conversation repeats the
+    // neutral sentence on every turn with nothing to act on.
+    const { execution, host } = await createHarness({ sessionLoadFails: true });
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({ providerState: {}, sessionId: 'ses-that-is-gone' });
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    const errors = chunks
+      .filter((chunk): chunk is Extract<StreamChunk, { type: 'error' }> => chunk.type === 'error')
+      .map(chunk => chunk.content);
+    expect(errors).toEqual([expect.stringContaining('session may no longer exist')]);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('reports the session a turn actually ran in, not the one it was bound to', async () => {
+    // The conversation remembers a session the agent no longer has. The backend
+    // replaces it; a tab that kept reporting the old id would save the
+    // conversation pointing at a session that does not exist, and every turn
+    // after this one would start over. Found by a live run.
+    const { execution, host } = await createHarness({ sessionIsGone: true });
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({
+      providerState: {},
+      sessionId: 'ses-that-is-gone',
+    });
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
     expect(runtime.getSessionId()).toBe('acp-session-1');
     execution.dispose();
     await host.dispose();

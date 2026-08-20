@@ -206,7 +206,15 @@ export interface AcpLoadSessionResponse {
   configOptions?: AcpSessionConfigOption[] | null;
   models?: AcpSessionModelState | null;
   modes?: AcpSessionModeState | null;
-  sessionId: AcpSessionId;
+  /**
+   * Optional, because a real agent omits it.
+   *
+   * OpenCode 1.18.18 answers `session/load` with `configOptions` and nothing
+   * else — the load is confirmed by succeeding, not by echoing the id it was
+   * given. Declared required, it made every resume look like a load that had
+   * returned some other session.
+   */
+  sessionId?: AcpSessionId;
 }
 
 export interface AcpListSessionsRequest {

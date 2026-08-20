@@ -652,10 +652,17 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
 
   private async establish(): Promise<boolean> {
     const executionSessionId = this.context.nextExecutionSessionId();
+    // The provider-native session this conversation is on, carried into the
+    // session the backend opens. Without it a backend that resumes through its
+    // session — rather than through the turn's own reference, as the first
+    // three flipped providers do — has nothing to load, and every reload starts
+    // a new one with the conversation left behind. Found by a live run.
+    const nativeSessionRef = this.ports.currentSessionId();
     await this.context.registry.createSession({
       backendId: this.context.backendId,
       executionSessionId,
       owner: this.context.owner,
+      ...(nativeSessionRef ? { nativeSessionRef } : {}),
     });
     this.executionSessionId = executionSessionId;
     this.announceReady(true);

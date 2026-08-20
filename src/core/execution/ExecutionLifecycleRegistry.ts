@@ -102,6 +102,14 @@ export interface CreateExecutionSessionCommand {
   readonly backendId: ExecutionBackendId;
   readonly executionSessionId: ExecutionSessionId;
   readonly owner: ExecutionOwner;
+  /**
+   * The provider-native session this one continues, where the caller knows it.
+   *
+   * Opaque here: the backend decides what loading it means, and whether a
+   * session it cannot find is replaced or refused. Absent for a conversation
+   * that has none yet, which is every new one.
+   */
+  readonly nativeSessionRef?: string;
 }
 
 export interface BeginSettingsTransitionCommand {
@@ -291,6 +299,7 @@ export class ExecutionLifecycleRegistry {
         executionSessionId: command.executionSessionId,
         owner: command.owner,
         backendGeneration: backend.generation,
+        ...(command.nativeSessionRef ? { nativeSessionRef: command.nativeSessionRef } : {}),
       });
       try {
         if (session.executionSessionId !== command.executionSessionId) {

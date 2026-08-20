@@ -3835,7 +3835,7 @@ lint, and `build:release` clean. The parity manifest moves fourteen OpenCode mod
 shared managed-ACP ones from pending to wired; `provider-opencode` moves from the dark-bundle
 markers to the wired ones, which is the gate that says the backend is actually in `main.js`.
 
-### M2-flips wave 4 — three surfaces that must open anyway (this commit)
+### M2-flips wave 4 — three surfaces that must open anyway (`7034a00`)
 
 A review of the flip's own diff, before its CI finished. The four metadata call sites reach the
 composition through `plugin.getOpencodeExecution()`, and that accessor **throws** when the kernel has
@@ -3850,6 +3850,79 @@ command loader's guard has a test: a plugin whose accessor throws still opens th
 commands rather than an exception.
 
 Gates: unit 470 suites / 7,588 tests, typecheck, lint, and `build:release` clean.
+
+### M2-flips wave 4 — the live half of OpenCode's matrix (this commit)
+
+Wave 2 built a live harness for Codex and wave 4 shipped without one. This is OpenCode's:
+`OpencodeLiveSmoke.integration.test.ts`, thirteen of the nineteen matrix rows driven headlessly
+against a real `opencode acp` 1.18.18, skipped unless `GRIMOIRE_OPENCODE_LIVE=1` asks for it. What
+it leaves behind is exactly what a person has to look at — whether the card, the diff, the plan and
+the badges *render*, two tabs side by side, the toolbar's model switch, "always allow", and a write
+outside the vault.
+
+Ten rows were green on the first run. The other two cost five defects, and **every one of them was
+invisible to the automated gates that were green**, because a fake agent answers instantly and
+answers exactly what the fake was told to answer:
+
+- **the command announcement was never heard.** The metadata session gives a session 250ms to
+  announce its commands. The countdown started when the listener was installed — before a cold
+  process was launched and initialized, which takes seconds — so the window had always expired by
+  the time there was a session to announce anything. Every blank tab's command list came back empty.
+  The listener is installed before `session/new` still, because the announcement follows it
+  immediately; the countdown now starts after;
+- **the tab reported the session it was bound to, not the one the turn ran in.** When the agent no
+  longer has the saved session the backend replaces it — and the tab kept reporting the old id, so
+  the conversation would have been saved pointing at a session that does not exist, starting over on
+  every turn, forever. The presenter's id comes first now: it is read from the reply to
+  `session/new` or `session/load`, which is the session the run actually used;
+- **resume did not work at all, in three places at once.** `session/load` was never called, because
+  `ExecutionLifecycleRegistry.createSession` built the backend's config from three fields and
+  dropped `nativeSessionRef`, and the adapter never passed one anyway — its `establish()` had the
+  port to ask (`currentSessionId`) and did not. The first three flipped providers hid this: Codex and
+  Claude resume through the turn's own reference, and Antigravity is a process per run with nothing
+  to resume. OpenCode is the first backend that resumes through its *session*. Underneath both, the
+  backend also required `session/load` to echo the id it was given — and a raw JSON-RPC probe against
+  the real agent shows the reply is `{configOptions}` and nothing else, so a load that succeeded read
+  as "the agent returned another session".
+
+That last one had been half-learned before. `QwenChatRuntime` carries the comment "ACP session/load
+responses need not repeat the session id" and reads the requested id instead — while the shared
+`AcpLoadSessionResponse` still declared `sessionId` required, and Gemini, Grok, Kimi Code and
+MiMoCode all assigned it straight into their session state, where it is `undefined`. Making the
+field optional turned that latent bug into four compile errors, and all four are fixed. **A fact
+known in one provider and not written into the type it belongs to is a fact the other five do not
+have.**
+
+Row 8 now resumes for real: the same session id across a process restart, and the model answers with
+the word it was told two turns and one shutdown ago.
+
+**Making resume work made a fifth defect reachable, which is the honest cost of fixing a path
+nobody was on.** Row 9 — a saved session the agent no longer has — used to "pass" because the load
+never happened. With the load happening, a probe shows OpenCode answers an unknown session with
+`Internal error: OpenCode service failure` and `data.service: "session"`: nothing that says the
+session is missing. The resume policy is deliberate about that — a binding is dropped only when the
+agent says explicitly that it is gone, because a transient failure must not throw a live session
+away — so the turn is refused and the binding kept, correctly, and the conversation would repeat
+`The turn was rejected before it started, so nothing ran.` on every turn with nothing to act on.
+The composition supplied no `describeFailure` at all; it does now, and says what to do:
+
+> OpenCode could not start this turn. If this conversation was resumed from a saved session, that
+> session may no longer exist — starting a new chat will create one.
+
+A translation of the classification, not the agent's text, which is what that port's contract allows
+and what D7 requires. The fake ACP client now answers exactly what 1.18.18 answers, so the path is
+pinned without a CLI.
+
+One thing reported rather than fixed: in 1.18.18 a permission request carries the **path** as
+`toolCall.title` where the vocabulary expects a permission id (`edit`, `bash`, `external_directory`),
+so the prompt reads "OpenCode wants permission to use /tmp/…/note.md on this path". The same code
+served the legacy runtime, so it is not a flip regression — it is a vocabulary written against an
+older CLI. Owner: whoever runs the rendering rows, since the fix is product copy and needs a person
+to judge it.
+
+Gates: unit 470 suites / 7,591 tests, typecheck, lint, and `build:release` clean, and **all twelve
+live rows green** against `opencode acp` 1.18.18, recorded in
+[`docs/opencode-flip-smoke-matrix.md`](opencode-flip-smoke-matrix.md).
 
 ## Current blocker
 
@@ -3876,7 +3949,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **what a session is set to** — 390 lines of model, mode and effort state lifted out of the legacy runtime, which delegates to it | `3427f68` |
 | **wave 4's runtime half** — `createRuntime` over the adapter, the four per-tab pieces, and the MCP restart the kernel path was missing | `0dec751` |
 | **wave 4 flipped** — OpenCode on the kernel, `OpencodeChatRuntime` deleted, the five legacy call sites answered by one isolated metadata session | `a0166a8` |
-| **three surfaces that must open anyway** — the metadata call sites guarded against a kernel that has not started | this commit |
+| **three surfaces that must open anyway** — the metadata call sites guarded against a kernel that has not started | `7034a00` |
+| **the live half of wave 4's matrix** — thirteen rows against a real `opencode acp`, and the four defects the first run found | this commit |
 
 Four providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode.
 
@@ -3946,10 +4020,10 @@ the command that runs them is in the matrix document under "the half that runs i
    twenty-eight of them, in a vault on a release build. Rows 14–16 first: Claude is the first flip
    with a rewind, and row 16 — a rewind that fails with the files restored — is what the backup port
    added in that entry exists for;
-3. **wave 4's rendering rows** — [`docs/opencode-flip-smoke-matrix.md`](opencode-flip-smoke-matrix.md),
-   nineteen of them, in a vault on a release build. Rows 12–16 first: OpenCode is the first flip
-   where the *protocol* decides what the client must answer, and rows 16 (containment) and 12–15
-   (permissions) are where the flip changed the shape of the answer rather than only its home;
+3. **wave 4's rendering rows** — [`docs/opencode-flip-smoke-matrix.md`](opencode-flip-smoke-matrix.md).
+   Thirteen of its nineteen rows now run themselves and are green; what is left is what a person has
+   to look at: rows 3, 4, 10, 11, 14, 16 and the *appearance* of row 5. Row 12's wording is a known
+   defect — the permission prompt names a path where it should name an action;
 4. **M2-flips wave 5 and after — the five remaining ACP providers**: MiMoCode, Kimi Code, Grok, Qwen
    and Gemini. Each needs its own wire recording first (M0b), and each inherits what wave 4 built:
    the transport, the launcher, the client adapter, the content surface, the permission bridge and

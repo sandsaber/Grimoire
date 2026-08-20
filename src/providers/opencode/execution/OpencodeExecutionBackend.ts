@@ -632,12 +632,17 @@ class OpencodeExecutionSession implements ExecutionSession {
           mcpServers: [...invocation.mcpServers],
           sessionId: target,
         });
-        if (response.sessionId !== target) {
+        // A load confirms the session by succeeding. OpenCode answers with its
+        // config options and no id at all, so requiring an echo turned every
+        // resume into "the agent returned another session" — a new session per
+        // reload, with the conversation left behind. An id that *is* echoed
+        // still has to be the one that was asked for.
+        if (response.sessionId && response.sessionId !== target) {
           throw new ExecutionDispatchError('Managed ACP load returned another session.', true);
         }
         this.requireCurrentClient(client, generation);
         this.loadedSessionRef = target;
-        return response;
+        return { ...response, sessionId: target };
       } catch (error) {
         const missing = (this.context.isMissingSessionError ?? isAcpMissingSessionError)(error);
         if (!missing) throw new ExecutionDispatchError('Managed ACP session load failed.', true);

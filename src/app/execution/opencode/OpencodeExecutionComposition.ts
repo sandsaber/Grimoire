@@ -330,10 +330,21 @@ export class OpencodeExecution {
         });
       },
       reasoningControl: OPENCODE_PROVIDER_CAPABILITIES.reasoningControl,
-      // The ACP session this conversation is on. The presenter's copy comes
-      // second because a new conversation learns its session mid-turn, and the
-      // record is written only after that turn ends.
-      currentSessionId: () => conversation?.sessionId ?? content.lastSessionId() ?? null,
+      /**
+       * The ACP session this conversation is actually on.
+       *
+       * The presenter's copy comes **first**, and a live run is what settled
+       * the order: it is read from the reply to `session/new` or
+       * `session/load`, so it is the session the last turn really ran in. The
+       * conversation's saved id is only what it was before. When the agent no
+       * longer has that session the backend replaces it, and a tab that kept
+       * reporting the old id would save the conversation pointing at a session
+       * that does not exist — every later turn starting over, forever.
+       *
+       * The conversation's own id is the fallback, which is what a tab that has
+       * not run a turn yet resumes from.
+       */
+      currentSessionId: () => content.lastSessionId() ?? conversation?.sessionId ?? null,
       syncConversation: next => {
         if (next?.id !== conversation?.id) {
           // A different conversation is a different ACP session, and what the
@@ -347,6 +358,21 @@ export class OpencodeExecution {
         }
         conversation = next;
       },
+      /**
+       * The provider's words for a turn that never started.
+       *
+       * A translation of the classification, not the agent's error text: for
+       * this provider a pre-dispatch rejection is almost always the session
+       * bind, and OpenCode answers an unknown session with a generic service
+       * failure that says nothing about the session. The resume policy keeps
+       * the binding rather than replacing it on an error that vague, so the
+       * conversation would otherwise repeat the neutral sentence forever with
+       * nothing to act on.
+       */
+      describeFailure: reason => (reason === 'pre-dispatch-rejected'
+        ? 'OpenCode could not start this turn. If this conversation was resumed from a saved '
+          + 'session, that session may no longer exist — starting a new chat will create one.'
+        : undefined),
       presentProviderContent: payload => content.present(payload),
       consumeProviderTurnMetadata: () => {
         // A vendor that reports no cost on the wire has still charged for the

@@ -554,9 +554,13 @@ export class GeminiChatRuntime implements ChatRuntime {
         sessionId,
       });
       this.sessionInvalidated = false;
-      this.loadedSessionId = response.sessionId;
-      this.sessionId = response.sessionId;
-      this.sessionCwds.set(response.sessionId, cwd);
+      // The id that was asked for, where the agent does not echo one: a load
+      // confirms the session by succeeding, and OpenCode's ACP — the same
+      // protocol this speaks — answers with config options and nothing else.
+      const boundSessionId = response.sessionId ?? sessionId;
+      this.loadedSessionId = boundSessionId;
+      this.sessionId = boundSessionId;
+      this.sessionCwds.set(boundSessionId, cwd);
       this.syncSessionDiscovery({
         configOptions: response.configOptions ?? null,
         models: response.models ?? null,
