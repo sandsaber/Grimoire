@@ -706,6 +706,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // references stand for, its own dynamic ordering and its sink.
       'src/app/execution/grok/GrokExecutionComposition.ts',
       'src/providers/grok/execution/GrokAcpDynamicConfig.ts',
+      'src/providers/grok/execution/GrokContentPresenter.ts',
       'src/providers/grok/execution/GrokExecutionBackend.ts',
       'src/providers/grok/execution/GrokExecutionRequests.ts',
       'src/providers/grok/execution/GrokProjectionResultSink.ts',

@@ -4091,7 +4091,7 @@ delivery and refusal — proven by removing the subscription.
 
 Gates: unit 470 suites / 7,603 tests, typecheck, lint, and `build:release` clean.
 
-### M2-flips wave 5 — Grok's dark backend half (this commit)
+### M2-flips wave 5 — Grok's dark backend half (`50e8bcc`)
 
 The second provider on the shared managed-ACP backend, and the first to cost what wave 4 said the
 remaining waves should. `GrokExecutionBackend` is a descriptor and a constructor; everything else
@@ -4130,6 +4130,40 @@ a test that wrote the top-level one was asserting nothing.
 
 Gates: unit 471 suites / 7,609 tests, typecheck, lint, and `build:release` clean.
 
+### M2-flips wave 5 — Grok's content surface, and what a turn costs (this commit)
+
+`GrokContentPresenter` draws a turn the way OpenCode's does — the shared ACP normalization with
+Grok's own tool vocabulary over it — plus the three updates only Grok sends, which the recording is
+the evidence for and which the shipped runtime drops:
+
+- **`response_completed` carries the turn's tokens, and nothing else does.** Grok's answer to
+  `session/prompt` is a stop reason with no usage at all, so a badge fed the way OpenCode's is would
+  stay empty for every turn;
+- **`turn_completed` carries the bill.** Following it to the end was worth doing: the legacy reads a
+  cost off Grok's own session log, and for the recorded turn **there is no cost record in that log**
+  — only `costUsdTicks`. So the spend indicator does not move today, and the number it needs was on
+  the wire all along;
+- **`model_changed`** is how a session says the model moved under the tab, which a `/model` typed
+  into the composer does.
+
+**The unit is documented, not guessed.** `costUsdTicks: 69751000` could have been anything; the CLI's
+own help settles it — "`total_cost_usd_ticks` is the same value in exact integer ticks (1 USD = 10^10
+ticks)… summing per-invocation ticks matches the server's usage export exactly, which float dollars
+cannot guarantee." That is $0.0069751 for the recorded turn, the division happens once, and the
+integer is what travels until then.
+
+The tests read their expected values **out of the fixture**: the first draft hardcoded the numbers
+from an earlier capture and failed against the committed one, which is the useful way to learn that
+an assertion about a constant is not an assertion about the transformation. One of them replays every
+notification the recording carried, in order, and asserts what comes out is a message, its thinking
+and the badge — and nothing at all for the updates that are not content.
+
+Still not here: **interactions**, where the bridge refuses every permission request, and the
+**runtime half**. Grok's own MCP surface — eleven `_x.ai/*` methods, of which the servers and their
+startup status are two — is untouched and still owed a decision before the flip.
+
+Gates: unit 471 suites / 7,615 tests, typecheck, lint, and `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -4162,7 +4196,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **a review of the flip** — seven findings, all real, five of which the live matrix ran straight past | `ef32886` |
 | **wave 5: the backend goes shared** — fifty-seven of sixty provider mentions were injected contract names, so the managed-ACP backend is now one class with a descriptor port | `476fd48` |
 | **wave 5: Grok's own envelope** — the parser that refused the shape the CLI sends, and a client that now subscribes to a vendor's methods | `e424c99` |
-| **wave 5: Grok's dark backend half** — a launch that is a command line, its own setters, and the two flags that restart a process rather than configure a session | this commit |
+| **wave 5: Grok's dark backend half** — a launch that is a command line, its own setters, and the two flags that restart a process rather than configure a session | `50e8bcc` |
+| **wave 5: Grok's content surface** — the three updates only Grok sends, and the bill that was on the wire while the runtime read the disk | this commit |
 
 Four providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode.
 
