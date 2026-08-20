@@ -3,6 +3,10 @@ import { isAbsolute } from 'node:path';
 
 import { NodeManagedAcpProcessLauncher } from '@/app/execution/acp/NodeManagedAcpProcessLauncher';
 import {
+  type GrokMetadataLaunch,
+  GrokMetadataSession,
+} from '@/app/execution/grok/GrokMetadataSession';
+import {
   executionSessionId,
   interactionId,
   runId,
@@ -39,6 +43,7 @@ import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpMan
 import { AcpWorkspaceFileSystem } from '@/providers/acp/execution/AcpWorkspaceFileSystem';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
 import type { ManagedAcpExecutionBackendContext } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
+import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createGrokModuleContext } from '@/providers/grok/app/GrokModuleContext';
 import { grokPlanUsageStore } from '@/providers/grok/app/GrokPlanUsageStore';
 import { GROK_PROVIDER_CAPABILITIES } from '@/providers/grok/capabilities';
@@ -93,6 +98,9 @@ const MAX_RESULT_BYTES = 256_000;
  * same question — the plan indicator is otherwise empty for this provider.
  */
 const GROK_BILLING_METHOD = 'x.ai/billing';
+
+/** Where a session opened only to answer a question keeps its state. */
+const GROK_METADATA_ARTIFACTS_SUBDIR = 'grok/metadata';
 
 /**
  * Grok chat execution, assembled from the running plugin.
@@ -153,6 +161,9 @@ export class GrokExecution {
 
   private readonly presenters = new Set<GrokInteractionPresenter>();
 
+  private metadataSession: GrokMetadataSession | undefined;
+  private clientFactory: ManagedAcpClientFactory | undefined;
+
   /** This composition's identity in the plan-usage store's reader table. */
   private readonly billingReaderOwner = {};
 
@@ -182,8 +193,9 @@ export class GrokExecution {
    * a turn is composed is testing the wrong thing.
    */
   createBackend(
-    clientFactory: ManagedAcpClientFactory = this.createClientFactory(),
+    clientFactory: ManagedAcpClientFactory = this.clientFactory ??= this.createClientFactory(),
   ): GrokExecutionBackend {
+    this.clientFactory ??= clientFactory;
     const context: Omit<ManagedAcpExecutionBackendContext, 'descriptor'> = {
       clientFactory,
       requestResolver: this.requests,
@@ -516,6 +528,28 @@ export class GrokExecution {
     return runtime;
   }
 
+  /**
+   * What Grimoire asks Grok when nobody is having a conversation.
+   *
+   * The model catalog, the settings tab, the chat toolbar and the command
+   * loader all need the same two answers, and each of them used to build a
+   * whole chat runtime to get them. One isolated session serves all of them.
+   */
+  get metadata(): GrokMetadataSession {
+    this.metadataSession ??= new GrokMetadataSession({
+      // The same factory the backend runs on, so a test that hands the backend
+      // a fake agent is not answered by a real process launched behind it.
+      clientFactory: this.clientFactory ??= this.createClientFactory(),
+      launch: () => this.metadataLaunch(),
+      settingsBag: () => this.plugin.settings,
+      saveSettings: () => this.plugin.saveSettings(),
+      refreshSelectors: () => this.refreshSelectors(),
+      workspaceRoot: () => getVaultPath(this.plugin.app) ?? process.cwd(),
+      cliPath: () => this.plugin.getResolvedProviderCliPath('grok') ?? 'grok',
+    });
+    return this.metadataSession;
+  }
+
   /** Drops every reference held, and takes down whatever is on screen. */
   dispose(): void {
     // Taken down before the subscriptions are dropped: unsubscribing first
@@ -718,6 +752,51 @@ export class GrokExecution {
         resolve: startupRef => this.requests.resolveLaunch(startupRef),
       }),
     });
+  }
+
+  /**
+   * The process a question is asked in, which is nobody's conversation.
+   *
+   * Its own managed home is what makes it isolated — the same isolation the
+   * auxiliary query runner uses — so asking what models exist never binds a
+   * session to a tab or leaves one in the chat home's session store. The
+   * permission policy is the vault's, because a launch flag is not optional.
+   */
+  private async metadataLaunch(): Promise<GrokMetadataLaunch> {
+    const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
+      this.plugin.settings,
+      'grok',
+    );
+    const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
+    const executable = this.plugin.getResolvedProviderCliPath('grok') ?? 'grok';
+    const permissionMode = resolveGrokPermissionModeForSettings(settings.permissionMode);
+    const artifacts = await prepareGrokLaunchArtifacts({
+      artifactsSubdir: GROK_METADATA_ARTIFACTS_SUBDIR,
+      permissionMode,
+      settings: {
+        customPrompt: this.plugin.settings.systemPrompt,
+        mediaFolder: this.plugin.settings.mediaFolder,
+        userName: this.plugin.settings.userName,
+        vaultPath: cwd,
+      },
+      workspaceRoot: cwd,
+    });
+    const runtimeEnv = buildGrokRuntimeEnv(this.plugin.settings, executable, artifacts.grokHomePath);
+    return {
+      startupRef: this.requests.referenceLaunch({
+        executable,
+        arguments: buildGrokAgentProcessArgs(null, permissionMode),
+        cwd,
+        environment: definedEnvironment({
+          ...runtimeEnv,
+          PATH: getEnhancedPath(runtimeEnv.PATH, isAbsolute(executable) ? executable : undefined),
+        }),
+      }),
+      cwd,
+      mcpServers: toAcpMcpServers([
+        ...(ProviderWorkspaceRegistry.getMcpServerManager('grok')?.getServers() ?? []),
+      ]),
+    };
   }
 
   /**

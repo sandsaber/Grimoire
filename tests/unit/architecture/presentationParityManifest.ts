@@ -717,6 +717,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/app/execution/grok/GrokExecutionComposition.ts',
       'src/providers/grok/GrokProviderModule.ts',
       'src/providers/grok/app/GrokModuleContext.ts',
+      'src/app/execution/grok/GrokMetadataSession.ts',
       'src/providers/grok/execution/GrokAcpDynamicConfig.ts',
       'src/providers/grok/execution/GrokContentPresenter.ts',
       'src/providers/grok/execution/GrokInteractionBridge.ts',

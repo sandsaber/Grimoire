@@ -4376,6 +4376,36 @@ Gates: unit 473 suites / 7,641 tests, typecheck, `eslint` over `src` and `tests`
 `GrokChatRuntime`, and the flip is the next checkpoint.
 
 
+### M2-flips wave 5 — what Grok is asked when nobody is talking to it (this commit)
+
+Five surfaces construct a whole `GrokChatRuntime` for something that is not a chat: the model
+catalog's refresh, the runtime command loader, two in the settings tab, and the chat UI config's
+model warm-up. All of them want one of two answers — which models exist and what a model can think
+at, or which commands a session offers — and the runtime's only part in it was opening a session and
+reading the reply. `GrokMetadataSession` is that session, isolated by its own managed home under
+`.grimoire/grok/metadata`, which is the isolation the auxiliary query runner already uses.
+
+Three things it does that wave 4's does not:
+
+- **selects a model through the method Grok has for it**, `session/set_model`, where OpenCode sets a
+  config option;
+- **refuses a model the vault has never discovered.** The legacy warm-up checked the catalog before
+  sending, and without that check a stale selection is sent to a session that has no such model;
+- **carries the vault's permission policy on its command line**, because for this provider a launch
+  flag is not optional — there is no session-level mode to fall back to.
+
+**A test that pinned nothing, caught by breaking it.** The row asserting that a metadata question
+does not become the vault's model selection stayed green with `seedActiveSelection: true`: seeding
+only ever writes an *unset* selection, and the session-open sync in the same call has already set
+one. The flag is kept, because it mirrors the legacy warm-up and matters when a session reports no
+models at all — but the assertion is gone, replaced by a comment saying why no assertion there could
+tell its presence from its absence. Of the three other breaks, dropping the catalog guard reds one
+row and never closing the client reds five.
+
+Gates: unit 473 suites / 7,647 tests, typecheck, `eslint` over `src` and `tests` clean. Dark: the
+five call sites still build runtimes, and the flip is what moves them.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
