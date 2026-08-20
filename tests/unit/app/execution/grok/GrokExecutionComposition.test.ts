@@ -9,14 +9,18 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { GrokExecution } from '@/app/execution/grok/GrokExecutionComposition';
 import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
-import { executionSessionId, runId } from '@/core/execution/ExecutionIds';
+import { executionSessionId, type InteractionId, runId } from '@/core/execution/ExecutionIds';
 import { JsonRpcErrorResponse } from '@/providers/acp';
 import type {
   ManagedAcpClient,
   ManagedAcpClientFactory,
   ManagedAcpClientFactoryInput,
 } from '@/providers/acp/execution/ManagedAcpClient';
-import type { AcpSessionNotification, AcpSetSessionModeRequest } from '@/providers/acp/types';
+import type {
+  AcpRequestPermissionResponse,
+  AcpSessionNotification,
+  AcpSetSessionModeRequest,
+} from '@/providers/acp/types';
 import { GROK_EXECUTION_DESCRIPTOR } from '@/providers/grok/execution/GrokExecutionBackend';
 import { updateGrokProviderSettings } from '@/providers/grok/settings';
 
@@ -66,22 +70,45 @@ describe('Grok execution composition', () => {
   }
 
   /** One ACP agent, without an agent. */
-  function createFakeAcp(options: { modeIsUnsupported?: boolean } = {}): {
+  function createFakeAcp(options: {
+    asksPermission?: boolean;
+    modeIsUnsupported?: boolean;
+  } = {}): {
     factory: ManagedAcpClientFactory;
     startupRefs: string[];
     prompts: unknown[];
     models: string[];
     modes: AcpSetSessionModeRequest[];
     configOptions: unknown[];
+    permissions: Array<Promise<AcpRequestPermissionResponse>>;
   } {
     const startupRefs: string[] = [];
     const prompts: unknown[] = [];
     const models: string[] = [];
     const modes: AcpSetSessionModeRequest[] = [];
     const configOptions: unknown[] = [];
+    const permissions: Array<Promise<AcpRequestPermissionResponse>> = [];
     const factory: ManagedAcpClientFactory = {
       create: async (input: ManagedAcpClientFactoryInput) => {
         startupRefs.push(input.startupRef);
+        const ask = (): void => {
+          permissions.push(input.requestPermission({
+            sessionId: 'grok-session',
+            options: [
+              { optionId: 'once', kind: 'allow_once', name: 'Allow' },
+              { optionId: 'no', kind: 'reject_once', name: 'Deny' },
+            ],
+            // The kind is what names this one. A title of "Shell" matches
+            // nothing in the vocabulary and would be read back at the user
+            // verbatim; `execute` is what makes it a shell command.
+            toolCall: {
+              toolCallId: 'tool-1',
+              title: 'Shell',
+              kind: 'execute',
+              rawInput: { command: 'ls' },
+            },
+          }));
+        };
         let notify: ((notification: AcpSessionNotification) => void) | undefined;
         const client: ManagedAcpClient = {
           initialize: async () => undefined,
@@ -99,6 +126,14 @@ describe('Grok execution composition', () => {
           loadSession: async request => ({ sessionId: request.sessionId }),
           prompt: async request => {
             prompts.push(request);
+            if (options.asksPermission) {
+              // ACP asks before it runs anything, over a pipe: the work that
+              // follows the answer starts a task later, never on the same
+              // microtask drain.
+              ask();
+              await permissions.at(-1);
+              await new Promise(resolve => { setTimeout(resolve, 0); });
+            }
             notify?.({
               sessionId: 'grok-session',
               update: {
@@ -137,10 +172,11 @@ describe('Grok execution composition', () => {
         return client;
       },
     };
-    return { factory, startupRefs, prompts, models, modes, configOptions };
+    return { factory, startupRefs, prompts, models, modes, configOptions, permissions };
   }
 
   async function createHarness(options: {
+    asksPermission?: boolean;
     plugin?: any;
     modeIsUnsupported?: boolean;
   } = {}): Promise<{
@@ -151,6 +187,7 @@ describe('Grok execution composition', () => {
     models: string[];
     modes: AcpSetSessionModeRequest[];
     configOptions: unknown[];
+    permissions: Array<Promise<AcpRequestPermissionResponse>>;
     events: ExecutionEventEnvelope[];
   }> {
     const host = new ExecutionKernelHost({
@@ -172,6 +209,22 @@ describe('Grok execution composition', () => {
     const events: ExecutionEventEnvelope[] = [];
     host.registry.observe(SESSION_ID, envelope => events.push(envelope));
     return { execution, host, events, ...fake };
+  }
+
+  async function waitForInteraction(
+    events: ExecutionEventEnvelope[],
+  ): Promise<{ interactionId: InteractionId; presentationRef: string }> {
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      const opened = events.find(envelope => envelope.event.kind === 'interaction-opened');
+      if (opened?.event.kind === 'interaction-opened') {
+        return {
+          interactionId: opened.event.interaction.interactionId,
+          presentationRef: opened.event.interaction.presentationRef,
+        };
+      }
+      await new Promise(resolve => { setTimeout(resolve, 5); });
+    }
+    throw new Error('No interaction was opened.');
   }
 
   async function settle(
@@ -217,6 +270,49 @@ describe('Grok execution composition', () => {
     expect(prompts).toHaveLength(1);
     expect(events.find(envelope => envelope.event.kind === 'terminal')?.event)
       .toMatchObject({ terminal: 'succeeded' });
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('asks before it runs a command, in Grok own words', async () => {
+    // ACP asks the client before an edit or a command, and Grok names its
+    // permissions by the tool and the kind together — a distinction the shared
+    // bridge does not make and its vocabulary does.
+    const { execution, host, permissions, events } = await createHarness({
+      asksPermission: true,
+    });
+
+    const requestRef = execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'run it' }],
+    });
+    await host.registry.startRun(SESSION_ID, {
+      runId: RUN_ID,
+      owner: OWNER,
+      requestRef,
+      resultExpectation: 'required',
+    });
+    const opened = await waitForInteraction(events);
+
+    expect(execution.interactionBridge.presentation(opened.presentationRef))
+      .toEqual(expect.objectContaining({
+        toolName: 'bash',
+        description: 'Grok Build wants to run a shell command.',
+        options: [
+          { responseId: 'allow-once', label: 'Allow', presentation: 'allow' },
+          { responseId: 'reject-once', label: 'Deny', presentation: 'reject' },
+        ],
+      }));
+
+    await host.registry.resolveInteraction({
+      interactionId: opened.interactionId,
+      responseId: 'allow-once',
+      resolvedAt: 1,
+    });
+    await settle(host, events);
+
+    await expect(permissions[0]).resolves.toEqual({
+      outcome: { outcome: 'selected', optionId: 'once' },
+    });
     execution.dispose();
     await host.dispose();
   });

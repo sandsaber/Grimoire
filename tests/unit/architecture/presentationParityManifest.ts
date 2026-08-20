@@ -579,6 +579,9 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/codex/runtime/CodexExecutionConnection.ts',
       'src/providers/gemini/runtime/GeminiChatRuntime.ts',
       'src/providers/grok/runtime/GrokChatRuntime.ts',
+      // Extracted from that runtime, which delegates to it, so the flip does
+      // not produce a second opinion about what a permission is asking for.
+      'src/providers/grok/execution/GrokPermissionPresentation.ts',
       'src/providers/kimicode/runtime/KimicodeChatRuntime.ts',
       'src/providers/mimocode/runtime/MimocodeChatRuntime.ts',
       // The shared managed-ACP platform, live since OpenCode's flip and
@@ -589,6 +592,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/acp/execution/AcpContentPayload.ts',
       'src/providers/acp/execution/AcpManagedClientAdapter.ts',
       'src/providers/acp/execution/ManagedAcpClient.ts',
+      'src/providers/acp/execution/AcpApprovalPresenter.ts',
+      'src/providers/acp/execution/AcpPermissionBridge.ts',
       'src/providers/acp/execution/ManagedAcpExecutionBackend.ts',
       // OpenCode chat execution, flipped: the first ACP provider on the kernel,
       // and the isolated session the four metadata surfaces now share.
@@ -707,6 +712,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/app/execution/grok/GrokExecutionComposition.ts',
       'src/providers/grok/execution/GrokAcpDynamicConfig.ts',
       'src/providers/grok/execution/GrokContentPresenter.ts',
+      'src/providers/grok/execution/GrokInteractionBridge.ts',
       'src/providers/grok/execution/GrokExecutionBackend.ts',
       'src/providers/grok/execution/GrokExecutionRequests.ts',
       'src/providers/grok/execution/GrokProjectionResultSink.ts',

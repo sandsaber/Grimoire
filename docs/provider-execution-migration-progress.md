@@ -4130,7 +4130,7 @@ a test that wrote the top-level one was asserting nothing.
 
 Gates: unit 471 suites / 7,609 tests, typecheck, lint, and `build:release` clean.
 
-### M2-flips wave 5 — Grok's content surface, and what a turn costs (this commit)
+### M2-flips wave 5 — Grok's content surface, and what a turn costs (`c37b300`)
 
 `GrokContentPresenter` draws a turn the way OpenCode's does — the shared ACP normalization with
 Grok's own tool vocabulary over it — plus the three updates only Grok sends, which the recording is
@@ -4163,6 +4163,31 @@ Still not here: **interactions**, where the bridge refuses every permission requ
 startup status are two — is untouched and still owed a decision before the flip.
 
 Gates: unit 471 suites / 7,615 tests, typecheck, lint, and `build:release` clean.
+
+### M2-flips wave 5 — interactions, and the second thing that was never one provider's (this commit)
+
+Wave 4 built OpenCode's permission bridge and its approval presenter. Writing Grok's showed the same
+thing the backend showed: **only one line of the bridge was ever OpenCode's** — the call that turns a
+request into a sentence. The id minting under the control store's identifier rule, the three
+different refusals, and the round trip back to the agent's own `optionId` are all the protocol.
+
+So both moved: `AcpPermissionBridge`, which takes a provider's vocabulary as a port, and
+`AcpApprovalPresenter`, which was already generic. OpenCode's twenty interaction tests pass
+unchanged on them, which is the same proof the backend extraction gave. What Grok's interactions
+then cost is a vocabulary and a subclass.
+
+**Grok names a permission by the tool *and* the kind**, where OpenCode names it by the tool alone —
+`kind: 'execute'` is what makes a request titled "Shell" a shell command rather than a tool called
+Shell. That vocabulary is 218 lines lifted out of the legacy runtime, which now delegates to it.
+
+A test that claimed to pin that distinction did not. The composition's approval row was green with
+the kind removed, because the fake's title was `bash` and the vocabulary resolves that on the title
+alone — the assertion agreed with its comment only by accident. The fake now sends a title the
+vocabulary has no rule for, and the row goes red without the kind.
+
+Gates: unit 472 suites / 7,616 tests, typecheck, lint clean. The shared bridge and presenter are
+recorded as wired; Grok's vocabulary is wired too, because the runtime that reaches it is still the
+one in production.
 
 ## Current blocker
 
@@ -4197,7 +4222,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **wave 5: the backend goes shared** — fifty-seven of sixty provider mentions were injected contract names, so the managed-ACP backend is now one class with a descriptor port | `476fd48` |
 | **wave 5: Grok's own envelope** — the parser that refused the shape the CLI sends, and a client that now subscribes to a vendor's methods | `e424c99` |
 | **wave 5: Grok's dark backend half** — a launch that is a command line, its own setters, and the two flags that restart a process rather than configure a session | `50e8bcc` |
-| **wave 5: Grok's content surface** — the three updates only Grok sends, and the bill that was on the wire while the runtime read the disk | this commit |
+| **wave 5: Grok's content surface** — the three updates only Grok sends, and the bill that was on the wire while the runtime read the disk | `c37b300` |
+| **wave 5: interactions** — the permission bridge and the approval presenter go shared, and Grok's vocabulary is what is left | this commit |
 
 Four providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode.
 

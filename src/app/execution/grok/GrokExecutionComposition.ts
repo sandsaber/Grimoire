@@ -14,16 +14,14 @@ import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceReg
 import type GrimoirePlugin from '@/main';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
-import type {
-  ManagedAcpExecutionBackendContext,
-  ManagedAcpInteractionBridge,
-} from '@/providers/acp/execution/ManagedAcpExecutionBackend';
+import type { ManagedAcpExecutionBackendContext } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
 import { GrokAcpDynamicConfigApplier } from '@/providers/grok/execution/GrokAcpDynamicConfig';
 import { GrokExecutionBackend } from '@/providers/grok/execution/GrokExecutionBackend';
 import {
   GrokExecutionRequests,
   type GrokInvocationEnvironment,
 } from '@/providers/grok/execution/GrokExecutionRequests';
+import { GrokInteractionBridge } from '@/providers/grok/execution/GrokInteractionBridge';
 import { GrokProjectionResultSink } from '@/providers/grok/execution/GrokProjectionResultSink';
 import { resolveGrokPermissionModeForSettings } from '@/providers/grok/modes';
 import { buildGrokAgentProcessArgs } from '@/providers/grok/runtime/GrokLaunchArgs';
@@ -63,16 +61,22 @@ const MAX_RESULT_BYTES = 256_000;
  *   the mode falls back to a config option on a release that answers "method
  *   not found".
  *
- * Two things are deliberately **not** here, each its own increment and each
- * named so a flip cannot land while it is missing: **the content surface**,
- * where the three wrapped updates have to become chunks and usage, and
- * **interactions**, where the bridge below refuses every permission request.
+ * One thing is deliberately **not** here, named so a flip cannot land while it
+ * is missing: **the runtime half**, which is what constructs the content
+ * presenter and the approval presenter and answers their ports. Both are built;
+ * nothing yet holds them for a tab.
  */
 export class GrokExecution {
   private readonly requests = new GrokExecutionRequests(
     () => opaqueId('grokreq'),
     () => this.environment(),
   );
+
+  /**
+   * One bridge for every tab, because the backend is one and it prepares every
+   * request through the bridge it was built with.
+   */
+  private readonly interactions = new GrokInteractionBridge(() => opaqueId('grokix'));
 
   private backend: GrokExecutionBackend | undefined;
 
@@ -81,6 +85,11 @@ export class GrokExecution {
     /** Held for the runtime half: a tab dispatches through the same registry. */
     readonly registry: ExecutionLifecycleRegistry,
   ) {}
+
+  /** What every open permission request is asking, for the tab that shows it. */
+  get interactionBridge(): GrokInteractionBridge {
+    return this.interactions;
+  }
 
   /** The store every tab runtime will reference its turns through. */
   get turnRequests(): GrokExecutionRequests {
@@ -103,7 +112,7 @@ export class GrokExecution {
       dynamicApplier: new GrokAcpDynamicConfigApplier({
         resolve: dynamicRef => this.requests.resolveDynamic(dynamicRef),
       }),
-      interactionBridge: refusingInteractionBridge(),
+      interactionBridge: this.interactions,
       resultSink: new GrokProjectionResultSink(),
       reconciler: {
         // What is known about a run this process did not see finish: nothing.
@@ -229,26 +238,6 @@ export class GrokExecution {
       mcpServers: ProviderWorkspaceRegistry.getMcpServerManager('grok')?.getServers() ?? [],
     };
   }
-}
-
-/**
- * The bridge a flip must replace.
- *
- * Fail-closed rather than absent: ACP asks before an edit or a command, and a
- * composition wired up before its approval surface exists must refuse that work
- * instead of allowing it silently.
- */
-function refusingInteractionBridge(): ManagedAcpInteractionBridge {
-  return {
-    prepare: async () => ({
-      kind: 'approval',
-      presentationRef: opaqueId('grokix'),
-      responseIds: ['refused'],
-      providerResolvedResponseId: 'refused',
-      resolve: async () => ({ outcome: { outcome: 'cancelled' } }),
-      cancel: async () => ({ outcome: { outcome: 'cancelled' } }),
-    }),
-  };
 }
 
 function definedEnvironment(
