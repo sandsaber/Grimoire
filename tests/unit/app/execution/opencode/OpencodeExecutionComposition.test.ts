@@ -96,7 +96,19 @@ describe('OpenCode execution composition', () => {
         let notify: ((notification: AcpSessionNotification) => void) | undefined;
         const client: ManagedAcpClient = {
           initialize: async () => undefined,
-          newSession: async () => ({ sessionId: 'acp-session-1' }),
+          // What a session answers with when it opens, which is where the
+          // models and the modes a tab can choose from are said.
+          newSession: async () => ({
+            sessionId: 'acp-session-1',
+            models: {
+              availableModels: [{ id: 'opencode/big-pickle', name: 'Big Pickle' }],
+              currentModelId: 'opencode/big-pickle',
+            },
+            modes: {
+              availableModes: [{ id: 'build', name: 'Build' }],
+              currentModeId: 'build',
+            },
+          }),
           loadSession: async () => ({ sessionId: 'acp-session-1' }),
           prompt: async request => {
             prompts.push(request);
@@ -252,9 +264,11 @@ describe('OpenCode execution composition', () => {
     // emits is only a contract if something actually renders it.
     const { execution, host, events } = await createHarness();
     const costs: unknown[] = [];
+    const opened: unknown[] = [];
     const presenter = new OpencodeContentPresenter({
       displayModel: () => 'opencode/big-pickle',
       onCost: cost => costs.push(cost),
+      onSessionOpened: opening => opened.push(opening),
     });
 
     const requestRef = execution.turnRequests.reference({
@@ -294,6 +308,13 @@ describe('OpenCode execution composition', () => {
       }),
     );
     expect(costs).toEqual([{ amount: 0.25, currency: 'USD' }]);
+    // The models and modes the selectors are built from, which the session
+    // says once and nothing repeats.
+    expect(opened).toEqual([expect.objectContaining({
+      sessionId: 'acp-session-1',
+      models: expect.objectContaining({ currentModelId: 'opencode/big-pickle' }),
+      modes: expect.objectContaining({ currentModeId: 'build' }),
+    })]);
     expect(presenter.lastSessionId()).toBe('acp-session-1');
     // The answer itself stays on the kernel's channel; a second copy here
     // prints every sentence twice.

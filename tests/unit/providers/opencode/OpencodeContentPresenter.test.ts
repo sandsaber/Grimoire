@@ -1,6 +1,7 @@
 import { TOOL_READ } from '@/core/tools/toolNames';
 import type { SlashCommand } from '@/core/types';
 import type {
+  AcpNewSessionResponse,
   AcpPromptResponse,
   AcpSessionConfigOption,
   AcpSessionNotification,
@@ -9,6 +10,7 @@ import type {
 import {
   type OpencodeContentPayload,
   OpencodeContentPresenter,
+  type OpencodeSessionOpening,
 } from '@/providers/opencode/execution/OpencodeContentPresenter';
 
 /**
@@ -25,16 +27,24 @@ describe('OpenCode content presenter', () => {
     readonly configOptions: AcpSessionConfigOption[][];
     readonly costs: unknown[];
     readonly modes: string[];
+    readonly opened: OpencodeSessionOpening[];
   }
 
   function createPresenter(): { presenter: OpencodeContentPresenter; recorded: Recorded } {
-    const recorded: Recorded = { commands: [], configOptions: [], costs: [], modes: [] };
+    const recorded: Recorded = {
+      commands: [],
+      configOptions: [],
+      costs: [],
+      modes: [],
+      opened: [],
+    };
     const presenter = new OpencodeContentPresenter({
       displayModel: () => 'opencode/big-pickle',
       onCommands: commands => recorded.commands.push([...commands]),
       onConfigOptions: options => recorded.configOptions.push([...options]),
       onCost: cost => recorded.costs.push(cost),
       onCurrentMode: modeId => recorded.modes.push(modeId),
+      onSessionOpened: opened => recorded.opened.push(opened),
     });
     return { presenter, recorded };
   }
@@ -46,6 +56,10 @@ describe('OpenCode content presenter', () => {
 
   function promptResult(response: AcpPromptResponse): OpencodeContentPayload {
     return { kind: 'prompt-result', response };
+  }
+
+  function sessionConfig(session: AcpNewSessionResponse): OpencodeContentPayload {
+    return { kind: 'session-config', session };
   }
 
   it('renders the tool call a card is drawn from', () => {
@@ -259,6 +273,45 @@ describe('OpenCode content presenter', () => {
     expect(recorded.commands[0]?.[0]).toEqual(expect.objectContaining({ name: 'brainstorming' }));
     expect(recorded.configOptions[0]?.[0]).toEqual(expect.objectContaining({ id: 'model' }));
     expect(recorded.modes).toEqual(['plan']);
+  });
+
+  it('reports the configuration the session was opened with', () => {
+    const { presenter, recorded } = createPresenter();
+
+    const chunks = presenter.present(sessionConfig({
+      sessionId: 'acp-session-1',
+      configOptions: [{
+        id: 'model',
+        name: 'Model',
+        category: 'model',
+        type: 'select',
+        currentValue: 'opencode/big-pickle',
+        options: [{ value: 'opencode/big-pickle', name: 'Big Pickle' }],
+      }] as unknown as AcpSessionConfigOption[],
+      models: { availableModels: [{ id: 'opencode/big-pickle', name: 'Big Pickle' }], currentModelId: 'opencode/big-pickle' },
+      modes: { availableModes: [{ id: 'build', name: 'Build' }], currentModeId: 'build' },
+    }));
+
+    // The model list and the mode list are answered once, when the session is
+    // created or loaded, and by nothing else afterwards — a selector fed only
+    // from later updates stays empty on a fresh vault.
+    expect(chunks).toEqual([]);
+    expect(recorded.opened).toEqual([expect.objectContaining({
+      configOptions: [expect.objectContaining({ id: 'model' })],
+      models: expect.objectContaining({ currentModelId: 'opencode/big-pickle' }),
+      modes: expect.objectContaining({ currentModeId: 'build' }),
+    })]);
+    // The mode a session opens on is OpenCode's default, not the user's pick,
+    // so it must not reach the toolbar the way a mode switch does.
+    expect(recorded.modes).toEqual([]);
+  });
+
+  it('learns the session from the response that created it', () => {
+    const { presenter } = createPresenter();
+
+    presenter.present(sessionConfig({ sessionId: 'acp-session-1' }));
+
+    expect(presenter.lastSessionId()).toBe('acp-session-1');
   });
 
   it('starts each turn without the last turn message ids', () => {

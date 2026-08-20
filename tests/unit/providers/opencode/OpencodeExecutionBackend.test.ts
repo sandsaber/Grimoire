@@ -48,15 +48,20 @@ describe('OpencodeExecutionBackend', () => {
     expect(fixture.stored).toEqual(['OpenCode result']);
     expect(session.getSnapshot().nativeSessionRef).toBe('native-session');
     expect(summarizeEvents(captured)).toEqual(trace.eventCases.success);
-    expect(captured[0]).toEqual(expect.objectContaining({
-      backendGeneration: trace.identity.backendGeneration,
-      executionSessionId: trace.identity.executionSessionId,
-      sessionInstanceId: trace.identity.sessionInstanceId,
-      scope: expect.objectContaining({
-        runId: trace.identity.runId,
-        nativeRunRef: trace.identity.nativeRunId,
+    // The first event that knows the dispatch identity, which is not the first
+    // event: what the session opened with is answered before the prompt is
+    // sent, so there is no native run to name yet.
+    expect(captured.find(event => event.event.kind === 'run-started')).toEqual(
+      expect.objectContaining({
+        backendGeneration: trace.identity.backendGeneration,
+        executionSessionId: trace.identity.executionSessionId,
+        sessionInstanceId: trace.identity.sessionInstanceId,
+        scope: expect.objectContaining({
+          runId: trace.identity.runId,
+          nativeRunRef: trace.identity.nativeRunId,
+        }),
       }),
-    }));
+    );
     const resultEvent = captured.find(event => event.event.kind === 'result');
     if (!resultEvent || resultEvent.event.kind !== 'result') throw new Error('No result event.');
     expect([
@@ -83,6 +88,9 @@ describe('OpencodeExecutionBackend', () => {
 
     const captured = await events;
     expect(contentPayloads(captured)).toEqual([
+      // What the session opened with comes first: it is answered before the
+      // prompt is even sent.
+      { kind: 'session-config', session: { sessionId: 'native-session' } },
       { kind: 'session-update', notification: planUpdate('native-session') },
       { kind: 'session-update', notification: usageUpdate('native-session') },
       { kind: 'session-update', notification: agentText('native-session', 'OpenCode result') },
@@ -91,6 +99,46 @@ describe('OpencodeExecutionBackend', () => {
         response: { stopReason: 'end_turn', userMessageId: 'message-1' },
       },
     ]);
+  });
+
+  it('forwards the configuration the session was opened with', async () => {
+    const fixture = createFixture();
+    fixture.client.newSessionConfigOptions = [{ id: 'model', name: 'Model' }];
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+    fixture.client.emit(agentText('native-session', 'OpenCode result'));
+    fixture.client.completePrompt({ stopReason: 'end_turn', userMessageId: 'message-1' });
+
+    // The models and the modes a tab can choose from are answered by
+    // `session/new` and by nothing afterwards; a selector fed only from later
+    // updates starts empty on a fresh vault.
+    expect(contentPayloads(await events)).toContainEqual({
+      kind: 'session-config',
+      session: expect.objectContaining({
+        sessionId: 'native-session',
+        configOptions: [{ id: 'model', name: 'Model' }],
+      }),
+    });
+  });
+
+  it('forwards the configuration again when a reconnect loads the session', async () => {
+    const second = new FakeManagedAcpClient('native-session');
+    second.newSessionConfigOptions = [{ id: 'model', name: 'Model' }];
+    const fixture = createFixture({ clients: [new FakeManagedAcpClient('native-session'), second] });
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+    fixture.client.loseConnection();
+    await waitFor(() => second.promptRequests.length === 1);
+    second.emit(agentText('native-session', 'recovered'));
+    second.completePrompt({ stopReason: 'end_turn', userMessageId: 'message-1' });
+
+    // A reloaded session answers with its own configuration, and the tab that
+    // reconnected must be told rather than keep the dead session's.
+    const configs = contentPayloads(await events)
+      .filter(payload => (payload as { kind?: string }).kind === 'session-config');
+    expect(configs).toHaveLength(2);
   });
 
   it('carries an assistant chunk to the surface before the text the kernel mirrors', async () => {
@@ -115,8 +163,11 @@ describe('OpencodeExecutionBackend', () => {
     await flushPromises();
 
     // A reader only ever sees a prefix of what will be committed, and the
-    // content channel is a reader like any other.
-    expect(contentPayloads(await events)).toEqual([]);
+    // content channel is a reader like any other. What the session opened with
+    // is still carried: it is not the text that overflowed.
+    expect(contentPayloads(await events).filter(
+      payload => (payload as { kind?: string }).kind === 'session-update',
+    )).toEqual([]);
   });
 
   it('loads the exact saved ACP session before dispatch', async () => {
@@ -216,6 +267,9 @@ describe('OpencodeExecutionBackend', () => {
 
     const captured = await events;
     expect(captured.map(event => event.event.kind)).toEqual([
+      // What the session was opened with, which is answered before the run is
+      // even dispatched.
+      'provider-content',
       'run-started',
       // The partial text reaches the reader before the connection drops, which
       // is the point of streaming it: a turn interrupted mid-answer still shows
@@ -265,8 +319,11 @@ describe('OpencodeExecutionBackend', () => {
 
     const captured = await events;
     expectTerminal(captured, 'indeterminate', 'effects-unknown');
-    expect(new Set(captured.map(event => (
-      event.scope.kind === 'run' ? event.scope.nativeRunRef : undefined
+    // Only the configuration the session opened with names nothing, having
+    // been emitted before the turn was dispatched; no event names a second
+    // native run.
+    expect(new Set(captured.flatMap(event => (
+      event.scope.kind === 'run' && event.scope.nativeRunRef ? [event.scope.nativeRunRef] : []
     )))).toEqual(new Set(['message-1']));
     expect(fixture.stored).toHaveLength(0);
   });
@@ -677,6 +734,7 @@ class FakeManagedAcpClient implements ManagedAcpClient {
   closeOutcome: 'confirmed' | 'unconfirmed' = 'confirmed';
   closeOutcomes: Array<'confirmed' | 'unconfirmed'> = [];
   newSessionGate?: Promise<void>;
+  newSessionConfigOptions?: unknown[];
   private promptCompletion = deferred<AcpPromptResponse>();
 
   constructor(private readonly createdSessionId: string) {}
@@ -685,12 +743,17 @@ class FakeManagedAcpClient implements ManagedAcpClient {
   async newSession(request: Parameters<ManagedAcpClient['newSession']>[0]) {
     this.newRequests.push(request);
     await this.newSessionGate;
-    return { sessionId: this.createdSessionId };
+    return { sessionId: this.createdSessionId, ...this.openingConfiguration() };
   }
   async loadSession(request: Parameters<ManagedAcpClient['loadSession']>[0]) {
     this.loadRequests.push(request);
     if (this.loadError) throw this.loadError;
-    return { sessionId: request.sessionId };
+    return { sessionId: request.sessionId, ...this.openingConfiguration() };
+  }
+  private openingConfiguration() {
+    return this.newSessionConfigOptions
+      ? { configOptions: this.newSessionConfigOptions as never }
+      : {};
   }
   prompt(request: Parameters<ManagedAcpClient['prompt']>[0]) {
     this.promptRequests.push(request);

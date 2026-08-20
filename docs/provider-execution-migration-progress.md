@@ -3632,7 +3632,7 @@ lint, and `build:release` clean. The bridge is declared dark in the parity manif
 presentation module is declared wired, and `main.js` confirms both — it contains the vocabulary and
 neither dark half.
 
-### M2-flips wave 4 — the surface an OpenCode approval is shown on (this commit)
+### M2-flips wave 4 — the surface an OpenCode approval is shown on (`a3f43df`)
 
 `OpencodeInteractionPresenter` is the half the bridge was missing: what puts a prepared approval on
 screen and turns what the person clicked back into an id the run can record. The tab speaks the
@@ -3661,6 +3661,37 @@ elsewhere.
 
 Gates: unit 469 suites / 7,597 tests, typecheck, lint clean. Declared dark in the parity manifest.
 
+### M2-flips wave 4 — what a session opens with (this commit)
+
+Found while planning the runtime half, by reading what the legacy runtime does with a session it has
+just created: **OpenCode answers `session/new` and `session/load` with its models, its modes and its
+config options, and says them nowhere else.** The legacy runtime syncs its model and mode state from
+exactly those two replies (and from the reply to each `setConfigOption`); no notification repeats
+them. The backend was discarding both replies and keeping the session id.
+
+A flip on top of that would have shipped a tab whose model selector and mode selector are empty on a
+fresh vault and stay empty until the user changes something — the kind of defect that looks like a
+rendering bug and is actually a missing wire fact. So the reply is now carried on the content
+channel as a third payload kind, and the presenter turns it into one port call. The recovery path
+carries it too: a reconnect loads the session again and answers with its own configuration, which
+the tab that is still open would otherwise not hear.
+
+**It is reported before the run starts**, because that is when the session is opened — the reply
+comes back during dispatch preparation, before the prompt is sent. That is legal precisely because
+content is transient: it writes no control record and advances no state machine, so it needs no run
+to have begun. Two existing assertions had to learn the same thing rather than be worked around: the
+first event of a turn is no longer the one that names the native run, and the overflow test now says
+what it always meant — that no *session update* is forwarded past the bound, not that nothing is.
+
+The mode in that reply is deliberately **not** treated as a mode switch. OpenCode reports its own
+default agent (`build`) there, and pushing it at the toolbar would overwrite the Safe/Plan/Auto the
+user picked before the turn applies theirs — which is the same reason the legacy runtime passes
+`emitPermissionSync: false` at exactly these two call sites.
+
+Gates: unit 469 suites / 7,601 tests, integration 5 / 145 (2 suites, 10 tests skipped), typecheck,
+lint, and `build:release` clean. The trace freezes the new event, and the composition test asserts
+the models and modes reach a real presenter through the kernel.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3681,7 +3712,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **wave 4 (OpenCode) backend half** — the first ACP provider on the kernel | `3b01158` |
 | **wave 4's content surface** — every session update and the prompt's own answer forwarded, and the presenter that draws a tab from them | `1ad9421` |
 | **wave 4's interactions** — the real permission bridge, the presentation vocabulary extracted from the legacy runtime, and an approval answered end to end through the kernel | `d11068c` |
-| **wave 4's approval surface** — the presenter that shows a prepared interaction and answers it in the kernel's ids | this commit |
+| **wave 4's approval surface** — the presenter that shows a prepared interaction and answers it in the kernel's ids | `a3f43df` |
+| **what a session opens with** — the models, modes and config options `session/new` answers with, carried to the surface instead of discarded | this commit |
 
 Three providers now execute through the kernel: Antigravity, Codex, Claude.
 

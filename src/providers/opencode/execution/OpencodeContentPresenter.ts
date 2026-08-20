@@ -4,8 +4,11 @@ import { AcpSessionUpdateNormalizer } from '@/providers/acp/AcpSessionUpdateNorm
 import type { AcpToolStreamAdapter } from '@/providers/acp/AcpToolStreamAdapter';
 import { buildAcpUsageInfo } from '@/providers/acp/buildAcpUsageInfo';
 import type {
+  AcpNewSessionResponse,
   AcpPromptResponse,
   AcpSessionConfigOption,
+  AcpSessionModelState,
+  AcpSessionModeState,
   AcpSessionNotification,
   AcpUsage,
   AcpUsageUpdate,
@@ -16,12 +19,22 @@ import { createOpencodeToolStreamAdapter } from '@/providers/opencode/normalizat
  * What the ACP connection delivered, in the two shapes it delivers it.
  *
  * A session update is a notification; the tokens a prompt cost arrive only in
- * the answer to `session/prompt`, and the badge reads zero on every turn
- * without them. Both are the wire, neither is interpreted before it gets here.
+ * the answer to `session/prompt`; and the models and modes a tab can choose
+ * from are answered once, by `session/new` or `session/load`, and by nothing
+ * afterwards. All three are the wire, none is interpreted before it gets here.
  */
 export type OpencodeContentPayload =
   | { readonly kind: 'session-update'; readonly notification: AcpSessionNotification }
-  | { readonly kind: 'prompt-result'; readonly response: AcpPromptResponse };
+  | { readonly kind: 'prompt-result'; readonly response: AcpPromptResponse }
+  | { readonly kind: 'session-config'; readonly session: AcpNewSessionResponse };
+
+/** What a session answered with when it was created or loaded. */
+export interface OpencodeSessionOpening {
+  readonly sessionId: string;
+  readonly configOptions?: readonly AcpSessionConfigOption[] | null;
+  readonly models?: AcpSessionModelState | null;
+  readonly modes?: AcpSessionModeState | null;
+}
 
 export interface OpencodeContentPresenterPorts {
   /** The model a usage badge is labelled with. */
@@ -34,6 +47,15 @@ export interface OpencodeContentPresenterPorts {
   readonly onCost?: (cost: AcpUsageUpdate['cost']) => void;
   /** The mode the session switched to, which the user may not have chosen. */
   readonly onCurrentMode?: (modeId: string) => void;
+  /**
+   * What the session answered with when it opened: the models, the modes and
+   * the config options a tab's selectors are built from.
+   *
+   * Separate from `onCurrentMode` because the mode reported here is OpenCode's
+   * own default rather than a switch: pushing it at the toolbar would overwrite
+   * the Safe/Plan/Auto the user picked, before the turn applies theirs.
+   */
+  readonly onSessionOpened?: (opening: OpencodeSessionOpening) => void;
 }
 
 /**
@@ -114,6 +136,9 @@ export class OpencodeContentPresenter {
     if (content?.kind === 'prompt-result') {
       return this.presentPromptResult(content.response);
     }
+    if (content?.kind === 'session-config') {
+      return this.presentSessionConfig(content.session);
+    }
     if (content?.kind !== 'session-update' || !content.notification) {
       return [];
     }
@@ -166,6 +191,30 @@ export class OpencodeContentPresenter {
       default:
         return [];
     }
+  }
+
+  /**
+   * What the session was opened with, which is the only answer there is.
+   *
+   * OpenCode reports its models, its modes and its config options in the reply
+   * to `session/new` and `session/load`, and never again unless something is
+   * set. A tab whose selectors were fed only from later updates would start
+   * empty on a fresh vault and stay empty until the user changed something.
+   */
+  private presentSessionConfig(
+    session: AcpNewSessionResponse | undefined,
+  ): readonly StreamChunk[] {
+    if (!session?.sessionId) {
+      return [];
+    }
+    this.sessionId = session.sessionId;
+    this.ports.onSessionOpened?.({
+      sessionId: session.sessionId,
+      ...(session.configOptions ? { configOptions: session.configOptions } : {}),
+      ...(session.models ? { models: session.models } : {}),
+      ...(session.modes ? { modes: session.modes } : {}),
+    });
+    return [];
   }
 
   /**

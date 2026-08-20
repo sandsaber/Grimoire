@@ -78,6 +78,7 @@
   },
   "eventCases": {
     "success": [
+      "provider-content:session-config",
       "run-started",
       "provider-content:agent_message_chunk",
       "output-delta",
@@ -86,6 +87,7 @@
       "terminal:succeeded:completed"
     ],
     "recoveryAfterOutput": [
+      "provider-content:session-config",
       "run-started",
       "provider-content:agent_message_chunk",
       "output-delta",

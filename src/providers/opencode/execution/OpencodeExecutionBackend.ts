@@ -37,6 +37,7 @@ import { ManagedAcpTerminationUnconfirmedError } from '@/providers/acp/execution
 import type {
   AcpContentBlock,
   AcpNewSessionRequest,
+  AcpNewSessionResponse,
   AcpPromptResponse,
   AcpRequestPermissionRequest,
   AcpRequestPermissionResponse,
@@ -453,8 +454,9 @@ class OpencodeExecutionSession implements ExecutionSession {
     await this.ensureClient(invocation);
     if (run.isTerminal) return;
     const generation = this.clientGeneration;
-    await this.ensureSessionBinding(invocation, generation);
+    const opened = await this.ensureSessionBinding(invocation, generation);
     if (run.isTerminal || generation !== this.clientGeneration) return;
+    if (opened) run.presentSessionConfig(opened);
     if (!this.client || !this.nativeSessionRef) {
       throw new ExecutionDispatchError('Managed ACP session is not ready.', true);
     }
@@ -525,7 +527,10 @@ class OpencodeExecutionSession implements ExecutionSession {
           throw new Error('Managed ACP retry process termination was not confirmed.');
         }
         await this.ensureClient(invocation, true);
-        await this.ensureSessionBinding(invocation, this.clientGeneration);
+        const reopened = await this.ensureSessionBinding(invocation, this.clientGeneration);
+        // The reconnected session answers with its own configuration, and the
+        // tab that is still open would otherwise keep the dead one's.
+        if (reopened) run.presentSessionConfig(reopened);
         await this.context.dynamicApplier.apply({
           client: this.client!,
           sessionId: this.nativeSessionRef!,
@@ -605,10 +610,18 @@ class OpencodeExecutionSession implements ExecutionSession {
     }
   }
 
+  /**
+   * Binds the session, and answers with what it reported when it opened.
+   *
+   * Returned rather than swallowed: the models, the modes and the config
+   * options a tab's selectors are built from are in this reply and in no
+   * notification afterwards. Nothing is returned when the session the client
+   * already holds is reused, because nothing new was said about it.
+   */
   private async ensureSessionBinding(
     invocation: OpencodeExecutionInvocation,
     generation: number,
-  ): Promise<void> {
+  ): Promise<AcpNewSessionResponse | undefined> {
     const client = this.client;
     if (!client) throw new ExecutionDispatchError('Managed ACP client is unavailable.', true);
     if (this.nativeSessionRef && this.loadedSessionRef !== this.nativeSessionRef) {
@@ -624,7 +637,7 @@ class OpencodeExecutionSession implements ExecutionSession {
         }
         this.requireCurrentClient(client, generation);
         this.loadedSessionRef = target;
-        return;
+        return response;
       } catch (error) {
         const missing = (this.context.isMissingSessionError ?? isAcpMissingSessionError)(error);
         if (!missing) throw new ExecutionDispatchError('Managed ACP session load failed.', true);
@@ -643,7 +656,9 @@ class OpencodeExecutionSession implements ExecutionSession {
       this.requireCurrentClient(client, generation);
       this.nativeSessionRef = response.sessionId;
       this.loadedSessionRef = response.sessionId;
+      return response;
     }
+    return undefined;
   }
 
   private handleNotification(notification: AcpSessionNotification): void {
@@ -799,6 +814,22 @@ class OpencodeExecutionRun implements ExecutionRun {
 
   emitRunStarted(): void {
     this.emit({ kind: 'run-started' });
+  }
+
+  /**
+   * What the session answered with when it was created or loaded.
+   *
+   * Carried on the content channel like every other thing the surface is drawn
+   * from, and before the run has started, because that is when the session is
+   * opened — a transient event writes no record and advances no state machine,
+   * so it needs no run to have begun.
+   */
+  presentSessionConfig(session: AcpNewSessionResponse): void {
+    if (this.terminal) return;
+    this.emit({
+      kind: 'provider-content',
+      payload: { kind: 'session-config', session } satisfies OpencodeContentPayload,
+    });
   }
 
   claimRecovery(attempt: number): boolean {
