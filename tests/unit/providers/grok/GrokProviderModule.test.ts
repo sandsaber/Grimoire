@@ -1,0 +1,268 @@
+import trace from '@test/fixtures/provider-traces/grok-execution.json';
+
+import { GROK_PROVIDER_CAPABILITIES } from '@/providers/grok/capabilities';
+import {
+  grokProviderModule,
+  grokSettingsCodec,
+  type GrokWorkspaceContext,
+} from '@/providers/grok/GrokProviderModule';
+import { grokProviderRegistration } from '@/providers/grok/registration';
+import { GrokChatRuntime } from '@/providers/grok/runtime/GrokChatRuntime';
+
+/**
+ * The fifth module, and the first that had nothing new to prove.
+ *
+ * OpenCode established the managed-ACP topology; Grok reaches production
+ * through the same one, so what this file checks is not the contract but this
+ * provider's own claims — and the two places where the module deliberately
+ * says something the live capability record does not.
+ */
+describe('Grok provider module', () => {
+  function createContext(): GrokWorkspaceContext {
+    return {
+      listCommands: async () => [{ name: 'init', source: 'project' as const }],
+      listSessionCommands: async () => [{ name: 'compact', source: 'session' as const }],
+      listAgentMentions: async () => [{ id: 'build', label: 'Build' }],
+      refreshAgentMentions: async () => undefined,
+      resolveCliPath: async () => '/usr/local/bin/grok',
+      listModels: async () => [{ id: 'grok-4.6', label: 'Grok 4.6' }],
+      refreshModels: async () => [{ id: 'grok-4.6', label: 'Grok 4.6' }],
+      readPlanUsage: async () => null,
+      loadMcpServers: async () => [{ id: 'vault', label: 'Vault', enabled: true }],
+      saveMcpServers: async () => undefined,
+      startMcpServer: async () => undefined,
+      stopMcpServer: async () => undefined,
+      shouldKeepWarm: () => true,
+      renderSettingsTab: () => undefined,
+      hydrateConversation: async () => ({ outcome: 'complete' as const }),
+      deleteConversationSession: async () => undefined,
+      resolveSessionId: () => 'grok-session',
+      isPendingFork: () => false,
+      readSessionPaths: () => ({
+        sessionDirPath: '/vault/.grimoire/grok/sessions/grok-session',
+        workspacePath: '/vault',
+      }),
+      dispose: async () => undefined,
+    };
+  }
+
+  function features(): ReturnType<typeof grokProviderModule.features> {
+    return grokProviderModule.features(createContext());
+  }
+
+  function workspaceSlots(): ReturnType<typeof grokProviderModule.workspace.initialize> {
+    return grokProviderModule.workspace.initialize(
+      createContext(),
+      new AbortController().signal,
+    );
+  }
+
+  it('declares its identity and ordering from the registration it replaces', () => {
+    expect(grokProviderModule.manifest).toEqual({
+      id: 'grok',
+      displayName: grokProviderRegistration.displayName,
+      order: grokProviderRegistration.blankTabOrder,
+    });
+  });
+
+  it('agrees with the trace fixture it was proven against', () => {
+    expect(grokProviderModule.execution.descriptor.backendId).toBe(trace.backendId);
+    expect(grokProviderModule.capabilities.process).toEqual({
+      topology: trace.topology,
+      concurrency: trace.concurrency,
+    });
+    expect(grokProviderModule.capabilities.session.resume).toBe(trace.resume);
+  });
+
+  describe('capabilities', () => {
+    const capabilities = grokProviderModule.capabilities;
+
+    it('matches the live capability record where the two overlap', () => {
+      expect(capabilities.session.resume === 'native')
+        .toBe(GROK_PROVIDER_CAPABILITIES.supportsPersistentRuntime);
+      expect(capabilities.history.ownership === 'provider-native')
+        .toBe(GROK_PROVIDER_CAPABILITIES.supportsNativeHistory);
+      expect(capabilities.interactions.planMode === 'native')
+        .toBe(GROK_PROVIDER_CAPABILITIES.supportsPlanMode);
+      expect(capabilities.conversation.fork === 'native')
+        .toBe(GROK_PROVIDER_CAPABILITIES.supportsFork);
+      expect(capabilities.conversation.steering === 'native')
+        .toBe(GROK_PROVIDER_CAPABILITIES.supportsTurnSteer);
+      expect(capabilities.commands.discovery !== 'unsupported')
+        .toBe(GROK_PROVIDER_CAPABILITIES.supportsProviderCommands);
+      expect(capabilities.input.imageAttachments === 'native')
+        .toBe(GROK_PROVIDER_CAPABILITIES.supportsImageAttachments);
+    });
+
+    it('drops the rewind the runtime it replaces never performs', async () => {
+      const runtime = new GrokChatRuntime({ settings: {} } as never);
+
+      // The live record advertises rewind, which puts a button on every Grok
+      // assistant message; the runtime behind it refuses every input. The
+      // module declares what the provider does, and the flip takes the dead
+      // affordance with it.
+      expect(GROK_PROVIDER_CAPABILITIES.supportsRewind).toBe(true);
+      await expect(runtime.rewind('user-1', 'assistant-1')).resolves.toEqual({ canRewind: false });
+      expect(capabilities.conversation.rewind).toBe('unsupported');
+    });
+
+    it('never claims a rewind it contributes no port for', () => {
+      // The invariant behind the row above, which outlives Grok's own answer:
+      // the adapter reads the port, and the capability is what the UI reads.
+      expect(capabilities.conversation.rewind === 'unsupported')
+        .toBe(features().rewind === undefined);
+    });
+
+    it('splits MCP ownership from the per-run selector the boolean conflates', () => {
+      // Grimoire owns `.grimoire/mcp/grok.json` and injects those servers into
+      // the ACP session; `supportsMcpTools` gates the chat tab's per-run
+      // selector alone, and reads as "no MCP" for a provider that has it.
+      expect(GROK_PROVIDER_CAPABILITIES.supportsMcpTools).toBe(false);
+      expect(capabilities.mcp).toEqual({
+        ownership: 'grimoire',
+        sessionConfiguration: 'grimoire',
+        perRunSelection: 'unsupported',
+      });
+    });
+  });
+
+  describe('workspace slots', () => {
+    it('fills every slot the provider registers, including Grimoire-owned MCP', async () => {
+      const workspace = await workspaceSlots();
+
+      expect(Object.keys(workspace).sort()).toEqual([
+        'agentMentions',
+        'cliResolution',
+        'commands',
+        'mcp',
+        'models',
+        'residency',
+        'runtimeCommands',
+        'settingsPresentation',
+        'usage',
+      ]);
+      expect(await workspace.mcp?.loadServers()).toEqual([
+        { id: 'vault', label: 'Vault', enabled: true },
+      ]);
+    });
+  });
+
+  describe('session patch', () => {
+    it('keeps where the transcript is when the session itself is invalidated', () => {
+      const patch = features().history?.buildSessionPatch({
+        conversationId: 'conversation-1',
+        nativeSessionRef: 'grok-session',
+        sessionInvalidated: true,
+      });
+
+      // The legacy runtime's own rule: a session that is gone must not be
+      // resumed, but the directory it wrote is where the next one writes too,
+      // and the transcript already there is still this conversation's.
+      expect(patch).toEqual({
+        sessionId: null,
+        providerState: {
+          sessionDirPath: '/vault/.grimoire/grok/sessions/grok-session',
+          workspacePath: '/vault',
+        },
+      });
+    });
+
+    it('binds the conversation to the session the run observed', () => {
+      const patch = features().history?.buildSessionPatch({
+        conversationId: 'conversation-1',
+        nativeSessionRef: 'grok-session-2',
+        sessionInvalidated: false,
+      });
+
+      expect(patch?.sessionId).toBe('grok-session-2');
+    });
+  });
+
+  describe('settings codec', () => {
+    it('round-trips defaults without reporting a change', () => {
+      const defaults = grokSettingsCodec.defaults();
+
+      expect(grokSettingsCodec.decode(grokSettingsCodec.encode(defaults)).ok).toBe(true);
+      expect(grokSettingsCodec.reconcile(defaults, 'load').changed).toBe(false);
+    });
+
+    it('never writes discovery state into the settings file', () => {
+      const encoded = grokSettingsCodec.encode({
+        ...grokSettingsCodec.defaults(),
+        availableModes: [{ id: 'safe', name: 'Safe' }],
+        discoveredModels: [{ rawId: 'grok-4.6', label: 'Grok 4.6' }],
+      });
+
+      expect(encoded).not.toHaveProperty('availableModes');
+      expect(encoded).not.toHaveProperty('discoveredModels');
+    });
+
+    it('rejects discovery state found in a stored settings record', () => {
+      const decoded = grokSettingsCodec.decode({
+        ...grokSettingsCodec.encode(grokSettingsCodec.defaults()),
+        discoveredModels: [{ rawId: 'grok-3', label: 'Stale' }],
+      });
+
+      expect(decoded.ok).toBe(false);
+      expect(decoded.ok ? [] : decoded.issues)
+        .toContain('discovery state must not be stored in settings');
+      expect(decoded.ok ? [] : decoded.fallback.discoveredModels).toEqual([]);
+    });
+
+    it('keeps discovery state across a reconciliation that did not persist it', () => {
+      const discovered = [{ rawId: 'grok-4.6', label: 'Grok 4.6' }];
+
+      const result = grokSettingsCodec.reconcile({
+        ...grokSettingsCodec.defaults(),
+        discoveredModels: discovered,
+      }, 'load');
+
+      expect(result.settings.discoveredModels).toEqual(discovered);
+      expect(result.changed).toBe(false);
+    });
+
+    it('invalidates sessions when the account or the managed home changes', () => {
+      const changed = grokSettingsCodec.reconcile({
+        ...grokSettingsCodec.defaults(),
+        environmentVariables: 'XAI_API_KEY=xai-second-account\n',
+        environmentHash: '',
+      }, 'environment-change');
+
+      expect(changed.invalidatesSessions).toBe(true);
+      expect(changed.settings.environmentHash).toBe('XAI_API_KEY=xai-second-account');
+    });
+
+    it('ignores a GROK_ variable that decides nothing about a session', () => {
+      // The registration's `/^GROK_/i` pattern matches every one of them; the
+      // four keys that decide whether a saved session is still resumable do
+      // not include the ones that only change how the CLI prints.
+      const result = grokSettingsCodec.reconcile({
+        ...grokSettingsCodec.defaults(),
+        environmentVariables: 'GROK_THEME=dark\n',
+        environmentHash: '',
+      }, 'environment-change');
+
+      expect(result.invalidatesSessions).toBe(false);
+      expect(result.settings.environmentHash).toBe('');
+    });
+  });
+
+  describe('model presentation', () => {
+    it('owns a model by Grimoire\'s own encoding rather than by the visible list', () => {
+      const settings = {
+        ...grokSettingsCodec.defaults(),
+        modelAliases: { 'grok-4.6': 'Fast' },
+        visibleModels: ['grok-4.6'],
+      };
+      const presentation = features().chatUI.modelPresentation;
+
+      // Unlike OpenCode, a Grok selection carries its provider in the id, so a
+      // model the vault has never discovered is still Grok's to label.
+      expect(presentation.ownsModel('grok:grok-4.6', settings)).toBe(true);
+      expect(presentation.ownsModel('grok:anthropic/claude-sonnet-4', settings)).toBe(true);
+      expect(presentation.ownsModel('anthropic/claude-sonnet-4', settings)).toBe(false);
+      expect(presentation.label('grok:grok-4.6', settings)).toBe('Fast');
+      expect(presentation.label('grok:grok-4.5', settings)).toBe('grok-4.5');
+    });
+  });
+});

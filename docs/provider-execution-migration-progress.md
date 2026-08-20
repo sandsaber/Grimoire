@@ -4233,6 +4233,49 @@ not the linter's; this is the second time this session a gate was believed from 
 than from the tool. Gate proof in this branch means the tool's own exit code.
 
 
+### M2-flips wave 5 — Grok's catalog contribution (this commit)
+
+`GrokProviderModule` is the fifth module and the first that had nothing new to prove: OpenCode
+established the managed-ACP topology, and Grok reaches production through the same one. Its settings
+are field-for-field OpenCode's, so the codec is that codec with Grok's four environment keys —
+`GROK_AUTH`, `GROK_AUTH_PATH`, `GROK_HOME`, `XAI_API_KEY`, the ones that decide whether a saved
+session is still resumable. Which is the outcome wave 4 predicted for the remaining ACP providers,
+now measured on a second one.
+
+Two declarations deliberately disagree with the live capability record:
+
+- **rewind is dropped.** `GROK_PROVIDER_CAPABILITIES.supportsRewind` is `true`, which puts a rewind
+  button on every Grok assistant message; `GrokChatRuntime.rewind()` answers `canRewind: false` for
+  every input. The module declares `unsupported`, so the flip takes a dead affordance with it. **This
+  is the one product behaviour Grok's flip changes**, named here so it can be reversed by whoever
+  wants the button back — with a rewind port behind it. The test asserts both halves, including the
+  runtime's own answer, plus the invariant that outlives it: the capability says `unsupported`
+  exactly when no rewind port is contributed;
+- **MCP is three fields, not one boolean** — same split OpenCode's module made, for the same reason:
+  Grimoire owns `.grimoire/mcp/grok.json` and injects those servers into the session, while
+  `supportsMcpTools: false` gates only the chat tab's per-run selector.
+
+Fork stays `native`: `resolveSessionIdForFork` answers with the live session, which is what forking
+a Grok conversation actually resumes.
+
+The session patch is where Grok differs from OpenCode in substance rather than in names. OpenCode
+carries a database path; Grok carries `sessionDirPath` and `workspacePath`, and keeps both when the
+session id is invalidated — the legacy runtime's own rule, because the next session writes to the
+same directory and the transcript already there is still this conversation's.
+
+Proof the assertions bite: declaring `rewind: 'native'` reds 2 of 16, a passthrough `label` reds 1,
+dropping `XAI_API_KEY` from the hash keys reds 1.
+
+**A gate that was run the wrong way.** `npx jest --selectProjects unit` across the whole suite reds
+497 tests with `storage.getItem is not a function` — the project's runner sets up the device-settings
+storage, so only `npm run test` is a real result. Single-file break-tests through `npx` are fine and
+were used above; a suite-wide number through it is noise.
+
+Gates: unit 473 suites / 7,632 tests, typecheck, `eslint` over `src` and `tests`, and
+`build:release` clean. Recorded as **dark** in the parity manifest: nothing constructs it, and
+`registration.ts` plus `GrokWorkspaceServices` are still Grok's only wiring.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

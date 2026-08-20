@@ -710,8 +710,11 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
       // Wave 5's dark half: the composition that binds Grok's backend to the
       // running plugin, its descriptor over the shared backend, the stores its
-      // references stand for, its own dynamic ordering and its sink.
+      // references stand for, its own dynamic ordering and its sink — and the
+      // catalog contribution the flip reads its capabilities and its history
+      // ports out of.
       'src/app/execution/grok/GrokExecutionComposition.ts',
+      'src/providers/grok/GrokProviderModule.ts',
       'src/providers/grok/execution/GrokAcpDynamicConfig.ts',
       'src/providers/grok/execution/GrokContentPresenter.ts',
       'src/providers/grok/execution/GrokInteractionBridge.ts',
