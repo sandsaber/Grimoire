@@ -1,59 +1,19 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import {
+  AcpWorkspaceFileSystem,
+  type AcpWorkspaceFileSystemContext,
+} from '@/providers/acp/execution/AcpWorkspaceFileSystem';
 
-import { resolveWorkspacePath } from '@/providers/acp/resolveWorkspacePath';
-import type {
-  AcpReadTextFileRequest,
-  AcpReadTextFileResponse,
-  AcpWriteTextFileRequest,
-  AcpWriteTextFileResponse,
-} from '@/providers/acp/types';
+export type OpencodeAcpFileSystemContext = Omit<AcpWorkspaceFileSystemContext, 'providerLabel'>;
 
-export interface OpencodeAcpFileSystemContext {
-  resolveSession(sessionId: string): {
-    readonly cwd: string;
-    readonly allowOutsideWorkspace: boolean;
-  };
-  approveWrite(input: {
-    readonly sessionId: string;
-    readonly requestPath: string;
-    readonly resolvedPath: string;
-  }): Promise<boolean>;
-}
-
-/** Provider-owned filesystem delegate with explicit workspace containment. */
-export class OpencodeAcpFileSystem {
-  constructor(private readonly context: OpencodeAcpFileSystemContext) {}
-
-  async readTextFile(request: AcpReadTextFileRequest): Promise<AcpReadTextFileResponse> {
-    const resolved = this.resolve(request.sessionId, request.path);
-    const content = await readFile(resolved, 'utf8');
-    if (request.line === undefined && request.limit === undefined) return { content };
-    const lines = content.split(/\r?\n/);
-    const start = Math.max(0, (request.line ?? 1) - 1);
-    const end = request.limit === undefined || request.limit === null
-      ? lines.length
-      : start + Math.max(0, request.limit);
-    return { content: lines.slice(start, end).join('\n') };
-  }
-
-  async writeTextFile(request: AcpWriteTextFileRequest): Promise<AcpWriteTextFileResponse> {
-    const resolvedPath = this.resolve(request.sessionId, request.path);
-    const approved = await this.context.approveWrite({
-      sessionId: request.sessionId,
-      requestPath: request.path,
-      resolvedPath,
-    });
-    if (!approved) throw new Error('OpenCode file write was not approved.');
-    await mkdir(dirname(resolvedPath), { recursive: true });
-    await writeFile(resolvedPath, request.content, 'utf8');
-    return {};
-  }
-
-  private resolve(sessionId: string, requestPath: string): string {
-    const session = this.context.resolveSession(sessionId);
-    return resolveWorkspacePath(session.cwd, requestPath, {
-      allowOutsideWorkspace: session.allowOutsideWorkspace,
-    });
+/**
+ * OpenCode's filesystem delegate: the shared one, under OpenCode's name.
+ *
+ * The label is the whole difference. Containment, the line window and the
+ * refusal are the protocol's, and wave 5 found them identical in every ACP
+ * runtime that has them.
+ */
+export class OpencodeAcpFileSystem extends AcpWorkspaceFileSystem {
+  constructor(context: OpencodeAcpFileSystemContext) {
+    super({ ...context, providerLabel: 'OpenCode' });
   }
 }

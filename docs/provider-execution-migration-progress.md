@@ -4276,6 +4276,24 @@ Gates: unit 473 suites / 7,632 tests, typecheck, `eslint` over `src` and `tests`
 `registration.ts` plus `GrokWorkspaceServices` are still Grok's only wiring.
 
 
+### M2-flips wave 5 — the third thing that was never one provider's (this commit)
+
+The filesystem an ACP agent reads and writes the vault through is now
+`AcpWorkspaceFileSystem`. Wave 5's pattern holds a third time: the containment rule, the line window
+a read may ask for and the refusal on an unapproved write are the protocol's, and the five legacy ACP
+runtimes carry the same three behaviours copied five times with nothing but the label different.
+What a provider supplies is that label and two decisions — where a session is rooted, and whether a
+write may happen.
+
+`OpencodeAcpFileSystem` is now four lines over it, and OpenCode's 21 filesystem and composition tests
+pass unchanged, which is the same proof the backend, the bridge and the approval presenter gave.
+Grok's composition will construct the shared class directly rather than adding a subclass to hold one
+string.
+
+Gates: unit 473 suites / 7,632 tests, typecheck, `eslint` over `src` and `tests` clean. Recorded as
+wired: it is reachable through OpenCode, which is flipped.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

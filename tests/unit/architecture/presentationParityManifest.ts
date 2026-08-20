@@ -596,6 +596,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/acp/execution/ManagedAcpClient.ts',
       'src/providers/acp/execution/AcpApprovalPresenter.ts',
       'src/providers/acp/execution/AcpPermissionBridge.ts',
+      'src/providers/acp/execution/AcpWorkspaceFileSystem.ts',
       'src/providers/acp/execution/ManagedAcpExecutionBackend.ts',
       // OpenCode chat execution, flipped: the first ACP provider on the kernel,
       // and the isolated session the four metadata surfaces now share.
