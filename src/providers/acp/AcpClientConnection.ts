@@ -84,12 +84,28 @@ export interface AcpClientConnectionDelegate {
   terminal?: AcpTerminalDelegate;
 }
 
+/**
+ * Session updates an agent sends under names ACP does not define.
+ *
+ * Grok is the first: beside `session/update` it sends its own updates on
+ * `_x.ai/session_notification`, and a client subscribed only to the standard
+ * method never sees the turn's usage or its stop reason. The parser is the
+ * provider's, because only it knows what its envelope looks like — and
+ * returning `null` is how it declines one that is not a session notification
+ * at all.
+ */
+export interface AcpVendorSessionNotifications {
+  readonly methods: readonly string[];
+  parse(method: string, params: unknown): AcpSessionNotification | null;
+}
+
 export interface AcpClientConnectionOptions {
   clientCapabilities?: Partial<AcpClientCapabilities>;
   clientInfo?: AcpImplementation | null;
   delegate?: AcpClientConnectionDelegate;
   methodOverrides?: AcpMethodOverrides;
   transport: AcpJsonRpcTransport;
+  vendorSessionNotifications?: AcpVendorSessionNotifications;
 }
 
 export class AcpClientConnection {
@@ -232,6 +248,18 @@ export class AcpClientConnection {
       ACP_SERVER_NOTIFICATION_ALIASES.sessionUpdate,
       async (params) => this.dispatchSessionNotification(params as AcpSessionNotification),
     );
+
+    const vendor = this.options.vendorSessionNotifications;
+    if (vendor) {
+      for (const method of vendor.methods) {
+        this.unsubscribeHandlers.push(transport.onNotification(method, async (params) => {
+          const notification = vendor.parse(method, params);
+          if (notification) {
+            await this.dispatchSessionNotification(notification);
+          }
+        }));
+      }
+    }
 
     if (delegate?.requestPermission) {
       const requestPermission = delegate.requestPermission;

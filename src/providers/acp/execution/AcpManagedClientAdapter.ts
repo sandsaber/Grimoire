@@ -1,6 +1,7 @@
 import {
   AcpClientConnection,
   type AcpClientConnectionDelegate,
+  type AcpVendorSessionNotifications,
 } from '../AcpClientConnection';
 import { AcpJsonRpcTransport } from '../AcpJsonRpcTransport';
 import type { AcpImplementation } from '../types';
@@ -26,6 +27,13 @@ export interface AcpManagedClientAdapterOptions {
   readonly clientInfo: AcpImplementation;
   readonly delegate?: Omit<AcpClientConnectionDelegate, 'requestPermission'>;
   readonly processLauncher: AcpManagedProcessLauncher;
+  /**
+   * Session updates this agent sends under its own method names.
+   *
+   * Passed through rather than known here: the composition owns the provider,
+   * and this factory owns the process.
+   */
+  readonly vendorSessionNotifications?: AcpVendorSessionNotifications;
 }
 
 /**
@@ -55,6 +63,9 @@ export class AcpManagedClientAdapterFactory implements ManagedAcpClientFactory {
           requestPermission: input.requestPermission,
         },
         transport,
+        ...(this.options.vendorSessionNotifications
+          ? { vendorSessionNotifications: this.options.vendorSessionNotifications }
+          : {}),
       });
       transport.start();
       return new AcpManagedClientAdapter(process, transport, connection);

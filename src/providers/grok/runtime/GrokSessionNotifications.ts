@@ -44,11 +44,16 @@ export function parseGrokSessionNotification(
   if (method !== GROK_WRAPPED_SESSION_NOTIFICATION_METHOD || !isRecord(params)) {
     return null;
   }
-  if (params.method !== GROK_WRAPPED_SESSION_NOTIFICATION_NAME) {
-    return null;
-  }
 
-  return parseSessionNotification(params.params);
+  // Two shapes, and the wire says which one is current. 1.0.5 sends the
+  // notification *as* the params — `{sessionId, update}` and nothing else — so
+  // requiring the envelope's inner `method` dropped every update Grok sends
+  // this way, the turn's usage and its stop reason among them. The envelope is
+  // still accepted, because an older CLI wraps it.
+  if (params.method === GROK_WRAPPED_SESSION_NOTIFICATION_NAME) {
+    return parseSessionNotification(params.params);
+  }
+  return typeof params.method === 'string' ? null : parseSessionNotification(params);
 }
 
 export function isGrokTurnCompletedUpdate(update: unknown): boolean {

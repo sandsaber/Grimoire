@@ -4034,7 +4034,7 @@ redundant field is gone and the test now points at what actually holds the depen
 Gates: unit 470 suites / 7,600 tests, integration 5 / 145, typecheck, lint, `build:release` clean,
 and the twelve live rows re-run green after the fixes.
 
-### M2-flips wave 5 — the backend every managed-ACP provider runs on (this commit)
+### M2-flips wave 5 — the backend every managed-ACP provider runs on (`476fd48`)
 
 Wave 4 said the next five waves should each cost "the launch, the three stores and the sink". Grok's
 wire recording is what made it worth checking, and the count settles it: of sixty mentions of the
@@ -4063,6 +4063,33 @@ own increments will be.
 Gates: unit 470 suites / 7,600 tests, typecheck, lint, and `build:release` clean. The shared backend
 and the shared payload are recorded as wired in the parity manifest, beside the transport, the
 launcher and the client adapter that went live with wave 4's flip.
+
+### M2-flips wave 5 — the envelope Grok speaks its own updates through (this commit)
+
+The first thing wave 5 owes that no earlier wave did. Grok sends three of its own session updates on
+`_x.ai/session_notification` rather than `session/update`, and two of them carry what a turn is
+worth: `response_completed` its token usage, `turn_completed` its stop reason, model calls and cost.
+
+Two things were in the way, and the recording is what named both.
+
+**The parser refused the shape the CLI sends.** `parseGrokSessionNotification` required an inner
+`method` field — an envelope 1.0.5 does not use: its params *are* the notification,
+`{sessionId, update}` and nothing else. The existing test asserted that refusal explicitly, which is
+what a test written against another version looks like from the outside. It now reads the recorded
+notifications out of the fixture and asserts every one of them parses, so the rule and the evidence
+cannot drift apart. The enveloped shape is still accepted, because an older CLI wraps it.
+
+This changes nothing for the shipped runtime — it drops those three updates a second time, in the
+handler, for not being ACP update types — except for `subagent_finished`, which the wrapped channel
+can also carry and which was being lost.
+
+**The shared client subscribed only to the ACP method.** `AcpClientConnection` takes
+`vendorSessionNotifications` now: the method names to listen on, and the provider's parser to read
+them, which declines by answering `null`. The managed client factory passes it through, so the
+composition owns the provider and the factory owns the process. Two tests, one for each half —
+delivery and refusal — proven by removing the subscription.
+
+Gates: unit 470 suites / 7,603 tests, typecheck, lint, and `build:release` clean.
 
 ## Current blocker
 
@@ -4094,7 +4121,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **wave 5 begins: Grok's wire recording** — two protocols, three dropped updates, and a recorder that redacts | `28f3691` |
 | **MiMoCode's wire recording** — partial and labelled: it mirrors OpenCode, and its failed turn looks like a successful empty one | `1af76bf` |
 | **a review of the flip** — seven findings, all real, five of which the live matrix ran straight past | `ef32886` |
-| **wave 5: the backend goes shared** — fifty-seven of sixty provider mentions were injected contract names, so the managed-ACP backend is now one class with a descriptor port | this commit |
+| **wave 5: the backend goes shared** — fifty-seven of sixty provider mentions were injected contract names, so the managed-ACP backend is now one class with a descriptor port | `476fd48` |
+| **wave 5: Grok's own envelope** — the parser that refused the shape the CLI sends, and a client that now subscribes to a vendor's methods | this commit |
 
 Four providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode.
 

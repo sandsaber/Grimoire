@@ -60,6 +60,69 @@ function createConnectionHarness(
 }
 
 describe('AcpClientConnection', () => {
+  it('delivers session updates an agent sends under its own method name', async () => {
+    // Grok is the first: beside `session/update` it sends its own updates on
+    // `_x.ai/session_notification`, and a client subscribed only to the
+    // standard method never sees the turn's usage or its stop reason.
+    const seen: AcpSessionNotification[] = [];
+    const harness = createConnectionHarness((transport) => new AcpClientConnection({
+      transport,
+      delegate: { onSessionNotification: async notification => { seen.push(notification); } },
+      vendorSessionNotifications: {
+        methods: ['_x.ai/session_notification'],
+        parse: (_method, params) => params as AcpSessionNotification,
+      },
+    }));
+    harness.connection.onSessionNotification(notification => {
+      seen.push(notification);
+    });
+    harness.transport.start();
+
+    harness.sendInbound({
+      jsonrpc: '2.0',
+      method: '_x.ai/session_notification',
+      params: {
+        sessionId: 'session-1',
+        update: { sessionUpdate: 'turn_completed', stop_reason: 'end_turn' },
+      },
+    });
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(seen).toHaveLength(2);
+    expect(seen[0]).toMatchObject({
+      sessionId: 'session-1',
+      update: { sessionUpdate: 'turn_completed' },
+    });
+    harness.close();
+  });
+
+  it('declines a vendor notification its parser does not recognize', async () => {
+    const seen: AcpSessionNotification[] = [];
+    const harness = createConnectionHarness((transport) => new AcpClientConnection({
+      transport,
+      vendorSessionNotifications: {
+        methods: ['_x.ai/session_notification'],
+        // A method the agent sends on the same channel that is not a session
+        // notification at all: the provider says so by answering nothing.
+        parse: () => null,
+      },
+    }));
+    harness.connection.onSessionNotification(notification => {
+      seen.push(notification);
+    });
+    harness.transport.start();
+
+    harness.sendInbound({
+      jsonrpc: '2.0',
+      method: '_x.ai/session_notification',
+      params: { anything: true },
+    });
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(seen).toEqual([]);
+    harness.close();
+  });
+
   it('advertises derived client capabilities and dispatches session notifications', async () => {
     const notifications: AcpSessionNotification[] = [];
     const harness = createConnectionHarness((transport) => new AcpClientConnection({
