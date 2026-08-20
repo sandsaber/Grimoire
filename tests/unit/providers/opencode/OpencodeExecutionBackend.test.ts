@@ -759,6 +759,8 @@ class FakeManagedAcpClient implements ManagedAcpClient {
     this.promptRequests.push(request);
     return this.promptCompletion.promise;
   }
+  async setMode() { return {}; }
+  async setModel() { return {}; }
   async setConfigOption() { return { configOptions: [] }; }
   cancel(sessionId: string): void { this.cancelledSessions.push(sessionId); }
   onSessionNotification(listener: (notification: AcpSessionNotification) => void) {

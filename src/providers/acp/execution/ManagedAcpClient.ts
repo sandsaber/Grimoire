@@ -11,6 +11,10 @@ import type {
   AcpSessionNotification,
   AcpSetSessionConfigOptionRequest,
   AcpSetSessionConfigOptionResponse,
+  AcpSetSessionModelRequest,
+  AcpSetSessionModelResponse,
+  AcpSetSessionModeRequest,
+  AcpSetSessionModeResponse,
 } from '@/providers/acp/types';
 
 /** An owned protocol connection; provider execution policy stays outside this contract. */
@@ -22,6 +26,16 @@ export interface ManagedAcpClient {
   setConfigOption(
     request: AcpSetSessionConfigOptionRequest,
   ): Promise<AcpSetSessionConfigOptionResponse>;
+  /**
+   * The two dedicated setters, where the agent has them.
+   *
+   * ACP defines both beside `session/set_config_option`, and which one an agent
+   * answers is a property of its release rather than of the protocol — Grok has
+   * them and refuses the mode on a build that carries its policy on the command
+   * line. A provider that only uses config options never calls these.
+   */
+  setMode(request: AcpSetSessionModeRequest): Promise<AcpSetSessionModeResponse>;
+  setModel(request: AcpSetSessionModelRequest): Promise<AcpSetSessionModelResponse>;
   cancel(sessionId: string): void;
   onSessionNotification(listener: (notification: AcpSessionNotification) => void): Unsubscribe;
   onConnectionLost(listener: (error?: Error) => void): Unsubscribe;

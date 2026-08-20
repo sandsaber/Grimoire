@@ -225,6 +225,8 @@ class AuxiliaryClient implements ManagedAcpClient {
   async newSession() { this.newCalls += 1; return { sessionId: 'aux-session' }; }
   async loadSession() { return { sessionId: 'aux-session' }; }
   prompt(): Promise<AcpPromptResponse> { this.promptCalls += 1; return this.completion.promise; }
+  async setMode() { return {}; }
+  async setModel() { return {}; }
   async setConfigOption() { return { configOptions: [] }; }
   cancel(sessionId: string): void { this.cancelCalls.push(sessionId); }
   onSessionNotification(listener: (notification: AcpSessionNotification) => void) {

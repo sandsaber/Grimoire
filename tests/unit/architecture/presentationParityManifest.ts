@@ -701,6 +701,14 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // M5. The transport, the launcher and the client adapter beside it went
       // live with OpenCode's flip and are listed as wired.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
+      // Wave 5's dark half: the composition that binds Grok's backend to the
+      // running plugin, its descriptor over the shared backend, the stores its
+      // references stand for, its own dynamic ordering and its sink.
+      'src/app/execution/grok/GrokExecutionComposition.ts',
+      'src/providers/grok/execution/GrokAcpDynamicConfig.ts',
+      'src/providers/grok/execution/GrokExecutionBackend.ts',
+      'src/providers/grok/execution/GrokExecutionRequests.ts',
+      'src/providers/grok/execution/GrokProjectionResultSink.ts',
     ],
   },
 ];

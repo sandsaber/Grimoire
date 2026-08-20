@@ -69,6 +69,10 @@ describe('OpenCode metadata session', () => {
       throw new Error('A metadata session never prompts.');
     }
 
+    async setMode(): Promise<Record<string, never>> { return {}; }
+
+    async setModel(): Promise<Record<string, unknown>> { return {}; }
+
     async setConfigOption(request: AcpSetSessionConfigOptionRequest) {
       this.configOptions.push(request);
       return {

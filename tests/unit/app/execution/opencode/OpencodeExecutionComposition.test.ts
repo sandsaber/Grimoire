@@ -205,6 +205,8 @@ describe('OpenCode execution composition', () => {
               usage: { inputTokens: 15_940, outputTokens: 4, totalTokens: 16_979 },
             };
           },
+          setMode: async () => ({}),
+          setModel: async () => ({}),
           setConfigOption: async request => {
             configOptions.push(request);
             return { configOptions: [] };

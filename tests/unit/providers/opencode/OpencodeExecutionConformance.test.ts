@@ -114,6 +114,8 @@ class ConformanceClient implements ManagedAcpClient {
     this.promptRequests += 1;
     return this.promptCompletion.promise;
   }
+  async setMode() { return {}; }
+  async setModel() { return {}; }
   async setConfigOption() { return { configOptions: [] }; }
   cancel(): void {}
   onSessionNotification(listener: (notification: AcpSessionNotification) => void) {

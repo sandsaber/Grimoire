@@ -109,6 +109,14 @@ class AcpManagedClientAdapter implements ManagedAcpClient {
     return this.connection.setConfigOption(request);
   }
 
+  setMode(request: Parameters<ManagedAcpClient['setMode']>[0]) {
+    return this.connection.setMode(request);
+  }
+
+  setModel(request: Parameters<ManagedAcpClient['setModel']>[0]) {
+    return this.connection.setModel(request);
+  }
+
   cancel(sessionId: string): void {
     this.connection.cancel({ sessionId });
   }

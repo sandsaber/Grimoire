@@ -4064,7 +4064,7 @@ Gates: unit 470 suites / 7,600 tests, typecheck, lint, and `build:release` clean
 and the shared payload are recorded as wired in the parity manifest, beside the transport, the
 launcher and the client adapter that went live with wave 4's flip.
 
-### M2-flips wave 5 — the envelope Grok speaks its own updates through (this commit)
+### M2-flips wave 5 — the envelope Grok speaks its own updates through (`e424c99`)
 
 The first thing wave 5 owes that no earlier wave did. Grok sends three of its own session updates on
 `_x.ai/session_notification` rather than `session/update`, and two of them carry what a turn is
@@ -4090,6 +4090,45 @@ composition owns the provider and the factory owns the process. Two tests, one f
 delivery and refusal — proven by removing the subscription.
 
 Gates: unit 470 suites / 7,603 tests, typecheck, lint, and `build:release` clean.
+
+### M2-flips wave 5 — Grok's dark backend half (this commit)
+
+The second provider on the shared managed-ACP backend, and the first to cost what wave 4 said the
+remaining waves should. `GrokExecutionBackend` is a descriptor and a constructor; everything else
+here is what Grok owns.
+
+**The launch is a command line, not a directory.** OpenCode is configured by files it reads; Grok
+takes its permission policy and its reasoning effort as *process arguments* — `grok agent
+[--always-approve] [--reasoning-effort <level>] stdio`. Both therefore belong to the launch key, and
+a change to either restarts the process rather than reconfiguring an open session, which is the
+opposite of where those two settings live for every provider flipped so far.
+
+**Its own ordering, because it has its own methods.** Model and mode are `session/set_model` and
+`session/set_mode` here rather than config options. The mode also has a fall-back the recording
+explains: a release that carries its policy on the command line answers `-32601 method not found`,
+and what is left is the option the session advertised. `-32602` on either is not a failed turn — it
+is the agent saying it has no such mode, and the turn proceeds on the one it has.
+
+**Its own envelope, wired at the client.** The composition builds its client factory with Grok's
+notification methods and parser, so the three updates it sends on `_x.ai/session_notification`
+arrive at all.
+
+Two things are deliberately not here, each named so a flip cannot land while it is missing: the
+**content surface**, where those three updates have to become chunks and a usage badge — and where
+the turn's cost, which the legacy runtime reads off Grok's session log, is on the wire waiting — and
+**interactions**, where the bridge refuses every permission request.
+
+Two architecture gates fired while this landed, both correctly: a provider with an `execution`
+directory owes a topology trace, and every unreachable module owes a manifest entry. Both are
+answered rather than relaxed.
+
+Five composition tests, each proven by breaking what it covers: the whole turn, the command line the
+launcher would spawn, the restart when the effort changes, the two dedicated setters, and the
+fall-back when the release has neither. The effort test found where that setting actually lives —
+the coordinator restores the per-provider projection over the top-level value on every snapshot, so
+a test that wrote the top-level one was asserting nothing.
+
+Gates: unit 471 suites / 7,609 tests, typecheck, lint, and `build:release` clean.
 
 ## Current blocker
 
@@ -4122,7 +4161,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **MiMoCode's wire recording** — partial and labelled: it mirrors OpenCode, and its failed turn looks like a successful empty one | `1af76bf` |
 | **a review of the flip** — seven findings, all real, five of which the live matrix ran straight past | `ef32886` |
 | **wave 5: the backend goes shared** — fifty-seven of sixty provider mentions were injected contract names, so the managed-ACP backend is now one class with a descriptor port | `476fd48` |
-| **wave 5: Grok's own envelope** — the parser that refused the shape the CLI sends, and a client that now subscribes to a vendor's methods | this commit |
+| **wave 5: Grok's own envelope** — the parser that refused the shape the CLI sends, and a client that now subscribes to a vendor's methods | `e424c99` |
+| **wave 5: Grok's dark backend half** — a launch that is a command line, its own setters, and the two flags that restart a process rather than configure a session | this commit |
 
 Four providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode.
 
