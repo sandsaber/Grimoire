@@ -1,17 +1,17 @@
+import { AcpApprovalPresenter } from '@/providers/acp/execution/AcpApprovalPresenter';
 import {
   AcpPermissionBridge,
   normalizeApprovalInput,
 } from '@/providers/acp/execution/AcpPermissionBridge';
-import { AcpApprovalPresenter } from '@/providers/acp/execution/AcpApprovalPresenter';
 import { buildGrokPermissionPresentation } from '@/providers/grok/execution/GrokPermissionPresentation';
 
+export type {
+  AcpApprovalCallbacks as GrokInteractionCallbacks,
+} from '@/providers/acp/execution/AcpApprovalPresenter';
 export type {
   AcpApprovalOption as GrokApprovalOption,
   AcpPermissionPresentation as GrokInteractionPresentation,
 } from '@/providers/acp/execution/AcpPermissionBridge';
-export type {
-  AcpApprovalCallbacks as GrokInteractionCallbacks,
-} from '@/providers/acp/execution/AcpApprovalPresenter';
 
 /**
  * Grok's permission requests, as interactions the kernel can carry.
