@@ -45,7 +45,10 @@ export class OpencodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
       return await boundRuntime.getSupportedCommands();
     }
 
-    const announced = await context.plugin.getOpencodeExecution().metadata.listCommands();
+    // Opportunistic, like every other question asked without a conversation: a
+    // plugin whose kernel has not started yet has no session to ask in, and a
+    // tab that cannot list commands must still open.
+    const announced = await this.announcedCommands(context);
     return announced.map(command => ({
       id: `opencode:${command.name}`,
       name: command.name,
@@ -53,5 +56,15 @@ export class OpencodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
       content: '',
       ...(command.description === undefined ? {} : { description: command.description }),
     }));
+  }
+
+  private async announcedCommands(
+    context: ProviderRuntimeCommandLoaderContext,
+  ): Promise<readonly { readonly name: string; readonly description?: string }[]> {
+    try {
+      return await context.plugin.getOpencodeExecution().metadata.listCommands();
+    } catch {
+      return [];
+    }
   }
 }

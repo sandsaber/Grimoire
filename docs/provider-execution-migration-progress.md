@@ -3774,7 +3774,7 @@ chat, and the tests that must move onto the extracted modules rather than be del
 Gates: unit 469 suites / 7,606 tests, integration 5 / 145 (2 suites, 10 tests skipped), typecheck,
 lint, and `build:release` clean. The module context is declared dark in the parity manifest.
 
-### M2-flips wave 4 — OpenCode is flipped (this commit)
+### M2-flips wave 4 — OpenCode is flipped (`a0166a8`)
 
 `registration.ts` points `createRuntime` at the composition, `main.ts` constructs one per load and
 registers the backend with its interaction and recovery ports, and `OpencodeChatRuntime` is deleted.
@@ -3835,6 +3835,22 @@ lint, and `build:release` clean. The parity manifest moves fourteen OpenCode mod
 shared managed-ACP ones from pending to wired; `provider-opencode` moves from the dark-bundle
 markers to the wired ones, which is the gate that says the backend is actually in `main.js`.
 
+### M2-flips wave 4 — three surfaces that must open anyway (this commit)
+
+A review of the flip's own diff, before its CI finished. The four metadata call sites reach the
+composition through `plugin.getOpencodeExecution()`, and that accessor **throws** when the kernel has
+not started — which is exactly the window a settings tab or a blank tab can be opened in. The legacy
+runtime never threw there: constructing one was free, and two of the three call sites wrapped it in
+`try` anyway because a metadata warmup is opportunistic.
+
+So the flip had quietly made three surfaces depend on a started kernel: the settings tab's
+per-model metadata, the toolbar's model warmup, and a blank tab's command list. Each is guarded now,
+in the words the legacy used — a question left for the first real turn, which asks it anyway. The
+command loader's guard has a test: a plugin whose accessor throws still opens the tab, with no
+commands rather than an exception.
+
+Gates: unit 470 suites / 7,588 tests, typecheck, lint, and `build:release` clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3859,7 +3875,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **what a session opens with** — the models, modes and config options `session/new` answers with, carried to the surface instead of discarded | `cdf4434` |
 | **what a session is set to** — 390 lines of model, mode and effort state lifted out of the legacy runtime, which delegates to it | `3427f68` |
 | **wave 4's runtime half** — `createRuntime` over the adapter, the four per-tab pieces, and the MCP restart the kernel path was missing | `0dec751` |
-| **wave 4 flipped** — OpenCode on the kernel, `OpencodeChatRuntime` deleted, the five legacy call sites answered by one isolated metadata session | this commit |
+| **wave 4 flipped** — OpenCode on the kernel, `OpencodeChatRuntime` deleted, the five legacy call sites answered by one isolated metadata session | `a0166a8` |
+| **three surfaces that must open anyway** — the metadata call sites guarded against a kernel that has not started | this commit |
 
 Four providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode.
 

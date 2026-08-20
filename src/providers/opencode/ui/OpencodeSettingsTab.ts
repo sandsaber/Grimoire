@@ -248,12 +248,17 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
     };
 
     const persistModelMetadata = async (rawId: string): Promise<void> => {
-      // Opportunistic: a metadata session that cannot open leaves the question
-      // for the first chat turn, which asks it anyway.
-      const loaded = await context.plugin.getOpencodeExecution()
-        .metadata.discoverMetadata({ rawModelId: rawId });
-      if (loaded) {
-        context.refreshModelSelectors();
+      try {
+        // Opportunistic: a metadata session that cannot open leaves the
+        // question for the first chat turn, which asks it anyway.
+        const loaded = await context.plugin.getOpencodeExecution()
+          .metadata.discoverMetadata({ rawModelId: rawId });
+        if (loaded) {
+          context.refreshModelSelectors();
+        }
+      } catch {
+        // Including a plugin whose kernel has not started: the settings tab
+        // opens either way.
       }
     };
 

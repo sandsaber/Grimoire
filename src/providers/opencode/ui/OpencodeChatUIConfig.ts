@@ -181,9 +181,13 @@ export const opencodeChatUIConfig: ProviderChatUIConfig = {
       return;
     }
 
-    // Opportunistic: the first real turn discovers the same thing if this
-    // session cannot open.
-    await context.plugin.getOpencodeExecution().metadata.discoverMetadata({ rawModelId });
+    try {
+      // Opportunistic: the first real turn discovers the same thing if this
+      // session cannot open, or if the kernel has not started yet.
+      await context.plugin.getOpencodeExecution().metadata.discoverMetadata({ rawModelId });
+    } catch {
+      // Metadata warmup never blocks the toolbar.
+    }
   },
 
   applyReasoningSelection(model: string, value: string, settings: unknown): void {

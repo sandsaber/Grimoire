@@ -91,6 +91,23 @@ describe('OpencodeRuntimeCommandLoader', () => {
     expect(listCommands).toHaveBeenCalledTimes(1);
   });
 
+  it('opens the tab anyway when there is no execution to ask', async () => {
+    const { plugin } = createMockPlugin();
+    plugin.getOpencodeExecution = () => {
+      throw new Error('OpenCode execution is not available before plugin load.');
+    };
+    const loader = new OpencodeRuntimeCommandLoader();
+
+    // A tab that cannot list its commands still has to open.
+    await expect(loader.loadCommands({
+      allowSessionCreation: true,
+      conversation: null,
+      externalContextPaths: [],
+      plugin,
+      runtime: null,
+    })).resolves.toEqual([]);
+  });
+
   it('answers from the session a live tab already holds', async () => {
     const { plugin, listCommands } = createMockPlugin();
     const bound = [{ id: 'opencode:plan', name: 'plan', content: '' }];
