@@ -75,7 +75,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | Third review applied: kernel-in-production-at-first-flip owned (interim kernel host, storage docs, revert safety, unload), adapter bound to the lifecycle registry, capability-driven flip smoke, providerState parity gate, release-train rules, shared-resource inventory in M0a | Complete | `6df5658` |
 | UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | `b94a588` |
 | M0a — parity gate and adapter contract | Complete | `3273321` … `401a1b8`, plus post-review corrections in this commit |
-| M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Complete for the four proof providers; five remain, each at its own flip | `7f8dfaa` |
+| M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Complete for the four proof providers, plus Grok's wire recording taken at the start of wave 5; four remain | `7f8dfaa`, plus this commit |
 | M1 — execution kernel, dark-launched | Complete | `dca2f84`, `cc6081e`, `ec1303f`, `86f0585`, `a689af8` |
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
@@ -3851,7 +3851,7 @@ commands rather than an exception.
 
 Gates: unit 470 suites / 7,588 tests, typecheck, lint, and `build:release` clean.
 
-### M2-flips wave 4 — the live half of OpenCode's matrix (this commit)
+### M2-flips wave 4 — the live half of OpenCode's matrix (`5cb457f`)
 
 Wave 2 built a live harness for Codex and wave 4 shipped without one. This is OpenCode's:
 `OpencodeLiveSmoke.integration.test.ts`, thirteen of the nineteen matrix rows driven headlessly
@@ -3924,6 +3924,51 @@ Gates: unit 470 suites / 7,591 tests, typecheck, lint, and `build:release` clean
 live rows green** against `opencode acp` 1.18.18, recorded in
 [`docs/opencode-flip-smoke-matrix.md`](opencode-flip-smoke-matrix.md).
 
+### M0b — Grok's wire recording, taken before its wave (this commit)
+
+Wave 5 is Grok, chosen at the owner's direction over the journal's nomination of MiMoCode for one
+reason: the Grok CLI is installed and signed in on the owner's machine and MiMoCode's was not, so
+this is the first wave that can start with the evidence the plan asks for rather than owe it.
+
+`grok agent stdio`, 1.0.5, sixty-three messages: initialize, `session/new`, one prompt. **It is not
+one protocol, it is two.** Beside `session/update`, Grok speaks eleven `_x.ai/*` methods — MCP
+startup progress and per-server status, the model list, the prompt queue, settings, announcements,
+the session list, and a prompt-completion notice — and wraps three of its own session updates in
+`_x.ai/session_notification`.
+
+Three findings, all from the recording rather than from reading the code:
+
+- **the three wrapped updates are dropped twice over.** `model_changed`, `response_completed` and
+  `turn_completed` arrive wrapped, and `parseGrokSessionNotification` refuses them because it
+  requires an inner `method` field that 1.0.5 does not send; even parsed, they are not in the ACP
+  update set `handleSessionNotification` admits. `response_completed` carries the turn's token usage
+  and `turn_completed` its stop reason, model call count and cost in `costUsdTicks` — which is
+  exactly what the shipped runtime goes and reads off Grok's own session log instead. The wire hands
+  it over and the provider reads the disk. Owner: wave 5's backend, which should take the wire;
+- **`session/new` answers with `models`, not `configOptions`.** OpenCode's opening reply carries
+  config options; Grok's carries a model state. The shared `session-config` payload wave 4 built
+  covers both, which is the first evidence that it generalizes;
+- **Grok manages its own MCP servers.** `_x.ai/mcp/servers_updated` reports the servers from Grok's
+  own configuration with their startup status, independently of the `mcpServers` Grimoire passes to
+  `session/new`. Wave 5 has to decide what the MCP surface means for this provider before it flips,
+  not after.
+
+**The recorder now redacts.** The first capture contained a live API key: Grok reports its MCP
+servers with their environment variables, values included. It was never committed — the fixture in
+this commit is the second capture, taken with a recorder that redacts by key name (`*key*`,
+`*token*`, `*secret*`, `authorization`, …), by `{name, value}` pair, and by value shape, and the
+owner was told to rotate the key. **A recording script that only elides long strings is not
+sanitized**; the four existing recordings predate this rule and should be re-checked before anyone
+publishes them.
+
+Pinned in `wireVocabularyCoverage.test.ts`: the three unadmitted updates measured against
+`isSupportedAcpSessionUpdate` itself rather than a source grep, and the ten vendor methods nothing
+subscribes to measured against `GROK_SESSION_NOTIFICATION_METHODS`. A twelfth, `_x.ai/mcp_initialized`,
+appeared in the first capture and not the second: whether it lands before the turn ends is MCP
+startup timing, so it is named in a comment rather than asserted.
+
+Gates: unit 470 suites / 7,594 tests, typecheck, lint clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3950,7 +3995,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **wave 4's runtime half** — `createRuntime` over the adapter, the four per-tab pieces, and the MCP restart the kernel path was missing | `0dec751` |
 | **wave 4 flipped** — OpenCode on the kernel, `OpencodeChatRuntime` deleted, the five legacy call sites answered by one isolated metadata session | `a0166a8` |
 | **three surfaces that must open anyway** — the metadata call sites guarded against a kernel that has not started | `7034a00` |
-| **the live half of wave 4's matrix** — thirteen rows against a real `opencode acp`, and the four defects the first run found | this commit |
+| **the live half of wave 4's matrix** — thirteen rows against a real `opencode acp`, and the five defects the first run found | `5cb457f` |
+| **wave 5 begins: Grok's wire recording** — two protocols, three dropped updates, and a recorder that redacts | this commit |
 
 Four providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode.
 
@@ -4024,12 +4070,14 @@ the command that runs them is in the matrix document under "the half that runs i
    Thirteen of its nineteen rows now run themselves and are green; what is left is what a person has
    to look at: rows 3, 4, 10, 11, 14, 16 and the *appearance* of row 5. Row 12's wording is a known
    defect — the permission prompt names a path where it should name an action;
-4. **M2-flips wave 5 and after — the five remaining ACP providers**: MiMoCode, Kimi Code, Grok, Qwen
-   and Gemini. Each needs its own wire recording first (M0b), and each inherits what wave 4 built:
-   the transport, the launcher, the client adapter, the content surface, the permission bridge and
-   the metadata session. What is genuinely per provider is the launch, the permission vocabulary and
-   the tool normalization. MiMoCode is the closest to OpenCode by design — the two intentionally
-   mirror each other — and is the natural next one.
+4. **M2-flips wave 5 — Grok**, whose wire recording is taken (the entry above). It inherits what
+   wave 4 built — the transport, the launcher, the client adapter, the content surface, the
+   permission bridge and the metadata session — and owes three things none of the first four did:
+   the `_x.ai/session_notification` envelope and the three updates inside it, a decision about what
+   Grok's self-managed MCP servers mean beside the ones Grimoire injects, and the transcript
+   recovery and `utf8Stream` semantics that landed on `main` after the v1 baseline. Then the four
+   remaining ACP providers — MiMoCode (its CLI is installed as of this session, so its recording is
+   takeable), Kimi Code, Qwen and Gemini.
 
 **Three matrices are outstanding at once**, which is the state the owner accepted when wave 3 flipped
 ahead of wave 2's certification and again when wave 4 flipped ahead of both. Each flip reverts as a
@@ -4126,8 +4174,10 @@ Open obligations, each with an owner:
   Claude message types" this entry used to claim was an unmeasured number. Owner: each provider's
   flip — and Claude's is owed a gate shaped like OpenCode's replay, since wave 3 has already
   flipped;
-- **five providers still need wire recordings** — MiMoCode, Kimi Code, Grok, Qwen, Gemini — each
-  before its own flip. Owner: M2-flips, per provider;
+- **four providers still need wire recordings** — MiMoCode, Kimi Code, Qwen, Gemini — each before
+  its own flip. Grok's was taken at the start of wave 5, which is the order the plan asks for.
+  Owner: M2-flips, per provider. The recorder that takes them must redact: see the Grok entry for
+  what the first capture contained;
 - **awaiting an owner decision: redo.** Recorded as D9 in the persistence decisions. Re-running a
   request is free and needs no new state; undoing a rewind cannot be built on the control store,
   because D2 forbids a second copy of a provider transcript without exception, and the file backup

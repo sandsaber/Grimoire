@@ -3,6 +3,10 @@ import { resolve } from 'node:path';
 
 import type { AcpSessionNotification } from '@/providers/acp/types';
 import { CODEX_EXECUTION_NOTIFICATION_METHODS } from '@/providers/codex/runtime/CodexExecutionConnection';
+import {
+  GROK_SESSION_NOTIFICATION_METHODS,
+  isSupportedAcpSessionUpdate,
+} from '@/providers/grok/runtime/GrokSessionNotifications';
 import { OpencodeContentPresenter } from '@/providers/opencode/execution/OpencodeContentPresenter';
 
 /**
@@ -58,7 +62,44 @@ const UNMODELLED_BY_PROVIDER: Readonly<Record<string, readonly string[]>> = {
   // which is why the check below replays the recording through it instead of
   // grepping for the wire name the normalizer already renamed.
   opencode: [],
+  /**
+   * Grok's own three, none of which ACP defines.
+   *
+   * They arrive on `_x.ai/session_notification` rather than `session/update`,
+   * and the runtime drops every one of them twice over: the wrapped-notification
+   * parser wants an inner `method` field the CLI does not send, and the update
+   * types are not in the ACP set the handler admits. `response_completed`
+   * carries the turn's token usage and `turn_completed` its stop reason and
+   * cost — which is why the runtime reads both off Grok's own session log
+   * instead. Owner: wave 5's backend.
+   */
+  grok: ['model_changed', 'response_completed', 'turn_completed'],
 };
+
+/**
+ * Grok's vendor methods, beside the one ACP method it also speaks.
+ *
+ * Eleven of the twelve server methods in the recording are `_x.ai/*`, and the
+ * runtime subscribes to one of them. The rest carry MCP startup progress, the
+ * model list, the prompt queue, settings, announcements and the session list —
+ * a whole second protocol beside ACP. Recorded so wave 5 chooses what to
+ * consume rather than discovering it.
+ */
+const GROK_UNSUBSCRIBED_METHODS = [
+  '_x.ai/announcements/update',
+  '_x.ai/mcp/init_progress',
+  '_x.ai/mcp/server_status',
+  '_x.ai/mcp/servers_updated',
+  // `_x.ai/mcp_initialized` is a twelfth, seen in a first capture and not in
+  // the committed one: whether it lands before the turn ends is MCP startup
+  // timing. Listed here rather than asserted, because the assertion measures
+  // the recording and the recording is what it saw.
+  '_x.ai/models/update',
+  '_x.ai/queue/changed',
+  '_x.ai/session/prompt_complete',
+  '_x.ai/sessions/changed',
+  '_x.ai/settings/update',
+];
 
 function readRecordings(): WireRecording[] {
   const directory = resolve(process.cwd(), WIRE_DIRECTORY);
@@ -72,9 +113,12 @@ function readRecordings(): WireRecording[] {
 describe('wire vocabulary coverage', () => {
   const recordings = readRecordings();
 
-  it('has a recording for each of the four proof providers', () => {
+  it('has a recording for each provider that has reached the kernel', () => {
+    // The four proof providers, and Grok — whose recording was taken at the
+    // start of its own wave, which is the order the plan asks for and the one
+    // the first four did not always get.
     expect(recordings.map(recording => recording.providerId).sort())
-      .toEqual(['antigravity', 'claude', 'codex', 'opencode']);
+      .toEqual(['antigravity', 'claude', 'codex', 'grok', 'opencode']);
   });
 
   it.each(recordings)('$providerId names the CLI version it was taken from', recording => {
@@ -119,6 +163,25 @@ describe('wire vocabulary coverage', () => {
     const missing = observed.filter(update => !consumed.has(update)).sort();
 
     expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.opencode].sort());
+  });
+
+  it('records every Grok session update the runtime does not admit', () => {
+    const observed = recordings.find(recording => recording.providerId === 'grok')
+      ?.sessionUpdatesObserved ?? [];
+    const missing = observed.filter(update => !isSupportedAcpSessionUpdate({
+      sessionUpdate: update,
+    })).sort();
+
+    expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.grok].sort());
+  });
+
+  it('records every Grok notification method nothing subscribes to', () => {
+    const observed = recordings.find(recording => recording.providerId === 'grok')
+      ?.serverMethodsObserved ?? [];
+    const subscribed = new Set<string>([...GROK_SESSION_NOTIFICATION_METHODS, 'session/update']);
+    const missing = observed.filter(method => !subscribed.has(method)).sort();
+
+    expect(missing).toEqual([...GROK_UNSUBSCRIBED_METHODS].sort());
   });
 
   it('carries no content, only shape', () => {
