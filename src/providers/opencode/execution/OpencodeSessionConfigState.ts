@@ -221,6 +221,27 @@ export class OpencodeSessionConfigState {
     return availableModes[0]?.id || null;
   }
 
+  /**
+   * The thinking level the vault is set to, before any session has said which
+   * levels it has.
+   *
+   * `resolveSelectedEffortValue` answers for a session that has reported its
+   * options; a tab's first turn is dispatched before one exists, and the
+   * legacy runtime applied the level after the session opened rather than
+   * losing it. This is what the applier resolves against the session's own
+   * config id once it has one.
+   */
+  desiredEffortValue(): string | null {
+    const providerSettings = this.providerSettings();
+    const selectedEffort = typeof providerSettings.effortLevel === 'string'
+      ? providerSettings.effortLevel.trim()
+      : '';
+    if (!selectedEffort || selectedEffort === OPENCODE_DEFAULT_THINKING_LEVEL) {
+      return null;
+    }
+    return selectedEffort;
+  }
+
   resolveSelectedEffortValue(): string | null {
     const providerSettings = this.providerSettings();
     const selectedEffort = typeof providerSettings.effortLevel === 'string'

@@ -108,11 +108,38 @@ describe('OpencodeRuntimeCommandLoader', () => {
     })).resolves.toEqual([]);
   });
 
+  it('asks the isolated session for a blank tab whose runtime has none', async () => {
+    const { plugin, listCommands } = createMockPlugin();
+    const boundRuntime = {
+      providerId: 'opencode',
+      // A blank tab: a runtime, and no session for it to answer from.
+      getSessionId: () => null,
+      getSupportedCommands: jest.fn().mockResolvedValue([]),
+    };
+    const loader = new OpencodeRuntimeCommandLoader();
+
+    await expect(loader.loadCommands({
+      allowSessionCreation: true,
+      conversation: null,
+      externalContextPaths: [],
+      plugin,
+      runtime: boundRuntime as any,
+    })).resolves.toEqual([
+      { id: 'opencode:review', name: 'review', content: '', description: 'Review the diff' },
+    ]);
+
+    // Asking a runtime with no session returns nothing at all, which is how a
+    // fresh tab ends up with an empty command menu until the first message.
+    expect(boundRuntime.getSupportedCommands).not.toHaveBeenCalled();
+    expect(listCommands).toHaveBeenCalledTimes(1);
+  });
+
   it('answers from the session a live tab already holds', async () => {
     const { plugin, listCommands } = createMockPlugin();
     const bound = [{ id: 'opencode:plan', name: 'plan', content: '' }];
     const boundRuntime = {
       providerId: 'opencode',
+      getSessionId: () => 'acp-session-1',
       getSupportedCommands: jest.fn().mockResolvedValue(bound),
     };
     const loader = new OpencodeRuntimeCommandLoader();

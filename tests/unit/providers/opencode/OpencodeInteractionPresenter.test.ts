@@ -61,10 +61,14 @@ describe('OpenCode interaction presenter', () => {
       'OpenCode wants to run a shell command.',
       expect.objectContaining({
         decisionReason: 'Command execution permission required',
+        // No `decision` on any of them: it makes the surface answer with that
+        // word instead of the option picked, and two allowances of one kind —
+        // which OpenCode offers for path-scoped ones — then collapse into the
+        // first.
         decisionOptions: [
-          expect.objectContaining({ label: 'Allow', value: 'allow-once', decision: 'allow' }),
-          expect.objectContaining({ label: 'Always allow', value: 'allow-always' }),
-          expect.objectContaining({ label: 'Deny', value: 'reject-once', decision: 'deny' }),
+          { label: 'Allow', value: 'allow-once', presentation: 'allow' },
+          { label: 'Always allow', value: 'allow-always', presentation: 'always' },
+          { label: 'Deny', value: 'reject-once', presentation: 'reject' },
         ],
       }),
     );

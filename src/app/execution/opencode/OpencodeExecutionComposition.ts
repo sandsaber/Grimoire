@@ -104,7 +104,11 @@ const METADATA_DATABASE = ':memory:';
 export class OpencodeExecution {
   private readonly requests = new OpencodeExecutionRequests(
     () => opaqueId('ocreq'),
-    () => this.environment(),
+    // Forwarded, not swallowed: a zero-arity lambda type-checks here and drops
+    // the conversation's database, which is the whole reason a turn carries
+    // one. Every resume then launches against the default database and the
+    // session it was told to load is not in it.
+    databasePath => this.environment(databasePath),
   );
 
   /**
@@ -285,8 +289,12 @@ export class OpencodeExecution {
         });
       })()),
       onCost: cost => {
-        sawTurnCost = true;
+        // Only a cost that was actually recorded counts as one: OpenCode sends
+        // a usage update every turn for the context badge, usually with no cost
+        // in it, and a flag set on the update rather than on the record would
+        // disable the fallback that reads the session's own database.
         if (opencodePlanUsageStore.recordCost(cost ?? null)) {
+          sawTurnCost = true;
           this.refreshSelectors();
         }
       },
@@ -297,7 +305,10 @@ export class OpencodeExecution {
       () => adapter?.interactionCallbacks() ?? {},
     );
     this.presenters.add(presenter);
-    this.disposers.push(this.interactions.onSettled(ref => presenter.dismiss(ref)));
+    // Held by the tab, not by the composition: a subscription pushed onto the
+    // shared list would outlive every tab that ever opened and be called for
+    // every interaction after it closed.
+    const releaseSettled = this.interactions.onSettled(ref => presenter.dismiss(ref));
 
     const ports: ExecutionChatRuntimeHostPorts = {
       prepareTurn: (request: ChatTurnRequest) => ({
@@ -315,6 +326,11 @@ export class OpencodeExecution {
         // Carried into the prompt only when no session can carry it itself: a
         // bound session already holds the conversation, and sending the history
         // again would say everything twice.
+        // The turn boundary: what the normalizer and the tool stream carry is
+        // this turn's, and the tokens the last prompt cost are not this
+        // prompt's. Here rather than at dispatch because this is the one place
+        // a turn is known to be starting.
+        content.beginTurn();
         const bootstrap = ports.currentSessionId() ? [] : history ?? [];
         const dynamic = this.dynamicConfiguration(sessionConfig, options);
         const conversationDatabase = databasePath
@@ -442,6 +458,7 @@ export class OpencodeExecution {
         // The tab closing is when the prompts it raised stop being anyone's,
         // and when a write on its sessions has nobody left to ask.
         presenter.dismissAll();
+        releaseSettled();
         this.presenters.delete(presenter);
         for (const sessionId of ownedSessions) {
           this.writeApprovers.delete(sessionId);
@@ -503,12 +520,18 @@ export class OpencodeExecution {
     const modelId = sessionConfig.resolveSelectedRawModelId(options);
     const effortValue = sessionConfig.resolveSelectedEffortValue();
     const effortConfigId = sessionConfig.effortConfigId;
+    // The level the vault is set to, for the turn that is composed before its
+    // session has said which levels exist — a tab's first, and the first after
+    // every reload. The applier resolves the id from the session's own reply;
+    // the legacy runtime applied it after the session opened for this reason.
+    const desiredEffort = sessionConfig.desiredEffortValue();
     const dynamic: OpencodeAcpDynamicConfig = {
       ...(modeId ? { modeId } : {}),
       ...(modelId ? { modelId } : {}),
       ...(effortConfigId && effortValue
         ? { effort: { configId: effortConfigId, value: effortValue } }
         : {}),
+      ...(!effortConfigId && desiredEffort ? { effortValue: desiredEffort } : {}),
     };
     return Object.keys(dynamic).length > 0 ? dynamic : undefined;
   }
@@ -722,6 +745,9 @@ export class OpencodeExecution {
         configPath: artifacts.configPath,
         envText: getRuntimeEnvironmentText(this.plugin.settings, 'opencode'),
         promptKey: computeSystemPromptKey(promptSettings),
+        // The artifact key already carries the resolved database, which is what
+        // makes a tab that moves to a conversation kept in another one restart
+        // its process — a running process reads one database.
         artifactKey: artifacts.launchKey,
         // Added to the legacy key rather than inherited from it: the legacy
         // runtime shut the process down on an MCP reload, and a session that

@@ -79,6 +79,7 @@ describe('OpenCode execution composition', () => {
   /** One ACP agent, without an agent. */
   function createFakeAcp(options: {
     asksPermission?: boolean;
+    offersEffort?: boolean;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
   } = {}): {
@@ -114,6 +115,18 @@ describe('OpenCode execution composition', () => {
           // models and the modes a tab can choose from are said.
           newSession: async () => ({
             sessionId: 'acp-session-1',
+            ...(options.offersEffort
+              ? {
+                configOptions: [{
+                  category: 'thought_level',
+                  currentValue: 'low',
+                  id: 'effort',
+                  name: 'Effort',
+                  options: [{ name: 'Low', value: 'low' }, { name: 'High', value: 'high' }],
+                  type: 'select',
+                }],
+              }
+              : {}),
             models: {
               availableModels: [{ id: 'opencode/big-pickle', name: 'Big Pickle' }],
               currentModelId: 'opencode/big-pickle',
@@ -181,6 +194,9 @@ describe('OpenCode execution composition', () => {
               sessionId: 'acp-session-1',
               update: {
                 sessionUpdate: 'agent_message_chunk',
+                // One id for every turn, the way an agent that numbers its
+                // messages per session does.
+                messageId: 'assistant-message',
                 content: { type: 'text', text: 'the answer' },
               },
             });
@@ -209,6 +225,7 @@ describe('OpenCode execution composition', () => {
 
   async function createHarness(options: {
     asksPermission?: boolean;
+    offersEffort?: boolean;
     plugin?: any;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
@@ -583,6 +600,80 @@ describe('OpenCode execution composition', () => {
     const launch = await execution.turnRequests.resolveLaunch(startupRefs[0]);
     expect(launch.environment.OPENCODE_DB).toBe(':memory:');
     expect(launch.arguments).toEqual(['acp']);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('launches against the database the conversation is kept in', async () => {
+    // Everything the database plumbing exists for is inert if the environment
+    // is asked without it: the resume then loads a session that is not in the
+    // database it opened. Found by review — a zero-arity lambda type-checks.
+    const plugin = createPlugin();
+    const { execution, host } = await createHarness({ plugin });
+    const other = join(plugin.app.vault.adapter.basePath, 'other.db');
+
+    const invocation = await execution.turnRequests.resolve(execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'what now?' }],
+      databasePath: other,
+    }));
+    const launch = await execution.turnRequests.resolveLaunch(invocation.startupRef);
+
+    expect(launch.environment.OPENCODE_DB).toBe(other);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('restarts the process for a conversation kept in another database', async () => {
+    const plugin = createPlugin();
+    const { execution, host } = await createHarness({ plugin });
+
+    const first = await execution.turnRequests.resolve(execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'first' }],
+    }));
+    const second = await execution.turnRequests.resolve(execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'second' }],
+      databasePath: join(plugin.app.vault.adapter.basePath, 'other.db'),
+    }));
+
+    // A running process reads one database; a tab that moves to a conversation
+    // kept in another has to restart it. The artifact key is what carries it —
+    // asserted here rather than assumed, because the launch key is assembled by
+    // hand and the database is the newest thing in it.
+    expect(second.restartFingerprint).not.toBe(first.restartFingerprint);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('sets the thinking level on a tab first turn, before any session named it', async () => {
+    const plugin = createPlugin();
+    plugin.settings.effortLevel = 'high';
+    const { execution, host, configOptions } = await createHarness({ plugin, offersEffort: true });
+    const runtime = execution.createRuntime();
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    // The turn is composed before the session exists, so the id the level is
+    // set under is unknown then; the applier resolves it from the session's own
+    // reply rather than dropping the level for the first turn of every tab.
+    expect(configOptions).toContainEqual(expect.objectContaining({
+      configId: 'effort',
+      value: 'high',
+    }));
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('opens a message for every turn, not only the first', async () => {
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+    await drain(runtime.query(runtime.prepareTurn({ text: 'first' })));
+
+    const second = await drain(runtime.query(runtime.prepareTurn({ text: 'second' })));
+
+    // The agent reuses a message id across turns, and a normalizer that was
+    // never reset opens no message for the second — the surface then appends
+    // the second answer to the first one's bubble.
+    expect(second).toContainEqual(expect.objectContaining({ type: 'assistant_message_start' }));
     execution.dispose();
     await host.dispose();
   });

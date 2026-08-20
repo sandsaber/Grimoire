@@ -41,6 +41,7 @@ import type {
   AcpPromptResponse,
   AcpRequestPermissionRequest,
   AcpRequestPermissionResponse,
+  AcpSessionConfigOption,
   AcpSessionNotification,
 } from '@/providers/acp/types';
 import type { OpencodeContentPayload } from '@/providers/opencode/execution/OpencodeContentPresenter';
@@ -70,6 +71,15 @@ export interface OpencodeExecutionDynamicApplier {
     readonly sessionId: string;
     readonly dynamicRef?: string;
     readonly signal: AbortSignal;
+    /**
+     * What the session answered with when it opened, where this dispatch
+     * opened one.
+     *
+     * A turn is composed before its session exists, so a setting whose id the
+     * session names — the thinking level — cannot be resolved when the turn is
+     * queued. This is the only moment both are known.
+     */
+    readonly sessionConfigOptions?: readonly AcpSessionConfigOption[];
   }): Promise<void>;
 }
 
@@ -466,6 +476,7 @@ class OpencodeExecutionSession implements ExecutionSession {
         sessionId: this.nativeSessionRef,
         dynamicRef: invocation.dynamicRef,
         signal: this.clientAbort?.signal ?? new AbortController().signal,
+        ...(opened?.configOptions ? { sessionConfigOptions: opened.configOptions } : {}),
       }),
       this.context.scheduler,
       this.context.controlTimeoutMs ?? 2_000,
@@ -536,6 +547,7 @@ class OpencodeExecutionSession implements ExecutionSession {
           sessionId: this.nativeSessionRef!,
           dynamicRef: invocation.dynamicRef,
           signal: this.clientAbort!.signal,
+          ...(reopened?.configOptions ? { sessionConfigOptions: reopened.configOptions } : {}),
         });
         run.releaseRecovery();
         this.dispatch(run, invocation);

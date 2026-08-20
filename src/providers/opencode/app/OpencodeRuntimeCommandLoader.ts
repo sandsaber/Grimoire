@@ -37,8 +37,13 @@ export class OpencodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
       return [];
     }
 
+    // A live tab answers from the session it already holds — and only then. A
+    // blank tab has a runtime and no session, and asking it returns nothing at
+    // all, which is how a fresh tab ends up with an empty slash-command menu
+    // until the first message is sent.
     const boundRuntime = context.runtime?.providerId === 'opencode'
       && !shouldWarmPreSessionConversation
+      && Boolean(context.runtime.getSessionId?.())
       ? context.runtime
       : null;
     if (boundRuntime) {

@@ -3969,7 +3969,7 @@ startup timing, so it is named in a comment rather than asserted.
 
 Gates: unit 470 suites / 7,594 tests, typecheck, lint clean.
 
-### M0b — MiMoCode's wire recording, partial and labelled (this commit)
+### M0b — MiMoCode's wire recording, partial and labelled (`1af76bf`)
 
 The MiMoCode CLI was installed on the owner's machine mid-session, so its recording was taken while
 the recorder was out: `mimo acp` 0.1.13, ten messages. **It mirrors OpenCode exactly** — a
@@ -3991,6 +3991,48 @@ shape. What it is not: message chunks, tool calls, or anything a turn produces o
 MiMoCode still owes a recording of a turn that answers.
 
 Gates: unit 470 suites / 7,595 tests, typecheck, lint clean.
+
+### M2-flips wave 4 — a review of the flip, seven items (this commit)
+
+An external review of `c66973b..1af76bf`. **All seven were real**, and five of them were things the
+live matrix had run straight past — which is the honest measure of what a live harness does and does
+not cover:
+
+- **the conversation's database never reached the launch.** `OpencodeExecutionRequests` asks
+  `environment(request.databasePath)`, and the composition constructed it with `() =>
+  this.environment()` — a zero-arity lambda, which type-checks. Every resume launched against the
+  default database. The whole plumbing added a commit earlier was inert, and row 8 passed only
+  because this machine's default database happened to be the right one;
+- **the spend fallback was disabled by its own flag.** `sawTurnCost` was set on every usage update
+  rather than on a cost that was actually recorded — and OpenCode sends a usage update every turn
+  for the context badge, usually with no cost in it. The legacy set it inside the `recordCost`
+  success branch. Row 19 asserts an implication and the vendor charged nothing, so it stayed green;
+- **two approval options of one kind collapsed into the first.** Carrying `decision` on a decision
+  option makes the surface answer with that *word* instead of the option the person picked, and the
+  word resolves back to whichever option matches it first. The bridge mints `allow-once` and
+  `allow-once-2` precisely because OpenCode offers path-scoped allowances, and the second would have
+  been answered as the first. The legacy left `decision` off for this reason;
+- **nothing reset at a turn boundary.** `beginTurn` existed and only `forgetConversation` called it,
+  so the tool-stream state, the prompt's tokens and — by this file's own comment — the message-start
+  dedup all carried into the next turn: a second answer appended to the first one's bubble;
+- **the thinking level was dropped on a tab's first turn.** The id a level is set under is named by
+  the session, and a turn is composed before the session exists. The legacy applied it after the
+  session opened. The turn now carries the *level* alone and the applier resolves the id from the
+  reply the session opened with — the same shape as the session configuration wave 4 already
+  carries;
+- **a blank tab listed no slash commands.** Its runtime exists and has no session, so asking it
+  returned nothing and the isolated metadata session was never reached;
+- **one `onSettled` subscription leaked per opened tab** — held by the composition's disposer list
+  rather than released when the tab closed.
+
+Four of the fixes had no test; they have one each now, and each was proven by breaking the fix it
+covers. One of the four found something the review had not: the launch key's new `databasePath`
+field was **redundant**, because the artifacts' own key already hashes the resolved database — the
+test stayed green with the field removed and went red when the artifact key stopped carrying it. The
+redundant field is gone and the test now points at what actually holds the dependency.
+
+Gates: unit 470 suites / 7,600 tests, integration 5 / 145, typecheck, lint, `build:release` clean,
+and the twelve live rows re-run green after the fixes.
 
 ## Current blocker
 
@@ -4020,7 +4062,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **three surfaces that must open anyway** — the metadata call sites guarded against a kernel that has not started | `7034a00` |
 | **the live half of wave 4's matrix** — thirteen rows against a real `opencode acp`, and the five defects the first run found | `5cb457f` |
 | **wave 5 begins: Grok's wire recording** — two protocols, three dropped updates, and a recorder that redacts | `28f3691` |
-| **MiMoCode's wire recording** — partial and labelled: it mirrors OpenCode, and its failed turn looks like a successful empty one | this commit |
+| **MiMoCode's wire recording** — partial and labelled: it mirrors OpenCode, and its failed turn looks like a successful empty one | `1af76bf` |
+| **a review of the flip** — seven findings, all real, five of which the live matrix ran straight past | this commit |
 
 Four providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode.
 

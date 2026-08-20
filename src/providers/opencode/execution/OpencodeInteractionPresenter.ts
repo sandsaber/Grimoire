@@ -135,6 +135,15 @@ export class OpencodeInteractionPresenter {
   }
 }
 
+/**
+ * One option, carrying the kernel's id and **no** decision.
+ *
+ * A `decision` makes the surface answer with that word instead of the option
+ * the person picked, and the word is then resolved back to whichever option
+ * matches it first — so an agent that offers two allowances of one kind, which
+ * OpenCode does for path-scoped ones, has the second one answered as the first.
+ * The legacy runtime left `decision` off for exactly this reason.
+ */
 function toDecisionOption(option: OpencodeApprovalOption): ApprovalDecisionOption {
   return {
     label: option.label,
@@ -142,9 +151,6 @@ function toDecisionOption(option: OpencodeApprovalOption): ApprovalDecisionOptio
     // record without a second mapping table.
     value: option.responseId,
     presentation: option.presentation,
-    ...(option.presentation === 'allow' ? { decision: 'allow' as const } : {}),
-    ...(option.presentation === 'always' ? { decision: 'allow-always' as const } : {}),
-    ...(option.presentation === 'reject' ? { decision: 'deny' as const } : {}),
   };
 }
 
