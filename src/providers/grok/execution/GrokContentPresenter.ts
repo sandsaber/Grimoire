@@ -27,6 +27,19 @@ import { createGrokToolStreamAdapter } from '@/providers/grok/normalization/grok
  */
 const TICKS_PER_USD = 10_000_000_000;
 
+/**
+ * What the wire delivered, plus the one thing it never does.
+ *
+ * Grok sends no context-window update at all — its wire recording observes
+ * seven update types and none of them is one — so the composition reads it out
+ * of the session log and hands it back on this channel. Grok-local rather than
+ * in the shared union, because the shared union is what an ACP connection
+ * delivered.
+ */
+export type GrokContentPayload =
+  | AcpContentPayload
+  | { readonly kind: 'session-usage'; readonly usage: AcpUsageUpdate | null };
+
 /** What a session opened with, in whichever shape the agent answered. */
 export interface GrokSessionOpening {
   readonly sessionId: string;
@@ -111,9 +124,16 @@ export class GrokContentPresenter {
   }
 
   present(payload: unknown): readonly StreamChunk[] {
-    const content = payload as Partial<AcpContentPayload> | null;
+    const content = payload as GrokContentPayload | null;
     if (content?.kind === 'session-config') {
       return this.presentSessionConfig(content.session);
+    }
+    if (content?.kind === 'session-usage') {
+      // How full the context is, which Grok never says over the wire: the
+      // composition reads it out of the session log while the answer is being
+      // committed and hands it back here, in time for this turn's badge.
+      this.contextUsage = content.usage ?? null;
+      return this.usageChunks();
     }
     if (content?.kind === 'prompt-result') {
       // Grok's prompt answer is a stop reason and nothing else; its tokens

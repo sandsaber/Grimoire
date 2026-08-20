@@ -1,6 +1,6 @@
 import '@/providers';
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -10,6 +10,7 @@ import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { GrokExecution } from '@/app/execution/grok/GrokExecutionComposition';
 import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
 import { executionSessionId, type InteractionId, runId } from '@/core/execution/ExecutionIds';
+import type { StreamChunk } from '@/core/types';
 import { JsonRpcErrorResponse } from '@/providers/acp';
 import type {
   ManagedAcpClient,
@@ -73,6 +74,7 @@ describe('Grok execution composition', () => {
   function createFakeAcp(options: {
     asksPermission?: boolean;
     modeIsUnsupported?: boolean;
+    sessionLoadFails?: boolean;
   } = {}): {
     factory: ManagedAcpClientFactory;
     startupRefs: string[];
@@ -123,7 +125,14 @@ describe('Grok execution composition', () => {
               type: 'select',
             }] as never,
           }),
-          loadSession: async request => ({ sessionId: request.sessionId }),
+          loadSession: async request => {
+            if (options.sessionLoadFails) {
+              // What Grok answers for a session it no longer has: a service
+              // failure that names nothing about the session.
+              throw new JsonRpcErrorResponse('session/load', -32603, 'Internal error');
+            }
+            return { sessionId: request.sessionId };
+          },
           prompt: async request => {
             prompts.push(request);
             if (options.asksPermission) {
@@ -179,7 +188,9 @@ describe('Grok execution composition', () => {
     asksPermission?: boolean;
     plugin?: any;
     modeIsUnsupported?: boolean;
+    sessionLoadFails?: boolean;
   } = {}): Promise<{
+    plugin: any;
     execution: GrokExecution;
     host: ExecutionKernelHost;
     startupRefs: string[];
@@ -197,7 +208,8 @@ describe('Grok execution composition', () => {
         clearTimeout: handle => clearTimeout(handle as NodeJS.Timeout),
       },
     });
-    const execution = new GrokExecution(options.plugin ?? createPlugin(), host.registry);
+    const plugin = options.plugin ?? createPlugin();
+    const execution = new GrokExecution(plugin, host.registry);
     const fake = createFakeAcp(options);
     host.registerBackend(execution.createBackendRegistration(fake.factory));
     await host.start();
@@ -208,7 +220,7 @@ describe('Grok execution composition', () => {
     });
     const events: ExecutionEventEnvelope[] = [];
     host.registry.observe(SESSION_ID, envelope => events.push(envelope));
-    return { execution, host, events, ...fake };
+    return { execution, host, events, plugin, ...fake };
   }
 
   async function waitForInteraction(
@@ -261,6 +273,152 @@ describe('Grok execution composition', () => {
     });
     await settle(host, events);
   }
+
+  async function drain(chunks: AsyncGenerator<StreamChunk>): Promise<StreamChunk[]> {
+    const collected: StreamChunk[] = [];
+    for await (const chunk of chunks) {
+      collected.push(chunk);
+    }
+    return collected;
+  }
+
+  /** A Grok session on disk, as the CLI leaves one behind. */
+  function writeSessionLog(vault: string, sessionId: string, contents: {
+    signals?: Record<string, unknown>;
+    updates?: readonly Record<string, unknown>[];
+  }): string {
+    const sessionDir = join(
+      vault,
+      '.grimoire',
+      'grok',
+      'sessions',
+      encodeURIComponent(vault),
+      sessionId,
+    );
+    mkdirSync(sessionDir, { recursive: true });
+    // The marker the path resolver looks for; without it no other file in this
+    // directory is found, which is how the CLI's own layout works.
+    writeFileSync(join(sessionDir, 'chat_history.jsonl'), '');
+    if (contents.signals) {
+      writeFileSync(join(sessionDir, 'signals.json'), JSON.stringify(contents.signals));
+    }
+    if (contents.updates) {
+      writeFileSync(
+        join(sessionDir, 'updates.jsonl'),
+        contents.updates.map(row => JSON.stringify(row)).join('\n'),
+      );
+    }
+    return sessionDir;
+  }
+
+  it('renders a turn a tab can draw, and learns the session it is on', async () => {
+    // The runtime half end to end: a tab prepares a turn, the kernel dispatches
+    // it, the agent answers, and what comes back is what the surface draws.
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks.some(chunk => chunk.type === 'text' && chunk.content.includes('the answer')))
+      .toBe(true);
+    // Without this a tab starts a new session every turn: no resume across a
+    // reload, and nothing to hydrate from.
+    expect(runtime.getSessionId()).toBe('grok-session');
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('fills the context reading Grok never sends over the wire', async () => {
+    // Grok's wire recording observes seven update types and no context window
+    // at all. Its own session log has one, and the turn is still open while the
+    // answer is committed — which is the only reason this reaches the badge of
+    // the turn that earned it.
+    const plugin = createPlugin();
+    const vault = plugin.app.vault.adapter.basePath;
+    writeSessionLog(vault, 'grok-session', {
+      signals: { contextTokensUsed: 12_000, contextWindowTokens: 256_000 },
+    });
+    const { execution, host } = await createHarness({ plugin });
+    const runtime = execution.createRuntime();
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'usage',
+      usage: expect.objectContaining({
+        contextTokens: 12_000,
+        contextWindow: 256_000,
+        contextWindowIsAuthoritative: true,
+      }),
+    }));
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('says what a turn that never started needs the person to do', async () => {
+    // Grok answers an unknown session with a generic service failure that names
+    // nothing, so without provider wording the conversation repeats the neutral
+    // sentence on every turn with nothing to act on.
+    const { execution, host } = await createHarness({ sessionLoadFails: true });
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({ providerState: {}, sessionId: 'grok-session-gone' });
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks.filter(chunk => chunk.type === 'error').map(chunk => (
+      (chunk).content
+    ))).toEqual([expect.stringContaining('session may no longer exist')]);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('saves the conversation pointing at the transcript it can be hydrated from', async () => {
+    // A Grok session id alone hydrates nothing: the transcript is a directory
+    // under the managed home, and the conversation is saved pointing at it.
+    const plugin = createPlugin();
+    const vault = plugin.app.vault.adapter.basePath;
+    const sessionDir = writeSessionLog(vault, 'grok-session', { signals: {} });
+    const { execution, host } = await createHarness({ plugin });
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState(
+      { id: 'conversation-1', providerState: {}, sessionId: null } as never,
+    );
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+    const updates = runtime.buildSessionUpdates({
+      conversation: { id: 'conversation-1' } as never,
+      sessionInvalidated: false,
+    });
+
+    expect(updates.updates).toEqual({
+      sessionId: 'grok-session',
+      providerState: { sessionDirPath: sessionDir, workspacePath: vault },
+    });
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('asks the tab before a command runs, and answers the agent with what it chose', async () => {
+    const { execution, host, permissions } = await createHarness({ asksPermission: true });
+    const runtime = execution.createRuntime();
+    const asked: Array<{ toolName: string; description: string }> = [];
+    runtime.setApprovalCallback(async (toolName: string, _input: unknown, description: string) => {
+      asked.push({ toolName, description });
+      return 'allow';
+    });
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'run it' })));
+
+    expect(asked).toEqual([expect.objectContaining({
+      toolName: 'bash',
+      description: 'Grok Build wants to run a shell command.',
+    })]);
+    await expect(permissions[0]).resolves.toEqual({
+      outcome: { outcome: 'selected', optionId: 'once' },
+    });
+    execution.dispose();
+    await host.dispose();
+  });
 
   it('carries a whole turn from the reference to the ACP prompt and back', async () => {
     const { execution, host, prompts, events } = await createHarness();

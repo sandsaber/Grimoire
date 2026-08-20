@@ -134,6 +134,30 @@ describe('Grok content presenter', () => {
     expect(recorded.commands[0]?.length).toBeGreaterThan(0);
   });
 
+  it('fills the context reading Grok never sends over the wire', () => {
+    const { presenter } = createPresenter();
+    const observed = grokWire.sessionUpdatesObserved as readonly string[];
+
+    // The recording is the evidence: seven update types, none of them a
+    // context window. What the tab shows comes from Grok's own session log,
+    // read while the answer is committed and handed back on this channel.
+    expect(observed).not.toContain('usage');
+    present(presenter, updateOf('response_completed'));
+    const chunks = presenter.present({
+      kind: 'session-usage',
+      usage: { size: 256_000, used: 12_000 },
+    });
+
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'usage',
+      usage: expect.objectContaining({
+        contextTokens: 12_000,
+        contextWindow: 256_000,
+        contextWindowIsAuthoritative: true,
+      }),
+    }));
+  });
+
   it('replays the whole recording without inventing a chunk', () => {
     const { presenter } = createPresenter();
 

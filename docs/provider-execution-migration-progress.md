@@ -4337,6 +4337,45 @@ must appear before `terminal` in the run's own event sequence.
 Gates: unit 473 suites / 7,635 tests, typecheck, `eslint` over `src` and `tests` clean.
 
 
+### M2-flips wave 5 — Grok's runtime half (this commit)
+
+A tab's Grok runtime now exists: `createRuntime` builds the session state, the content presenter,
+the approval presenter and the module context per tab, over the one backend and the one permission
+bridge the composition owns. Same shape as wave 4's, and four things Grok needs that OpenCode did
+not:
+
+- **the vault's model catalog is a file, not an answer.** Grok writes what models it has into the
+  managed home; `session/new` reports only the session's own. Read when a process comes up, which is
+  the moment the legacy runtime read it and the only one where the file is known to be current;
+- **the plan indicator asks the live process.** `x.ai/billing` over the same transport a turn runs
+  on, registered on `onClientReady` and cleared on `onClientLost` — the two moments the legacy
+  runtime used;
+- **the badge is filled from the session log.** No Grok turn reports a context window over ACP, and
+  many report no cost either. Both readings happen while the answer is committed, through the
+  `presentContent` seam, so they reach the turn that earned them;
+- **the conversation is saved pointing at a directory.** A Grok session id alone hydrates nothing:
+  the transcript is a directory under the managed home, and `sessionDirPath` plus `workspacePath` are
+  what the history service and the usage readers both resolve through.
+
+The mode is sent only when the session reported a native one, which is the legacy rule Grok's own
+tests pin: a release that carries its policy on the command line has no modes, and Grimoire's toolbar
+ids mean nothing to it.
+
+Five tests cover the half end to end, and each was proven by breaking what it covers: dropping
+`fillSurface` reds the context row alone; emptying the session paths reds the saved-conversation row
+alone; neutral failure wording reds the resume-advice row alone; and reporting the conversation's
+session instead of the one the turn ran in reds two.
+
+**The wrapper lied a second time, the other way.** Running these break-tests through `npx jest`
+reddened all 11 rows every time — the project's runner sets up device-settings storage, and without
+it every test that touches settings dies before it asserts anything. A break-test through `npx` is
+as untrustworthy as a green through it.
+
+Gates: unit 473 suites / 7,641 tests, typecheck, `eslint` over `src` and `tests`, and
+`build:release` clean. Still **dark**: `registration.ts` points `createRuntime` at
+`GrokChatRuntime`, and the flip is the next checkpoint.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
