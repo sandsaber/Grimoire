@@ -582,6 +582,9 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/kimicode/runtime/KimicodeChatRuntime.ts',
       'src/providers/mimocode/runtime/MimocodeChatRuntime.ts',
       'src/providers/opencode/runtime/OpencodeChatRuntime.ts',
+      // Extracted from that runtime, which delegates to it, so the flip does
+      // not produce a second opinion about what a permission is asking for.
+      'src/providers/opencode/execution/OpencodePermissionPresentation.ts',
       'src/providers/qwen/runtime/QwenChatRuntime.ts',
     ],
   },
@@ -683,6 +686,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/opencode/execution/OpencodeAcpDynamicConfig.ts',
       'src/providers/opencode/execution/OpencodeContentPresenter.ts',
       'src/providers/opencode/execution/OpencodeExecutionRequests.ts',
+      'src/providers/opencode/execution/OpencodeInteractionBridge.ts',
       'src/providers/opencode/execution/OpencodeProjectionResultSink.ts',
       'src/providers/opencode/execution/OpencodeAcpFileSystem.ts',
       'src/providers/opencode/execution/OpencodeExecutionBackend.ts',

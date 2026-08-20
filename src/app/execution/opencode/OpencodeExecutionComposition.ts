@@ -18,12 +18,12 @@ import { OpencodeAcpDynamicConfigApplier } from '@/providers/opencode/execution/
 import {
   OpencodeExecutionBackend,
   type OpencodeExecutionBackendContext,
-  type OpencodeInteractionBridge,
 } from '@/providers/opencode/execution/OpencodeExecutionBackend';
 import {
   OpencodeExecutionRequests,
   type OpencodeInvocationEnvironment,
 } from '@/providers/opencode/execution/OpencodeExecutionRequests';
+import { OpencodeInteractionBridge } from '@/providers/opencode/execution/OpencodeInteractionBridge';
 import { OpencodeProjectionResultSink } from '@/providers/opencode/execution/OpencodeProjectionResultSink';
 import { prepareOpencodeLaunchArtifacts } from '@/providers/opencode/runtime/OpencodeLaunchArtifacts';
 import { buildOpencodeRuntimeEnv } from '@/providers/opencode/runtime/OpencodeRuntimeEnvironment';
@@ -58,15 +58,23 @@ const MAX_RESULT_BYTES = 256_000;
  *   one. Its four ports — commands, config options, mode, cost — are what the
  *   runtime half must answer for, or a flipped tab loses its model selector,
  *   its slash commands and its plan indicator;
- * - **interactions.** The bridge below refuses every permission request rather
- *   than guessing an answer, which is fail-closed and useless: ACP asks before
- *   edits and commands, so a flipped tab would refuse all of them.
+ * - **the surface an interaction is shown on.** `OpencodeInteractionBridge` is
+ *   wired below and carries every permission request the agent raises, but
+ *   what puts one on screen and answers it is the tab's presenter — and a
+ *   presenter reads callbacks the tab installs, which is the runtime half.
  */
 export class OpencodeExecution {
   private readonly requests = new OpencodeExecutionRequests(
     () => opaqueId('ocreq'),
     () => this.environment(),
   );
+
+  /**
+   * One bridge for every tab, because the backend is one and it prepares every
+   * request through the bridge it was built with. A per-tab bridge would leave
+   * the presentation for a request in a map the presenter cannot read.
+   */
+  private readonly interactions = new OpencodeInteractionBridge(() => opaqueId('ocix'));
 
   private backend: OpencodeExecutionBackend | undefined;
 
@@ -79,6 +87,11 @@ export class OpencodeExecution {
      */
     readonly registry: ExecutionLifecycleRegistry,
   ) {}
+
+  /** What every open permission request is asking, for the tab that shows it. */
+  get interactionBridge(): OpencodeInteractionBridge {
+    return this.interactions;
+  }
 
   /** The store every tab runtime will reference its turns through. */
   get turnRequests(): OpencodeExecutionRequests {
@@ -101,7 +114,7 @@ export class OpencodeExecution {
       dynamicApplier: new OpencodeAcpDynamicConfigApplier({
         resolve: dynamicRef => this.requests.resolveDynamic(dynamicRef),
       }),
-      interactionBridge: refusingInteractionBridge(),
+      interactionBridge: this.interactions,
       resultSink: new OpencodeProjectionResultSink(),
       reconciler: {
         // What is known about a run this process did not see finish: nothing.
@@ -214,26 +227,6 @@ export class OpencodeExecution {
       mcpServers: ProviderWorkspaceRegistry.getMcpServerManager('opencode')?.getServers() ?? [],
     };
   }
-}
-
-/**
- * The bridge a flip must replace.
- *
- * Fail-closed rather than absent: ACP asks before an edit or a command, and a
- * composition wired up before its approval surface exists must refuse that work
- * instead of allowing it silently.
- */
-function refusingInteractionBridge(): OpencodeInteractionBridge {
-  return {
-    prepare: async () => ({
-      kind: 'approval',
-      presentationRef: opaqueId('ocix'),
-      responseIds: ['refused'],
-      providerResolvedResponseId: 'refused',
-      resolve: async () => ({ outcome: { outcome: 'cancelled' } }),
-      cancel: async () => ({ outcome: { outcome: 'cancelled' } }),
-    }),
-  };
 }
 
 function definedEnvironment(

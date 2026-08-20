@@ -9,14 +9,17 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { OpencodeExecution } from '@/app/execution/opencode/OpencodeExecutionComposition';
 import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
-import { executionSessionId, runId } from '@/core/execution/ExecutionIds';
+import { executionSessionId, type InteractionId, runId } from '@/core/execution/ExecutionIds';
 import { TOOL_READ } from '@/core/tools/toolNames';
 import type {
   ManagedAcpClient,
   ManagedAcpClientFactory,
   ManagedAcpClientFactoryInput,
 } from '@/providers/acp/execution/ManagedAcpClient';
-import type { AcpSessionNotification } from '@/providers/acp/types';
+import type {
+  AcpRequestPermissionResponse,
+  AcpSessionNotification,
+} from '@/providers/acp/types';
 import { OpencodeContentPresenter } from '@/providers/opencode/execution/OpencodeContentPresenter';
 import { OPENCODE_EXECUTION_DESCRIPTOR } from '@/providers/opencode/execution/OpencodeExecutionBackend';
 import { updateOpencodeProviderSettings } from '@/providers/opencode/settings';
@@ -68,16 +71,28 @@ describe('OpenCode execution composition', () => {
   }
 
   /** One ACP agent, without an agent. */
-  function createFakeAcp(): {
+  function createFakeAcp(options: { asksPermission?: boolean } = {}): {
     factory: ManagedAcpClientFactory;
     startupRefs: string[];
     prompts: unknown[];
+    permissions: Array<Promise<AcpRequestPermissionResponse>>;
   } {
     const startupRefs: string[] = [];
     const prompts: unknown[] = [];
+    const permissions: Array<Promise<AcpRequestPermissionResponse>> = [];
     const factory: ManagedAcpClientFactory = {
       create: async (input: ManagedAcpClientFactoryInput) => {
         startupRefs.push(input.startupRef);
+        const ask = (): void => {
+          permissions.push(input.requestPermission({
+            sessionId: 'acp-session-1',
+            options: [
+              { optionId: 'once', kind: 'allow_once', name: 'Allow' },
+              { optionId: 'no', kind: 'reject_once', name: 'Deny' },
+            ],
+            toolCall: { toolCallId: 'tool-1', title: 'bash', rawInput: { command: 'ls' } },
+          }));
+        };
         let notify: ((notification: AcpSessionNotification) => void) | undefined;
         const client: ManagedAcpClient = {
           initialize: async () => undefined,
@@ -85,6 +100,17 @@ describe('OpenCode execution composition', () => {
           loadSession: async () => ({ sessionId: 'acp-session-1' }),
           prompt: async request => {
             prompts.push(request);
+            if (options.asksPermission) {
+              // ACP asks before it runs anything, and the turn does not finish
+              // until the answer comes back — over a pipe, which is why the
+              // work that follows it starts a task later rather than on the
+              // same microtask drain. See the journal: a provider that answers
+              // within that drain makes the kernel throw while it is still
+              // committing the resolution.
+              ask();
+              await permissions.at(-1);
+              await new Promise(resolve => { setTimeout(resolve, 0); });
+            }
             // Everything an ACP agent says, it says as a session update: the
             // work it did, the plan it is on, how full the context is, and the
             // answer. The stop reason ends the turn.
@@ -133,14 +159,15 @@ describe('OpenCode execution composition', () => {
         return client;
       },
     };
-    return { factory, startupRefs, prompts };
+    return { factory, startupRefs, prompts, permissions };
   }
 
-  async function createHarness(): Promise<{
+  async function createHarness(options: { asksPermission?: boolean } = {}): Promise<{
     execution: OpencodeExecution;
     host: ExecutionKernelHost;
     startupRefs: string[];
     prompts: unknown[];
+    permissions: Array<Promise<AcpRequestPermissionResponse>>;
     events: ExecutionEventEnvelope[];
   }> {
     const host = new ExecutionKernelHost({
@@ -151,7 +178,7 @@ describe('OpenCode execution composition', () => {
       },
     });
     const execution = new OpencodeExecution(createPlugin(), host.registry);
-    const { factory, startupRefs, prompts } = createFakeAcp();
+    const { factory, startupRefs, prompts, permissions } = createFakeAcp(options);
     host.registerBackend(execution.createBackendRegistration(factory));
     await host.start();
     await host.registry.createSession({
@@ -161,7 +188,23 @@ describe('OpenCode execution composition', () => {
     });
     const events: ExecutionEventEnvelope[] = [];
     host.registry.observe(SESSION_ID, envelope => events.push(envelope));
-    return { execution, host, startupRefs, prompts, events };
+    return { execution, host, startupRefs, prompts, permissions, events };
+  }
+
+  async function waitForInteraction(
+    events: ExecutionEventEnvelope[],
+  ): Promise<{ interactionId: InteractionId; presentationRef: string }> {
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      const opened = events.find(envelope => envelope.event.kind === 'interaction-opened');
+      if (opened?.event.kind === 'interaction-opened') {
+        return {
+          interactionId: opened.event.interaction.interactionId,
+          presentationRef: opened.event.interaction.presentationRef,
+        };
+      }
+      await new Promise(resolve => { setTimeout(resolve, 5); });
+    }
+    throw new Error('No interaction was opened.');
   }
 
   async function settle(
@@ -255,6 +298,51 @@ describe('OpenCode execution composition', () => {
     // The answer itself stays on the kernel's channel; a second copy here
     // prints every sentence twice.
     expect(chunks.some(chunk => chunk.type === 'text')).toBe(false);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('asks before it runs a command, in the words the tab renders', async () => {
+    // ACP asks the client for permission before an edit or a command, so the
+    // bridge is what stands between a flipped tab and a turn that hangs on a
+    // prompt nobody was shown.
+    const { execution, host, permissions, events } = await createHarness({
+      asksPermission: true,
+    });
+
+    const requestRef = execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'list the vault' }],
+    });
+    await host.registry.startRun(SESSION_ID, {
+      runId: RUN_ID,
+      owner: OWNER,
+      requestRef,
+      resultExpectation: 'required',
+    });
+    const opened = await waitForInteraction(events);
+
+    expect(execution.interactionBridge.presentation(opened.presentationRef))
+      .toEqual(expect.objectContaining({
+        toolName: 'bash',
+        description: 'OpenCode wants to run a shell command.',
+        options: [
+          { responseId: 'allow-once', label: 'Allow', presentation: 'allow' },
+          { responseId: 'reject-once', label: 'Deny', presentation: 'reject' },
+        ],
+      }));
+
+    await host.registry.resolveInteraction({
+      interactionId: opened.interactionId,
+      responseId: 'allow-once',
+      resolvedAt: 1,
+    });
+    await settle(host, events);
+
+    // The agent hears the option it named, not the id the kernel recorded.
+    await expect(permissions[0]).resolves.toEqual({
+      outcome: { outcome: 'selected', optionId: 'once' },
+    });
+    expect(execution.interactionBridge.presentation(opened.presentationRef)).toBeUndefined();
     execution.dispose();
     await host.dispose();
   });

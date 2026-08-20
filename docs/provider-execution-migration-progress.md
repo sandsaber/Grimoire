@@ -3522,7 +3522,7 @@ useless, exactly as wave 3's was at this stage.
 Gates: unit 465 suites / 7,560 tests, integration 5 / 145, typecheck, lint, and `build:release`
 clean. The three new modules are declared dark in the parity manifest.
 
-### M2-flips wave 4 — OpenCode's content surface (this commit)
+### M2-flips wave 4 — OpenCode's content surface (`1ad9421`)
 
 The backend reported facts about a turn — a tool started, a thought happened — and the answer's
 text, and nothing a tool card, a diff, a plan or a context badge could be drawn from. It forwards
@@ -3571,8 +3571,66 @@ presenter is built but unwired — what constructs a presenter is the tab runtim
 increment, and its four ports are what that runtime must answer for.
 
 Gates: unit 467 suites / 7,577 tests, integration 5 / 145 (2 suites, 10 tests skipped), typecheck,
-lint, and `build:release` clean. The presenter is declared dark in the parity manifest; `main.js` is
-unchanged, because nothing reachable imports either half yet.
+lint, and `build:release` clean. The presenter is declared dark in the parity manifest, and the
+bundle confirms it: `main.js` contains neither half, because nothing reachable imports them.
+
+### M2-flips wave 4 — OpenCode's interactions (this commit)
+
+ACP asks the client before an edit or a command, so the refusing bridge the backend half shipped
+with was fail-closed and useless: a flipped tab would have refused every write OpenCode proposed.
+`OpencodeInteractionBridge` is the real one, and the composition now builds the backend with it.
+
+**One kind, not three.** ACP has a single `session/request_permission`, and the legacy runtime
+rendered every one of them through the approval callback — a question, a plan-mode switch and a
+shell command alike, each described by its own words and answered with the agent's own options.
+Kept, rather than split: what a permission is *about* is already carried by the presentation, and an
+interaction promoted to a question would be answered by a UI the agent's options do not fit.
+
+**The response ids are minted, not passed through.** The agent picks its own `optionId` — an
+arbitrary string — and a control record accepts only constrained, unique identifiers. An option
+named `opt one!` would make the record unwritable, and two options of one kind (which OpenCode
+offers for path-scoped allowances) would collide into one id that answers with whichever was found
+first. So each id is named after ACP's own option kind, suffixed only where there are two, and maps
+back to exactly one of the agent's options — which is what the answer is finally expressed in. The
+test asserts both halves: that every id matches the store's identifier shape, and that `allow-once`
+and `allow-once-2` resolve to different agent options.
+
+Three refusals, each different on purpose. A **dismissed** prompt is `cancelled`, because dismissing
+is not choosing and telling the agent the user refused would be a decision nobody made. An **id the
+interaction never offered** is a defect upstream, answered with the refusal the agent itself
+offered — the safe way to be wrong. And a request that **offered no refusal at all** is cancelled,
+because there is nothing else honest to send.
+
+`buildOpencodePermissionPresentation` and `normalizeApprovalInput` moved out of the legacy runtime,
+which now delegates to them — two hundred lines of OpenCode's own permission vocabulary (`bash`,
+`edit`, `external_directory`, `doom_loop`, `workflow_tool_approval`, and the workflow-tool summary),
+so the flip does not produce a second opinion about what is being asked. The runtime's existing
+approval tests cover the move, and the module is recorded as wired rather than dark, because the
+runtime that reaches it is still the one in production.
+
+The composition test drives it end to end: the fake agent asks before running a command, the
+interaction opens through the kernel, the presentation reads `bash` with its two options, the
+resolution goes back as the agent's own `optionId`, and the presentation is forgotten. Proven by
+mangling the option id in the bridge and watching only that test fail.
+
+**One finding, recorded rather than fixed.** The registry throws `Interaction run became terminal
+while resolving` if the provider finishes the turn between `interactionPort.resolve()` and the
+kernel's commit of that resolution. The answer has already reached the provider at that point, so
+the throw loses a resolution that succeeded, and it reaches whatever asked — a tab would see a
+failed approval on a turn that went fine. It cannot happen over a real transport, where the answer
+and the response cross a pipe; the first version of the composition test hit it only because the
+fake agent resumed on the same microtask drain, and the fake now crosses a task boundary the way a
+pipe would. Owner: M3, with the control plane — either commit the interaction without resurrecting
+the run, or say in the contract that a resolution is delivered before it is recorded.
+
+Still not here: **the presenter**, which is what puts a prepared interaction on screen and turns the
+answer back into a response id. It reads callbacks the tab installs, so it belongs to the runtime
+half — the same increment that constructs the content presenter.
+
+Gates: unit 468 suites / 7,588 tests, integration 5 / 145 (2 suites, 10 tests skipped), typecheck,
+lint, and `build:release` clean. The bridge is declared dark in the parity manifest; the extracted
+presentation module is declared wired, and `main.js` confirms both — it contains the vocabulary and
+neither dark half.
 
 ## Current blocker
 
@@ -3592,7 +3650,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **an external review of the Codex flip answered** — eight items, all real: the transient dedup window, a dropped `turn/started`, a swallowed refusal, and five smaller | `77ad8a3` |
 | **wave 3 (Claude) built and flipped** — dark half in four increments, then the flip with `ClaudeChatRuntime` deleted | `3df7a3a`, `2976714`, `fe4870d`, `b7a6424`, `f8c4ad2`, `ec519a7` |
 | **wave 4 (OpenCode) backend half** — the first ACP provider on the kernel | `3b01158` |
-| **wave 4's content surface** — every session update and the prompt's own answer forwarded, and the presenter that draws a tab from them | this commit |
+| **wave 4's content surface** — every session update and the prompt's own answer forwarded, and the presenter that draws a tab from them | `1ad9421` |
+| **wave 4's interactions** — the real permission bridge, the presentation vocabulary extracted from the legacy runtime, and an approval answered end to end through the kernel | this commit |
 
 Three providers now execute through the kernel: Antigravity, Codex, Claude.
 
@@ -3601,8 +3660,8 @@ Three providers now execute through the kernel: Antigravity, Codex, Claude.
 - **two smoke matrices, both needing a person in a vault** — Codex's rendering rows and Claude's
   twenty-eight. Wave 3 flipped ahead of wave 2's certification at the owner's direction; what stands
   in for the missing evidence is that each flip reverts as a single commit;
-- **wave 4's remaining two increments**, in the order wave 3 proved: interactions, then the
-  runtime half, then the flip. The content surface landed in this commit.
+- **wave 4's remaining increment**: the runtime half, then the flip. The content surface and the
+  interactions landed in the two commits above.
 
 Completed: **M0a** (parity gate, contribution inventory, adapter contract, the two contract suites,
 topology and shared-resource records, persistence decisions), **M1** (execution kernel, narrow
@@ -3660,14 +3719,15 @@ the command that runs them is in the matrix document under "the half that runs i
    twenty-eight of them, in a vault on a release build. Rows 14–16 first: Claude is the first flip
    with a rewind, and row 16 — a rewind that fails with the files restored — is what the backup port
    added in that entry exists for;
-3. **M2-flips wave 4 — OpenCode**, whose backend half and content surface are now built (the two
-   entries above). What the flip still needs, in the order wave 3 proved: **interactions**, where
-   the bridge refuses every permission request today and ACP asks before every edit and command;
-   then the **runtime half**, which is also what finally constructs the presenter and answers its
-   four ports — commands, config options, current mode, cost; then the flip itself with
-   `OpencodeChatRuntime` deleted in the same commit. Most of what it needs after that is shared: the
-   next five ACP providers inherit the transport, the launcher, the client adapter — and now the
-   content surface, since nothing in the presenter is OpenCode's except its tool normalization.
+3. **M2-flips wave 4 — OpenCode**, whose backend half, content surface and interactions are now
+   built (the three entries above). What the flip still needs is the **runtime half**: the tab
+   runtime over the adapter, which is what finally constructs the content presenter and answers its
+   four ports — commands, config options, current mode, cost — and builds the interaction presenter
+   that puts a prepared approval on screen. Then the flip itself, with `OpencodeChatRuntime` deleted
+   in the same commit. Most of what it needs after that is shared: the next five ACP providers
+   inherit the transport, the launcher, the client adapter — and now the content surface and the
+   interaction bridge, since nothing in either is OpenCode's except its tool normalization and its
+   permission vocabulary.
 
 **Two matrices are outstanding at once**, which is the state the owner accepted when wave 3 flipped
 ahead of wave 2's certification. Either flip reverts as a single commit.
