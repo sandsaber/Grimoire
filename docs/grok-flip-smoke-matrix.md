@@ -56,7 +56,8 @@ client. Rows 18–21 are what five surfaces ask when nobody is in a conversation
 
 ## The half that runs itself
 
-Rows driven headlessly by `tests/integration/app/execution/grok/GrokLiveSmoke.integration.test.ts`,
+Thirteen rows are driven headlessly by
+`tests/integration/app/execution/grok/GrokLiveSmoke.integration.test.ts`,
 against a real `grok agent … stdio`. It is skipped unless asked for, because it starts a CLI and
 spends the account's tokens:
 
@@ -72,12 +73,14 @@ function`.
 `GRIMOIRE_GROK_TRACE=1` prints the debug records the composition writes, `GRIMOIRE_GROK_CLI` points
 at a binary other than `grok` on `PATH`, and `GRIMOIRE_GROK_MODEL` overrides the model.
 
-**The rows it does not cover are the ones a person has to look at**: whether the tool card, the diff,
-the thinking block and the badges actually render, two tabs side by side, switching the model from
-the toolbar, a write outside the vault, and the rewind button being gone.
+It covers rows 1, 1b (the mirrored update, which has no number in the table because it is invisible
+when it works), 2, 5, 6, 7, 8, 9, 13, 14, 16, 18, 19 and 20. **The rows it does not cover are the
+ones a person has to look at**: whether the tool card, the diff, the thinking block and the badges
+actually render, two tabs side by side, switching the model from the toolbar, changing the effort,
+a write outside the vault, a question dialog, and the rewind button being gone.
 
 ## Record
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
-| — | — | — | — | not yet run |
+| 2026-08-20 | 1.0.5 | live: 1, 1b, 2, 5, 6, 7, 8, 9, 13, 14, 16, 18, 19, 20 | — | first live run found the resume shape this provider actually has; see the journal entry for that run |

@@ -40,6 +40,7 @@ import type {
 } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
 import type GrimoirePlugin from '@/main';
+import { isAcpMissingSessionError, JsonRpcErrorResponse } from '@/providers/acp';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import { AcpWorkspaceFileSystem } from '@/providers/acp/execution/AcpWorkspaceFileSystem';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
@@ -279,6 +280,20 @@ export class GrokExecution {
       },
       sessionInstanceIdFactory: () => sessionInstanceId(opaqueId('si')),
       interactionIdFactory: () => interactionId(opaqueId('ix')),
+      // What this provider says when a saved session is not there any more.
+      //
+      // The shared heuristic wants the agent to say "session" and Grok says
+      // `FS_NOT_FOUND` — its store is a directory, and a session that was
+      // deleted, or a vault that moved, is a missing path. Without this the
+      // kernel reads it as a hard failure and refuses the turn, where the
+      // legacy resume policy dropped the binding and created a session. Only
+      // for `session/load`: the same code from a prompt is a real error.
+      isMissingSessionError: error => (
+        isAcpMissingSessionError(error)
+        || (error instanceof JsonRpcErrorResponse
+          && (error.method === 'session/load' || error.method === 'loadSession')
+          && readErrorCode(error.data) === 'FS_NOT_FOUND')
+      ),
       resultCommitTimeoutMs: 2_000,
       recoveryTimeoutMs: 2_000,
       runTimeoutMs: 10 * 60_000,
@@ -942,6 +957,14 @@ export class GrokExecution {
       mcpServers: ProviderWorkspaceRegistry.getMcpServerManager('grok')?.getServers() ?? [],
     };
   }
+}
+
+/** The vendor's own code for a failure, where it names one. */
+function readErrorCode(data: unknown): string | undefined {
+  return typeof data === 'object' && data !== null && 'code' in data
+    && typeof (data as { code?: unknown }).code === 'string'
+    ? (data as { code: string }).code
+    : undefined;
 }
 
 function definedEnvironment(

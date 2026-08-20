@@ -75,6 +75,7 @@ describe('Grok execution composition', () => {
     asksPermission?: boolean;
     modeIsUnsupported?: boolean;
     reportsNoModes?: boolean;
+    sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
     streamsNothing?: boolean;
   } = {}): {
@@ -130,6 +131,14 @@ describe('Grok execution composition', () => {
             }] as never,
           }),
           loadSession: async request => {
+            if (options.sessionIsGone) {
+              // What Grok answers for a session whose directory is not there:
+              // a filesystem error, with the session never named.
+              throw new JsonRpcErrorResponse('session/load', -32603, 'Path not found.', {
+                code: 'FS_NOT_FOUND',
+                detail: 'No such file or directory (os error 2)',
+              });
+            }
             if (options.sessionLoadFails) {
               // What Grok answers for a session it no longer has: a service
               // failure that names nothing about the session.
@@ -195,6 +204,7 @@ describe('Grok execution composition', () => {
     plugin?: any;
     modeIsUnsupported?: boolean;
     reportsNoModes?: boolean;
+    sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
     streamsNothing?: boolean;
   } = {}): Promise<{
@@ -456,6 +466,28 @@ describe('Grok execution composition', () => {
       chunk.type === 'text' && chunk.content.includes('the answer it never sent')
     ))).toBe(true);
     expect(chunks.some(chunk => chunk.type === 'error')).toBe(false);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('starts a new session when the saved one is not on disk any more', async () => {
+    // Grok reports a session it cannot find as a filesystem error and never
+    // names the session, so the shared heuristic reads it as a hard failure and
+    // refuses the turn. The legacy runtime's resume policy was the opposite:
+    // drop the binding, create a session, answer the turn.
+    const { execution, host } = await createHarness({ sessionIsGone: true });
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({ providerState: {}, sessionId: 'grok-session-deleted' });
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks.some(chunk => chunk.type === 'error')).toBe(false);
+    expect(chunks.some(chunk => (
+      chunk.type === 'text' && chunk.content.includes('the answer')
+    ))).toBe(true);
+    // The tab is on the session the turn actually ran in, which is what the
+    // conversation is then saved pointing at.
+    expect(runtime.getSessionId()).toBe('grok-session');
     execution.dispose();
     await host.dispose();
   });

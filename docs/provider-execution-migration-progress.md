@@ -4452,6 +4452,39 @@ Gates: unit 473 suites / 7,626 tests, integration 5 suites / 145 tests, typechec
 `src` and `tests`, and `build:release` clean.
 
 
+### M2-flips wave 5 — the live half of Grok's matrix (this commit)
+
+Thirteen rows of the flip matrix now run headlessly against a real `grok agent … stdio` (CLI 1.0.5),
+behind `GRIMOIRE_GROK_LIVE=1`. All thirteen are green. What the run was for is the two things it
+found, neither of which a green unit suite could have:
+
+- **Grok says `FS_NOT_FOUND`, not "no such session".** Its session store is a directory, so a
+  session that was deleted — or a vault that moved — comes back from `session/load` as
+  `-32603 Path not found.` with `data.code: FS_NOT_FOUND`, never naming the session. The shared
+  heuristic requires the agent to say "session", so the kernel read it as a hard failure and refused
+  the turn, where the legacy resume policy dropped the binding and started a session. The
+  composition now recognizes this provider's own shape, for `session/load` alone — the same code
+  from a prompt is a real error. Row 9 answers on a new session instead of refusing;
+- **the harness deleted the vault it was about to reuse.** Row 8 shuts one composition down and
+  starts another on the same vault. OpenCode's equivalent survived that because its database lives
+  outside the vault; Grok keeps its session store *inside* it, under the managed home — so the
+  first harness's cleanup took the sessions with it and the resume row asked for a session whose
+  directory no longer existed. Vaults now outlive the harness that made one, and the row was proven
+  by the answer coming back: "cobalt".
+
+Getting to that answer took a protocol probe rather than a guess: a raw JSON-RPC script against the
+real CLI showed `session/load` succeeding for a session created the same way, which is what proved
+the failure was the harness's and not the product's. The instrumentation used to find it — a printed
+load error, the load's own parameters, the client's failed reads — was temporary and is gone.
+
+One row has no number in the matrix table: **1b, the mirrored update**. A release that mirrors an
+update onto both channels is invisible when the deduplicator works, so the row asserts the answer's
+phrase appears exactly once.
+
+Gates: unit 473 suites / 7,627 tests, integration 5 suites / 145 tests (live suite skipped),
+typecheck, `eslint` over `src` and `tests`, and `build:release` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
