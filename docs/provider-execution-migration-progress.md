@@ -4492,6 +4492,18 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
+### Where the session of 2026-08-20 ended
+
+Wave 5 is complete: **Grok executes through the kernel**, its legacy runtime is deleted, and thirteen
+live rows are green against CLI 1.0.5. Four ACP providers remain on the legacy path — MiMoCode, Kimi
+Code, Qwen, Gemini — and MiMoCode is the next wave: its CLI is installed, its wire recording is taken
+(partial, and labelled as such), and it mirrors OpenCode closely enough that the shared backend,
+bridge, presenter and filesystem should cover most of it.
+
+**Owed before the next wave starts**, both named in the entries above: four manual smoke matrices
+(Codex, Claude, OpenCode, Grok — the rendering rows only a person can run), and MiMoCode's own wire
+recording completed by a generating account.
+
 ### Where the session of 2026-08-19 ended
 
 Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
@@ -4519,9 +4531,18 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **wave 5: Grok's own envelope** — the parser that refused the shape the CLI sends, and a client that now subscribes to a vendor's methods | `e424c99` |
 | **wave 5: Grok's dark backend half** — a launch that is a command line, its own setters, and the two flags that restart a process rather than configure a session | `50e8bcc` |
 | **wave 5: Grok's content surface** — the three updates only Grok sends, and the bill that was on the wire while the runtime read the disk | `c37b300` |
-| **wave 5: interactions** — the permission bridge and the approval presenter go shared, and Grok's vocabulary is what is left | this commit |
+| **wave 5: interactions** — the permission bridge and the approval presenter go shared, and Grok's vocabulary is what is left | `c66973b`'s successor, `da74f9c` before it |
+| **wave 5: what a Grok session is set to** — 451 lines lifted out of the legacy runtime, and the settings overlay the first extraction dropped | `da74f9c` |
+| **wave 5: Grok's catalog contribution** — the fifth module, and the rewind the live record advertised while the runtime refused it | `0110840` |
+| **the ACP filesystem goes shared** — containment, the line window and the refusal were never one provider's | `c50faea` |
+| **reaching the owned process from outside a turn** — a client observer and a vendor request, for a plan indicator that is not a turn | `1e14c1b` |
+| **filling the surface from what a provider must go and read** — `presentContent` while the answer is committed, because Grok reports no context window at all | `9525be6` |
+| **wave 5: Grok's runtime half** — the per-tab pieces, the catalog that is a file, and the badge read from a session log | `eacbfa6` |
+| **one isolated session for the questions that are not chat** — five surfaces that built a whole runtime to ask two questions | `ae94c5f` |
+| **wave 5 flipped** — Grok on the kernel, `GrokChatRuntime` deleted, and the four things flipping found the new path had dropped | `2b96e70` |
+| **the live half of wave 5's matrix** — thirteen rows against a real `grok agent … stdio`, and this provider's own resume shape | `028cf67` |
 
-Four providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode.
+Five providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode, Grok.
 
 **What is owed, and by whom:**
 
