@@ -4485,6 +4485,38 @@ Gates: unit 473 suites / 7,627 tests, integration 5 suites / 145 tests (live sui
 typecheck, `eslint` over `src` and `tests`, and `build:release` clean.
 
 
+### A six-specialist review of the branch (this commit)
+
+The branch was reviewed end to end at `0f84b41..d9f715e` — kernel architecture, ACP transport,
+security, Grok's wave, the three earlier flips, and the gates. Verdict: ready to merge with fixes.
+One Critical, about eighteen Important, about twenty-five Minor. The work list is
+[`docs/providers-migration-review-backlog.md`](providers-migration-review-backlog.md); the reports it
+was drawn from are in this session's transcript, which that file names.
+
+Six of the findings were re-checked against the tree before being written down, and all six hold:
+
+- **nothing ever deletes a control record.** `VersionedRepository.remove` and `DurableStorage.remove`
+  have no production caller at all, and startup parses every intent and record ever written — so the
+  store grows monotonically in a real vault and start time grows with it. This is the one finding
+  that accumulates on users' disks daily, and it is what the next commit should answer;
+- **a process that dies while idle wedges the conversation**, because the backend only reacts to a
+  lost connection when a run is active. The legacy path handled it, which makes this a fix the
+  migration dropped — the failure mode this journal's own rule about harvested fixes exists to
+  prevent;
+- **`AcpSessionUpdateNormalizer.normalize` can return `undefined`** while typed as if it cannot: the
+  switch has no default and no trailing return, and the vendor channel wave 5 added is exactly what
+  delivers updates outside its union;
+- **`resolveGrokAcpModeId` is dead code**, referenced only by its own test. It is what keeps
+  Grimoire's synthetic mode ids off the wire, and issue #52 is that class of bug;
+- **`ClaudePlanUsageStore.recordSdkMessage` has no caller**, so Claude's plan indicator is fed
+  nothing — the same class wave 2 found and fixed for Codex;
+- **the auto-turn callback has two shapes**: the adapter passes a run id, the tab expects a result
+  object with chunks.
+
+Nothing was fixed here. The next session starts at the top of that backlog, in the order it names:
+C1, then Grok in one pass, then Claude in one pass, then ACP robustness, then hygiene.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -4493,6 +4525,10 @@ overrides it.**
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
 ### Where the session of 2026-08-20 ended
+
+**Tomorrow starts here:** [`docs/providers-migration-review-backlog.md`](providers-migration-review-backlog.md),
+item C1 — control records are written and never deleted. Then the Grok pass, the Claude pass, ACP
+robustness, hygiene. Nothing from that review is fixed yet.
 
 Wave 5 is complete: **Grok executes through the kernel**, its legacy runtime is deleted, and thirteen
 live rows are green against CLI 1.0.5. Four ACP providers remain on the legacy path — MiMoCode, Kimi
