@@ -7,7 +7,6 @@ import {
   type GrokWorkspaceContext,
 } from '@/providers/grok/GrokProviderModule';
 import { grokProviderRegistration } from '@/providers/grok/registration';
-import { GrokChatRuntime } from '@/providers/grok/runtime/GrokChatRuntime';
 
 /**
  * The fifth module, and the first that had nothing new to prove.
@@ -94,15 +93,12 @@ describe('Grok provider module', () => {
         .toBe(GROK_PROVIDER_CAPABILITIES.supportsImageAttachments);
     });
 
-    it('drops the rewind the runtime it replaces never performs', async () => {
-      const runtime = new GrokChatRuntime({ settings: {} } as never);
-
+    it('drops the rewind the runtime it replaced never performed', () => {
       // The live record advertises rewind, which puts a button on every Grok
-      // assistant message; the runtime behind it refuses every input. The
-      // module declares what the provider does, and the flip takes the dead
-      // affordance with it.
+      // assistant message; the runtime behind it refused every input, and the
+      // flip deleted it without ever implementing one. The module declares what
+      // the provider does, and the dead affordance went with the runtime.
       expect(GROK_PROVIDER_CAPABILITIES.supportsRewind).toBe(true);
-      await expect(runtime.rewind('user-1', 'assistant-1')).resolves.toEqual({ canRewind: false });
       expect(capabilities.conversation.rewind).toBe('unsupported');
     });
 

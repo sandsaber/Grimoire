@@ -631,6 +631,42 @@ describe('OpencodeExecutionBackend', () => {
     await expect(auxiliary).rejects.toThrow('auxiliary aborted');
     expect(observedSignal?.aborted).toBe(true);
   });
+  it('asks the provider for an answer it finished without streaming', async () => {
+    // Grok can finish a turn without delivering its final message over ACP
+    // while still writing the answer to its own session log — which surfaced,
+    // before the legacy runtime read it back, as an empty answer or a
+    // credentials error. A turn with no output is where that is asked.
+    const fixture = createFixture({ recoverOutput: async () => 'the answer it never sent' });
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    fixture.client.completePrompt({ stopReason: 'end_turn', userMessageId: 'message-1' });
+    const captured = await events;
+
+    expect(fixture.stored).toEqual(['the answer it never sent']);
+    // Carried on the assistant channel as well as committed: the surface draws
+    // an answer from the deltas, and a recovered one that is only committed is
+    // a turn that succeeds with an empty bubble.
+    expect(captured.some(event => (
+      event.event.kind === 'output-delta' && event.event.text === 'the answer it never sent'
+    ))).toBe(true);
+    expectTerminal(captured, 'succeeded', 'completed');
+  });
+
+  it('fails a turn that produced nothing when the provider recovers nothing either', async () => {
+    const fixture = createFixture({ recoverOutput: async () => null });
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    fixture.client.completePrompt({ stopReason: 'end_turn', userMessageId: 'message-1' });
+    const captured = await events;
+
+    expect(fixture.stored).toEqual([]);
+    expectTerminal(captured, 'failed', 'missing-required-result');
+  });
+
   it('carries what the provider learned while committing, before the turn ends', async () => {
     const fixture = createFixture({
       resultStore: async input => {
@@ -700,6 +736,7 @@ function createFixture(options: {
     readonly output: string;
     readonly presentContent: (payload: unknown) => void;
   }) => Promise<ResultCommitOutcome>;
+  readonly recoverOutput?: () => Promise<string | null>;
   readonly dynamicApply?: () => Promise<void>;
   readonly interactionPrepare?: () => Promise<OpencodePreparedInteraction>;
   readonly auxiliaryExecute?: (requestRef: string, signal: AbortSignal) => Promise<string>;
@@ -729,6 +766,7 @@ function createFixture(options: {
       })),
     },
     resultSink: {
+      ...(options.recoverOutput ? { recoverOutput: options.recoverOutput } : {}),
       storeResult: async ({ output, presentContent }) => {
         if (options.resultStore) return options.resultStore({ output, presentContent });
         stored.push(output);

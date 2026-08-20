@@ -578,11 +578,19 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/codex/execution/CodexTurnSandboxPolicy.ts',
       'src/providers/codex/runtime/CodexExecutionConnection.ts',
       'src/providers/gemini/runtime/GeminiChatRuntime.ts',
-      'src/providers/grok/runtime/GrokChatRuntime.ts',
-      // Extracted from that runtime, which delegates to it, so the flip does
-      // not produce a second opinion about what a permission is asking for,
-      // nor about which model, mode and effort a turn is dispatched under.
+      // Grok chat execution, flipped: the second ACP provider on the kernel,
+      // and the isolated session its five metadata surfaces now share.
+      'src/app/execution/grok/GrokExecutionComposition.ts',
+      'src/app/execution/grok/GrokMetadataSession.ts',
+      'src/providers/grok/GrokProviderModule.ts',
+      'src/providers/grok/app/GrokModuleContext.ts',
+      'src/providers/grok/execution/GrokAcpDynamicConfig.ts',
+      'src/providers/grok/execution/GrokContentPresenter.ts',
+      'src/providers/grok/execution/GrokExecutionBackend.ts',
+      'src/providers/grok/execution/GrokExecutionRequests.ts',
+      'src/providers/grok/execution/GrokInteractionBridge.ts',
       'src/providers/grok/execution/GrokPermissionPresentation.ts',
+      'src/providers/grok/execution/GrokProjectionResultSink.ts',
       'src/providers/grok/execution/GrokSessionConfigState.ts',
       'src/providers/kimicode/runtime/KimicodeChatRuntime.ts',
       'src/providers/mimocode/runtime/MimocodeChatRuntime.ts',
@@ -709,21 +717,6 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // M5. The transport, the launcher and the client adapter beside it went
       // live with OpenCode's flip and are listed as wired.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
-      // Wave 5's dark half: the composition that binds Grok's backend to the
-      // running plugin, its descriptor over the shared backend, the stores its
-      // references stand for, its own dynamic ordering and its sink — and the
-      // catalog contribution the flip reads its capabilities and its history
-      // ports out of.
-      'src/app/execution/grok/GrokExecutionComposition.ts',
-      'src/providers/grok/GrokProviderModule.ts',
-      'src/providers/grok/app/GrokModuleContext.ts',
-      'src/app/execution/grok/GrokMetadataSession.ts',
-      'src/providers/grok/execution/GrokAcpDynamicConfig.ts',
-      'src/providers/grok/execution/GrokContentPresenter.ts',
-      'src/providers/grok/execution/GrokInteractionBridge.ts',
-      'src/providers/grok/execution/GrokExecutionBackend.ts',
-      'src/providers/grok/execution/GrokExecutionRequests.ts',
-      'src/providers/grok/execution/GrokProjectionResultSink.ts',
     ],
   },
 ];

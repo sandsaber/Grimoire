@@ -241,7 +241,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     capabilities: GROK_PROVIDER_CAPABILITIES,
     isolationEvidence: 'grok/auxiliary/',
     evidence: [
-      'src/providers/grok/runtime/GrokChatRuntime.ts',
+      'src/providers/grok/execution/GrokExecutionBackend.ts',
       'src/providers/grok/runtime/GrokAuxQueryRunner.ts',
       'src/providers/grok/runtime/GrokPaths.ts',
     ],

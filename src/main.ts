@@ -15,6 +15,7 @@ import { AntigravityExecution } from './app/execution/antigravity/AntigravityExe
 import { ClaudeExecution } from './app/execution/claude/ClaudeExecutionComposition';
 import { CodexExecution } from './app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
+import { GrokExecution } from './app/execution/grok/GrokExecutionComposition';
 import { OpencodeExecution } from './app/execution/opencode/OpencodeExecutionComposition';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
@@ -101,6 +102,7 @@ export default class GrimoirePlugin extends Plugin {
   private codexExecution: CodexExecution | null = null;
   private claudeExecution: ClaudeExecution | null = null;
   private opencodeExecution: OpencodeExecution | null = null;
+  private grokExecution: GrokExecution | null = null;
   private unloading = false;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
@@ -353,6 +355,7 @@ export default class GrimoirePlugin extends Plugin {
     this.codexExecution?.dispose();
     this.claudeExecution?.dispose();
     this.opencodeExecution?.dispose();
+    this.grokExecution?.dispose();
     void this.executionKernelHost?.dispose();
     void this.persistOpenTabStates();
   }
@@ -411,6 +414,14 @@ export default class GrimoirePlugin extends Plugin {
     return this.opencodeExecution;
   }
 
+  /** The Grok execution this plugin instance owns; see the note above. */
+  getGrokExecution(): GrokExecution {
+    if (!this.grokExecution) {
+      throw new Error('Grok execution is not available before plugin load.');
+    }
+    return this.grokExecution;
+  }
+
   /**
    * Brings the kernel up before anything can ask it for work.
    *
@@ -456,6 +467,12 @@ export default class GrimoirePlugin extends Plugin {
     // a backend registered without its interaction port refuses work the user
     // already approved.
     host.registerBackend(this.opencodeExecution.createBackendRegistration());
+    this.grokExecution = new GrokExecution(this, host.registry);
+    // The second ACP provider, on the same shared backend and registered the
+    // same way. What differs is beside it rather than here: its own launch
+    // flags, its own update envelope, and a plan indicator that asks the live
+    // process.
+    host.registerBackend(this.grokExecution.createBackendRegistration());
     this.executionKernelHost = host;
     try {
       await host.start();

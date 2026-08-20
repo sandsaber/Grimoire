@@ -18,7 +18,6 @@ import {
   type GrokDiscoveredModel,
   splitGrokModelLabel,
 } from '../models';
-import { GrokChatRuntime } from '../runtime/GrokChatRuntime';
 import {
   getGrokProviderSettings,
   GROK_DEFAULT_ENVIRONMENT_VARIABLES,
@@ -248,20 +247,16 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
     };
 
     const persistModelMetadata = async (rawId: string): Promise<void> => {
-      const runtime = new GrokChatRuntime(context.plugin);
       try {
-        runtime.syncConversationState({
-          providerState: {},
-          sessionId: null,
+        const loaded = await context.plugin.getGrokExecution().metadata.discoverMetadata({
+          model: encodeGrokModelId(rawId),
         });
-        const loaded = await runtime.warmModelMetadata(encodeGrokModelId(rawId));
         if (loaded) {
           context.refreshModelSelectors();
         }
       } catch {
-        // Metadata warmup is opportunistic; the first chat turn can still discover it.
-      } finally {
-        runtime.cleanup();
+        // Metadata warmup is opportunistic; the first chat turn can still
+        // discover it. The session closes itself on every path.
       }
     };
 
@@ -559,16 +554,7 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
             settings: settingsBag,
           });
         } else {
-          const runtime = new GrokChatRuntime(context.plugin);
-          try {
-            runtime.syncConversationState({
-              providerState: {},
-              sessionId: null,
-            });
-            await runtime.ensureReady({ allowSessionCreation: true });
-          } finally {
-            runtime.cleanup();
-          }
+          await context.plugin.getGrokExecution().metadata.discoverMetadata();
         }
         modelCatalogLoadFailed = getGrokProviderSettings(settingsBag).discoveredModels.length === 0;
         if (!modelCatalogLoadFailed) {

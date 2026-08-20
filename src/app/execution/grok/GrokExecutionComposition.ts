@@ -33,6 +33,7 @@ import {
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type {
   ApprovalCallback,
+  AskUserQuestionCallback,
   ChatRuntimeQueryOptions,
   ChatTurnRequest,
   PreparedChatTurn,
@@ -44,6 +45,10 @@ import { AcpWorkspaceFileSystem } from '@/providers/acp/execution/AcpWorkspaceFi
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
 import type { ManagedAcpExecutionBackendContext } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
+import type {
+  AcpAskUserQuestionRequest,
+  AcpAskUserQuestionResponse,
+} from '@/providers/acp/types';
 import { createGrokModuleContext } from '@/providers/grok/app/GrokModuleContext';
 import { grokPlanUsageStore } from '@/providers/grok/app/GrokPlanUsageStore';
 import { GROK_PROVIDER_CAPABILITIES } from '@/providers/grok/capabilities';
@@ -64,12 +69,15 @@ import {
 import { GrokProjectionResultSink } from '@/providers/grok/execution/GrokProjectionResultSink';
 import { GrokSessionConfigState } from '@/providers/grok/execution/GrokSessionConfigState';
 import { grokProviderModule } from '@/providers/grok/GrokProviderModule';
+import { GrokNativeTranscriptRecovery } from '@/providers/grok/history/GrokTranscriptRecovery';
 import {
   loadGrokSessionContextUsage,
   loadGrokSessionCost,
 } from '@/providers/grok/history/GrokUsageMetadataStore';
 import { resolveGrokPermissionModeForSettings } from '@/providers/grok/modes';
 import { buildGrokPromptBlocks, buildGrokPromptText } from '@/providers/grok/runtime/buildGrokPrompt';
+import { formatGrokAskUserQuestionResponse } from '@/providers/grok/runtime/formatGrokAskUserQuestionResponse';
+import { logGrokDebug } from '@/providers/grok/runtime/grokDebugLog';
 import { buildGrokAgentProcessArgs } from '@/providers/grok/runtime/GrokLaunchArgs';
 import { prepareGrokLaunchArtifacts } from '@/providers/grok/runtime/GrokLaunchArtifacts';
 import { applyGrokNativeModelCatalog, readGrokNativeModelCatalog } from '@/providers/grok/runtime/GrokModelsCache';
@@ -79,8 +87,10 @@ import {
   resolveManagedGrokHomePath,
 } from '@/providers/grok/runtime/GrokPaths';
 import { buildGrokRuntimeEnv } from '@/providers/grok/runtime/GrokRuntimeEnvironment';
+import { GrokSessionNotificationMirrorDeduplicator } from '@/providers/grok/runtime/GrokSessionNotificationMirrorDeduplicator';
 import {
   GROK_SESSION_NOTIFICATION_METHODS,
+  type GrokSessionNotificationSource,
   parseGrokSessionNotification,
 } from '@/providers/grok/runtime/GrokSessionNotifications';
 import type { GrokProviderSettings } from '@/providers/grok/settings';
@@ -101,6 +111,9 @@ const GROK_BILLING_METHOD = 'x.ai/billing';
 
 /** Where a session opened only to answer a question keeps its state. */
 const GROK_METADATA_ARTIFACTS_SUBDIR = 'grok/metadata';
+
+/** How much of a session log a recovered answer may be, in bytes. */
+const GROK_RECOVERED_ANSWER_LIMIT_BYTES = 1_000_000;
 
 /**
  * Grok chat execution, assembled from the running plugin.
@@ -159,7 +172,16 @@ export class GrokExecution {
     (present: (payload: unknown) => void) => Promise<void>
   >();
 
+  /** Which tab answers a question Grok asked on which session. */
+  private readonly questionAskers = new Map<string, () => AskUserQuestionCallback | undefined>();
+  private questionAbort: AbortController | null = null;
+
+  /** Where each open session's transcript is, by the tab that opened it. */
+  private readonly sessionPaths = new Map<string, () => GrokProviderState>();
+
   private readonly presenters = new Set<GrokInteractionPresenter>();
+
+  private readonly transcriptRecovery = new GrokNativeTranscriptRecovery();
 
   private metadataSession: GrokMetadataSession | undefined;
   private clientFactory: ManagedAcpClientFactory | undefined;
@@ -205,6 +227,7 @@ export class GrokExecution {
       interactionBridge: this.interactions,
       resultSink: new GrokProjectionResultSink({
         fillSurface: input => this.fillSurface(input),
+        recoverAnswer: input => this.recoverAnswer(input.nativeSessionRef),
       }),
       reconciler: {
         // What is known about a run this process did not see finish: nothing.
@@ -304,12 +327,10 @@ export class GrokExecution {
       refreshSelectors: () => this.refreshSelectors(),
       workspaceRoot: () => getVaultPath(this.plugin.app) ?? process.cwd(),
       cliPath: () => this.plugin.getResolvedProviderCliPath('grok') ?? 'grok',
-      recordDebug: (event, data) => this.plugin.recordDebugLog({
-        data,
-        event,
-        level: 'debug',
-        scope: 'grok',
-      }),
+      // Through Grok's own logger rather than the plugin's: it stamps the
+      // provider onto every record, which is what makes a debug log filterable
+      // by the provider that wrote it.
+      recordDebug: (event, data) => logGrokDebug(this.plugin, event, data),
     });
 
     const content = new GrokContentPresenter({
@@ -352,6 +373,14 @@ export class GrokExecution {
           sessionDirPath,
           buildManagedGrokProcessEnv(cwd),
         );
+        this.questionAskers.set(
+          opening.sessionId,
+          () => adapter?.interactionCallbacks().question as AskUserQuestionCallback | undefined,
+        );
+        this.sessionPaths.set(opening.sessionId, () => ({
+          ...(sessionDirPath ? { sessionDirPath } : {}),
+          ...(workspacePath ? { workspacePath } : {}),
+        }));
         this.surfaceReaders.set(
           opening.sessionId,
           present => this.readSessionSurface(opening.sessionId, present, {
@@ -456,12 +485,7 @@ export class GrokExecution {
       consumeProviderTurnMetadata: () => content.consumeTurnMetadata(),
       interactionPresenter: presenter,
       reportCleanupFailure: error => {
-        this.plugin.recordDebugLog({
-          error,
-          event: 'execution.cleanup.failed',
-          level: 'warn',
-          scope: 'grok',
-        });
+        logGrokDebug(this.plugin, 'execution.cleanup.failed', {}, { error, level: 'warn' });
       },
     };
 
@@ -520,6 +544,8 @@ export class GrokExecution {
         for (const sessionId of ownedSessions) {
           this.writeApprovers.delete(sessionId);
           this.surfaceReaders.delete(sessionId);
+          this.sessionPaths.delete(sessionId);
+          this.questionAskers.delete(sessionId);
         }
         ownedSessions.clear();
       },
@@ -585,6 +611,28 @@ export class GrokExecution {
       ...(modelId ? { modelId } : {}),
     };
     return Object.keys(dynamic).length > 0 ? dynamic : undefined;
+  }
+
+  /**
+   * The answer Grok wrote down but never sent.
+   *
+   * Read from the session's own transcript, through the tab that owns it —
+   * which is the only thing that knows where that transcript is. Bounded,
+   * because an unbounded read of a session log is a whole conversation loaded
+   * to recover one message.
+   */
+  private async recoverAnswer(nativeSessionRef: string): Promise<string | null> {
+    const paths = this.sessionPaths.get(nativeSessionRef)?.();
+    if (!paths) {
+      return null;
+    }
+    const recovered = await this.transcriptRecovery.recoverFinalAssistantMessage({
+      nativeSessionRef,
+      workspacePath: paths.workspacePath ?? null,
+      providerState: paths,
+      maxBytes: GROK_RECOVERED_ANSWER_LIMIT_BYTES,
+    }).catch(() => '');
+    return recovered.trim() || null;
   }
 
   /** The tab that owns this session, asked to fill what the wire did not. */
@@ -668,12 +716,7 @@ export class GrokExecution {
    */
   private settle(task: Promise<void>): void {
     void task.catch(error => {
-      this.plugin.recordDebugLog({
-        error,
-        event: 'execution.sessionConfig.failed',
-        level: 'warn',
-        scope: 'grok',
-      });
+      logGrokDebug(this.plugin, 'execution.sessionConfig.failed', {}, { error, level: 'warn' });
     });
   }
 
@@ -696,6 +739,36 @@ export class GrokExecution {
    * found by the session the write arrived on — and a write whose session
    * belongs to no open tab is refused rather than allowed by default.
    */
+  /**
+   * A question Grok asked, put to the tab whose session it came in on.
+   *
+   * Not an interaction the kernel carries: ACP's `ask_user_question` is a
+   * server request with its own answer shape, and the legacy runtime answered
+   * it from the same callback the chat surface installs. A question whose
+   * session belongs to no open tab is cancelled — the alternative is a turn
+   * waiting for an answer nobody will ever be shown.
+   */
+  private async askUserQuestion(
+    request: AcpAskUserQuestionRequest,
+  ): Promise<AcpAskUserQuestionResponse> {
+    const ask = this.questionAskers.get(request.sessionId)?.();
+    if (!ask) {
+      return { outcome: 'cancelled' };
+    }
+    const abort = new AbortController();
+    const previous = this.questionAbort;
+    this.questionAbort = abort;
+    previous?.abort();
+    try {
+      const answers = await ask({ questions: request.questions }, abort.signal);
+      return formatGrokAskUserQuestionResponse(answers);
+    } finally {
+      if (this.questionAbort === abort) {
+        this.questionAbort = null;
+      }
+    }
+  }
+
   private async approveWrite(input: {
     readonly sessionId: string;
     readonly requestPath: string;
@@ -738,11 +811,27 @@ export class GrokExecution {
       vendorSessionNotifications: {
         methods: GROK_SESSION_NOTIFICATION_METHODS,
         parse: (method, params) => parseGrokSessionNotification(method, params),
+        // Some releases mirror the same update onto both channels, and a
+        // client that delivers both prints every sentence twice and commits it
+        // twice. One filter per connection, because two Grok processes are two
+        // conversations.
+        createDeduplicator: () => {
+          const mirror = new GrokSessionNotificationMirrorDeduplicator();
+          return (notification, source) => mirror.shouldProcess(
+            notification,
+            source as GrokSessionNotificationSource,
+          );
+        },
       },
       // Declared, and therefore used: an ACP client that advertises no
       // filesystem is one the agent writes around, and the containment and the
       // write approval below are the two things it would be writing around.
       delegate: {
+        // Grok asks the client questions of its own, beside the permissions the
+        // kernel carries as interactions. Answered by the tab the question's
+        // session belongs to, the same way a write is — and cancelled rather
+        // than guessed when no tab owns it.
+        askUserQuestion: request => this.askUserQuestion(request),
         fileSystem: {
           readTextFile: request => fileSystem.readTextFile(request),
           writeTextFile: request => fileSystem.writeTextFile(request),

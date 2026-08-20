@@ -13,7 +13,6 @@ import { getVaultPath } from '../../../utils/path';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { GrokAgentMentionProvider } from '../agents/GrokAgentMentionProvider';
 import { GrokCommandCatalog } from '../commands/GrokCommandCatalog';
-import { GrokChatRuntime } from '../runtime/GrokChatRuntime';
 import { GrokCliResolver } from '../runtime/GrokCliResolver';
 import { discoverGrokModelsFromCli } from '../runtime/GrokModelDiscovery';
 import {
@@ -103,18 +102,12 @@ async function refreshGrokModelCatalog(
 
   let changed = applyGrokNativeModelCatalog(settings, catalog);
   if (catalog.models.length === 0) {
-    const runtime = new GrokChatRuntime(plugin);
-    try {
-      runtime.syncConversationState({
-        providerState: {},
-        sessionId: null,
-      });
-      const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-      const after = JSON.stringify(getGrokProviderSettings(settings).discoveredModels);
-      changed = loaded && before !== after;
-    } finally {
-      runtime.cleanup();
-    }
+    // The managed home had no catalog to read, so the models are asked for the
+    // only other way there is: one isolated session, opened and closed. What
+    // the legacy runtime did here was exactly that.
+    const loaded = await plugin.getGrokExecution().metadata.discoverMetadata();
+    const after = JSON.stringify(getGrokProviderSettings(settings).discoveredModels);
+    changed = loaded && before !== after;
   }
 
   if (changed) {

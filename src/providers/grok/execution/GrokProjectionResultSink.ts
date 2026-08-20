@@ -29,10 +29,25 @@ export interface GrokResultSinkPorts {
     readonly nativeSessionRef: string;
     readonly presentContent: (payload: unknown) => void;
   }) => Promise<void>;
+  /**
+   * The answer this turn produced without sending it.
+   *
+   * Grok finishes turns whose final message never reaches ACP while writing the
+   * answer to its own session log. Reading it back keeps the answer instead of
+   * failing a turn the provider actually completed — which is what an empty
+   * response looked like before the legacy runtime read it.
+   */
+  readonly recoverAnswer?: (input: {
+    readonly nativeSessionRef: string;
+  }) => Promise<string | null>;
 }
 
 export class GrokProjectionResultSink implements ManagedAcpExecutionResultSink {
   constructor(private readonly ports: GrokResultSinkPorts = {}) {}
+
+  async recoverOutput(input: { readonly nativeSessionRef: string }): Promise<string | null> {
+    return (await this.ports.recoverAnswer?.(input)) ?? null;
+  }
 
   async storeResult(input: {
     readonly output: string;

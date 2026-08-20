@@ -96,6 +96,57 @@ describe('AcpClientConnection', () => {
     harness.close();
   });
 
+  it('delivers a mirrored update once when the provider recognizes the copy', async () => {
+    // Some Grok releases send the same update twice — once as `session/update`
+    // and once wrapped in their own method — and a client that delivers both
+    // prints every sentence twice and commits it twice.
+    const seen: AcpSessionNotification[] = [];
+    const notification = {
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'agent_message_chunk',
+        messageId: 'assistant-1',
+        content: { type: 'text', text: 'One answer' },
+      },
+    };
+    const harness = createConnectionHarness((transport) => new AcpClientConnection({
+      transport,
+      vendorSessionNotifications: {
+        methods: ['_x.ai/session_notification'],
+        parse: (_method, params) => params as AcpSessionNotification,
+        // Per connection, not per factory: two Grok processes are two
+        // conversations, and a shared filter would drop one's update because
+        // the other had just sent the same words.
+        createDeduplicator: () => {
+          const seenSources = new Map<string, Set<string>>();
+          return (candidate, source) => {
+            const key = JSON.stringify(candidate);
+            const sources = seenSources.get(key) ?? new Set<string>();
+            seenSources.set(key, sources);
+            if (sources.has(source)) return true;
+            sources.add(source);
+            return sources.size === 1;
+          };
+        },
+      },
+    }));
+    harness.connection.onSessionNotification(update => {
+      seen.push(update);
+    });
+    harness.transport.start();
+
+    harness.sendInbound({ jsonrpc: '2.0', method: 'session/update', params: notification });
+    harness.sendInbound({
+      jsonrpc: '2.0',
+      method: '_x.ai/session_notification',
+      params: notification,
+    });
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(seen).toHaveLength(1);
+    harness.close();
+  });
+
   it('declines a vendor notification its parser does not recognize', async () => {
     const seen: AcpSessionNotification[] = [];
     const harness = createConnectionHarness((transport) => new AcpClientConnection({

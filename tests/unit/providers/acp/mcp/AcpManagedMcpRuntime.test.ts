@@ -1,21 +1,19 @@
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { GeminiChatRuntime } from '@/providers/gemini/runtime/GeminiChatRuntime';
-import { GrokChatRuntime } from '@/providers/grok/runtime/GrokChatRuntime';
 import { KimicodeChatRuntime } from '@/providers/kimicode/runtime/KimicodeChatRuntime';
 import { MimocodeChatRuntime } from '@/providers/mimocode/runtime/MimocodeChatRuntime';
 import { QwenChatRuntime } from '@/providers/qwen/runtime/QwenChatRuntime';
 
 /**
- * The five ACP runtimes still on the legacy path.
+ * The four ACP runtimes still on the legacy path.
  *
- * OpenCode left this list at its flip: its servers reach a session through the
- * kernel now, asserted where they are passed —
- * `OpencodeExecutionComposition.test.ts` for the launch key that restarts on a
- * change, and `OpencodeExecutionBackend.test.ts` for the `session/new` that
- * carries them.
+ * OpenCode left this list at its flip and Grok at its own: their servers reach
+ * a session through the kernel now, asserted where they are passed — each
+ * provider's `*ExecutionComposition.test.ts` for the launch key that restarts
+ * on a change, and `OpencodeExecutionBackend.test.ts` for the `session/new`
+ * that carries them.
  */
 const cases = [
-  ['grok', GrokChatRuntime],
   ['mimocode', MimocodeChatRuntime],
   ['kimicode', KimicodeChatRuntime],
   ['qwen', QwenChatRuntime],
@@ -59,10 +57,9 @@ describe('ACP managed MCP runtime integration', () => {
     const runtime = new Runtime(createPlugin()) as any;
     runtime.syncSessionDiscovery = jest.fn();
     runtime.updateSessionPaths = jest.fn();
-    // What a session answers with is read by the runtime for four of these and
-    // by an extracted `GrokSessionConfigState` for the fifth, which is Grok's
-    // step towards its flip. This assertion is about the servers a session is
-    // opened with either way, so the stub goes wherever the reading lives.
+    // What a session answers with is read by the runtime for all four that are
+    // left; the two that flipped read it on an extracted state instead. The
+    // stub goes wherever the reading lives, so this row survives the next flip.
     const sessionConfig = runtime.sessionConfig ?? runtime;
     sessionConfig.syncSessionModelState = jest.fn().mockResolvedValue(undefined);
     sessionConfig.syncSessionModeState = jest.fn().mockResolvedValue(undefined);

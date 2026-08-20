@@ -1,5 +1,4 @@
 import { createGrokWorkspaceServices } from '@/providers/grok/app/GrokWorkspaceServices';
-import { GrokChatRuntime } from '@/providers/grok/runtime/GrokChatRuntime';
 import { discoverGrokModelsFromCli } from '@/providers/grok/runtime/GrokModelDiscovery';
 import { readGrokNativeModelCatalog } from '@/providers/grok/runtime/GrokModelsCache';
 import { getGrokProviderSettings, updateGrokProviderSettings } from '@/providers/grok/settings';
@@ -58,7 +57,10 @@ describe('createGrokWorkspaceServices', () => {
         { label: 'Grok 4.5', rawId: 'grok-4.5' },
       ],
     });
-    const ensureReadySpy = jest.spyOn(GrokChatRuntime.prototype, 'ensureReady');
+    // No session is opened when the CLI answered: the ACP fallback exists for
+    // the case where it did not.
+    const discoverMetadata = jest.fn();
+    (plugin as any).getGrokExecution = () => ({ metadata: { discoverMetadata } });
 
     const services = await createGrokWorkspaceServices(plugin as any, createVaultAdapter() as any);
     const changed = await services.modelCatalog?.refreshModels({
@@ -68,7 +70,7 @@ describe('createGrokWorkspaceServices', () => {
 
     expect(changed).toBe(true);
     expect(discoverGrokModelsFromCliMock).toHaveBeenCalled();
-    expect(ensureReadySpy).not.toHaveBeenCalled();
+    expect(discoverMetadata).not.toHaveBeenCalled();
     expect(getGrokProviderSettings(settings).discoveredModels).toEqual([
       { label: 'Grok 4.6', rawId: 'grok-4.6' },
       { label: 'Grok 4.5', rawId: 'grok-4.5' },
@@ -143,15 +145,16 @@ describe('createGrokWorkspaceServices', () => {
       settings,
     };
     discoverGrokModelsFromCliMock.mockResolvedValue({ defaultModelId: null, models: [] });
-    jest.spyOn(GrokChatRuntime.prototype, 'ensureReady')
-      .mockImplementation(async function ensureReady(this: GrokChatRuntime) {
-        updateGrokProviderSettings((this as any).plugin.settings, {
-          discoveredModels: [{ label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' }],
-          visibleModels: ['openai/gpt-5.6'],
-        });
-        return true;
+    // The catalog asks the isolated metadata session, which is what opening a
+    // session and reading its reply has become.
+    const discoverMetadata = jest.fn().mockImplementation(async () => {
+      updateGrokProviderSettings(settings, {
+        discoveredModels: [{ label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' }],
+        visibleModels: ['openai/gpt-5.6'],
       });
-    jest.spyOn(GrokChatRuntime.prototype, 'cleanup').mockImplementation(() => undefined);
+      return true;
+    });
+    (plugin as any).getGrokExecution = () => ({ metadata: { discoverMetadata } });
 
     const services = await createGrokWorkspaceServices(plugin as any, createVaultAdapter() as any);
     const changed = await services.modelCatalog?.refreshModels({
@@ -160,6 +163,7 @@ describe('createGrokWorkspaceServices', () => {
     });
 
     expect(changed).toBe(true);
+    expect(discoverMetadata).toHaveBeenCalledTimes(1);
     expect(getGrokProviderSettings(settings).discoveredModels).toEqual([
       { label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' },
     ]);

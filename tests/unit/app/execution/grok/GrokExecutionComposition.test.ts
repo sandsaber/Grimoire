@@ -74,7 +74,9 @@ describe('Grok execution composition', () => {
   function createFakeAcp(options: {
     asksPermission?: boolean;
     modeIsUnsupported?: boolean;
+    reportsNoModes?: boolean;
     sessionLoadFails?: boolean;
+    streamsNothing?: boolean;
   } = {}): {
     factory: ManagedAcpClientFactory;
     startupRefs: string[];
@@ -114,7 +116,9 @@ describe('Grok execution composition', () => {
         let notify: ((notification: AcpSessionNotification) => void) | undefined;
         const client: ManagedAcpClient = {
           initialize: async () => undefined,
-          newSession: async () => ({
+          newSession: async () => (options.reportsNoModes ? {
+            sessionId: 'grok-session',
+          } : {
             sessionId: 'grok-session',
             configOptions: [{
               category: 'mode',
@@ -143,14 +147,16 @@ describe('Grok execution composition', () => {
               await permissions.at(-1);
               await new Promise(resolve => { setTimeout(resolve, 0); });
             }
-            notify?.({
-              sessionId: 'grok-session',
-              update: {
-                sessionUpdate: 'agent_message_chunk',
-                messageId: 'assistant-message',
-                content: { type: 'text', text: 'the answer' },
-              },
-            });
+            if (!options.streamsNothing) {
+              notify?.({
+                sessionId: 'grok-session',
+                update: {
+                  sessionUpdate: 'agent_message_chunk',
+                  messageId: 'assistant-message',
+                  content: { type: 'text', text: 'the answer' },
+                },
+              });
+            }
             return { stopReason: 'end_turn' };
           },
           setMode: async request => {
@@ -188,7 +194,9 @@ describe('Grok execution composition', () => {
     asksPermission?: boolean;
     plugin?: any;
     modeIsUnsupported?: boolean;
+    reportsNoModes?: boolean;
     sessionLoadFails?: boolean;
+    streamsNothing?: boolean;
   } = {}): Promise<{
     plugin: any;
     execution: GrokExecution;
@@ -351,6 +359,103 @@ describe('Grok execution composition', () => {
         contextWindowIsAuthoritative: true,
       }),
     }));
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('sends no mode at all to a session that reported none', async () => {
+    // A release that carries its permission policy on the command line
+    // advertises no modes, and Grimoire's own toolbar ids mean nothing to it.
+    const { execution, host, modes, configOptions } = await createHarness({
+      reportsNoModes: true,
+    });
+    const runtime = execution.createRuntime();
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(modes).toEqual([]);
+    expect(configOptions).toEqual([]);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('puts a question Grok asked to the tab whose session it came in on', async () => {
+    // ACP's `ask_user_question` is a server request with its own answer shape,
+    // not one of the interactions the kernel carries — and a question nobody is
+    // shown is a turn waiting forever.
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+    const asked: unknown[] = [];
+    runtime.setAskUserQuestionCallback(async (request: unknown) => {
+      asked.push(request);
+      return { 'What do you want to do?': 'notes' };
+    });
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+    const answer = await (execution as any).askUserQuestion({
+      questions: [{
+        multiSelect: false,
+        options: [{ description: 'Notes', label: 'notes' }],
+        question: 'What do you want to do?',
+      }],
+      sessionId: 'grok-session',
+      toolCallId: 'call-1',
+    });
+
+    expect(answer).toEqual({
+      annotations: {},
+      answers: { 'What do you want to do?': 'notes' },
+      outcome: 'accepted',
+    });
+    expect(asked).toHaveLength(1);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('cancels a question whose session belongs to no open tab', async () => {
+    const { execution, host } = await createHarness();
+
+    await expect((execution as any).askUserQuestion({
+      questions: [{ multiSelect: false, options: [], question: 'anyone?' }],
+      sessionId: 'nobodys-session',
+    })).resolves.toEqual({ outcome: 'cancelled' });
+
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('keeps the answer Grok wrote down but never sent', async () => {
+    // Grok finishes turns whose final message never reaches ACP while writing
+    // the answer to its own session log. Before that log was read back, this
+    // was an empty chat bubble or a credentials error on a turn the provider
+    // had actually completed.
+    const plugin = createPlugin();
+    const vault = plugin.app.vault.adapter.basePath;
+    const sessionDir = join(
+      vault,
+      '.grimoire',
+      'grok',
+      'sessions',
+      encodeURIComponent(vault),
+      'grok-session',
+    );
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(
+      join(sessionDir, 'chat_history.jsonl'),
+      [
+        JSON.stringify({ type: 'user', content: 'what now?' }),
+        JSON.stringify({ type: 'assistant', content: 'the answer it never sent' }),
+      ].join('\n'),
+    );
+    const { execution, host } = await createHarness({ plugin, streamsNothing: true });
+    const runtime = execution.createRuntime();
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks.some(chunk => (
+      chunk.type === 'text' && chunk.content.includes('the answer it never sent')
+    ))).toBe(true);
+    expect(chunks.some(chunk => chunk.type === 'error')).toBe(false);
     execution.dispose();
     await host.dispose();
   });

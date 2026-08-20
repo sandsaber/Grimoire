@@ -4406,6 +4406,52 @@ Gates: unit 473 suites / 7,647 tests, typecheck, `eslint` over `src` and `tests`
 five call sites still build runtimes, and the flip is what moves them.
 
 
+### M2-flips wave 5 — Grok is flipped (this commit)
+
+`registration.ts` points `createRuntime` at the composition, `main.ts` constructs it and registers
+the backend with its interaction and recovery ports, and `GrokChatRuntime` — 1,732 lines — is gone.
+Five providers execute through the kernel, and the second ACP one is among them.
+
+Five call sites built that runtime for reasons unrelated to chat: the model catalog, the command
+loader, two in the settings tab, one in the chat UI. Each is now `GrokMetadataSession`.
+
+**Flipping found four things the new path had dropped**, each of which is a seam rather than a patch:
+
+- **the answer Grok never sent.** This provider finishes turns whose final message never reaches ACP
+  while writing the answer to its own session log; the kernel would have ended those turns with
+  `missing-required-result`. `storeResult` now has a sibling, `recoverOutput`, asked only when a turn
+  produced nothing — and the recovered answer is emitted on the assistant channel as well as
+  committed, because the surface draws an answer from the deltas and a committed-only answer is a
+  turn that succeeds with an empty bubble;
+- **the mirrored update.** Some releases send the same update on `session/update` *and* under their
+  own method. The legacy runtime deduplicated them; the new client delivered both, which prints every
+  sentence twice and commits it twice. The vendor-notification declaration now carries a
+  `createDeduplicator`, built **per connection** — a filter shared across processes would drop one
+  conversation's update because another had just sent the same words;
+- **questions.** `ask_user_question` is a server request with its own answer shape, outside the
+  interactions the kernel carries. Routed to the tab whose session it arrived on, the same way a
+  write approval is, and cancelled rather than guessed when no tab owns that session;
+- **the debug vocabulary.** `logGrokDebug` stamps the provider onto every record and had become
+  unreachable, which the parity gate caught. The composition writes through it.
+
+**One product behaviour changes**: the rewind button is gone from Grok messages. The live record
+advertised rewind; the runtime answered `canRewind: false` to every input. Named in the module, in
+its test, and here, so it can be reversed by whoever wants the button back — with a port behind it.
+
+Twenty-five of the deleted runtime's tests moved rather than dying with it: thirteen onto
+`GrokSessionConfigState`, nine onto `GrokAcpDynamicConfigApplier` (rewritten, because *what to send*
+and *how it is sent* are two objects now), three onto the permission vocabulary. The rest were
+covered by helper-level suites that already existed, or by the composition's own rows.
+
+`docs/grok-flip-smoke-matrix.md` is the manual matrix: 21 rows, eight of them differences from
+OpenCode's that only a real CLI can show. Flipped ahead of it at the owner's standing direction, so
+four manual matrices are now outstanding. What stands in for the evidence is that this reverts as one
+commit.
+
+Gates: unit 473 suites / 7,626 tests, integration 5 suites / 145 tests, typecheck, `eslint` over
+`src` and `tests`, and `build:release` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

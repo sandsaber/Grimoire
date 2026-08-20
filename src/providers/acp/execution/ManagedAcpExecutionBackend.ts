@@ -121,6 +121,20 @@ export interface ManagedAcpExecutionResultSink {
      */
     readonly presentContent: (payload: unknown) => void;
   }): Promise<ResultCommitOutcome>;
+  /**
+   * The answer a turn produced without sending it, where the provider can find
+   * one.
+   *
+   * Grok finishes turns whose final message never reaches ACP while writing the
+   * answer to its own session log; before the legacy runtime read that back, it
+   * surfaced as an empty answer or as a credentials error. Asked only when the
+   * turn produced no output at all, so a provider that has nothing to recover
+   * declines by not declaring it.
+   */
+  recoverOutput?(input: {
+    readonly nativeSessionRef: string;
+    readonly nativeRunRef?: string;
+  }): Promise<string | null>;
 }
 
 export interface ManagedAcpClientObserver {
@@ -965,13 +979,37 @@ class ManagedAcpExecutionRun implements ExecutionRun {
       this.finish('interrupted', 'known-process-exit');
       return;
     }
-    const output = this.output.trim();
+    const output = this.output.trim() || await this.recoverOutput();
+    if (this.terminal || attempt !== this.attempt) return;
     if (!output) {
       this.finishForMissingResult();
       return;
     }
     this.completionTask = this.commitCompletion(output, attempt);
     await this.completionTask;
+  }
+
+  /** What the provider can still find, for a turn that streamed nothing. */
+  private async recoverOutput(): Promise<string> {
+    const sink = this.context.resultSink;
+    if (!sink.recoverOutput || !this.sessionRef) return '';
+    try {
+      const recovered = (await sink.recoverOutput({
+        nativeSessionRef: this.sessionRef,
+        ...(this.nativeRunRef ? { nativeRunRef: this.nativeRunRef } : {}),
+      }))?.trim() ?? '';
+      if (recovered) {
+        // The surface draws an answer from the deltas, never from the result
+        // reference — so a recovered answer that is only committed is a turn
+        // that succeeds with an empty bubble.
+        this.emit({ kind: 'output-delta', channel: 'assistant', text: recovered });
+      }
+      return recovered;
+    } catch {
+      // A recovery that failed is a turn with no answer, which is what it
+      // already was.
+      return '';
+    }
   }
 
   private async commitCompletion(output: string, attempt: number): Promise<void> {

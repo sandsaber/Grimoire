@@ -8,7 +8,6 @@ import { GROK_PROVIDER_CAPABILITIES } from './capabilities';
 import { grokSettingsReconciler } from './env/GrokSettingsReconciler';
 import { GrokConversationHistoryService } from './history/GrokConversationHistoryService';
 import { grokSubagentLifecycleAdapter } from './normalization/grokSubagentNormalization';
-import { GrokChatRuntime } from './runtime/GrokChatRuntime';
 import { GROK_ARTIFACTS_SUBDIR } from './runtime/GrokPaths';
 import { getGrokProviderSettings, updateGrokProviderSettings } from './settings';
 import { grokChatUIConfig } from './ui/GrokChatUIConfig';
@@ -19,7 +18,7 @@ export const grokProviderRegistration: ProviderRegistration = {
   chatUIConfig: grokChatUIConfig,
   createInlineEditService: (plugin) => new GrokInlineEditService(plugin),
   createInstructionRefineService: (plugin) => new GrokInstructionRefineService(plugin),
-  createRuntime: ({ plugin }) => new GrokChatRuntime(plugin),
+  createRuntime: ({ plugin }) => plugin.getGrokExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new GrokTitleGenerationService(plugin),
   displayName: 'Grok Build',
   environmentKeyPatterns: [/^GROK_/i, /^XAI_/i],
