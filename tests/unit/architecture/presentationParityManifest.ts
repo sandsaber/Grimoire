@@ -580,8 +580,10 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/gemini/runtime/GeminiChatRuntime.ts',
       'src/providers/grok/runtime/GrokChatRuntime.ts',
       // Extracted from that runtime, which delegates to it, so the flip does
-      // not produce a second opinion about what a permission is asking for.
+      // not produce a second opinion about what a permission is asking for,
+      // nor about which model, mode and effort a turn is dispatched under.
       'src/providers/grok/execution/GrokPermissionPresentation.ts',
+      'src/providers/grok/execution/GrokSessionConfigState.ts',
       'src/providers/kimicode/runtime/KimicodeChatRuntime.ts',
       'src/providers/mimocode/runtime/MimocodeChatRuntime.ts',
       // The shared managed-ACP platform, live since OpenCode's flip and

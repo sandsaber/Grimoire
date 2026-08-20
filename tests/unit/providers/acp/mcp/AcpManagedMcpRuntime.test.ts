@@ -58,9 +58,14 @@ describe('ACP managed MCP runtime integration', () => {
 
     const runtime = new Runtime(createPlugin()) as any;
     runtime.syncSessionDiscovery = jest.fn();
-    runtime.syncSessionModelState = jest.fn().mockResolvedValue(undefined);
-    runtime.syncSessionModeState = jest.fn().mockResolvedValue(undefined);
     runtime.updateSessionPaths = jest.fn();
+    // What a session answers with is read by the runtime for four of these and
+    // by an extracted `GrokSessionConfigState` for the fifth, which is Grok's
+    // step towards its flip. This assertion is about the servers a session is
+    // opened with either way, so the stub goes wherever the reading lives.
+    const sessionConfig = runtime.sessionConfig ?? runtime;
+    sessionConfig.syncSessionModelState = jest.fn().mockResolvedValue(undefined);
+    sessionConfig.syncSessionModeState = jest.fn().mockResolvedValue(undefined);
 
     const newSession = jest.fn().mockResolvedValue({
       configOptions: null,

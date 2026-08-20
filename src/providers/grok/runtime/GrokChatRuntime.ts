@@ -42,13 +42,6 @@ import type {
 import { coercePermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
-import {
-  sameDiscoveredModels,
-  sameModes,
-  sameStringList,
-  sameStringMap,
-  sameThinkingOptionsByModel,
-} from '../../../utils/collections';
 import { getEnhancedPath } from '../../../utils/env';
 import { getVaultPath } from '../../../utils/path';
 import {
@@ -59,9 +52,6 @@ import {
   type AcpReadTextFileRequest,
   type AcpRequestPermissionRequest,
   type AcpRequestPermissionResponse,
-  type AcpSessionConfigOption,
-  type AcpSessionModelState,
-  type AcpSessionModeState,
   type AcpSessionNotification,
   AcpSessionUpdateNormalizer,
   AcpSubprocess,
@@ -70,9 +60,6 @@ import {
   type AcpWriteTextFileRequest,
   approveAcpWriteTextFile,
   buildAcpUsageInfo,
-  extractAcpSessionModelState,
-  extractAcpSessionModeState,
-  extractAcpSessionThoughtLevelState,
   isAcpRetryableTransportClose,
   JsonRpcErrorResponse,
   resolveWorkspacePath,
@@ -82,6 +69,7 @@ import { grokPlanUsageStore } from '../app/GrokPlanUsageStore';
 import { GROK_PROVIDER_CAPABILITIES } from '../capabilities';
 import { getGrokDiscoveryState, updateGrokDiscoveryState } from '../discoveryState';
 import { buildGrokPermissionPresentation } from '../execution/GrokPermissionPresentation';
+import { GrokSessionConfigState } from '../execution/GrokSessionConfigState';
 import {
   GrokNativeTranscriptRecovery,
   type GrokTranscriptRecoveryPort,
@@ -90,30 +78,18 @@ import {
   loadGrokSessionContextUsage,
   loadGrokSessionCost,
 } from '../history/GrokUsageMetadataStore';
-import { ensureProviderProjectionMap } from '../internal/providerProjection';
 import {
-  buildGrokBaseModels,
   decodeGrokModelId,
-  encodeGrokModelId,
-  GROK_DEFAULT_THINKING_LEVEL,
-  GROK_SYNTHETIC_MODEL_ID,
-  type GrokDiscoveredModel,
-  isGrokModelSelectionId,
-  normalizeGrokDiscoveredModels,
-  normalizeGrokModelVariants,
   resolveGrokBaseModelRawId,
 } from '../models';
 import {
-  getManagedGrokModes,
   type GrokPermissionMode,
-  normalizeGrokAvailableModes,
   resolveGrokAcpModeId,
-  resolveGrokModeForPermissionMode,
   resolveGrokPermissionModeForSettings,
 } from '../modes';
 import { normalizeGrokSubagentExtensionNotification } from '../normalization/grokSubagentNormalization';
 import { createGrokToolStreamAdapter } from '../normalization/grokToolNormalization';
-import { getGrokProviderSettings, updateGrokProviderSettings } from '../settings';
+import { getGrokProviderSettings } from '../settings';
 import { getGrokState, type GrokProviderState } from '../types';
 import { buildGrokPromptBlocks, buildGrokPromptText } from './buildGrokPrompt';
 import { formatGrokAskUserQuestionResponse } from './formatGrokAskUserQuestionResponse';
@@ -126,16 +102,11 @@ import { buildGrokAgentProcessArgs } from './GrokLaunchArgs';
 import { prepareGrokLaunchArtifacts } from './GrokLaunchArtifacts';
 import {
   applyGrokNativeModelCatalog,
-  expandGrokVisibleModelsWithFrontier,
-  mergeGrokDiscoveredModels,
-  readGrokNativeModelCatalog,
   resolveGrokCatalogDefaultModel,
-  shouldUpgradeGrokFrontierDefault,
 } from './GrokModelsCache';
 import {
   buildManagedGrokProcessEnv,
   resolveGrokSessionDirectory,
-  resolveManagedGrokHomePath,
 } from './GrokPaths';
 import { resolveGrokProviderAuthPath } from './GrokRuntimeEnvironment';
 import { buildGrokRuntimeEnv } from './GrokRuntimeEnvironment';
@@ -212,12 +183,21 @@ export class GrokChatRuntime implements ChatRuntime {
   private currentSessionDirPath: string | null = null;
   private currentWorkspacePath: string | null = null;
   private currentLaunchKey: string | null = null;
-  private currentSessionEffortConfigId: string | null = null;
-  private currentSessionEffortValue: string | null = null;
-  private currentSessionEffortValues = new Set<string>();
-  private currentSessionModelId: string | null = null;
-  private currentSessionModeConfigId: string | null = null;
-  private currentSessionModeId: string | null = null;
+  /**
+   * What the live session is set to, and what the vault has learned from it.
+   *
+   * Extracted so the kernel path answers the same questions from a composition
+   * that has no runtime: which model and mode a turn dispatches under, and what
+   * to keep of the lists a session reports back.
+   */
+  private readonly sessionConfig = new GrokSessionConfigState({
+    settingsBag: () => this.plugin.settings,
+    saveSettings: () => this.plugin.saveSettings(),
+    refreshSelectors: () => this.refreshModelSelectors(),
+    workspaceRoot: () => getVaultPath(this.plugin.app) ?? process.cwd(),
+    cliPath: () => this.plugin.getResolvedProviderCliPath('grok') ?? 'grok',
+    recordDebug: (event, data) => logGrokDebug(this.plugin, event, data),
+  });
   private currentTurnSawAcpCost = false;
   private currentTurnMetadata: ChatTurnMetadata = {};
   private loadedSessionId: string | null = null;
@@ -275,12 +255,7 @@ export class GrokChatRuntime implements ChatRuntime {
     const previousSessionId = this.sessionId;
     const nextSessionId = conversation?.sessionId ?? null;
     if (this.sessionId !== nextSessionId) {
-      this.currentSessionEffortConfigId = null;
-      this.currentSessionEffortValue = null;
-      this.currentSessionEffortValues = new Set<string>();
-      this.currentSessionModelId = null;
-      this.currentSessionModeConfigId = null;
-      this.currentSessionModeId = null;
+      this.sessionConfig.forgetSession();
       this.sessionInvalidated = false;
       this.setSupportedCommands([]);
     }
@@ -336,8 +311,8 @@ export class GrokChatRuntime implements ChatRuntime {
       modelId: selectedBaseRawModelId,
       sessionId: this.sessionId,
     });
-    this.currentSessionModelId = selectedBaseRawModelId;
-    await this.syncSessionModelState({}, {
+    this.sessionConfig.markApplied({ modelId: selectedBaseRawModelId });
+    await this.sessionConfig.syncSessionModelState({}, {
       currentRawModelId: selectedBaseRawModelId,
       seedActiveSelection: false,
     });
@@ -581,7 +556,7 @@ export class GrokChatRuntime implements ChatRuntime {
 
       const usage = buildAcpUsageInfo({
         contextWindow: this.contextUsage,
-        model: this.getActiveDisplayModel(queryOptions),
+        model: this.sessionConfig.getActiveDisplayModel(queryOptions),
         promptUsage: this.promptUsage,
       });
       if (usage) {
@@ -890,9 +865,7 @@ export class GrokChatRuntime implements ChatRuntime {
       this.activeTurn?.queue.close();
       this.activeTurn = null;
     }
-    this.currentSessionModelId = null;
-    this.currentSessionModeConfigId = null;
-    this.currentSessionModeId = null;
+    this.sessionConfig.forgetSession();
     this.setSupportedCommands([]);
 
     this.unregisterTransportClose?.();
@@ -968,103 +941,26 @@ export class GrokChatRuntime implements ChatRuntime {
     return snapshot;
   }
 
-  private resolveSelectedRawModelId(queryOptions?: ChatRuntimeQueryOptions): string | null {
-    const providerSettings = this.getProviderSettings();
-    const selectedModel = typeof queryOptions?.model === 'string'
-      ? queryOptions.model
-      : typeof providerSettings.model === 'string'
-      ? providerSettings.model
-      : '';
-
-    if (!isGrokModelSelectionId(selectedModel)) {
-      return null;
-    }
-
-    const selectedBaseRawModelId = decodeGrokModelId(selectedModel);
-    if (!selectedBaseRawModelId) {
-      return null;
-    }
-
-    const discoveredModels = getGrokProviderSettings(providerSettings).discoveredModels;
-    const normalizedBaseRawModelId = resolveGrokBaseModelRawId(selectedBaseRawModelId, discoveredModels);
-    if (!normalizedBaseRawModelId) {
-      return null;
-    }
-
-    const availableModelIds = new Set(discoveredModels.map((model) => model.rawId));
-    if (availableModelIds.size > 0 && !availableModelIds.has(normalizedBaseRawModelId)) {
-      return null;
-    }
-
-    return normalizedBaseRawModelId;
-  }
 
   getAuxiliaryModel(): string | null {
-    return this.getActiveDisplayModel() ?? null;
+    return this.sessionConfig.getActiveDisplayModel() ?? null;
   }
 
-  private getActiveDisplayModel(queryOptions?: ChatRuntimeQueryOptions): string | undefined {
-    const providerSettings = this.getProviderSettings();
-    const selectedModel = typeof queryOptions?.model === 'string'
-      ? queryOptions.model
-      : typeof providerSettings.model === 'string'
-      ? providerSettings.model
-      : '';
 
-    if (
-      selectedModel
-      && selectedModel !== GROK_SYNTHETIC_MODEL_ID
-      && isGrokModelSelectionId(selectedModel)
-    ) {
-      const selectedRawModelId = this.resolveSelectedRawModelId(queryOptions);
-      return selectedRawModelId
-        ? encodeGrokModelId(selectedRawModelId)
-        : (this.currentSessionModelId
-          ? encodeGrokModelId(this.currentSessionModelId)
-          : selectedModel);
-    }
-
-    return this.currentSessionModelId
-      ? encodeGrokModelId(this.currentSessionModelId)
-      : (selectedModel && isGrokModelSelectionId(selectedModel) ? selectedModel : undefined);
-  }
-
-  private resolveSelectedModeId(): string | null {
-    const providerSettings = this.getProviderSettings();
-    const grokSettings = getGrokProviderSettings(providerSettings);
-    const availableModes = getManagedGrokModes(grokSettings.availableModes);
-    const mappedModeId = resolveGrokModeForPermissionMode(
-      providerSettings.permissionMode,
-      grokSettings.availableModes,
-    );
-    if (mappedModeId) {
-      return mappedModeId;
-    }
-
-    if (grokSettings.selectedMode) {
-      if (
-        availableModes.some((mode) => mode.id === grokSettings.selectedMode)
-      ) {
-        return grokSettings.selectedMode;
-      }
-    }
-
-    return availableModes[0]?.id || null;
-  }
 
   private async applySelectedMode(sessionId: string): Promise<void> {
     if (!this.connection) {
       return;
     }
 
-    const selectedModeId = this.resolveSelectedModeId();
+    const selectedModeId = this.sessionConfig.resolveSelectedModeId();
     if (!selectedModeId) {
       return;
     }
 
     // Current Grok releases use launch policy without advertising ACP mode control.
     // Do not send Grimoire's synthetic toolbar mode IDs to such sessions.
-    if (!this.currentSessionModeId) {
+    if (!this.sessionConfig.sessionModeId) {
       return;
     }
 
@@ -1073,10 +969,10 @@ export class GrokChatRuntime implements ChatRuntime {
       .map((mode) => mode.id);
     const modeToSend = resolveGrokAcpModeId(
       selectedModeId,
-      this.currentSessionModeId,
+      this.sessionConfig.sessionModeId,
       advertisedModeIds,
     );
-    if (!modeToSend || modeToSend === this.currentSessionModeId) {
+    if (!modeToSend || modeToSend === this.sessionConfig.sessionModeId) {
       return;
     }
 
@@ -1086,7 +982,7 @@ export class GrokChatRuntime implements ChatRuntime {
         modeId: modeToSend,
         sessionId,
       });
-      this.currentSessionModeId = modeToSend;
+      this.sessionConfig.markApplied({ modeId: modeToSend });
       return;
     } catch (error) {
       if (this.isIgnorableAcpModeError(error, modeToSend, sessionId, 'session.set_mode')) {
@@ -1098,19 +994,19 @@ export class GrokChatRuntime implements ChatRuntime {
       unsupportedMethodError = error;
     }
 
-    if (!this.currentSessionModeConfigId) {
+    if (!this.sessionConfig.sessionModeConfigId) {
       throw unsupportedMethodError;
     }
 
     try {
       const response = await this.connection.setConfigOption({
-        configId: this.currentSessionModeConfigId,
+        configId: this.sessionConfig.sessionModeConfigId,
         sessionId,
         type: 'select',
         value: modeToSend,
       });
-      this.currentSessionModeId = modeToSend;
-      await this.syncSessionModeState({
+      this.sessionConfig.markApplied({ modeId: modeToSend });
+      await this.sessionConfig.syncSessionModeState({
         configOptions: response.configOptions,
       });
     } catch (error) {
@@ -1149,8 +1045,8 @@ export class GrokChatRuntime implements ChatRuntime {
       return;
     }
 
-    const selectedRawModelId = this.resolveSelectedRawModelId(queryOptions);
-    if (!selectedRawModelId || selectedRawModelId === this.currentSessionModelId) {
+    const selectedRawModelId = this.sessionConfig.resolveSelectedRawModelId(queryOptions);
+    if (!selectedRawModelId || selectedRawModelId === this.sessionConfig.sessionModelId) {
       return;
     }
 
@@ -1158,214 +1054,38 @@ export class GrokChatRuntime implements ChatRuntime {
       modelId: selectedRawModelId,
       sessionId,
     });
-    this.currentSessionModelId = selectedRawModelId;
-    await this.syncSessionModelState({}, {
+    this.sessionConfig.markApplied({ modelId: selectedRawModelId });
+    await this.sessionConfig.syncSessionModelState({}, {
       currentRawModelId: selectedRawModelId,
     });
   }
 
-  private resolveSelectedEffortValue(): string | null {
-    const providerSettings = this.getProviderSettings();
-    const selectedEffort = typeof providerSettings.effortLevel === 'string'
-      ? providerSettings.effortLevel.trim()
-      : '';
-    if (!selectedEffort || selectedEffort === GROK_DEFAULT_THINKING_LEVEL) {
-      return null;
-    }
-
-    return this.currentSessionEffortValues.has(selectedEffort)
-      ? selectedEffort
-      : null;
-  }
 
   private async applySelectedEffort(sessionId: string): Promise<void> {
-    if (!this.connection || !this.currentSessionEffortConfigId) {
+    if (!this.connection || !this.sessionConfig.effortConfigId) {
       return;
     }
 
-    const selectedEffort = this.resolveSelectedEffortValue();
-    if (!selectedEffort || selectedEffort === this.currentSessionEffortValue) {
+    const selectedEffort = this.sessionConfig.resolveSelectedEffortValue();
+    if (!selectedEffort || selectedEffort === this.sessionConfig.effortValue) {
       return;
     }
 
     const response = await this.connection.setConfigOption({
-      configId: this.currentSessionEffortConfigId,
+      configId: this.sessionConfig.effortConfigId,
       sessionId,
       type: 'select',
       value: selectedEffort,
     });
-    this.currentSessionEffortValue = selectedEffort;
-    await this.syncSessionModelState({
+    this.sessionConfig.markApplied({ effortValue: selectedEffort });
+    await this.sessionConfig.syncSessionModelState({
       configOptions: response.configOptions,
     });
   }
 
-  private async syncSessionModelState(params: {
-    configOptions?: AcpSessionConfigOption[] | null;
-    models?: AcpSessionModelState | null;
-  }, options: {
-    currentRawModelId?: string | null;
-    seedActiveSelection?: boolean;
-  } = {}): Promise<void> {
-    const acpState = extractAcpSessionModelState({
-      ...params,
-      models: normalizeGrokAcpSessionModels(params.models),
-    });
-    const forcedCurrentRawModelId = typeof options.currentRawModelId === 'string'
-      ? options.currentRawModelId.trim()
-      : '';
-    const currentRawModelId = forcedCurrentRawModelId || acpState.currentModelId || this.currentSessionModelId;
-    const acpDiscoveredModels = normalizeGrokDiscoveredModels(
-      acpState.availableModels.map((model) => ({
-        ...(model.description ? { description: model.description } : {}),
-        label: model.name,
-        rawId: model.id,
-      })),
-    );
-    const nativeCatalog = this.readNativeModelCatalog();
-    const discoveredModels = nativeCatalog.models.length > 0
-      ? mergeGrokDiscoveredModels(nativeCatalog.models, acpDiscoveredModels)
-      : acpDiscoveredModels;
-    if (currentRawModelId) {
-      this.currentSessionModelId = currentRawModelId;
-    }
-
-    const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
-    const currentSettings = getGrokProviderSettings(settingsBag);
-    const currentBaseRawModelId = currentRawModelId
-      ? resolveGrokBaseModelRawId(currentRawModelId, discoveredModels)
-      : null;
-    const thoughtLevelState = extractAcpSessionThoughtLevelState(params);
-    const currentThinkingOptions = normalizeGrokModelVariants(
-      thoughtLevelState.availableLevels.map((level) => ({
-        ...(level.description ? { description: level.description } : {}),
-        label: level.name,
-        value: level.id,
-      })),
-    );
-    const currentThinkingLevel = thoughtLevelState.currentLevel;
-    this.currentSessionEffortConfigId = currentThinkingOptions.length > 0
-      ? thoughtLevelState.configId
-      : null;
-    this.currentSessionEffortValue = currentThinkingOptions.length > 0
-      ? currentThinkingLevel
-      : null;
-    this.currentSessionEffortValues = new Set(currentThinkingOptions.map((option) => option.value));
-
-    const nextThinkingOptionsByModel = { ...currentSettings.thinkingOptionsByModel };
-    if (currentBaseRawModelId) {
-      if (currentThinkingOptions.length > 0) {
-        nextThinkingOptionsByModel[currentBaseRawModelId] = currentThinkingOptions;
-      } else {
-        delete nextThinkingOptionsByModel[currentBaseRawModelId];
-      }
-    }
-
-    const discoveredBaseModelIds = buildGrokBaseModels(discoveredModels)
-      .map((model) => model.rawId);
-    const discoveredBaseModelIdSet = new Set(discoveredBaseModelIds);
-    const availableVisibleModels = currentSettings.visibleModels.filter((rawId) =>
-      discoveredBaseModelIdSet.has(rawId)
-    );
-    const removedUnavailableVisibleModels = discoveredBaseModelIds.length > 0
-      && availableVisibleModels.length !== currentSettings.visibleModels.length;
-    const reconciledVisibleModels = currentSettings.visibleModels.length === 0
-      ? (discoveredBaseModelIds.length > 0
-        ? discoveredBaseModelIds
-        : (currentBaseRawModelId ? [currentBaseRawModelId] : []))
-      : removedUnavailableVisibleModels
-      ? [
-          ...(currentBaseRawModelId && discoveredBaseModelIdSet.has(currentBaseRawModelId)
-            ? [currentBaseRawModelId]
-            : []),
-          ...availableVisibleModels.filter((rawId) => rawId !== currentBaseRawModelId),
-          ...(availableVisibleModels.length === 0
-            ? discoveredBaseModelIds.filter((rawId) => rawId !== currentBaseRawModelId)
-            : []),
-        ]
-      : currentSettings.visibleModels;
-    const nextVisibleModels = expandGrokVisibleModelsWithFrontier(
-      reconciledVisibleModels,
-      discoveredModels,
-    );
-    const currentPreferredThinking = currentBaseRawModelId
-      ? currentSettings.preferredThinkingByModel[currentBaseRawModelId]
-      : '';
-    const shouldSeedCurrentThinking = currentBaseRawModelId
-      && currentThinkingLevel
-      && (
-        !currentPreferredThinking
-        || (
-          currentThinkingOptions.length > 0
-          && !this.currentSessionEffortValues.has(currentPreferredThinking)
-        )
-      );
-    const nextPreferredThinkingByModel = shouldSeedCurrentThinking && currentBaseRawModelId && currentThinkingLevel
-      ? {
-        ...currentSettings.preferredThinkingByModel,
-        [currentBaseRawModelId]: currentThinkingLevel,
-      }
-      : currentSettings.preferredThinkingByModel;
-    const upgradedDefault = this.upgradeFrontierDefaultSelection(
-      settingsBag,
-      discoveredModels,
-      currentSettings.visibleModels,
-      nativeCatalog.defaultModelId,
-    );
-    const shouldSeedVisibleModels = !sameStringList(currentSettings.visibleModels, nextVisibleModels);
-    const shouldSeedPreferredThinking = !sameStringMap(
-      currentSettings.preferredThinkingByModel,
-      nextPreferredThinkingByModel,
-    );
-    const shouldUpdateDiscoveredModels = discoveredModels.length > 0
-      && !sameDiscoveredModels(currentSettings.discoveredModels, discoveredModels);
-    const shouldUpdateThinkingOptions = !sameThinkingOptionsByModel(
-      currentSettings.thinkingOptionsByModel,
-      nextThinkingOptionsByModel,
-    );
-    const discoveryChanged = shouldUpdateDiscoveredModels
-      && updateGrokDiscoveryState(settingsBag, { discoveredModels });
-    if (discoveredModels.length > 0 || discoveryChanged) {
-      logGrokDebug(this.plugin, 'models.discovered', {
-        currentModelId: currentRawModelId,
-        discoveryChanged,
-        modelCount: discoveredModels.length,
-        modelIds: discoveredModels.map((model) => model.rawId).slice(0, 12),
-      }, {
-        level: discoveryChanged ? 'info' : 'debug',
-      });
-    }
-    let changed = shouldSeedVisibleModels || shouldSeedPreferredThinking || upgradedDefault;
-
-    if (currentBaseRawModelId && options.seedActiveSelection !== false) {
-      const seeded = this.seedActiveModelSelection(
-        settingsBag,
-        encodeGrokModelId(currentBaseRawModelId),
-        currentThinkingLevel,
-      );
-      changed = changed || seeded;
-    }
-
-    if (shouldUpdateThinkingOptions || shouldSeedPreferredThinking || shouldSeedVisibleModels) {
-      updateGrokProviderSettings(settingsBag, {
-        ...(shouldSeedPreferredThinking ? { preferredThinkingByModel: nextPreferredThinkingByModel } : {}),
-        ...(shouldUpdateThinkingOptions ? { thinkingOptionsByModel: nextThinkingOptionsByModel } : {}),
-        ...(shouldSeedVisibleModels ? { visibleModels: nextVisibleModels } : {}),
-      });
-    }
-
-    if (!changed && !discoveryChanged && !shouldUpdateThinkingOptions) {
-      return;
-    }
-
-    if (changed || shouldUpdateThinkingOptions) {
-      await this.plugin.saveSettings();
-    }
-    this.refreshModelSelectors();
-  }
 
   private hydrateNativeModelCatalog(): void {
-    const catalog = this.readNativeModelCatalog();
+    const catalog = this.sessionConfig.readNativeModelCatalog();
     const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
     if (!applyGrokNativeModelCatalog(settingsBag, catalog)) {
       return;
@@ -1375,136 +1095,22 @@ export class GrokChatRuntime implements ChatRuntime {
     this.refreshModelSelectors();
   }
 
-  private readNativeModelCatalog() {
-    const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
-    const runtimeEnv = this.buildRuntimeEnv(
-      this.plugin.getResolvedProviderCliPath('grok') ?? 'grok',
-      resolveManagedGrokHomePath(cwd),
-    );
-    return readGrokNativeModelCatalog({
-      env: runtimeEnv,
-      managedGrokHomePath: runtimeEnv.GROK_HOME ?? null,
-    });
-  }
 
   private resolveLaunchDefaultModel(): string | null {
     const providerSettings = this.getProviderSettings();
-    const selectedRawModelId = this.resolveSelectedRawModelId();
+    const selectedRawModelId = this.sessionConfig.resolveSelectedRawModelId();
     if (selectedRawModelId) {
       return selectedRawModelId;
     }
 
     return resolveGrokCatalogDefaultModel(
       getGrokProviderSettings(providerSettings).discoveredModels,
-      this.readNativeModelCatalog().defaultModelId,
+      this.sessionConfig.readNativeModelCatalog().defaultModelId,
     );
   }
 
-  private upgradeFrontierDefaultSelection(
-    settingsBag: Record<string, unknown>,
-    discoveredModels: readonly { rawId: string }[],
-    visibleModels: readonly string[],
-    configuredDefault?: string | null,
-  ): boolean {
-    const savedProviderModel = ensureProviderProjectionMap(settingsBag, 'savedProviderModel');
-    const savedRawId = typeof savedProviderModel.grok === 'string'
-      ? resolveGrokBaseModelRawId(
-        decodeGrokModelId(savedProviderModel.grok) ?? '',
-        discoveredModels as GrokDiscoveredModel[],
-      )
-      : null;
-    const defaultRawId = resolveGrokCatalogDefaultModel(
-      discoveredModels as GrokDiscoveredModel[],
-      configuredDefault,
-    );
-    if (!shouldUpgradeGrokFrontierDefault({
-      defaultRawId,
-      savedRawId: savedRawId || null,
-      visibleModels,
-    }) || !defaultRawId) {
-      return false;
-    }
 
-    const nextModelId = encodeGrokModelId(defaultRawId);
-    savedProviderModel.grok = nextModelId;
-    if (ProviderRegistry.resolveSettingsProviderId(settingsBag) === this.providerId) {
-      settingsBag.model = nextModelId;
-    }
-    return true;
-  }
 
-  private seedActiveModelSelection(
-    settingsBag: Record<string, unknown>,
-    modelSelection: string,
-    thinkingLevel: string | null,
-  ): boolean {
-    let changed = false;
-    const savedProviderModel = ensureProviderProjectionMap(settingsBag, 'savedProviderModel');
-    const savedModel = typeof savedProviderModel.grok === 'string'
-      ? savedProviderModel.grok
-      : '';
-    if (!savedModel || savedModel === GROK_SYNTHETIC_MODEL_ID) {
-      savedProviderModel.grok = modelSelection;
-      changed = true;
-    }
-
-    if (thinkingLevel) {
-      const savedProviderEffort = ensureProviderProjectionMap(settingsBag, 'savedProviderEffort');
-      const savedEffort = typeof savedProviderEffort.grok === 'string'
-        ? savedProviderEffort.grok.trim()
-        : '';
-      if (!savedEffort || savedEffort === GROK_DEFAULT_THINKING_LEVEL) {
-        savedProviderEffort.grok = thinkingLevel;
-        changed = true;
-      }
-    }
-
-    if (ProviderRegistry.resolveSettingsProviderId(settingsBag) !== this.providerId) {
-      return changed;
-    }
-
-    const activeModel = typeof settingsBag.model === 'string' ? settingsBag.model : '';
-    if (!activeModel || activeModel === GROK_SYNTHETIC_MODEL_ID) {
-      settingsBag.model = modelSelection;
-      changed = true;
-    }
-    if (thinkingLevel) {
-      const activeEffort = typeof settingsBag.effortLevel === 'string' ? settingsBag.effortLevel : '';
-      if (!activeEffort || activeEffort === GROK_DEFAULT_THINKING_LEVEL) {
-        settingsBag.effortLevel = thinkingLevel;
-        changed = true;
-      }
-    }
-    return changed;
-  }
-
-  private async syncSessionModeState(params: {
-    configOptions?: AcpSessionConfigOption[] | null;
-    currentModeId?: string | null;
-    modes?: AcpSessionModeState | null;
-  }): Promise<void> {
-    const acpState = extractAcpSessionModeState(params);
-    const availableModes = normalizeGrokAvailableModes(acpState.availableModes);
-    const currentModeId = params.currentModeId ?? acpState.currentModeId;
-    if (acpState.configId) {
-      this.currentSessionModeConfigId = acpState.configId;
-    }
-    if (currentModeId) {
-      this.currentSessionModeId = currentModeId;
-    }
-
-    const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
-    const currentSettings = getGrokProviderSettings(settingsBag);
-    const discoveryChanged = availableModes.length > 0
-      && !sameModes(currentSettings.availableModes, availableModes)
-      && updateGrokDiscoveryState(settingsBag, { availableModes });
-
-    if (!discoveryChanged) {
-      return;
-    }
-
-    this.refreshModelSelectors();
-  }
 
   private refreshModelSelectors(): void {
     for (const view of this.plugin.getAllViews()) {
@@ -1528,11 +1134,11 @@ export class GrokChatRuntime implements ChatRuntime {
       this.sessionId = response.sessionId;
       this.sessionCwds.set(response.sessionId, cwd);
       this.updateSessionPaths(response.sessionId, cwd);
-      await this.syncSessionModelState({
+      await this.sessionConfig.syncSessionModelState({
         configOptions: response.configOptions ?? null,
         models: normalizeGrokAcpSessionModels(response.models ?? null),
       });
-      await this.syncSessionModeState({
+      await this.sessionConfig.syncSessionModeState({
         configOptions: response.configOptions ?? null,
         modes: response.modes ?? null,
       });
@@ -1576,11 +1182,11 @@ export class GrokChatRuntime implements ChatRuntime {
       this.sessionId = boundSessionId;
       this.sessionCwds.set(boundSessionId, cwd);
       this.updateSessionPaths(boundSessionId, cwd);
-      await this.syncSessionModelState({
+      await this.sessionConfig.syncSessionModelState({
         configOptions: response.configOptions ?? null,
         models: normalizeGrokAcpSessionModels(response.models ?? null),
       });
-      await this.syncSessionModeState({
+      await this.sessionConfig.syncSessionModeState({
         configOptions: response.configOptions ?? null,
         modes: response.modes ?? null,
       });
@@ -1642,17 +1248,17 @@ export class GrokChatRuntime implements ChatRuntime {
 
     const normalized = this.sessionUpdateNormalizer.normalize(notification.update);
     if (normalized.type === 'config_options') {
-      await this.syncSessionModelState({
+      await this.sessionConfig.syncSessionModelState({
         configOptions: normalized.configOptions,
       });
-      await this.syncSessionModeState({
+      await this.sessionConfig.syncSessionModeState({
         configOptions: normalized.configOptions,
       });
       return;
     }
 
     if (normalized.type === 'current_mode') {
-      await this.syncSessionModeState({
+      await this.sessionConfig.syncSessionModeState({
         currentModeId: normalized.currentModeId,
       });
       return;
@@ -1722,7 +1328,7 @@ export class GrokChatRuntime implements ChatRuntime {
         }
         const usage = buildAcpUsageInfo({
           contextWindow: normalized.usage,
-          model: this.getActiveDisplayModel(),
+          model: this.sessionConfig.getActiveDisplayModel(),
           promptUsage: this.promptUsage,
         });
         if (usage) {
@@ -1762,7 +1368,7 @@ export class GrokChatRuntime implements ChatRuntime {
         this.contextUsage = contextUsage;
         const usage = buildAcpUsageInfo({
           contextWindow: contextUsage,
-          model: this.getActiveDisplayModel(),
+          model: this.sessionConfig.getActiveDisplayModel(),
           promptUsage: this.promptUsage,
         });
         if (usage && this.activeTurn) {
@@ -2012,9 +1618,7 @@ export class GrokChatRuntime implements ChatRuntime {
     }
     this.sessionId = null;
     this.loadedSessionId = null;
-    this.currentSessionModelId = null;
-    this.currentSessionModeConfigId = null;
-    this.currentSessionModeId = null;
+    this.sessionConfig.forgetSession();
     this.setSupportedCommands([]);
   }
 }

@@ -4189,6 +4189,50 @@ Gates: unit 472 suites / 7,616 tests, typecheck, lint clean. The shared bridge a
 recorded as wired; Grok's vocabulary is wired too, because the runtime that reaches it is still the
 one in production.
 
+### M2-flips wave 5 — what a Grok session is set to (this commit)
+
+`GrokSessionConfigState` is 451 lines lifted out of the legacy runtime, which now delegates to it:
+which model, mode and reasoning effort a turn is dispatched under, and what to keep of the lists a
+session reports back. The runtime kept the `setMode` / `setModel` / `setConfigOption` calls, because
+those need a connection; everything about *what* to set and *what it means* moved. Same shape as
+wave 4's, six ports instead of four — Grok's state also reads the model catalog off the managed
+`GROK_HOME` on disk, so it needs the workspace root, the resolved CLI path and the debug recorder
+that names what it read.
+
+Two things this cost that wave 4's did not:
+
+- **the snapshot is not the whole truth.** The runtime's `getProviderSettings()` overlays what a
+  running Grok discovered onto the saved provider snapshot before anything resolves against it. The
+  first extraction dropped that overlay, and a model the vault had never discovered became
+  selectable — caught by the runtime's own test for exactly that, and restored inside the state
+  where every resolution now reads it;
+- **a shared test knew where the reading lived.** `AcpManagedMcpRuntime.test.ts` stubs the session
+  sync for all five remaining ACP runtimes, and Grok's is no longer on the runtime. It now stubs
+  wherever the reading is, which is the one line that tells the next four waves this list is shrinking.
+
+The legacy runtime's own tests are what prove the move — retargeted at the object, not rewritten.
+Three of them had been seeding session state by assignment, which the extraction made impossible:
+they now tell the state what the session advertised, through the same replies production learns it
+from. One of those seeds was written twice before it was right — a fabricated mode option that
+advertised only `Default` rewrote the vault's mode catalog and made the test pass for the wrong
+reason. Proof the retarget still bites: with `markApplied` ignoring the mode it was given, 14 of the
+53 go red.
+
+**Named for the flip, not solved here:** those 53 tests live in `GrokChatRuntime.test.ts`, and the
+flip deletes that runtime. They must be *moved* onto the extracted modules in that commit, not
+deleted with it — the same obligation wave 4 carried and met.
+
+Gates: unit 472 suites / 7,616 tests, typecheck, `eslint` over `src` and `tests` clean, and
+`build:release` clean. Recorded as wired in the parity manifest, because the runtime that reaches it
+is still the one in production.
+
+**A gate that lied about its own result.** `npm run lint` through the local RTK filter reported
+`LINT=1` with 34 errors in `scripts/*.js` — files the lint script's globs do not cover. Running
+`eslint "src/**/*.ts" "tests/**/*.ts" --max-warnings=0` directly exits 0. The filter's exit code is
+not the linter's; this is the second time this session a gate was believed from a wrapper rather
+than from the tool. Gate proof in this branch means the tool's own exit code.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

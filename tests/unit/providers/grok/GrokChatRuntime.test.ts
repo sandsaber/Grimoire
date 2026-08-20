@@ -111,7 +111,7 @@ describe('GrokChatRuntime', () => {
     (runtime as any).applySelectedMode = jest.fn().mockResolvedValue(undefined);
     (runtime as any).applySelectedModel = jest.fn().mockResolvedValue(undefined);
     (runtime as any).applySelectedEffort = jest.fn().mockResolvedValue(undefined);
-    (runtime as any).getActiveDisplayModel = jest.fn().mockReturnValue('grok:test-model');
+    (runtime as any).sessionConfig.getActiveDisplayModel = jest.fn().mockReturnValue('grok:test-model');
 
     const history = [
       { id: 'user-previous', role: 'user' as const, content: 'Keep the language rich.', timestamp: 1 },
@@ -690,7 +690,7 @@ describe('GrokChatRuntime', () => {
     });
     const runtime = new GrokChatRuntime(plugin);
 
-    await (runtime as any).syncSessionModeState({
+    await (runtime as any).sessionConfig.syncSessionModeState({
       configOptions: [{
         category: 'mode',
         currentValue: 'build',
@@ -709,8 +709,8 @@ describe('GrokChatRuntime', () => {
       { description: 'Planning-first agent', id: 'plan', name: 'Plan' },
     ]);
     expect(plugin.settings.providerConfigs.grok.selectedMode).toBe('plan');
-    expect((runtime as any).currentSessionModeConfigId).toBe('session_mode');
-    expect((runtime as any).currentSessionModeId).toBe('build');
+    expect((runtime as any).sessionConfig.sessionModeConfigId).toBe('session_mode');
+    expect((runtime as any).sessionConfig.sessionModeId).toBe('build');
     expect(plugin.saveSettings).not.toHaveBeenCalled();
     expect(refreshModelSelector).toHaveBeenCalledTimes(1);
   });
@@ -728,12 +728,12 @@ describe('GrokChatRuntime', () => {
     });
     const runtime = new GrokChatRuntime(plugin);
 
-    await (runtime as any).syncSessionModeState({
+    await (runtime as any).sessionConfig.syncSessionModeState({
       currentModeId: GROK_BUILD_MODE_ID,
     });
 
     expect(plugin.settings.providerConfigs.grok.selectedMode).toBe('');
-    expect((runtime as any).currentSessionModeId).toBe(GROK_BUILD_MODE_ID);
+    expect((runtime as any).sessionConfig.sessionModeId).toBe(GROK_BUILD_MODE_ID);
     expect(plugin.saveSettings).not.toHaveBeenCalled();
   });
 
@@ -752,7 +752,7 @@ describe('GrokChatRuntime', () => {
     const runtime = new GrokChatRuntime(plugin);
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
-    expect((runtime as any).resolveSelectedModeId()).toBe(GROK_FULL_ACCESS_MODE_ID);
+    expect((runtime as any).sessionConfig.resolveSelectedModeId()).toBe(GROK_FULL_ACCESS_MODE_ID);
   });
 
   it('falls back to the managed full-access mode when a saved custom mode is not managed by Grimoire', () => {
@@ -770,7 +770,7 @@ describe('GrokChatRuntime', () => {
     const runtime = new GrokChatRuntime(plugin);
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
-    expect((runtime as any).resolveSelectedModeId()).toBe(GROK_FULL_ACCESS_MODE_ID);
+    expect((runtime as any).sessionConfig.resolveSelectedModeId()).toBe(GROK_FULL_ACCESS_MODE_ID);
   });
 
   it('prefers managed full-access/safe/plan modes over auxiliary Grok Build primary modes for the main toolbar', () => {
@@ -793,7 +793,7 @@ describe('GrokChatRuntime', () => {
     const runtime = new GrokChatRuntime(plugin);
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
-    expect((runtime as any).resolveSelectedModeId()).toBe(GROK_FULL_ACCESS_MODE_ID);
+    expect((runtime as any).sessionConfig.resolveSelectedModeId()).toBe(GROK_FULL_ACCESS_MODE_ID);
   });
 
   it('maps shared safe mode onto the managed Grok Build safe agent', () => {
@@ -815,7 +815,7 @@ describe('GrokChatRuntime', () => {
     const runtime = new GrokChatRuntime(plugin);
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
-    expect((runtime as any).resolveSelectedModeId()).toBe(GROK_SAFE_MODE_ID);
+    expect((runtime as any).sessionConfig.resolveSelectedModeId()).toBe(GROK_SAFE_MODE_ID);
   });
 
   it('applies the saved Auto-approve mode through the native ACP mode method', async () => {
@@ -837,7 +837,7 @@ describe('GrokChatRuntime', () => {
     const setMode = jest.fn().mockResolvedValue({});
     const setConfigOption = jest.fn();
     (runtime as any).connection = { setConfigOption, setMode };
-    (runtime as any).currentSessionModeId = GROK_SAFE_MODE_ID;
+    (runtime as any).sessionConfig.markApplied({ modeId: GROK_SAFE_MODE_ID });
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
     await (runtime as any).applySelectedMode('session-1');
@@ -847,7 +847,7 @@ describe('GrokChatRuntime', () => {
       sessionId: 'session-1',
     });
     expect(setConfigOption).not.toHaveBeenCalled();
-    expect((runtime as any).currentSessionModeId).toBe(GROK_FULL_ACCESS_MODE_ID);
+    expect((runtime as any).sessionConfig.sessionModeId).toBe(GROK_FULL_ACCESS_MODE_ID);
   });
 
   it('uses launch policy when the session advertises no runtime mode control', async () => {
@@ -909,7 +909,7 @@ describe('GrokChatRuntime', () => {
     (runtime as any).connection = { setConfigOption, setMode };
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
-    await (runtime as any).syncSessionModeState({
+    await (runtime as any).sessionConfig.syncSessionModeState({
       configOptions: [{
         category: 'mode',
         currentValue: GROK_SAFE_MODE_ID,
@@ -930,7 +930,7 @@ describe('GrokChatRuntime', () => {
       type: 'select',
       value: GROK_FULL_ACCESS_MODE_ID,
     });
-    expect((runtime as any).currentSessionModeId).toBe(GROK_FULL_ACCESS_MODE_ID);
+    expect((runtime as any).sessionConfig.sessionModeId).toBe(GROK_FULL_ACCESS_MODE_ID);
   });
 
   it('preserves method-not-found when the session exposes no mode config fallback', async () => {
@@ -957,13 +957,13 @@ describe('GrokChatRuntime', () => {
     const setMode = jest.fn().mockRejectedValue(methodNotFound);
     const setConfigOption = jest.fn();
     (runtime as any).connection = { setConfigOption, setMode };
-    (runtime as any).currentSessionModeId = GROK_SAFE_MODE_ID;
+    (runtime as any).sessionConfig.markApplied({ modeId: GROK_SAFE_MODE_ID });
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
     await expect((runtime as any).applySelectedMode('session-1')).rejects.toBe(methodNotFound);
 
     expect(setConfigOption).not.toHaveBeenCalled();
-    expect((runtime as any).currentSessionModeId).toBe(GROK_SAFE_MODE_ID);
+    expect((runtime as any).sessionConfig.sessionModeId).toBe(GROK_SAFE_MODE_ID);
   });
 
   it('rethrows real ACP mode errors without attempting a second mutation', async () => {
@@ -990,14 +990,27 @@ describe('GrokChatRuntime', () => {
     const setMode = jest.fn().mockRejectedValue(policyError);
     const setConfigOption = jest.fn();
     (runtime as any).connection = { setConfigOption, setMode };
-    (runtime as any).currentSessionModeConfigId = 'session_mode';
-    (runtime as any).currentSessionModeId = GROK_SAFE_MODE_ID;
+    // How the state learns the config id in production: the session advertises
+    // the option its mode is set through, with the modes it actually offers.
+    await (runtime as any).sessionConfig.syncSessionModeState({
+      configOptions: [{
+        category: 'mode',
+        currentValue: GROK_SAFE_MODE_ID,
+        id: 'session_mode',
+        name: 'Mode',
+        options: [
+          { name: 'Auto-approve', value: GROK_FULL_ACCESS_MODE_ID },
+          { name: 'Safe', value: GROK_SAFE_MODE_ID },
+        ],
+        type: 'select',
+      }],
+    });
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
     await expect((runtime as any).applySelectedMode('session-1')).rejects.toBe(policyError);
 
     expect(setConfigOption).not.toHaveBeenCalled();
-    expect((runtime as any).currentSessionModeId).toBe(GROK_SAFE_MODE_ID);
+    expect((runtime as any).sessionConfig.sessionModeId).toBe(GROK_SAFE_MODE_ID);
   });
 
   it('does not send synthetic toolbar mode ids when Grok only reported a current native mode', async () => {
@@ -1016,14 +1029,14 @@ describe('GrokChatRuntime', () => {
     const setMode = jest.fn();
     const setConfigOption = jest.fn();
     (runtime as any).connection = { setConfigOption, setMode };
-    (runtime as any).currentSessionModeId = 'ask';
+    (runtime as any).sessionConfig.markApplied({ modeId: 'ask' });
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
     await (runtime as any).applySelectedMode('session-1');
 
     expect(setMode).not.toHaveBeenCalled();
     expect(setConfigOption).not.toHaveBeenCalled();
-    expect((runtime as any).currentSessionModeId).toBe('ask');
+    expect((runtime as any).sessionConfig.sessionModeId).toBe('ask');
   });
 
   it('keeps the turn alive when ACP rejects a mode id with Invalid params', async () => {
@@ -1049,13 +1062,13 @@ describe('GrokChatRuntime', () => {
     ));
     const setConfigOption = jest.fn();
     (runtime as any).connection = { setConfigOption, setMode };
-    (runtime as any).currentSessionModeId = GROK_SAFE_MODE_ID;
+    (runtime as any).sessionConfig.markApplied({ modeId: GROK_SAFE_MODE_ID });
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
     await expect((runtime as any).applySelectedMode('session-1')).resolves.toBeUndefined();
 
     expect(setConfigOption).not.toHaveBeenCalled();
-    expect((runtime as any).currentSessionModeId).toBe(GROK_SAFE_MODE_ID);
+    expect((runtime as any).sessionConfig.sessionModeId).toBe(GROK_SAFE_MODE_ID);
   });
 
   it('does not leak CLI stderr into user-facing Invalid params errors', () => {
@@ -1123,11 +1136,11 @@ describe('GrokChatRuntime', () => {
 
     runtime.setPermissionModeSyncCallback(syncCallback);
 
-    await (runtime as any).syncSessionModeState({
+    await (runtime as any).sessionConfig.syncSessionModeState({
       currentModeId: GROK_BUILD_MODE_ID,
     });
 
-    expect((runtime as any).currentSessionModeId).toBe(GROK_BUILD_MODE_ID);
+    expect((runtime as any).sessionConfig.sessionModeId).toBe(GROK_BUILD_MODE_ID);
     expect(plugin.settings.permissionMode).toBe('normal');
     expect(plugin.settings.providerConfigs.grok.selectedMode).toBe(GROK_SAFE_MODE_ID);
     expect(plugin.saveSettings).not.toHaveBeenCalled();
@@ -1239,7 +1252,7 @@ describe('GrokChatRuntime', () => {
     jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
-    await (runtime as any).syncSessionModelState({
+    await (runtime as any).sessionConfig.syncSessionModelState({
       configOptions: [{
         currentValue: 'anthropic/claude-sonnet-4',
         id: 'model',
@@ -1259,7 +1272,7 @@ describe('GrokChatRuntime', () => {
     expect(plugin.settings.savedProviderEffort.grok).toBe('high');
     expect(plugin.settings.model).toBe('grok:anthropic/claude-sonnet-4');
     expect(plugin.settings.effortLevel).toBe('high');
-    expect((runtime as any).resolveSelectedRawModelId()).toBe('anthropic/claude-sonnet-4');
+    expect((runtime as any).sessionConfig.resolveSelectedRawModelId()).toBe('anthropic/claude-sonnet-4');
     expect(plugin.saveSettings).not.toHaveBeenCalled();
     expect(refreshModelSelector).not.toHaveBeenCalled();
   });
@@ -1282,7 +1295,7 @@ describe('GrokChatRuntime', () => {
     const runtime = new GrokChatRuntime(plugin);
     jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
 
-    await (runtime as any).syncSessionModelState({
+    await (runtime as any).sessionConfig.syncSessionModelState({
       configOptions: [{
         category: 'model',
         currentValue: 'openai/gpt-5',
@@ -1335,7 +1348,7 @@ describe('GrokChatRuntime', () => {
     const runtime = new GrokChatRuntime(plugin);
     jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
 
-    await (runtime as any).syncSessionModelState({
+    await (runtime as any).sessionConfig.syncSessionModelState({
       models: {
         availableModels: [
           { id: 'grok-4.5', name: 'Grok 4.5' },
@@ -1374,7 +1387,7 @@ describe('GrokChatRuntime', () => {
       },
     });
     const runtime = new GrokChatRuntime(plugin);
-    jest.spyOn(runtime as any, 'readNativeModelCatalog').mockReturnValue({
+    jest.spyOn((runtime as any).sessionConfig, 'readNativeModelCatalog').mockReturnValue({
       defaultModelId: 'grok-4.6',
       models: [
         { label: 'Grok 4.6', rawId: 'grok-4.6' },
@@ -1383,7 +1396,7 @@ describe('GrokChatRuntime', () => {
     });
     jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
 
-    await (runtime as any).syncSessionModelState({
+    await (runtime as any).sessionConfig.syncSessionModelState({
       models: {
         availableModels: [
           { id: 'grok-4.5', name: 'Grok 4.5' },
@@ -1423,7 +1436,7 @@ describe('GrokChatRuntime', () => {
     const runtime = new GrokChatRuntime(plugin);
     jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
 
-    await (runtime as any).syncSessionModelState({
+    await (runtime as any).sessionConfig.syncSessionModelState({
       configOptions: [
         {
           category: 'model',
@@ -1506,7 +1519,7 @@ describe('GrokChatRuntime', () => {
       modelId: 'grok-build',
       sessionId: 'session-1',
     });
-    expect((runtime as any).currentSessionModelId).toBe('grok-build');
+    expect((runtime as any).sessionConfig.sessionModelId).toBe('grok-build');
   });
 
   it('applies the selected Grok model through session/set_model before prompting', async () => {
@@ -1530,7 +1543,7 @@ describe('GrokChatRuntime', () => {
       _meta: { model: { Ok: 'grok-composer-2.5-fast' } },
     });
     (runtime as any).connection = { setModel };
-    (runtime as any).currentSessionModelId = 'grok-build';
+    (runtime as any).sessionConfig.markApplied({ modelId: 'grok-build' });
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
     await (runtime as any).applySelectedModel('session-1');
@@ -1539,7 +1552,7 @@ describe('GrokChatRuntime', () => {
       modelId: 'grok-composer-2.5-fast',
       sessionId: 'session-1',
     });
-    expect((runtime as any).currentSessionModelId).toBe('grok-composer-2.5-fast');
+    expect((runtime as any).sessionConfig.sessionModelId).toBe('grok-composer-2.5-fast');
   });
 
   it('does not apply a stale selected model outside the runtime discovery catalog', async () => {
@@ -1565,7 +1578,7 @@ describe('GrokChatRuntime', () => {
     const runtime = new GrokChatRuntime(plugin);
     const setModel = jest.fn();
     (runtime as any).connection = { setModel };
-    (runtime as any).currentSessionModelId = 'grok-4.5';
+    (runtime as any).sessionConfig.markApplied({ modelId: 'grok-4.5' });
     jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
 
     await (runtime as any).applySelectedModel('session-1', {
@@ -1573,7 +1586,7 @@ describe('GrokChatRuntime', () => {
     });
 
     expect(setModel).not.toHaveBeenCalled();
-    expect((runtime as any).getActiveDisplayModel({
+    expect((runtime as any).sessionConfig.getActiveDisplayModel({
       model: 'grok:grok-composer-2.5-fast',
     })).toBe('grok:grok-4.5');
   });
@@ -1615,9 +1628,21 @@ describe('GrokChatRuntime', () => {
       }],
     });
     (runtime as any).connection = { setConfigOption };
-    (runtime as any).currentSessionEffortConfigId = 'effort';
-    (runtime as any).currentSessionEffortValue = 'low';
-    (runtime as any).currentSessionEffortValues = new Set(['low', 'high']);
+    // The session is the only thing that names the option a thinking level is
+    // set through, and it names it the same way in the answer this asserts on.
+    await (runtime as any).sessionConfig.syncSessionModelState({
+      configOptions: [{
+        category: 'thought_level',
+        currentValue: 'low',
+        id: 'effort',
+        name: 'Effort',
+        options: [
+          { name: 'Low', value: 'low' },
+          { name: 'High', value: 'high' },
+        ],
+        type: 'select',
+      }],
+    });
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
     await (runtime as any).applySelectedEffort('session-1');
