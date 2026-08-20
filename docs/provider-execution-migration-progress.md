@@ -3992,7 +3992,7 @@ MiMoCode still owes a recording of a turn that answers.
 
 Gates: unit 470 suites / 7,595 tests, typecheck, lint clean.
 
-### M2-flips wave 4 — a review of the flip, seven items (this commit)
+### M2-flips wave 4 — a review of the flip, seven items (`ef32886`)
 
 An external review of `c66973b..1af76bf`. **All seven were real**, and five of them were things the
 live matrix had run straight past — which is the honest measure of what a live harness does and does
@@ -4034,6 +4034,36 @@ redundant field is gone and the test now points at what actually holds the depen
 Gates: unit 470 suites / 7,600 tests, integration 5 / 145, typecheck, lint, `build:release` clean,
 and the twelve live rows re-run green after the fixes.
 
+### M2-flips wave 5 — the backend every managed-ACP provider runs on (this commit)
+
+Wave 4 said the next five waves should each cost "the launch, the three stores and the sink". Grok's
+wire recording is what made it worth checking, and the count settles it: of sixty mentions of the
+provider in `OpencodeExecutionBackend.ts`, **fifty-seven were the names of injected contracts** and
+three were the provider itself — two of them the descriptor.
+
+So the backend moved to `src/providers/acp/execution/ManagedAcpExecutionBackend.ts` and takes its
+descriptor through its context. Everything in it is the protocol: the client's lifetime and its
+restart fingerprint, the session binding and its reload, the dispatch, the recovery, the
+interactions, the result commit, and the content channel. `OpencodeExecutionBackend` is what is left
+of OpenCode's — a descriptor and a constructor — and re-exports the contract names its own modules
+and tests already use, so nothing else in that provider changed.
+
+The content payload moved with it, to `AcpContentPayload`: the backend that emits the union is
+shared, and a second copy of it would be a second thing to keep in step.
+
+**The proof is that nothing moved in the tests.** OpenCode's whole suite — the backend's own
+twenty-five cases, the composition's nineteen, the presenter's, the bridge's — runs unchanged
+against the shared class and stays green, including the seam tests that drive a turn end to end. A
+behaviour-preserving extraction that needed a test rewritten would not have been one.
+
+What a provider still owns after this: its launch, its permission vocabulary, its tool
+normalization, and what its presenter does with the content the backend carries. That is what Grok's
+own increments will be.
+
+Gates: unit 470 suites / 7,600 tests, typecheck, lint, and `build:release` clean. The shared backend
+and the shared payload are recorded as wired in the parity manifest, beside the transport, the
+launcher and the client adapter that went live with wave 4's flip.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -4063,7 +4093,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **the live half of wave 4's matrix** — thirteen rows against a real `opencode acp`, and the five defects the first run found | `5cb457f` |
 | **wave 5 begins: Grok's wire recording** — two protocols, three dropped updates, and a recorder that redacts | `28f3691` |
 | **MiMoCode's wire recording** — partial and labelled: it mirrors OpenCode, and its failed turn looks like a successful empty one | `1af76bf` |
-| **a review of the flip** — seven findings, all real, five of which the live matrix ran straight past | this commit |
+| **a review of the flip** — seven findings, all real, five of which the live matrix ran straight past | `ef32886` |
+| **wave 5: the backend goes shared** — fifty-seven of sixty provider mentions were injected contract names, so the managed-ACP backend is now one class with a descriptor port | this commit |
 
 Four providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode.
 

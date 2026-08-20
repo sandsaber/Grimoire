@@ -3,6 +3,7 @@ import type { SlashCommand, StreamChunk } from '@/core/types';
 import { AcpSessionUpdateNormalizer } from '@/providers/acp/AcpSessionUpdateNormalizer';
 import type { AcpToolStreamAdapter } from '@/providers/acp/AcpToolStreamAdapter';
 import { buildAcpUsageInfo } from '@/providers/acp/buildAcpUsageInfo';
+import type { AcpContentPayload } from '@/providers/acp/execution/AcpContentPayload';
 import type {
   AcpNewSessionResponse,
   AcpPromptResponse,
@@ -16,17 +17,12 @@ import type {
 import { createOpencodeToolStreamAdapter } from '@/providers/opencode/normalization/opencodeToolNormalization';
 
 /**
- * What the ACP connection delivered, in the two shapes it delivers it.
+ * What the ACP connection delivered, shared with every managed-ACP provider.
  *
- * A session update is a notification; the tokens a prompt cost arrive only in
- * the answer to `session/prompt`; and the models and modes a tab can choose
- * from are answered once, by `session/new` or `session/load`, and by nothing
- * afterwards. All three are the wire, none is interpreted before it gets here.
+ * Re-exported under this provider's name because that is what its own modules
+ * and tests call it; the union itself belongs beside the backend that emits it.
  */
-export type OpencodeContentPayload =
-  | { readonly kind: 'session-update'; readonly notification: AcpSessionNotification }
-  | { readonly kind: 'prompt-result'; readonly response: AcpPromptResponse }
-  | { readonly kind: 'session-config'; readonly session: AcpNewSessionResponse };
+export type OpencodeContentPayload = AcpContentPayload;
 
 /** What a session answered with when it was created or loaded. */
 export interface OpencodeSessionOpening {

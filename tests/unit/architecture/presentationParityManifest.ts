@@ -582,10 +582,14 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/kimicode/runtime/KimicodeChatRuntime.ts',
       'src/providers/mimocode/runtime/MimocodeChatRuntime.ts',
       // The shared managed-ACP platform, live since OpenCode's flip and
-      // inherited by the five ACP providers that follow it.
+      // inherited by the five ACP providers that follow it — the backend
+      // itself since wave 5, which found that three lines of it were ever
+      // OpenCode's.
       'src/app/execution/acp/NodeManagedAcpProcessLauncher.ts',
+      'src/providers/acp/execution/AcpContentPayload.ts',
       'src/providers/acp/execution/AcpManagedClientAdapter.ts',
       'src/providers/acp/execution/ManagedAcpClient.ts',
+      'src/providers/acp/execution/ManagedAcpExecutionBackend.ts',
       // OpenCode chat execution, flipped: the first ACP provider on the kernel,
       // and the isolated session the four metadata surfaces now share.
       'src/app/execution/opencode/OpencodeExecutionComposition.ts',
