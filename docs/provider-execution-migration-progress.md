@@ -3692,7 +3692,7 @@ Gates: unit 469 suites / 7,601 tests, integration 5 / 145 (2 suites, 10 tests sk
 lint, and `build:release` clean. The trace freezes the new event, and the composition test asserts
 the models and modes reach a real presenter through the kernel.
 
-### M2-flips wave 4 — what a session is set to (this commit)
+### M2-flips wave 4 — what a session is set to (`3427f68`)
 
 `OpencodeSessionConfigState` is 390 lines lifted out of the legacy runtime, which now delegates to
 it: which model, mode and effort a turn should be dispatched under, and what to keep of the lists a
@@ -3728,6 +3728,52 @@ therefore larger than wave 3's, and this is the measurement rather than a guess.
 Gates: unit 469 suites / 7,601 tests, typecheck, lint, and `build:release` clean. Recorded as wired
 in the parity manifest, because the runtime that reaches it is still the one in production.
 
+### M2-flips wave 4 — OpenCode's runtime half (this commit)
+
+`createRuntime` puts a tab on the kernel. Four things are per tab and each for the same reason —
+they are about *this* conversation's session: what it is set to (`OpencodeSessionConfigState`), what
+it has said (the content presenter), what commands it offers, and which prompt is on screen (the
+interaction presenter). The bridge, the request store and the backend stay shared.
+
+**The session's slash commands no longer cost a second process.** They arrive as an
+`available_commands_update` on the content channel, and the tab's `runtimeCommands` slot answers
+from what the presenter kept — where the legacy path launches an OpenCode process to ask
+(`OpencodeRuntimeCommandLoader`), which is one of the five call sites the flip still owes an answer.
+
+**The mode, model and effort are sent every turn, not only when they change.** The legacy runtime
+compared against the session it had; here the session a turn lands on is decided at dispatch and may
+be one this tab never configured — created by the backend after the saved one went missing. The
+applier skips whatever is empty, so the cost of being right is at most three `setConfigOption` calls
+the session would have ignored.
+
+**History is bootstrapped only when no session can carry it.** A bound ACP session already holds the
+conversation; sending the history again would say everything twice.
+
+**MCP had a gap the flip would have shipped.** The legacy runtime shut the process down on a reload,
+so the next turn's session picked the new servers up. Nothing in the kernel path did that: the
+launch key did not mention MCP, and a session already loaded is never told about a list that changed
+under it. The servers are part of the launch key now — the fingerprint restarts the process, which
+is what the key is for — and the tab's `mcp` slot reloads the vault's list. Its other three members
+refuse by name: editing servers is a settings surface, not a chat tab.
+
+The two settings writes the content channel starts — a session's models and its modes — are
+awaited off the presenter's synchronous ports and their failures logged, rather than left as
+unhandled rejections that a tab would show no sign of.
+
+Four tests drive it end to end over the fake agent: a turn a tab can draw (text from the kernel, the
+`Read` card from the presenter, the session the tab learned), an approval answered with the agent's
+own `optionId`, the vault learning its models from the session the turn opened, and the mode the tab
+is set to reaching the session as a `setConfigOption` before the prompt. The last two were proven by
+breaking them.
+
+Not here: **the flip itself**. `registration.ts` still points `createRuntime` at
+`OpencodeChatRuntime`, and nothing constructs this. What the flip owes beyond the pointer is
+recorded in the entry above — five call sites that build the legacy runtime for reasons unrelated to
+chat, and the tests that must move onto the extracted modules rather than be deleted with it.
+
+Gates: unit 469 suites / 7,606 tests, integration 5 / 145 (2 suites, 10 tests skipped), typecheck,
+lint, and `build:release` clean. The module context is declared dark in the parity manifest.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3750,7 +3796,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **wave 4's interactions** — the real permission bridge, the presentation vocabulary extracted from the legacy runtime, and an approval answered end to end through the kernel | `d11068c` |
 | **wave 4's approval surface** — the presenter that shows a prepared interaction and answers it in the kernel's ids | `a3f43df` |
 | **what a session opens with** — the models, modes and config options `session/new` answers with, carried to the surface instead of discarded | `cdf4434` |
-| **what a session is set to** — 390 lines of model, mode and effort state lifted out of the legacy runtime, which delegates to it | this commit |
+| **what a session is set to** — 390 lines of model, mode and effort state lifted out of the legacy runtime, which delegates to it | `3427f68` |
+| **wave 4's runtime half** — `createRuntime` over the adapter, the four per-tab pieces, and the MCP restart the kernel path was missing | this commit |
 
 Three providers now execute through the kernel: Antigravity, Codex, Claude.
 
@@ -3759,8 +3806,8 @@ Three providers now execute through the kernel: Antigravity, Codex, Claude.
 - **two smoke matrices, both needing a person in a vault** — Codex's rendering rows and Claude's
   twenty-eight. Wave 3 flipped ahead of wave 2's certification at the owner's direction; what stands
   in for the missing evidence is that each flip reverts as a single commit;
-- **wave 4's remaining increment**: the runtime half, then the flip. The content surface and the
-  interactions landed in the two commits above.
+- **wave 4's flip**, which is all that remains of the wave: `registration.ts`, `main.ts`, the parity
+  manifest, and the five legacy call sites named in the entries above.
 
 Completed: **M0a** (parity gate, contribution inventory, adapter contract, the two contract suites,
 topology and shared-resource records, persistence decisions), **M1** (execution kernel, narrow
@@ -3818,12 +3865,16 @@ the command that runs them is in the matrix document under "the half that runs i
    twenty-eight of them, in a vault on a release build. Rows 14–16 first: Claude is the first flip
    with a rewind, and row 16 — a rewind that fails with the files restored — is what the backup port
    added in that entry exists for;
-3. **M2-flips wave 4 — OpenCode**, whose backend half, content surface and interactions are now
-   built, and its approval surface with them (the four entries above). What the flip still needs is
-   the **runtime half**: the tab runtime over the adapter, which is what finally constructs the
-   content presenter and answers its four ports — commands, config options, current mode, cost — and
-   constructs the interaction presenter, subscribing it to the bridge so a prompt comes down when
-   its interaction ends elsewhere. Then the flip itself, with `OpencodeChatRuntime` deleted
+3. **M2-flips wave 4 — OpenCode**, whose backend half, content surface, interactions, approval
+   surface, session-configuration state and runtime half are all built (the entries above). What
+   remains is **the flip**: `registration.ts` points `createRuntime` at the composition, `main.ts`
+   constructs it and registers the backend with its interaction and recovery ports, the parity
+   manifest moves — and, unlike waves 1 to 3, **five call sites that build `OpencodeChatRuntime` for
+   reasons unrelated to chat** have to be answered first (the model catalog's refresh, the runtime
+   command loader, two in the settings tab, one in the chat UI config), most likely through the
+   shared managed-ACP auxiliary session. The legacy runtime's tests of the extracted state must move
+   onto that module in the same commit rather than be deleted with it, with `OpencodeChatRuntime`
+   deleted
    in the same commit. Most of what it needs after that is shared: the next five ACP providers
    inherit the transport, the launcher, the client adapter — and now the content surface and the
    interaction bridge, since nothing in either is OpenCode's except its tool normalization and its

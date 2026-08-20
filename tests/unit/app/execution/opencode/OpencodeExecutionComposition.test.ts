@@ -10,7 +10,9 @@ import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { OpencodeExecution } from '@/app/execution/opencode/OpencodeExecutionComposition';
 import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
 import { executionSessionId, type InteractionId, runId } from '@/core/execution/ExecutionIds';
+import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { TOOL_READ } from '@/core/tools/toolNames';
+import type { StreamChunk } from '@/core/types';
 import type {
   ManagedAcpClient,
   ManagedAcpClientFactory,
@@ -22,7 +24,10 @@ import type {
 } from '@/providers/acp/types';
 import { OpencodeContentPresenter } from '@/providers/opencode/execution/OpencodeContentPresenter';
 import { OPENCODE_EXECUTION_DESCRIPTOR } from '@/providers/opencode/execution/OpencodeExecutionBackend';
-import { updateOpencodeProviderSettings } from '@/providers/opencode/settings';
+import {
+  getOpencodeProviderSettings,
+  updateOpencodeProviderSettings,
+} from '@/providers/opencode/settings';
 
 /**
  * The half of the OpenCode flip that only exists in production.
@@ -76,10 +81,12 @@ describe('OpenCode execution composition', () => {
     startupRefs: string[];
     prompts: unknown[];
     permissions: Array<Promise<AcpRequestPermissionResponse>>;
+    configOptions: unknown[];
   } {
     const startupRefs: string[] = [];
     const prompts: unknown[] = [];
     const permissions: Array<Promise<AcpRequestPermissionResponse>> = [];
+    const configOptions: unknown[] = [];
     const factory: ManagedAcpClientFactory = {
       create: async (input: ManagedAcpClientFactoryInput) => {
         startupRefs.push(input.startupRef);
@@ -159,7 +166,10 @@ describe('OpenCode execution composition', () => {
               usage: { inputTokens: 15_940, outputTokens: 4, totalTokens: 16_979 },
             };
           },
-          setConfigOption: async () => ({ configOptions: [] }),
+          setConfigOption: async request => {
+            configOptions.push(request);
+            return { configOptions: [] };
+          },
           cancel: () => undefined,
           onSessionNotification: listener => {
             notify = listener;
@@ -171,15 +181,19 @@ describe('OpenCode execution composition', () => {
         return client;
       },
     };
-    return { factory, startupRefs, prompts, permissions };
+    return { factory, startupRefs, prompts, permissions, configOptions };
   }
 
-  async function createHarness(options: { asksPermission?: boolean } = {}): Promise<{
+  async function createHarness(options: {
+    asksPermission?: boolean;
+    plugin?: any;
+  } = {}): Promise<{
     execution: OpencodeExecution;
     host: ExecutionKernelHost;
     startupRefs: string[];
     prompts: unknown[];
     permissions: Array<Promise<AcpRequestPermissionResponse>>;
+    configOptions: unknown[];
     events: ExecutionEventEnvelope[];
   }> {
     const host = new ExecutionKernelHost({
@@ -189,8 +203,8 @@ describe('OpenCode execution composition', () => {
         clearTimeout: handle => clearTimeout(handle as NodeJS.Timeout),
       },
     });
-    const execution = new OpencodeExecution(createPlugin(), host.registry);
-    const { factory, startupRefs, prompts, permissions } = createFakeAcp(options);
+    const execution = new OpencodeExecution(options.plugin ?? createPlugin(), host.registry);
+    const { factory, startupRefs, prompts, permissions, configOptions } = createFakeAcp(options);
     host.registerBackend(execution.createBackendRegistration(factory));
     await host.start();
     await host.registry.createSession({
@@ -200,7 +214,7 @@ describe('OpenCode execution composition', () => {
     });
     const events: ExecutionEventEnvelope[] = [];
     host.registry.observe(SESSION_ID, envelope => events.push(envelope));
-    return { execution, host, startupRefs, prompts, permissions, events };
+    return { execution, host, startupRefs, prompts, permissions, configOptions, events };
   }
 
   async function waitForInteraction(
@@ -364,6 +378,116 @@ describe('OpenCode execution composition', () => {
       outcome: { outcome: 'selected', optionId: 'once' },
     });
     expect(execution.interactionBridge.presentation(opened.presentationRef)).toBeUndefined();
+    execution.dispose();
+    await host.dispose();
+  });
+
+  async function drain(chunks: AsyncGenerator<StreamChunk>): Promise<StreamChunk[]> {
+    const collected: StreamChunk[] = [];
+    for await (const chunk of chunks) {
+      collected.push(chunk);
+    }
+    return collected;
+  }
+
+  it('renders a turn a tab can draw, and learns the session it is on', async () => {
+    // The runtime half end to end: a tab prepares a turn, the kernel dispatches
+    // it, the agent answers, and what comes back is what the surface draws —
+    // the text the kernel carries and the card the presenter makes from the
+    // update carried beside it.
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks.some(chunk => chunk.type === 'text' && chunk.content.includes('the answer')))
+      .toBe(true);
+    expect(chunks.some(chunk => chunk.type === 'tool_use' && chunk.name === TOOL_READ)).toBe(true);
+    // Without this a tab starts a new session every turn: no resume across a
+    // reload, and nothing to hydrate from.
+    expect(runtime.getSessionId()).toBe('acp-session-1');
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('asks the tab before a command runs, and answers the agent with what it chose', async () => {
+    const { execution, host, permissions } = await createHarness({ asksPermission: true });
+    const runtime = execution.createRuntime();
+    const asked: Array<{ toolName: string; description: string }> = [];
+    runtime.setApprovalCallback(async (toolName: string, _input: unknown, description: string) => {
+      asked.push({ toolName, description });
+      return 'allow';
+    });
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'run it' })));
+
+    expect(asked).toEqual([{
+      toolName: 'bash',
+      description: 'OpenCode wants to run a shell command.',
+    }]);
+    // What the tab chose, in the agent's own vocabulary: the point of the
+    // bridge is that this arrives as a permission rather than as a chunk.
+    await expect(permissions[0]).resolves.toEqual({
+      outcome: { outcome: 'selected', optionId: 'once' },
+    });
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('learns the vault models from the session the turn opened', async () => {
+    // An OpenCode vault learns what its models are by opening a session and
+    // being told; nothing else answers that question.
+    const plugin = createPlugin();
+    const { execution, host } = await createHarness({ plugin });
+    const runtime = execution.createRuntime();
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(getOpencodeProviderSettings(plugin.settings).discoveredModels)
+      .toEqual([expect.objectContaining({ rawId: 'opencode/big-pickle' })]);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('dispatches the turn under the mode the tab is set to', async () => {
+    const plugin = createPlugin();
+    updateOpencodeProviderSettings(plugin.settings, { selectedMode: 'plan' });
+    plugin.settings.permissionMode = 'plan';
+    const { execution, host, configOptions } = await createHarness({ plugin });
+    const runtime = execution.createRuntime();
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    // The third reference space, end to end: what the tab is set to reaches
+    // the session as a `setConfigOption` before the prompt is sent.
+    expect(configOptions).toContainEqual(expect.objectContaining({
+      configId: 'mode',
+      sessionId: 'acp-session-1',
+      value: 'plan',
+    }));
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('restarts the process when the vault MCP servers change', async () => {
+    // The legacy runtime shut the process down on an MCP reload so the next
+    // turn's session picks the servers up. Here the launch key is what says a
+    // running process cannot be told, and the fingerprint is what restarts it.
+    const { execution, host } = await createHarness();
+    const servers: unknown[] = [];
+    jest.spyOn(ProviderWorkspaceRegistry, 'getMcpServerManager').mockReturnValue({
+      getServers: () => servers,
+    } as never);
+
+    const before = await execution.turnRequests.resolve(execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'first' }],
+    }));
+    servers.push({ id: 'docs', name: 'docs', type: 'stdio', command: 'docs-mcp', enabled: true });
+    const after = await execution.turnRequests.resolve(execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'second' }],
+    }));
+
+    expect(after.restartFingerprint).not.toBe(before.restartFingerprint);
     execution.dispose();
     await host.dispose();
   });
