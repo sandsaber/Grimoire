@@ -3574,7 +3574,7 @@ Gates: unit 467 suites / 7,577 tests, integration 5 / 145 (2 suites, 10 tests sk
 lint, and `build:release` clean. The presenter is declared dark in the parity manifest, and the
 bundle confirms it: `main.js` contains neither half, because nothing reachable imports them.
 
-### M2-flips wave 4 — OpenCode's interactions (this commit)
+### M2-flips wave 4 — OpenCode's interactions (`d11068c`)
 
 ACP asks the client before an edit or a command, so the refusing bridge the backend half shipped
 with was fail-closed and useless: a flipped tab would have refused every write OpenCode proposed.
@@ -3632,6 +3632,35 @@ lint, and `build:release` clean. The bridge is declared dark in the parity manif
 presentation module is declared wired, and `main.js` confirms both — it contains the vocabulary and
 neither dark half.
 
+### M2-flips wave 4 — the surface an OpenCode approval is shown on (this commit)
+
+`OpencodeInteractionPresenter` is the half the bridge was missing: what puts a prepared approval on
+screen and turns what the person clicked back into an id the run can record. The tab speaks the
+legacy callback contract and the kernel speaks response ids, and this is the only place both are
+spoken.
+
+**The decision may not be one of the options.** The surface returns either a picked option — whose
+value is already the kernel's id, because the options it was handed carry them — or a plain
+`allow` / `allow-always` / `deny` / `cancel` it produced itself. ACP names options by kind rather
+than by a fixed set, so a plain decision is matched to the option that expresses it: an agent that
+offers only `reject_always` still has to be able to hear "deny", and the presenter finds it rather
+than looking up an id that was never offered.
+
+**Four ways an approval ends without an answer, and they are not the same.** A prompt the person
+dismissed is `cancel`, which aborts the turn. An interaction that ended somewhere else — a run
+cancelled while the prompt was up — resolves *nothing*, because the person did not choose to cancel
+it, and the presenter can tell the difference only because it holds an abort signal per open prompt.
+A tab with no approval callback and a surface that threw while rendering are both refusals: the
+agent is blocked on this answer before it does anything at all, so a prompt nobody can see would
+hang the turn, and refusing is what the legacy transport answered with.
+
+Not wired yet: the composition constructs no presenter, because a presenter reads the callbacks a
+tab installs. That is the runtime half, the last increment before the flip, and it is also what
+subscribes this to the bridge's `onSettled` so a prompt comes down when its interaction ends
+elsewhere.
+
+Gates: unit 469 suites / 7,597 tests, typecheck, lint clean. Declared dark in the parity manifest.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3651,7 +3680,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **wave 3 (Claude) built and flipped** — dark half in four increments, then the flip with `ClaudeChatRuntime` deleted | `3df7a3a`, `2976714`, `fe4870d`, `b7a6424`, `f8c4ad2`, `ec519a7` |
 | **wave 4 (OpenCode) backend half** — the first ACP provider on the kernel | `3b01158` |
 | **wave 4's content surface** — every session update and the prompt's own answer forwarded, and the presenter that draws a tab from them | `1ad9421` |
-| **wave 4's interactions** — the real permission bridge, the presentation vocabulary extracted from the legacy runtime, and an approval answered end to end through the kernel | this commit |
+| **wave 4's interactions** — the real permission bridge, the presentation vocabulary extracted from the legacy runtime, and an approval answered end to end through the kernel | `d11068c` |
+| **wave 4's approval surface** — the presenter that shows a prepared interaction and answers it in the kernel's ids | this commit |
 
 Three providers now execute through the kernel: Antigravity, Codex, Claude.
 
@@ -3720,10 +3750,11 @@ the command that runs them is in the matrix document under "the half that runs i
    with a rewind, and row 16 — a rewind that fails with the files restored — is what the backup port
    added in that entry exists for;
 3. **M2-flips wave 4 — OpenCode**, whose backend half, content surface and interactions are now
-   built (the three entries above). What the flip still needs is the **runtime half**: the tab
-   runtime over the adapter, which is what finally constructs the content presenter and answers its
-   four ports — commands, config options, current mode, cost — and builds the interaction presenter
-   that puts a prepared approval on screen. Then the flip itself, with `OpencodeChatRuntime` deleted
+   built, and its approval surface with them (the four entries above). What the flip still needs is
+   the **runtime half**: the tab runtime over the adapter, which is what finally constructs the
+   content presenter and answers its four ports — commands, config options, current mode, cost — and
+   constructs the interaction presenter, subscribing it to the bridge so a prompt comes down when
+   its interaction ends elsewhere. Then the flip itself, with `OpencodeChatRuntime` deleted
    in the same commit. Most of what it needs after that is shared: the next five ACP providers
    inherit the transport, the launcher, the client adapter — and now the content surface and the
    interaction bridge, since nothing in either is OpenCode's except its tool normalization and its

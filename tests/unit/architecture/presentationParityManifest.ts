@@ -687,6 +687,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/opencode/execution/OpencodeContentPresenter.ts',
       'src/providers/opencode/execution/OpencodeExecutionRequests.ts',
       'src/providers/opencode/execution/OpencodeInteractionBridge.ts',
+      'src/providers/opencode/execution/OpencodeInteractionPresenter.ts',
       'src/providers/opencode/execution/OpencodeProjectionResultSink.ts',
       'src/providers/opencode/execution/OpencodeAcpFileSystem.ts',
       'src/providers/opencode/execution/OpencodeExecutionBackend.ts',
