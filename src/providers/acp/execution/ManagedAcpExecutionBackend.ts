@@ -113,6 +113,11 @@ export interface ManagedAcpExecutionResultSink {
   }): Promise<ResultCommitOutcome>;
 }
 
+export interface ManagedAcpClientObserver {
+  onClientReady(client: ManagedAcpClient): void;
+  onClientLost(): void;
+}
+
 export interface ManagedAcpAuxiliaryPort {
   execute(requestRef: string, signal: AbortSignal): Promise<string>;
 }
@@ -126,6 +131,16 @@ export interface ManagedAcpExecutionBackendContext {
    */
   readonly descriptor: ExecutionBackendDescriptor;
   readonly clientFactory: ManagedAcpClientFactory;
+  /**
+   * The live process, for the provider features that are not turns.
+   *
+   * Grok reads its account's billing over the same transport a turn runs on,
+   * and the composition that answers the plan indicator owns neither the
+   * process nor its lifetime. Reported after `initialize`, because a client
+   * that has not handshaken answers nothing — and withdrawn when the client
+   * goes, so a feature cannot keep asking a process that is gone.
+   */
+  readonly clientObserver?: ManagedAcpClientObserver;
   readonly requestResolver: ManagedAcpExecutionRequestResolver;
   readonly dynamicApplier: ManagedAcpExecutionDynamicApplier;
   readonly interactionBridge: ManagedAcpInteractionBridge;
@@ -635,6 +650,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
       await this.closeClient();
       throw new ExecutionDispatchError('Managed ACP initialize timed out.', true);
     }
+    this.context.clientObserver?.onClientReady(client);
   }
 
   /**
@@ -709,6 +725,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
   }
 
   private async closeCurrentClient(): Promise<'confirmed' | 'unconfirmed'> {
+    if (this.client) this.context.clientObserver?.onClientLost();
     this.notificationUnsubscribe?.();
     this.notificationUnsubscribe = undefined;
     this.clientCloseUnsubscribe?.();

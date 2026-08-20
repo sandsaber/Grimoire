@@ -631,11 +631,40 @@ describe('OpencodeExecutionBackend', () => {
     await expect(auxiliary).rejects.toThrow('auxiliary aborted');
     expect(observedSignal?.aborted).toBe(true);
   });
+  it('names the live process for the provider features that are not turns', async () => {
+    const ready: ManagedAcpClient[] = [];
+    let lost = 0;
+    const fixture = createFixture({
+      clientObserver: {
+        onClientReady: client => { ready.push(client); },
+        onClientLost: () => { lost += 1; },
+      },
+    });
+    const session = await createSession(fixture.backend);
+    void collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    // Grok reads its account's billing over the same transport a turn runs on,
+    // and the composition owns neither the process nor its lifetime. Reported
+    // after `initialize`, because a client that has not handshaken answers
+    // nothing — and withdrawn when it goes, so a feature cannot hold a
+    // reference to a process that is gone.
+    expect(ready).toEqual([fixture.client]);
+    expect(lost).toBe(0);
+
+    await fixture.backend.dispose();
+
+    expect(lost).toBe(1);
+  });
 });
 
 function createFixture(options: {
   readonly clients?: FakeManagedAcpClient[];
   readonly clientFactory?: ManagedAcpClientFactory;
+  readonly clientObserver?: {
+    onClientReady(client: ManagedAcpClient): void;
+    onClientLost(): void;
+  };
   readonly reconciliation?: RunRecoveryEvidence;
   readonly isMissingSessionError?: (error: unknown) => boolean;
   readonly maxResultBytes?: number;
@@ -652,6 +681,7 @@ function createFixture(options: {
   let interactionResolveCalls = 0;
   const backend = new OpencodeExecutionBackend({
     clientFactory: options.clientFactory ?? factory,
+    ...(options.clientObserver ? { clientObserver: options.clientObserver } : {}),
     requestResolver: { resolve: options.requestResolve ?? (async () => invocation()) },
     dynamicApplier: { apply: options.dynamicApply ?? (async () => undefined) },
     interactionBridge: {

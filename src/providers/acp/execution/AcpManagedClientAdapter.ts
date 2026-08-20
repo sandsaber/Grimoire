@@ -117,6 +117,10 @@ class AcpManagedClientAdapter implements ManagedAcpClient {
     return this.connection.setModel(request);
   }
 
+  vendorRequest(method: string, params: unknown): Promise<unknown> {
+    return this.transport.request(method, params);
+  }
+
   cancel(sessionId: string): void {
     this.connection.cancel({ sessionId });
   }

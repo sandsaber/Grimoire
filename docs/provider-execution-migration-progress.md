@@ -4294,6 +4294,29 @@ Gates: unit 473 suites / 7,632 tests, typecheck, `eslint` over `src` and `tests`
 wired: it is reachable through OpenCode, which is flipped.
 
 
+### M2-flips wave 5 — what a provider's non-turn features need from the process (this commit)
+
+Grok's plan indicator is not a turn. It is `x.ai/billing`, asked over the same transport a turn runs
+on, and the legacy runtime registers a billing reader when its process comes up and clears it when
+the process goes. The composition owns neither the process nor its lifetime, so two seams had to
+exist before Grok's runtime half could keep that behaviour:
+
+- **`clientObserver`** on the shared backend — `onClientReady(client)` after `initialize` succeeds,
+  `onClientLost()` when the client is closed or replaced. After the handshake because a client that
+  has not handshaken answers nothing; withdrawn on close so a feature cannot hold a reference to a
+  process that is gone;
+- **`vendorRequest(method, params)`** on the managed client — the outbound half of what
+  `vendorSessionNotifications` does inbound. Optional, because most agents have nothing to ask that
+  ACP has no method for. The alternative was launching a second Grok process to ask what the first
+  one already knows.
+
+Both tests were written first and watched fail: the observer's against the shared backend through
+OpenCode's suite, which is where the shared backend is exercised, and the vendor request's against
+the real JSON-RPC transport over a pipe — it asserts the method and id on the wire, not a spy.
+
+Gates: unit 473 suites / 7,634 tests, typecheck, `eslint` over `src` and `tests` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

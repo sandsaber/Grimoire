@@ -36,6 +36,15 @@ export interface ManagedAcpClient {
    */
   setMode(request: AcpSetSessionModeRequest): Promise<AcpSetSessionModeResponse>;
   setModel(request: AcpSetSessionModelRequest): Promise<AcpSetSessionModelResponse>;
+  /**
+   * A request under the agent's own method name, where it has one.
+   *
+   * The outbound half of `vendorSessionNotifications`: some agents answer
+   * questions ACP has no method for — Grok's account billing is one — and the
+   * alternative is launching a second process to ask. Optional, because most
+   * agents have nothing to ask.
+   */
+  vendorRequest?(method: string, params: unknown): Promise<unknown>;
   cancel(sessionId: string): void;
   onSessionNotification(listener: (notification: AcpSessionNotification) => void): Unsubscribe;
   onConnectionLost(listener: (error?: Error) => void): Unsubscribe;

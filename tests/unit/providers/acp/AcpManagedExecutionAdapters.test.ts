@@ -56,6 +56,31 @@ describe('managed ACP execution adapters', () => {
     expect(process.terminateCalls).toBe(1);
   });
 
+  it('carries a vendor request the protocol does not define', async () => {
+    const process = new WireProcess();
+    const factory = new AcpManagedClientAdapterFactory({
+      clientInfo: { name: 'grimoire-tests', version: '1.0.0' },
+      processLauncher: { launch: async () => process },
+    });
+    const client = await factory.create({
+      startupRef: 'opaque-startup',
+      signal: new AbortController().signal,
+      requestPermission: async () => ({ outcome: { outcome: 'cancelled' } }),
+    });
+
+    // The outbound half of what `vendorSessionNotifications` does inbound.
+    // Grok's plan indicator is `x.ai/billing` over the same transport a turn
+    // runs on: no ACP method says what an account has spent, and launching a
+    // second process to ask would be a second process.
+    const billing = client.vendorRequest?.('x.ai/billing', {});
+    const request = await process.nextRequest() as { id: number; method: string };
+    expect(request).toEqual(expect.objectContaining({ method: 'x.ai/billing', params: {} }));
+    process.respond(request.id, { remainingCredits: 12 });
+
+    await expect(billing).resolves.toEqual({ remainingCredits: 12 });
+    await client.close();
+  });
+
   it('routes provider-owned contained filesystem delegates through ACP', async () => {
     const process = new WireProcess();
     const readTextFile = jest.fn(async () => ({ content: 'contained content' }));
