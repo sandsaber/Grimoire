@@ -4317,6 +4317,26 @@ the real JSON-RPC transport over a pipe — it asserts the method and id on the 
 Gates: unit 473 suites / 7,634 tests, typecheck, `eslint` over `src` and `tests` clean.
 
 
+### M2-flips wave 5 — the badge Grok fills from its own log (this commit)
+
+Grok's wire recording observes seven session updates and **no context-window usage among them**: the
+tokens a turn cost arrive on `response_completed`, and how full the context is arrives nowhere. The
+legacy runtime reads it out of Grok's own session log after each prompt returns, which is why that
+provider's badge has a context reading at all.
+
+Nothing in the kernel path could reproduce that. The content channel is synchronous per payload — a
+presenter answers chunks for the payload it is handed — so an asynchronous file read that finishes
+after the last payload has no way onto the surface, and the turn is over by the time it lands.
+
+The seam is where the answer is committed: `storeResult` now receives `presentContent`, and the
+result and the terminal are emitted after it returns. So a provider that has to *go and read
+something* to fill the surface has one bounded place to do it, and what it finds reaches the turn
+that earned it rather than the next one. The test asserts the ordering, not the call: the payload
+must appear before `terminal` in the run's own event sequence.
+
+Gates: unit 473 suites / 7,635 tests, typecheck, `eslint` over `src` and `tests` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

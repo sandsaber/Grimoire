@@ -110,6 +110,16 @@ export interface ManagedAcpExecutionResultSink {
     readonly nativeSessionRef: string;
     readonly nativeRunRef?: string;
     readonly signal: AbortSignal;
+    /**
+     * Content this provider learned somewhere other than the wire.
+     *
+     * Grok never sends a context-window update over ACP — its wire recording
+     * observes none — and its own session log is the only source. Handed to the
+     * sink because committing the answer is the last moment the turn is still
+     * open: the result and the terminal are emitted after this returns, so a
+     * badge filled here reaches the turn that earned it rather than the next one.
+     */
+    readonly presentContent: (payload: unknown) => void;
   }): Promise<ResultCommitOutcome>;
 }
 
@@ -873,6 +883,12 @@ class ManagedAcpExecutionRun implements ExecutionRun {
    * opened — a transient event writes no record and advances no state machine,
    * so it needs no run to have begun.
    */
+  /** One payload the provider produced itself, on the same content channel. */
+  presentProviderContent(payload: unknown): void {
+    if (this.terminal) return;
+    this.emit({ kind: 'provider-content', payload });
+  }
+
   presentSessionConfig(session: AcpNewSessionResponse): void {
     if (this.terminal) return;
     this.emit({
@@ -966,6 +982,7 @@ class ManagedAcpExecutionRun implements ExecutionRun {
         nativeSessionRef: this.sessionRef!,
         ...(this.nativeRunRef ? { nativeRunRef: this.nativeRunRef } : {}),
         signal: abort.signal,
+        presentContent: payload => this.presentProviderContent(payload),
       }),
       abort,
       this.context.scheduler,

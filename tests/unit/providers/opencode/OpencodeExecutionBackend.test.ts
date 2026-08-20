@@ -631,6 +631,34 @@ describe('OpencodeExecutionBackend', () => {
     await expect(auxiliary).rejects.toThrow('auxiliary aborted');
     expect(observedSignal?.aborted).toBe(true);
   });
+  it('carries what the provider learned while committing, before the turn ends', async () => {
+    const fixture = createFixture({
+      resultStore: async input => {
+        // Grok never sends a context-window update on the wire — its wire
+        // recording observes none — and its own session log is the only source.
+        // Read while the answer is being committed, which is the last moment
+        // the turn is still open.
+        input.presentContent({ kind: 'session-usage', usage: { totalTokens: 4096 } });
+        return { kind: 'committed', result: { resultId: 'result-1', storage: 'projection' } };
+      },
+    });
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    fixture.client.emit(agentText('native-session', 'answer'));
+    fixture.client.completePrompt({ stopReason: 'end_turn', userMessageId: 'message-1' });
+    const captured = await events;
+
+    const kinds = captured.map(event => event.event.kind);
+    const learned = captured.findIndex(event => (
+      event.event.kind === 'provider-content'
+      && (event.event.payload as { kind?: string }).kind === 'session-usage'
+    ));
+    expect(learned).toBeGreaterThan(-1);
+    expect(learned).toBeLessThan(kinds.indexOf('terminal'));
+  });
+
   it('names the live process for the provider features that are not turns', async () => {
     const ready: ManagedAcpClient[] = [];
     let lost = 0;
@@ -668,7 +696,10 @@ function createFixture(options: {
   readonly reconciliation?: RunRecoveryEvidence;
   readonly isMissingSessionError?: (error: unknown) => boolean;
   readonly maxResultBytes?: number;
-  readonly resultStore?: (input: { readonly output: string }) => Promise<ResultCommitOutcome>;
+  readonly resultStore?: (input: {
+    readonly output: string;
+    readonly presentContent: (payload: unknown) => void;
+  }) => Promise<ResultCommitOutcome>;
   readonly dynamicApply?: () => Promise<void>;
   readonly interactionPrepare?: () => Promise<OpencodePreparedInteraction>;
   readonly auxiliaryExecute?: (requestRef: string, signal: AbortSignal) => Promise<string>;
@@ -698,8 +729,8 @@ function createFixture(options: {
       })),
     },
     resultSink: {
-      storeResult: async ({ output }) => {
-        if (options.resultStore) return options.resultStore({ output });
+      storeResult: async ({ output, presentContent }) => {
+        if (options.resultStore) return options.resultStore({ output, presentContent });
         stored.push(output);
         return {
           kind: 'committed',
