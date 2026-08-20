@@ -292,7 +292,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     capabilities: OPENCODE_PROVIDER_CAPABILITIES,
     isolationEvidence: 'opencode/auxiliary/',
     evidence: [
-      'src/providers/opencode/runtime/OpencodeChatRuntime.ts',
+      'src/providers/opencode/execution/OpencodeExecutionBackend.ts',
       'src/providers/opencode/runtime/OpencodeAuxQueryRunner.ts',
       'src/providers/opencode/runtime/OpencodeLaunchArtifacts.ts',
     ],

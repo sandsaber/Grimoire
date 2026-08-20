@@ -36,6 +36,7 @@ describe('OpenCode provider module', () => {
       deleteConversationSession: async () => undefined,
       resolveSessionId: () => 'acp-session',
       isPendingFork: () => false,
+      readDatabasePath: () => '/vault/.opencode/opencode.db',
       dispose: async () => undefined,
     };
   }

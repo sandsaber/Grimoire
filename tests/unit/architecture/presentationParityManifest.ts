@@ -581,11 +581,26 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/grok/runtime/GrokChatRuntime.ts',
       'src/providers/kimicode/runtime/KimicodeChatRuntime.ts',
       'src/providers/mimocode/runtime/MimocodeChatRuntime.ts',
-      'src/providers/opencode/runtime/OpencodeChatRuntime.ts',
-      // Extracted from that runtime, which delegates to them, so the flip does
-      // not produce a second opinion about what a permission is asking for or
-      // about what the live session is set to.
+      // The shared managed-ACP platform, live since OpenCode's flip and
+      // inherited by the five ACP providers that follow it.
+      'src/app/execution/acp/NodeManagedAcpProcessLauncher.ts',
+      'src/providers/acp/execution/AcpManagedClientAdapter.ts',
+      'src/providers/acp/execution/ManagedAcpClient.ts',
+      // OpenCode chat execution, flipped: the first ACP provider on the kernel,
+      // and the isolated session the four metadata surfaces now share.
+      'src/app/execution/opencode/OpencodeExecutionComposition.ts',
+      'src/app/execution/opencode/OpencodeMetadataSession.ts',
+      'src/providers/opencode/OpencodeProviderModule.ts',
+      'src/providers/opencode/app/OpencodeModuleContext.ts',
+      'src/providers/opencode/execution/OpencodeAcpDynamicConfig.ts',
+      'src/providers/opencode/execution/OpencodeAcpFileSystem.ts',
+      'src/providers/opencode/execution/OpencodeContentPresenter.ts',
+      'src/providers/opencode/execution/OpencodeExecutionBackend.ts',
+      'src/providers/opencode/execution/OpencodeExecutionRequests.ts',
+      'src/providers/opencode/execution/OpencodeInteractionBridge.ts',
+      'src/providers/opencode/execution/OpencodeInteractionPresenter.ts',
       'src/providers/opencode/execution/OpencodePermissionPresentation.ts',
+      'src/providers/opencode/execution/OpencodeProjectionResultSink.ts',
       'src/providers/opencode/execution/OpencodeSessionConfigState.ts',
       'src/providers/qwen/runtime/QwenChatRuntime.ts',
     ],
@@ -676,24 +691,12 @@ export const PARITY_SURFACES: ParitySurface[] = [
     state: 'pending',
     owner: 'M2-flips — each module becomes reachable at its own provider\'s flip.',
     modules: [
-      'src/app/execution/acp/NodeManagedAcpProcessLauncher.ts',
       'src/core/execution/testing/DeterministicFakeBackend.ts',
-      'src/providers/acp/execution/AcpManagedClientAdapter.ts',
+      // Still dark after wave 4: the auxiliary ACP query has no caller, because
+      // titles, refinement and inline edits stay on the legacy services until
+      // M5. The transport, the launcher and the client adapter beside it went
+      // live with OpenCode's flip and are listed as wired.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
-      'src/providers/acp/execution/ManagedAcpClient.ts',
-      'src/providers/opencode/OpencodeProviderModule.ts',
-      // Wave 4's dark half: the composition that binds OpenCode's backend to
-      // the running plugin, and the two stores it needs.
-      'src/app/execution/opencode/OpencodeExecutionComposition.ts',
-      'src/providers/opencode/execution/OpencodeAcpDynamicConfig.ts',
-      'src/providers/opencode/execution/OpencodeContentPresenter.ts',
-      'src/providers/opencode/execution/OpencodeExecutionRequests.ts',
-      'src/providers/opencode/execution/OpencodeInteractionBridge.ts',
-      'src/providers/opencode/execution/OpencodeInteractionPresenter.ts',
-      'src/providers/opencode/app/OpencodeModuleContext.ts',
-      'src/providers/opencode/execution/OpencodeProjectionResultSink.ts',
-      'src/providers/opencode/execution/OpencodeAcpFileSystem.ts',
-      'src/providers/opencode/execution/OpencodeExecutionBackend.ts',
     ],
   },
 ];

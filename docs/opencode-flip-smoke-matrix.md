@@ -1,0 +1,68 @@
+# OpenCode flip — manual smoke matrix
+
+The OpenCode flip moved chat execution onto the execution kernel and deleted `OpencodeChatRuntime`.
+Automated gates prove the wiring, the contracts, and whole turns over a fake ACP agent; **this is the
+layer they cannot reach** — a real `opencode acp` process in a real vault.
+
+Run it against a release build installed in a vault (`npm run build:release`, then the plugin folder
+copy). Record the date, the OpenCode CLI version, and one line per row. A row that fails is a stop
+condition for the flip, not a bug report for later: the flip reverts as a single commit.
+
+## What makes this one different from the first three
+
+Antigravity is a process per run, Codex a daemon, Claude an SDK stream. OpenCode is the first
+**managed ACP subprocess**, and the first flip where the protocol — not the provider — decides what
+the client must answer. Five of the rows below exist only because of that.
+
+| Capability | Declared | Why it needs the real CLI |
+|---|---|---|
+| persistent runtime | yes | one `opencode acp` process outlives a turn; the kernel owns its lifetime |
+| native history | yes | a session is resumed by id **and by database**, and both are written by the new path |
+| plan mode | yes | the mode is a `setConfigOption` on an open session, not a launch flag |
+| provider commands | yes | announced by the session as an update; nothing answers a request for them |
+| images | yes | **never exercised by any flip**: prompt blocks carry them |
+| instruction mode | yes | orchestrator instructions are added to the prompt the reference carries |
+| effort | yes | a third `setConfigOption`, under an id the session itself names |
+| rewind / fork | no | not declared; nothing to check |
+| turn steering | no | not declared; nothing to check |
+| per-run MCP selection | no | Grimoire owns the list and injects it; the per-run selector is off |
+
+## The matrix
+
+Rows 1–6 are the turn. Rows 7–11 are the session. Rows 12–16 are what the protocol asks of the
+client. Rows 17–19 are what four surfaces ask when nobody is in a conversation.
+
+| # | Row | What proves it |
+|---|---|---|
+| 1 | A turn answers, and the answer streams | text appears while it runs, not only at the end |
+| 2 | A tool call renders as a card, with its output | the card shows the normalized tool name, not `tool` |
+| 3 | A diff renders for an edit | the edit card shows the change, not raw text |
+| 4 | A plan renders and updates | the progress item follows the agent's plan entries |
+| 5 | The context badge fills in | percentage and window, then the prompt's own tokens after the answer |
+| 6 | Cancelling a turn stops the agent | the process stops working; the tab is usable immediately |
+| 7 | A second turn continues the same session | no history is re-sent, and the agent remembers turn 1 |
+| 8 | Reloading Obsidian resumes the conversation | the transcript hydrates and turn 3 continues it |
+| 9 | Deleting the session outside Grimoire recovers | the tab starts a new session instead of failing |
+| 10 | Two tabs run at once | neither tab's answer, model or mode appears in the other |
+| 11 | Switching the model mid-conversation applies | the next turn runs on it, and the effort list changes with it |
+| 12 | An edit asks before it writes | the prompt names the file, and Deny stops the write |
+| 13 | A command asks before it runs | the prompt names the command; Allow runs it, Deny does not |
+| 14 | "Always allow" is not asked again in that session | the second edit runs without a prompt |
+| 15 | Dismissing the prompt cancels the turn | nothing is written and the turn ends |
+| 16 | A write outside the vault is refused in safe mode | containment holds; full access allows it |
+| 17 | The model catalog fills from an empty vault | the settings model browser lists models on first open |
+| 18 | Slash commands list in a blank tab | the session's own commands appear in the composer |
+| 19 | The spend indicator moves | after a turn, with a vendor that reports cost and one that does not |
+
+## The half that runs itself
+
+Nothing in this matrix runs itself. Unlike Codex, OpenCode has no live harness on this branch: the
+automated coverage stops at the fake ACP agent, and every row above needs a person, a vault, and a
+CLI. Two rows are worth running twice — 8 (reload) and 19 (spend) — because both depend on state
+written by a previous turn.
+
+## Record
+
+| Date | CLI version | Rows passed | Rows failed | Notes |
+|---|---|---|---|---|
+| | | | | |

@@ -45,6 +45,11 @@ const LIVE_MARKERS = [
   { marker: 'provider-antigravity', why: 'the flipped Antigravity execution backend' },
   { marker: 'provider-codex', why: 'the flipped Codex execution backend' },
   { marker: 'provider-claude', why: 'the flipped Claude execution backend' },
+  { marker: 'provider-opencode', why: 'the flipped OpenCode execution backend' },
+  {
+    marker: 'Unknown OpenCode startup reference',
+    why: 'the store the flipped backend resolves launches through',
+  },
   {
     marker: 'Unknown Claude startup reference',
     why: 'the store the flipped backend resolves SDK options through',
@@ -61,7 +66,6 @@ const LIVE_MARKERS = [
 
 /** Strings that appear in the bundle only if a still-dark module was pulled in. */
 const DARK_MARKERS = [
-  { marker: 'provider-opencode', why: 'the OpenCode execution backend descriptor' },
   { marker: 'internal-deterministic-fake', why: 'the test-only fake backend' },
 ];
 

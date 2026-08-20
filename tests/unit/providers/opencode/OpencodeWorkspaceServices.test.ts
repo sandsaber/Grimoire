@@ -1,5 +1,4 @@
 import { createOpencodeWorkspaceServices } from '@/providers/opencode/app/OpencodeWorkspaceServices';
-import { OpencodeChatRuntime } from '@/providers/opencode/runtime/OpencodeChatRuntime';
 import { getOpencodeProviderSettings, updateOpencodeProviderSettings } from '@/providers/opencode/settings';
 
 describe('createOpencodeWorkspaceServices', () => {
@@ -14,17 +13,16 @@ describe('createOpencodeWorkspaceServices', () => {
       settings,
       saveSettings: jest.fn().mockResolvedValue(undefined),
     };
-    const syncConversationStateSpy = jest.spyOn(OpencodeChatRuntime.prototype, 'syncConversationState');
-    const ensureReadySpy = jest
-      .spyOn(OpencodeChatRuntime.prototype, 'ensureReady')
-      .mockImplementation(async function ensureReady(this: OpencodeChatRuntime) {
-        updateOpencodeProviderSettings((this as any).plugin.settings, {
-          discoveredModels: [{ label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' }],
-          visibleModels: ['openai/gpt-5.6'],
-        });
-        return true;
+    // The catalog asks the isolated metadata session, which is what opening a
+    // session and reading its reply has become.
+    const discoverMetadata = jest.fn().mockImplementation(async () => {
+      updateOpencodeProviderSettings(settings, {
+        discoveredModels: [{ label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' }],
+        visibleModels: ['openai/gpt-5.6'],
       });
-    const cleanupSpy = jest.spyOn(OpencodeChatRuntime.prototype, 'cleanup').mockImplementation(() => undefined);
+      return true;
+    });
+    (plugin as any).getOpencodeExecution = () => ({ metadata: { discoverMetadata } });
     const vaultAdapter = {
       delete: jest.fn(),
       ensureFolder: jest.fn(),
@@ -42,12 +40,7 @@ describe('createOpencodeWorkspaceServices', () => {
     });
 
     expect(changed).toBe(true);
-    expect(syncConversationStateSpy).toHaveBeenCalledWith({
-      providerState: { databasePath: ':memory:' },
-      sessionId: null,
-    });
-    expect(ensureReadySpy).toHaveBeenCalledWith({ allowSessionCreation: true });
-    expect(cleanupSpy).toHaveBeenCalled();
+    expect(discoverMetadata).toHaveBeenCalledTimes(1);
     expect(getOpencodeProviderSettings(settings).discoveredModels).toEqual([
       { label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' },
     ]);
@@ -65,8 +58,8 @@ describe('createOpencodeWorkspaceServices', () => {
       settings,
       saveSettings: jest.fn().mockResolvedValue(undefined),
     };
-    const ensureReadySpy = jest.spyOn(OpencodeChatRuntime.prototype, 'ensureReady');
-    const cleanupSpy = jest.spyOn(OpencodeChatRuntime.prototype, 'cleanup');
+    const discoverMetadata = jest.fn();
+    (plugin as any).getOpencodeExecution = () => ({ metadata: { discoverMetadata } });
     const vaultAdapter = {
       delete: jest.fn(),
       ensureFolder: jest.fn(),
@@ -83,8 +76,8 @@ describe('createOpencodeWorkspaceServices', () => {
     });
 
     expect(changed).toBe(false);
-    expect(ensureReadySpy).not.toHaveBeenCalled();
-    expect(cleanupSpy).not.toHaveBeenCalled();
+    // No process at all for a catalog that is still fresh.
+    expect(discoverMetadata).not.toHaveBeenCalled();
     expect(plugin.recordDebugLog).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         modelCount: 1,

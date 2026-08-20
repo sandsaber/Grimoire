@@ -3,6 +3,10 @@ import { isAbsolute } from 'node:path';
 
 import { NodeManagedAcpProcessLauncher } from '@/app/execution/acp/NodeManagedAcpProcessLauncher';
 import {
+  type OpencodeMetadataLaunch,
+  OpencodeMetadataSession,
+} from '@/app/execution/opencode/OpencodeMetadataSession';
+import {
   executionSessionId,
   interactionId,
   runId,
@@ -32,15 +36,18 @@ import type {
   ChatTurnRequest,
   PreparedChatTurn,
 } from '@/core/runtime/types';
+import type { ApprovalCallback } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
 import type GrimoirePlugin from '@/main';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
+import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createOpencodeModuleContext } from '@/providers/opencode/app/OpencodeModuleContext';
 import { opencodePlanUsageStore } from '@/providers/opencode/app/OpencodePlanUsageStore';
 import { OPENCODE_PROVIDER_CAPABILITIES } from '@/providers/opencode/capabilities';
 import type { OpencodeAcpDynamicConfig } from '@/providers/opencode/execution/OpencodeAcpDynamicConfig';
 import { OpencodeAcpDynamicConfigApplier } from '@/providers/opencode/execution/OpencodeAcpDynamicConfig';
+import { OpencodeAcpFileSystem } from '@/providers/opencode/execution/OpencodeAcpFileSystem';
 import { OpencodeContentPresenter } from '@/providers/opencode/execution/OpencodeContentPresenter';
 import {
   OpencodeExecutionBackend,
@@ -54,6 +61,7 @@ import { OpencodeInteractionBridge } from '@/providers/opencode/execution/Openco
 import { OpencodeInteractionPresenter } from '@/providers/opencode/execution/OpencodeInteractionPresenter';
 import { OpencodeProjectionResultSink } from '@/providers/opencode/execution/OpencodeProjectionResultSink';
 import { OpencodeSessionConfigState } from '@/providers/opencode/execution/OpencodeSessionConfigState';
+import { loadOpencodeSessionCost } from '@/providers/opencode/history/OpencodeUsageMetadataStore';
 import { opencodeProviderModule } from '@/providers/opencode/OpencodeProviderModule';
 import {
   buildOpencodePromptBlocks,
@@ -62,17 +70,21 @@ import {
 import { prepareOpencodeLaunchArtifacts } from '@/providers/opencode/runtime/OpencodeLaunchArtifacts';
 import { buildOpencodeRuntimeEnv } from '@/providers/opencode/runtime/OpencodeRuntimeEnvironment';
 import type { OpencodeProviderSettings } from '@/providers/opencode/settings';
+import { getOpencodeState } from '@/providers/opencode/types';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
 /** What a turn may answer with, before it is refused as too large. */
 const MAX_RESULT_BYTES = 256_000;
 
+/** Where a session opened only to answer a question keeps its state. */
+const METADATA_DATABASE = ':memory:';
+
 /**
  * OpenCode chat execution, assembled from the running plugin.
  *
- * **Dark.** Nothing constructs this yet: `registration.ts` still points
- * `createRuntime` at `OpencodeChatRuntime`, and the flip is a later checkpoint.
+ * **Flipped.** `registration.ts` points `createRuntime` here, `main.ts`
+ * constructs one per load, and `OpencodeChatRuntime` is gone.
  *
  * The first ACP provider to reach the kernel, and the shape shows it. Where
  * Codex resolves a daemon and Claude an SDK query, this resolves **three**
@@ -83,20 +95,11 @@ const MAX_RESULT_BYTES = 256_000;
  * follows, so what this composition adds is the OpenCode-specific launch and
  * nothing else.
  *
- * Two things are deliberately **not** here, each its own increment and each
- * named so a flip cannot land while it is missing:
- *
- * - **the content surface is built but unwired.** The backend forwards every
- *   session update and the prompt's own answer, and `OpencodeContentPresenter`
- *   turns them into chunks — but nothing constructs it here, because what
- *   consumes a presenter is the tab runtime, which is the increment after this
- *   one. Its four ports — commands, config options, mode, cost — are what the
- *   runtime half must answer for, or a flipped tab loses its model selector,
- *   its slash commands and its plan indicator;
- * - **the surface an interaction is shown on.** `OpencodeInteractionBridge` is
- *   wired below and carries every permission request the agent raises, but
- *   what puts one on screen and answers it is the tab's presenter — and a
- *   presenter reads callbacks the tab installs, which is the runtime half.
+ * It owns three things a tab cannot: the backend every tab dispatches through,
+ * the permission bridge every prompt is prepared by, and the isolated metadata
+ * session the model catalog, the settings tab and the toolbar ask their
+ * questions in. Everything else is built per tab in `createRuntime`, because it
+ * is about one conversation's session.
  */
 export class OpencodeExecution {
   private readonly requests = new OpencodeExecutionRequests(
@@ -110,6 +113,17 @@ export class OpencodeExecution {
    * the presentation for a request in a map the presenter cannot read.
    */
   private readonly interactions = new OpencodeInteractionBridge(() => opaqueId('ocix'));
+
+  private metadataSession: OpencodeMetadataSession | undefined;
+  private clientFactory: ManagedAcpClientFactory | undefined;
+
+  /**
+   * Which tab answers for a write on which ACP session.
+   *
+   * The filesystem delegate belongs to the process, and the approval belongs to
+   * a tab; this is the only thing that knows both.
+   */
+  private readonly writeApprovers = new Map<string, () => ApprovalCallback | undefined>();
 
   private readonly presenters = new Set<OpencodeInteractionPresenter>();
   private readonly disposers: Array<() => void> = [];
@@ -144,8 +158,9 @@ export class OpencodeExecution {
    * how a turn is composed is testing the wrong thing.
    */
   createBackend(
-    clientFactory: ManagedAcpClientFactory = this.createClientFactory(),
+    clientFactory: ManagedAcpClientFactory = this.clientFactory ?? this.createClientFactory(),
   ): OpencodeExecutionBackend {
+    this.clientFactory = clientFactory;
     const context: OpencodeExecutionBackendContext = {
       clientFactory,
       requestResolver: this.requests,
@@ -212,6 +227,11 @@ export class OpencodeExecution {
     let conversation: BoundConversation | null = null;
     let adapter: OpencodeRuntimeAdapter | undefined;
     let sessionCommands: readonly ProviderCommandDescriptor[] = [];
+    // What the last launch resolved for this tab, which is what the
+    // conversation is saved pointing at.
+    let databasePath: string | null = null;
+    const ownedSessions = new Set<string>();
+    let sawTurnCost = false;
     const boundConversation = (): BoundConversation | null => conversation;
 
     const sessionConfig = new OpencodeSessionConfigState({
@@ -247,6 +267,12 @@ export class OpencodeExecution {
         sessionConfig.syncSessionModeState({ currentModeId }),
       ),
       onSessionOpened: opening => this.settle((async () => {
+        // This tab is the one that answers for a write on this session.
+        ownedSessions.add(opening.sessionId);
+        this.writeApprovers.set(
+          opening.sessionId,
+          () => adapter?.interactionCallbacks().approval as ApprovalCallback | undefined,
+        );
         await sessionConfig.syncSessionModelState({
           configOptions: opening.configOptions ? [...opening.configOptions] : null,
           models: opening.models ?? null,
@@ -259,6 +285,7 @@ export class OpencodeExecution {
         });
       })()),
       onCost: cost => {
+        sawTurnCost = true;
         if (opencodePlanUsageStore.recordCost(cost ?? null)) {
           this.refreshSelectors();
         }
@@ -290,11 +317,16 @@ export class OpencodeExecution {
         // again would say everything twice.
         const bootstrap = ports.currentSessionId() ? [] : history ?? [];
         const dynamic = this.dynamicConfiguration(sessionConfig, options);
+        const conversationDatabase = databasePath
+          ?? getOpencodeState(conversation?.providerState).databasePath
+          ?? undefined;
         return this.requests.reference({
           prompt: buildOpencodePromptBlocks(turn.request, [...bootstrap], {
             ...(options?.orchestratorMode ? { orchestratorMode: true } : {}),
           }),
           ...(dynamic ? { dynamic } : {}),
+          ...(conversationDatabase ? { databasePath: conversationDatabase } : {}),
+          onLaunchResolved: resolved => { databasePath = resolved; },
         });
       },
       reasoningControl: OPENCODE_PROVIDER_CAPABILITIES.reasoningControl,
@@ -309,11 +341,23 @@ export class OpencodeExecution {
           content.forgetConversation();
           sessionConfig.forgetSession();
           sessionCommands = [];
+          // Another conversation is another database as often as not, and the
+          // last one's would send this turn to a session that is not in it.
+          databasePath = null;
         }
         conversation = next;
       },
       presentProviderContent: payload => content.present(payload),
-      consumeProviderTurnMetadata: () => content.consumeTurnMetadata(),
+      consumeProviderTurnMetadata: () => {
+        // A vendor that reports no cost on the wire has still charged for the
+        // turn, and OpenCode's own session database knows what. Read once per
+        // turn that reported nothing, which is what the legacy runtime did.
+        if (!sawTurnCost) {
+          this.settle(this.recordSessionCost(content.lastSessionId(), databasePath));
+        }
+        sawTurnCost = false;
+        return content.consumeTurnMetadata();
+      },
       interactionPresenter: presenter,
       reportCleanupFailure: error => {
         this.plugin.recordDebugLog({
@@ -329,7 +373,9 @@ export class OpencodeExecution {
     // about *this tab's* conversation, so the context has to close over the
     // same one the ports above sync.
     const contributions = opencodeProviderModule.features(
-      createOpencodeModuleContext(this.plugin, boundConversation),
+      createOpencodeModuleContext(this.plugin, boundConversation, {
+        databasePath: () => databasePath,
+      }),
     );
 
     const runtime = new OpencodeRuntimeAdapter(
@@ -367,13 +413,38 @@ export class OpencodeExecution {
         },
       },
       () => {
-        // The tab closing is when the prompts it raised stop being anyone's.
+        // The tab closing is when the prompts it raised stop being anyone's,
+        // and when a write on its sessions has nobody left to ask.
         presenter.dismissAll();
         this.presenters.delete(presenter);
+        for (const sessionId of ownedSessions) {
+          this.writeApprovers.delete(sessionId);
+        }
+        ownedSessions.clear();
       },
     );
     adapter = runtime;
     return runtime;
+  }
+
+  /**
+   * What Grimoire asks OpenCode when nobody is having a conversation.
+   *
+   * The model catalog, the settings tab and the chat toolbar all need the same
+   * two answers, and each of them used to build a whole chat runtime to get
+   * them. One isolated session serves all of them instead.
+   */
+  get metadata(): OpencodeMetadataSession {
+    this.metadataSession ??= new OpencodeMetadataSession({
+      // The same factory the backend runs on, so a test that hands the backend
+      // a fake agent is not answered by a real process launched behind it.
+      clientFactory: this.clientFactory ??= this.createClientFactory(),
+      launch: () => this.metadataLaunch(),
+      settingsBag: () => this.plugin.settings,
+      saveSettings: () => this.plugin.saveSettings(),
+      refreshSelectors: () => this.refreshSelectors(),
+    });
+    return this.metadataSession;
   }
 
   /** Drops every reference held, and takes down whatever is on screen. */
@@ -416,6 +487,30 @@ export class OpencodeExecution {
     return Object.keys(dynamic).length > 0 ? dynamic : undefined;
   }
 
+  /**
+   * What the vendor charged, when only OpenCode's database knows.
+   *
+   * The plan indicator for this provider is spend, and a vendor that omits
+   * `cost` from its usage update would otherwise never move it. The store
+   * records the difference from the session total, so reading it twice for one
+   * session counts nothing twice.
+   */
+  private async recordSessionCost(
+    sessionId: string | undefined,
+    databasePath: string | null,
+  ): Promise<void> {
+    if (!sessionId) {
+      return;
+    }
+    const cost = await loadOpencodeSessionCost(
+      sessionId,
+      databasePath ? { databasePath } : undefined,
+    );
+    if (opencodePlanUsageStore.recordSessionTotalCost(sessionId, cost)) {
+      this.refreshSelectors();
+    }
+  }
+
   /** Redraws the model and mode selectors of every open view. */
   private refreshSelectors(): void {
     for (const view of this.plugin.getAllViews()) {
@@ -443,15 +538,115 @@ export class OpencodeExecution {
   }
 
   private createClientFactory(): ManagedAcpClientFactory {
+    const fileSystem = new OpencodeAcpFileSystem({
+      // Full access opts into unrestricted file access; safe and plan modes
+      // confine an ACP-delegated read or write to the session workspace.
+      resolveSession: () => ({
+        cwd: getVaultPath(this.plugin.app) ?? process.cwd(),
+        allowOutsideWorkspace: this.fullAccess(),
+      }),
+      approveWrite: input => this.approveWrite(input),
+    });
     return new AcpManagedClientAdapterFactory({
       clientInfo: {
         name: 'grimoire',
         version: this.plugin.manifest?.version ?? '0.0.0',
       },
+      // Declared, and therefore used: an ACP client that advertises no
+      // filesystem is one the agent writes around, and the containment and the
+      // write approval below are the two things it would be writing around.
+      delegate: {
+        fileSystem: {
+          readTextFile: request => fileSystem.readTextFile(request),
+          writeTextFile: request => fileSystem.writeTextFile(request),
+        },
+      },
       processLauncher: new NodeManagedAcpProcessLauncher({
         resolve: startupRef => this.requests.resolveLaunch(startupRef),
       }),
     });
+  }
+
+  private fullAccess(): boolean {
+    const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
+      this.plugin.settings,
+      'opencode',
+    );
+    return settings.permissionMode === 'full_access';
+  }
+
+  /**
+   * Whether an ACP-delegated write may happen, asked of the tab that owns the
+   * session it came in on.
+   *
+   * The legacy runtime asked its own approval callback, because a runtime was
+   * one tab. The client factory is one process for every tab, so the tab is
+   * found by the session the write arrived on — and a write whose session
+   * belongs to no open tab is refused rather than allowed by default.
+   */
+  private async approveWrite(input: {
+    readonly sessionId: string;
+    readonly requestPath: string;
+    readonly resolvedPath: string;
+  }): Promise<boolean> {
+    if (this.fullAccess()) {
+      return true;
+    }
+    const approval = this.writeApprovers.get(input.sessionId)?.();
+    if (!approval) {
+      return false;
+    }
+    const decision = await approval(
+      'write',
+      { path: input.resolvedPath, relativePath: input.requestPath },
+      `OpenCode wants to write ${input.requestPath}.`,
+      { decisionReason: 'File write permission required' },
+    );
+    return decision === 'allow' || decision === 'allow-always';
+  }
+
+  /**
+   * The process a question is asked in, which is nobody's conversation.
+   *
+   * The database is in memory, which is what makes it isolated: the legacy
+   * warmups passed the same override for the same reason, so that asking what
+   * models exist never binds a session to a tab or writes OpenCode state into
+   * the vault.
+   */
+  private async metadataLaunch(): Promise<OpencodeMetadataLaunch> {
+    const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
+      this.plugin.settings,
+      'opencode',
+    );
+    const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
+    const executable = this.plugin.getResolvedProviderCliPath('opencode') ?? 'opencode';
+    const runtimeEnv = buildOpencodeRuntimeEnv(settings, executable, METADATA_DATABASE);
+    const artifacts = await prepareOpencodeLaunchArtifacts({
+      runtimeEnv,
+      settings: {
+        customPrompt: this.plugin.settings.systemPrompt,
+        mediaFolder: this.plugin.settings.mediaFolder,
+        userName: this.plugin.settings.userName,
+        vaultPath: cwd,
+      },
+      workspaceRoot: cwd,
+    });
+    return {
+      startupRef: this.requests.referenceLaunch({
+        executable,
+        arguments: ['acp'],
+        cwd,
+        environment: definedEnvironment({
+          ...runtimeEnv,
+          OPENCODE_CONFIG: artifacts.configPath,
+          PATH: getEnhancedPath(runtimeEnv.PATH, isAbsolute(executable) ? executable : undefined),
+        }),
+      }),
+      cwd,
+      mcpServers: toAcpMcpServers([
+        ...(ProviderWorkspaceRegistry.getMcpServerManager('opencode')?.getServers() ?? []),
+      ]),
+    };
   }
 
   /**
@@ -463,14 +658,17 @@ export class OpencodeExecution {
    * from files, so a process spawned before they exist runs under the previous
    * turn's configuration.
    */
-  private async environment(): Promise<OpencodeInvocationEnvironment> {
+  private async environment(databasePath?: string): Promise<OpencodeInvocationEnvironment> {
     const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
       this.plugin.settings,
       'opencode',
     );
     const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
     const executable = this.plugin.getResolvedProviderCliPath('opencode') ?? 'opencode';
-    const runtimeEnv = buildOpencodeRuntimeEnv(settings, executable);
+    // The conversation's own database, when it has one: a session created
+    // against one cannot be loaded from another, so a turn launched without it
+    // resumes nothing and leaves the history behind.
+    const runtimeEnv = buildOpencodeRuntimeEnv(settings, executable, databasePath ?? null);
     const promptSettings = {
       customPrompt: this.plugin.settings.systemPrompt,
       mediaFolder: this.plugin.settings.mediaFolder,
@@ -507,6 +705,10 @@ export class OpencodeExecution {
         mcpServers,
       }),
       mcpServers,
+      // What the artifacts resolved, which is the answer the conversation is
+      // saved with — `OPENCODE_DB` when it was given, the vault default when
+      // it was not.
+      databasePath: artifacts.databasePath,
     };
   }
 }

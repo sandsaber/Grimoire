@@ -79,7 +79,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M1 — execution kernel, dark-launched | Complete | `dca2f84`, `cc6081e`, `ec1303f`, `86f0585`, `a689af8` |
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
-| M2-flips — nine production flips with legacy deletion | In progress — wave 1 (Antigravity) shipped, one manual check outstanding; wave 2 (Codex) under way | wave 1: `e06417b` … `a725a27`; wave 2: `0151961`, `1f34df6`, `e056871` |
+| M2-flips — nine production flips with legacy deletion | In progress — waves 1–4 (Antigravity, Codex, Claude, OpenCode) shipped; wave 1 certified, three matrices outstanding | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — provider control plane | Not started | — |
 | M4 — revisioned persistence in production | Not started | — |
 | M5 — presentation evolution and seam deletion | Not started | — |
@@ -3728,7 +3728,7 @@ therefore larger than wave 3's, and this is the measurement rather than a guess.
 Gates: unit 469 suites / 7,601 tests, typecheck, lint, and `build:release` clean. Recorded as wired
 in the parity manifest, because the runtime that reaches it is still the one in production.
 
-### M2-flips wave 4 — OpenCode's runtime half (this commit)
+### M2-flips wave 4 — OpenCode's runtime half (`0dec751`)
 
 `createRuntime` puts a tab on the kernel. Four things are per tab and each for the same reason —
 they are about *this* conversation's session: what it is set to (`OpencodeSessionConfigState`), what
@@ -3774,6 +3774,67 @@ chat, and the tests that must move onto the extracted modules rather than be del
 Gates: unit 469 suites / 7,606 tests, integration 5 / 145 (2 suites, 10 tests skipped), typecheck,
 lint, and `build:release` clean. The module context is declared dark in the parity manifest.
 
+### M2-flips wave 4 — OpenCode is flipped (this commit)
+
+`registration.ts` points `createRuntime` at the composition, `main.ts` constructs one per load and
+registers the backend with its interaction and recovery ports, and `OpencodeChatRuntime` is deleted.
+**Four providers execute through the kernel**, and the first ACP one is among them — which is the
+point of this wave, because five more inherit its transport, its launcher, its client adapter, its
+content surface and its permission bridge.
+
+**This flip was larger than the three before it, and the entries above measured why.** Five call
+sites built the legacy runtime for reasons that had nothing to do with chat: the model catalog's
+refresh, the runtime command loader, two in the settings tab, one in the chat UI config. Every one
+of them was doing the same thing — opening an OpenCode session and reading its reply — through a
+whole chat runtime, because that was the only object that could. `OpencodeMetadataSession` is that
+question asked directly: an isolated process on an in-memory database, opened, read, and closed on
+every path including the ones that failed. It answers both questions the five needed — which models
+exist, and which commands a session offers.
+
+Flipping found three things the new path had dropped, each a real regression and none visible from
+the automated gates that were green before it:
+
+- **the conversation's database.** OpenCode keeps sessions in a SQLite file, and a session created
+  against one cannot be loaded from another. The legacy runtime passed the conversation's recorded
+  path as `OPENCODE_DB`, recorded what the launch resolved, and saved it back into `providerState`.
+  The kernel path did none of that: every turn would have run against the vault default, and a
+  conversation whose session lives elsewhere would have silently started a new one with its history
+  left behind. The path is carried per turn now, reported back by the resolver that decided it, and
+  written into the session patch by a new module slot — kept even when the session is invalidated,
+  which is what the legacy did and for its recorded reason: the hydrate still resolves through it;
+- **the client filesystem.** The legacy runtime answered ACP's `fs/read_text_file` and
+  `fs/write_text_file` with workspace containment and a write approval. The composition declared no
+  filesystem at all, so the agent would have written around both. `OpencodeAcpFileSystem` — dark
+  since the backend half — is wired into the client factory now. The approval is the part that had
+  to change shape: a runtime was one tab and could ask its own callback, while the client factory is
+  one process for every tab, so the tab is found by the ACP session the write arrived on, and a
+  write whose session belongs to no open tab is refused rather than allowed;
+- **the spend the vendor did not report.** OpenCode's plan indicator is spend-only, and a vendor
+  that omits `cost` from its usage update leaves it still. The legacy read the session total from
+  OpenCode's own database at the end of such a turn. That now runs at the same moment, from the
+  database the turn resolved.
+
+**What moved rather than died.** Thirteen of the legacy runtime's tests are now
+`OpencodeSessionConfigState.test.ts` — the behaviour they cover did not move with the flip, only the
+object holding it did. The workflow-approval summary moved onto the interaction presenter, the
+launch-argument guard onto the composition (still asserting a Windows path with spaces and non-ASCII
+characters is the working directory and never an argument), and the environment-flag guard with it.
+The rest of that file — transport retries, session lifecycle, plan updates, permission mapping —
+went with the runtime, because the backend, the presenter and the bridge each test the same
+behaviour where it now lives.
+
+**Certification.** The owner directed the flip ahead of the smoke matrices, and this is the third
+uncertified flip outstanding — wave 2's rendering rows, wave 3's twenty-eight, and now wave 4's
+nineteen in [`docs/opencode-flip-smoke-matrix.md`](opencode-flip-smoke-matrix.md). What stands in
+for the missing evidence is the same as before: each flip reverts as a single commit, and this one
+puts the legacy runtime back with nothing else moved. Unlike Codex, OpenCode has no live harness on
+this branch — every row of its matrix needs a person, a vault and a CLI.
+
+Gates: unit 470 suites / 7,587 tests, integration 5 / 145 (2 suites, 10 tests skipped), typecheck,
+lint, and `build:release` clean. The parity manifest moves fourteen OpenCode modules and the three
+shared managed-ACP ones from pending to wired; `provider-opencode` moves from the dark-bundle
+markers to the wired ones, which is the gate that says the backend is actually in `main.js`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3797,24 +3858,27 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **wave 4's approval surface** — the presenter that shows a prepared interaction and answers it in the kernel's ids | `a3f43df` |
 | **what a session opens with** — the models, modes and config options `session/new` answers with, carried to the surface instead of discarded | `cdf4434` |
 | **what a session is set to** — 390 lines of model, mode and effort state lifted out of the legacy runtime, which delegates to it | `3427f68` |
-| **wave 4's runtime half** — `createRuntime` over the adapter, the four per-tab pieces, and the MCP restart the kernel path was missing | this commit |
+| **wave 4's runtime half** — `createRuntime` over the adapter, the four per-tab pieces, and the MCP restart the kernel path was missing | `0dec751` |
+| **wave 4 flipped** — OpenCode on the kernel, `OpencodeChatRuntime` deleted, the five legacy call sites answered by one isolated metadata session | this commit |
 
-Three providers now execute through the kernel: Antigravity, Codex, Claude.
+Four providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode.
 
 **What is owed, and by whom:**
 
 - **two smoke matrices, both needing a person in a vault** — Codex's rendering rows and Claude's
   twenty-eight. Wave 3 flipped ahead of wave 2's certification at the owner's direction; what stands
   in for the missing evidence is that each flip reverts as a single commit;
-- **wave 4's flip**, which is all that remains of the wave: `registration.ts`, `main.ts`, the parity
-  manifest, and the five legacy call sites named in the entries above.
+- **three smoke matrices, all needing a person in a vault** — Codex's rendering rows, Claude's
+  twenty-eight, and OpenCode's nineteen. Every flip after wave 1 went ahead of its certification at
+  the owner's direction; what stands in for the missing evidence is that each reverts as a single
+  commit.
 
 Completed: **M0a** (parity gate, contribution inventory, adapter contract, the two contract suites,
 topology and shared-resource records, persistence decisions), **M1** (execution kernel, narrow
 control-record persistence, local-shell internal backend, cross-platform CI with Windows
 process-tree conformance green), **M2-proofs**, **M2-adapter**, and **M0b** for the four proof
-providers. In progress: **M2-flips** — waves 1, 2 and 3 (Antigravity, Codex, Claude) shipped and
-running in production; wave 1 certified, waves 2 and 3 not.
+providers. In progress: **M2-flips** — waves 1 to 4 (Antigravity, Codex, Claude, OpenCode) shipped and
+running in production; wave 1 certified, the other three not.
 
 **M2-proofs.** Four topologies proven dark — Antigravity (stateless process-per-run),
 Codex (persistent daemon, multiplexed sessions), Claude (persistent SDK stream, serial runs), and
@@ -3865,23 +3929,20 @@ the command that runs them is in the matrix document under "the half that runs i
    twenty-eight of them, in a vault on a release build. Rows 14–16 first: Claude is the first flip
    with a rewind, and row 16 — a rewind that fails with the files restored — is what the backup port
    added in that entry exists for;
-3. **M2-flips wave 4 — OpenCode**, whose backend half, content surface, interactions, approval
-   surface, session-configuration state and runtime half are all built (the entries above). What
-   remains is **the flip**: `registration.ts` points `createRuntime` at the composition, `main.ts`
-   constructs it and registers the backend with its interaction and recovery ports, the parity
-   manifest moves — and, unlike waves 1 to 3, **five call sites that build `OpencodeChatRuntime` for
-   reasons unrelated to chat** have to be answered first (the model catalog's refresh, the runtime
-   command loader, two in the settings tab, one in the chat UI config), most likely through the
-   shared managed-ACP auxiliary session. The legacy runtime's tests of the extracted state must move
-   onto that module in the same commit rather than be deleted with it, with `OpencodeChatRuntime`
-   deleted
-   in the same commit. Most of what it needs after that is shared: the next five ACP providers
-   inherit the transport, the launcher, the client adapter — and now the content surface and the
-   interaction bridge, since nothing in either is OpenCode's except its tool normalization and its
-   permission vocabulary.
+3. **wave 4's rendering rows** — [`docs/opencode-flip-smoke-matrix.md`](opencode-flip-smoke-matrix.md),
+   nineteen of them, in a vault on a release build. Rows 12–16 first: OpenCode is the first flip
+   where the *protocol* decides what the client must answer, and rows 16 (containment) and 12–15
+   (permissions) are where the flip changed the shape of the answer rather than only its home;
+4. **M2-flips wave 5 and after — the five remaining ACP providers**: MiMoCode, Kimi Code, Grok, Qwen
+   and Gemini. Each needs its own wire recording first (M0b), and each inherits what wave 4 built:
+   the transport, the launcher, the client adapter, the content surface, the permission bridge and
+   the metadata session. What is genuinely per provider is the launch, the permission vocabulary and
+   the tool normalization. MiMoCode is the closest to OpenCode by design — the two intentionally
+   mirror each other — and is the natural next one.
 
-**Two matrices are outstanding at once**, which is the state the owner accepted when wave 3 flipped
-ahead of wave 2's certification. Either flip reverts as a single commit.
+**Three matrices are outstanding at once**, which is the state the owner accepted when wave 3 flipped
+ahead of wave 2's certification and again when wave 4 flipped ahead of both. Each flip reverts as a
+single commit.
 
 The Windows job guardian is done: compiled once, cached per user, green on `windows-latest`, and
 measured — the entry above has the numbers and what they say about the flake.

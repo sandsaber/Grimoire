@@ -103,6 +103,14 @@ export interface OpencodeWorkspaceContext {
   deleteConversationSession(conversationId: string): Promise<void>;
   resolveSessionId(conversationId: string): string | null;
   isPendingFork(conversationId: string): boolean;
+  /**
+   * The OpenCode database this conversation's session lives in.
+   *
+   * Part of the binding rather than of the settings: a session id without the
+   * database it was created in resolves to nothing, so both are saved together
+   * or neither is worth saving.
+   */
+  readDatabasePath(conversationId: string): string | null;
   dispose(): Promise<void>;
 }
 
@@ -333,9 +341,16 @@ OpencodeProviderSettings
       deleteSession: conversationId => context.deleteConversationSession(conversationId),
       resolveSessionId: conversationId => context.resolveSessionId(conversationId),
       isPendingFork: conversationId => context.isPendingFork(conversationId),
-      buildSessionPatch: input => ({
-        sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
-      }),
+      buildSessionPatch: input => {
+        const databasePath = context.readDatabasePath(input.conversationId);
+        return {
+          sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
+          // Kept even when the session was invalidated, which is what the
+          // legacy runtime did and for the reason it recorded: the SQLite
+          // hydrate and `OPENCODE_DB` still resolve through it.
+          ...(databasePath ? { providerState: { databasePath } } : {}),
+        };
+      },
     },
   }),
 };

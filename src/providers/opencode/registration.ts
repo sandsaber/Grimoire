@@ -6,7 +6,6 @@ import { OpencodeTitleGenerationService } from './auxiliary/OpencodeTitleGenerat
 import { OPENCODE_PROVIDER_CAPABILITIES } from './capabilities';
 import { opencodeSettingsReconciler } from './env/OpencodeSettingsReconciler';
 import { OpencodeConversationHistoryService } from './history/OpencodeConversationHistoryService';
-import { OpencodeChatRuntime } from './runtime/OpencodeChatRuntime';
 import { getOpencodeProviderSettings, updateOpencodeProviderSettings } from './settings';
 import { opencodeChatUIConfig } from './ui/OpencodeChatUIConfig';
 
@@ -16,7 +15,7 @@ export const opencodeProviderRegistration: ProviderRegistration = {
   chatUIConfig: opencodeChatUIConfig,
   createInlineEditService: (plugin) => new OpencodeInlineEditService(plugin),
   createInstructionRefineService: (plugin) => new OpencodeInstructionRefineService(plugin),
-  createRuntime: ({ plugin }) => new OpencodeChatRuntime(plugin),
+  createRuntime: ({ plugin }) => plugin.getOpencodeExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new OpencodeTitleGenerationService(plugin),
   displayName: 'OpenCode',
   environmentKeyPatterns: [/^OPENCODE_/i],

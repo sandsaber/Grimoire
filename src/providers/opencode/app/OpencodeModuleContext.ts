@@ -3,6 +3,7 @@ import type { Conversation } from '@/core/types';
 import type GrimoirePlugin from '@/main';
 import { OpencodeConversationHistoryService } from '@/providers/opencode/history/OpencodeConversationHistoryService';
 import type { OpencodeWorkspaceContext } from '@/providers/opencode/OpencodeProviderModule';
+import { getOpencodeState } from '@/providers/opencode/types';
 import { getVaultPath } from '@/utils/path';
 
 /**
@@ -25,9 +26,18 @@ export type OpencodeBoundConversation = () => BoundConversation | null;
  * a settings surface that silently lists nothing is worse than one that fails
  * where it was wired.
  */
+export interface OpencodeModuleContextPorts {
+  /**
+   * The database the last launch resolved for this tab, which is what the
+   * conversation is saved pointing at.
+   */
+  readonly databasePath: () => string | null;
+}
+
 export function createOpencodeModuleContext(
   plugin: GrimoirePlugin,
   conversation: OpencodeBoundConversation,
+  ports: OpencodeModuleContextPorts,
 ): OpencodeWorkspaceContext {
   const history = new OpencodeConversationHistoryService();
 
@@ -55,6 +65,15 @@ export function createOpencodeModuleContext(
     isPendingFork: conversationId => {
       const bound = matching(conversation, conversationId);
       return bound ? history.isPendingForkConversation(bound) : false;
+    },
+    readDatabasePath: conversationId => {
+      const bound = matching(conversation, conversationId);
+      if (!bound) {
+        return null;
+      }
+      // What this tab's last launch resolved comes first; the conversation's
+      // own is what a tab that has not launched yet still knows.
+      return ports.databasePath() ?? getOpencodeState(bound.providerState).databasePath ?? null;
     },
     listCommands: () => notWired('listCommands'),
     listSessionCommands: () => notWired('listSessionCommands'),

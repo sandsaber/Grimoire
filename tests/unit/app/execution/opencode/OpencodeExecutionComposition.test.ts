@@ -469,6 +469,40 @@ describe('OpenCode execution composition', () => {
     await host.dispose();
   });
 
+  it('forces the Claude prompt flag while preserving the project config flag', async () => {
+    const plugin = createPlugin();
+    plugin.settings.sharedEnvironmentVariables =
+      'OPENCODE_DISABLE_PROJECT_CONFIG=false\nOPENCODE_DISABLE_CLAUDE_CODE_PROMPT=false';
+    const { execution, host } = await createHarness({ plugin });
+
+    const invocation = await execution.turnRequests.resolve(execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'what now?' }],
+    }));
+    const launch = await execution.turnRequests.resolveLaunch(invocation.startupRef);
+
+    // The vault's own OpenCode variables are honoured; the one Grimoire owns —
+    // OpenCode reading Claude's prompt files — is not negotiable.
+    expect(launch.environment.OPENCODE_DISABLE_PROJECT_CONFIG).toBe('false');
+    expect(launch.environment.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT).toBe('true');
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('asks its questions in a process bound to no conversation', async () => {
+    // The four surfaces that ask what models exist must not bind a session to
+    // a tab or write OpenCode state into the vault while they do it.
+    const { execution, host, startupRefs } = await createHarness();
+
+    await execution.metadata.discoverMetadata();
+
+    expect(startupRefs).toHaveLength(1);
+    const launch = await execution.turnRequests.resolveLaunch(startupRefs[0]);
+    expect(launch.environment.OPENCODE_DB).toBe(':memory:');
+    expect(launch.arguments).toEqual(['acp']);
+    execution.dispose();
+    await host.dispose();
+  });
+
   it('restarts the process when the vault MCP servers change', async () => {
     // The legacy runtime shut the process down on an MCP reload so the next
     // turn's session picks the servers up. Here the launch key is what says a

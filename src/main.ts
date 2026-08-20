@@ -15,6 +15,7 @@ import { AntigravityExecution } from './app/execution/antigravity/AntigravityExe
 import { ClaudeExecution } from './app/execution/claude/ClaudeExecutionComposition';
 import { CodexExecution } from './app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
+import { OpencodeExecution } from './app/execution/opencode/OpencodeExecutionComposition';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
 import { VaultDurableStorage } from './app/storage/VaultDurableStorage';
@@ -99,6 +100,7 @@ export default class GrimoirePlugin extends Plugin {
   private antigravityExecution: AntigravityExecution | null = null;
   private codexExecution: CodexExecution | null = null;
   private claudeExecution: ClaudeExecution | null = null;
+  private opencodeExecution: OpencodeExecution | null = null;
   private unloading = false;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
@@ -350,6 +352,7 @@ export default class GrimoirePlugin extends Plugin {
     // shutdown then cancels what is still running.
     this.codexExecution?.dispose();
     this.claudeExecution?.dispose();
+    this.opencodeExecution?.dispose();
     void this.executionKernelHost?.dispose();
     void this.persistOpenTabStates();
   }
@@ -400,6 +403,14 @@ export default class GrimoirePlugin extends Plugin {
     return this.claudeExecution;
   }
 
+  /** The OpenCode execution this plugin instance owns; see the note above. */
+  getOpencodeExecution(): OpencodeExecution {
+    if (!this.opencodeExecution) {
+      throw new Error('OpenCode execution is not available before plugin load.');
+    }
+    return this.opencodeExecution;
+  }
+
   /**
    * Brings the kernel up before anything can ask it for work.
    *
@@ -439,6 +450,12 @@ export default class GrimoirePlugin extends Plugin {
     // approvals, questions and plan decisions, and a backend registered without
     // its interaction port leaves the SDK waiting on a permission for ever.
     host.registerBackend(this.claudeExecution.createBackendRegistration());
+    this.opencodeExecution = new OpencodeExecution(this, host.registry);
+    // The first ACP provider on the kernel, registered the same way and for the
+    // same reason: ACP asks the client before every edit and every command, so
+    // a backend registered without its interaction port refuses work the user
+    // already approved.
+    host.registerBackend(this.opencodeExecution.createBackendRegistration());
     this.executionKernelHost = host;
     try {
       await host.start();

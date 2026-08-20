@@ -13,7 +13,6 @@ import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { OpencodeAgentMentionProvider } from '../agents/OpencodeAgentMentionProvider';
 import { OpencodeCommandCatalog } from '../commands/OpencodeCommandCatalog';
-import { OpencodeChatRuntime } from '../runtime/OpencodeChatRuntime';
 import { OpencodeCliResolver } from '../runtime/OpencodeCliResolver';
 import { getOpencodeProviderSettings } from '../settings';
 import { OpencodeAgentStorage } from '../storage/OpencodeAgentStorage';
@@ -29,8 +28,6 @@ export interface OpencodeWorkspaceServices extends ProviderWorkspaceServices {
   mcpStorage: AcpMcpStorage;
   mcpServerManager: McpServerManager;
 }
-
-const OPENCODE_METADATA_WARMUP_DB = ':memory:';
 
 const opencodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
   resolveMode() {
@@ -74,18 +71,11 @@ function createOpencodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalo
         hasCachedModels: currentSettings.discoveredModels.length > 0,
         load: async () => {
           const before = JSON.stringify(currentSettings.discoveredModels);
-          const runtime = new OpencodeChatRuntime(plugin);
-          try {
-            runtime.syncConversationState({
-              providerState: { databasePath: OPENCODE_METADATA_WARMUP_DB },
-              sessionId: null,
-            });
-            const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-            const after = JSON.stringify(getOpencodeProviderSettings(settings).discoveredModels);
-            return loaded && before !== after;
-          } finally {
-            runtime.cleanup();
-          }
+          // One isolated session, opened and closed: what the legacy runtime
+          // was doing here was opening a session and reading its reply.
+          const loaded = await plugin.getOpencodeExecution().metadata.discoverMetadata();
+          const after = JSON.stringify(getOpencodeProviderSettings(settings).discoveredModels);
+          return loaded && before !== after;
         },
       });
     },

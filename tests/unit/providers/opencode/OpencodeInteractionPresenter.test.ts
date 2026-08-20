@@ -70,6 +70,51 @@ describe('OpenCode interaction presenter', () => {
     );
   });
 
+  it('summarizes a workflow approval with the tools it would pre-approve', async () => {
+    const approval = jest.fn(async (): Promise<ApprovalDecision> => 'allow');
+    const bridge = new OpencodeInteractionBridge();
+    const presenter = new OpencodeInteractionPresenter(bridge, () => ({ approval }));
+    const prepared = await bridge.prepare({
+      sessionId: 'acp-session-1',
+      options: [{ optionId: 'approve-now', kind: 'allow_once', name: 'Allow once' }],
+      toolCall: {
+        kind: 'other',
+        rawInput: {
+          tools: [
+            { name: 'bash', args: JSON.stringify({ title: 'npm test' }) },
+            { name: 'edit', args: JSON.stringify({ title: 'src/app.ts' }) },
+            { name: 'read', args: '{}' },
+            { name: 'glob', args: '{}' },
+          ],
+        },
+        title: 'workflow_tool_approval',
+        toolCallId: 'tool-2',
+      },
+    });
+
+    await presenter.present({
+      interactionId: interactionId(`ix-${'2'.repeat(32)}`),
+      runId: runId(`run-${'2'.repeat(32)}`),
+      kind: prepared.kind,
+      presentationRef: prepared.presentationRef,
+      responseIds: prepared.responseIds,
+    });
+
+    // A session-level pre-approval says what it would pre-approve, in the
+    // vocabulary the legacy runtime built and this kept.
+    expect(approval).toHaveBeenCalledWith(
+      'Workflow Approval',
+      expect.objectContaining({ tools: expect.any(Array) }),
+      'Pre-approve workflow tools for this session: bash: npm test, edit: src/app.ts, read +1 more.',
+      expect.objectContaining({
+        decisionReason: 'Session-level workflow approval requested',
+        decisionOptions: [
+          expect.objectContaining({ label: 'Allow once', value: 'allow-once' }),
+        ],
+      }),
+    );
+  });
+
   it('answers with the id the option it offered stands for', async () => {
     const { bridge, presenter } = createPresenter({
       approval: async () => ({ type: 'select-option', value: 'allow-always' }),

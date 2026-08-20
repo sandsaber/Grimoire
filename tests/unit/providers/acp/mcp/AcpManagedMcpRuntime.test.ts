@@ -3,11 +3,18 @@ import { GeminiChatRuntime } from '@/providers/gemini/runtime/GeminiChatRuntime'
 import { GrokChatRuntime } from '@/providers/grok/runtime/GrokChatRuntime';
 import { KimicodeChatRuntime } from '@/providers/kimicode/runtime/KimicodeChatRuntime';
 import { MimocodeChatRuntime } from '@/providers/mimocode/runtime/MimocodeChatRuntime';
-import { OpencodeChatRuntime } from '@/providers/opencode/runtime/OpencodeChatRuntime';
 import { QwenChatRuntime } from '@/providers/qwen/runtime/QwenChatRuntime';
 
+/**
+ * The five ACP runtimes still on the legacy path.
+ *
+ * OpenCode left this list at its flip: its servers reach a session through the
+ * kernel now, asserted where they are passed —
+ * `OpencodeExecutionComposition.test.ts` for the launch key that restarts on a
+ * change, and `OpencodeExecutionBackend.test.ts` for the `session/new` that
+ * carries them.
+ */
 const cases = [
-  ['opencode', OpencodeChatRuntime],
   ['grok', GrokChatRuntime],
   ['mimocode', MimocodeChatRuntime],
   ['kimicode', KimicodeChatRuntime],

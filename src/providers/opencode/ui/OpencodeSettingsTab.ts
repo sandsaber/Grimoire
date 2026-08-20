@@ -14,11 +14,9 @@ import { maybeGetOpencodeWorkspaceServices } from '../app/OpencodeWorkspaceServi
 import { clearOpencodeDiscoveryState } from '../discoveryState';
 import {
   buildOpencodeBaseModels,
-  encodeOpencodeModelId,
   type OpencodeDiscoveredModel,
   splitOpencodeModelLabel,
 } from '../models';
-import { OpencodeChatRuntime } from '../runtime/OpencodeChatRuntime';
 import {
   getOpencodeProviderSettings,
   normalizeOpencodeVisibleModels,
@@ -28,7 +26,6 @@ import {
 import { OpencodeAgentSettings } from './OpencodeAgentSettings';
 
 const ALL_PROVIDERS_KEY = 'all';
-const OPENCODE_METADATA_WARMUP_DB = ':memory:';
 
 interface EnrichedModel {
   description: string;
@@ -251,20 +248,12 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
     };
 
     const persistModelMetadata = async (rawId: string): Promise<void> => {
-      const runtime = new OpencodeChatRuntime(context.plugin);
-      try {
-        runtime.syncConversationState({
-          providerState: { databasePath: OPENCODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-        const loaded = await runtime.warmModelMetadata(encodeOpencodeModelId(rawId));
-        if (loaded) {
-          context.refreshModelSelectors();
-        }
-      } catch {
-        // Metadata warmup is opportunistic; the first chat turn can still discover it.
-      } finally {
-        runtime.cleanup();
+      // Opportunistic: a metadata session that cannot open leaves the question
+      // for the first chat turn, which asks it anyway.
+      const loaded = await context.plugin.getOpencodeExecution()
+        .metadata.discoverMetadata({ rawModelId: rawId });
+      if (loaded) {
+        context.refreshModelSelectors();
       }
     };
 
@@ -556,13 +545,8 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
       modelCatalogLoadFailed = false;
       renderAll();
 
-      const runtime = new OpencodeChatRuntime(context.plugin);
       try {
-        runtime.syncConversationState({
-          providerState: { databasePath: OPENCODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
+        const loaded = await context.plugin.getOpencodeExecution().metadata.discoverMetadata();
         modelCatalogLoadFailed = !loaded || getOpencodeProviderSettings(settingsBag).discoveredModels.length === 0;
         if (!modelCatalogLoadFailed) {
           context.refreshModelSelectors();
@@ -571,7 +555,6 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
         modelCatalogLoadFailed = true;
       } finally {
         loadingModelCatalog = false;
-        runtime.cleanup();
         renderAll();
       }
     };

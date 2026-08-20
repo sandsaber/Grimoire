@@ -13,6 +13,21 @@ export interface OpencodeExecutionRequest {
   /** The mode, model and effort this turn runs under, applied to the session. */
   readonly dynamic?: OpencodeAcpDynamicConfig;
   readonly messageId?: string;
+  /**
+   * The OpenCode database this conversation's session lives in.
+   *
+   * Carried per turn because it belongs to the conversation, not to the vault:
+   * a session created against one database cannot be loaded from another, so a
+   * turn launched without its conversation's path resumes nothing and starts a
+   * new session with the history left behind.
+   */
+  readonly databasePath?: string;
+  /**
+   * Told what the launch actually resolved to, so the conversation can be saved
+   * pointing at it. The environment decides — `OPENCODE_DB`, or the default the
+   * artifacts compute — and only it knows the answer.
+   */
+  readonly onLaunchResolved?: (databasePath: string | null) => void;
 }
 
 
@@ -32,6 +47,8 @@ export interface OpencodeInvocationEnvironment {
   /** Everything the launch is keyed by; a change restarts the process. */
   readonly launchKey: string;
   readonly mcpServers: readonly ManagedMcpServer[];
+  /** Where the launched process keeps its sessions, as the launch resolved it. */
+  readonly databasePath: string | null;
 }
 
 const DEFAULT_LIMIT = 64;
@@ -59,7 +76,9 @@ export class OpencodeExecutionRequests {
 
   constructor(
     private readonly nextReference: () => string,
-    private readonly environment: () => Promise<OpencodeInvocationEnvironment>,
+    private readonly environment: (
+      databasePath?: string,
+    ) => Promise<OpencodeInvocationEnvironment>,
     private readonly limit: number = DEFAULT_LIMIT,
   ) {}
 
@@ -73,7 +92,8 @@ export class OpencodeExecutionRequests {
 
   async resolve(requestRef: string): Promise<OpencodeExecutionInvocation> {
     const request = this.take(requestRef);
-    const environment = await this.environment();
+    const environment = await this.environment(request.databasePath);
+    request.onLaunchResolved?.(environment.databasePath);
     evict(this.startups, this.limit);
     const startupRef = this.nextReference();
     this.startups.set(startupRef, {
@@ -99,6 +119,20 @@ export class OpencodeExecutionRequests {
       ...(request.messageId ? { messageId: request.messageId } : {}),
       ...(dynamicRef ? { dynamicRef } : {}),
     };
+  }
+
+  /**
+   * Holds a launch that belongs to no turn, and returns its startup reference.
+   *
+   * The metadata session is the caller: it opens an isolated OpenCode process
+   * to ask what models and commands exist, which is a launch with no prompt
+   * behind it and therefore no request reference to resolve into one.
+   */
+  referenceLaunch(launch: ManagedAcpLaunchInvocation): string {
+    evict(this.startups, this.limit);
+    const startupRef = this.nextReference();
+    this.startups.set(startupRef, launch);
+    return startupRef;
   }
 
   /** What the launcher spawns, by the reference the startup carries. */
