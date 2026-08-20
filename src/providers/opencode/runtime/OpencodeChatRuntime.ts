@@ -40,13 +40,6 @@ import type {
 import { coercePermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
-import {
-  sameDiscoveredModels,
-  sameModes,
-  sameStringList,
-  sameStringMap,
-  sameThinkingOptionsByModel,
-} from '../../../utils/collections';
 import { getEnhancedPath } from '../../../utils/env';
 import { getVaultPath } from '../../../utils/path';
 import {
@@ -55,9 +48,6 @@ import {
   type AcpReadTextFileRequest,
   type AcpRequestPermissionRequest,
   type AcpRequestPermissionResponse,
-  type AcpSessionConfigOption,
-  type AcpSessionModelState,
-  type AcpSessionModeState,
   type AcpSessionNotification,
   AcpSessionUpdateNormalizer,
   AcpSubprocess,
@@ -68,9 +58,6 @@ import {
   buildAcpPersistedSessionFields,
   buildAcpSessionLoadFailureDebugEvent,
   buildAcpUsageInfo,
-  extractAcpSessionModelState,
-  extractAcpSessionModeState,
-  extractAcpSessionThoughtLevelState,
   isAcpMissingSessionError,
   isAcpRetryableTransportClose,
   planAcpEnsureReadySessionPhase,
@@ -81,33 +68,20 @@ import {
 import { toAcpMcpServers } from '../../acp/mcp/toAcpMcpServers';
 import { opencodePlanUsageStore } from '../app/OpencodePlanUsageStore';
 import { OPENCODE_PROVIDER_CAPABILITIES } from '../capabilities';
-import { updateOpencodeDiscoveryState } from '../discoveryState';
 import {
   buildOpencodePermissionPresentation,
   normalizeApprovalInput,
 } from '../execution/OpencodePermissionPresentation';
+import { OpencodeSessionConfigState } from '../execution/OpencodeSessionConfigState';
 import { loadOpencodeSessionCost } from '../history/OpencodeUsageMetadataStore';
-import { ensureProviderProjectionMap } from '../internal/providerProjection';
 import {
-  buildOpencodeBaseModels,
   decodeOpencodeModelId,
-  encodeOpencodeModelId,
-  isOpencodeModelSelectionId,
-  normalizeOpencodeDiscoveredModels,
-  normalizeOpencodeModelVariants,
-  OPENCODE_DEFAULT_THINKING_LEVEL,
-  OPENCODE_SYNTHETIC_MODEL_ID,
   resolveOpencodeBaseModelRawId,
 } from '../models';
 import {
-  getManagedOpencodeModes,
-  isManagedOpencodeModeId,
-  normalizeOpencodeAvailableModes,
-  resolveOpencodeModeForPermissionMode,
-  resolvePermissionModeForManagedOpencodeMode,
 } from '../modes';
 import { createOpencodeToolStreamAdapter } from '../normalization/opencodeToolNormalization';
-import { getOpencodeProviderSettings, updateOpencodeProviderSettings } from '../settings';
+import { getOpencodeProviderSettings } from '../settings';
 import { getOpencodeState, type OpencodeProviderState } from '../types';
 import { buildOpencodePromptBlocks, buildOpencodePromptText } from './buildOpencodePrompt';
 import { prepareOpencodeLaunchArtifacts } from './OpencodeLaunchArtifacts';
@@ -176,11 +150,19 @@ export class OpencodeChatRuntime implements ChatRuntime {
   private contextUsage: AcpUsageUpdate | null = null;
   private currentDatabasePath: string | null = null;
   private currentLaunchKey: string | null = null;
-  private currentSessionEffortConfigId: string | null = null;
-  private currentSessionEffortValue: string | null = null;
-  private currentSessionEffortValues = new Set<string>();
-  private currentSessionModelId: string | null = null;
-  private currentSessionModeId: string | null = null;
+  /**
+   * What the live session is set to, and what the vault has learned from it.
+   *
+   * Extracted so the kernel path answers the same questions: which model, mode
+   * and effort a turn dispatches under, and what to keep of the lists a session
+   * reports back.
+   */
+  private readonly sessionConfig = new OpencodeSessionConfigState({
+    settingsBag: () => this.plugin.settings,
+    saveSettings: () => this.plugin.saveSettings(),
+    refreshSelectors: () => this.refreshModelSelectors(),
+    syncPermissionMode: permissionMode => this.emitPermissionModeSync(permissionMode),
+  });
   private currentTurnSawAcpCost = false;
   private currentTurnMetadata: ChatTurnMetadata = {};
   private cleanupPromise: Promise<void> | null = null;
@@ -238,11 +220,7 @@ export class OpencodeChatRuntime implements ChatRuntime {
     const previousSessionId = this.sessionId;
     const nextSessionId = conversation?.sessionId ?? null;
     if (this.sessionId !== nextSessionId) {
-      this.currentSessionEffortConfigId = null;
-      this.currentSessionEffortValue = null;
-      this.currentSessionEffortValues = new Set<string>();
-      this.currentSessionModelId = null;
-      this.currentSessionModeId = null;
+      this.sessionConfig.forgetSession();
       this.sessionInvalidated = false;
       this.setSupportedCommands([]);
     }
@@ -293,8 +271,8 @@ export class OpencodeChatRuntime implements ChatRuntime {
       type: 'select',
       value: selectedBaseRawModelId,
     });
-    this.currentSessionModelId = selectedBaseRawModelId;
-    await this.syncSessionModelState({
+    this.sessionConfig.markApplied({ modelId: selectedBaseRawModelId });
+    await this.sessionConfig.syncSessionModelState({
       configOptions: response.configOptions,
     }, {
       currentRawModelId: selectedBaseRawModelId,
@@ -470,7 +448,7 @@ export class OpencodeChatRuntime implements ChatRuntime {
 
       const usage = buildAcpUsageInfo({
         contextWindow: this.contextUsage,
-        model: this.getActiveDisplayModel(queryOptions),
+        model: this.sessionConfig.getActiveDisplayModel(queryOptions),
         promptUsage: this.promptUsage,
       });
       if (usage) {
@@ -739,8 +717,7 @@ export class OpencodeChatRuntime implements ChatRuntime {
       this.activeTurn?.queue.close();
       this.activeTurn = null;
     }
-    this.currentSessionModelId = null;
-    this.currentSessionModeId = null;
+    this.sessionConfig.forgetSession();
     this.setSupportedCommands([]);
 
     this.unregisterTransportClose?.();
@@ -796,86 +773,8 @@ export class OpencodeChatRuntime implements ChatRuntime {
     );
   }
 
-  private resolveSelectedRawModelId(queryOptions?: ChatRuntimeQueryOptions): string | null {
-    const providerSettings = this.getProviderSettings();
-    const selectedModel = typeof queryOptions?.model === 'string'
-      ? queryOptions.model
-      : typeof providerSettings.model === 'string'
-      ? providerSettings.model
-      : '';
-
-    if (!isOpencodeModelSelectionId(selectedModel)) {
-      return null;
-    }
-
-    const selectedBaseRawModelId = decodeOpencodeModelId(selectedModel);
-    if (!selectedBaseRawModelId) {
-      return null;
-    }
-
-    const discoveredModels = getOpencodeProviderSettings(providerSettings).discoveredModels;
-    const normalizedBaseRawModelId = resolveOpencodeBaseModelRawId(selectedBaseRawModelId, discoveredModels);
-    if (!normalizedBaseRawModelId) {
-      return null;
-    }
-
-    const availableModelIds = new Set(discoveredModels.map((model) => model.rawId));
-    if (availableModelIds.size > 0 && !availableModelIds.has(normalizedBaseRawModelId)) {
-      return null;
-    }
-
-    return normalizedBaseRawModelId;
-  }
-
   getAuxiliaryModel(): string | null {
-    return this.getActiveDisplayModel() ?? null;
-  }
-
-  private getActiveDisplayModel(queryOptions?: ChatRuntimeQueryOptions): string | undefined {
-    const providerSettings = this.getProviderSettings();
-    const selectedModel = typeof queryOptions?.model === 'string'
-      ? queryOptions.model
-      : typeof providerSettings.model === 'string'
-      ? providerSettings.model
-      : '';
-
-    if (
-      selectedModel
-      && selectedModel !== OPENCODE_SYNTHETIC_MODEL_ID
-      && isOpencodeModelSelectionId(selectedModel)
-    ) {
-      const selectedRawModelId = this.resolveSelectedRawModelId(queryOptions);
-      return selectedRawModelId
-        ? encodeOpencodeModelId(selectedRawModelId)
-        : selectedModel;
-    }
-
-    return this.currentSessionModelId
-      ? encodeOpencodeModelId(this.currentSessionModelId)
-      : (selectedModel && isOpencodeModelSelectionId(selectedModel) ? selectedModel : undefined);
-  }
-
-  private resolveSelectedModeId(): string | null {
-    const providerSettings = this.getProviderSettings();
-    const opencodeSettings = getOpencodeProviderSettings(providerSettings);
-    const availableModes = getManagedOpencodeModes(opencodeSettings.availableModes);
-    const mappedModeId = resolveOpencodeModeForPermissionMode(
-      providerSettings.permissionMode,
-      opencodeSettings.availableModes,
-    );
-    if (mappedModeId) {
-      return mappedModeId;
-    }
-
-    if (opencodeSettings.selectedMode) {
-      if (
-        availableModes.some((mode) => mode.id === opencodeSettings.selectedMode)
-      ) {
-        return opencodeSettings.selectedMode;
-      }
-    }
-
-    return availableModes[0]?.id || null;
+    return this.sessionConfig.getActiveDisplayModel() ?? null;
   }
 
   private async applySelectedMode(sessionId: string): Promise<void> {
@@ -883,8 +782,8 @@ export class OpencodeChatRuntime implements ChatRuntime {
       return;
     }
 
-    const selectedModeId = this.resolveSelectedModeId();
-    if (!selectedModeId || selectedModeId === this.currentSessionModeId) {
+    const selectedModeId = this.sessionConfig.resolveSelectedModeId();
+    if (!selectedModeId || selectedModeId === this.sessionConfig.sessionModeId) {
       return;
     }
 
@@ -894,8 +793,8 @@ export class OpencodeChatRuntime implements ChatRuntime {
       type: 'select',
       value: selectedModeId,
     });
-    this.currentSessionModeId = selectedModeId;
-    await this.syncSessionModeState({
+    this.sessionConfig.markApplied({ modeId: selectedModeId });
+    await this.sessionConfig.syncSessionModeState({
       configOptions: response.configOptions,
     });
   }
@@ -908,8 +807,8 @@ export class OpencodeChatRuntime implements ChatRuntime {
       return;
     }
 
-    const selectedRawModelId = this.resolveSelectedRawModelId(queryOptions);
-    if (!selectedRawModelId || selectedRawModelId === this.currentSessionModelId) {
+    const selectedRawModelId = this.sessionConfig.resolveSelectedRawModelId(queryOptions);
+    if (!selectedRawModelId || selectedRawModelId === this.sessionConfig.sessionModelId) {
       return;
     }
 
@@ -919,253 +818,34 @@ export class OpencodeChatRuntime implements ChatRuntime {
       type: 'select',
       value: selectedRawModelId,
     });
-    this.currentSessionModelId = selectedRawModelId;
-    await this.syncSessionModelState({
+    this.sessionConfig.markApplied({ modelId: selectedRawModelId });
+    await this.sessionConfig.syncSessionModelState({
       configOptions: response.configOptions,
     }, {
       currentRawModelId: selectedRawModelId,
     });
   }
 
-  private resolveSelectedEffortValue(): string | null {
-    const providerSettings = this.getProviderSettings();
-    const selectedEffort = typeof providerSettings.effortLevel === 'string'
-      ? providerSettings.effortLevel.trim()
-      : '';
-    if (!selectedEffort || selectedEffort === OPENCODE_DEFAULT_THINKING_LEVEL) {
-      return null;
-    }
-
-    return this.currentSessionEffortValues.has(selectedEffort)
-      ? selectedEffort
-      : null;
-  }
-
   private async applySelectedEffort(sessionId: string): Promise<void> {
-    if (!this.connection || !this.currentSessionEffortConfigId) {
+    if (!this.connection || !this.sessionConfig.effortConfigId) {
       return;
     }
 
-    const selectedEffort = this.resolveSelectedEffortValue();
-    if (!selectedEffort || selectedEffort === this.currentSessionEffortValue) {
+    const selectedEffort = this.sessionConfig.resolveSelectedEffortValue();
+    if (!selectedEffort || selectedEffort === this.sessionConfig.effortValue) {
       return;
     }
 
     const response = await this.connection.setConfigOption({
-      configId: this.currentSessionEffortConfigId,
+      configId: this.sessionConfig.effortConfigId,
       sessionId,
       type: 'select',
       value: selectedEffort,
     });
-    this.currentSessionEffortValue = selectedEffort;
-    await this.syncSessionModelState({
+    this.sessionConfig.markApplied({ effortValue: selectedEffort });
+    await this.sessionConfig.syncSessionModelState({
       configOptions: response.configOptions,
     });
-  }
-
-  private async syncSessionModelState(params: {
-    configOptions?: AcpSessionConfigOption[] | null;
-    models?: AcpSessionModelState | null;
-  }, options: {
-    currentRawModelId?: string | null;
-    seedActiveSelection?: boolean;
-  } = {}): Promise<void> {
-    const acpState = extractAcpSessionModelState(params);
-    const forcedCurrentRawModelId = typeof options.currentRawModelId === 'string'
-      ? options.currentRawModelId.trim()
-      : '';
-    const currentRawModelId = forcedCurrentRawModelId || acpState.currentModelId || this.currentSessionModelId;
-    const discoveredModels = normalizeOpencodeDiscoveredModels(
-      acpState.availableModels.map((model) => ({
-        ...(model.description ? { description: model.description } : {}),
-        label: model.name,
-        rawId: model.id,
-      })),
-    );
-    if (currentRawModelId) {
-      this.currentSessionModelId = currentRawModelId;
-    }
-
-    const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
-    const currentSettings = getOpencodeProviderSettings(settingsBag);
-    const currentBaseRawModelId = currentRawModelId
-      ? resolveOpencodeBaseModelRawId(currentRawModelId, discoveredModels)
-      : null;
-    const thoughtLevelState = extractAcpSessionThoughtLevelState(params);
-    const currentThinkingOptions = normalizeOpencodeModelVariants(
-      thoughtLevelState.availableLevels.map((level) => ({
-        ...(level.description ? { description: level.description } : {}),
-        label: level.name,
-        value: level.id,
-      })),
-    );
-    const currentThinkingLevel = thoughtLevelState.currentLevel;
-    this.currentSessionEffortConfigId = currentThinkingOptions.length > 0
-      ? thoughtLevelState.configId
-      : null;
-    this.currentSessionEffortValue = currentThinkingOptions.length > 0
-      ? currentThinkingLevel
-      : null;
-    this.currentSessionEffortValues = new Set(currentThinkingOptions.map((option) => option.value));
-
-    const nextThinkingOptionsByModel = { ...currentSettings.thinkingOptionsByModel };
-    if (currentBaseRawModelId) {
-      if (currentThinkingOptions.length > 0) {
-        nextThinkingOptionsByModel[currentBaseRawModelId] = currentThinkingOptions;
-      } else {
-        delete nextThinkingOptionsByModel[currentBaseRawModelId];
-      }
-    }
-
-    const discoveredBaseModelIds = buildOpencodeBaseModels(discoveredModels)
-      .map((model) => model.rawId);
-    const nextVisibleModels = currentSettings.visibleModels.length === 0
-      ? (discoveredBaseModelIds.length > 0
-        ? discoveredBaseModelIds
-        : (currentBaseRawModelId ? [currentBaseRawModelId] : []))
-      : currentSettings.visibleModels;
-    const currentPreferredThinking = currentBaseRawModelId
-      ? currentSettings.preferredThinkingByModel[currentBaseRawModelId]
-      : '';
-    const shouldSeedCurrentThinking = currentBaseRawModelId
-      && currentThinkingLevel
-      && (
-        !currentPreferredThinking
-        || (
-          currentThinkingOptions.length > 0
-          && !this.currentSessionEffortValues.has(currentPreferredThinking)
-        )
-      );
-    const nextPreferredThinkingByModel = shouldSeedCurrentThinking && currentBaseRawModelId && currentThinkingLevel
-      ? {
-        ...currentSettings.preferredThinkingByModel,
-        [currentBaseRawModelId]: currentThinkingLevel,
-      }
-      : currentSettings.preferredThinkingByModel;
-    const shouldSeedVisibleModels = !sameStringList(currentSettings.visibleModels, nextVisibleModels);
-    const shouldSeedPreferredThinking = !sameStringMap(
-      currentSettings.preferredThinkingByModel,
-      nextPreferredThinkingByModel,
-    );
-    const shouldUpdateDiscoveredModels = discoveredModels.length > 0
-      && !sameDiscoveredModels(currentSettings.discoveredModels, discoveredModels);
-    const shouldUpdateThinkingOptions = !sameThinkingOptionsByModel(
-      currentSettings.thinkingOptionsByModel,
-      nextThinkingOptionsByModel,
-    );
-    const discoveryChanged = shouldUpdateDiscoveredModels
-      && updateOpencodeDiscoveryState(settingsBag, { discoveredModels });
-    let changed = shouldSeedVisibleModels || shouldSeedPreferredThinking;
-
-    if (currentBaseRawModelId && options.seedActiveSelection !== false) {
-      const seeded = this.seedActiveModelSelection(
-        settingsBag,
-        encodeOpencodeModelId(currentBaseRawModelId),
-        currentThinkingLevel,
-      );
-      changed = changed || seeded;
-    }
-
-    if (shouldUpdateThinkingOptions || shouldSeedPreferredThinking || shouldSeedVisibleModels) {
-      updateOpencodeProviderSettings(settingsBag, {
-        ...(shouldSeedPreferredThinking ? { preferredThinkingByModel: nextPreferredThinkingByModel } : {}),
-        ...(shouldUpdateThinkingOptions ? { thinkingOptionsByModel: nextThinkingOptionsByModel } : {}),
-        ...(shouldSeedVisibleModels ? { visibleModels: nextVisibleModels } : {}),
-      });
-    }
-
-    if (!changed && !discoveryChanged && !shouldUpdateThinkingOptions) {
-      return;
-    }
-
-    if (changed || shouldUpdateThinkingOptions) {
-      await this.plugin.saveSettings();
-    }
-    this.refreshModelSelectors();
-  }
-
-  private seedActiveModelSelection(
-    settingsBag: Record<string, unknown>,
-    modelSelection: string,
-    thinkingLevel: string | null,
-  ): boolean {
-    let changed = false;
-    const savedProviderModel = ensureProviderProjectionMap(settingsBag, 'savedProviderModel');
-    const savedModel = typeof savedProviderModel.opencode === 'string'
-      ? savedProviderModel.opencode
-      : '';
-    if (!savedModel || savedModel === OPENCODE_SYNTHETIC_MODEL_ID) {
-      savedProviderModel.opencode = modelSelection;
-      changed = true;
-    }
-
-    if (thinkingLevel) {
-      const savedProviderEffort = ensureProviderProjectionMap(settingsBag, 'savedProviderEffort');
-      const savedEffort = typeof savedProviderEffort.opencode === 'string'
-        ? savedProviderEffort.opencode.trim()
-        : '';
-      if (!savedEffort || savedEffort === OPENCODE_DEFAULT_THINKING_LEVEL) {
-        savedProviderEffort.opencode = thinkingLevel;
-        changed = true;
-      }
-    }
-
-    if (ProviderRegistry.resolveSettingsProviderId(settingsBag) !== this.providerId) {
-      return changed;
-    }
-
-    const activeModel = typeof settingsBag.model === 'string' ? settingsBag.model : '';
-    if (!activeModel || activeModel === OPENCODE_SYNTHETIC_MODEL_ID) {
-      settingsBag.model = modelSelection;
-      changed = true;
-    }
-    if (thinkingLevel) {
-      const activeEffort = typeof settingsBag.effortLevel === 'string' ? settingsBag.effortLevel : '';
-      if (!activeEffort || activeEffort === OPENCODE_DEFAULT_THINKING_LEVEL) {
-        settingsBag.effortLevel = thinkingLevel;
-        changed = true;
-      }
-    }
-    return changed;
-  }
-
-  private async syncSessionModeState(params: {
-    configOptions?: AcpSessionConfigOption[] | null;
-    currentModeId?: string | null;
-    emitPermissionSync?: boolean;
-    modes?: AcpSessionModeState | null;
-  }): Promise<void> {
-    const acpState = extractAcpSessionModeState(params);
-    const availableModes = normalizeOpencodeAvailableModes(acpState.availableModes);
-    const currentModeId = params.currentModeId ?? acpState.currentModeId;
-    if (currentModeId) {
-      this.currentSessionModeId = currentModeId;
-      // session/new and session/load report OpenCode's default agent (`build`).
-      // Pushing that into the toolbar overwrites the user's Safe/Plan/Auto pick
-      // before applySelectedMode can run.
-      if (params.emitPermissionSync !== false) {
-        this.emitPermissionModeSync(currentModeId);
-      }
-    }
-
-    const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
-    const currentSettings = getOpencodeProviderSettings(settingsBag);
-    const shouldSeedSelectedMode = typeof currentModeId === 'string'
-      && !currentSettings.selectedMode
-      && isManagedOpencodeModeId(currentModeId);
-    const discoveryChanged = availableModes.length > 0
-      && !sameModes(currentSettings.availableModes, availableModes)
-      && updateOpencodeDiscoveryState(settingsBag, { availableModes });
-
-    if (!discoveryChanged && !shouldSeedSelectedMode) {
-      return;
-    }
-
-    if (shouldSeedSelectedMode && currentModeId) {
-      updateOpencodeProviderSettings(settingsBag, { selectedMode: currentModeId });
-      await this.plugin.saveSettings();
-    }
-    this.refreshModelSelectors();
   }
 
   private refreshModelSelectors(): void {
@@ -1174,9 +854,8 @@ export class OpencodeChatRuntime implements ChatRuntime {
     }
   }
 
-  private emitPermissionModeSync(modeId: string): void {
-    const permissionMode = resolvePermissionModeForManagedOpencodeMode(modeId);
-    if (!permissionMode || !this.permissionModeSyncCallback) {
+  private emitPermissionModeSync(permissionMode: 'normal' | 'plan' | 'full_access'): void {
+    if (!this.permissionModeSyncCallback) {
       return;
     }
 
@@ -1202,11 +881,11 @@ export class OpencodeChatRuntime implements ChatRuntime {
       this.loadedSessionId = response.sessionId;
       this.sessionId = response.sessionId;
       this.sessionCwds.set(response.sessionId, cwd);
-      await this.syncSessionModelState({
+      await this.sessionConfig.syncSessionModelState({
         configOptions: response.configOptions ?? null,
         models: response.models ?? null,
       });
-      await this.syncSessionModeState({
+      await this.sessionConfig.syncSessionModeState({
         configOptions: response.configOptions ?? null,
         emitPermissionSync: false,
         modes: response.modes ?? null,
@@ -1233,11 +912,11 @@ export class OpencodeChatRuntime implements ChatRuntime {
       this.loadedSessionId = response.sessionId;
       this.sessionId = response.sessionId;
       this.sessionCwds.set(response.sessionId, cwd);
-      await this.syncSessionModelState({
+      await this.sessionConfig.syncSessionModelState({
         configOptions: response.configOptions ?? null,
         models: response.models ?? null,
       });
-      await this.syncSessionModeState({
+      await this.sessionConfig.syncSessionModeState({
         configOptions: response.configOptions ?? null,
         emitPermissionSync: false,
         modes: response.modes ?? null,
@@ -1285,17 +964,17 @@ export class OpencodeChatRuntime implements ChatRuntime {
 
     const normalized = this.sessionUpdateNormalizer.normalize(notification.update);
     if (normalized.type === 'config_options') {
-      await this.syncSessionModelState({
+      await this.sessionConfig.syncSessionModelState({
         configOptions: normalized.configOptions,
       });
-      await this.syncSessionModeState({
+      await this.sessionConfig.syncSessionModeState({
         configOptions: normalized.configOptions,
       });
       return;
     }
 
     if (normalized.type === 'current_mode') {
-      await this.syncSessionModeState({
+      await this.sessionConfig.syncSessionModeState({
         currentModeId: normalized.currentModeId,
       });
       return;
@@ -1357,7 +1036,7 @@ export class OpencodeChatRuntime implements ChatRuntime {
         }
         const usage = buildAcpUsageInfo({
           contextWindow: normalized.usage,
-          model: this.getActiveDisplayModel(),
+          model: this.sessionConfig.getActiveDisplayModel(),
           promptUsage: this.promptUsage,
         });
         if (usage) {
@@ -1551,8 +1230,7 @@ export class OpencodeChatRuntime implements ChatRuntime {
     }
     this.sessionId = null;
     this.loadedSessionId = null;
-    this.currentSessionModelId = null;
-    this.currentSessionModeId = null;
+    this.sessionConfig.forgetSession();
     this.setSupportedCommands([]);
   }
 }

@@ -50,7 +50,7 @@ describe('OpencodeChatRuntime', () => {
     (runtime as any).applySelectedMode = jest.fn().mockResolvedValue(undefined);
     (runtime as any).applySelectedModel = jest.fn().mockResolvedValue(undefined);
     (runtime as any).applySelectedEffort = jest.fn().mockResolvedValue(undefined);
-    (runtime as any).getActiveDisplayModel = jest.fn().mockReturnValue('opencode:test-model');
+    (runtime as any).sessionConfig.getActiveDisplayModel = jest.fn().mockReturnValue('opencode:test-model');
 
     await expect(collectRuntimeChunks(runtime)).resolves.toEqual([
       {
@@ -116,7 +116,7 @@ describe('OpencodeChatRuntime', () => {
     (runtime as any).applySelectedMode = jest.fn().mockResolvedValue(undefined);
     (runtime as any).applySelectedModel = jest.fn().mockResolvedValue(undefined);
     (runtime as any).applySelectedEffort = jest.fn().mockResolvedValue(undefined);
-    (runtime as any).getActiveDisplayModel = jest.fn().mockReturnValue('opencode:test-model');
+    (runtime as any).sessionConfig.getActiveDisplayModel = jest.fn().mockReturnValue('opencode:test-model');
 
     const history = [
       { id: 'user-previous', role: 'user' as const, content: 'Keep the language rich.', timestamp: 1 },
@@ -146,7 +146,7 @@ describe('OpencodeChatRuntime', () => {
     (runtime as any).applySelectedMode = jest.fn().mockResolvedValue(undefined);
     (runtime as any).applySelectedModel = jest.fn().mockResolvedValue(undefined);
     (runtime as any).applySelectedEffort = jest.fn().mockResolvedValue(undefined);
-    (runtime as any).getActiveDisplayModel = jest.fn().mockReturnValue('opencode:test-model');
+    (runtime as any).sessionConfig.getActiveDisplayModel = jest.fn().mockReturnValue('opencode:test-model');
 
     await expect(collectRuntimeChunks(runtime)).resolves.toEqual([{ type: 'done' }]);
 
@@ -630,7 +630,7 @@ describe('OpencodeChatRuntime', () => {
     });
     const runtime = new OpencodeChatRuntime(plugin);
 
-    await (runtime as any).syncSessionModeState({
+    await (runtime as any).sessionConfig.syncSessionModeState({
       configOptions: [{
         currentValue: 'build',
         id: 'mode',
@@ -648,7 +648,7 @@ describe('OpencodeChatRuntime', () => {
       { description: 'Planning-first agent', id: 'plan', name: 'Plan' },
     ]);
     expect(plugin.settings.providerConfigs.opencode.selectedMode).toBe('plan');
-    expect((runtime as any).currentSessionModeId).toBe('build');
+    expect((runtime as any).sessionConfig.sessionModeId).toBe('build');
     expect(plugin.saveSettings).not.toHaveBeenCalled();
     expect(refreshModelSelector).toHaveBeenCalledTimes(1);
   });
@@ -666,7 +666,7 @@ describe('OpencodeChatRuntime', () => {
     });
     const runtime = new OpencodeChatRuntime(plugin);
 
-    await (runtime as any).syncSessionModeState({
+    await (runtime as any).sessionConfig.syncSessionModeState({
       currentModeId: OPENCODE_BUILD_MODE_ID,
     });
 
@@ -688,7 +688,7 @@ describe('OpencodeChatRuntime', () => {
     const runtime = new OpencodeChatRuntime(plugin);
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
-    expect((runtime as any).resolveSelectedModeId()).toBe(OPENCODE_FULL_ACCESS_MODE_ID);
+    expect((runtime as any).sessionConfig.resolveSelectedModeId()).toBe(OPENCODE_FULL_ACCESS_MODE_ID);
   });
 
   it('falls back to the managed full-access mode when a saved custom mode is not managed by Grimoire', () => {
@@ -706,7 +706,7 @@ describe('OpencodeChatRuntime', () => {
     const runtime = new OpencodeChatRuntime(plugin);
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
-    expect((runtime as any).resolveSelectedModeId()).toBe(OPENCODE_FULL_ACCESS_MODE_ID);
+    expect((runtime as any).sessionConfig.resolveSelectedModeId()).toBe(OPENCODE_FULL_ACCESS_MODE_ID);
   });
 
   it('prefers managed full-access/safe/plan modes over auxiliary OpenCode primary modes for the main toolbar', () => {
@@ -729,7 +729,7 @@ describe('OpencodeChatRuntime', () => {
     const runtime = new OpencodeChatRuntime(plugin);
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
-    expect((runtime as any).resolveSelectedModeId()).toBe(OPENCODE_FULL_ACCESS_MODE_ID);
+    expect((runtime as any).sessionConfig.resolveSelectedModeId()).toBe(OPENCODE_FULL_ACCESS_MODE_ID);
   });
 
   it('maps shared safe mode onto the managed OpenCode safe agent', () => {
@@ -751,7 +751,7 @@ describe('OpencodeChatRuntime', () => {
     const runtime = new OpencodeChatRuntime(plugin);
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
-    expect((runtime as any).resolveSelectedModeId()).toBe(OPENCODE_SAFE_MODE_ID);
+    expect((runtime as any).sessionConfig.resolveSelectedModeId()).toBe(OPENCODE_SAFE_MODE_ID);
   });
 
   it('syncs managed OpenCode safe mode back through the permission-mode callback', async () => {
@@ -770,7 +770,7 @@ describe('OpencodeChatRuntime', () => {
 
     runtime.setPermissionModeSyncCallback(syncCallback);
 
-    await (runtime as any).syncSessionModeState({
+    await (runtime as any).sessionConfig.syncSessionModeState({
       currentModeId: OPENCODE_SAFE_MODE_ID,
     });
 
@@ -783,7 +783,7 @@ describe('OpencodeChatRuntime', () => {
 
     runtime.setPermissionModeSyncCallback(syncCallback);
 
-    await (runtime as any).syncSessionModeState({
+    await (runtime as any).sessionConfig.syncSessionModeState({
       currentModeId: OPENCODE_BUILD_MODE_ID,
     });
 
@@ -809,7 +809,7 @@ describe('OpencodeChatRuntime', () => {
 
     await expect((runtime as any).createSession('/tmp/vault')).resolves.toBe('session-1');
 
-    expect((runtime as any).currentSessionModeId).toBe(OPENCODE_BUILD_MODE_ID);
+    expect((runtime as any).sessionConfig.sessionModeId).toBe(OPENCODE_BUILD_MODE_ID);
     expect(syncCallback).not.toHaveBeenCalled();
   });
 
@@ -891,7 +891,7 @@ describe('OpencodeChatRuntime', () => {
     jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('opencode');
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
-    await (runtime as any).syncSessionModelState({
+    await (runtime as any).sessionConfig.syncSessionModelState({
       configOptions: [{
         currentValue: 'anthropic/claude-sonnet-4',
         id: 'model',
@@ -911,7 +911,7 @@ describe('OpencodeChatRuntime', () => {
     expect(plugin.settings.savedProviderEffort.opencode).toBe('high');
     expect(plugin.settings.model).toBe('opencode:anthropic/claude-sonnet-4');
     expect(plugin.settings.effortLevel).toBe('high');
-    expect((runtime as any).resolveSelectedRawModelId()).toBe('anthropic/claude-sonnet-4');
+    expect((runtime as any).sessionConfig.resolveSelectedRawModelId()).toBe('anthropic/claude-sonnet-4');
     expect(plugin.saveSettings).not.toHaveBeenCalled();
     expect(refreshModelSelector).not.toHaveBeenCalled();
   });
@@ -934,7 +934,7 @@ describe('OpencodeChatRuntime', () => {
     const runtime = new OpencodeChatRuntime(plugin);
     jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('opencode');
 
-    await (runtime as any).syncSessionModelState({
+    await (runtime as any).sessionConfig.syncSessionModelState({
       configOptions: [{
         category: 'model',
         currentValue: 'openai/gpt-5',
@@ -975,7 +975,7 @@ describe('OpencodeChatRuntime', () => {
     const runtime = new OpencodeChatRuntime(plugin);
     jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('opencode');
 
-    await (runtime as any).syncSessionModelState({
+    await (runtime as any).sessionConfig.syncSessionModelState({
       configOptions: [
         {
           category: 'model',
@@ -1146,7 +1146,7 @@ describe('OpencodeChatRuntime', () => {
 
     await expect(runtime.warmModelMetadata('opencode:deepseek/deepseek-v4-pro')).resolves.toBe(true);
 
-    expect((runtime as any).currentSessionModelId).toBe('deepseek/deepseek-v4-pro');
+    expect((runtime as any).sessionConfig.sessionModelId).toBe('deepseek/deepseek-v4-pro');
     expect(plugin.settings.model).toBe('opencode:deepseek/deepseek-v4-pro');
     expect(plugin.settings.savedProviderModel.opencode).toBe('opencode:deepseek/deepseek-v4-pro');
     expect(plugin.settings.providerConfigs.opencode.thinkingOptionsByModel).toEqual({
@@ -1195,10 +1195,22 @@ describe('OpencodeChatRuntime', () => {
       }],
     });
     (runtime as any).connection = { setConfigOption };
-    (runtime as any).currentSessionEffortConfigId = 'effort';
-    (runtime as any).currentSessionEffortValue = 'low';
-    (runtime as any).currentSessionEffortValues = new Set(['low', 'high']);
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
+    // The session is told what its thinking levels are, the way it is told in
+    // production: by the reply that reports them.
+    await (runtime as any).sessionConfig.syncSessionModelState({
+      configOptions: [{
+        category: 'thought_level',
+        currentValue: 'low',
+        id: 'effort',
+        name: 'Effort',
+        options: [
+          { name: 'Low', value: 'low' },
+          { name: 'High', value: 'high' },
+        ],
+        type: 'select',
+      }],
+    });
 
     await (runtime as any).applySelectedEffort('session-1');
 

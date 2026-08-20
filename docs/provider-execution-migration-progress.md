@@ -3661,7 +3661,7 @@ elsewhere.
 
 Gates: unit 469 suites / 7,597 tests, typecheck, lint clean. Declared dark in the parity manifest.
 
-### M2-flips wave 4 — what a session opens with (this commit)
+### M2-flips wave 4 — what a session opens with (`cdf4434`)
 
 Found while planning the runtime half, by reading what the legacy runtime does with a session it has
 just created: **OpenCode answers `session/new` and `session/load` with its models, its modes and its
@@ -3692,6 +3692,42 @@ Gates: unit 469 suites / 7,601 tests, integration 5 / 145 (2 suites, 10 tests sk
 lint, and `build:release` clean. The trace freezes the new event, and the composition test asserts
 the models and modes reach a real presenter through the kernel.
 
+### M2-flips wave 4 — what a session is set to (this commit)
+
+`OpencodeSessionConfigState` is 390 lines lifted out of the legacy runtime, which now delegates to
+it: which model, mode and effort a turn should be dispatched under, and what to keep of the lists a
+session reports back. The runtime kept only the `setConfigOption` calls themselves, because those
+need a connection; everything about *what* to set and *what it means* moved.
+
+It is more than a cache of the session's settings — it is **the vault's memory of them**. Syncing a
+session's reply seeds the discovered models, the per-model thinking options, the visible-model list
+and, on a first run, the active model and effort selection itself. An OpenCode vault learns what its
+models are by opening a session and being told, which is why the flip could not recompute this per
+turn and why the extraction had to keep the seeding rather than only the reading.
+
+Four ports carry what it cannot reach on its own: the settings bag it reads and seeds, the save it
+calls only when something actually changed, the selector refresh, and the permission-mode sync. The
+last one now translates OpenCode's mode id into Grimoire's permission mode **inside** the state
+rather than at each call site, because a mode that maps to no permission mode must reach neither.
+
+The legacy runtime's own tests are what prove the move, retargeted at the object rather than
+rewritten — including one that had been seeding the effort state by assignment and now tells the
+session what its thinking levels are the way production does, through the reply that reports them.
+
+**Named for the flip, not solved here:** those tests live in `OpencodeChatRuntime.test.ts`, and the
+flip deletes that runtime. They must be *moved* onto the extracted module in that commit, not
+deleted with it, or the flip silently drops the coverage of 390 lines of settings-seeding.
+
+**Also named for the flip: five call sites construct `OpencodeChatRuntime` for reasons that have
+nothing to do with chat** — the model catalog's refresh, the runtime command loader, two in the
+settings tab, and one in the chat UI config — all of them using it as a general-purpose "talk to
+OpenCode" object. Deleting the runtime in the flip commit means answering all five, most likely
+through the shared managed-ACP auxiliary session the ACP directory already has. Wave 4's flip is
+therefore larger than wave 3's, and this is the measurement rather than a guess.
+
+Gates: unit 469 suites / 7,601 tests, typecheck, lint, and `build:release` clean. Recorded as wired
+in the parity manifest, because the runtime that reaches it is still the one in production.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3713,7 +3749,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **wave 4's content surface** — every session update and the prompt's own answer forwarded, and the presenter that draws a tab from them | `1ad9421` |
 | **wave 4's interactions** — the real permission bridge, the presentation vocabulary extracted from the legacy runtime, and an approval answered end to end through the kernel | `d11068c` |
 | **wave 4's approval surface** — the presenter that shows a prepared interaction and answers it in the kernel's ids | `a3f43df` |
-| **what a session opens with** — the models, modes and config options `session/new` answers with, carried to the surface instead of discarded | this commit |
+| **what a session opens with** — the models, modes and config options `session/new` answers with, carried to the surface instead of discarded | `cdf4434` |
+| **what a session is set to** — 390 lines of model, mode and effort state lifted out of the legacy runtime, which delegates to it | this commit |
 
 Three providers now execute through the kernel: Antigravity, Codex, Claude.
 

@@ -582,9 +582,11 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/kimicode/runtime/KimicodeChatRuntime.ts',
       'src/providers/mimocode/runtime/MimocodeChatRuntime.ts',
       'src/providers/opencode/runtime/OpencodeChatRuntime.ts',
-      // Extracted from that runtime, which delegates to it, so the flip does
-      // not produce a second opinion about what a permission is asking for.
+      // Extracted from that runtime, which delegates to them, so the flip does
+      // not produce a second opinion about what a permission is asking for or
+      // about what the live session is set to.
       'src/providers/opencode/execution/OpencodePermissionPresentation.ts',
+      'src/providers/opencode/execution/OpencodeSessionConfigState.ts',
       'src/providers/qwen/runtime/QwenChatRuntime.ts',
     ],
   },
