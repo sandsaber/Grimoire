@@ -1,0 +1,916 @@
+{
+  "schemaVersion": 1,
+  "providerId": "mimocode",
+  "kind": "wire-recording",
+  "recordedAgainst": "mimocode 0.1.13",
+  "transport": "stdio JSON-RPC 2.0 (`/home/m5/.mimocode/bin/mimo acp`)",
+  "cases": [
+    "initialize",
+    "session/new",
+    "session/set_config_option",
+    "session/prompt:empty"
+  ],
+  "sessionUpdatesObserved": [
+    "available_commands_update",
+    "usage_update"
+  ],
+  "serverMethodsObserved": [
+    "session/update"
+  ],
+  "exchange": [
+    {
+      "seq": 1,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": 1,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 2,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": true,
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "promptCapabilities": {
+              "embeddedContext": true,
+              "image": true
+            },
+            "sessionCapabilities": {
+              "fork": {},
+              "list": {},
+              "resume": {}
+            }
+          },
+          "authMethods": [
+            {
+              "description": "Run `opencode auth login` in the terminal",
+              "name": "Login with opencode",
+              "id": "opencode-login"
+            }
+          ],
+          "agentInfo": {
+            "name": "OpenCode",
+            "version": "0.1.13"
+          }
+        }
+      }
+    },
+    {
+      "seq": 3,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/new",
+        "params": {
+          "cwd": "<tmp>",
+          "mcpServers": []
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "sessionId": "<session-id>",
+          "configOptions": [
+            {
+              "id": "model",
+              "name": "Model",
+              "category": "model",
+              "type": "select",
+              "currentValue": "xiaomi/mimo-v2.5-pro-ultraspeed",
+              "options": [
+                {
+                  "value": "mimo/mimo-auto",
+                  "name": "MiMo Auto (free)/MiMo Auto"
+                },
+                {
+                  "value": "mimo/mimo-auto/low",
+                  "name": "MiMo Auto (free)/MiMo Auto (low)"
+                },
+                {
+                  "value": "mimo/mimo-auto/medium",
+                  "name": "MiMo Auto (free)/MiMo Auto (medium)"
+                },
+                {
+                  "value": "mimo/mimo-auto/high",
+                  "name": "MiMo Auto (free)/MiMo Auto (high)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed/low",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (low)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed/medium",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (medium)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed/high",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (high)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro",
+                  "name": "Xiaomi/MiMo-V2.5-Pro"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro/low",
+                  "name": "Xiaomi/MiMo-V2.5-Pro (low)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro/medium",
+                  "name": "Xiaomi/MiMo-V2.5-Pro (medium)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro/high",
+                  "name": "Xiaomi/MiMo-V2.5-Pro (high)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5",
+                  "name": "Xiaomi/MiMo-V2.5"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5/low",
+                  "name": "Xiaomi/MiMo-V2.5 (low)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5/medium",
+                  "name": "Xiaomi/MiMo-V2.5 (medium)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5/high",
+                  "name": "Xiaomi/MiMo-V2.5 (high)"
+                }
+              ]
+            },
+            {
+              "id": "mode",
+              "name": "Session Mode",
+              "category": "mode",
+              "type": "select",
+              "currentValue": "build",
+              "options": [
+                {
+                  "value": "build",
+                  "name": "build",
+                  "description": "Executes tools based on configured permissions."
+                },
+                {
+                  "value": "plan",
+                  "name": "plan",
+                  "description": "Plan mode. Disallows all edit tools."
+                },
+                {
+                  "value": "compose",
+                  "name": "compose",
+                  "description": "Compose mode (deprecated). Orchestrates workflows with built-in compose skills. For Fable/Sol-class models, use Build and run /compose-next instead."
+                }
+              ]
+            }
+          ],
+          "models": {
+            "currentModelId": "xiaomi/mimo-v2.5-pro-ultraspeed",
+            "availableModels": [
+              {
+                "modelId": "mimo/mimo-auto",
+                "name": "MiMo Auto (free)/MiMo Auto"
+              },
+              {
+                "modelId": "mimo/mimo-auto/low",
+                "name": "MiMo Auto (free)/MiMo Auto (low)"
+              },
+              {
+                "modelId": "mimo/mimo-auto/medium",
+                "name": "MiMo Auto (free)/MiMo Auto (medium)"
+              },
+              {
+                "modelId": "mimo/mimo-auto/high",
+                "name": "MiMo Auto (free)/MiMo Auto (high)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro-ultraspeed",
+                "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro-ultraspeed/low",
+                "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (low)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro-ultraspeed/medium",
+                "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (medium)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro-ultraspeed/high",
+                "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (high)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro",
+                "name": "Xiaomi/MiMo-V2.5-Pro"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro/low",
+                "name": "Xiaomi/MiMo-V2.5-Pro (low)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro/medium",
+                "name": "Xiaomi/MiMo-V2.5-Pro (medium)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro/high",
+                "name": "Xiaomi/MiMo-V2.5-Pro (high)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5",
+                "name": "Xiaomi/MiMo-V2.5"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5/low",
+                "name": "Xiaomi/MiMo-V2.5 (low)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5/medium",
+                "name": "Xiaomi/MiMo-V2.5 (medium)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5/high",
+                "name": "Xiaomi/MiMo-V2.5 (high)"
+              }
+            ]
+          },
+          "modes": {
+            "availableModes": [
+              {
+                "id": "build",
+                "name": "build",
+                "description": "Executes tools based on configured permissions."
+              },
+              {
+                "id": "plan",
+                "name": "plan",
+                "description": "Plan mode. Disallows all edit tools."
+              },
+              {
+                "id": "compose",
+                "name": "compose",
+                "description": "Compose mode (deprecated). Orchestrates workflows with built-in compose skills. For Fable/Sol-class models, use Build and run /compose-next instead."
+              }
+            ],
+            "currentModeId": "build"
+          },
+          "_meta": {
+            "opencode": {
+              "modelId": "xiaomi/mimo-v2.5-pro-ultraspeed",
+              "variant": null,
+              "availableVariants": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "session/set_config_option",
+        "params": {
+          "sessionId": "<session-id>",
+          "configId": "model",
+          "type": "select",
+          "value": "mimo/mimo-auto"
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "init",
+                "description": "guided AGENTS.md setup"
+              },
+              {
+                "name": "review",
+                "description": "review changes [commit|branch|pr], defaults to uncommitted"
+              },
+              {
+                "name": "dream",
+                "description": "manually consolidate project memory from memory files and raw trajectory"
+              },
+              {
+                "name": "distill",
+                "description": "find repeated workflows in recent work and package them into skills, subagents, or commands"
+              },
+              {
+                "name": "goal",
+                "description": "set a stop-condition goal; runs until a judge says it's met. /goal clear to abort"
+              },
+              {
+                "name": "rebuild",
+                "description": "rebuild the conversation context now from the latest checkpoint (frees context; keeps recent messages)"
+              },
+              {
+                "name": "loops",
+                "description": "list active scheduled jobs; accepts `cancel <id>` to delete one"
+              },
+              {
+                "name": "arxiv",
+                "description": "<elided 660 chars>"
+              },
+              {
+                "name": "claude-code",
+                "description": "<elided 208 chars>"
+              },
+              {
+                "name": "codex",
+                "description": "<elided 518 chars>"
+              },
+              {
+                "name": "compose-next",
+                "description": "<elided 516 chars>"
+              },
+              {
+                "name": "data-analytics",
+                "description": "<elided 307 chars>"
+              },
+              {
+                "name": "deep-research",
+                "description": "<elided 385 chars>"
+              },
+              {
+                "name": "design-blueprint",
+                "description": "<elided 843 chars>"
+              },
+              {
+                "name": "docx-official",
+                "description": "<elided 608 chars>"
+              },
+              {
+                "name": "drive-mimo",
+                "description": "<elided 447 chars>"
+              },
+              {
+                "name": "evolve",
+                "description": "<elided 670 chars>"
+              },
+              {
+                "name": "frontend-design",
+                "description": "<elided 549 chars>"
+              },
+              {
+                "name": "grok-build",
+                "description": "<elided 471 chars>"
+              },
+              {
+                "name": "html-to-video-pipeline",
+                "description": "<elided 1132 chars>"
+              },
+              {
+                "name": "learn-everything",
+                "description": "<elided 752 chars>"
+              },
+              {
+                "name": "loop",
+                "description": "<elided 416 chars>"
+              },
+              {
+                "name": "memory-search",
+                "description": "<elided 427 chars>"
+              },
+              {
+                "name": "mimocode-docs",
+                "description": "<elided 1051 chars>"
+              },
+              {
+                "name": "modern-python-toolchain",
+                "description": "<elided 432 chars>"
+              },
+              {
+                "name": "pdf-official",
+                "description": "<elided 608 chars>"
+              },
+              {
+                "name": "playwright",
+                "description": "<elided 209 chars>"
+              },
+              {
+                "name": "pptx-official",
+                "description": "<elided 812 chars>"
+              },
+              {
+                "name": "product-design",
+                "description": "<elided 289 chars>"
+              },
+              {
+                "name": "research-paper-writing",
+                "description": "<elided 631 chars>"
+              },
+              {
+                "name": "sales",
+                "description": "<elided 320 chars>"
+              },
+              {
+                "name": "skill-creator",
+                "description": "<elided 225 chars>"
+              },
+              {
+                "name": "super-research",
+                "description": "<elided 2447 chars>"
+              },
+              {
+                "name": "xlsx-official",
+                "description": "<elided 815 chars>"
+              },
+              {
+                "name": "compose:ask",
+                "description": "<elided 235 chars>"
+              },
+              {
+                "name": "compose:brainstorm",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+              },
+              {
+                "name": "compose:debug",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes"
+              },
+              {
+                "name": "compose:execute",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints"
+              },
+              {
+                "name": "compose:feedback",
+                "description": "<elided 234 chars>"
+              },
+              {
+                "name": "compose:merge",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup"
+              },
+              {
+                "name": "compose:parallel",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies"
+              },
+              {
+                "name": "compose:plan",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code"
+              },
+              {
+                "name": "compose:report",
+                "description": "Use after implementation is verified and before merge \u2014 consolidates multiple spec iterations into a single final-state report, marks related specs, and records key lessons"
+              },
+              {
+                "name": "compose:review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements"
+              },
+              {
+                "name": "compose:subagent",
+                "description": "Use when executing implementation plans with independent tasks in the current session"
+              },
+              {
+                "name": "compose:tdd",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code"
+              },
+              {
+                "name": "compose:verify",
+                "description": "<elided 225 chars>"
+              },
+              {
+                "name": "compose:worktree",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback"
+              },
+              {
+                "name": "karpathy-guidelines",
+                "description": "<elided 553 chars>"
+              },
+              {
+                "name": "brainstorming",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+              },
+              {
+                "name": "coding-guidelines",
+                "description": "<elided 272 chars>"
+              },
+              {
+                "name": "dispatching-parallel-agents",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies"
+              },
+              {
+                "name": "domain-cli",
+                "description": "<elided 262 chars>"
+              },
+              {
+                "name": "domain-cloud-native",
+                "description": "<elided 202 chars>"
+              },
+              {
+                "name": "domain-embedded",
+                "description": "<elided 261 chars>"
+              },
+              {
+                "name": "domain-fintech",
+                "description": "Use when building fintech apps. Keywords: fintech, trading, decimal, currency, financial, money, transaction, ledger, payment, exchange rate, precision, rounding, accounting, \u91d1\u878d, \u4ea4\u6613\u7cfb\u7edf, \u8d27\u5e01, \u652f\u4ed8"
+              },
+              {
+                "name": "domain-iot",
+                "description": "Use when building IoT apps. Keywords: IoT, Internet of Things, sensor, MQTT, device, edge computing, telemetry, actuator, smart home, gateway, protocol, \u7269\u8054\u7f51, \u4f20\u611f\u5668, \u8fb9\u7f18\u8ba1\u7b97, \u667a\u80fd\u5bb6\u5c45"
+              },
+              {
+                "name": "domain-ml",
+                "description": "Use when building ML/AI apps in Rust. Keywords: machine learning, ML, AI, tensor, model, inference, neural network, deep learning, training, prediction, ndarray, tch-rs, burn, candle, \u673a\u5668\u5b66\u4e60, \u4eba\u5de5\u667a\u80fd, \u6a21\u578b\u63a8\u7406"
+              },
+              {
+                "name": "domain-web",
+                "description": "<elided 304 chars>"
+              },
+              {
+                "name": "executing-plans",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints"
+              },
+              {
+                "name": "find-skills",
+                "description": "<elided 303 chars>"
+              },
+              {
+                "name": "finishing-a-development-branch",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup"
+              },
+              {
+                "name": "m01-ownership",
+                "description": "<elided 280 chars>"
+              },
+              {
+                "name": "m02-resource",
+                "description": "<elided 229 chars>"
+              },
+              {
+                "name": "m03-mutability",
+                "description": "<elided 203 chars>"
+              },
+              {
+                "name": "m04-zero-cost",
+                "description": "<elided 234 chars>"
+              },
+              {
+                "name": "m05-type-driven",
+                "description": "<elided 213 chars>"
+              },
+              {
+                "name": "m06-error-handling",
+                "description": "<elided 205 chars>"
+              },
+              {
+                "name": "m07-concurrency",
+                "description": "<elided 218 chars>"
+              },
+              {
+                "name": "m09-domain",
+                "description": "CRITICAL: Use for domain modeling. Triggers: domain model, DDD, domain-driven design, entity, value object, aggregate, repository pattern, business rules, validation, invariant, \u9886\u57df\u6a21\u578b, \u9886\u57df\u9a71\u52a8\u8bbe\u8ba1, \u4e1a\u52a1\u89c4\u5219"
+              },
+              {
+                "name": "m10-performance",
+                "description": "CRITICAL: Use for performance optimization. Triggers: performance, optimization, benchmark, profiling, flamegraph, criterion, slow, fast, allocation, cache, SIMD, make it faster, \u6027\u80fd\u4f18\u5316, \u57fa\u51c6\u6d4b\u8bd5"
+              },
+              {
+                "name": "m11-ecosystem",
+                "description": "<elided 382 chars>"
+              },
+              {
+                "name": "m12-lifecycle",
+                "description": "<elided 357 chars>"
+              },
+              {
+                "name": "m13-domain-error",
+                "description": "<elided 371 chars>"
+              },
+              {
+                "name": "m14-mental-model",
+                "description": "<elided 374 chars>"
+              },
+              {
+                "name": "m15-anti-pattern",
+                "description": "<elided 365 chars>"
+              },
+              {
+                "name": "meta-cognition-parallel",
+                "description": "EXPERIMENTAL: Three-layer parallel meta-cognition analysis. Triggers on: /meta-parallel, \u4e09\u5c42\u5206\u6790, parallel analysis, \u5e76\u884c\u5143\u8ba4\u77e5"
+              },
+              {
+                "name": "receiving-code-review",
+                "description": "<elided 234 chars>"
+              },
+              {
+                "name": "requesting-code-review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements"
+              },
+              {
+                "name": "rust-call-graph",
+                "description": "Visualize Rust function call graphs using LSP. Triggers on: /call-graph, call hierarchy, who calls, what calls, \u8c03\u7528\u56fe, \u8c03\u7528\u5173\u7cfb, \u8c01\u8c03\u7528\u4e86, \u8c03\u7528\u4e86\u8c01"
+              },
+              {
+                "name": "rust-code-navigator",
+                "description": "Navigate Rust code using LSP. Triggers on: /navigate, go to definition, find references, where is defined, \u8df3\u8f6c\u5b9a\u4e49, \u67e5\u627e\u5f15\u7528, \u5b9a\u4e49\u5728\u54ea, \u8c01\u7528\u4e86\u8fd9\u4e2a"
+              },
+              {
+                "name": "rust-daily",
+                "description": "CRITICAL: Use for Rust news and daily/weekly/monthly reports. Triggers on:\nrust news, rust daily, rust weekly, TWIR, rust blog,\nRust \u65e5\u62a5, Rust \u5468\u62a5, Rust \u65b0\u95fb, Rust \u52a8\u6001\n"
+              },
+              {
+                "name": "rust-deps-visualizer",
+                "description": "Visualize Rust project dependencies as ASCII art. Triggers on: /deps-viz, dependency graph, show dependencies, visualize deps, \u4f9d\u8d56\u56fe, \u4f9d\u8d56\u53ef\u89c6\u5316, \u663e\u793a\u4f9d\u8d56"
+              },
+              {
+                "name": "rust-learner",
+                "description": "<elided 387 chars>"
+              },
+              {
+                "name": "rust-refactor-helper",
+                "description": "Safe Rust refactoring with LSP analysis. Triggers on: /refactor, rename symbol, move function, extract, \u91cd\u6784, \u91cd\u547d\u540d, \u63d0\u53d6\u51fd\u6570, \u5b89\u5168\u91cd\u6784"
+              },
+              {
+                "name": "rust-router",
+                "description": "<elided 853 chars>"
+              },
+              {
+                "name": "rust-symbol-analyzer",
+                "description": "Analyze Rust project structure using LSP symbols. Triggers on: /symbols, project structure, list structs, list traits, list functions, \u7b26\u53f7\u5206\u6790, \u9879\u76ee\u7ed3\u6784, \u5217\u51fa\u6240\u6709, \u6709\u54ea\u4e9bstruct"
+              },
+              {
+                "name": "rust-trait-explorer",
+                "description": "Explore Rust trait implementations using LSP. Triggers on: /trait-impl, find implementations, who implements, trait \u5b9e\u73b0, \u8c01\u5b9e\u73b0\u4e86, \u5b9e\u73b0\u4e86\u54ea\u4e9btrait"
+              },
+              {
+                "name": "subagent-driven-development",
+                "description": "Use when executing implementation plans with independent tasks in the current session"
+              },
+              {
+                "name": "systematic-debugging",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes"
+              },
+              {
+                "name": "test-driven-development",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code"
+              },
+              {
+                "name": "unsafe-checker",
+                "description": "<elided 339 chars>"
+              },
+              {
+                "name": "using-git-worktrees",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback"
+              },
+              {
+                "name": "using-superpowers",
+                "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions"
+              },
+              {
+                "name": "verification-before-completion",
+                "description": "<elided 225 chars>"
+              },
+              {
+                "name": "writing-plans",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code"
+              },
+              {
+                "name": "writing-skills",
+                "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment"
+              },
+              {
+                "name": "imagegen",
+                "description": "<elided 570 chars>"
+              },
+              {
+                "name": "openai-docs",
+                "description": "<elided 459 chars>"
+              },
+              {
+                "name": "plugin-creator",
+                "description": "<elided 471 chars>"
+              },
+              {
+                "name": "review-agent",
+                "description": "<elided 229 chars>"
+              },
+              {
+                "name": "skill-installer",
+                "description": "<elided 225 chars>"
+              },
+              {
+                "name": "compact",
+                "description": "summarize the session to reduce context"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "configOptions": [
+            {
+              "id": "model",
+              "name": "Model",
+              "category": "model",
+              "type": "select",
+              "currentValue": "mimo/mimo-auto",
+              "options": [
+                {
+                  "value": "mimo/mimo-auto",
+                  "name": "MiMo Auto (free)/MiMo Auto"
+                },
+                {
+                  "value": "mimo/mimo-auto/low",
+                  "name": "MiMo Auto (free)/MiMo Auto (low)"
+                },
+                {
+                  "value": "mimo/mimo-auto/medium",
+                  "name": "MiMo Auto (free)/MiMo Auto (medium)"
+                },
+                {
+                  "value": "mimo/mimo-auto/high",
+                  "name": "MiMo Auto (free)/MiMo Auto (high)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed/low",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (low)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed/medium",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (medium)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed/high",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (high)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro",
+                  "name": "Xiaomi/MiMo-V2.5-Pro"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro/low",
+                  "name": "Xiaomi/MiMo-V2.5-Pro (low)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro/medium",
+                  "name": "Xiaomi/MiMo-V2.5-Pro (medium)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro/high",
+                  "name": "Xiaomi/MiMo-V2.5-Pro (high)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5",
+                  "name": "Xiaomi/MiMo-V2.5"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5/low",
+                  "name": "Xiaomi/MiMo-V2.5 (low)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5/medium",
+                  "name": "Xiaomi/MiMo-V2.5 (medium)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5/high",
+                  "name": "Xiaomi/MiMo-V2.5 (high)"
+                }
+              ]
+            },
+            {
+              "id": "mode",
+              "name": "Session Mode",
+              "category": "mode",
+              "type": "select",
+              "currentValue": "build",
+              "options": [
+                {
+                  "value": "build",
+                  "name": "build",
+                  "description": "Executes tools based on configured permissions."
+                },
+                {
+                  "value": "plan",
+                  "name": "plan",
+                  "description": "Plan mode. Disallows all edit tools."
+                },
+                {
+                  "value": "compose",
+                  "name": "compose",
+                  "description": "Compose mode (deprecated). Orchestrates workflows with built-in compose skills. For Fable/Sol-class models, use Build and run /compose-next instead."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "<session-id>",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "Reply with exactly: OK"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "usage_update",
+            "used": 0,
+            "size": 1000000,
+            "cost": {
+              "amount": 0,
+              "currency": "USD"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 10,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "stopReason": "end_turn",
+          "usage": {
+            "totalTokens": 0,
+            "inputTokens": 0,
+            "outputTokens": 0
+          },
+          "_meta": {}
+        }
+      }
+    }
+  ],
+  "payloadPolicy": "Strings over 200 characters are elided: the recording is evidence of protocol shape, not of content.",
+  "limitations": [
+    "The turn answered nothing: this account cannot generate with either offered",
+    "model (400 Not supported model, in the agent log and not on the wire).",
+    "The handshake, the config option and the empty-turn shape are evidence;",
+    "message chunks and tool calls are not, and this provider still owes a",
+    "recording of a turn that answers."
+  ]
+}

@@ -114,11 +114,13 @@ describe('wire vocabulary coverage', () => {
   const recordings = readRecordings();
 
   it('has a recording for each provider that has reached the kernel', () => {
-    // The four proof providers, and Grok — whose recording was taken at the
-    // start of its own wave, which is the order the plan asks for and the one
-    // the first four did not always get.
+    // The four proof providers, Grok — whose recording was taken at the start
+    // of its own wave, which is the order the plan asks for and the one the
+    // first four did not always get — and MiMoCode, taken the day its CLI
+    // arrived. MiMoCode's is partial and says so in its own `limitations`: the
+    // account cannot generate, so the turn it recorded answered nothing.
     expect(recordings.map(recording => recording.providerId).sort())
-      .toEqual(['antigravity', 'claude', 'codex', 'grok', 'opencode']);
+      .toEqual(['antigravity', 'claude', 'codex', 'grok', 'mimocode', 'opencode']);
   });
 
   it.each(recordings)('$providerId names the CLI version it was taken from', recording => {

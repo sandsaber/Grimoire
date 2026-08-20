@@ -3924,7 +3924,7 @@ Gates: unit 470 suites / 7,591 tests, typecheck, lint, and `build:release` clean
 live rows green** against `opencode acp` 1.18.18, recorded in
 [`docs/opencode-flip-smoke-matrix.md`](opencode-flip-smoke-matrix.md).
 
-### M0b — Grok's wire recording, taken before its wave (this commit)
+### M0b — Grok's wire recording, taken before its wave (`28f3691`)
 
 Wave 5 is Grok, chosen at the owner's direction over the journal's nomination of MiMoCode for one
 reason: the Grok CLI is installed and signed in on the owner's machine and MiMoCode's was not, so
@@ -3969,6 +3969,29 @@ startup timing, so it is named in a comment rather than asserted.
 
 Gates: unit 470 suites / 7,594 tests, typecheck, lint clean.
 
+### M0b — MiMoCode's wire recording, partial and labelled (this commit)
+
+The MiMoCode CLI was installed on the owner's machine mid-session, so its recording was taken while
+the recorder was out: `mimo acp` 0.1.13, ten messages. **It mirrors OpenCode exactly** — a
+`session/new` that answers with `configOptions`, `available_commands_update`, `usage_update`, a
+prompt result carrying usage — which is the first evidence for the claim the roadmap makes about
+these two providers rather than a reading of their code.
+
+**It is partial, and says so in its own `limitations` field.** The turn answered nothing: both models
+the session offers are refused by the account's endpoint with `400 Not supported model`, which
+appears in the agent's log and **not on the wire**. Over ACP the failure is
+`stopReason: "end_turn"` with zero tokens and no chunks — a failed turn that looks exactly like a
+successful empty one. That is the silent-success failure mode this migration exists to remove, and
+the kernel already refuses it: `resultExpectation: 'required'` turns a turn with no result into
+`missing-required-result` rather than an empty answer on screen. Recorded now so MiMoCode's wave
+starts knowing it.
+
+What the recording is evidence of: the handshake, `session/set_config_option`, and the empty-turn
+shape. What it is not: message chunks, tool calls, or anything a turn produces once it can generate.
+MiMoCode still owes a recording of a turn that answers.
+
+Gates: unit 470 suites / 7,595 tests, typecheck, lint clean.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3996,7 +4019,8 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **wave 4 flipped** — OpenCode on the kernel, `OpencodeChatRuntime` deleted, the five legacy call sites answered by one isolated metadata session | `a0166a8` |
 | **three surfaces that must open anyway** — the metadata call sites guarded against a kernel that has not started | `7034a00` |
 | **the live half of wave 4's matrix** — thirteen rows against a real `opencode acp`, and the five defects the first run found | `5cb457f` |
-| **wave 5 begins: Grok's wire recording** — two protocols, three dropped updates, and a recorder that redacts | this commit |
+| **wave 5 begins: Grok's wire recording** — two protocols, three dropped updates, and a recorder that redacts | `28f3691` |
+| **MiMoCode's wire recording** — partial and labelled: it mirrors OpenCode, and its failed turn looks like a successful empty one | this commit |
 
 Four providers now execute through the kernel: Antigravity, Codex, Claude, OpenCode.
 
@@ -4174,8 +4198,8 @@ Open obligations, each with an owner:
   Claude message types" this entry used to claim was an unmeasured number. Owner: each provider's
   flip — and Claude's is owed a gate shaped like OpenCode's replay, since wave 3 has already
   flipped;
-- **four providers still need wire recordings** — MiMoCode, Kimi Code, Qwen, Gemini — each before
-  its own flip. Grok's was taken at the start of wave 5, which is the order the plan asks for.
+- **three providers still need wire recordings** — Kimi Code, Qwen, Gemini — each before its own
+  flip, and MiMoCode owes the half of its own that a generating account would show. Grok's was taken at the start of wave 5, which is the order the plan asks for.
   Owner: M2-flips, per provider. The recorder that takes them must redact: see the Grok entry for
   what the first capture contained;
 - **awaiting an owner decision: redo.** Recorded as D9 in the persistence decisions. Re-running a
