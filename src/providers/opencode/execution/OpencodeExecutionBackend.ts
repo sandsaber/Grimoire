@@ -42,6 +42,7 @@ import type {
   AcpRequestPermissionResponse,
   AcpSessionNotification,
 } from '@/providers/acp/types';
+import type { OpencodeContentPayload } from '@/providers/opencode/execution/OpencodeContentPresenter';
 
 export const OPENCODE_EXECUTION_DESCRIPTOR = Object.freeze({
   backendId: executionBackendId('provider-opencode'),
@@ -814,16 +815,28 @@ class OpencodeExecutionRun implements ExecutionRun {
     if (this.terminal || notification.sessionId !== this.sessionRef) return;
     this.observedProviderActivity = true;
     const update = notification.update;
-    if (update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text') {
-      const next = `${this.output}${update.content.text}`;
+    const text = update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text'
+      ? update.content.text
+      : undefined;
+    if (text !== undefined) {
+      const next = `${this.output}${text}`;
       if (Buffer.byteLength(next, 'utf8') > this.context.maxResultBytes) {
         void this.terminate('output-limit');
         return;
       }
       this.output = next;
-      // Emitted after the bound check, so a reader only ever sees a prefix of
-      // what will be committed.
-      this.emit({ kind: 'output-delta', channel: 'assistant', text: update.content.text });
+    }
+    // The surface's copy of the update, forwarded once and before any branch
+    // below reads it: a tool card, a plan and a context badge are drawn from
+    // the update itself, and the kernel carries it without interpreting it.
+    // After the bound above, because the content channel is a reader like any
+    // other and must see only a prefix of what will be committed.
+    this.emit({
+      kind: 'provider-content',
+      payload: { kind: 'session-update', notification } satisfies OpencodeContentPayload,
+    });
+    if (text !== undefined) {
+      this.emit({ kind: 'output-delta', channel: 'assistant', text });
       return;
     }
     if (update.sessionUpdate === 'agent_thought_chunk') {
@@ -837,6 +850,14 @@ class OpencodeExecutionRun implements ExecutionRun {
 
   async completeFromPrompt(response: AcpPromptResponse, attempt: number): Promise<void> {
     if (this.terminal || attempt !== this.attempt || this.recoveringAttempt === attempt) return;
+    // The tokens this prompt cost are in the answer and nowhere else: the
+    // window update arrives while the turn is still running and knows only how
+    // full the context is. Forwarded whatever the stop reason, because a turn
+    // that was cancelled still spent them.
+    this.emit({
+      kind: 'provider-content',
+      payload: { kind: 'prompt-result', response } satisfies OpencodeContentPayload,
+    });
     const responseRunRef = response.userMessageId?.trim();
     if (responseRunRef && this.nativeRunRef && responseRunRef !== this.nativeRunRef) {
       this.finish('indeterminate', 'effects-unknown');

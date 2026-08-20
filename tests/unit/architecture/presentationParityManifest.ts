@@ -681,6 +681,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // the running plugin, and the two stores it needs.
       'src/app/execution/opencode/OpencodeExecutionComposition.ts',
       'src/providers/opencode/execution/OpencodeAcpDynamicConfig.ts',
+      'src/providers/opencode/execution/OpencodeContentPresenter.ts',
       'src/providers/opencode/execution/OpencodeExecutionRequests.ts',
       'src/providers/opencode/execution/OpencodeProjectionResultSink.ts',
       'src/providers/opencode/execution/OpencodeAcpFileSystem.ts',

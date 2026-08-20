@@ -1,7 +1,9 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import type { AcpSessionNotification } from '@/providers/acp/types';
 import { CODEX_EXECUTION_NOTIFICATION_METHODS } from '@/providers/codex/runtime/CodexExecutionConnection';
+import { OpencodeContentPresenter } from '@/providers/opencode/execution/OpencodeContentPresenter';
 
 /**
  * What the providers actually send, against what the code models.
@@ -51,7 +53,11 @@ const UNMODELLED_BY_PROVIDER: Readonly<Record<string, readonly string[]>> = {
     'remoteControl/status/changed',
     'thread/started',
   ],
-  opencode: ['available_commands_update', 'usage_update'],
+  // Empty since wave 4's content surface: the commands update and the usage
+  // update are both consumed now, by the presenter rather than the backend —
+  // which is why the check below replays the recording through it instead of
+  // grepping for the wire name the normalizer already renamed.
+  opencode: [],
 };
 
 function readRecordings(): WireRecording[] {
@@ -88,16 +94,29 @@ describe('wire vocabulary coverage', () => {
     expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.codex].sort());
   });
 
-  it('records every OpenCode session update the backend does not handle', () => {
-    const observed = recordings.find(recording => recording.providerId === 'opencode')
-      ?.sessionUpdatesObserved ?? [];
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/providers/opencode/execution/OpencodeExecutionBackend.ts'),
-      'utf8',
+  it('records every OpenCode session update nothing draws the surface from', () => {
+    const recording = recordings.find(entry => entry.providerId === 'opencode');
+    const observed = recording?.sessionUpdatesObserved ?? [];
+    // Replayed rather than grepped: the normalizer renames every wire update
+    // before anything consumes it, so a source search for `usage_update` would
+    // report a gap that is closed and would miss one that opens.
+    const consumed = new Set<string>(
+      readOpencodeSessionUpdates(recording).flatMap(notification => {
+        const effects: string[] = [];
+        const presenter = new OpencodeContentPresenter({
+          displayModel: () => 'model',
+          onCommands: () => effects.push('commands'),
+          onConfigOptions: () => effects.push('config'),
+          onCost: () => effects.push('cost'),
+          onCurrentMode: () => effects.push('mode'),
+        });
+        const chunks = presenter.present({ kind: 'session-update', notification });
+        return chunks.length > 0 || effects.length > 0
+          ? [notification.update.sessionUpdate]
+          : [];
+      }),
     );
-    const missing = observed
-      .filter(update => !source.includes(`'${update}'`))
-      .sort();
+    const missing = observed.filter(update => !consumed.has(update)).sort();
 
     expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.opencode].sort());
   });
@@ -126,4 +145,16 @@ describe('wire vocabulary coverage', () => {
  */
 function readModelledCodexNotifications(): readonly string[] {
   return CODEX_EXECUTION_NOTIFICATION_METHODS;
+}
+
+/** The `session/update` notifications the recording actually carried. */
+function readOpencodeSessionUpdates(
+  recording: WireRecording | undefined,
+): AcpSessionNotification[] {
+  return (recording?.exchange ?? []).flatMap(entry => {
+    const message = (entry as { message?: { method?: string; params?: unknown } }).message;
+    return message?.method === 'session/update'
+      ? [message.params as AcpSessionNotification]
+      : [];
+  });
 }

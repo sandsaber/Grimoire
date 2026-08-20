@@ -3482,7 +3482,7 @@ typecheck tests — so two `as any`-shaped stubs in `Tab.test.ts` compiled local
 The gate in `AGENTS.md` lists four commands for exactly this reason, and running three of them is not
 running it.
 
-### M2-flips wave 4 — OpenCode's dark backend half (this commit)
+### M2-flips wave 4 — OpenCode's dark backend half (`3b01158`)
 
 The first ACP provider reaches the kernel. `OpencodeExecution` binds the dark `OpencodeExecutionBackend`
 to the running plugin, `OpencodeExecutionRequests` holds what its references stand for, and
@@ -3522,6 +3522,58 @@ useless, exactly as wave 3's was at this stage.
 Gates: unit 465 suites / 7,560 tests, integration 5 / 145, typecheck, lint, and `build:release`
 clean. The three new modules are declared dark in the parity manifest.
 
+### M2-flips wave 4 — OpenCode's content surface (this commit)
+
+The backend reported facts about a turn — a tool started, a thought happened — and the answer's
+text, and nothing a tool card, a diff, a plan or a context badge could be drawn from. It forwards
+every session update now, at one call site before any branch below reads it, because the branches
+consume what they recognize and a per-branch forward would have carried only those.
+
+**Two shapes on the channel, not one, and the second is a wire fact rather than a convenience.** An
+ACP turn's tokens are not in any notification: the `usage_update` arrives while the turn is still
+running and says how full the context is, and what this prompt itself cost is in the answer to
+`session/prompt`. The recording shows exactly that — `used: 16964, size: 200000` as an update, then
+`inputTokens: 15940, cachedReadTokens: 1024` as the result — so the payload is a small union of the
+two, and the backend forwards the prompt result whatever its stop reason, since a cancelled turn
+still spent them.
+
+`OpencodeContentPresenter` turns both into chunks with the code the legacy runtime rendered with —
+`AcpSessionUpdateNormalizer` and the OpenCode tool stream adapter — drops the copy of the answer the
+kernel already carries as `output-delta`, and owns the three things no chunk does: the ACP session a
+conversation resumes and forks from, the message ids the finished turn is saved with, and the
+session's own configuration. That last one is why it has ports rather than only a return value:
+commands, config options and current mode arrive as session updates but belong to the tab, not the
+transcript, and a flip that dropped them would lose the model selector, the slash commands and the
+plan indicator without failing anything.
+
+**The forward sits after the output bound, not before it.** The bound is what keeps a reader from
+seeing text that will never be committed, and the content channel is a reader like any other — so a
+turn cancelled for overflow forwards nothing, which is its own test.
+
+Two gates were rewritten rather than extended. The trace now freezes *what* was forwarded
+(`provider-content:agent_message_chunk`, `provider-content:prompt-result`) rather than that
+something was, following the Codex summarizer. And the OpenCode wire-coverage check no longer greps
+the backend source for `usage_update`: the normalizer renames every update before anything consumes
+it, so a text search would have reported a gap that is closed and missed one that opens. It replays
+the recorded notifications through the presenter and asks which produced nothing — proven by
+deleting the usage branch and watching it name `usage_update`. **The OpenCode row of that gap is now
+empty**, down from two.
+
+The end-to-end composition test runs both halves with no stand-in between them: a turn whose tool
+call, usage update and answer are forwarded by the real backend and rendered by the real presenter,
+asserting the `Read` card, its output, the badge that has both the window and the prompt's tokens,
+and that the answer appears exactly once. Proven by changing the payload shape in the backend and
+watching only that test fail — which is the wave-1 lesson applied where it applies: a seam both
+sides stub is not covered.
+
+Still not here: **interactions**, where the bridge refuses every permission request. And the
+presenter is built but unwired — what constructs a presenter is the tab runtime, which is the next
+increment, and its four ports are what that runtime must answer for.
+
+Gates: unit 467 suites / 7,577 tests, integration 5 / 145 (2 suites, 10 tests skipped), typecheck,
+lint, and `build:release` clean. The presenter is declared dark in the parity manifest; `main.js` is
+unchanged, because nothing reachable imports either half yet.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -3540,6 +3592,7 @@ Fourteen commits, all pushed, CI green on all four jobs at `3b01158`. In order:
 | **an external review of the Codex flip answered** — eight items, all real: the transient dedup window, a dropped `turn/started`, a swallowed refusal, and five smaller | `77ad8a3` |
 | **wave 3 (Claude) built and flipped** — dark half in four increments, then the flip with `ClaudeChatRuntime` deleted | `3df7a3a`, `2976714`, `fe4870d`, `b7a6424`, `f8c4ad2`, `ec519a7` |
 | **wave 4 (OpenCode) backend half** — the first ACP provider on the kernel | `3b01158` |
+| **wave 4's content surface** — every session update and the prompt's own answer forwarded, and the presenter that draws a tab from them | this commit |
 
 Three providers now execute through the kernel: Antigravity, Codex, Claude.
 
@@ -3548,8 +3601,8 @@ Three providers now execute through the kernel: Antigravity, Codex, Claude.
 - **two smoke matrices, both needing a person in a vault** — Codex's rendering rows and Claude's
   twenty-eight. Wave 3 flipped ahead of wave 2's certification at the owner's direction; what stands
   in for the missing evidence is that each flip reverts as a single commit;
-- **wave 4's remaining three increments**, in the order wave 3 proved: content surface,
-  interactions, runtime half, then the flip.
+- **wave 4's remaining two increments**, in the order wave 3 proved: interactions, then the
+  runtime half, then the flip. The content surface landed in this commit.
 
 Completed: **M0a** (parity gate, contribution inventory, adapter contract, the two contract suites,
 topology and shared-resource records, persistence decisions), **M1** (execution kernel, narrow
@@ -3607,11 +3660,14 @@ the command that runs them is in the matrix document under "the half that runs i
    twenty-eight of them, in a vault on a release build. Rows 14–16 first: Claude is the first flip
    with a rewind, and row 16 — a rewind that fails with the files restored — is what the backup port
    added in that entry exists for;
-3. **M2-flips wave 4 — OpenCode**, whose backend half is now built (entry above). What the flip
-   still needs, in the order wave 3 proved: the **content surface** over
-   `AcpSessionUpdateNormalizer`, then **interactions**, then the **runtime half**, then the flip
-   itself with `OpencodeChatRuntime` deleted in the same commit. Most of what it needs after that is
-   shared: the next five ACP providers inherit the transport, the launcher and the client adapter.
+3. **M2-flips wave 4 — OpenCode**, whose backend half and content surface are now built (the two
+   entries above). What the flip still needs, in the order wave 3 proved: **interactions**, where
+   the bridge refuses every permission request today and ACP asks before every edit and command;
+   then the **runtime half**, which is also what finally constructs the presenter and answers its
+   four ports — commands, config options, current mode, cost; then the flip itself with
+   `OpencodeChatRuntime` deleted in the same commit. Most of what it needs after that is shared: the
+   next five ACP providers inherit the transport, the launcher, the client adapter — and now the
+   content surface, since nothing in the presenter is OpenCode's except its tool normalization.
 
 **Two matrices are outstanding at once**, which is the state the owner accepted when wave 3 flipped
 ahead of wave 2's certification. Either flip reverts as a single commit.
@@ -3698,10 +3754,15 @@ Open obligations, each with an owner:
   ownership on every desktop platform — and treating a red Windows job as noise is how a real
   failure gets waved through. Owner: wave 2, before the Codex flip, since that is the provider whose
   ownership this test covers;
-- **the wire recordings show nine Codex notifications, two OpenCode session updates, and four Claude
-  message types that no backend consumes**, including the ones carrying plan indicators, token usage,
-  and raw response items. Pinned in `wireVocabularyCoverage.test.ts` so the gap cannot grow. Owner:
-  each provider's flip;
+- **the wire recordings show six Codex notifications that no backend consumes**, including the ones
+  carrying plan indicators and raw response items, pinned in `wireVocabularyCoverage.test.ts` so the
+  gap cannot grow. OpenCode's two are closed by wave 4's content surface, and that check now replays
+  the recording through the presenter rather than grepping the backend for a wire name the
+  normalizer has already renamed. **The Claude row of this obligation was never pinned**: the
+  recording observes seven message types and that file asserts nothing about them, so the "four
+  Claude message types" this entry used to claim was an unmeasured number. Owner: each provider's
+  flip — and Claude's is owed a gate shaped like OpenCode's replay, since wave 3 has already
+  flipped;
 - **five providers still need wire recordings** — MiMoCode, Kimi Code, Grok, Qwen, Gemini — each
   before its own flip. Owner: M2-flips, per provider;
 - **awaiting an owner decision: redo.** Recorded as D9 in the persistence decisions. Re-running a

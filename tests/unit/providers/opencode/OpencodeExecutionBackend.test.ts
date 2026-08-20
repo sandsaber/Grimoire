@@ -68,6 +68,57 @@ describe('OpencodeExecutionBackend', () => {
     ]).toEqual(trace.cases.initializeNewPrompt);
   });
 
+  it('forwards every session update the surface is drawn from, including the ones it never reads', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    // Two the backend derives nothing from: without the forward, a tab draws no
+    // plan and no context badge because nothing else carries them.
+    fixture.client.emit(planUpdate('native-session'));
+    fixture.client.emit(usageUpdate('native-session'));
+    fixture.client.emit(agentText('native-session', 'OpenCode result'));
+    fixture.client.completePrompt({ stopReason: 'end_turn', userMessageId: 'message-1' });
+
+    const captured = await events;
+    expect(contentPayloads(captured)).toEqual([
+      { kind: 'session-update', notification: planUpdate('native-session') },
+      { kind: 'session-update', notification: usageUpdate('native-session') },
+      { kind: 'session-update', notification: agentText('native-session', 'OpenCode result') },
+      {
+        kind: 'prompt-result',
+        response: { stopReason: 'end_turn', userMessageId: 'message-1' },
+      },
+    ]);
+  });
+
+  it('carries an assistant chunk to the surface before the text the kernel mirrors', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+    fixture.client.emit(agentText('native-session', 'OpenCode result'));
+    fixture.client.completePrompt({ stopReason: 'end_turn', userMessageId: 'message-1' });
+
+    // The message the answer hangs on is opened by the forwarded update, so a
+    // delta that arrived first would be appended to nothing.
+    expect(summarizeEvents(await events)).toEqual(trace.eventCases.success);
+  });
+
+  it('forwards nothing a turn cancelled for overflow will not commit', async () => {
+    const fixture = createFixture({ maxResultBytes: 4 });
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+    fixture.client.emit(agentText('native-session', 'too large'));
+    await flushPromises();
+
+    // A reader only ever sees a prefix of what will be committed, and the
+    // content channel is a reader like any other.
+    expect(contentPayloads(await events)).toEqual([]);
+  });
+
   it('loads the exact saved ACP session before dispatch', async () => {
     const fixture = createFixture();
     const session = await createSession(fixture.backend, 'saved-session');
@@ -168,7 +219,9 @@ describe('OpencodeExecutionBackend', () => {
       'run-started',
       // The partial text reaches the reader before the connection drops, which
       // is the point of streaming it: a turn interrupted mid-answer still shows
-      // what was said.
+      // what was said — as the update the surface draws the message from, and
+      // as the delta core reads.
+      'provider-content',
       'output-delta',
       'connection-lost',
       'recovery-started',
@@ -736,6 +789,29 @@ function agentText(sessionId: string, text: string): AcpSessionNotification {
   };
 }
 
+function planUpdate(sessionId: string): AcpSessionNotification {
+  return {
+    sessionId,
+    update: {
+      sessionUpdate: 'plan',
+      entries: [{ content: 'Read the note', priority: 'medium', status: 'in_progress' }],
+    },
+  };
+}
+
+function usageUpdate(sessionId: string): AcpSessionNotification {
+  return {
+    sessionId,
+    update: { sessionUpdate: 'usage_update', used: 16_964, size: 200_000 },
+  };
+}
+
+function contentPayloads(events: readonly ProviderExecutionEvent[]): unknown[] {
+  return events.flatMap(({ event }) => (
+    event.kind === 'provider-content' ? [event.payload] : []
+  ));
+}
+
 function permissionRequest(sessionId: string): AcpRequestPermissionRequest {
   return {
     sessionId,
@@ -805,6 +881,16 @@ function summarizeEvents(events: readonly ProviderExecutionEvent[]): string[] {
     // what it does not name, so leaving it out would have kept the trace silent
     // about whether a turn was readable while it ran.
     if (event.kind === 'output-delta') return [event.kind];
+    if (event.kind === 'provider-content') {
+      // Named by what it carries: a trace that recorded only "provider-content"
+      // would freeze the fact that something was forwarded without freezing
+      // what, and the surface is drawn from the what.
+      const payload = event.payload as {
+        kind: string;
+        notification?: AcpSessionNotification;
+      };
+      return [`provider-content:${payload.notification?.update.sessionUpdate ?? payload.kind}`];
+    }
     if (event.kind === 'result') return [`result:${event.result.storage}`];
     if (event.kind === 'terminal') return [`terminal:${event.terminal}:${event.reason}`];
     if (event.kind === 'interaction-opened') return [`interaction-opened:${event.interaction.kind}`];

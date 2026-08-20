@@ -10,12 +10,14 @@ import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { OpencodeExecution } from '@/app/execution/opencode/OpencodeExecutionComposition';
 import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
 import { executionSessionId, runId } from '@/core/execution/ExecutionIds';
+import { TOOL_READ } from '@/core/tools/toolNames';
 import type {
   ManagedAcpClient,
   ManagedAcpClientFactory,
   ManagedAcpClientFactoryInput,
 } from '@/providers/acp/execution/ManagedAcpClient';
 import type { AcpSessionNotification } from '@/providers/acp/types';
+import { OpencodeContentPresenter } from '@/providers/opencode/execution/OpencodeContentPresenter';
 import { OPENCODE_EXECUTION_DESCRIPTOR } from '@/providers/opencode/execution/OpencodeExecutionBackend';
 import { updateOpencodeProviderSettings } from '@/providers/opencode/settings';
 
@@ -83,8 +85,30 @@ describe('OpenCode execution composition', () => {
           loadSession: async () => ({ sessionId: 'acp-session-1' }),
           prompt: async request => {
             prompts.push(request);
-            // The answer arrives as a session update, the way an ACP agent
-            // says anything at all, and the stop reason ends the turn.
+            // Everything an ACP agent says, it says as a session update: the
+            // work it did, the plan it is on, how full the context is, and the
+            // answer. The stop reason ends the turn.
+            notify?.({
+              sessionId: 'acp-session-1',
+              update: {
+                sessionUpdate: 'tool_call',
+                toolCallId: 'tool-1',
+                title: 'read',
+                kind: 'read',
+                status: 'completed',
+                rawInput: { file_path: 'note.md' },
+                content: [{ type: 'content', content: { type: 'text', text: 'note body' } }],
+              },
+            });
+            notify?.({
+              sessionId: 'acp-session-1',
+              update: {
+                sessionUpdate: 'usage_update',
+                used: 16_964,
+                size: 200_000,
+                cost: { amount: 0.25, currency: 'USD' },
+              },
+            });
             notify?.({
               sessionId: 'acp-session-1',
               update: {
@@ -92,7 +116,10 @@ describe('OpenCode execution composition', () => {
                 content: { type: 'text', text: 'the answer' },
               },
             });
-            return { stopReason: 'end_turn' };
+            return {
+              stopReason: 'end_turn',
+              usage: { inputTokens: 15_940, outputTokens: 4, totalTokens: 16_979 },
+            };
           },
           setConfigOption: async () => ({ configOptions: [] }),
           cancel: () => undefined,
@@ -172,6 +199,62 @@ describe('OpenCode execution composition', () => {
     expect(kinds).toContain('run-started');
     const terminal = events.find(envelope => envelope.event.kind === 'terminal');
     expect(terminal?.event).toMatchObject({ terminal: 'succeeded' });
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('draws the tab from the content the same turn forwarded', async () => {
+    // Both halves real, no stand-in between them: wave 1's lesson is that a
+    // seam both sides stub is a seam nobody tests, and the payload the backend
+    // emits is only a contract if something actually renders it.
+    const { execution, host, events } = await createHarness();
+    const costs: unknown[] = [];
+    const presenter = new OpencodeContentPresenter({
+      displayModel: () => 'opencode/big-pickle',
+      onCost: cost => costs.push(cost),
+    });
+
+    const requestRef = execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'what now?' }],
+    });
+    await host.registry.startRun(SESSION_ID, {
+      runId: RUN_ID,
+      owner: OWNER,
+      requestRef,
+      resultExpectation: 'required',
+    });
+    await settle(host, events);
+
+    const chunks = events.flatMap(({ event }) => (
+      event.kind === 'provider-content' ? [...presenter.present(event.payload)] : []
+    ));
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'tool_use',
+      id: 'tool-1',
+      name: TOOL_READ,
+    }));
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'tool_result',
+      id: 'tool-1',
+      content: 'note body',
+    }));
+    // The window comes from the update, the prompt's own tokens from the
+    // answer, and the badge needs the pair.
+    expect(chunks.filter(chunk => chunk.type === 'usage').at(-1)).toEqual(
+      expect.objectContaining({
+        sessionId: 'acp-session-1',
+        usage: expect.objectContaining({
+          contextWindow: 200_000,
+          contextTokens: 16_964,
+          inputTokens: 15_940,
+        }),
+      }),
+    );
+    expect(costs).toEqual([{ amount: 0.25, currency: 'USD' }]);
+    expect(presenter.lastSessionId()).toBe('acp-session-1');
+    // The answer itself stays on the kernel's channel; a second copy here
+    // prints every sentence twice.
+    expect(chunks.some(chunk => chunk.type === 'text')).toBe(false);
     execution.dispose();
     await host.dispose();
   });

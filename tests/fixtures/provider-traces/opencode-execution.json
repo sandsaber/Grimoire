@@ -79,12 +79,15 @@
   "eventCases": {
     "success": [
       "run-started",
+      "provider-content:agent_message_chunk",
       "output-delta",
+      "provider-content:prompt-result",
       "result:projection",
       "terminal:succeeded:completed"
     ],
     "recoveryAfterOutput": [
       "run-started",
+      "provider-content:agent_message_chunk",
       "output-delta",
       "connection-lost",
       "recovery-started",

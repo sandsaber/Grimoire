@@ -51,9 +51,13 @@ const MAX_RESULT_BYTES = 256_000;
  * Two things are deliberately **not** here, each its own increment and each
  * named so a flip cannot land while it is missing:
  *
- * - **the content surface.** The backend carries session updates, and nothing
- *   yet turns them into the chunks a tab draws; `AcpSessionUpdateNormalizer`
- *   and the OpenCode tool stream adapter are what will;
+ * - **the content surface is built but unwired.** The backend forwards every
+ *   session update and the prompt's own answer, and `OpencodeContentPresenter`
+ *   turns them into chunks — but nothing constructs it here, because what
+ *   consumes a presenter is the tab runtime, which is the increment after this
+ *   one. Its four ports — commands, config options, mode, cost — are what the
+ *   runtime half must answer for, or a flipped tab loses its model selector,
+ *   its slash commands and its plan indicator;
  * - **interactions.** The bridge below refuses every permission request rather
  *   than guessing an answer, which is fail-closed and useless: ACP asks before
  *   edits and commands, so a flipped tab would refuse all of them.
