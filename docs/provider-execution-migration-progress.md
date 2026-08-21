@@ -4802,9 +4802,16 @@ Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`)
 
 ### Where the session of 2026-08-20 ended
 
-**Tomorrow starts here:** [`docs/providers-migration-review-backlog.md`](providers-migration-review-backlog.md),
-item C1 — control records are written and never deleted. Then the Grok pass, the Claude pass, ACP
-robustness, hygiene. Nothing from that review is fixed yet.
+**Where the review backlog stands:** the whole prioritized order is done —
+[`docs/providers-migration-review-backlog.md`](providers-migration-review-backlog.md) has the status
+column. C1 (all three parts), the Grok pass (G1–G5), the Claude pass (L1–L3), ACP robustness
+(A1–A3), and the hygiene items K1 and S2; K2 was refuted with evidence rather than fixed.
+
+**What is left from that review**, none of it started: K3 (the session record rewritten per durable
+event), K4 (`window.setTimeout` in provider-neutral core), K5 (`shutdown()` waiting forever on a hung
+`createSession`), S1 ("always allow" promoting rules the user was never shown), S3 (session metadata
+filenames and their non-atomic write), and the two QA notes. Beside them, the four manual smoke
+matrices still need a person in a vault.
 
 Wave 5 is complete: **Grok executes through the kernel**, its legacy runtime is deleted, and thirteen
 live rows are green against CLI 1.0.5. Four ACP providers remain on the legacy path — MiMoCode, Kimi
