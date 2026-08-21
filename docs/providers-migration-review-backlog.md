@@ -56,7 +56,7 @@ by the length of the session. **C1 is closed.**
 |---|---|---|---|
 | A1 ✅ | **A process that dies while idle wedges the conversation permanently.** `onConnectionLost` only acts when a run is active (`ManagedAcpExecutionBackend.ts:662`): with no active run the dead client is neither closed nor invalidated, so every later turn fails `invalidated` until a reload. The legacy path handled it (`acpSessionResume.ts` / `acpManagedSession.ts:105`), so this is a fix the migration lost — the one finding that can freeze a conversation for good. | code read: recovery is gated on `active && !active.isTerminal` | confirmed |
 | A2 ✅ | **`AcpSessionUpdateNormalizer.normalize` returns `undefined` for an update outside its union** — the switch has no `default:` and no trailing return (`AcpSessionUpdateNormalizer.ts:84–115`), while the signature promises `AcpNormalizedUpdate`. The presenter then reads `.type` off `undefined`. The vendor channel added in `e424c99` is exactly what delivers updates outside that union. | switch read in full | confirmed |
-| A3 | Launch diagnostics degraded: the managed launcher drops stderr and the legacy `describeSpawnError` wording ("command not found…"), so an ENOENT now surfaces as a misleading resume hint. | — | reported |
+| A3 ✅ | Launch diagnostics degraded: the managed launcher drops stderr and the legacy `describeSpawnError` wording ("command not found…"), so an ENOENT now surfaces as a misleading resume hint. | — | reported |
 
 ### Grok (wave 5)
 
@@ -96,6 +96,13 @@ CAS writes and shell-free Windows launch were all called out as done well.
 |---|---|---|
 | Q1 | Live matrices run nowhere automatically — by design, but nothing records when one last ran except each matrix's own Record table. | reported |
 | Q2 | The boundary gate does not resolve dynamic `import()`; no violation exists today. | reported |
+
+## Where this stands
+
+Everything in the order below is done except the four items nobody has started: **K3** (the session
+record rewritten per event), **K4** (`window.setTimeout` in neutral core), **K5** (`shutdown()` with
+no grace period on a hung `createSession`), **S1** ("always allow" promoting unshown rules), **S3**
+(session metadata filenames), and the two QA notes. **K2 was refuted** — see its row.
 
 ## The order to fix them in
 

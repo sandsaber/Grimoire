@@ -137,6 +137,59 @@ describe('NodeManagedAcpProcessLauncher', () => {
   });
 });
 
+  it('says what to do about a CLI that is not on the path', async () => {
+    const adapter = new FakeProcessAdapter('posix-process-group');
+    const spawnFailure: NodeJS.ErrnoException = new Error('spawn grok ENOENT');
+    spawnFailure.code = 'ENOENT';
+    adapter.startFailure = spawnFailure;
+    const launcher = new NodeManagedAcpProcessLauncher(
+      { resolve: async () => ({
+        executable: 'grok',
+        arguments: ['agent', 'stdio'],
+        // A directory that exists, because "the working directory is gone" is
+        // the other thing an ENOENT means and has its own wording.
+        cwd: process.cwd(),
+        environment: {},
+      }) },
+      adapter,
+      { wait: async () => undefined },
+      'linux',
+    );
+
+    // The raw ENOENT reads as a transport failure, and the kernel then renders
+    // it as the provider's resume hint — which tells the user to start a new
+    // chat about a CLI that is not installed where Grimoire looked.
+    await expect(launcher.launch('opaque-startup', new AbortController().signal))
+      .rejects.toThrow(/command not found[\s\S]*absolute CLI path/);
+  });
+
+  it('keeps the last of what the process printed before it failed', async () => {
+    const adapter = new FakeProcessAdapter('posix-process-group', { keepStderrOpen: true });
+    const launcher = new NodeManagedAcpProcessLauncher(
+      { resolve: async () => ({
+        executable: 'grok',
+        arguments: ['agent', 'stdio'],
+        cwd: '/vault',
+        environment: {},
+      }) },
+      adapter,
+      { wait: async () => undefined },
+      'linux',
+    );
+    const owned = await launcher.launch('opaque-startup', new AbortController().signal);
+    const closed = new Promise<Error | undefined>(resolve => owned.onClose(resolve));
+
+    adapter.stderr.write('error: cannot find module "@x/agent"\n');
+    adapter.exit({ code: 1 });
+
+    // Drained and discarded, the only thing left was "exited with code 1" —
+    // which says nothing about why. Bounded, because a CLI that prints for an
+    // hour must not be kept in memory.
+    await expect(closed).resolves.toEqual(
+      expect.objectContaining({ message: expect.stringContaining('cannot find module') }),
+    );
+  });
+
 class FakeProcessAdapter implements ManagedAcpProcessAdapter {
   readonly stdin = new PassThrough();
   readonly stdout = new PassThrough();
@@ -145,9 +198,20 @@ class FakeProcessAdapter implements ManagedAcpProcessAdapter {
   confirmations: boolean[] = [false];
   terminations: Array<'confirmed' | 'unconfirmed'> = ['confirmed'];
   readonly terminationModes: Array<'graceful' | 'forced'> = [];
+  startFailure?: Error;
+  private settleExit?: (exit: { code: number | null; signal?: string | null }) => void;
 
-  constructor(private readonly kind: LocalShellTerminationTarget['kind']) {
-    this.stderr.end();
+  constructor(
+    private readonly kind: LocalShellTerminationTarget['kind'],
+    options: { keepStderrOpen?: boolean } = {},
+  ) {
+    if (!options.keepStderrOpen) {
+      this.stderr.end();
+    }
+  }
+
+  exit(exit: { code: number | null; signal?: string | null }): void {
+    this.settleExit?.(exit);
   }
 
   launch(spec: LocalShellLaunchSpec) {
@@ -161,8 +225,10 @@ class FakeProcessAdapter implements ManagedAcpProcessAdapter {
       stderr: this.stderr,
       stdoutReadable: this.stdout,
       stderrReadable: this.stderr,
-      started: Promise.resolve(),
-      exited: new Promise<never>(() => undefined),
+      started: this.startFailure ? Promise.reject(this.startFailure) : Promise.resolve(),
+      exited: new Promise<{ code: number | null; signal?: string | null }>(resolve => {
+        this.settleExit = resolve;
+      }),
     };
   }
 

@@ -10,10 +10,15 @@ import type {
   LocalShellLaunchSpec,
   LocalShellProcessSupervisor,
 } from '@/core/execution/local/LocalShellBackend';
+import { describeAcpSpawnError } from '@/providers/acp/describeAcpSpawnError';
 import type {
   AcpManagedOwnedProcess,
   AcpManagedProcessLauncher,
 } from '@/providers/acp/execution/AcpManagedClientAdapter';
+
+/** How much of a process's stderr is kept, and how much of that is shown. */
+const STDERR_TAIL_BYTES = 4_000;
+const STDERR_PREVIEW_CHARS = 300;
 
 export interface ManagedAcpLaunchInvocation {
   readonly executable: string;
@@ -81,7 +86,10 @@ export class NodeManagedAcpProcessLauncher implements AcpManagedProcessLauncher 
       return owned;
     } catch (error) {
       await owned.terminate().catch(() => 'unconfirmed');
-      throw toError(error);
+      // Described rather than rethrown raw: an `ENOENT` from a spawn reads as a
+      // transport failure, and the provider's pre-dispatch wording then offers
+      // to start a new chat about a CLI that is not installed.
+      throw describeAcpSpawnError(toError(error), invocation.executable, invocation.cwd);
     }
   }
 
@@ -99,6 +107,7 @@ class OwnedManagedAcpProcess implements AcpManagedOwnedProcess {
   private closeError?: Error;
   private closed = false;
   private observing = false;
+  private stderrTail = '';
   private terminateTask?: Promise<'confirmed' | 'unconfirmed'>;
 
   constructor(
@@ -131,12 +140,10 @@ class OwnedManagedAcpProcess implements AcpManagedOwnedProcess {
     this.observing = true;
     this.child.stdin?.on('error', error => this.notifyClose(toError(error)));
     this.child.stdoutReadable?.on('error', error => this.notifyClose(toError(error)));
-    void this.drainStderr();
+    this.drainStderr();
     void this.child.exited.then(
       exit => {
-        this.notifyClose(exit.code === 0
-          ? undefined
-          : new Error(`Managed ACP process exited with code ${exit.code ?? 'unknown'}.`));
+        this.notifyClose(exit.code === 0 ? undefined : this.describeExit(exit.code));
       },
       error => this.notifyClose(toError(error)),
     );
@@ -185,15 +192,39 @@ class OwnedManagedAcpProcess implements AcpManagedOwnedProcess {
       : 'unconfirmed';
   }
 
-  private async drainStderr(): Promise<void> {
-    try {
-      for await (const chunk of this.child.stderr) {
-        void chunk;
-        // Draining prevents a blocked daemon; diagnostics remain ephemeral.
-      }
-    } catch {
-      // Process exit/termination owns the authoritative lifecycle result.
+  /**
+   * Drains stderr and keeps the tail of it.
+   *
+   * Draining prevents a blocked daemon; keeping the tail is what makes a
+   * non-zero exit legible — "exited with code 1" says nothing about a missing
+   * module or a rejected credential, and the CLI has usually just said which.
+   * Bounded, because a process that prints for an hour must not be held in
+   * memory, and one line, because this reaches an error message.
+   */
+  private drainStderr(): void {
+    // A listener rather than `for await`: the iterator yields on a later tick,
+    // so a process that prints and exits in the same breath — which is what a
+    // failing launch does — would be described before its own last words
+    // arrived. Reading in flowing mode still drains it, which is what keeps a
+    // chatty daemon from blocking.
+    const stderr = this.child.stderrReadable;
+    if (!stderr) {
+      return;
     }
+    stderr.on('data', (chunk: unknown) => {
+      this.stderrTail = `${this.stderrTail}${String(chunk)}`.slice(-STDERR_TAIL_BYTES);
+    });
+    stderr.on('error', () => {
+      // Process exit/termination owns the authoritative lifecycle result.
+    });
+  }
+
+  /** The last thing the process said, for an exit that has to be explained. */
+  private describeExit(code: number | null): Error {
+    const said = this.stderrTail.replace(/\s+/g, ' ').trim().slice(-STDERR_PREVIEW_CHARS);
+    return new Error(
+      `Managed ACP process exited with code ${code ?? 'unknown'}.${said ? ` ${said}` : ''}`,
+    );
   }
 
   private notifyClose(error?: Error): void {

@@ -4769,6 +4769,30 @@ Gates: unit 477 suites / 7,666 tests, integration 5 suites / 145 tests, typechec
 `build:release` clean.
 
 
+### Review A3 — what a process said before it failed (this commit)
+
+Two diagnostics the managed launcher lost, both of which the legacy path had:
+
+- **the spawn error.** An `ENOENT` was rethrown raw, so a missing CLI reached the surface as a
+  transport failure — and, through the provider's pre-dispatch wording, as advice to start a new chat
+  about a CLI that is not installed. `describeAcpSpawnError` is the legacy wording, moved out of
+  `AcpSubprocess` so both paths to an ACP process share it: "command not found. Set an absolute CLI
+  path in the provider settings — desktop apps do not inherit the shell PATH", or the other thing an
+  `ENOENT` means, a working directory that is gone;
+- **the process's own last words.** stderr was drained into `void chunk`, so a non-zero exit said
+  "exited with code 1" and nothing about the missing module or the rejected credential the CLI had
+  just printed. A bounded tail is kept — 4 KB held, 300 characters shown, on one line, because this
+  reaches an error message.
+
+Reading stderr with a listener rather than `for await` is the part worth remembering: the iterator
+yields on a later tick, so a process that prints and exits in the same breath — which is exactly what
+a failing launch does — was described before its own output arrived. The test caught it as a race
+and the fix removes the race rather than waiting on it.
+
+That closes the review's prioritized list. Gates: unit 477 suites / 7,668 tests, typecheck, `eslint`,
+and `build:release` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
