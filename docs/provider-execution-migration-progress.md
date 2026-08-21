@@ -5190,12 +5190,69 @@ than in a doc they may not open.
 
 Gates: unit 482 suites / 7,693 tests, typecheck, `eslint`, `build:release`.
 
+### Wave 6: MiMoCode's provider-owned execution parts (this commit)
+
+Five modules the composition will be built from — the dynamic-config applier,
+the filesystem delegate, the interaction bridge, the interaction presenter, the
+result sink — plus one that is not dark at all.
+
+**The permission vocabulary was moved, not written.** MiMoCode's legacy runtime
+carried its own copy of `buildMimocodePermissionPresentation`, ~200 lines of it,
+and now imports it from `execution/MimocodePermissionPresentation.ts`. That
+makes the extraction reachable the moment it exists, so it is deliberately *not*
+in the dark list beside the other five, and the manifest says why. It also means
+the flip cannot produce a second opinion about what MiMoCode is asking for:
+there is one copy of those sentences, and both paths read it.
+
+The test asserts the sentences themselves rather than that a sentence exists.
+Rewording an approval prompt is a change to the product, and it should have to
+be typed into a test to happen. Breaking one word failed three tests — the new
+one, the interaction test, and `MimocodeChatRuntime.test.ts`, which is the
+evidence that the runtime really delegates rather than keeping a copy.
+
+**The recording decided the effort question rather than the sibling did.**
+OpenCode's applier sets mode, model, then a thinking level under whatever config
+id the session names. Whether MiMoCode has that third call is not a thing to
+reason about: mimo 0.1.13 offers `model` and `mode` and carries its thinking
+level *inside the model id* (`.../low`, `.../medium`, `.../high`). So the test
+feeds the applier the config options the recorded session actually answered
+with, and asserts one call goes out where a guess would have sent two. The other
+half is tested too — a session that does report a thought level gets it set —
+because MiMoCode's legacy runtime handles both shapes and a later CLI growing
+one must not need this rewritten.
+
+One inherited claim corrected before it landed: the filesystem delegate's
+comment counted "five legacy runtimes" copied from OpenCode's. Six providers
+speak ACP here and I had not counted them, so the comment now says only what was
+checked — that MiMoCode's own runtime carries the same three behaviours.
+
+Every module proven by breaking it: reworded prompt, an effort set without
+asking the session, the filesystem refusal borrowed from a sibling's label, the
+answer smuggled into a result ref, and the bridge wired to no vocabulary. Five
+breaks, five caught, restored green.
+
+Gates: unit 487 suites / 7,729 tests, typecheck, `eslint`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
 overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
+
+### Where the session of 2026-08-22 ended
+
+**Wave 6 is mid-build.** Both wire recordings are taken (partial, and labelled so). MiMoCode has its
+provider module, its execution descriptor and five provider-owned execution parts, all dark and all
+listed in the parity manifest's `execution-platform-dark` entry — except
+`MimocodePermissionPresentation.ts`, which was moved out of the legacy runtime and is live now.
+
+**What is left before the MiMoCode flip:** `MimocodeContentPresenter`, `MimocodeExecutionRequests`
+and `MimocodeSessionConfigState` (the three large provider-owned parts), then
+`MimocodeExecutionComposition` in `src/app/execution/mimocode/`, then the flip itself as one
+revertible commit pointing `registration.ts` at the composition, then a live smoke harness and
+matrix. Derive each from OpenCode's — `AGENTS.md` requires these two to stay in step — and read every
+derived file end to end, because a derived file inherits claims along with code.
 
 ### Where the session of 2026-08-21 ended
 
