@@ -1,5 +1,22 @@
+export { isRecord } from './records';
 import { parseYaml } from 'obsidian';
 
+/**
+ * Read with Obsidian's own parser, deliberately.
+ *
+ * The codebase has a second YAML path — the `yaml` package, in
+ * `yamlFrontmatter.ts` — and one engine would be tidier. It is not a tidying
+ * job: switching this call changes how *existing vault files* parse. Six rows
+ * in `frontmatter.test.ts` are the evidence, all of them documents Obsidian's
+ * parser rejects and the `yaml` package accepts, where the fallback below then
+ * stops running and the values change with it — a bare `key:` becomes `null`
+ * instead of `''`.
+ *
+ * So the split is by role, not by accident: files Obsidian wrote are read the
+ * way Obsidian reads them, and the `yaml` package writes what Grimoire owns.
+ * Unifying is a decision about vault-file semantics and belongs with whoever
+ * makes those.
+ */
 const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 const VALID_KEY_PATTERN = /^[\w-]+$/;
 
@@ -167,10 +184,6 @@ export function extractBoolean(
   const val = fm[key];
   if (typeof val === 'boolean') return val;
   return undefined;
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 const MAX_SLUG_LENGTH = 64;

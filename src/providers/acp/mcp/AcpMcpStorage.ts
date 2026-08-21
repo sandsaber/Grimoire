@@ -6,6 +6,7 @@ import type {
   McpServerConfig,
 } from '../../../core/types';
 import { DEFAULT_MCP_SERVER, isValidMcpServerConfig } from '../../../core/types';
+import { isRecord } from '../../../utils/records';
 
 const ACP_DEFAULT_CONTEXT_SAVING = false;
 
@@ -131,6 +132,3 @@ function normalizeStringArray(value: unknown): string[] | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}

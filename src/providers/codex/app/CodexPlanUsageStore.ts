@@ -4,6 +4,7 @@ import type {
   ProviderPlanUsageProvider,
   ProviderPlanUsageWindow,
 } from '../../../core/providers/types';
+import { isRecord } from '../../../utils/records';
 import { getCodexProviderSettings } from '../settings';
 
 interface ParsedWindow {
@@ -346,6 +347,3 @@ function readValue(record: Record<string, unknown>, keys: string[]): unknown {
   return null;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}

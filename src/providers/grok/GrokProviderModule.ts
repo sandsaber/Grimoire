@@ -15,6 +15,7 @@ import type {
 import type { ManagedAcpExecutionBackendContext } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
 import { parseEnvironmentVariables } from '@/utils/env';
 
+import { isRecord } from '../../utils/records';
 import {
   GROK_EXECUTION_DESCRIPTOR,
   GrokExecutionBackend,
@@ -502,6 +503,3 @@ function deepEqual(left: unknown, right: unknown): boolean {
     && leftKeys.every(key => deepEqual(left[key], right[key]));
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}

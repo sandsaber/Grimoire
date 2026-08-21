@@ -1,5 +1,6 @@
 import type { ProviderSubagentLifecycleAdapter } from '../../../core/providers/types';
 import type { SubagentInfo, ToolCallInfo } from '../../../core/types';
+import { isRecord } from '../../../utils/records';
 
 export const GROK_SUBAGENT_SPAWN_TOOL = 'spawn_subagent';
 export const GROK_SUBAGENT_WAIT_TOOL = 'get_command_or_subagent_output';
@@ -17,10 +18,6 @@ interface GrokWaitStatus {
 interface GrokWaitResult {
   statuses: Record<string, GrokWaitStatus>;
   timedOut: boolean;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function parseJsonRecord(raw: string | undefined): Record<string, unknown> | null {

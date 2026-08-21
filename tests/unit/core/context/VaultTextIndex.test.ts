@@ -1,5 +1,6 @@
 import type { App, TFile } from 'obsidian';
 
+import { createObsidianVaultNoteSource } from '@/app/context/ObsidianVaultNoteSource';
 import { VaultTextIndex } from '@/core/context/VaultTextIndex';
 
 function createFile(path: string, mtime: number): TFile {
@@ -47,7 +48,7 @@ describe('VaultTextIndex', () => {
         },
       },
     });
-    const index = new VaultTextIndex(app);
+    const index = new VaultTextIndex(createObsidianVaultNoteSource(app));
 
     await index.refresh({ excludedTags: ['#secret'], excludedFolders: [] });
 
@@ -73,7 +74,7 @@ describe('VaultTextIndex', () => {
         'Private Notes/Visible.md': 'Visible note',
       },
     });
-    const index = new VaultTextIndex(app);
+    const index = new VaultTextIndex(createObsidianVaultNoteSource(app));
 
     await index.refresh({ excludedTags: [], excludedFolders: ['/Private/'] });
 
@@ -102,7 +103,7 @@ describe('VaultTextIndex', () => {
         },
       },
     });
-    const index = new VaultTextIndex(app);
+    const index = new VaultTextIndex(createObsidianVaultNoteSource(app));
 
     await index.refresh({ excludedTags: [], excludedFolders: [] });
 
@@ -126,7 +127,7 @@ describe('VaultTextIndex', () => {
         },
       },
     });
-    const index = new VaultTextIndex(app);
+    const index = new VaultTextIndex(createObsidianVaultNoteSource(app));
 
     await index.refresh({ excludedTags: [], excludedFolders: [] });
 
@@ -139,13 +140,13 @@ describe('VaultTextIndex', () => {
     const firstFile = createFile('notes/First.md', 100);
     const secondFile = createFile('notes/Second.md', 200);
     const index = new VaultTextIndex(
-      createApp({
+      createObsidianVaultNoteSource(createApp({
         files: [firstFile, secondFile],
         contents: {
           'notes/First.md': 'First note',
           'notes/Second.md': 'Second note',
         },
-      })
+      }))
     );
 
     await index.refresh({ excludedTags: [], excludedFolders: [] });
@@ -159,13 +160,13 @@ describe('VaultTextIndex', () => {
     const firstFile = createFile('notes/First.md', 100);
     const secondFile = createFile('notes/Second.md', 200);
     const index = new VaultTextIndex(
-      createApp({
+      createObsidianVaultNoteSource(createApp({
         files: [firstFile, secondFile],
         contents: {
           'notes/First.md': 'First note',
           'notes/Second.md': 'Second note',
         },
-      })
+      }))
     );
 
     await index.refresh({ excludedTags: [], excludedFolders: [] });

@@ -9,6 +9,7 @@ import type {
   SubagentInfo,
   ToolCallInfo,
 } from '../../../core/types';
+import { isRecord } from '../../../utils/records';
 import { extractFinalResultFromSubagentJsonl } from '../../../utils/subagentJsonl';
 import {
   addSubagentToolCall,
@@ -35,10 +36,6 @@ export type HandleTaskResult =
 export type RenderPendingResult =
   | { mode: 'sync'; subagentState: SubagentState }
   | { mode: 'async'; info: SubagentInfo; domState: AsyncSubagentState };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 function parseJsonRecord(value: string): Record<string, unknown> | null {
   try {

@@ -1,6 +1,8 @@
 import type { Component } from 'obsidian';
 import { Notice, setIcon } from 'obsidian';
 
+import { createObsidianVaultNoteSource } from '@/app/context/ObsidianVaultNoteSource';
+
 import { ProjectWorkspaceStore } from '../../../core/context/ProjectWorkspaceStore';
 import { RelevantNotesService } from '../../../core/context/RelevantNotesService';
 import { VaultSearchService } from '../../../core/context/VaultSearchService';
@@ -179,7 +181,7 @@ export function createTab(options: TabCreateOptions): TabData {
     onConversationChanged: onConversationIdChanged,
   });
 
-  const vaultTextIndex = new VaultTextIndex(plugin.app);
+  const vaultTextIndex = new VaultTextIndex(createObsidianVaultNoteSource(plugin.app));
   const vaultSearchService = new VaultSearchService(vaultTextIndex);
   const relevantNotesService = new RelevantNotesService(vaultTextIndex);
 

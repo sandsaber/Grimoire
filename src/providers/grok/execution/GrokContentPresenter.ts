@@ -16,6 +16,8 @@ import type {
 } from '@/providers/acp/types';
 import { createGrokToolStreamAdapter } from '@/providers/grok/normalization/grokToolNormalization';
 
+import { isRecord } from '../../../utils/records';
+
 /**
  * A dollar, in the unit Grok bills in.
  *
@@ -327,10 +329,6 @@ function readTurnUsage(value: unknown): {
       ? { amount: ticks / TICKS_PER_USD, currency: 'USD' }
       : null,
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function readNumber(value: unknown): number | null {

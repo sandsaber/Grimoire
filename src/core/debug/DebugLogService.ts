@@ -1,3 +1,4 @@
+import { isRecord } from '../../utils/records';
 import { GRIMOIRE_STORAGE_PATH } from '../bootstrap/StoragePaths';
 import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
 
@@ -27,10 +28,6 @@ const SENSITIVE_KEY_PATTERN =
 
 const SAFE_STRING_KEY_PATTERN =
   /^(account|argsSummary|code|command|commandSource|cwdLabel|errorCode|errorName|errorSummary|event|homePresent|killSignal|label|launchMode|level|messageType|method|mode|model|pathEntryCount|pathHasLocalBin|phase|plan|promptLength|provider|providerId|rateLimitInfoFields|rateLimitType|reason|reset|runtime|scope|shellPresent|signal|source|state|status|stderrPreview|stdinMode|stdioMode|usageKind|window|windowLabel)$/i;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 function padDatePart(value: number): string {
   return String(value).padStart(2, '0');

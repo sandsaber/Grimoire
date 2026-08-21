@@ -6,12 +6,9 @@ import type { SharedAppStorage } from '../../core/bootstrap/storage';
 import { GRIMOIRE_STORAGE_PATH } from '../../core/bootstrap/StoragePaths';
 import { VaultFileAdapter } from '../../core/storage/VaultFileAdapter';
 import { t } from '../../i18n/i18n';
+import { isRecord } from '../../utils/records';
 import { GrimoireSettingsStorage, type StoredGrimoireSettings } from '../settings/GrimoireSettingsStorage';
 import { VaultDurableStorage } from './VaultDurableStorage';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 type PersistedTabState = {
   tabId: string;

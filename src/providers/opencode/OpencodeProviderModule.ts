@@ -14,6 +14,7 @@ import type {
 } from '@/core/providers/ProviderModule';
 import { parseEnvironmentVariables } from '@/utils/env';
 
+import { isRecord } from '../../utils/records';
 import {
   OPENCODE_EXECUTION_DESCRIPTOR,
   OpencodeExecutionBackend,
@@ -495,6 +496,3 @@ function deepEqual(left: unknown, right: unknown): boolean {
     && leftKeys.every(key => deepEqual(left[key], right[key]));
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}

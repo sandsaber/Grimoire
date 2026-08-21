@@ -1,3 +1,4 @@
+import { isRecord } from '../../utils/records';
 import { TRANSACTION_INTENTS_PATH } from '../execution/ExecutionControlPaths';
 import { validateControlRecordPayload } from './ControlRecordPayloadPolicy';
 import type { DurableStorage } from './DurableStorage';
@@ -475,10 +476,6 @@ function stableSerialize(value: unknown): string {
     )).join(',')}}`;
   }
   return JSON.stringify(value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isStringArray(value: unknown): value is string[] {

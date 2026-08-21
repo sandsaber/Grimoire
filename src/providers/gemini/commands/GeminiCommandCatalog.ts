@@ -10,6 +10,7 @@ import {
 } from '../../../core/providers/commands/VaultSkillCommandCatalog';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type { SlashCommand } from '../../../core/types';
+import { isRecord } from '../../../utils/records';
 
 export const GEMINI_COMMANDS_PATH = '.gemini/commands';
 const GEMINI_COMMAND_PERSISTENCE_PREFIX = 'gemini-command';
@@ -218,6 +219,3 @@ function isSafeCommandRelativePath(value: string): boolean {
     && value.split('/').every((segment) => segment && segment !== '.' && segment !== '..');
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}

@@ -1,10 +1,7 @@
+import { isRecord } from '../../utils/records';
 import type { ProviderId } from './types';
 
 type ProviderConfigMap = Partial<Record<string, Record<string, unknown>>>;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 export function getProviderConfig(
   settings: Record<string, unknown>,

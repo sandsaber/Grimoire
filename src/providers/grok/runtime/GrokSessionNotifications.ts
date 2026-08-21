@@ -1,3 +1,4 @@
+import { isRecord } from '../../../utils/records';
 import type { AcpSessionNotification } from '../../acp';
 
 export const GROK_SESSION_UPDATE_NOTIFICATION_METHODS = [
@@ -53,6 +54,3 @@ function parseSessionNotification(value: unknown): AcpSessionNotification | null
   return value as unknown as AcpSessionNotification;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}

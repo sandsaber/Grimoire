@@ -19,6 +19,7 @@ import type {
 import { TOOL_SUBAGENT, TOOL_SUBAGENT_LEGACY } from '@/core/tools/toolNames';
 import { parseEnvironmentVariables } from '@/utils/env';
 
+import { isRecord } from '../../utils/records';
 import {
   CLAUDE_EXECUTION_DESCRIPTOR,
   ClaudeExecutionBackend,
@@ -536,10 +537,6 @@ function deepEqual(left: unknown, right: unknown): boolean {
   return leftKeys.length === rightKeys.length
     && leftKeys.every((key, index) => key === rightKeys[index])
     && leftKeys.every(key => deepEqual(left[key], right[key]));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export type { ClaudeDiscoveredModel };

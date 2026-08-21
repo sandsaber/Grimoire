@@ -8,6 +8,7 @@ import type {
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 
+import { isRecord } from '../../utils/records';
 import {
   ANTIGRAVITY_EXECUTION_DESCRIPTOR,
   AntigravityExecutionBackend,
@@ -365,10 +366,6 @@ function deepEqual(left: unknown, right: unknown): boolean {
   return leftKeys.length === rightKeys.length
     && leftKeys.every((key, index) => key === rightKeys[index])
     && leftKeys.every(key => deepEqual(left[key], right[key]));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isDiscoveredModel(value: unknown): value is AntigravityDiscoveredModel {

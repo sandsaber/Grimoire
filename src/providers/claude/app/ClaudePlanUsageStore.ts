@@ -6,6 +6,7 @@ import type {
   ProviderPlanUsageContext,
   ProviderPlanUsageWindow,
 } from '../../../core/providers/types';
+import { isRecord } from '../../../utils/records';
 import { getClaudeProviderSettings } from '../settings';
 import { loadClaudeStatusLineUsageSnapshot } from './ClaudeStatusLineUsageSnapshot';
 
@@ -83,10 +84,6 @@ export class ClaudePlanUsageStore extends ProviderSpendUsageStore {
 }
 
 export const claudePlanUsageStore = new ClaudePlanUsageStore();
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 function parseClaudeRateLimitWindow(message: SDKMessage | Record<string, unknown>): { key: string; window: ProviderPlanUsageWindow } | null {
   if (!isRecord(message) || message.type !== 'rate_limit_event' || !isRecord(message.rate_limit_info)) {

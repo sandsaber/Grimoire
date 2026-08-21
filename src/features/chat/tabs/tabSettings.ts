@@ -1,3 +1,4 @@
+export { isRecord } from '../../../utils/records';
 import { getHiddenProviderCommandSet } from '../../../core/providers/commands/hiddenCommands';
 import type { ProviderCommandDropdownConfig } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
@@ -12,6 +13,7 @@ import type {
 } from '../../../core/providers/types';
 import type { Conversation, GrimoireSettings } from '../../../core/types';
 import type GrimoirePlugin from '../../../main';
+import { isRecord } from '../../../utils/records';
 import { getTabProviderId } from './providerResolution';
 import type { TabId, TabProviderContext } from './types';
 
@@ -109,10 +111,6 @@ export function getBlankTabModelOptions(
         ...(providerIcon ? { providerIcon } : {}),
       }));
   });
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function getRecordEntry(record: Record<string, unknown>, key: string): Record<string, unknown> | null {

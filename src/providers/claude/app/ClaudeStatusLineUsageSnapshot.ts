@@ -1,5 +1,6 @@
 import type { ProviderPlanUsageWindow } from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
+import { isRecord } from '../../../utils/records';
 
 export const CLAUDE_STATUSLINE_USAGE_SNAPSHOT_PATH = '.grimoire/claude/statusline-usage.json';
 
@@ -118,6 +119,3 @@ function clampPct(pct: number): number {
   return Math.max(0, Math.min(100, Math.round(pct)));
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}

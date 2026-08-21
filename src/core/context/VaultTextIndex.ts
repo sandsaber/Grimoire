@@ -1,7 +1,28 @@
-import type { App } from 'obsidian';
-
 import { isPathInExcludedFolder } from './exclusions';
 import { tokenizeSearchText } from './text';
+
+/**
+ * One markdown note, as the index needs it.
+ *
+ * A port rather than the vault adapter, and rather than Obsidian's `App`. This
+ * is not file I/O: the index wants the *document* model — the metadata cache's
+ * tags and links, and the cached read tied to Obsidian's own file objects —
+ * none of which the storage adapter offers or should grow to. Reading it
+ * through a contract is what keeps this module in `src/core` honestly: it now
+ * depends on what it needs rather than on the plugin host.
+ */
+export interface VaultNote {
+  readonly path: string;
+  readonly basename: string;
+  readonly mtime: number;
+  /** Obsidian's file cache for this note, read only through the extractors. */
+  readonly cache: unknown;
+  read(): Promise<string>;
+}
+
+export interface VaultNoteSource {
+  markdownNotes(): Iterable<VaultNote>;
+}
 
 export interface VaultIndexedDocument {
   path: string;
@@ -16,34 +37,33 @@ export interface VaultIndexedDocument {
 export class VaultTextIndex {
   private readonly documents = new Map<string, VaultIndexedDocument>();
 
-  constructor(private readonly app: App) {}
+  constructor(private readonly notes: VaultNoteSource) {}
 
   async refresh(options: { excludedTags: string[]; excludedFolders: string[] }): Promise<void> {
     const excludedTags = new Set(options.excludedTags.map(normalizeTag));
     const documents = new Map<string, VaultIndexedDocument>();
 
-    for (const file of this.app.vault.getMarkdownFiles()) {
-      if (isPathInExcludedFolder(file.path, options.excludedFolders)) {
+    for (const note of this.notes.markdownNotes()) {
+      if (isPathInExcludedFolder(note.path, options.excludedFolders)) {
         continue;
       }
 
-      const cache = this.app.metadataCache.getFileCache(file);
-      const tags = extractTags(cache);
+      const tags = extractTags(note.cache);
 
       if (hasExcludedTag(tags, excludedTags)) {
         continue;
       }
 
-      const text = await this.app.vault.cachedRead(file);
+      const text = await note.read();
 
-      documents.set(file.path, {
-        path: file.path,
-        title: file.basename,
+      documents.set(note.path, {
+        path: note.path,
+        title: note.basename,
         text,
-        terms: new Set(tokenizeSearchText(`${file.basename} ${file.path} ${text}`)),
+        terms: new Set(tokenizeSearchText(`${note.basename} ${note.path} ${text}`)),
         tags,
-        links: extractLinks(cache),
-        mtime: file.stat.mtime,
+        links: extractLinks(note.cache),
+        mtime: note.mtime,
       });
     }
 

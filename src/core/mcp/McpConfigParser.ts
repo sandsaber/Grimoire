@@ -1,9 +1,6 @@
+import { isRecord } from '../../utils/records';
 import type { McpServerConfig, ParsedMcpConfig } from '../types';
 import { isValidMcpServerConfig } from '../types';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 /**
  * Parse pasted JSON (supports multiple formats).

@@ -418,6 +418,11 @@ export class GrimoireSettingsStorage {
       ...legacyNormalized,
     };
 
+    // Three providers by name, and it is not a list that fell behind: this is
+    // the migration of a *stored* shape, and the stored shape only ever held
+    // these three. A provider added later was never written in the old format,
+    // so migrating it would move a field that never existed. The list grows
+    // only if an old build did, which it cannot.
     updateClaudeProviderSettings(
       merged,
       getClaudeProviderSettings(legacyProviderSettings),

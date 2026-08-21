@@ -58,6 +58,7 @@ import { getClaudeState } from '@/providers/claude/types/providerState';
 import { getEnhancedPath,parseEnvironmentVariables } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
+import { isRecord } from '../../../utils/records';
 import { delayThroughWindow } from '../hostTimers';
 
 /** What an auxiliary answer may be, before it is refused as too large. */
@@ -552,6 +553,3 @@ function claudeSessionIntent(
   return sessionId ? { kind: 'resume', sessionId } : { kind: 'new' };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}

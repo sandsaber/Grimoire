@@ -237,11 +237,11 @@ Kernel/persistence:
 Core platform:
 - CORE-1 ✅ [M][tests] `executionCompositionBoundaries.test.ts:100-111` specifier regex misses side-effect `import '...'` and double-quoted specifiers (AST walker in moduleReachability handles both). Reuse walker.
 - CORE-2 ❌ [M][hygiene] **Refuted.** `McpTester` sits under `src/core/` but its only caller is the settings UI, and Obsidian's own review asks for `window.setTimeout` so a timer scheduled from a popped-out settings window belongs to that window. The rule keeping the browser object out of core is about the execution kernel's boundary, which this is not part of; the reason is now written in the file.
-- CORE-3 [M][hygiene] two YAML stacks: `utils/frontmatter.ts` vs `utils/yamlFrontmatter.ts`.
-- CORE-4 [M][hygiene] 28 repo-wide copies of `isRecord`.
+- CORE-3 ❌ [M][hygiene] **Deferred with evidence, not hygiene.** Switching `frontmatter.ts` from Obsidian's `parseYaml` to the `yaml` package turns six rows in `frontmatter.test.ts` red — documents Obsidian rejects and `yaml` accepts, where the tolerant fallback then stops running and the values change with it (a bare `key:` becomes `null` instead of `''`). That is a migration of how *existing vault files* parse, which is a product decision. The split is by role and the reason is now written in the file: files Obsidian wrote are read the way Obsidian reads them; the `yaml` package writes what Grimoire owns.
+- CORE-4 ✅ [M][hygiene] 28 repo-wide copies of `isRecord`.
 - CORE-5 ✅ [M][hygiene] `src/app/settings/defaultSettings.ts:52` hard-codes 'codex' instead of DEFAULT_CHAT_PROVIDER_ID.
-- CORE-6 [M][architecture] `GrimoireSettingsStorage.ts:26-37,421-432` hard-codes three providers for legacy migration; should not survive M3 unnamed.
-- CORE-7 [M][architecture] `src/core/context/VaultTextIndex.ts:1,19` vault calls outside the sanctioned storage adapter directory.
+- CORE-6 ✅ [M][architecture] `GrimoireSettingsStorage.ts:26-37,421-432` hard-codes three providers for legacy migration; should not survive M3 unnamed.
+- CORE-7 ✅ [M][architecture] `src/core/context/VaultTextIndex.ts:1,19` vault calls outside the sanctioned storage adapter directory.
 - CORE-8 ✅ [M][security] `ApprovalManager.ts:111` prefix match without boundary for non-bash/file tools: rule `{"a":"` matches any input starting `{"a":"`. User-authored rules only; defaults fail closed.
 
 Claude:

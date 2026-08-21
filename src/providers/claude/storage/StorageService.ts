@@ -10,6 +10,7 @@ import type {
   SlashCommand,
 } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
+import { isRecord } from '../../../utils/records';
 import {
   type CCPermissions,
   type CCSettings,
@@ -22,10 +23,6 @@ import { SKILLS_PATH, SkillStorage } from './SkillStorage';
 import { COMMANDS_PATH, SlashCommandStorage } from './SlashCommandStorage';
 
 export const CLAUDE_PATH = '.claude';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 function cloneJsonValue(value: unknown, depth = 0): unknown {
   if (depth > 6) {
