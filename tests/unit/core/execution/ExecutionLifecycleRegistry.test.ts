@@ -1206,6 +1206,37 @@ describe('ExecutionLifecycleRegistry — deleting a conversation', () => {
     created.mockRestore();
   });
 
+  it('sweeps records a tab owned rather than a conversation', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage);
+    // What a tab that ran a turn before it was bound to a chat leaves behind.
+    // D4 removes records when the *conversation* that owns them is deleted, so
+    // these were unreachable by construction — no conversation would ever ask.
+    const tabOwner = { kind: 'internal-service' as const, ownerId: 'grimoiretab-1' };
+    await first.registry.createSession({
+      ...sessionCommand(),
+      executionSessionId: SESSION_ID,
+      owner: tabOwner,
+    });
+    await first.registry.startRun(SESSION_ID, { ...request(RUN_ID, 'none'), owner: tabOwner });
+    first.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, {
+      deliveryId: `terminal-${RUN_ID}`,
+      destination: 'both',
+    });
+    await settle(first.registry);
+    await first.registry.disposeSession(SESSION_ID);
+    await expect(first.repositories.runs.read(RUN_ID)).resolves.toMatchObject({ kind: 'current' });
+
+    const restored = createFixture(storage, { transactionOffset: 7_000, instanceOffset: 70 });
+    await restored.registry.start();
+
+    // The tab that owned it belongs to a process that is gone; nothing in this
+    // one can resume it, and nothing else would ever remove it.
+    await expect(restored.repositories.runs.read(RUN_ID)).resolves.toMatchObject({ kind: 'absent' });
+    await expect(restored.repositories.sessions.read(SESSION_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+  });
+
   it('refuses to remove records a lease still holds', async () => {
     const fixture = await startedFixture();
     await fixture.registry.createSession(sessionCommand());

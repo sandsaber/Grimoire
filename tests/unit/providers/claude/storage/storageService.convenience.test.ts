@@ -35,7 +35,17 @@ function createMockAdapter(initialFiles: Record<string, string> = {}) {
         }
         return { files: filesAtLevel, folders: Array.from(folderSet) };
       }),
-      rename: jest.fn(),
+      // A real rename, because settings are now staged beside the file and
+      // renamed over it: a double that accepted the call and moved nothing left
+      // every save invisible.
+      rename: jest.fn(async (from: string, to: string) => {
+        const content = files.get(from);
+        if (content === undefined) {
+          throw new Error(`ENOENT: ${from}`);
+        }
+        files.delete(from);
+        files.set(to, content);
+      }),
       stat: jest.fn(async (path: string) => {
         if (!files.has(path)) return null;
         return { mtime: 1, size: files.get(path)!.length };

@@ -325,4 +325,73 @@ describe('CCSettingsStorage', () => {
             expect(writtenContent.enabledPlugins).toEqual({ 'plugin-a': false });
         });
     });
+  it('does not lose one save to another that overlapped it', async () => {
+    // The merge is a read-modify-write, and nothing serialized it: two saves
+    // overlapping meant the second read the file before the first wrote it, and
+    // whichever finished last silently won — dropping the other's permissions.
+    const files = new Map<string, string>();
+    const adapter = createSlowAdapter(files);
+    const storage = new CCSettingsStorage(adapter);
+
+    await Promise.all([
+      storage.save({ permissions: { allow: ['Read(a)'], deny: [], ask: [] } } as never),
+      storage.save({ permissions: { allow: ['Read(b)'], deny: [], ask: [] } } as never),
+    ]);
+
+    // The second write wins, which is what "last one wins" should mean — but it
+    // read the first one's file, so nothing was lost on the way.
+    const saved = JSON.parse(files.get('.claude/settings.json') as string);
+    expect(saved.permissions.allow).toEqual(['Read(b)']);
+    expect(files.has('.claude/settings.json.grimoire-pending')).toBe(false);
+  });
+
+  it('leaves the previous file whole when the replacement cannot land', async () => {
+    const files = new Map<string, string>([['.claude/settings.json', '{"permissions":{"allow":["Read(old)"]}}']]);
+    const adapter = createSlowAdapter(files);
+    adapter.rename = jest.fn(async () => {
+      throw new Error('rename failed');
+    });
+    const storage = new CCSettingsStorage(adapter);
+
+    await expect(storage.save({ permissions: { allow: ['Read(new)'], deny: [], ask: [] } } as never))
+      .rejects.toThrow('rename failed');
+
+    // Whole, and no staged copy left beside it for the next reader — Claude
+    // Code reads this directory too.
+    expect(JSON.parse(files.get('.claude/settings.json') as string).permissions.allow)
+      .toEqual(['Read(old)']);
+    expect(files.has('.claude/settings.json.grimoire-pending')).toBe(false);
+  });
+
 });
+
+/** An adapter whose reads and writes take a turn, so overlaps are real. */
+function createSlowAdapter(files: Map<string, string>): any {
+  const yieldTurn = () => new Promise(resolve => setTimeout(resolve, 0));
+  return {
+    exists: async (path: string) => {
+      await yieldTurn();
+      return files.has(path);
+    },
+    read: async (path: string) => {
+      await yieldTurn();
+      const content = files.get(path);
+      if (content === undefined) throw new Error(`ENOENT: ${path}`);
+      return content;
+    },
+    write: async (path: string, content: string) => {
+      await yieldTurn();
+      files.set(path, content);
+    },
+    rename: jest.fn(async (from: string, to: string) => {
+      await yieldTurn();
+      const content = files.get(from);
+      if (content === undefined) throw new Error(`ENOENT: ${from}`);
+      files.delete(from);
+      files.set(to, content);
+    }),
+    delete: async (path: string) => {
+      files.delete(path);
+    },
+  };
+}

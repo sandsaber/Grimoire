@@ -10,7 +10,11 @@ export const CC_SETTINGS_PATH = '.claude/settings.json';
 
 const CC_SETTINGS_SCHEMA = 'https://json.schemastore.org/claude-code-settings.json';
 
-type CCSettingsAdapter = Pick<VaultFileAdapter, 'exists' | 'read' | 'write'>;
+type CCSettingsAdapter = Pick<VaultFileAdapter, 'exists' | 'read' | 'write'>
+  & Partial<Pick<VaultFileAdapter, 'rename' | 'delete'>>;
+
+/** Where a replacement is staged, beside the file it replaces. */
+const CC_SETTINGS_PENDING_PATH = `${CC_SETTINGS_PATH}.grimoire-pending`;
 
 function normalizeRuleList(value: unknown): PermissionRule[] {
   if (!Array.isArray(value)) return [];
@@ -35,6 +39,9 @@ function normalizePermissions(permissions: unknown): CCPermissions {
 }
 
 export class CCSettingsStorage {
+  /** One save at a time: the merge below is a read-modify-write. */
+  private writes: Promise<void> = Promise.resolve();
+
   constructor(private adapter: CCSettingsAdapter) { }
 
   async load(): Promise<CCSettings> {
@@ -63,7 +70,26 @@ export class CCSettingsStorage {
     };
   }
 
-  async save(settings: CCSettings): Promise<void> {
+  /**
+   * Replaces the file, one writer at a time and without a torn state.
+   *
+   * Two problems that were one symptom. The merge is a read-modify-write, and
+   * nothing serialized it — two saves overlapping meant the second read the
+   * file before the first wrote it, and whichever finished last silently won,
+   * dropping the other's permissions. And the write itself was direct, so a
+   * crash mid-write left this shared file — Claude Code reads it too — as
+   * truncated JSON.
+   *
+   * Staged beside the file and renamed over it where the adapter can, which is
+   * every path that writes: the home adapter is read-only here. A reader that
+   * opens `settings.json` sees the old content or the new one, never half.
+   */
+  save(settings: CCSettings): Promise<void> {
+    this.writes = this.writes.catch(() => undefined).then(() => this.saveUnlocked(settings));
+    return this.writes;
+  }
+
+  private async saveUnlocked(settings: CCSettings): Promise<void> {
     // Preserve CC-specific fields we don't manage
     let existing: Record<string, unknown> = {};
     if (await this.adapter.exists(CC_SETTINGS_PATH)) {
@@ -83,7 +109,21 @@ export class CCSettingsStorage {
     };
 
     const content = JSON.stringify(merged, null, 2);
-    await this.adapter.write(CC_SETTINGS_PATH, content);
+    const rename = this.adapter.rename?.bind(this.adapter);
+    if (!rename) {
+      await this.adapter.write(CC_SETTINGS_PATH, content);
+      return;
+    }
+    await this.adapter.write(CC_SETTINGS_PENDING_PATH, content);
+    try {
+      await rename(CC_SETTINGS_PENDING_PATH, CC_SETTINGS_PATH);
+    } catch (error) {
+      // The staged copy is this build's, and a failed rename leaves it beside
+      // a file that is still whole. Removing it keeps the directory readable
+      // to whoever looks at it next — Claude Code included.
+      await this.adapter.delete?.(CC_SETTINGS_PENDING_PATH).catch(() => undefined);
+      throw error;
+    }
   }
 
   async exists(): Promise<boolean> {

@@ -881,11 +881,21 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   syncConversationState(state: BoundConversation | null): void {
     const next = state?.sessionId ?? null;
     const nextConversationId = state?.id ?? null;
-    if (this.boundConversationId !== undefined && this.boundConversationId !== nextConversationId) {
-      // A tab is not a conversation. The session the previous one was working
-      // in is owned by *it*, and carrying it into the next would put one
-      // conversation's runs under another's name — which deleting either then
-      // takes the wrong records for. The next turn establishes a fresh one.
+    // Two cases, and the second was missing. A tab moving between conversations
+    // must not carry the first one's session into the second — that puts one
+    // conversation's runs under another's name. And a tab that established a
+    // session *before* any conversation was bound holds one owned by the tab,
+    // not by a conversation: carrying that one forward means a session whose
+    // records name an owner no conversation deletion will ever look for, so
+    // they outlive the chat that produced them with nothing able to remove
+    // them (D4). Both are answered the same way — let it go, and let the next
+    // turn establish one under the right owner.
+    const movedBetweenConversations = this.boundConversationId !== undefined
+      && this.boundConversationId !== nextConversationId;
+    const boundItsFirstConversation = this.boundConversationId === undefined
+      && nextConversationId !== null
+      && this.executionSessionId !== null;
+    if (movedBetweenConversations || boundItsFirstConversation) {
       this.resetSession();
     }
     this.boundConversationId = nextConversationId;

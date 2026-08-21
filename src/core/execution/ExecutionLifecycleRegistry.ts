@@ -272,6 +272,7 @@ export class ExecutionLifecycleRegistry {
     }
     try {
       await this.controlTransactions.recoverPending();
+      await this.sweepTabScopedRecords();
       await this.loadPersistedControls();
       await this.recoverPersistedInteractions();
       await this.recoverPersistedRuns();
@@ -1446,6 +1447,36 @@ export class ExecutionLifecycleRegistry {
         this.trackEventTask(this.ingest(event).then(() => undefined));
       });
       this.sessions.set(typedSessionId, entry);
+    }
+  }
+
+  /**
+   * Removes what a tab owned rather than a conversation.
+   *
+   * A tab that ran a turn before it was bound to a chat owns that session
+   * itself, and D4 removes records when the *conversation* that owns them is
+   * deleted — so these were unreachable by construction: no conversation would
+   * ever ask for them, and no clock expires a run record. They accumulated for
+   * the life of the vault.
+   *
+   * Swept at startup rather than at tab close, because the tab that owned one
+   * belongs to a process that is gone: nothing in this one can resume it, and
+   * anything still holding it would have to be in this process to do so.
+   */
+  private async sweepTabScopedRecords(): Promise<void> {
+    const owners = new Map<string, ExecutionOwner>();
+    for (const id of await this.repositories.sessions.listRecordIds()) {
+      const read = await this.repositories.sessions.read(id);
+      if (read.kind !== 'current' && read.kind !== 'migrated') {
+        continue;
+      }
+      const owner = read.record.payload.owner;
+      if (owner.kind === 'internal-service') {
+        owners.set(`${owner.kind}:${owner.ownerId}`, owner);
+      }
+    }
+    for (const owner of owners.values()) {
+      await this.deleteOwnedRecordsUnlocked(owner);
     }
   }
 

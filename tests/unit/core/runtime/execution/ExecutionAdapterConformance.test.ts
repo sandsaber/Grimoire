@@ -8,7 +8,11 @@ import opencodeTrace from '@test/fixtures/provider-traces/opencode-execution.jso
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { executionBackendId } from '@/core/execution/ExecutionBackendDescriptor';
-import type { ExecutionRequest, RunTerminalReason } from '@/core/execution/ExecutionContracts';
+import type {
+  ExecutionOwner,
+  ExecutionRequest,
+  RunTerminalReason,
+} from '@/core/execution/ExecutionContracts';
 import { ExecutionControlRepositories } from '@/core/execution/ExecutionControlRepositories';
 import { ExecutionControlTransactionCoordinator } from '@/core/execution/ExecutionControlTransactionCoordinator';
 import type {
@@ -79,6 +83,8 @@ interface Harness {
   sessionOwner(): { readonly kind: string; readonly ownerId: string } | null;
   /** What the composition would answer for the conversation a tab is showing. */
   bindConversation(conversationId: string): void;
+  /** What a composition answers for a tab that has no conversation yet. */
+  bindNoConversation(): void;
 }
 
 async function createHarness(options: { ownSession?: boolean } = {}): Promise<Harness> {
@@ -105,7 +111,7 @@ async function createHarness(options: { ownSession?: boolean } = {}): Promise<Ha
   });
   registry.registerBackend({ backend });
   await registry.start();
-  let currentOwner = { kind: 'conversation' as const, ownerId: 'adapter-conformance' };
+  let currentOwner: ExecutionOwner = { kind: 'conversation', ownerId: 'adapter-conformance' };
   let sessionOrdinal = 0;
   const established: ExecutionSessionId[] = [];
   const owner = currentOwner;
@@ -142,6 +148,9 @@ async function createHarness(options: { ownSession?: boolean } = {}): Promise<Ha
     sessionOwner: () => registry.getSession(established[established.length - 1])?.owner ?? null,
     bindConversation(conversationId: string) {
       currentOwner = { kind: 'conversation' as const, ownerId: conversationId };
+    },
+    bindNoConversation() {
+      currentOwner = { kind: 'internal-service' as const, ownerId: 'grimoiretab-1' };
     },
     dispatched: runId => backend.dispatchedRequests.get(runId),
     steeredRefs: () => [...backend.sessions.values()].flatMap(session => session.steeredRefs),
@@ -594,6 +603,29 @@ describe('the assembled ChatRuntime adapter', () => {
     expect(adapter.isReady()).toBe(false);
     await adapter.ensureReady();
     expect(harness.sessionOwner()).toEqual({ kind: 'conversation', ownerId: 'conversation-2' });
+  });
+
+  it('does not keep a session it opened before it had a conversation', async () => {
+    const harness = await createHarness({ ownSession: true });
+    const adapter = createAdapter(harness);
+    // A blank tab warms up before the user has sent anything: it establishes a
+    // session, and that session is the tab's own.
+    harness.bindNoConversation();
+    await adapter.ensureReady();
+    expect(harness.sessionOwner()).toMatchObject({ kind: 'internal-service' });
+
+    harness.bindConversation('conversation-1');
+    adapter.syncConversationState(
+      { id: 'conversation-1', providerState: {}, sessionId: null },
+    );
+
+    // Carried forward, that session's records name an owner no conversation
+    // deletion will ever look for — so they outlive the chat that produced
+    // them with nothing able to remove them (D4). The next turn opens one under
+    // the conversation instead.
+    expect(adapter.isReady()).toBe(false);
+    await adapter.ensureReady();
+    expect(harness.sessionOwner()).toEqual({ kind: 'conversation', ownerId: 'conversation-1' });
   });
 
   it('follows the session it moved to, not the one it left', async () => {

@@ -295,7 +295,14 @@ export class CodexExecution {
         // established: this is what a deleted conversation's control records
         // are found by (D4). The tab's own id stands in only while no
         // conversation is bound, which is a session that belongs to no chat.
-        owner: () => ({ kind: 'conversation', ownerId: conversation?.id ?? scope }),
+        owner: () => (conversation?.id
+          ? { kind: 'conversation', ownerId: conversation.id }
+          // A tab with no conversation yet owns this session itself, and
+          // saying `conversation` about it is what made its records
+          // unreachable: deleting a chat looks for its own id and never finds
+          // one keyed by a tab. Named for what it is, so the startup sweep can
+          // remove what a closed tab left behind.
+          : { kind: 'internal-service', ownerId: scope }),
         nextExecutionSessionId: () => executionSessionId(opaqueId('es')),
         nextRunId: () => runId(opaqueId('run')),
       },
