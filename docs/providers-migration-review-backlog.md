@@ -51,9 +51,9 @@ by the length of the session. **C1 is closed.**
 |---|---|---|---|
 | K1 ✅ | **The auto-turn callback has two different shapes.** The adapter calls `autoTurn(runId)` with `unknown` (`ExecutionChatRuntimeAdapter.ts:1016`, declared `1060`); the only consumer takes an `AutoTurnResult` and reads `result.chunks` (`Tab.ts:1795`). A backend-initiated run would throw inside the registry's observer and be swallowed. Latent today because nothing initiates one. | both call sites read | confirmed |
 | K2 ❌ | **Refuted.** `wasSent` is false only for `invalidated`, and the terminal policy allows exactly two reasons there — `pre-dispatch-rejected` and `side-effect-free-rejection`, both meaning the turn never reached the provider. A dispatch that might have landed is `indeterminate`, which reports true, and a cancelled turn is already pinned at `wasSent: true` by `ExecutionAdapterConformance.test.ts`. | `ExecutionTerminalPolicy.ts` + the existing row | refuted |
-| K3 | Every durable event rewrites the whole session record, including an unbounded `runIds` array — roughly six file writes per event. | — | reported |
-| K4 | `window.setTimeout` in provider-neutral core (`ExecutionChatRuntimeAdapter.ts:811`) where an injectable scheduler already exists; the DOM boundary gate does not cover that file. | — | reported |
-| K5 | `shutdown()` can wait forever on a hung `createSession` (`ExecutionLifecycleRegistry.ts:988`) — no grace period. | — | reported |
+| K3 ✅ | Every durable event rewrites the whole session record, including an unbounded `runIds` array — roughly six file writes per event. | confirmed by reading both envelope paths | confirmed |
+| K4 ✅ | The browser timer in provider-neutral core (`ExecutionChatRuntimeAdapter.ts`) where an injectable clock already sat beside it; the DOM boundary gate covered neither that file nor that global. | gate read: the pattern named only `document` and `HTMLElement` | confirmed |
+| K5 ✅ | `shutdown()` can wait forever on a hung `createSession` — `waitForAdmissions` had no grace period, while every other wait in that method did. | code read | confirmed |
 
 #### ACP transport
 
@@ -88,9 +88,9 @@ held.
 
 | # | Finding | Evidence | Status |
 |---|---|---|---|
-| S1 | "Always allow" promotes the agent's whole `suggestions.replaceRules` to `behavior: 'allow'` without showing them (`ClaudePermissionUpdates.ts:17`); a rule of `{toolName: 'Bash'}` with no pattern is permanent auto-approval of every command. Pre-existing, preserved by the flip. Fix: show the rules in the card and clamp to the pattern displayed. | — | reported |
+| S1 ✅ | "Always allow" promotes the agent's whole `suggestions` rule set to `behavior: 'allow'` without showing them; a rule of `{toolName: 'Bash'}` with no pattern is permanent auto-approval of every command. Pre-existing, preserved by the flip. Fixed both ways the review asked for: clamped to the action approved, and shown on the card. | code read | confirmed |
 | S2 ✅ | D7 path redaction misses Linux: the pattern matches `/Users`, `/Volumes`, `/tmp`, `/var`, `C:\` (`DebugLogService.ts:57`), so `/home/...` leaks through `stderrPreview`. | — | reported |
-| S3 | Session metadata filenames embed an unvalidated provider-supplied id and are written non-atomically (`SessionStorage.ts:294`) — the control store solves exactly this for its own records; the metadata file does not. | — | reported |
+| S3 ✅ | Session metadata filenames embed an unvalidated provider-supplied id and are written non-atomically — the control store solves exactly this for its own records; the metadata file did not. | `conversationId = sessionId ?? generated` in `main.ts` | confirmed |
 
 No Critical security finding in the new code. Fail-closed bridges, D2 enforced mechanically, atomic
 CAS writes and shell-free Windows launch were all called out as done well.
@@ -99,15 +99,14 @@ CAS writes and shell-free Windows launch were all called out as done well.
 
 | # | Finding | Status |
 |---|---|---|
-| Q1 | Live matrices run nowhere automatically — by design, but nothing records when one last ran except each matrix's own Record table. | reported |
-| Q2 | The boundary gate does not resolve dynamic `import()`; no violation exists today. | reported |
+| Q1 ✅ | Live matrices run nowhere automatically — by design, but nothing recorded when one last ran except each matrix's own Record table, and two matrices had no table at all. | confirmed |
+| Q2 ✅ | The boundary gate did not see dynamic `import()` or `require()`; no violation existed. | confirmed |
 
 ### Where the first review stands
 
-Everything in the order below is done except the four items nobody has started: **K3** (the session
-record rewritten per event), **K4** (`window.setTimeout` in neutral core), **K5** (`shutdown()` with
-no grace period on a hung `createSession`), **S1** ("always allow" promoting unshown rules), **S3**
-(session metadata filenames), and the two QA notes. **K2 was refuted** — see its row.
+**Closed.** Every row is either fixed or, in K2's case, refuted with evidence. The last pass took
+K3, K4, K5, S1, S3, Q1 and Q2 together; what each of them turned out to need beyond the literal fix
+is in the journal entry for that commit.
 
 ### The order it was fixed in
 

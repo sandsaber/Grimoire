@@ -75,6 +75,8 @@ import { getOpencodeState } from '@/providers/opencode/types';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
+import { delayThroughWindow } from '../hostTimers';
+
 /** What a turn may answer with, before it is refused as too large. */
 const MAX_RESULT_BYTES = 256_000;
 
@@ -410,6 +412,7 @@ export class OpencodeExecution {
         return content.consumeTurnMetadata();
       },
       interactionPresenter: presenter,
+      delay: delayThroughWindow,
       reportCleanupFailure: error => {
         this.plugin.recordDebugLog({
           error,

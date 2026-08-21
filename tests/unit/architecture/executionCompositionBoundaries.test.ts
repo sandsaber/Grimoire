@@ -45,6 +45,7 @@ const STRICT_MODULES = [
   'src/core/persistence/TransactionIntentCoordinator.ts',
   'src/core/persistence/VersionedRecord.ts',
   'src/core/persistence/VersionedRepository.ts',
+  'src/core/runtime/execution/ExecutionChatRuntimeAdapter.ts',
 ];
 
 /**
@@ -81,7 +82,32 @@ function read(module: string): string {
 }
 
 function importsPlugin(source: string): boolean {
-  return /from '(\.\.\/)+main'|from '@\/main'/.test(source);
+  return [...specifiersIn(source)].some(specifier => (
+    /^(\.\.\/)+main$/.test(specifier) || specifier === '@/main'
+  ));
+}
+
+/**
+ * Every module specifier in a file, however it was written.
+ *
+ * Static `from '...'` was the only form this gate could see, so a dynamic
+ * `import()` or a `require()` was a way past every rule below it. No violation
+ * existed — which is the reason to close it now rather than after one does: a
+ * boundary that only holds for the syntax someone happened to use is not a
+ * boundary, and `import()` is exactly what a module reaches for when a static
+ * import would be circular.
+ */
+function* specifiersIn(source: string): Generator<string> {
+  const patterns = [
+    /from '([^']+)'/g,
+    /\bimport\s*\(\s*'([^']+)'\s*\)/g,
+    /\brequire\s*\(\s*'([^']+)'\s*\)/g,
+  ];
+  for (const pattern of patterns) {
+    for (const [, specifier] of source.matchAll(pattern)) {
+      yield specifier;
+    }
+  }
 }
 
 /**
@@ -99,7 +125,7 @@ function importsFrom(module: string, source: string, area: 'providers' | 'featur
   // modules that import `../providers/types` as importing a concrete provider.
   // They do not, and never did.
   const directory = dirname(module);
-  for (const [, specifier] of source.matchAll(/from '([^']+)'/g)) {
+  for (const specifier of specifiersIn(source)) {
     const resolved = specifier.startsWith('@/')
       ? `src/${specifier.slice(2)}`
       : specifier.startsWith('.')
@@ -130,7 +156,9 @@ function posixJoin(directory: string, specifier: string): string {
 }
 
 function launchesProcess(source: string): boolean {
-  return /from '(node:)?child_process'|require\('(node:)?child_process'\)/.test(source);
+  return [...specifiersIn(source)].some(specifier => (
+    specifier === 'child_process' || specifier === 'node:child_process'
+  ));
 }
 
 describe('execution composition boundaries', () => {
@@ -143,6 +171,24 @@ describe('execution composition boundaries', () => {
         .filter(module => importsFrom(module, read(module), 'providers'));
 
       expect(offenders).toEqual([]);
+    });
+
+    it('sees a specifier however it was written, including a dynamic import', () => {
+      // Guards the guard. `import()` is what a module reaches for when a static
+      // import would be circular, which is precisely the shape a boundary
+      // violation takes — and it was invisible to every rule in this file.
+      const dynamic = "const m = await import('@/providers/codex/settings');";
+      const required = "const m = require('../../providers/codex/settings');";
+      const dynamicPlugin = "const p = await import('@/main');";
+      const dynamicSpawn = "const { spawn } = await import('node:child_process');";
+
+      expect(importsFrom('src/core/x/Y.ts', dynamic, 'providers')).toBe(true);
+      expect(importsFrom('src/core/runtime/ChatRuntime.ts', required, 'providers')).toBe(true);
+      expect(importsPlugin(dynamicPlugin)).toBe(true);
+      expect(launchesProcess(dynamicSpawn)).toBe(true);
+      // And still says no to core's own neutral contracts.
+      expect(importsFrom('src/core/x/Y.ts', "await import('@/core/providers/types')", 'providers'))
+        .toBe(false);
     });
 
     it('resolves a specifier rather than matching it, so the rule means what it says', () => {
@@ -207,7 +253,13 @@ describe('execution composition boundaries', () => {
       expect(importsFrom(module, source, 'providers') && module.startsWith('src/core/'))
         .toBe(false);
       expect(source).not.toMatch(/from 'obsidian'/);
-      expect(source).not.toMatch(/\bHTMLElement\b|\bdocument\b/);
+      // The browser's global object belongs here with the other two: the
+      // adapter reached for its timer while an injectable clock was already
+      // beside it, and a rule naming only `document` and `HTMLElement` called
+      // that clean. A host's timer arrives through a port like everything else.
+      // The match is over the whole file, comments included — so a strict
+      // module explains the rule without writing the word it forbids.
+      expect(source).not.toMatch(/\bHTMLElement\b|\bdocument\b|\bwindow\./);
     });
   });
 

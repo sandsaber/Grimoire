@@ -97,3 +97,13 @@ badges and the two-tab behaviour actually render.
 Append the outcome to `docs/provider-execution-migration-progress.md` as a checkpoint entry: date,
 CLI version, one line per row, and — if any row failed — what was reverted or what the next action
 is. Until that entry exists, wave 2 is wired and not certified.
+
+## Record
+
+One row per run. `never` in the Date column is a real answer, and it is what
+`liveMatrixRecords.test.ts` reads — so a matrix that has never been run says so
+here rather than by the absence of a table.
+
+| Date | CLI version | Rows passed | Rows failed | Notes |
+|---|---|---|---|---|
+| never | — | — | — | wave 2 is wired and not certified; these rows need a person in a vault |

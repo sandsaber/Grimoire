@@ -81,6 +81,10 @@ a write outside the vault, a question dialog, and the rewind button being gone.
 
 ## Record
 
+One row per run. `never` in the Date column is a real answer, and it is what
+`liveMatrixRecords.test.ts` reads — so a matrix that has never been run says so
+here rather than by the absence of a table.
+
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
 | 2026-08-20 | 1.0.5 | live: 1, 1b, 2, 5, 6, 7, 8, 9, 13, 14, 16, 18, 19, 20 | — | first live run found the resume shape this provider actually has; see the journal entry for that run |

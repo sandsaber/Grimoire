@@ -200,6 +200,7 @@ function toDecisionOption(option: ClaudeApprovalOption): ApprovalDecisionOption 
     // record without a second mapping table.
     value: option.responseId,
     ...(decision ? { decision } : {}),
+    ...(option.description ? { description: option.description } : {}),
     presentation: option.presentation,
   };
 }

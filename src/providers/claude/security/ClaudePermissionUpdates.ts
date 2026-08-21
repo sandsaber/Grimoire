@@ -1,6 +1,41 @@
-import type { PermissionUpdate, PermissionUpdateDestination } from '@anthropic-ai/claude-agent-sdk';
+import type {
+  PermissionRuleValue,
+  PermissionUpdate,
+  PermissionUpdateDestination,
+} from '@anthropic-ai/claude-agent-sdk';
 
 import { getActionPattern } from '../../../core/security/ApprovalManager';
+
+/**
+ * The rule an approval grants, derived from the action that was approved.
+ *
+ * Shared with the card that offers it: what "Always allow" writes and what the
+ * button says it writes have to come from one place, or the sentence drifts
+ * away from the grant and the card becomes worse than no card.
+ */
+export function resolveApprovalRule(
+  toolName: string,
+  input: Record<string, unknown>,
+): PermissionRuleValue {
+  const pattern = getActionPattern(toolName, input);
+  if (pattern && !pattern.startsWith('{')) {
+    return { toolName, ruleContent: pattern };
+  }
+  return { toolName };
+}
+
+/** What that rule permits, in a sentence the person can weigh before clicking. */
+export function describeApprovalRule(
+  rule: PermissionRuleValue,
+  destination: PermissionUpdateDestination,
+): string {
+  const scope = destination === 'session' ? 'for this session' : 'for this project';
+  return rule.ruleContent
+    ? `Allows ${rule.toolName}(${rule.ruleContent}) ${scope}`
+    // The case worth spelling out: a rule with no pattern is every use of the
+    // tool, and it is what an unclamped suggestion used to grant silently.
+    : `Allows every ${rule.toolName} call ${scope}`;
+}
 
 export function buildPermissionUpdates(
   toolName: string,
@@ -10,15 +45,37 @@ export function buildPermissionUpdates(
 ): PermissionUpdate[] {
   const destination: PermissionUpdateDestination =
     decision === 'allow-always' ? 'projectSettings' : 'session';
+  const approved = resolveApprovalRule(toolName, input);
 
   const processed: PermissionUpdate[] = [];
   let hasRuleUpdate = false;
 
   if (suggestions) {
     for (const suggestion of suggestions) {
-      if (suggestion.type === 'addRules' || suggestion.type === 'replaceRules') {
+      if (suggestion.type === 'addRules') {
+        // Kept only where the agent asked for exactly what the person was
+        // shown. A suggestion is the *agent* proposing its own permissions, and
+        // the agent is the party being restrained — so a rule that reaches
+        // wider than the approved action is not a convenience, it is the
+        // request edited after the click. `{toolName: 'Bash'}` with no pattern
+        // was the extreme: permanent approval of every command, granted by a
+        // button that said "allow this one".
+        if (!suggestion.rules.every(rule => grantsNoMoreThan(rule, approved))) {
+          continue;
+        }
         hasRuleUpdate = true;
         processed.push({ ...suggestion, behavior: 'allow', destination });
+      } else if (suggestion.type === 'replaceRules') {
+        // Never promoted. Replacing the rule set can remove denials the person
+        // put there, and no approval button offers that.
+        continue;
+      } else if (suggestion.type === 'setMode') {
+        // A mode that widens is the same hazard through another door: one
+        // approval must not put the session into a mode that stops asking.
+        if (suggestion.mode === 'bypassPermissions' || suggestion.mode === 'acceptEdits') {
+          continue;
+        }
+        processed.push(suggestion);
       } else {
         processed.push(suggestion);
       }
@@ -26,19 +83,23 @@ export function buildPermissionUpdates(
   }
 
   if (!hasRuleUpdate) {
-    const pattern = getActionPattern(toolName, input);
-    const ruleValue: { toolName: string; ruleContent?: string } = { toolName };
-    if (pattern && !pattern.startsWith('{')) {
-      ruleValue.ruleContent = pattern;
-    }
-
     processed.unshift({
       type: 'addRules',
       behavior: 'allow',
-      rules: [ruleValue],
+      rules: [approved],
       destination,
     });
   }
 
   return processed;
+}
+
+/** Whether a suggested rule permits nothing the approved action did not. */
+function grantsNoMoreThan(rule: PermissionRuleValue, approved: PermissionRuleValue): boolean {
+  if (rule.toolName !== approved.toolName) {
+    return false;
+  }
+  // A missing pattern means every use of the tool, so it is narrower than the
+  // approved action only when the approved action was itself unpatterned.
+  return (rule.ruleContent ?? '') === (approved.ruleContent ?? '');
 }

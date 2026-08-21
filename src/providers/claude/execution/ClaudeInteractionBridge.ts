@@ -11,7 +11,11 @@ import {
   TOOL_SKILL,
 } from '../../../core/tools/toolNames';
 import type { PermissionMode } from '../../../core/types/settings';
-import { buildPermissionUpdates } from '../security/ClaudePermissionUpdates';
+import {
+  buildPermissionUpdates,
+  describeApprovalRule,
+  resolveApprovalRule,
+} from '../security/ClaudePermissionUpdates';
 import type {
   ClaudeInteractionBridge as ClaudeInteractionBridgeContract,
   ClaudePreparedInteraction,
@@ -26,6 +30,8 @@ export interface ClaudeApprovalOption {
   readonly responseId: string;
   readonly label: string;
   readonly presentation: ClaudeApprovalOptionPresentation;
+  /** What choosing it grants, where that is more than the label says. */
+  readonly description?: string;
 }
 
 /**
@@ -182,14 +188,27 @@ export class ClaudeInteractionBridge implements ClaudeInteractionBridgeContract 
     toolInput: Readonly<Record<string, unknown>>,
     options: ClaudeToolPermissionOptions,
   ): ClaudePreparedInteraction {
+    // Built from the same call the resolution builds its rule from, so the
+    // sentence on the button is the grant and not a description of it.
+    const granted = resolveApprovalRule(toolName, { ...toolInput });
     const presentationRef = this.remember(this.nextPresentationRef(), {
       kind: 'approval',
       toolName,
       description: getActionDescription(toolName, { ...toolInput }),
       input: toolInput,
       options: [
-        { responseId: ALLOW_ONCE, label: 'Allow once', presentation: 'allow' },
-        { responseId: ALLOW_ALWAYS, label: 'Always allow', presentation: 'always' },
+        {
+          responseId: ALLOW_ONCE,
+          label: 'Allow once',
+          presentation: 'allow',
+          description: describeApprovalRule(granted, 'session'),
+        },
+        {
+          responseId: ALLOW_ALWAYS,
+          label: 'Always allow',
+          presentation: 'always',
+          description: describeApprovalRule(granted, 'projectSettings'),
+        },
         { responseId: DENY, label: 'Deny', presentation: 'reject' },
       ],
       ...(options.decisionReason ? { decisionReason: options.decisionReason } : {}),

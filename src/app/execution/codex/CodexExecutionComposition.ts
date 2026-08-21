@@ -61,6 +61,8 @@ import { CodexSkillListingService } from '@/providers/codex/skills/CodexSkillLis
 import { DEFAULT_CODEX_PRIMARY_MODEL } from '@/providers/codex/types/models';
 import { getVaultPath } from '@/utils/path';
 
+import { delayThroughWindow } from '../hostTimers';
+
 /**
  * Codex chat execution, assembled from the running plugin.
  *
@@ -265,6 +267,7 @@ export class CodexExecution {
       // One per tab, because the router it runs tracks a turn's items across
       // notifications and two tabs are two turns.
       presentProviderContent: payload => content.present(payload),
+      delay: delayThroughWindow,
       reportCleanupFailure: error => {
         this.plugin.recordDebugLog({
           error,

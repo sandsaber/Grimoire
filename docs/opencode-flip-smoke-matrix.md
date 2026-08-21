@@ -81,6 +81,10 @@ plan and the badges actually render, two tabs side by side, switching the model 
 
 ## Record
 
+One row per run. `never` in the Date column is a real answer, and it is what
+`liveMatrixRecords.test.ts` reads — so a matrix that has never been run says so
+here rather than by the absence of a table.
+
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
 | 2026-08-20 | 1.18.18 | live: 1, 2, 5, 6, 7, 8, 9, 12, 13, 15, 17, 18, 19 | — | first live run found five defects, all fixed and pinned; see the journal entry for that run |

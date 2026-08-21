@@ -168,6 +168,16 @@ interface SessionEntry {
     readonly nextCausalSequence: number;
     readonly runIds: Set<RunId>;
   }>;
+  /**
+   * Every run this process has seen for the session, finished ones included.
+   *
+   * The durable record lists only what is unfinished, because it is rewritten
+   * on every event and an ever-growing array made each of those writes larger
+   * than the last. This set is the memory that list used to double as: ids
+   * only, never leaves the process, and it is what tells disposal which runs
+   * and interactions to forget.
+   */
+  readonly knownRunIds: Set<string>;
 }
 
 interface RunEntry {
@@ -338,7 +348,14 @@ export class ExecutionLifecycleRegistry {
           revision: created.revision,
           unsubscribe: () => undefined,
           pendingGapStreams: new Map(),
+          knownRunIds: new Set(),
         };
+        if (this.state !== 'accepting') {
+          // Shutdown gave up waiting on this admission and moved on. Registering
+          // now would add a session the checkpoint does not name, owning a
+          // process nothing will dispose. The catch below closes it instead.
+          throw new Error('Execution lifecycle registry stopped accepting new work.');
+        }
         entry.unsubscribe = session.subscribe(event => {
           this.trackEventTask(this.ingest(event).then(() => undefined));
         });
@@ -365,7 +382,7 @@ export class ExecutionLifecycleRegistry {
         if (session.backend.state !== 'stable') {
           throw new Error(`Execution backend "${session.record.backendId}" is draining.`);
         }
-        if (this.runs.has(request.runId) || session.record.runIds.includes(request.runId)) {
+        if (this.runs.has(request.runId) || session.knownRunIds.has(request.runId)) {
           throw new Error(`Execution run "${request.runId}" already exists.`);
         }
         requireOwner(request.owner);
@@ -392,6 +409,7 @@ export class ExecutionLifecycleRegistry {
           runIds: [...session.record.runIds, request.runId],
           updatedAt: timestamp,
         };
+        session.knownRunIds.add(request.runId);
         await this.commitWrites([
           write('sessions', executionSessionId, session.revision, nextSessionRecord),
           write('runs', request.runId, null, runRecord),
@@ -955,7 +973,9 @@ export class ExecutionLifecycleRegistry {
       const run = this.runs.get(runId(id));
       return run !== undefined && !run.record.terminal;
     });
-    const sessionRunIds = new Set(session.record.runIds);
+    // The full set, not the record's list: a prompt whose run has just
+    // terminalized is off the record and is exactly the one nobody can answer.
+    const sessionRunIds = session.knownRunIds;
     const hasOpenInteraction = [...this.interactions.values()].some(interaction => (
       sessionRunIds.has(interaction.record.runId)
       && isActiveInteraction(interaction.record.status)
@@ -989,7 +1009,7 @@ export class ExecutionLifecycleRegistry {
       // hold a closure per disposed conversation for the life of the process,
       // and a session id is never reused for a different session.
       this.envelopeObservers.delete(executionSessionId);
-      this.forgetSessionWork(session.record);
+      this.forgetSessionWork(session);
     });
   }
 
@@ -1006,8 +1026,8 @@ export class ExecutionLifecycleRegistry {
    * (D4) and by nothing else, because an honest history of what ran outlives
    * the tab that ran it.
    */
-  private forgetSessionWork(record: ExecutionSessionRecord): void {
-    const runIds = new Set(record.runIds);
+  private forgetSessionWork(session: SessionEntry): void {
+    const runIds = session.knownRunIds;
     for (const id of runIds) {
       // Every one of them is finished: disposal refuses a session with a live
       // run, which is checked above and is what makes this safe to do at all.
@@ -1162,6 +1182,7 @@ export class ExecutionLifecycleRegistry {
     requireOpaqueRecordId(checkpointId, 'sd', 'shutdown checkpoint id');
     this.state = 'quiescing';
     await this.waitForAdmissions();
+
 
     const activeRuns = [...this.runs.values()].filter(run => !run.record.terminal);
     const timestamp = this.now();
@@ -1339,6 +1360,15 @@ export class ExecutionLifecycleRegistry {
         revision: updated.revision,
         unsubscribe: () => undefined,
         pendingGapStreams: new Map(),
+        // Rebuilt from the run records themselves, which name their session:
+        // the session record lists only unfinished runs, so a restart that read
+        // the list alone would forget every turn the session already ran.
+        knownRunIds: new Set([
+          ...updated.payload.runIds,
+          ...[...this.runs.values()]
+            .filter(run => run.record.executionSessionId === typedSessionId)
+            .map(run => run.record.runId),
+        ]),
       };
       entry.unsubscribe = executionSession.subscribe(event => {
         this.trackEventTask(this.ingest(event).then(() => undefined));
@@ -1508,6 +1538,17 @@ export class ExecutionLifecycleRegistry {
       status: sessionStatusForEvent(session.record.status, envelope.event),
       lastSequence: envelope.sequence,
       acceptedEventIds: [...session.ingestor.getRecentDeliveryIds()],
+      // The list is what is still unfinished, not a history. This record is
+      // rewritten on every event the session sees, so carrying every run it
+      // ever held made each write larger than the last for the life of the
+      // conversation. What the list is read for is live work — whether the
+      // session can be disposed, and which runs a lost connection has to
+      // recover — and a run that reached a terminal is neither. Nothing is
+      // lost: every run record names its own session and its own owner, which
+      // is what deletion and a restart read.
+      runIds: reduced.terminal
+        ? session.record.runIds.filter(id => id !== reduced.runId)
+        : session.record.runIds,
       updatedAt: this.now(),
     };
     const desiredRun: ExecutionRunRecord = {
@@ -1690,7 +1731,7 @@ export class ExecutionLifecycleRegistry {
     additionalInteractionIds: readonly InteractionId[],
   ): Promise<void> {
     await this.refreshSession(session);
-    for (const runIdValue of session.record.runIds) {
+    for (const runIdValue of session.knownRunIds) {
       const run = this.runs.get(runId(runIdValue));
       if (run) {
         await this.refreshRun(run);
@@ -1698,7 +1739,7 @@ export class ExecutionLifecycleRegistry {
     }
     const interactionIds = new Set<InteractionId>(additionalInteractionIds);
     for (const [id, interaction] of this.interactions) {
-      if (session.record.runIds.includes(interaction.record.runId)) {
+      if (session.knownRunIds.has(interaction.record.runId)) {
         interactionIds.add(id);
       }
     }
@@ -1716,6 +1757,21 @@ export class ExecutionLifecycleRegistry {
       .map(id => this.runs.get(runId(id)))
       .filter((run): run is RunEntry => run !== undefined && !run.record.terminal);
     const currentSnapshot = session.session.getSnapshot();
+    const runWrites: ExecutionControlWrite[] = [];
+    const finished = new Set<string>();
+    for (const run of activeRuns) {
+      const reduced = reduceRun(run.record, envelope.event, envelope.occurredAt);
+      if (reduced) {
+        if (reduced.terminal) {
+          finished.add(reduced.runId);
+        }
+        runWrites.push(write('runs', run.record.runId, run.revision, {
+          ...reduced,
+          lastSequence: envelope.sequence,
+          updatedAt: this.now(),
+        }));
+      }
+    }
     const desiredSession: ExecutionSessionRecord = {
       ...session.record,
       ...(currentSnapshot.nativeSessionRef
@@ -1724,21 +1780,17 @@ export class ExecutionLifecycleRegistry {
       status: sessionStatusForEvent(session.record.status, envelope.event),
       lastSequence: envelope.sequence,
       acceptedEventIds: [...session.ingestor.getRecentDeliveryIds()],
+      // See the run-scoped path: the list is live work, and one session event
+      // can finish several runs at once.
+      runIds: finished.size === 0
+        ? session.record.runIds
+        : session.record.runIds.filter(id => !finished.has(id)),
       updatedAt: this.now(),
     };
     const writes: ExecutionControlWrite[] = [
       write('sessions', session.record.executionSessionId, session.revision, desiredSession),
+      ...runWrites,
     ];
-    for (const run of activeRuns) {
-      const reduced = reduceRun(run.record, envelope.event, envelope.occurredAt);
-      if (reduced) {
-        writes.push(write('runs', run.record.runId, run.revision, {
-          ...reduced,
-          lastSequence: envelope.sequence,
-          updatedAt: this.now(),
-        }));
-      }
-    }
     await this.commitWrites(writes);
     await this.refreshSession(session);
     for (const run of activeRuns) {
@@ -2195,11 +2247,23 @@ export class ExecutionLifecycleRegistry {
     };
   }
 
-  private waitForAdmissions(): Promise<void> {
+  /**
+   * Waits for admitted work to finish, and gives up like everything else does.
+   *
+   * An admission is held for the whole of `createSession` or `startRun`,
+   * including the part that is inside the provider. Waiting for it without a
+   * bound made shutdown depend on a CLI answering — a provider that hangs on
+   * `createSession` held the plugin's unload open with no way out, while every
+   * other wait in this method already had the grace period. Answers `false`
+   * when it gave up, and the work it gave up on refuses to register itself when
+   * it eventually returns.
+   */
+  private waitForAdmissions(): Promise<boolean> {
     if (this.activeAdmissions === 0) {
-      return Promise.resolve();
+      return Promise.resolve(true);
     }
-    return new Promise(resolve => this.admissionWaiters.add(resolve));
+    const drained = new Promise<void>(resolve => this.admissionWaiters.add(resolve));
+    return this.settleWithin([drained]);
   }
 
   private async settleWithin(

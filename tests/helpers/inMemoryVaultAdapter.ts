@@ -48,3 +48,31 @@ export function createInMemoryVaultAdapter(
 
   return adapter as unknown as InMemoryVaultAdapter;
 }
+
+/**
+ * The same store, with the members a durable writer needs.
+ *
+ * `VaultDurableStorage` replaces a file by writing beside it and renaming, and
+ * it serializes per path against the adapter's backing store — so a double that
+ * a `SessionStorage` writes through has to answer those three as well.
+ */
+export function createDurableInMemoryVaultAdapter(
+  initialFiles: Record<string, string> = {},
+): InMemoryVaultAdapter {
+  const adapter = createInMemoryVaultAdapter(initialFiles);
+  const files = adapter.files;
+  const coordinationKey = {};
+  return Object.assign(adapter, {
+    coordinationKey,
+    rename: async (from: string, to: string) => {
+      const content = files.get(from);
+      if (content === undefined) {
+        throw new Error(`ENOENT: ${from}`);
+      }
+      files.delete(from);
+      files.set(to, content);
+    },
+    listFilesRecursive: async (path: string) =>
+      [...files.keys()].filter(key => key.startsWith(`${path}/`)),
+  });
+}

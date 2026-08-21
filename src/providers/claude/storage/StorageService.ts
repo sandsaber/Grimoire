@@ -2,6 +2,7 @@ import type { App, Plugin } from 'obsidian';
 import { Notice } from 'obsidian';
 
 import { GrimoireSettingsStorage, type StoredGrimoireSettings } from '../../../app/settings/GrimoireSettingsStorage';
+import { VaultDurableStorage } from '../../../app/storage/VaultDurableStorage';
 import { SESSIONS_PATH, SessionStorage } from '../../../core/bootstrap/SessionStorage';
 import { GRIMOIRE_STORAGE_PATH } from '../../../core/bootstrap/StoragePaths';
 import { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
@@ -87,7 +88,7 @@ export class StorageService {
     this.grimoireSettings = new GrimoireSettingsStorage(this.adapter);
     this.commands = new SlashCommandStorage(this.adapter);
     this.skills = new SkillStorage(this.adapter);
-    this.sessions = new SessionStorage(this.adapter);
+    this.sessions = new SessionStorage(this.adapter, new VaultDurableStorage(this.adapter));
     this.mcp = new McpStorage(this.adapter);
     this.agents = new AgentVaultStorage(this.adapter);
   }

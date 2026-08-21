@@ -1193,10 +1193,17 @@ describe('GrimoirePlugin', () => {
       const loaded = await plugin.getConversationById('conv-saved-1');
       expect(loaded?.sessionId).toBeNull();
 
+      // Session metadata is replaced rather than overwritten: the content goes
+      // to a file beside the destination, which is then renamed over it, so a
+      // write torn by a crash leaves the previous transcript intact.
       const sessionWrite = (mockApp.vault.adapter.write as jest.Mock).mock.calls.find(
-        ([path]) => path === '.grimoire/sessions/conv-saved-1.meta.json'
+        ([path]) => path === '.grimoire/sessions/conv-saved-1.meta.json.pending'
       );
       expect(sessionWrite).toBeDefined();
+      expect(mockApp.vault.adapter.rename).toHaveBeenCalledWith(
+        '.grimoire/sessions/conv-saved-1.meta.json.pending',
+        '.grimoire/sessions/conv-saved-1.meta.json',
+      );
       const meta = JSON.parse(sessionWrite?.[1] as string);
       expect(meta.sessionId).toBeNull();
     });

@@ -1,5 +1,7 @@
 import '@/providers';
 
+import { createPassthroughDurableStorage } from '@test/helpers/passthroughDurableStorage';
+
 import {
   applyAssistantResponseMetadataToMessages,
   applyVaultSearchContextsToMessages,
@@ -24,7 +26,7 @@ describe('SessionStorage', () => {
       listFiles: jest.fn(),
     } as unknown as jest.Mocked<VaultFileAdapter>;
 
-    storage = new SessionStorage(mockAdapter);
+    storage = new SessionStorage(mockAdapter, createPassthroughDurableStorage(mockAdapter));
   });
 
   describe('SESSIONS_PATH', () => {
@@ -117,10 +119,17 @@ describe('SessionStorage', () => {
         updatedAt: 1700001000,
       };
 
-      mockAdapter.exists.mockImplementation(async (path: string) => (
-        path === `${LEGACY_SESSIONS_PATH}/session-legacy.meta.json`
-      ));
-      mockAdapter.read.mockResolvedValue(JSON.stringify(metadata));
+      // Only the legacy file is there, and a real adapter says so by failing
+      // the read of the one that is not — the `exists` mock alone left the
+      // double answering for a file it had just said did not exist.
+      const legacyPath = `${LEGACY_SESSIONS_PATH}/session-legacy.meta.json`;
+      mockAdapter.exists.mockImplementation(async (path: string) => path === legacyPath);
+      mockAdapter.read.mockImplementation(async (path: string) => {
+        if (path !== legacyPath) {
+          throw new Error(`ENOENT: ${path}`);
+        }
+        return JSON.stringify(metadata);
+      });
 
       const result = await storage.loadMetadata('session-legacy');
 

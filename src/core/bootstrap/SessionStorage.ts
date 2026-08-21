@@ -1,3 +1,4 @@
+import type { DurableStorage } from '../persistence/DurableStorage';
 import { ProviderRegistry } from '../providers/ProviderRegistry';
 import { DEFAULT_CHAT_PROVIDER_ID } from '../providers/types';
 import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
@@ -263,39 +264,65 @@ function countSessionSources(meta: SessionMetadata): number | undefined {
   return sources.size > 0 ? sources.size : undefined;
 }
 
+/**
+ * What a conversation id may be, given that it becomes a file name.
+ *
+ * A conversation's id is its provider's session id whenever one was resumed, so
+ * it is a value Grimoire did not mint and cannot vouch for. Interpolated into a
+ * path unchecked, a `/` or a `..` writes outside `.grimoire/sessions/` — and
+ * the vault is the user's own notes. One path segment, and one that means the
+ * same thing on every filesystem the plugin runs on.
+ */
+const SAFE_CONVERSATION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+function requireStorableId(id: string): string {
+  if (!SAFE_CONVERSATION_ID.test(id) || id.includes('..')) {
+    throw new Error('Conversation id is not usable as a session file name.');
+  }
+  return id;
+}
+
 export class SessionStorage {
-  constructor(private adapter: VaultFileAdapter) {}
+  /**
+   * @param durable the recoverable replacement a metadata write goes through.
+   *   A metadata file is a whole conversation's transcript, and a plain write
+   *   torn by a crash or a quit left a truncated JSON file that `loadMetadata`
+   *   then answered as a conversation that no longer exists. Injected rather
+   *   than built here so this module stays inside `src/core`, which is not
+   *   where a vault-shaped implementation belongs.
+   */
+  constructor(
+    private adapter: VaultFileAdapter,
+    private readonly durable: DurableStorage,
+  ) {}
 
   getMetadataPath(id: string): string {
-    return `${SESSIONS_PATH}/${id}.meta.json`;
+    return `${SESSIONS_PATH}/${requireStorableId(id)}.meta.json`;
   }
 
   getLegacyMetadataPath(id: string): string {
-    return `${LEGACY_SESSIONS_PATH}/${id}.meta.json`;
+    return `${LEGACY_SESSIONS_PATH}/${requireStorableId(id)}.meta.json`;
   }
 
   async saveMetadata(metadata: SessionMetadata): Promise<void> {
     const filePath = this.getMetadataPath(metadata.id);
     const content = JSON.stringify(metadata, null, 2);
-    await this.adapter.write(filePath, content);
+    await this.durable.writeAtomic(filePath, content);
     await this.deleteLegacyMetadataIfPresent(metadata.id);
   }
 
   async loadMetadata(id: string): Promise<SessionMetadata | null> {
-    const filePath = await this.getLoadPath(id);
-
     try {
-      if (!filePath) {
+      const found = await this.readFirstPresent(id);
+      if (!found) {
         return null;
       }
-
-      const content = await this.adapter.read(filePath);
-      const metadata: unknown = JSON.parse(content);
+      const metadata: unknown = JSON.parse(found.content);
       if (!isSupportedSessionMetadata(metadata)) {
         return null;
       }
 
-      if (filePath !== this.getMetadataPath(id)) {
+      if (found.path !== this.getMetadataPath(id)) {
         await this.saveMetadata(metadata);
       }
 
@@ -306,7 +333,9 @@ export class SessionStorage {
   }
 
   async deleteMetadata(id: string): Promise<void> {
-    await this.adapter.delete(this.getMetadataPath(id));
+    // Through the durable store, so a half-finished write is not resurrected by
+    // the next read of a conversation the user just deleted.
+    await this.durable.remove(this.getMetadataPath(id));
     await this.deleteLegacyMetadataIfPresent(id);
   }
 
@@ -317,7 +346,10 @@ export class SessionStorage {
 
     for (const filePath of files) {
       try {
-        const content = await this.adapter.read(filePath);
+        const content = await this.durable.read(filePath);
+        if (content === null) {
+          continue;
+        }
         const raw: unknown = JSON.parse(content);
         if (!isSupportedSessionMetadata(raw)) {
           continue;
@@ -390,18 +422,26 @@ export class SessionStorage {
     };
   }
 
-  private async getLoadPath(id: string): Promise<string | null> {
+  /**
+   * The current file if there is one, otherwise the legacy file.
+   *
+   * Read rather than asked about: a write interrupted between the temporary
+   * file and the rename leaves the destination missing and the value
+   * recoverable, and only a read through the durable store puts it back. One
+   * read serves both the decision and the content.
+   */
+  private async readFirstPresent(
+    id: string,
+  ): Promise<{ readonly path: string; readonly content: string } | null> {
     const filePath = this.getMetadataPath(id);
-    if (await this.adapter.exists(filePath)) {
-      return filePath;
+    const current = await this.durable.read(filePath);
+    if (current !== null) {
+      return { path: filePath, content: current };
     }
 
     const legacyFilePath = this.getLegacyMetadataPath(id);
-    if (await this.adapter.exists(legacyFilePath)) {
-      return legacyFilePath;
-    }
-
-    return null;
+    const legacy = await this.durable.read(legacyFilePath);
+    return legacy === null ? null : { path: legacyFilePath, content: legacy };
   }
 
   private async deleteLegacyMetadataIfPresent(id: string): Promise<void> {

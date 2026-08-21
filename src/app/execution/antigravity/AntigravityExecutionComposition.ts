@@ -42,6 +42,8 @@ import { buildAntigravityRuntimeEnv } from '@/providers/antigravity/runtime/Anti
 import { getAntigravityProviderSettings } from '@/providers/antigravity/settings';
 import { getVaultPath } from '@/utils/path';
 
+import { delayThroughWindow } from '../hostTimers';
+
 /** Combined stdout, stderr, and recovered-transcript ceiling for one run. */
 const OUTPUT_BYTE_LIMIT = 64_000;
 
@@ -135,6 +137,7 @@ export class AntigravityExecution {
       // Print mode has no provider-native session, which is what the legacy
       // runtime reported too — it returned null and wrote `sessionId: null`.
       currentSessionId: () => null,
+      delay: delayThroughWindow,
       reportCleanupFailure: error => {
         plugin.recordDebugLog({
           error,

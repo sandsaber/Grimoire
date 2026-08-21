@@ -347,6 +347,7 @@ function createBareAdapter(
       encodeRequestRef: () => 'encoded',
       reasoningControl: 'effort',
       currentSessionId: () => null,
+      delay: immediately,
     },
     { providerId: capabilities.providerId, chatUI: {
       modelPresentation: {
@@ -424,3 +425,14 @@ describe('turn metadata carries the native identities', () => {
     expect(stream.consumeTurnMetadata()).toEqual({ wasSent: true });
   });
 });
+
+/**
+ * The host's timer, for suites that only need the wait to end.
+ *
+ * Required rather than optional on the port, because core owns no timer: the
+ * adapter must not touch `window`, and Obsidian's review wants the browser's
+ * own `setTimeout` where a popped-out view can see it.
+ */
+function immediately(): Promise<void> {
+  return Promise.resolve();
+}

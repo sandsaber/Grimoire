@@ -100,6 +100,8 @@ import type { GrokProviderState } from '@/providers/grok/types';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
+import { delayThroughWindow } from '../hostTimers';
+
 /** What a turn may answer with, before it is refused as too large. */
 const MAX_RESULT_BYTES = 256_000;
 
@@ -518,6 +520,7 @@ export class GrokExecution {
       presentProviderContent: payload => content.present(payload),
       consumeProviderTurnMetadata: () => content.consumeTurnMetadata(),
       interactionPresenter: presenter,
+      delay: delayThroughWindow,
       reportCleanupFailure: error => {
         logGrokDebug(this.plugin, 'execution.cleanup.failed', {}, { error, level: 'warn' });
       },

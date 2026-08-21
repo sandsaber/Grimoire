@@ -111,6 +111,9 @@ export interface BoundConversation {
 }
 
 /** How long a tab close waits for its run to settle before giving up on it. */
+/** How often a closing tab looks again at a run it is waiting on. */
+const TERMINAL_POLL_INTERVAL_MS = 10;
+
 const CLEANUP_TERMINAL_WAIT_MS = 2_000;
 
 type RunOutcome =
@@ -599,6 +602,18 @@ export interface ExecutionChatRuntimeHostPorts {
   readonly describeFailure?: FailurePresenter;
   now?(): number;
   /**
+   * Waits, without core owning a timer.
+   *
+   * Required, and it is the one port here that is. The adapter is
+   * provider-neutral core and must not reach for the browser's global object —
+   * the boundary gate holds it to that, prose included — while Obsidian's own
+   * review wants the browser's timer, so that one scheduled from a popped-out
+   * view belongs to the window it runs in. Both rules hold at once only if the
+   * browser call sits on the host's side of this port, which is why there is no
+   * fallback here to fall back to. See `src/app/execution/hostTimers.ts`.
+   */
+  delay(milliseconds: number): Promise<void>;
+  /**
    * Renders an opened interaction and returns the chosen response id.
    *
    * Absent means the host installed no presenter yet, in which case
@@ -847,9 +862,7 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   private async awaitTerminal(stream: ExecutionRunStream): Promise<void> {
     const deadline = (this.ports.now?.() ?? Date.now()) + CLEANUP_TERMINAL_WAIT_MS;
     while (!stream.settled() && (this.ports.now?.() ?? Date.now()) < deadline) {
-      await new Promise<void>(resolve => {
-        window.setTimeout(resolve, 10);
-      });
+      await this.ports.delay(TERMINAL_POLL_INTERVAL_MS);
     }
   }
 

@@ -7,6 +7,7 @@ import { GRIMOIRE_STORAGE_PATH } from '../../core/bootstrap/StoragePaths';
 import { VaultFileAdapter } from '../../core/storage/VaultFileAdapter';
 import { t } from '../../i18n/i18n';
 import { GrimoireSettingsStorage, type StoredGrimoireSettings } from '../settings/GrimoireSettingsStorage';
+import { VaultDurableStorage } from './VaultDurableStorage';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -71,7 +72,7 @@ export class SharedStorageService implements SharedAppStorage {
     this.plugin = plugin;
     this.adapter = new VaultFileAdapter(plugin.app);
     this.grimoireSettings = new GrimoireSettingsStorage(this.adapter);
-    this.sessions = new SessionStorage(this.adapter);
+    this.sessions = new SessionStorage(this.adapter, new VaultDurableStorage(this.adapter));
   }
 
   async initialize(): Promise<{ grimoire: Record<string, unknown> }> {

@@ -4866,6 +4866,66 @@ what it actually pins is the guard that refuses to deliver.
 Gates: unit 477 suites / 7,677 tests, integration 5 suites / 145 tests, typecheck, `eslint`,
 `build:release`.
 
+### The rest of the first review — K3, K4, K5, S1, S3 and the two QA notes (this commit)
+
+The seven rows nobody had started, taken together because they are small and none of them belongs to
+a provider. With them the first review is closed: every row fixed, or in K2's case refuted.
+
+**K3 — the session record was a history, and it was rewritten on every event.** `runIds` only ever
+grew, so a conversation's hundredth turn wrote a hundred-entry array on every delta of every later
+turn. The list is now what is still *unfinished*: a run that reaches a terminal leaves it. Nothing is
+lost, because a run record already names its own session and its own owner — which is what deletion
+and a restart read. What the list quietly doubled as, though, was this process's memory of every turn
+a session ever ran, and disposal needs that; so the entry keeps it as a `Set` of ids that never
+leaves the process, rebuilt on a restart from the run records themselves.
+
+**K4 — core reached for the browser's timer, and two rules disagreed about it.** The adapter is
+provider-neutral and the boundary gate holds it away from the DOM; Obsidian's own review, though,
+wants the browser's timer so one scheduled from a popped-out view belongs to the window it runs in.
+Both hold at once only if the browser call sits on the host's side of a port — so `delay` is now a
+port, required rather than optional, and `src/app/execution/hostTimers.ts` is where the browser call
+lives. The gate gained `window.` beside `document` and `HTMLElement`, and the adapter joined the
+strict list. One consequence worth knowing: the gate matches the whole file, comments included, so a
+strict module has to explain that rule without writing the word it forbids.
+
+**K5 — `shutdown()` could wait forever.** An admission is held for the whole of `createSession`, the
+part inside the provider included, and `waitForAdmissions` waited on it unbounded while every other
+wait in that method already had the grace period. A CLI that hung on session creation held the
+plugin's unload open with no way out. It now gives up like everything else — and the work it gave up
+on refuses to register itself when it finally returns, so a late session closes rather than joining a
+registry that has already written its checkpoint.
+
+**S1 — one click could grant everything.** "Always allow" promoted the agent's suggested rules
+wholesale, and `{toolName: 'Bash'}` with no pattern is permanent approval of every command Claude
+ever runs in the project. The suggestion is the *agent* proposing its own permissions, and the agent
+is the party being restrained, so a rule that reaches wider than the action on the card is not a
+shortcut — it is the request edited after the click. Promoted rules are now clamped to the approved
+action, `replaceRules` is never promoted at all (it can remove denials the person put there), and a
+`setMode` that would stop the asking is dropped. The review asked for two things and the second was
+the point: the card now *says* what the button grants, from the same call that builds the grant, and
+it says "Allows every Bash call for this project" when that is what it means.
+
+**S3 — a conversation's id is a file name, and Grimoire does not mint it.** It is the provider's
+session id whenever one was resumed, interpolated into `.grimoire/sessions/<id>.meta.json` unchecked
+— and the vault is the user's own notes. Ids are validated now, and metadata goes through the same
+recoverable replacement the control store uses, so a write torn by a crash leaves the previous
+transcript readable instead of truncated JSON that `loadMetadata` answered as a conversation that no
+longer exists. `SessionStorage` takes its durable store as an argument rather than building one:
+`src/core` is not where a vault-shaped implementation belongs.
+
+**Q1 — a matrix nobody has run looked exactly like one that passed.** The manual matrices are
+deliberately manual, but the only record of when one last ran was its own table four documents deep,
+and two of the four had no table at all. All four have one now, `never` is a real answer in the Date
+column, and `liveMatrixRecords.test.ts` both enforces that and carries the summary — Claude never,
+Codex never, Grok and OpenCode 2026-08-20.
+
+**Q2 — the boundary gate could only see one import syntax.** `import()` and `require()` were
+invisible to every rule in that file, which is the shape a violation takes when a static import would
+be circular. No violation existed, which is the reason to close it now rather than after one does.
+
+Nine new tests, each run against the code with its fix removed. Gates: unit 478 suites / 7,698 tests,
+integration 5 suites / 145 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -4886,11 +4946,13 @@ From the second: R1–R6, all six confirmed against the tree before being touche
 prompts after a New Chat or a history switch in the same tab, for every flipped provider. It is the
 reason not to hand out a build from that range.
 
-**What is left from the first review**, none of it started: K3 (the session record rewritten per durable
-event), K4 (`window.setTimeout` in provider-neutral core), K5 (`shutdown()` waiting forever on a hung
-`createSession`), S1 ("always allow" promoting rules the user was never shown), S3 (session metadata
-filenames and their non-atomic write), and the two QA notes. Beside them, the four manual smoke
-matrices still need a person in a vault.
+**Both review backlogs are closed.** The last pass took the seven rows nobody had started — K3, K4,
+K5, S1, S3, Q1 and Q2 — so every row of both reviews is fixed, or refuted with evidence in K2's case.
+
+**What is still owed is a person, not a commit:** the four manual smoke matrices. Two of them have
+never been run at all, which `liveMatrixRecords.test.ts` now states rather than implies — Claude
+never, Codex never, Grok and OpenCode 2026-08-20 (live rows only; the rendering rows are the ones
+only a person can run).
 
 Wave 5 is complete: **Grok executes through the kernel**, its legacy runtime is deleted, and thirteen
 live rows are green against CLI 1.0.5. Four ACP providers remain on the legacy path — MiMoCode, Kimi

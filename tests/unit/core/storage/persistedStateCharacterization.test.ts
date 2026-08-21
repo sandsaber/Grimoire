@@ -3,10 +3,11 @@ import '@/providers';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { createInMemoryVaultAdapter } from '@test/helpers/inMemoryVaultAdapter';
+import { createDurableInMemoryVaultAdapter } from '@test/helpers/inMemoryVaultAdapter';
 
 import { GRIMOIRE_SETTINGS_PATH, GrimoireSettingsStorage } from '@/app/settings/GrimoireSettingsStorage';
 import { SharedStorageService } from '@/app/storage/SharedStorageService';
+import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
 import { SESSIONS_PATH, SessionStorage } from '@/core/bootstrap/SessionStorage';
 import type { AppTabManagerState } from '@/core/providers/types';
 import type { SessionMetadata } from '@/core/types';
@@ -34,9 +35,46 @@ describe('persisted state characterization', () => {
     const parsed = JSON.parse(raw) as SessionMetadata & Record<string, unknown>;
     const path = `${SESSIONS_PATH}/${parsed.id}.meta.json`;
 
+    it('refuses a conversation id that would write outside the sessions folder', async () => {
+      const adapter = createDurableInMemoryVaultAdapter();
+      const storage = new SessionStorage(adapter, new VaultDurableStorage(adapter));
+
+      // A conversation's id is its provider's session id whenever one was
+      // resumed, so it is a value Grimoire did not mint. Interpolated into a
+      // path unchecked, this one writes into the user's own notes.
+      await expect(storage.saveMetadata({
+        ...parsed,
+        id: '../../../notes/stolen',
+      })).rejects.toThrow(/not usable as a session file name/);
+      expect([...adapter.files.keys()]).toEqual([]);
+      // And it is not quietly answered as a conversation that exists, either.
+      await expect(storage.loadMetadata('../../../notes/stolen')).resolves.toBeNull();
+    });
+
+    it('leaves the previous transcript readable when a write is interrupted', async () => {
+      const adapter = createDurableInMemoryVaultAdapter({ [path]: raw });
+      const storage = new SessionStorage(adapter, new VaultDurableStorage(adapter));
+      const previous = adapter.files.get(path) as string;
+
+      // A metadata file is a whole conversation. A plain write torn by a crash
+      // or a quit left truncated JSON behind, which `loadMetadata` then
+      // answered as a conversation that no longer exists.
+      adapter.rename = async () => {
+        throw new Error('interrupted');
+      };
+      await expect(storage.saveMetadata({ ...parsed, title: 'Half written' }))
+        .rejects.toThrow('interrupted');
+
+      const recovered = await new SessionStorage(
+        adapter,
+        new VaultDurableStorage(adapter),
+      ).loadMetadata(parsed.id);
+      expect(recovered).toEqual(JSON.parse(previous));
+    });
+
     it('loads a session written by a newer build without dropping it', async () => {
-      const adapter = createInMemoryVaultAdapter({ [path]: raw });
-      const storage = new SessionStorage(adapter);
+      const adapter = createDurableInMemoryVaultAdapter({ [path]: raw });
+      const storage = new SessionStorage(adapter, new VaultDurableStorage(adapter));
 
       const loaded = await storage.loadMetadata(parsed.id);
 
@@ -44,8 +82,8 @@ describe('persisted state characterization', () => {
     });
 
     it('preserves unknown top-level and provider fields across a load-save cycle', async () => {
-      const adapter = createInMemoryVaultAdapter({ [path]: raw });
-      const storage = new SessionStorage(adapter);
+      const adapter = createDurableInMemoryVaultAdapter({ [path]: raw });
+      const storage = new SessionStorage(adapter, new VaultDurableStorage(adapter));
 
       const loaded = await storage.loadMetadata(parsed.id);
       await storage.saveMetadata(loaded as SessionMetadata);
@@ -56,8 +94,8 @@ describe('persisted state characterization', () => {
     });
 
     it('keeps the fork source and the unknown provider field inside providerState', async () => {
-      const adapter = createInMemoryVaultAdapter({ [path]: raw });
-      const storage = new SessionStorage(adapter);
+      const adapter = createDurableInMemoryVaultAdapter({ [path]: raw });
+      const storage = new SessionStorage(adapter, new VaultDurableStorage(adapter));
 
       const loaded = await storage.loadMetadata(parsed.id);
       await storage.saveMetadata(loaded as SessionMetadata);
@@ -76,16 +114,16 @@ describe('persisted state characterization', () => {
       // error and no trace. The migration's typed hydration outcomes
       // (`absent`, `corrupt`, `stale`) exist to replace exactly this silence.
       const foreign = raw.replace('"providerId": "codex"', '"providerId": "retired-provider"');
-      const adapter = createInMemoryVaultAdapter({ [path]: foreign });
-      const storage = new SessionStorage(adapter);
+      const adapter = createDurableInMemoryVaultAdapter({ [path]: foreign });
+      const storage = new SessionStorage(adapter, new VaultDurableStorage(adapter));
 
       expect(await storage.loadMetadata(parsed.id)).toBeNull();
       expect(await storage.listMetadata()).toEqual([]);
     });
 
     it('round-trips through a list as well as a direct read', async () => {
-      const adapter = createInMemoryVaultAdapter({ [path]: raw });
-      const storage = new SessionStorage(adapter);
+      const adapter = createDurableInMemoryVaultAdapter({ [path]: raw });
+      const storage = new SessionStorage(adapter, new VaultDurableStorage(adapter));
 
       const listed = await storage.listMetadata();
 
@@ -135,7 +173,7 @@ describe('persisted state characterization', () => {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
 
     async function loadAndSave(): Promise<Record<string, unknown>> {
-      const adapter = createInMemoryVaultAdapter({ [GRIMOIRE_SETTINGS_PATH]: raw });
+      const adapter = createDurableInMemoryVaultAdapter({ [GRIMOIRE_SETTINGS_PATH]: raw });
       const storage = new GrimoireSettingsStorage(adapter);
 
       const loaded = await storage.load();

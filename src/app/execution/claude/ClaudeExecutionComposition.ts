@@ -58,6 +58,8 @@ import { getClaudeState } from '@/providers/claude/types/providerState';
 import { getEnhancedPath,parseEnvironmentVariables } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
+import { delayThroughWindow } from '../hostTimers';
+
 /** What an auxiliary answer may be, before it is refused as too large. */
 const AUXILIARY_RESULT_BYTE_LIMIT = 64_000;
 
@@ -292,6 +294,7 @@ export class ClaudeExecution {
       presentProviderContent: payload => content.present(payload),
       consumeProviderTurnMetadata: () => content.consumeTurnMetadata(),
       interactionPresenter: presenter,
+      delay: delayThroughWindow,
       reportCleanupFailure: error => {
         this.plugin.recordDebugLog({
           error,

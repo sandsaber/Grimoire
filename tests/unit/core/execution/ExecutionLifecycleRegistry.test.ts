@@ -1,6 +1,6 @@
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
-import type { ResultRef } from '@/core/execution/ExecutionContracts';
+import type { ExecutionSession, ResultRef } from '@/core/execution/ExecutionContracts';
 import { SETTINGS_TRANSITIONS_PATH } from '@/core/execution/ExecutionControlPaths';
 import { ExecutionControlRepositories } from '@/core/execution/ExecutionControlRepositories';
 import { ExecutionControlTransactionCoordinator } from '@/core/execution/ExecutionControlTransactionCoordinator';
@@ -810,6 +810,31 @@ describe('ExecutionLifecycleRegistry', () => {
     )).payload.status).toBe('completed');
   });
 
+  it('gives up on an admission that never returns rather than never shutting down', async () => {
+    const scheduler = new ImmediateScheduler();
+    const fixture = await startedFixture(undefined, { scheduler });
+    const hung = deferred<ExecutionSession>();
+    const created = jest.spyOn(fixture.backend, 'createSession')
+      .mockReturnValue(hung.promise);
+    const admission = fixture.registry.createSession(sessionCommand());
+    await Promise.resolve();
+    expect(created).toHaveBeenCalledTimes(1);
+
+    // An admission is held for the whole of `createSession`, provider included.
+    // Waiting on it unbounded made unloading the plugin depend on a CLI
+    // answering, while every other wait in `shutdown` already had the grace
+    // period this one skipped.
+    await expect(fixture.registry.shutdown(`sd-${'c'.repeat(32)}`)).resolves.toBeUndefined();
+
+    // And what it gave up on cleans up after itself rather than joining a
+    // registry that has already written its checkpoint.
+    const session = new DeterministicFakeSessionDouble();
+    hung.resolve(session as unknown as ExecutionSession);
+    await expect(admission).rejects.toThrow(/stopped accepting new work/);
+    expect(fixture.registry.getSession(SESSION_ID)).toBeNull();
+    expect(session.disposed).toBe(true);
+  });
+
   it('closes admission synchronously and classifies unconfirmed work during bounded shutdown', async () => {
     const scheduler = new ImmediateScheduler();
     const fixture = await startedFixture(undefined, { scheduler });
@@ -977,6 +1002,28 @@ describe('ExecutionLifecycleRegistry — deleting a conversation', () => {
       await fixture.registry.disposeSession(session);
     }
   }
+
+  it('keeps the session record to live work instead of every turn it ever ran', async () => {
+    const fixture = await startedFixture();
+    await recordATurn(fixture, SESSION_ID, RUN_ID, OWNER, { keepOpen: true });
+
+    // This record is rewritten on every event the session sees, so a list that
+    // only ever grew made each of those writes larger than the last — for the
+    // whole life of a conversation. What the list is read for is live work, and
+    // a finished run is not that.
+    expect(fixture.registry.getSession(SESSION_ID)?.runIds).toEqual([]);
+    // The turn itself is still there, both in the process and on disk: the run
+    // record names its own session and its own owner, which is what deletion
+    // and a restart read.
+    expect(fixture.registry.getRun(RUN_ID)).not.toBeNull();
+    await expect(fixture.repositories.runs.read(RUN_ID))
+      .resolves.toMatchObject({ kind: 'current' });
+
+    // And disposal still forgets it, which it can only do if the process kept
+    // the list the record stopped carrying.
+    await fixture.registry.disposeSession(SESSION_ID);
+    expect(fixture.registry.getRun(RUN_ID)).toBeNull();
+  });
 
   it('lets go of a disposed session\'s runs and interactions', async () => {
     const fixture = await startedFixture();
@@ -1216,6 +1263,25 @@ async function currentRecord<T>(read: Promise<{
     throw new Error(`Expected current record, received ${result.kind}.`);
   }
   return result.record;
+}
+
+/** Just enough session for the one that arrives after shutdown gave up. */
+class DeterministicFakeSessionDouble {
+  disposed = false;
+  readonly executionSessionId = SESSION_ID;
+  readonly sessionInstanceId = sessionInstanceId(`si-${'9'.repeat(32)}`);
+  getSnapshot(): { readonly nativeSessionRef?: string } {
+    return {};
+  }
+  subscribe(): () => void {
+    return () => undefined;
+  }
+  createRun(): never {
+    throw new Error('This session exists only to be disposed.');
+  }
+  async dispose(): Promise<void> {
+    this.disposed = true;
+  }
 }
 
 class ImmediateScheduler implements ExecutionLifecycleScheduler {

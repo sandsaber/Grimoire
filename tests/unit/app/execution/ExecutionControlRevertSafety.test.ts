@@ -1,3 +1,5 @@
+import { createPassthroughDurableStorage } from '@test/helpers/passthroughDurableStorage';
+
 import { GrimoireSettingsStorage } from '@/app/settings/GrimoireSettingsStorage';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
 import { SessionStorage } from '@/core/bootstrap/SessionStorage';
@@ -51,7 +53,7 @@ describe('control records are inert to the runtime that does not own them', () =
   it('leaves conversations and settings exactly as the reverted build expects', async () => {
     const vault = createVault();
 
-    const sessions = await new SessionStorage(vault.adapter).listMetadata();
+    const sessions = await new SessionStorage(vault.adapter, createPassthroughDurableStorage(vault.adapter)).listMetadata();
     const settings = await new GrimoireSettingsStorage(vault.adapter).load();
 
     expect(sessions.map(meta => meta.id)).toEqual(['conversation-1']);
@@ -63,7 +65,7 @@ describe('control records are inert to the runtime that does not own them', () =
     const reads: string[] = [];
     const watched = createAdapter(vault.files, path => reads.push(path));
 
-    await new SessionStorage(watched).listAllConversations();
+    await new SessionStorage(watched, createPassthroughDurableStorage(watched)).listAllConversations();
     await new GrimoireSettingsStorage(watched).load();
 
     // The strong half. Returning the right conversations while also parsing
