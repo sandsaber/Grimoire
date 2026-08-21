@@ -4546,6 +4546,48 @@ Gates: unit 473 suites / 7,630 tests, integration 5 suites / 145 tests, typechec
 `src` and `tests` clean.
 
 
+### Review C1, second half — deleting a chat deletes its traces (this commit)
+
+D4 says deleting a conversation deletes every control record owned by it, in the same operation,
+idempotently, and finished at the next start if it was interrupted. None of that existed:
+`deleteConversation` removed the provider session and the metadata and no control record at all.
+
+Two things had to be true before it could:
+
+- **the records had to be findable.** Every composition minted its owner as a per-*tab* opaque id —
+  `{kind: 'conversation', ownerId: 'groktab-…'}` — so a conversation had no way to name what it
+  owned. The owner is now read when a session is established rather than when the tab is built, and
+  it is the conversation's id; the tab's own id stands in only for a session belonging to no chat.
+  Which exposed the second thing: **a tab is not a conversation.** Moving a tab to another chat kept
+  the first chat's session, so the second's runs would have been recorded under the first's name.
+  The adapter now drops its session when the conversation changes, and the next turn establishes one
+  under the right owner;
+- **removal had to be a transaction.** `removeIfPresent` is written against whatever is on disk
+  rather than an expected revision, because a deletion step is replayed by recovery against a record
+  it may already have removed. The removals go through the same intent-backed coordinator a write
+  uses, so an interrupted deletion is finished at the next start — which the test proves by crashing
+  one half-way and then starting a second registry over the same storage.
+
+`deleteOwnedRecords` refuses rather than forcing when a session is still live, per D4's rule about
+leases and running work; `main.ts` calls it last, after the tabs holding that conversation have been
+reset off it, and reports a refusal instead of throwing — a chat the user deleted is gone from the
+vault either way.
+
+**The fallback that had to be minted once.** Writing the owner as `conversation?.id ?? opaqueId(…)`
+minted a fresh tab id on every read, so a session and its own runs got different owners and the
+registry refused the run — caught by seven composition tests, fixed by hoisting the id.
+
+Four new deletion rows and two owner rows, each proven by breaking what it covers: dropping the live
+guard reds the refusal row alone, matching every owner reds the "only those" row alone, removing the
+reset reds the tab-move row, and freezing the owner at construction reds six.
+
+**Not this commit:** C1's third part — evicting terminal runs from the registry's in-memory maps.
+`deleteOwnedRecords` evicts what it deletes, which is the conversation-lifetime half of it.
+
+Gates: unit 473 suites / 7,636 tests, integration 5 suites / 145 tests, typecheck, `eslint` over
+`src` and `tests`, and `build:release` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

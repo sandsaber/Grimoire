@@ -286,9 +286,11 @@ export class CodexExecution {
         registry: this.registry,
         backendId: codexProviderModule.execution.descriptor.backendId,
         capabilities: codexProviderModule.capabilities,
-        // Minted per runtime because the construction call site has no
-        // conversation to bind one to; it moves to the catalog at M3.
-        owner: { kind: 'conversation', ownerId: scope },
+        // The conversation the tab is showing, read when a session is
+        // established: this is what a deleted conversation's control records
+        // are found by (D4). The tab's own id stands in only while no
+        // conversation is bound, which is a session that belongs to no chat.
+        owner: () => ({ kind: 'conversation', ownerId: conversation?.id ?? scope }),
         nextExecutionSessionId: () => executionSessionId(opaqueId('es')),
         nextRunId: () => runId(opaqueId('run')),
       },

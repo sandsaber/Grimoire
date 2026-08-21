@@ -272,7 +272,7 @@ function createBareAdapter(
       registry: {} as never,
       backendId: executionBackendId('provider-fake'),
       capabilities,
-      owner: { kind: 'conversation', ownerId: 'bare' },
+      owner: () => ({ kind: 'conversation', ownerId: 'bare' }),
       nextExecutionSessionId: () => executionSessionId(`es-${'d'.repeat(32)}`),
       nextRunId: () => toRunId(`run-${'d'.repeat(32)}`),
     },

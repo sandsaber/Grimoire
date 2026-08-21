@@ -17,6 +17,7 @@ import type {
   ProviderExecutionEvent,
 } from '@/core/execution/ExecutionEvents';
 import {
+  type ExecutionSessionId,
   executionSessionId,
   type RunId,
   runId as toRunId,
@@ -72,6 +73,10 @@ interface Harness {
   emit(runId: RunId, event: ExecutionEvent, deliveryId: string): Promise<unknown>;
   dispatched(runId: RunId): ExecutionRequest | undefined;
   steeredRefs(): readonly string[];
+  /** The owner the last established session was recorded under. */
+  sessionOwner(): { readonly kind: string; readonly ownerId: string } | null;
+  /** What the composition would answer for the conversation a tab is showing. */
+  bindConversation(conversationId: string): void;
 }
 
 async function createHarness(options: { ownSession?: boolean } = {}): Promise<Harness> {
@@ -98,7 +103,10 @@ async function createHarness(options: { ownSession?: boolean } = {}): Promise<Ha
   });
   registry.registerBackend({ backend });
   await registry.start();
-  const owner = { kind: 'conversation' as const, ownerId: 'adapter-conformance' };
+  let currentOwner = { kind: 'conversation' as const, ownerId: 'adapter-conformance' };
+  let sessionOrdinal = 0;
+  const established: ExecutionSessionId[] = [];
+  const owner = currentOwner;
   if (!options.ownSession) {
     // The assembled adapter creates its own session through `ensureReady`; the
     // lower-level cases need one to already exist.
@@ -115,9 +123,23 @@ async function createHarness(options: { ownSession?: boolean } = {}): Promise<Ha
       registry,
       backendId: backend.descriptor.backendId,
       capabilities: codexProviderModule.capabilities,
-      owner,
-      nextExecutionSessionId: () => SESSION_ID,
+      owner: () => currentOwner,
+      // The first is the id the harness's own emissions are addressed to; a
+      // tab that moves to another conversation establishes a second.
+      nextExecutionSessionId: () => {
+        const next = sessionOrdinal === 0
+          ? SESSION_ID
+          : executionSessionId(`es-${(sessionOrdinal + 1).toString().repeat(32).slice(0, 32)}`);
+        sessionOrdinal += 1;
+        established.push(next);
+        return next;
+      },
       nextRunId: () => toRunId(`run-${(++runOrdinal).toString().padStart(32, '0')}`),
+    },
+    /** The owner the last established session was recorded under. */
+    sessionOwner: () => registry.getSession(established[established.length - 1])?.owner ?? null,
+    bindConversation(conversationId: string) {
+      currentOwner = { kind: 'conversation' as const, ownerId: conversationId };
     },
     dispatched: runId => backend.dispatchedRequests.get(runId),
     steeredRefs: () => [...backend.sessions.values()].flatMap(session => session.steeredRefs),
@@ -506,6 +528,45 @@ describe('the assembled ChatRuntime adapter', () => {
 
     expect(adapter.isReady()).toBe(true);
     expect(ready).toEqual([true]);
+  });
+
+  it('reads its owner when the session is established, not when the tab is built', async () => {
+    const harness = await createHarness({ ownSession: true });
+    const adapter = createAdapter(harness);
+    // A tab is built before it knows which conversation it is showing, so an
+    // owner captured at construction is the tab's identity and not the
+    // conversation's — and a control record keyed that way cannot be found
+    // when the conversation is deleted (D4).
+    harness.bindConversation('conversation-1');
+    adapter.syncConversationState(
+      { id: 'conversation-1', providerState: {}, sessionId: null },
+    );
+
+    await adapter.ensureReady();
+
+    expect(harness.sessionOwner()).toEqual({ kind: 'conversation', ownerId: 'conversation-1' });
+  });
+
+  it('leaves the first conversation session behind when the tab moves to another', async () => {
+    const harness = await createHarness({ ownSession: true });
+    const adapter = createAdapter(harness);
+    harness.bindConversation('conversation-1');
+    adapter.syncConversationState(
+      { id: 'conversation-1', providerState: {}, sessionId: null },
+    );
+    await adapter.ensureReady();
+
+    harness.bindConversation('conversation-2');
+    adapter.syncConversationState(
+      { id: 'conversation-2', providerState: {}, sessionId: null },
+    );
+
+    // A tab is not a conversation: the session the first one was working in
+    // must not carry on under the second's name, or one conversation's records
+    // are owned by another — and deleting either takes the wrong ones.
+    expect(adapter.isReady()).toBe(false);
+    await adapter.ensureReady();
+    expect(harness.sessionOwner()).toEqual({ kind: 'conversation', ownerId: 'conversation-2' });
   });
 
   it('streams a turn and closes only on the terminal', async () => {

@@ -7,6 +7,9 @@ import type {
 
 const storageMutationQueues = new WeakMap<DurableStorage, Map<string, Promise<void>>>();
 
+/** How many times a removal re-reads a record that changed under it. */
+const REMOVE_ATTEMPTS = 3;
+
 export interface VersionedRepositoryOptions<TPayload> {
   readonly storage: DurableStorage;
   readonly namespace: string;
@@ -153,6 +156,38 @@ export class VersionedRepository<TPayload> {
           await this.readActualRevision(recordId),
         );
       }
+    });
+  }
+
+  /**
+   * Removes a record if it is there, and answers quietly if it is not.
+   *
+   * The revision-checked `remove` above is for a caller that knows what it is
+   * deleting. A deletion step has to be replayable — it may run again after a
+   * crash, against a record it already removed — so this one is written against
+   * whatever is currently on disk, retrying the compare-and-swap if something
+   * changed under it.
+   */
+  async removeIfPresent(recordId: string): Promise<void> {
+    await this.enqueue(recordId, async () => {
+      for (let attempt = 0; attempt < REMOVE_ATTEMPTS; attempt += 1) {
+        const current = await this.readUnlocked(recordId);
+        const raw = current.kind === 'absent' ? null : current.raw;
+        if (raw === null) {
+          return;
+        }
+        if (await this.storage.compareAndSwap(
+          getVersionedRecordPath(this.namespace, recordId),
+          raw,
+          null,
+        )) {
+          return;
+        }
+      }
+      throw new RecordUnavailableError(
+        recordId,
+        `Record "${recordId}" kept changing while it was being removed.`,
+      );
     });
   }
 

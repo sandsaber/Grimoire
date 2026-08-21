@@ -7,6 +7,7 @@ import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifec
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
 import {
+  type BoundConversation,
   ExecutionChatRuntimeAdapter,
   type ExecutionChatRuntimeHostPorts,
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
@@ -100,15 +101,23 @@ export class AntigravityExecution {
   /**
    * The Antigravity chat runtime, over the kernel.
    *
-   * One per tab, matching how `ProviderRegistry` constructs runtimes today. The
-   * owner is minted per runtime rather than taken from a conversation because
-   * the construction call site has none to give — it moves to the catalog at
-   * M3, which is the checkpoint that can bind one. Print mode has no resume, so
-   * nothing outlives the tab that would need the stronger binding.
+   * One per tab, matching how `ProviderRegistry` constructs runtimes today.
+   * Print mode has no resume and keeps nothing per conversation, so the only
+   * thing the binding below is for is naming the owner of what a turn records.
    */
   createRuntime(): ChatRuntime {
     const plugin = this.plugin;
+    // Minted once, and only used while no conversation is bound: a fallback
+    // minted per read would give one tab's session and its runs different
+    // owners, which the registry refuses.
+    const agyTab = opaqueId('agytab');
+
+    // Print mode keeps nothing per conversation; this is here so the records a
+    // turn writes name the chat that owns them, which is what deleting that
+    // chat then finds them by (D4).
+    let conversation: BoundConversation | null = null;
     const ports: ExecutionChatRuntimeHostPorts = {
+      syncConversation: next => { conversation = next; },
       prepareTurn: (request: ChatTurnRequest) => {
         const prompt = buildAntigravityPromptText(request);
         return {
@@ -141,7 +150,11 @@ export class AntigravityExecution {
         registry: this.registry,
         backendId: antigravityProviderModule.execution.descriptor.backendId,
         capabilities: antigravityProviderModule.capabilities,
-        owner: { kind: 'conversation', ownerId: opaqueId('agytab') },
+        // The conversation the tab is showing, read when a session is
+        // established: this is what a deleted conversation's control records
+        // are found by (D4). The tab's own id stands in only while no
+        // conversation is bound, which is a session that belongs to no chat.
+        owner: () => ({ kind: 'conversation', ownerId: conversation?.id ?? agyTab }),
         nextExecutionSessionId: () => executionSessionId(opaqueId('es')),
         nextRunId: () => runId(opaqueId('run')),
       },

@@ -67,6 +67,11 @@ export class RevisionedControlRepository<TRecord> {
   ): Promise<VersionedRecord<TRecord>> {
     return this.records.mutate(recordId, expectedRevision, mutation);
   }
+
+  /** Removes a record the conversation that owned it no longer has (D4). */
+  removeIfPresent(recordId: string): Promise<void> {
+    return this.records.removeIfPresent(recordId);
+  }
 }
 
 export class AppendOnlyControlRepository<TRecord> {
@@ -89,6 +94,18 @@ export class AppendOnlyControlRepository<TRecord> {
 
   append(recordId: string, record: TRecord): Promise<VersionedRecord<TRecord>> {
     return this.records.save(recordId, record, null);
+  }
+
+  /**
+   * Removes a record the conversation that owned it no longer has (D4).
+   *
+   * Append-only is a rule about what may be *written*: evidence is never
+   * rewritten, so a later reading cannot be quietly replaced by an earlier one.
+   * It says nothing about a conversation the user deleted, whose evidence has
+   * nothing left to be evidence about.
+   */
+  removeIfPresent(recordId: string): Promise<void> {
+    return this.records.removeIfPresent(recordId);
   }
 }
 

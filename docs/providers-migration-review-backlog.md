@@ -32,7 +32,10 @@ artifact), then deletion by conversation, then eviction of terminal runs from th
 
 **Progress:** the intents half is done — completed intents are removed at completion and swept at
 startup, including everything older builds left behind, with the repeat answer moved into a bounded
-in-memory window. Deletion by conversation and in-memory eviction are still open.
+in-memory window. Deletion by conversation is done too: control records are owned by the conversation
+rather than by the tab, `deleteOwnedRecords` removes them through an intent-backed transaction that
+recovery finishes, and `deleteConversation` calls it. **Still open:** evicting terminal runs from the
+registry's in-memory maps outside a conversation deletion.
 
 ## Important
 

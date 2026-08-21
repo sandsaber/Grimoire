@@ -237,6 +237,11 @@ export class OpencodeExecution {
     const ownedSessions = new Set<string>();
     let sawTurnCost = false;
     const boundConversation = (): BoundConversation | null => conversation;
+    // Minted once, and only used while no conversation is bound: a fallback
+    // minted per read would give one tab's session and its runs different
+    // owners, which the registry refuses.
+    const opencodeTab = opaqueId('opencodetab');
+
 
     const sessionConfig = new OpencodeSessionConfigState({
       settingsBag: () => this.plugin.settings,
@@ -425,9 +430,11 @@ export class OpencodeExecution {
         registry: this.registry,
         backendId: opencodeProviderModule.execution.descriptor.backendId,
         capabilities: opencodeProviderModule.capabilities,
-        // Minted per runtime because the construction call site has no
-        // conversation to bind one to; it moves to the catalog at M3.
-        owner: { kind: 'conversation', ownerId: opaqueId('opencodetab') },
+        // The conversation the tab is showing, read when a session is
+        // established: this is what a deleted conversation's control records
+        // are found by (D4). The tab's own id stands in only while no
+        // conversation is bound, which is a session that belongs to no chat.
+        owner: () => ({ kind: 'conversation', ownerId: conversation?.id ?? opencodeTab }),
         nextExecutionSessionId: () => executionSessionId(opaqueId('es')),
         nextRunId: () => runId(opaqueId('run')),
       },

@@ -27,6 +27,7 @@ import type {
 } from './ExecutionControlRecords';
 import type { ExecutionControlRepositories } from './ExecutionControlRepositories';
 import type {
+  ExecutionControlRemoval,
   ExecutionControlTransactionCoordinator,
   ExecutionControlWrite,
 } from './ExecutionControlTransactionCoordinator';
@@ -983,6 +984,112 @@ export class ExecutionLifecycleRegistry {
       // and a session id is never reused for a different session.
       this.envelopeObservers.delete(executionSessionId);
     });
+  }
+
+  /**
+   * Removes every control record a conversation owns (D4).
+   *
+   * The user's mental model is that deleting a chat deletes its traces, and D3
+   * ties retention to exactly that: nothing here expires on a clock, so this is
+   * the only thing that ever removes a run, an interaction or the evidence
+   * recorded about one.
+   *
+   * Refused rather than forced while the conversation is still working: a
+   * session with a live run, an open interaction or a held lease would be
+   * stranded by having its records taken away, so the caller cancels first —
+   * which is what a conversation being deleted does to its tabs — and this
+   * throws if it did not.
+   *
+   * Idempotent, and interruptible: the removals go through one intent-backed
+   * transaction, so a deletion that stopped half-way is finished at the next
+   * start instead of leaving a session gone with its runs behind.
+   */
+  async deleteOwnedRecords(owner: ExecutionOwner): Promise<void> {
+    requireOwner(owner);
+    const sessionIds = await this.findSessionsOwnedBy(owner);
+    for (const id of sessionIds.map(executionSessionId)) {
+      if (this.sessions.has(id) && !this.canDisposeSession(id)) {
+        throw new Error(
+          `Execution session "${id}" still has lifecycle owners; cancel its work before deleting.`,
+        );
+      }
+    }
+    const runIds = await this.findRunsOwnedBy(owner, sessionIds);
+    const removals: ExecutionControlRemoval[] = [
+      ...await this.findRecordsAbout('interactions', runIds),
+      ...await this.findRecordsAbout('reconciliations', runIds),
+      ...runIds.map(id => ({ repository: 'runs' as const, recordId: id })),
+      ...sessionIds.map(id => ({ repository: 'sessions' as const, recordId: id })),
+    ];
+    if (removals.length === 0) {
+      return;
+    }
+    // Interactions and evidence first, then the runs, then the sessions: a
+    // crash between two steps leaves a session whose parts are gone rather than
+    // parts whose session is gone, and only the first is recoverable by reading
+    // the session's own list.
+    await this.controlTransactions.delete(this.nextTransactionId(), removals);
+    for (const id of runIds) {
+      this.runs.delete(runId(id));
+    }
+    for (const id of sessionIds) {
+      this.sessions.delete(executionSessionId(id));
+      this.envelopeObservers.delete(executionSessionId(id));
+    }
+  }
+
+  private async findSessionsOwnedBy(owner: ExecutionOwner): Promise<string[]> {
+    const owned: string[] = [];
+    for (const id of await this.repositories.sessions.listRecordIds()) {
+      const read = await this.repositories.sessions.read(id);
+      if ((read.kind === 'current' || read.kind === 'migrated')
+        && read.record.payload.owner.kind === owner.kind
+        && read.record.payload.owner.ownerId === owner.ownerId) {
+        owned.push(id);
+      }
+    }
+    return owned;
+  }
+
+  private async findRunsOwnedBy(
+    owner: ExecutionOwner,
+    sessionIds: readonly string[],
+  ): Promise<string[]> {
+    const sessions = new Set(sessionIds);
+    const owned: string[] = [];
+    for (const id of await this.repositories.runs.listRecordIds()) {
+      const read = await this.repositories.runs.read(id);
+      if (read.kind !== 'current' && read.kind !== 'migrated') {
+        continue;
+      }
+      const record = read.record.payload;
+      // Either link is enough: a run names its own owner, and a session that
+      // was deleted before its runs were written still owns them.
+      if (sessions.has(record.executionSessionId)
+        || (record.owner.kind === owner.kind && record.owner.ownerId === owner.ownerId)) {
+        owned.push(id);
+      }
+    }
+    return owned;
+  }
+
+  private async findRecordsAbout(
+    repository: 'interactions' | 'reconciliations',
+    runIds: readonly string[],
+  ): Promise<ExecutionControlRemoval[]> {
+    const runs = new Set(runIds);
+    const source = repository === 'interactions'
+      ? this.repositories.interactions
+      : this.repositories.reconciliations;
+    const removals: ExecutionControlRemoval[] = [];
+    for (const id of await source.listRecordIds()) {
+      const read = await source.read(id);
+      if ((read.kind === 'current' || read.kind === 'migrated')
+        && runs.has(read.record.payload.runId)) {
+        removals.push({ repository, recordId: id });
+      }
+    }
+    return removals;
   }
 
   async shutdown(checkpointId: string): Promise<void> {

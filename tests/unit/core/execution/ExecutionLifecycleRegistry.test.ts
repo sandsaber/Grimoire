@@ -932,6 +932,114 @@ describe('ExecutionLifecycleRegistry', () => {
   });
 });
 
+describe('ExecutionLifecycleRegistry — deleting a conversation', () => {
+  const OTHER_OWNER = { kind: 'conversation' as const, ownerId: 'conversation-2' };
+
+  /**
+   * A crash that waits to be armed.
+   *
+   * The turn this deletion is about writes control transactions of its own, so
+   * an injector that fires on the first matching point crashes the setup rather
+   * than the thing under test.
+   */
+  function armableCrashAt(target: TransactionCrashPoint): {
+    readonly injector: (point: TransactionCrashPoint) => void;
+    arm(): void;
+  } {
+    let armed = false;
+    return {
+      injector: point => {
+        if (armed && point === target) {
+          armed = false;
+          throw new Error(`crash:${point}`);
+        }
+      },
+      arm: () => { armed = true; },
+    };
+  }
+
+  /** One conversation's worth of records: a session, a run, and its terminal. */
+  async function recordATurn(
+    fixture: ReturnType<typeof createFixture>,
+    session: ReturnType<typeof executionSessionId>,
+    run: RunId,
+    owner: { kind: 'conversation'; ownerId: string },
+  ): Promise<void> {
+    await fixture.registry.createSession({ ...sessionCommand(), executionSessionId: session, owner });
+    await fixture.registry.startRun(session, { ...request(run, 'none'), owner });
+    fixture.backend.emit(run, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, {
+      deliveryId: `terminal-${run}`,
+      destination: 'both',
+    });
+    await settle(fixture.registry);
+    await fixture.registry.disposeSession(session);
+  }
+
+  it('removes every record the conversation owns, and only those', async () => {
+    const fixture = await startedFixture();
+    await recordATurn(fixture, SESSION_ID, RUN_ID, OWNER);
+    await recordATurn(fixture, SESSION_ID_2, RUN_ID_2, OTHER_OWNER);
+
+    await fixture.registry.deleteOwnedRecords(OWNER);
+
+    // D4: deleting a conversation deletes every control record owned by it. The
+    // other conversation's records are the control: a sweep that took them too
+    // would be a deletion nobody asked for.
+    await expect(fixture.repositories.sessions.read(SESSION_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+    await expect(fixture.repositories.runs.read(RUN_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+    await expect(fixture.repositories.sessions.read(SESSION_ID_2))
+      .resolves.toMatchObject({ kind: 'current' });
+    await expect(fixture.repositories.runs.read(RUN_ID_2))
+      .resolves.toMatchObject({ kind: 'current' });
+  });
+
+  it('answers a second deletion the same way as the first', async () => {
+    const fixture = await startedFixture();
+    await recordATurn(fixture, SESSION_ID, RUN_ID, OWNER);
+
+    await fixture.registry.deleteOwnedRecords(OWNER);
+
+    // D4: idempotent. A deletion that threw on its second call would make the
+    // recovery of an interrupted one impossible.
+    await expect(fixture.registry.deleteOwnedRecords(OWNER)).resolves.toBeUndefined();
+  });
+
+  it('refuses to remove records out from under a live session', async () => {
+    const fixture = await startedFixture();
+    await fixture.registry.createSession(sessionCommand());
+    await fixture.registry.startRun(SESSION_ID, request(RUN_ID, 'none'));
+
+    // D4: records are never removed while a lease is held or a run is live —
+    // that would strand a running turn with no record of who owns it.
+    await expect(fixture.registry.deleteOwnedRecords(OWNER))
+      .rejects.toThrow(/still (has|running)/i);
+    await expect(fixture.repositories.runs.read(RUN_ID)).resolves.toMatchObject({ kind: 'current' });
+  });
+
+  it('finishes a deletion that was interrupted half-way', async () => {
+    const storage = new TestDurableStorage();
+    const crash = armableCrashAt('after-step-effect:step-0');
+    const crashed = await startedFixture(storage, { crashInjector: crash.injector });
+    await recordATurn(crashed, SESSION_ID, RUN_ID, OWNER);
+    crash.arm();
+
+    await expect(crashed.registry.deleteOwnedRecords(OWNER))
+      .rejects.toThrow('crash:after-step-effect:step-0');
+
+    // D4: a partially completed deletion is finished on next startup rather
+    // than left half-applied — which is what the intent is written for.
+    const restarted = createFixture(storage, { transactionOffset: 50 });
+    await restarted.registry.start();
+
+    await expect(restarted.repositories.sessions.read(SESSION_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+    await expect(restarted.repositories.runs.read(RUN_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+  });
+});
+
 async function startedFixture(
   storage?: DurableStorage,
   options: FixtureOptions = {},

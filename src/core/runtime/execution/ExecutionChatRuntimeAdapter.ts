@@ -66,7 +66,16 @@ export interface ExecutionChatRuntimeAdapterContext {
   readonly registry: ExecutionLifecycleRegistry;
   readonly backendId: ExecutionBackendId;
   readonly capabilities: ProviderCapabilityDescriptor;
-  readonly owner: ExecutionOwner;
+  /**
+   * Who owns the control records this tab's session writes.
+   *
+   * A function because a tab is built before it knows which conversation it is
+   * showing: an owner captured at construction is the tab's identity, and a
+   * record keyed that way cannot be found when the conversation it belonged to
+   * is deleted (D4). Read when a session is established, and again when a run
+   * starts.
+   */
+  readonly owner: () => ExecutionOwner;
   nextExecutionSessionId(): ExecutionSessionId;
   nextRunId(): RunId;
 }
@@ -446,7 +455,7 @@ export async function startExecutionRun(
   try {
     await context.registry.startRun(executionSessionId, {
       runId,
-      owner: context.owner,
+      owner: context.owner(),
       resultExpectation: spec.resultExpectation ?? 'required',
       requestRef: spec.requestRef,
       ...(resumeCheckpoint ? { resumeCheckpoint } : {}),
@@ -589,6 +598,8 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   private readonly readyListeners = new Set<(ready: boolean) => void>();
   private executionSessionId: ExecutionSessionId | null = null;
   private boundSessionId: string | null | undefined;
+  /** Which conversation this tab is showing, so a move to another is visible. */
+  private boundConversationId: string | null | undefined;
   /**
    * What the surface installed, by the names the presenter reads back.
    *
@@ -661,7 +672,7 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     await this.context.registry.createSession({
       backendId: this.context.backendId,
       executionSessionId,
-      owner: this.context.owner,
+      owner: this.context.owner(),
       ...(nativeSessionRef ? { nativeSessionRef } : {}),
     });
     this.executionSessionId = executionSessionId;
@@ -823,6 +834,15 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
    */
   syncConversationState(state: BoundConversation | null): void {
     const next = state?.sessionId ?? null;
+    const nextConversationId = state?.id ?? null;
+    if (this.boundConversationId !== undefined && this.boundConversationId !== nextConversationId) {
+      // A tab is not a conversation. The session the previous one was working
+      // in is owned by *it*, and carrying it into the next would put one
+      // conversation's runs under another's name — which deleting either then
+      // takes the wrong records for. The next turn establishes a fresh one.
+      this.resetSession();
+    }
+    this.boundConversationId = nextConversationId;
     if (this.boundSessionId !== undefined && this.boundSessionId !== next) {
       this.session.markInvalidated();
     }
@@ -846,6 +866,7 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     const executionSessionId = this.executionSessionId;
     this.executionSessionId = null;
     this.boundSessionId = undefined;
+    this.boundConversationId = undefined;
     this.announceReady(false);
     if (executionSessionId) {
       void this.context.registry.disposeSession(executionSessionId)

@@ -1099,6 +1099,40 @@ export default class GrimoirePlugin extends Plugin {
         }
       }
     }
+
+    await this.deleteConversationControlRecords(id);
+  }
+
+  /**
+   * Removes what the execution kernel recorded about a conversation (D4).
+   *
+   * Last, and after the tabs holding it have been moved off it: the registry
+   * refuses to take records away from a session that is still working, and by
+   * this point the tabs have been reset onto a new conversation. Retention is
+   * tied to the conversation's lifetime and to nothing else — no clock expires
+   * a run record — so this call is the only thing that ever removes one.
+   *
+   * Reported rather than thrown: a conversation the user deleted is gone from
+   * the vault either way, and a failure here must not leave them looking at a
+   * chat that would not delete.
+   */
+  private async deleteConversationControlRecords(id: string): Promise<void> {
+    if (!this.executionKernelHost) {
+      return;
+    }
+    try {
+      await this.executionKernelHost.registry.deleteOwnedRecords({
+        kind: 'conversation',
+        ownerId: id,
+      });
+    } catch (error) {
+      this.recordDebugLog({
+        error,
+        event: 'execution.control.deleteFailed',
+        level: 'warn',
+        scope: 'plugin',
+      });
+    }
   }
 
   async renameConversation(id: string, title: string): Promise<void> {

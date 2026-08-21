@@ -35,6 +35,11 @@ export type ExecutionControlRepositoryKind =
   | 'settings-transitions'
   | 'shutdown-checkpoints';
 
+export interface ExecutionControlRemoval {
+  readonly repository: ExecutionControlRepositoryKind;
+  readonly recordId: string;
+}
+
 export interface ExecutionControlWrite {
   readonly repository: ExecutionControlRepositoryKind;
   readonly recordId: string;
@@ -56,8 +61,11 @@ export class ExecutionControlTransactionCoordinator {
     options: ExecutionControlTransactionCoordinatorOptions = {},
   ) {
     this.transactions = new TransactionIntentCoordinator(storage, {
-      kinds: ['execution-control-write'],
-      handlers: [createControlWriteHandler(repositories)],
+      kinds: ['execution-control-write', 'execution-control-delete'],
+      handlers: [
+        createControlWriteHandler(repositories),
+        createControlRemoveHandler(repositories),
+      ],
       now: options.now,
       crashInjector: options.crashInjector,
     });
@@ -71,6 +79,26 @@ export class ExecutionControlTransactionCoordinator {
         id: `step-${index}`,
         handlerId: 'execution-record-put',
         input: { ...write },
+      })),
+    }).then(() => undefined);
+  }
+
+  /**
+   * Removes records in one intent-backed operation (D4).
+   *
+   * The same machinery a write uses, for the same reason: a deletion that is
+   * interrupted half-way must be finished at the next start rather than left
+   * with a session gone and its runs still on disk. Each step is written to be
+   * replayable, because recovery runs the ones it cannot prove were applied.
+   */
+  delete(transactionId: string, removals: readonly ExecutionControlRemoval[]): Promise<void> {
+    return this.transactions.execute({
+      transactionId,
+      kind: 'execution-control-delete',
+      steps: removals.map((removal, index) => ({
+        id: `step-${index}`,
+        handlerId: 'execution-record-remove',
+        input: { ...removal },
       })),
     }).then(() => undefined);
   }
@@ -98,6 +126,51 @@ function createControlWriteHandler(
       await applyWrite(repositories, decodeWrite(input));
     },
   };
+}
+
+function createControlRemoveHandler(
+  repositories: ExecutionControlRepositories,
+): TransactionStepHandler {
+  return {
+    handlerId: 'execution-record-remove',
+    validate(input) {
+      const removal = decodeRemoval(input);
+      return { repository: removal.repository, recordId: removal.recordId };
+    },
+    async apply(input) {
+      const removal = decodeRemoval(input);
+      await repositoryFor(repositories, removal.repository).removeIfPresent(removal.recordId);
+    },
+  };
+}
+
+function decodeRemoval(input: unknown): ExecutionControlRemoval {
+  const record = exactRecord(input, ['repository', 'recordId'], 'execution control removal');
+  if (!isRepositoryKind(record.repository)) {
+    throw new Error('Execution control repository kind is invalid.');
+  }
+  requireRecordId(record.recordId);
+  return { repository: record.repository, recordId: record.recordId };
+}
+
+function repositoryFor(
+  repositories: ExecutionControlRepositories,
+  kind: ExecutionControlRepositoryKind,
+): { removeIfPresent(recordId: string): Promise<void> } {
+  switch (kind) {
+    case 'sessions':
+      return repositories.sessions;
+    case 'runs':
+      return repositories.runs;
+    case 'interactions':
+      return repositories.interactions;
+    case 'reconciliations':
+      return repositories.reconciliations;
+    case 'settings-transitions':
+      return repositories.settingsTransitions;
+    case 'shutdown-checkpoints':
+      return repositories.shutdownCheckpoints;
+  }
 }
 
 function decodeWrite(input: unknown): ExecutionControlWrite {
