@@ -964,6 +964,7 @@ describe('ExecutionLifecycleRegistry — deleting a conversation', () => {
     session: ReturnType<typeof executionSessionId>,
     run: RunId,
     owner: { kind: 'conversation'; ownerId: string },
+    options: { keepOpen?: boolean } = {},
   ): Promise<void> {
     await fixture.registry.createSession({ ...sessionCommand(), executionSessionId: session, owner });
     await fixture.registry.startRun(session, { ...request(run, 'none'), owner });
@@ -972,8 +973,58 @@ describe('ExecutionLifecycleRegistry — deleting a conversation', () => {
       destination: 'both',
     });
     await settle(fixture.registry);
-    await fixture.registry.disposeSession(session);
+    if (!options.keepOpen) {
+      await fixture.registry.disposeSession(session);
+    }
   }
+
+  it('lets go of a disposed session\'s runs and interactions', async () => {
+    const fixture = await startedFixture();
+    await recordATurn(fixture, SESSION_ID, RUN_ID, OWNER);
+    await recordATurn(fixture, SESSION_ID_2, RUN_ID_2, OTHER_OWNER, { keepOpen: true });
+
+    // The maps are the process's memory of work in progress. A run whose
+    // session is disposed is neither in progress nor reachable, and keeping it
+    // means a working day's session holds every turn it ever ran.
+    expect(fixture.registry.getRun(RUN_ID)).toBeNull();
+    // The open session keeps its own: a tab that is still there can still ask
+    // about the turn it just finished.
+    expect(fixture.registry.getRun(RUN_ID_2)).not.toBeNull();
+  });
+
+  it('lets go of an interaction the closed session had opened', async () => {
+    const fixture = await startedFixture();
+    await fixture.registry.createSession(sessionCommand());
+    await fixture.registry.startRun(SESSION_ID, request(RUN_ID, 'none'));
+    fixture.backend.emit(RUN_ID, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: INTERACTION_ID,
+        runId: RUN_ID,
+        kind: 'approval',
+        presentationRef: 'approval-disposed',
+        responseIds: ['allow', 'deny'],
+      },
+    });
+    await settle(fixture.registry);
+    await fixture.registry.resolveInteraction({
+      interactionId: INTERACTION_ID,
+      responseId: 'allow',
+      resolvedAt: 1,
+    });
+    fixture.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, {
+      deliveryId: 'terminal-disposed',
+      destination: 'both',
+    });
+    await settle(fixture.registry);
+    expect(fixture.registry.getInteraction(INTERACTION_ID)).not.toBeNull();
+
+    await fixture.registry.disposeSession(SESSION_ID);
+
+    // A prompt raised by a tab that has closed cannot be shown to anyone or
+    // answered by anyone; what happened to it is in its durable record.
+    expect(fixture.registry.getInteraction(INTERACTION_ID)).toBeNull();
+  });
 
   it('removes every record the conversation owns, and only those', async () => {
     const fixture = await startedFixture();

@@ -25,7 +25,7 @@ All seven green: unit 476 suites / 7,627 tests, typecheck, lint, integration 145
 
 | # | Finding | Evidence | Status |
 |---|---|---|---|
-| C1 | **Control records are never deleted, and every start reads all of them.** `VersionedRepository.remove` (`src/core/persistence/VersionedRepository.ts:136`) and `DurableStorage.remove` have no production caller anywhere in `src/core` or `src/app` — the only `.remove(` in either is the vault adapter primitive itself (`src/core/storage/VaultFileAdapter.ts:56`). `deleteConversation` (`src/main.ts:1078`) removes the provider session and the metadata and no control record, though D4 requires deleting every control record the conversation owns. Startup parses every intent and record ever written (`TransactionIntentCoordinator.ts:156`), so disk and start time grow monotonically in a real vault. | grep for `.remove(` callers; D3/D4 in `docs/provider-execution-persistence-decisions.md` | confirmed |
+| C1 ✅ | **Control records are never deleted, and every start reads all of them.** `VersionedRepository.remove` (`src/core/persistence/VersionedRepository.ts:136`) and `DurableStorage.remove` have no production caller anywhere in `src/core` or `src/app` — the only `.remove(` in either is the vault adapter primitive itself (`src/core/storage/VaultFileAdapter.ts:56`). `deleteConversation` (`src/main.ts:1078`) removes the provider session and the metadata and no control record, though D4 requires deleting every control record the conversation owns. Startup parses every intent and record ever written (`TransactionIntentCoordinator.ts:156`), so disk and start time grow monotonically in a real vault. | grep for `.remove(` callers; D3/D4 in `docs/provider-execution-persistence-decisions.md` | confirmed |
 
 Order of work inside C1, as reviewed: completed transaction intents first (the highest-volume
 artifact), then deletion by conversation, then eviction of terminal runs from the in-memory maps.
@@ -34,8 +34,9 @@ artifact), then deletion by conversation, then eviction of terminal runs from th
 startup, including everything older builds left behind, with the repeat answer moved into a bounded
 in-memory window. Deletion by conversation is done too: control records are owned by the conversation
 rather than by the tab, `deleteOwnedRecords` removes them through an intent-backed transaction that
-recovery finishes, and `deleteConversation` calls it. **Still open:** evicting terminal runs from the
-registry's in-memory maps outside a conversation deletion.
+recovery finishes, and `deleteConversation` calls it. In-memory eviction is done as well: a disposed
+session's runs and interactions go with it, bounding the maps by the tabs that are open rather than
+by the length of the session. **C1 is closed.**
 
 ## Important
 

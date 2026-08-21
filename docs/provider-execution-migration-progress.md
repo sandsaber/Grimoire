@@ -4588,6 +4588,32 @@ Gates: unit 473 suites / 7,636 tests, integration 5 suites / 145 tests, typechec
 `src` and `tests`, and `build:release` clean.
 
 
+### Review C1, third half — the memory of work nobody holds (this commit)
+
+The registry's maps are this process's memory of work in progress, and a run stayed in them after it
+finished: `disposeSession` dropped the session and its observers and left every run the session had
+ever carried, plus their interactions. A working day in one Obsidian session therefore held every
+turn it ever ran.
+
+A disposed session's runs and interactions are now dropped with it. Two things make that safe rather
+than lossy: disposal already refuses a session with a live run — which is what lets this delete
+without checking each one — and the durable records stay, because an honest history of what ran
+outlives the tab that ran it. They are removed when the conversation is deleted, and by nothing else.
+
+Interactions are found **by their run rather than by the run's open list**, which the second test is
+for: a resolved prompt is no longer listed as open, and it is exactly the one nobody can be shown.
+Both rows go red when their eviction is removed.
+
+**The guard that pinned nothing.** The first version skipped runs that were not terminal, and the
+break-test showed the branch was unreachable — evicting live runs too kept every row green. It is
+gone, and the refusal that makes it unnecessary is named where it used to be.
+
+That closes C1: intents swept, a deleted conversation's records deleted, and the in-memory half
+bounded by the tabs that are open rather than by the length of the session.
+
+Gates: unit 473 suites / 7,637 tests, typecheck, `eslint` over `src` and `tests` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

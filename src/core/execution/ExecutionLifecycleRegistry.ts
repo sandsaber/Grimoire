@@ -983,7 +983,37 @@ export class ExecutionLifecycleRegistry {
       // hold a closure per disposed conversation for the life of the process,
       // and a session id is never reused for a different session.
       this.envelopeObservers.delete(executionSessionId);
+      this.forgetSessionWork(session.record);
     });
+  }
+
+  /**
+   * Drops the in-memory record of work that belongs to a session nobody holds.
+   *
+   * The maps are this process's memory of work in progress; a run whose session
+   * is disposed is neither in progress nor reachable — `getRun` is asked by the
+   * tab that owns it, and that tab is gone. Keeping them means a working day's
+   * session holds every turn it ever ran, which is the in-memory half of the
+   * same growth the control store had.
+   *
+   * The durable records stay: they are removed when the conversation is deleted
+   * (D4) and by nothing else, because an honest history of what ran outlives
+   * the tab that ran it.
+   */
+  private forgetSessionWork(record: ExecutionSessionRecord): void {
+    const runIds = new Set(record.runIds);
+    for (const id of runIds) {
+      // Every one of them is finished: disposal refuses a session with a live
+      // run, which is checked above and is what makes this safe to do at all.
+      this.runs.delete(runId(id));
+    }
+    for (const [id, interaction] of this.interactions) {
+      // By the run rather than by the run's open list: a resolved prompt is no
+      // longer listed there, and it is exactly the one nobody can be shown.
+      if (runIds.has(interaction.record.runId)) {
+        this.interactions.delete(id);
+      }
+    }
   }
 
   /**
