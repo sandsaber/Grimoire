@@ -4517,6 +4517,35 @@ Nothing was fixed here. The next session starts at the top of that backlog, in t
 C1, then Grok in one pass, then Claude in one pass, then ACP robustness, then hygiene.
 
 
+### Review C1, first half — the intent that is kept after it is answered (this commit)
+
+Every durable event writes a transaction intent, and nothing ever removed one. The file exists to
+survive a crash *between* the steps of a write; once every step is done there is no reader left,
+because ids are minted per write and no caller can reproduce one afterwards. So the store grew by one
+file per event for the life of a vault, and every start read all of them looking for the pending few.
+
+Now: a completed intent is removed at completion, and `recoverPending` sweeps any it finds — which
+covers both the crash between the completion write and its removal, **and every vault that ran an
+older build**, whose store is swept on the first start after this.
+
+**What the removal took away, and where it went.** A repeat of a transaction id used to be answered
+from the completed file: "already done", without doing the work twice. The existing concurrent-caller
+test is exactly that property, and deleting the file broke it — the second caller re-applied the
+step. The answer moved into a **bounded** window of 64 finished ids, because a set that grows with
+every write is the same defect one layer up; the window only has to cover a retry of an id still in
+flight, which is the only repeat that can happen. Proof it is load-bearing: with the window emptied,
+the concurrent-caller row goes red.
+
+Each of the three new rows was proven by breaking what it covers: no removal at completion reds the
+first, no startup sweep reds the second, an empty window reds the third.
+
+**Not this commit:** the other two halves of C1 — deleting a conversation's control records (D4), and
+evicting terminal runs from the registry's in-memory maps.
+
+Gates: unit 473 suites / 7,630 tests, integration 5 suites / 145 tests, typecheck, `eslint` over
+`src` and `tests` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

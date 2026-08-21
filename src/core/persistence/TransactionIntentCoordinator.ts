@@ -112,6 +112,9 @@ const transactionIntentSchema: RecordSchema<TransactionIntent> = {
   },
 };
 
+/** How many finished transactions are remembered for a caller that asks twice. */
+const COMPLETED_TRANSACTION_WINDOW = 64;
+
 export class TransactionIntentCoordinator {
   private readonly repository: VersionedRepository<TransactionIntent>;
   private readonly now: () => number;
@@ -119,6 +122,18 @@ export class TransactionIntentCoordinator {
   private readonly handlers = new Map<string, TransactionStepHandler>();
   private readonly crashInjector?: (point: TransactionCrashPoint) => void;
   private readonly operationQueues = new Map<string, Promise<void>>();
+  /**
+   * The transactions this process finished, for a caller that asks twice.
+   *
+   * The intent file used to answer this: a repeat found a completed record and
+   * was told so instead of doing the work again. Removing the file on
+   * completion is what keeps the store bounded, so the answer moves here —
+   * bounded too, because a set that grows with every write is the same defect
+   * one layer up. The window only has to cover a retry of an id still in
+   * flight, which is the only repeat that can happen: ids are minted per write
+   * and no caller can reproduce one later.
+   */
+  private readonly completedTransactionIds = new Set<string>();
 
   constructor(storage: DurableStorage, options: TransactionIntentCoordinatorOptions = {}) {
     this.now = options.now ?? Date.now;
@@ -165,12 +180,21 @@ export class TransactionIntentCoordinator {
       if (read.kind === 'corrupt') {
         throw new Error(`Transaction "${transactionId}" is corrupt: ${read.error}`);
       }
-      if ((read.kind === 'current' || read.kind === 'migrated')
-        && read.record.payload.status === 'pending') {
-        this.requireRegisteredKind(read.record.payload.kind);
-        results.push(await this.enqueue(transactionId, () => (
-          this.resume(read.record, true)
-        )));
+      if (read.kind === 'current' || read.kind === 'migrated') {
+        if (read.record.payload.status === 'pending') {
+          this.requireRegisteredKind(read.record.payload.kind);
+          results.push(await this.enqueue(transactionId, () => (
+            this.resume(read.record, true)
+          )));
+        } else {
+          // A completed intent has no reader: the ids are minted per write and
+          // never reused, so nothing can resume it and nothing can be answered
+          // from it. Swept here as well as at completion, because a crash
+          // between the completion write and its removal leaves one behind —
+          // and because every vault that ran an older build has a store full
+          // of them.
+          await this.enqueue(transactionId, () => this.discard(read.record));
+        }
       }
     }
     return results;
@@ -183,6 +207,9 @@ export class TransactionIntentCoordinator {
     let record: VersionedRecord<TransactionIntent>;
     const recovered = existing.kind !== 'absent';
 
+    if (existing.kind === 'absent' && this.completedTransactionIds.has(operation.transactionId)) {
+      return { transactionId: operation.transactionId, status: 'completed', recovered: true };
+    }
     if (existing.kind === 'absent') {
       const timestamp = this.now();
       this.crashInjector?.('before-intent');
@@ -255,7 +282,32 @@ export class TransactionIntentCoordinator {
       updatedAt: this.now(),
     }, record.revision);
     this.crashInjector?.('after-completion');
+    await this.discard(record);
     return { transactionId: record.recordId, status: 'completed', recovered };
+  }
+
+  /**
+   * Drops an intent whose work is done.
+   *
+   * Failures are swallowed on purpose: the effects are applied and the
+   * completion is durable, so a removal that could not happen is a file the
+   * next start sweeps rather than a transaction that failed. A revision
+   * conflict means someone else already removed it.
+   */
+  private async discard(record: VersionedRecord<TransactionIntent>): Promise<void> {
+    await this.repository.remove(record.recordId, record.revision).catch(() => undefined);
+    this.rememberCompleted(record.recordId);
+  }
+
+  private rememberCompleted(transactionId: string): void {
+    this.completedTransactionIds.add(transactionId);
+    if (this.completedTransactionIds.size <= COMPLETED_TRANSACTION_WINDOW) {
+      return;
+    }
+    for (const oldest of this.completedTransactionIds) {
+      this.completedTransactionIds.delete(oldest);
+      break;
+    }
   }
 
   private normalizeOperation(operation: TransactionOperation): TransactionOperation {

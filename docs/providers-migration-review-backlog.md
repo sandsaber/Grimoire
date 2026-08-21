@@ -30,6 +30,10 @@ All seven green: unit 476 suites / 7,627 tests, typecheck, lint, integration 145
 Order of work inside C1, as reviewed: completed transaction intents first (the highest-volume
 artifact), then deletion by conversation, then eviction of terminal runs from the in-memory maps.
 
+**Progress:** the intents half is done — completed intents are removed at completion and swept at
+startup, including everything older builds left behind, with the repeat answer moved into a bounded
+in-memory window. Deletion by conversation and in-memory eviction are still open.
+
 ## Important
 
 ### Kernel and adapter

@@ -81,6 +81,73 @@ describe('TransactionIntentCoordinator', () => {
     expect(apply).toHaveBeenCalledTimes(1);
   });
 
+  it('leaves nothing on disk for a transaction that completed', async () => {
+    const storage = new TestDurableStorage();
+    const coordinator = new TransactionIntentCoordinator(storage, {
+      kinds: TRANSACTION_KINDS,
+      handlers: [createHandler(async () => undefined)],
+    });
+
+    await coordinator.execute(createOperation(20));
+
+    // An intent exists to survive a crash between its steps. Once every step is
+    // done there is no reader left — the ids are minted per write and never
+    // reused — so a kept intent is a file that is read at every start and
+    // answers nothing. This is the shape of the store's growth: one file per
+    // durable event, for the life of the vault.
+    await expect(storage.list(TRANSACTION_INTENTS_PATH)).resolves.toEqual([]);
+  });
+
+  it('clears the completed intents an older build left behind', async () => {
+    const storage = new TestDurableStorage();
+    const apply = jest.fn().mockResolvedValue(undefined);
+    // What every vault that ran a build before this one has: intents that did
+    // their work and were then kept forever.
+    await storage.writeAtomic(
+      getVersionedRecordPath(TRANSACTION_INTENTS_PATH, createTransactionId(21)),
+      JSON.stringify({
+        schemaVersion: 1,
+        recordId: createTransactionId(21),
+        revision: 3,
+        updatedAt: 1,
+        payload: {
+          transactionId: createTransactionId(21),
+          kind: 'test-write',
+          steps: [{ id: 'step-0', handlerId: 'set-flag', input: { key: 'written' } }],
+          completedStepIds: ['step-0'],
+          status: 'completed',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      }),
+    );
+
+    await expect(new TransactionIntentCoordinator(storage, {
+      kinds: TRANSACTION_KINDS,
+      handlers: [createHandler(apply)],
+    }).recoverPending()).resolves.toEqual([]);
+
+    // Swept rather than resumed: its work was done before this process existed.
+    await expect(storage.list(TRANSACTION_INTENTS_PATH)).resolves.toEqual([]);
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it('keeps an intent whose steps have not all run', async () => {
+    const storage = new TestDurableStorage();
+    const coordinator = new TransactionIntentCoordinator(storage, {
+      kinds: TRANSACTION_KINDS,
+      handlers: [createHandler(async () => undefined)],
+      crashInjector: crashOnceAt('after-step-effect:step-0'),
+    });
+
+    await expect(coordinator.execute(createOperation(22)))
+      .rejects.toThrow('crash:after-step-effect:step-0');
+
+    // The one case the file exists for. Sweeping this would lose the record of
+    // an effect that already happened.
+    await expect(storage.list(TRANSACTION_INTENTS_PATH)).resolves.toHaveLength(1);
+  });
+
   it('discovers and recovers an intent after restart without the old operation', async () => {
     const storage = new TestDurableStorage();
     const apply = jest.fn().mockResolvedValue(undefined);
