@@ -88,3 +88,4 @@ here rather than by the absence of a table.
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
 | 2026-08-20 | 1.0.5 | live: 1, 1b, 2, 5, 6, 7, 8, 9, 13, 14, 16, 18, 19, 20 | — | first live run found the resume shape this provider actually has; see the journal entry for that run |
+| 2026-08-21 | 1.0.5 | live: 1, 1b, 2, 5, 6, 7, 8, 9, 13, 14, 16, 18, 19, 20 | — | re-run after the two review passes; row 6 is the one that mattered, since a Stop now waits for the prompt ACP answers it on |

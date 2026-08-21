@@ -106,4 +106,4 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
-| never | — | — | — | wave 2 is wired and not certified; these rows need a person in a vault |
+| 2026-08-21 | 0.147.0 | live: 1, 2, 6, 8, 12, 14, 16, 21 | — | re-run after the two review passes; the shared kernel changes left every row green |

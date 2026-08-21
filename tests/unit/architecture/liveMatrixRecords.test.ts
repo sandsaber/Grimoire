@@ -87,10 +87,10 @@ describe('live smoke matrix records', () => {
     // who wants the answer reads this line rather than four documents. Update
     // it in the same commit as the run it records.
     expect(status).toEqual([
-      'claude-flip-smoke-matrix.md: never',
-      'codex-flip-smoke-matrix.md: never',
-      'grok-flip-smoke-matrix.md: 2026-08-20',
-      'opencode-flip-smoke-matrix.md: 2026-08-20',
+      'claude-flip-smoke-matrix.md: 2026-08-21',
+      'codex-flip-smoke-matrix.md: 2026-08-21',
+      'grok-flip-smoke-matrix.md: 2026-08-21',
+      'opencode-flip-smoke-matrix.md: 2026-08-21',
     ]);
   });
 });

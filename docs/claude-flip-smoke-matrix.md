@@ -76,6 +76,44 @@ model makes the long rows cheaper and changes nothing they assert.
   flipped path calls them;
 - **turn steering** is declared unsupported for Claude and always has been. There is no row for it.
 
+## The half that runs itself
+
+Ten rows are driven headlessly by
+`tests/integration/app/execution/claude/ClaudeLiveSmoke.integration.test.ts`, against the real
+`@anthropic-ai/claude-agent-sdk` and the real CLI. It is skipped unless asked for, because it starts
+the CLI and spends the account's tokens:
+
+```bash
+GRIMOIRE_CLAUDE_LIVE=1 NODE_OPTIONS=--experimental-vm-modules \
+  node scripts/run-jest.js --selectProjects=integration \
+  --runTestsByPath tests/integration/app/execution/claude/ClaudeLiveSmoke.integration.test.ts
+```
+
+Two flags that are not decoration. `scripts/run-jest.js` rather than bare `npx jest`, because the
+runner passes `--localstorage-file` and without it every suite that writes provider settings fails
+with `storage.getItem is not a function`. And `--experimental-vm-modules`, because
+`jest.config.js` maps `@anthropic-ai/claude-agent-sdk` to a mock for every suite in the repository —
+right for all of them but this one — so the harness loads the real module by absolute path through
+`tests/helpers/loadEsmModule.js`, and a dynamic import inside Jest's VM context is gated on that flag.
+
+`GRIMOIRE_CLAUDE_TRACE=1` prints the debug records the composition writes, `GRIMOIRE_CLAUDE_CLI`
+points at a binary other than `claude` on `PATH`, and `GRIMOIRE_CLAUDE_MODEL` overrides the model.
+
+It covers rows 1, 2, 3, 10, 12, 19, 22, 25, 27 and 28, plus the half of row 4 that needs no eyes —
+that the answer arrives once rather than twice. **The rows it does not cover are the ones a person
+has to look at or drive by hand**: how the diff, the thinking block, the subagent card and the badges
+actually render, an image attachment, plan mode and its two decisions, a question dialog, Escape and
+Stop while a prompt is showing, fork, all three rewind rows, MCP tools, two tabs side by side,
+closing a tab mid-turn, and restarting Obsidian mid-turn.
+
+Two things the first run of this harness established, both worth knowing before writing a row:
+
+- **Claude Code decides for itself that a read-only shell command is safe.** `echo` never reaches
+  `canUseTool`, so a row that approves one proves nothing about the prompt. Ask for a command that
+  writes.
+- **An unknown model name is not an error.** The SDK accepts it and answers anyway, so the
+  deliberate-failure row points the CLI path at a binary that is not there instead.
+
 ## Recording the result
 
 Append the outcome to `docs/provider-execution-migration-progress.md` as a checkpoint entry: date,
@@ -90,4 +128,4 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
-| never | — | — | — | wave 3 is wired and not certified; these rows need a person in a vault |
+| 2026-08-21 | 2.1.238 | live: 1, 2, 3, 10, 12, 19, 22, 25, 27, 28 | — | first run; built the harness the other three already had, and found two things about the SDK rather than about Grimoire — see the section above |

@@ -4926,6 +4926,53 @@ be circular. No violation existed, which is the reason to close it now rather th
 Nine new tests, each run against the code with its fix removed. Gates: unit 478 suites / 7,698 tests,
 integration 5 suites / 145 tests, typecheck, `eslint`, `build:release`.
 
+### The fourth live harness, and all four matrices run (this commit)
+
+Claude was the only flipped provider without one. Codex, Grok, OpenCode and Antigravity each had a
+harness that drives the mechanical half of their matrix against a real CLI; Claude's matrix — the
+longest of the four, twenty-eight rows — had never been run at all, and neither had Codex's.
+
+**Why Claude had none, and what it took.** `jest.config.js` maps
+`@anthropic-ai/claude-agent-sdk` to a mock for every suite in the repository, which is right for all
+of them except this one. The package is `"type": "module"` with an exports map offering no CommonJS
+entry, and ts-jest rewrites `await import(...)` into `require(...)` — which puts the module straight
+back through the mapper. The harness loads it by absolute URL through
+`tests/helpers/loadEsmModule.js`, a plain `.js` file the transform does not match, and hands it to
+the composition through the seam that already existed for exactly this: the optional `queryFunction`
+on `createBackendRegistration`. It needs `NODE_OPTIONS=--experimental-vm-modules`, because a dynamic
+import inside Jest's VM context is gated on that.
+
+**Ten of the twenty-eight rows now run themselves**, and the first run found two things — both about
+the SDK rather than about Grimoire, and both of which had made a row pass while proving nothing:
+
+- **Claude Code decides for itself that a read-only shell command is safe.** `echo` never reaches
+  `canUseTool`. The first version of row 2 approved one and read the absent prompt as a missing
+  prompt; isolated against the raw SDK, a command that *writes* asks every time. The row asks for one
+  now.
+- **An unknown model name is not an error.** The SDK accepts `no-such-model-grimoire-live` and
+  answers anyway, so the deliberate-failure row was green on a turn that succeeded. It points the CLI
+  path at a binary that is not there instead.
+
+A third thing is worth recording as a non-finding: `getSupportedCommands()` answers empty for Claude,
+because the workspace half is still registered the legacy way and `listCommands` throws by name —
+the gap this matrix already documents. Row 19 asks the question it can actually answer: `/compact`
+sent as a turn reaches the provider, which answers in its own words ("Error: No messages to
+compact"), rather than being answered locally.
+
+**All four matrices were then run**, three of them as a re-run against the two review passes. That
+matters most for Grok and OpenCode: a Stop now waits for the prompt ACP answers a cancelled turn on,
+which is the shared backend's cancel path for every ACP provider, and row 6 is green in both. Codex
+and Claude are green on their own harnesses. Q1's gate carries the summary, so all four now read
+`2026-08-21` instead of two `never`s.
+
+What is left is genuinely manual, and now written down as such:
+[`docs/manual-smoke-instructions.md`](manual-smoke-instructions.md) is a document for a person with
+Obsidian and a scratch vault, not for a developer — 18 rows for Claude, 14 for Codex, 8 for OpenCode,
+7 for Grok, with the fiddly ones spelled out.
+
+Gates: unit 478 suites / 7,698 tests, integration 5 suites / 145 tests plus four live suites run by
+hand, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -4949,10 +4996,13 @@ reason not to hand out a build from that range.
 **Both review backlogs are closed.** The last pass took the seven rows nobody had started — K3, K4,
 K5, S1, S3, Q1 and Q2 — so every row of both reviews is fixed, or refuted with evidence in K2's case.
 
-**What is still owed is a person, not a commit:** the four manual smoke matrices. Two of them have
-never been run at all, which `liveMatrixRecords.test.ts` now states rather than implies — Claude
-never, Codex never, Grok and OpenCode 2026-08-20 (live rows only; the rendering rows are the ones
-only a person can run).
+**Every automatable row of every matrix has been run**, all four on 2026-08-21, including the Claude
+harness written for this commit. `liveMatrixRecords.test.ts` carries the dates.
+
+**What is still owed is a person, not a commit:** the rows that are about what the screen shows or
+about actions only a hand can take — 18 for Claude, 14 for Codex, 8 for OpenCode, 7 for Grok.
+[`docs/manual-smoke-instructions.md`](manual-smoke-instructions.md) is the instruction for whoever
+sits down with a vault; it needs Obsidian and about an hour, and no knowledge of this codebase.
 
 Wave 5 is complete: **Grok executes through the kernel**, its legacy runtime is deleted, and thirteen
 live rows are green against CLI 1.0.5. Four ACP providers remain on the legacy path — MiMoCode, Kimi
