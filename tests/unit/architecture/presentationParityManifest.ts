@@ -717,6 +717,13 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // M5. The transport, the launcher and the client adapter beside it went
       // live with OpenCode's flip and are listed as wired.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
+      // Wave 6, built ahead of its own flip: MiMoCode's module and the
+      // descriptor its backend runs under. Dark until `registration.ts` points
+      // `createRuntime` at the composition, which is a later checkpoint —
+      // listed here so "unreachable" stays something someone stated rather than
+      // a gap nobody noticed.
+      'src/providers/mimocode/MimocodeProviderModule.ts',
+      'src/providers/mimocode/execution/MimocodeExecutionBackend.ts',
     ],
   },
 ];

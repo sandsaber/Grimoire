@@ -5159,6 +5159,37 @@ The first re-recording also replaced MiMoCode's fixture with a thinner one that
 had lost `session/set_config_option` entirely. The new one matches the old
 coverage exactly — same cases, same updates, same ten exchanges — taken fresh.
 
+### Wave 6, first code: MiMoCode's module and backend, dark (this commit)
+
+The module and the descriptor its backend runs under. Both unreachable, both
+listed as such in the parity manifest, and the flip is a later checkpoint —
+`registration.ts` still points `createRuntime` at `MimocodeChatRuntime`.
+
+**Derived rather than reasoned out, deliberately.** MiMoCode's settings module
+is byte-identical to OpenCode's modulo the provider name, and its capability
+record is too; `AGENTS.md` says a change to one of these two is usually a change
+to both. So the module is OpenCode's with the names swapped — and then read end
+to end, because a derived file inherits *claims* along with code. Two kinds had
+to go: the header called this "proof four, the last topology" and said the
+composition builds from it, neither of which is true of a sixth module that
+nothing constructs.
+
+**The wire recording caught the first inherited untruth before any code used
+it.** OpenCode's execution trace lists `set-config:variant:high` among its
+dynamic configuration. MiMoCode's session offers `model` and `mode` and no
+`variant` — so the derived trace would have declared a capability the provider
+does not have, in the file the module test asserts against. The trace is written
+from the recording where the recording speaks: two config options rather than
+three, plus the two updates the session emits when it opens
+(`available_commands_update`, `usage_update`), which OpenCode's trace does not
+name.
+
+What the recording still cannot confirm is the answer traffic — that account
+does not generate — and the module says so where a reader will meet it rather
+than in a doc they may not open.
+
+Gates: unit 482 suites / 7,693 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
