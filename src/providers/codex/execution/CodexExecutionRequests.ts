@@ -209,6 +209,9 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
       baseInstructionsAlreadySent: false,
     });
 
+    // Computed once. Called twice it was also *decided* twice, which for a
+    // sandbox policy is a question that must have one answer per turn.
+    const sandboxPolicy = sandboxPolicyFor(request, environment, permission.sandbox);
     return {
       thread,
       turn: {
@@ -221,9 +224,7 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
           effort: parameters.effort,
           summary: parameters.summary,
           collaborationMode: parameters.collaborationMode,
-          ...(sandboxPolicyFor(request, environment, permission.sandbox)
-            ? { sandboxPolicy: sandboxPolicyFor(request, environment, permission.sandbox) }
-            : {}),
+          ...(sandboxPolicy ? { sandboxPolicy } : {}),
         },
       },
     };

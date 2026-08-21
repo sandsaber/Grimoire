@@ -43,7 +43,18 @@ export class CCSettingsStorage {
     }
 
     const content = await this.adapter.read(CC_SETTINGS_PATH);
-    const stored = JSON.parse(content) as Record<string, unknown>;
+    let stored: Record<string, unknown>;
+    try {
+      stored = JSON.parse(content) as Record<string, unknown>;
+    } catch {
+      // A file this build cannot parse is not a reason to fail every permission
+      // read — `save` has tolerated one since it was written, and only `load`
+      // threw, so a single stray character broke reading *and* writing
+      // permissions everywhere. Defaults are returned so the surface works; the
+      // file itself is left exactly as it is, because it is the user's and it
+      // may be recoverable by hand.
+      return { ...DEFAULT_CC_SETTINGS };
+    }
 
     return {
       $schema: CC_SETTINGS_SCHEMA,

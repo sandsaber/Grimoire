@@ -233,6 +233,16 @@ export interface ClaudeExecutionBackendContext {
    * cannot take another turn at all.
    */
   readonly onSessionUnusable?: (executionSessionId: string) => void;
+  /**
+   * Why the SDK connection went away, for the debug log and nothing else.
+   *
+   * The run event carries no error text — the kernel classifies causes rather
+   * than forwarding provider strings, and D7 would have to redact one anyway —
+   * so the cause was simply dropped, and a lost connection was indistinguishable
+   * from any other in a diagnostic session. The host writes it where redaction
+   * already applies.
+   */
+  readonly reportConnectionLost?: (error: unknown) => void;
   readonly now?: () => number;
   readonly runTimeoutMs?: number;
   readonly resultCommitTimeoutMs?: number;
@@ -408,9 +418,6 @@ ExecutionRecoveryPort {
     );
     if (!evidence) {
       return { kind: 'unknown', effectsPossible: true };
-    }
-    if (evidence.kind === 'terminal') {
-      return evidence;
     }
     return evidence;
   }
@@ -1538,10 +1545,13 @@ class ClaudeExecutionSession implements ExecutionSession {
   private handleConnectionLost(
     query: ClaudeExecutionQuery,
     generation: number,
-    _error?: Error,
+    error?: Error,
   ): void {
     if (!this.isCurrentQuery(query, generation)) {
       return;
+    }
+    if (error) {
+      this.context.reportConnectionLost?.(error);
     }
     this.query = undefined;
     this.queryGeneration += 1;

@@ -37,7 +37,12 @@ export class CodexAuxQueryRunner {
   constructor(private readonly plugin: GrimoirePlugin) {}
 
   async query(config: CodexAuxQueryConfig, prompt: string): Promise<string> {
-    if (!this.process || !this.transport) {
+    // Liveness, not just presence. After the daemon dies both references stay
+    // non-null, so this asked "have we ever started one" and answered yes —
+    // every later inline edit and title refresh then failed against a dead
+    // transport until the plugin was reloaded.
+    if (!this.process || !this.transport || !this.process.isAlive()) {
+      this.threadId = null;
       await this.startProcess();
     }
 

@@ -245,19 +245,19 @@ Core platform:
 - CORE-8 ✅ [M][security] `ApprovalManager.ts:111` prefix match without boundary for non-bash/file tools: rule `{"a":"` matches any input starting `{"a":"`. User-authored rules only; defaults fail closed.
 
 Claude:
-- CLA-3 [M][bug] `CCSettingsStorage.ts:46` unguarded `JSON.parse` in `load()` (save() tolerates corrupt); corrupt `.claude/settings.json` breaks every permission read/write.
-- CLA-4 [M][hygiene] `ClaudeExecutionBackend.ts:400-403` dead conditional (`if terminal return evidence; return evidence`).
-- CLA-5 [M][bug] `ClaudeExecutionBackend.ts:1521-1524` `handleConnectionLost` discards `_error`; cause never reaches run event.
+- CLA-3 ✅ [M][bug] `CCSettingsStorage.ts:46` unguarded `JSON.parse` in `load()` (save() tolerates corrupt); corrupt `.claude/settings.json` breaks every permission read/write.
+- CLA-4 ✅ [M][hygiene] `ClaudeExecutionBackend.ts:400-403` dead conditional (`if terminal return evidence; return evidence`).
+- CLA-5 ✅ [M][bug] `ClaudeExecutionBackend.ts:1521-1524` `handleConnectionLost` discards `_error`; cause never reaches run event.
 - CLA-6 [M][hygiene] `runAuxiliaryQuery`/`ClaudeAuxiliaryQuery` production code wired to always-throwing resolver (M5 seam; mark as such).
 - CLA-7 [M][architecture] `VaultFileAdapter.ts:34-37` plain writes + unsynchronized read-modify-write of `.claude/settings.json` (crash/race can corrupt); pre-existing, shared.
 
 Codex:
 - CX-1 ✅ [M][hygiene] `CodexSessionFileTail.ts` 792-line legacy JSONL tail parser, zero importers in src/; flip manifest said it would die with the legacy runtime.
-- CX-2 [M][docs] `codex/AGENTS.md:30` says enabled defaults false; `settings.ts:43` defaults true (pinned by test).
-- CX-3 [M][bug] `CodexAuxQueryRunner.ts:40` restarts only when process/transport are null; after process death both non-null → inline-edit/refine fail on every later call until reload.
-- CX-4 [M][hygiene] `CodexNotificationRouter.ts:80` `seenWebSearchIds` never cleared (unbounded growth).
-- CX-5 [M][hygiene] `CodexExecutionConnection.ts:151` only first registered `onServerRequest` handler dispatched.
-- CX-6 [M][hygiene] `CodexExecutionRequests.ts:224-226` `sandboxPolicyFor` evaluated twice per resolve.
+- CX-2 ✅ [M][docs] `codex/AGENTS.md:30` says enabled defaults false; `settings.ts:43` defaults true (pinned by test).
+- CX-3 ✅ [M][bug] `CodexAuxQueryRunner.ts:40` restarts only when process/transport are null; after process death both non-null → inline-edit/refine fail on every later call until reload.
+- CX-4 ✅ [M][hygiene] `CodexNotificationRouter.ts:80` `seenWebSearchIds` never cleared (unbounded growth).
+- CX-5 ✅ [M][hygiene] `CodexExecutionConnection.ts:151` only first registered `onServerRequest` handler dispatched.
+- CX-6 ✅ [M][hygiene] `CodexExecutionRequests.ts:224-226` `sandboxPolicyFor` evaluated twice per resolve.
 - Tracked unchanged (not new): result-reference→turn provenance (M5); six unmodelled notifications pinned (no growth); scratch-dir release still next-turn; steering now REAL through kernel (improved); plan-turn-silent-success still open.
 
 Grok:

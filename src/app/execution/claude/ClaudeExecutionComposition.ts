@@ -177,6 +177,14 @@ export class ClaudeExecution {
       // tab: the session that was refused is the one whose conversation has to
       // let its binding go.
       onSessionUnusable: id => this.unusableSessionListeners.get(id)?.(),
+      reportConnectionLost: error => {
+        this.plugin.recordDebugLog({
+          error,
+          event: 'execution.connection.lost',
+          level: 'warn',
+          scope: 'claude',
+        });
+      },
       rewindBackup: {
         create: filesChanged => createClaudeRewindBackup(
           filesChanged ? [...filesChanged] : undefined,

@@ -32,6 +32,9 @@ import type {
   WebSearchItem,
 } from './codexAppServerTypes';
 
+/** How many rendered web searches a connection remembers. */
+const SEEN_WEB_SEARCH_LIMIT = 2048;
+
 type ChunkEmitter = (chunk: StreamChunk) => void;
 type TurnMetadataListener = (update: Partial<ChatTurnMetadata>) => void;
 
@@ -681,6 +684,10 @@ export class CodexNotificationRouter {
   private emitToolUseFromWebSearch(item: WebSearchItem): void {
     if (this.seenWebSearchIds.has(item.id)) return;
     this.seenWebSearchIds.add(item.id);
+    // Bounded: this set exists to render one search once, and a router lives as
+    // long as its connection. Unbounded it holds every search id of a working
+    // day, for a question only ever asked about the recent ones.
+    trimOldestSetEntries(this.seenWebSearchIds, SEEN_WEB_SEARCH_LIMIT);
 
     this.resetAssistantSegmentText();
     this.emit({
@@ -1122,4 +1129,15 @@ function normalizeAgentMessageCompletionText(
     return text.slice(streamedAssistantText.length);
   }
   return text;
+}
+
+/** Keeps a de-duplication set bounded, oldest first. */
+function trimOldestSetEntries<T>(set: Set<T>, maximum: number): void {
+  while (set.size > maximum) {
+    const oldest = set.values().next().value;
+    if (oldest === undefined) {
+      return;
+    }
+    set.delete(oldest);
+  }
 }

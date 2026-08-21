@@ -27,6 +27,6 @@
 
 ## Storage and Environment
 
-- Codex is opt-in; `isEnabled()` defaults to false.
+- Codex is the product's default provider and ships enabled; `settings.ts` defaults `enabled` to true, and a test pins it.
 - Environment hash invalidation watches `OPENAI_MODEL`, `OPENAI_BASE_URL`, and `OPENAI_API_KEY`; changes invalidate existing Codex session IDs.
 - Session file paths may include a date prefix. `findCodexSessionFile` handles both direct and DFS fallback patterns.

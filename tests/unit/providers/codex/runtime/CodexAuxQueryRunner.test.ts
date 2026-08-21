@@ -9,6 +9,7 @@ const mockProcessStart = jest.fn();
 const mockProcessShutdown = jest.fn().mockResolvedValue(undefined);
 const mockProcessOnExit = jest.fn();
 const mockProcessOffExit = jest.fn();
+const mockProcessIsAlive = jest.fn().mockReturnValue(true);
 
 const mockResolveLaunchSpec = jest.fn();
 
@@ -28,6 +29,7 @@ jest.mock('@/providers/codex/runtime/CodexAppServerProcess', () => ({
     shutdown: mockProcessShutdown,
     onExit: mockProcessOnExit,
     offExit: mockProcessOffExit,
+    isAlive: mockProcessIsAlive,
   })),
 }));
 
@@ -126,5 +128,29 @@ describe('CodexAuxQueryRunner', () => {
         experimentalRawEvents: true,
       }),
     );
+  });
+
+  it('starts a new daemon once the last one has died', async () => {
+    const plugin = {
+      settings: {},
+      getActiveEnvironmentVariables: jest.fn(),
+      app: { vault: { adapter: { basePath: 'C:\\repo' } } },
+    } as any;
+    const runner = new CodexAuxQueryRunner(plugin);
+    await runner.query({ systemPrompt: 'You are concise.' }, 'first');
+    expect(MockedProcessClass).toHaveBeenCalledTimes(1);
+
+    // The daemon dies. Both references stay non-null, so the guard that asked
+    // only whether one had ever been started answered yes — and every later
+    // inline edit and title refresh failed against a dead transport until the
+    // plugin was reloaded.
+    mockProcessIsAlive.mockReturnValue(false);
+    await runner.query({ systemPrompt: 'You are concise.' }, 'second');
+
+    expect(MockedProcessClass).toHaveBeenCalledTimes(2);
+    // And a fresh daemon has no thread of the old one's: asking it to continue
+    // `thread-1` would be asking a process that never had it.
+    expect(mockTransportRequest.mock.calls.filter(([method]) => method === 'thread/start'))
+      .toHaveLength(2);
   });
 });

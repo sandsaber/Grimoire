@@ -148,11 +148,20 @@ export class CodexJsonRpcExecutionConnection implements CodexExecutionConnection
     }
     for (const method of SERVER_REQUEST_METHODS) {
       transport.onServerRequest(method, async (requestId, params) => {
-        const handler = this.serverRequests.values().next().value;
-        if (!handler) {
+        // A server request has exactly one answer, so exactly one handler may
+        // own it. Taking the first of a set silently ignored every later
+        // registration — a second one would have looked installed and never
+        // been called.
+        const handlers = [...this.serverRequests];
+        if (handlers.length === 0) {
           throw new Error(`No Codex execution handler for ${method}.`);
         }
-        return handler(requestId, method, params);
+        if (handlers.length > 1) {
+          throw new Error(
+            `Codex execution has ${handlers.length} handlers for ${method}; exactly one may answer.`,
+          );
+        }
+        return handlers[0](requestId, method, params);
       });
     }
     const result = await transport.request<InitializeResult>('initialize', {
