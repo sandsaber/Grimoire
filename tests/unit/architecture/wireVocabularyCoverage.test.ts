@@ -3,10 +3,8 @@ import { resolve } from 'node:path';
 
 import type { AcpSessionNotification } from '@/providers/acp/types';
 import { CODEX_EXECUTION_NOTIFICATION_METHODS } from '@/providers/codex/runtime/CodexExecutionConnection';
-import {
-  GROK_SESSION_NOTIFICATION_METHODS,
-  isSupportedAcpSessionUpdate,
-} from '@/providers/grok/runtime/GrokSessionNotifications';
+import { GrokContentPresenter } from '@/providers/grok/execution/GrokContentPresenter';
+import { GROK_SESSION_NOTIFICATION_METHODS } from '@/providers/grok/runtime/GrokSessionNotifications';
 import { OpencodeContentPresenter } from '@/providers/opencode/execution/OpencodeContentPresenter';
 
 /**
@@ -63,17 +61,16 @@ const UNMODELLED_BY_PROVIDER: Readonly<Record<string, readonly string[]>> = {
   // grepping for the wire name the normalizer already renamed.
   opencode: [],
   /**
-   * Grok's own three, none of which ACP defines.
+   * Empty since wave 5's content surface.
    *
-   * They arrive on `_x.ai/session_notification` rather than `session/update`,
-   * and the runtime drops every one of them twice over: the wrapped-notification
-   * parser wants an inner `method` field the CLI does not send, and the update
-   * types are not in the ACP set the handler admits. `response_completed`
-   * carries the turn's token usage and `turn_completed` its stop reason and
-   * cost — which is why the runtime reads both off Grok's own session log
-   * instead. Owner: wave 5's backend.
+   * Grok's own three — `model_changed`, `response_completed`, `turn_completed`
+   * — arrive on `_x.ai/session_notification` rather than `session/update`, and
+   * the legacy runtime dropped all three: its wrapped-notification parser
+   * wanted an inner `method` field the CLI does not send, and the update types
+   * are not in the ACP set it admitted. The flip consumes them, so a regression
+   * that dropped one again turns this row red.
    */
-  grok: ['model_changed', 'response_completed', 'turn_completed'],
+  grok: [],
 };
 
 /**
@@ -167,12 +164,32 @@ describe('wire vocabulary coverage', () => {
     expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.opencode].sort());
   });
 
-  it('records every Grok session update the runtime does not admit', () => {
-    const observed = recordings.find(recording => recording.providerId === 'grok')
-      ?.sessionUpdatesObserved ?? [];
-    const missing = observed.filter(update => !isSupportedAcpSessionUpdate({
-      sessionUpdate: update,
-    })).sort();
+  it('records every Grok session update nothing draws the surface from', () => {
+    const recording = recordings.find(candidate => candidate.providerId === 'grok');
+    const observed = recording?.sessionUpdatesObserved ?? [];
+    // Replayed through the presenter rather than tested against the legacy
+    // runtime's ACP predicate: that predicate rejects Grok's own three by
+    // definition — they are not ACP updates — so it answered the same before
+    // and after the flip consumed them. What matters is whether anything draws
+    // a surface from each one.
+    const consumed = new Set(
+      readGrokSessionUpdates(recording).flatMap(notification => {
+        const effects: string[] = [];
+        const presenter = new GrokContentPresenter({
+          displayModel: () => 'model',
+          onCommands: () => effects.push('commands'),
+          onConfigOptions: () => effects.push('config'),
+          onCost: () => effects.push('cost'),
+          onCurrentMode: () => effects.push('mode'),
+          onModelChanged: () => effects.push('model'),
+        });
+        const chunks = presenter.present({ kind: 'session-update', notification });
+        return chunks.length > 0 || effects.length > 0
+          ? [(notification.update as { sessionUpdate: string }).sessionUpdate]
+          : [];
+      }),
+    );
+    const missing = observed.filter(update => !consumed.has(update)).sort();
 
     expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.grok].sort());
   });
@@ -210,6 +227,18 @@ describe('wire vocabulary coverage', () => {
  */
 function readModelledCodexNotifications(): readonly string[] {
   return CODEX_EXECUTION_NOTIFICATION_METHODS;
+}
+
+/** Every session update Grok's recording carried, on either channel. */
+function readGrokSessionUpdates(
+  recording: { readonly exchange?: readonly unknown[] } | undefined,
+): AcpSessionNotification[] {
+  return (recording?.exchange ?? []).flatMap(entry => {
+    const message = (entry as { message?: { method?: string; params?: unknown } }).message;
+    return message?.method === 'session/update' || message?.method === '_x.ai/session_notification'
+      ? [message.params as AcpSessionNotification]
+      : [];
+  });
 }
 
 /** The `session/update` notifications the recording actually carried. */

@@ -4668,6 +4668,25 @@ Gates: unit 476 suites / 7,645 tests, integration 5 suites / 145 tests, typechec
 `build:release` clean.
 
 
+### Review G4 and G5 — two gates that were measuring the wrong thing (this commit)
+
+**G5.** Grok had no execution-backend conformance suite while Antigravity, Codex, Claude and
+OpenCode each had one. It has one now — twelve rows: exactly one terminal, a refused second run, a
+bounded result, a required result that never came, an unconfirmed termination, and the rest. The
+backend is shared, so this is not a second proof of the backend; it is the proof that *this
+provider's* descriptor, ids and timeouts compose into one that still keeps those invariants. That it
+runs the real machinery rather than a copy is shown by inverting the missing-result policy, which
+reds a row.
+
+**G4.** The wire gate's Grok row asserted that the legacy runtime's ACP predicate rejects
+`model_changed`, `response_completed` and `turn_completed` — which it does by definition, before and
+after the flip, because those are not ACP updates. It measured nothing. It now replays the recording
+through the content presenter, the way OpenCode's row has since wave 4, and the unconsumed list is
+**empty**: every update the recording carried draws something. Dropping either vendor update reds it.
+
+Gates: unit 477 suites / 7,658 tests, typecheck, `eslint` over `src` and `tests` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
