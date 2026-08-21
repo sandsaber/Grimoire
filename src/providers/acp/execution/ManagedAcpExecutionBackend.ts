@@ -676,10 +676,19 @@ class ManagedAcpExecutionSession implements ExecutionSession {
       if (generation === this.clientGeneration) this.handleNotification(notification);
     });
     this.clientCloseUnsubscribe = client.onConnectionLost(error => {
+      if (generation !== this.clientGeneration) return;
       const active = this.activeRun;
-      if (generation === this.clientGeneration && active && !active.isTerminal) {
+      if (active && !active.isTerminal) {
         void this.recover(active, active.invocation, error, active.currentAttempt);
+        return;
       }
+      // Nothing is running, so there is no run to recover — but the client is
+      // dead, and the next turn would dispatch into a closed transport, fail
+      // `invalidated`, and leave the same dead client in place for the turn
+      // after that. The conversation stays wedged until a reload. Closing here
+      // is what makes the next turn launch a process instead. The legacy path
+      // had this; the migration dropped it.
+      void this.closeClient().catch(() => undefined);
     });
     const initialized = await completesWithin(
       client.initialize(),

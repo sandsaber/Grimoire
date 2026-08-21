@@ -667,6 +667,38 @@ describe('OpencodeExecutionBackend', () => {
     expectTerminal(captured, 'failed', 'missing-required-result');
   });
 
+  it('replaces a process that died while nothing was running', async () => {
+    const first = new FakeManagedAcpClient('native-session');
+    const second = new FakeManagedAcpClient('native-session-2');
+    const fixture = createFixture({ clients: [first, second] });
+    const session = await createSession(fixture.backend);
+    const opening = collectEvents(session.createRun(request('1')));
+    await waitFor(() => first.promptRequests.length === 1);
+    first.emit(agentText('native-session', 'first answer'));
+    first.completePrompt({ stopReason: 'end_turn', userMessageId: 'message-1' });
+    await opening;
+
+    // The agent exits between turns — a crash, a machine asleep, a CLI
+    // upgrade. Nothing is running, so there is no run to recover; what must
+    // happen is that the dead client stops being the one the next turn uses.
+    for (const listener of first.lossListeners) listener(new Error('process exited'));
+    await waitFor(() => first.closeCalls > 0);
+
+    const events = collectEvents(session.createRun(request('2')));
+    await waitFor(() => second.promptRequests.length === 1);
+    // The same message id the invocation dispatches with: a different one is
+    // how this backend fences a stale native run, which is a different test.
+    second.emit(agentText('native-session', 'second answer'));
+    second.completePrompt({ stopReason: 'end_turn', userMessageId: 'message-1' });
+    const captured = await events;
+
+    // Without this the next turn dispatches into a closed transport and fails
+    // `invalidated` — and so does every turn after it, because nothing ever
+    // clears the client. The conversation is wedged until a reload.
+    expect([first.closeCalls > 0, second.promptRequests.length]).toEqual([true, 1]);
+    expectTerminal(captured, 'succeeded', 'completed');
+  });
+
   it('gives the provider its last look at a turn that was cancelled', async () => {
     // Grok reads what a turn cost off its own session log, and a cancelled turn
     // still spent tokens. The legacy runtime read it when the prompt returned,

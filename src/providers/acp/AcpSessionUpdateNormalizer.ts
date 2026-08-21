@@ -16,6 +16,10 @@ import type {
 
 export type AcpNormalizedUpdate =
   | {
+    /** An update this normalizer has no meaning for; the caller decides. */
+    type: 'unsupported';
+  }
+  | {
     content: AcpContentBlock;
     messageId?: string | null;
     role: 'assistant' | 'thinking' | 'user';
@@ -111,6 +115,12 @@ export class AcpSessionUpdateNormalizer {
         };
       case 'usage_update':
         return { type: 'usage', usage: update };
+      default:
+        // Not unreachable, whatever the union says: the vendor channel carries
+        // updates ACP does not define — Grok's three are why it exists — and
+        // falling off the end returned `undefined` from a signature that
+        // promises a value, which the presenter then read `.type` off.
+        return { type: 'unsupported' };
     }
   }
 

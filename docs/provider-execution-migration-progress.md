@@ -4717,6 +4717,28 @@ than credited for something this row cannot see.
 Gates: unit 477 suites / 7,662 tests, typecheck, `eslint`, and `build:release` clean.
 
 
+### Review A1 and A2 — the two ways an ACP conversation could stop working (this commit)
+
+**A1, the one that wedges a conversation for good.** `onConnectionLost` only did anything when a run
+was active: it recovered that run. With nothing running — the agent exits between turns, the machine
+sleeps, the CLI is upgraded — the dead client stayed, so the next turn dispatched into a closed
+transport and failed `invalidated`, and so did the one after it, and the one after that, because
+nothing ever cleared the client. Only a reload fixed it. The legacy path handled this; the migration
+dropped it, which is the failure mode this journal's rule about harvested fixes exists to catch.
+
+A client lost while idle is now closed, so the next turn launches a process. The regression test is
+the shape of the bug: run a turn, kill the client between turns, run another, and require it to
+succeed. Without the close it fails.
+
+**A2.** `AcpSessionUpdateNormalizer.normalize` promised an `AcpNormalizedUpdate` and had no `default`
+and no trailing return, so an update outside its union came back `undefined` and the presenter read
+`.type` off it. The union is exhaustive only if the wire is — and the vendor channel exists precisely
+because it is not: Grok's three updates are why. There is a `default` now, answering
+`{type: 'unsupported'}`, and the caller decides.
+
+Gates: unit 477 suites / 7,664 tests, integration 5 suites / 145 tests, typecheck, `eslint` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

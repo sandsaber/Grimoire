@@ -4,6 +4,20 @@ import {
 } from '../../../../src/providers/acp';
 
 describe('AcpSessionUpdateNormalizer', () => {
+  it('answers something for an update it has never seen', () => {
+    const normalizer = new AcpSessionUpdateNormalizer();
+
+    // The vendor channel delivers updates ACP does not define — Grok's three
+    // are the reason it exists. The switch had no default and no trailing
+    // return, so an unknown one came back as `undefined` from a signature that
+    // promises otherwise, and the presenter read `.type` off it.
+    const normalized = normalizer.normalize({
+      sessionUpdate: 'something_only_this_vendor_sends',
+    } as never);
+
+    expect(normalized).toEqual({ type: 'unsupported' });
+  });
+
   it('emits assistant message boundaries once per message id', () => {
     const normalizer = new AcpSessionUpdateNormalizer();
 
