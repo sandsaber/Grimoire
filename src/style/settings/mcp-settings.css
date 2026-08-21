@@ -25,20 +25,6 @@
   position: relative;
 }
 
-.grimoire-add-mcp-btn {
-  padding: 4px 12px;
-  border-radius: 4px;
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  font-size: 12px;
-  cursor: pointer;
-  border: none;
-}
-
-.grimoire-add-mcp-btn:hover {
-  background: var(--interactive-accent-hover);
-}
-
 .grimoire-mcp-add-dropdown {
   display: none;
   position: absolute;

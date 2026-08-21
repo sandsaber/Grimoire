@@ -155,20 +155,6 @@
   min-width: 0;
 }
 
-/* Diff colors - NO strikethrough for Write/Edit blocks */
-.grimoire-diff-equal {
-  color: var(--text-muted);
-}
-
-.grimoire-diff-delete {
-  background: rgba(255, 80, 80, 0.25);
-  color: var(--text-normal);
-}
-
-.grimoire-diff-delete .grimoire-diff-prefix {
-  color: var(--color-red);
-}
-
 .grimoire-diff-insert {
   background: rgba(80, 200, 80, 0.25);
   color: var(--text-normal);

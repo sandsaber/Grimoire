@@ -564,7 +564,7 @@
         "noPrompt": "No se proporcionó ningún prompt",
         "expandAria": "Tarea de subagente: {description} — Estado: {status} — haz clic para expandir",
         "result": "Resultado",
-        "prompt": "Prompt",
+        "prompt": "Indicación",
         "runningBackground": "En ejecución en segundo plano",
         "backgroundExpandAria": "Tarea en segundo plano: {description} — {status} — haz clic para expandir",
         "endedEarly": "La conversación terminó antes de completar la tarea",

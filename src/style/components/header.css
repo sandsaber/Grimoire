@@ -9,45 +9,6 @@
   background: var(--grimoire-panel);
 }
 
-.grimoire-session-strip .grimoire-title-text {
-  overflow: hidden;
-  max-width: 100%;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Title slot: contains logo + title (or tabs in header mode) */
-.grimoire-title-slot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;  /* Allow flex item to shrink below content size */
-}
-
-/* Legacy class for backwards compatibility */
-.grimoire-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.grimoire-title-text {
-  margin: 0;
-  color: var(--text-normal);
-  font-size: 13px;
-  font-weight: 650;
-  line-height: 1;
-}
-
-.grimoire-logo {
-  display: flex;
-  align-items: center;
-  color: var(--grimoire-brand);
-  filter: drop-shadow(0 0 5px rgba(var(--grimoire-brand-rgb), 0.32));
-}
-
 /* Header actions (end side - always stays at end via margin-inline-start: auto) */
 .grimoire-header-actions {
   display: flex;

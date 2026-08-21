@@ -178,15 +178,6 @@
   box-shadow: inset 0 0 0 1px var(--grimoire-accent-line);
 }
 
-.grimoire-rail-kicker {
-  color: var(--grimoire-workbench-faint);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
 .grimoire-context-summary {
   display: flex;
   min-height: 0;

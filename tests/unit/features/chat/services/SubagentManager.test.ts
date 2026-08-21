@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
+import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import type { SubagentInfo, ToolCallInfo } from '@/core/types';
 import { SubagentManager } from '@/features/chat/services/SubagentManager';
 import { createStopSubagentHook } from '@/providers/claude/hooks/SubagentHooks';
@@ -47,9 +48,12 @@ jest.mock('@/features/chat/rendering/SubagentRenderer', () => ({
 
 const createManager = () => {
   const updates: SubagentInfo[] = [];
+  // Named, because it is no longer defaulted: reading a subagent result is
+  // provider-specific, and a manager that borrowed one provider's interpreter
+  // for every tab was wrong quietly.
   const manager = new SubagentManager((subagent) => {
     updates.push({ ...subagent });
-  });
+  }, ProviderRegistry.getTaskResultInterpreter('claude'));
   return { manager, updates };
 };
 

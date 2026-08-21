@@ -179,11 +179,6 @@ export function createTab(options: TabCreateOptions): TabData {
     onConversationChanged: onConversationIdChanged,
   });
 
-  // Create subagent manager with no-op callback.
-  // This placeholder is replaced in initializeTabControllers() with the actual
-  // callback that updates the StreamController. We defer the real callback
-  // because StreamController doesn't exist until controllers are initialized.
-  const subagentManager = new SubagentManager(() => {});
   const vaultTextIndex = new VaultTextIndex(plugin.app);
   const vaultSearchService = new VaultSearchService(vaultTextIndex);
   const relevantNotesService = new RelevantNotesService(vaultTextIndex);
@@ -209,6 +204,15 @@ export function createTab(options: TabCreateOptions): TabData {
     ?? (draftModel
       ? getEnabledProviderForModel(draftModel, plugin.settings)
       : DEFAULT_CHAT_PROVIDER_ID);
+  // Built here rather than above, because it needs the provider this tab is
+  // for: reading a subagent result is provider-specific, and the interpreter
+  // used to default to one named provider's for every tab until a rebind.
+  // The callback is a placeholder — `initializeTabControllers` replaces it once
+  // the StreamController it updates exists.
+  const subagentManager = new SubagentManager(
+    () => {},
+    ProviderRegistry.getTaskResultInterpreter(initialProviderId),
+  );
 
   const tab: TabData = {
     id,
@@ -353,7 +357,10 @@ export async function initializeTabService(
 
   try {
     if (typeof previousService?.cleanup === 'function') {
-      previousService.cleanup();
+      // Discarded on purpose: `ChatRuntime.cleanup()` returns void by contract,
+      // and the implementations that are async are total — a tab must not wait
+      // on a provider to finish closing before it can be replaced.
+      void previousService.cleanup();
     }
     tab.service = null;
     tab.serviceInitialized = false;
@@ -378,7 +385,7 @@ export async function initializeTabService(
     // Re-check after async operations — tab may have been closed during init
     if (isClosingLifecycleState(tab.lifecycleState)) {
       unsubscribeReadyState?.();
-      service?.cleanup();
+      void service?.cleanup();
       return;
     }
 
@@ -1733,8 +1740,8 @@ export async function destroyTab(tab: TabData): Promise<void> {
   }
   tab.dom.eventCleanups.length = 0;
 
-  // Clean up runtime before removing DOM
-  tab.service?.cleanup();
+  // Clean up runtime before removing DOM. Discarded: see `replaceTabRuntime`.
+  void tab.service?.cleanup();
   tab.service = null;
   tab.dom.contentEl.remove();
 }

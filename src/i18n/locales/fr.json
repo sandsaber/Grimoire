@@ -1158,7 +1158,7 @@
           "name": "Résumé du raisonnement",
           "desc": "Affichez un résumé du processus de raisonnement du modèle dans le bloc de réflexion.",
           "auto": "Auto",
-          "concise": "Concise",
+          "concise": "Concis",
           "detailed": "Détaillé",
           "off": "Désactivé"
         },

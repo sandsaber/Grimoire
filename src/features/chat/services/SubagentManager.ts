@@ -2,7 +2,6 @@ import { existsSync, readFileSync, realpathSync } from 'fs';
 import { tmpdir } from 'os';
 import { isAbsolute, sep } from 'path';
 
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import type { ProviderTaskResultInterpreter } from '../../../core/providers/types';
 import { TOOL_TASK } from '../../../core/tools/toolNames';
 import { extractToolResultContent } from '../../../core/tools/toolResultContent';
@@ -76,11 +75,17 @@ export class SubagentManager {
   private onStateChange: SubagentStateChangeCallback;
   private taskResultInterpreter: ProviderTaskResultInterpreter;
 
+  /**
+   * @param taskResultInterpreter how *this tab's* provider reads a subagent
+   *   result. Required, because the default it used to carry was one named
+   *   provider's — so a construction that skipped the rebind would read every
+   *   other provider's results through Claude's interpreter and be wrong
+   *   quietly. A caller that has no provider yet has no interpreter, and should
+   *   say so rather than borrow one.
+   */
   constructor(
     onStateChange: SubagentStateChangeCallback,
-    // Interim default for unit tests / pre-bind construction. Tabs always
-    // rebind this via setTaskResultInterpreter to the active provider.
-    taskResultInterpreter: ProviderTaskResultInterpreter = ProviderRegistry.getTaskResultInterpreter('claude'),
+    taskResultInterpreter: ProviderTaskResultInterpreter,
   ) {
     this.onStateChange = onStateChange;
     this.taskResultInterpreter = taskResultInterpreter;

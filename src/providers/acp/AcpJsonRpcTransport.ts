@@ -77,6 +77,8 @@ export class AcpJsonRpcTransport {
   private readonly abortController = new AbortController();
   private readonly closeListeners = new Set<(error?: Error) => void>();
   private disposed = false;
+  /** Whether the output stream has asked us to wait before writing more. */
+  private awaitingDrain = false;
   private nextId = 1;
   private readonly notificationHandlers = new Map<string, Set<JsonRpcNotificationHandler>>();
   private readonly pending = new Map<number, PendingRequest>();
@@ -393,7 +395,19 @@ export class AcpJsonRpcTransport {
     if (this.disposed) {
       throw new JsonRpcTransportClosedError();
     }
-    this.streams.output.write(`${JSON.stringify(message)}\n`);
+    // `write` answers whether the buffer took it. A `false` means the stream
+    // asked us to wait for `drain`, and ignoring it is how a transport ends up
+    // buffering without bound — not a problem at the sizes an ACP turn sends,
+    // which is why it went unnoticed, but a large image attachment is the shape
+    // that changes that. Backpressure is recorded and the next send waits for
+    // the stream to ask for more.
+    const accepted = this.streams.output.write(`${JSON.stringify(message)}\n`);
+    if (!accepted && !this.awaitingDrain) {
+      this.awaitingDrain = true;
+      this.streams.output.once('drain', () => {
+        this.awaitingDrain = false;
+      });
+    }
   }
 
   private trySendRaw(message: JsonRpcMessage): void {

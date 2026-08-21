@@ -275,7 +275,7 @@ ACP/OpenCode:
 - ACP-3 ✅ [M][parity] `limit: 0` semantics differ: aux runner returns whole file (falsy check) vs shared delegate zero lines. `OpencodeAuxQueryRunner.ts:303` vs `AcpWorkspaceFileSystem.ts:44`.
 - ACP-4 [M][hygiene] `OpencodeAuxQueryRunner` duplicates shared `ManagedAcpAuxiliaryQuery`; up to 3 idle `opencode acp` processes; M5-fenced.
 - ACP-5 ✅ [M][security] **Sound, and now pinned.** The CLI fallback cannot bind — the sqlite3 CLI takes a statement and nothing else — so the escaping *is* the safety: quotes are doubled, every non-string is a recognised type, and anything else throws rather than being interpolated. That was true and untested, which is a claim rather than a guarantee; `AcpSqliteBinding.test.ts` asserts it directly, including the injection shapes.
-- ACP-6 [M][hygiene] `AcpJsonRpcTransport.ts:392-397` write() return ignored, no drain handling (bounded in practice).
+- ACP-6 ✅ [M][hygiene] `AcpJsonRpcTransport.ts:392-397` write() return ignored, no drain handling (bounded in practice).
 
 MiMo/Kimi:
 - MK-2 ✅ [M][bug] `MimocodeRuntimeCommandLoader.ts:53-60` (+Kimi twin, +`MimocodeChatRuntime.ts:603`) `ensureReady` can reject on spawn failure through slash-menu warmup; OpenCode's flipped loader catches → `[]`.
@@ -297,15 +297,15 @@ Antigravity/Gemini/Qwen (beyond GQ-*):
 
 Features/shared:
 - FE-1 ✅ [M][hygiene] hardcoded English strings bypassing `t()`: `StreamController.ts:264,274` ('Blocked'/'Notice', '❌ **Error:**', '**Error:**', 'Interrupted · …'), `InputController.ts:603,641,758`, `Tab.ts:1756` ('New Chat' default title).
-- FE-2 [M][architecture] `SubagentManager.ts:83` defaults `taskResultInterpreter` to Claude's; rebound per tab; future path skipping bind misinterprets. Make required.
+- FE-2 ✅ [M][architecture] `SubagentManager.ts:83` defaults `taskResultInterpreter` to Claude's; rebound per tab; future path skipping bind misinterprets. Make required.
 - FE-3 ✅ [M][hygiene] `ConversationController.ts:952-956` unknown-provider dot color falls back to Claude's CSS var.
 - FE-4 ✅ [M][hygiene] `ExecutionChatRuntimeAdapter.ts:1061` stale cast `(runId: unknown) => void` re-imports the K1/R6-removed shape (field typed correctly at :1186).
-- FE-5 [M][hygiene] `Tab.ts:1737`, `tabProviderUI.ts:361` floating cleanup promises.
+- FE-5 ✅ [M][hygiene] `Tab.ts:1737`, `tabProviderUI.ts:361` floating cleanup promises.
 
 Style/i18n/release:
-- ST-1 [M][hygiene] ~19 dead CSS selectors across `settings/env-snippets.css`, `components/header.css`, `settings/base.css`, `mcp-settings.css`, `base/container.css`, `features/file-context.css`, `features/ask-user-question.css` + mirrors in `accessibility.css:24-28` (zero TS references).
+- ST-1 ✅ [M][hygiene] ~19 dead CSS selectors across `settings/env-snippets.css`, `components/header.css`, `settings/base.css`, `mcp-settings.css`, `base/container.css`, `features/file-context.css`, `features/ask-user-question.css` + mirrors in `accessibility.css:24-28` (zero TS references).
 - ST-2 ✅ [M][hygiene] `lockfile-age-exceptions.json` all 42 entries expired 2026-08-06..11; nothing prunes/warns.
-- ST-3 [M][parity] `ja.json` 14 values byte-identical to English (several translatable); de.json 41 (mostly cognates).
+- ST-3 ✅ [M][parity] **Half refuted, half fixed.** Byte-identical is not untranslated: `Error`, `General` and `Color` are Spanish; `Option`, `Question` and `Actions` are French; `Prompt`, `Name` and `Agent` are ordinary German UI vocabulary. What *was* untranslated is now translated — ru, ja, ko and both Chinese locales are at zero. `localeCoverage.test.ts` replaces the count with a decision: every remaining identical value is listed as verified, and a new one fails until somebody translates it or writes it down.
 
 Tests/QA:
 - QA-1 ✅ [M][hygiene] `tests/fixtures/provider-traces/wire/grok-wire.json:457+` dozens of unredacted `/home/m5/...` absolute paths in tool payloads; leaks username; wire gate replays it every run. Extend the "no content, only shape" test to assert no home paths.

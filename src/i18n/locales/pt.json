@@ -793,7 +793,7 @@
       "desc": "Variáveis de ambiente para Claude SDK (formato KEY=VALUE, uma por linha). Prefixo export suportado."
     },
     "envSnippets": {
-      "name": "Snippets",
+      "name": "Trechos",
       "addBtn": "Adicionar snippet",
       "noSnippets": "Nenhum snippet de ambiente salvo. Clique em + para salvar sua configuração atual.",
       "nameRequired": "Por favor, insira um nome para o snippet",
@@ -1008,7 +1008,7 @@
         "topPDesc": "Valor opcional de nucleus sampling",
         "color": "Cor",
         "colorDesc": "Cor hexadecimal ou token do tema",
-        "steps": "Etapas",
+        "steps": "Passos",
         "stepsDesc": "Máximo de iterações agentic antes de forçar saída somente em texto",
         "hideFromMention": "Ocultar de @mention",
         "hideFromMentionDesc": "Ocultar este subagente do menu de autocomplete @",
@@ -1330,7 +1330,7 @@
       "disableUserInvocationDesc": "Impedir que o usuário invoque esta habilidade diretamente",
       "context": "Contexto",
       "contextDesc": "Executar em um subagente (bifurcação)",
-      "agent": "Agent",
+      "agent": "Agente",
       "agentDesc": "Tipo de subagente quando o contexto é bifurcação",
       "promptTemplate": "Modelo de prompt",
       "promptTemplateDesc": "Utilize $ARGUMENTS, $1, $2, @file, !`bash`",

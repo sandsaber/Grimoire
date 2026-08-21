@@ -841,13 +841,17 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
       return;
     }
     const active = this.active;
-    if (active) {
-      dispatchCancellation(this.context, active.runId, active.stream);
-      await this.awaitTerminal(active.stream);
-    }
     try {
+      if (active) {
+        dispatchCancellation(this.context, active.runId, active.stream);
+        await this.awaitTerminal(active.stream);
+      }
       await this.context.registry.disposeSession(executionSessionId);
     } catch (error) {
+      // Total by contract. `ChatRuntime.cleanup()` returns void, so every
+      // caller discards what this returns — a rejection from anywhere in here,
+      // the bounded wait included, would surface as an unhandled one with a
+      // tab already gone from the screen.
       this.ports.reportCleanupFailure?.(error);
     }
   }

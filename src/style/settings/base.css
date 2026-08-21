@@ -330,77 +330,6 @@
   text-align: right;
 }
 
-/* ── Provider enable rows (General → Providers) ── */
-.grimoire-provider-settings-desc {
-  margin: -2px 0 2px;
-  padding: 0 2px;
-}
-
-.grimoire-provider-settings-desc p {
-  margin: 0;
-  color: var(--text-faint);
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-
-.grimoire-settings .grimoire-provider-row .setting-item-info {
-  position: relative;
-  padding-left: 18px;
-}
-
-/* Provider dot — always tinted in the provider's brand hue */
-.grimoire-settings .grimoire-provider-row .setting-item-info::before {
-  content: "";
-  position: absolute;
-  top: 0.55em;
-  left: 2px;
-  width: 9px;
-  height: 9px;
-  border-radius: var(--gs-pill);
-  background: var(--gs-provider-dot, var(--text-faint));
-}
-
-/* Enabled providers get a soft status ring around the dot */
-.grimoire-settings .grimoire-provider-row.is-enabled .setting-item-info::before {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gs-provider-dot, var(--interactive-accent)) 18%, transparent);
-}
-
-.grimoire-provider-row--claude {
-  --gs-provider-dot: var(--gs-dot-claude);
-}
-
-.grimoire-provider-row--codex {
-  --gs-provider-dot: var(--gs-dot-codex);
-}
-
-.grimoire-provider-row--qwen {
-  --gs-provider-dot: var(--gs-dot-qwen);
-}
-
-.grimoire-provider-row--antigravity {
-  --gs-provider-dot: var(--gs-dot-antigravity);
-}
-
-.grimoire-provider-row--gemini {
-  --gs-provider-dot: var(--gs-dot-gemini);
-}
-
-.grimoire-provider-row--opencode {
-  --gs-provider-dot: var(--gs-dot-opencode);
-}
-
-.grimoire-provider-row--mimocode {
-  --gs-provider-dot: var(--gs-dot-mimocode);
-}
-
-.grimoire-provider-row--kimicode {
-  --gs-provider-dot: var(--gs-dot-kimicode);
-}
-
-.grimoire-provider-row--grok {
-  --gs-provider-dot: var(--gs-dot-grok);
-}
-
 /* ── Provider-disabled notice → .note-card ── */
 .grimoire-provider-disabled-notice {
   margin: 14px 0 4px;
@@ -602,18 +531,6 @@
 .grimoire-settings-media-input {
   min-width: 0;
   width: 200px;
-}
-
-/* ============================================================
-   Retained utilities (used by sub-managers and shared panels).
-   ============================================================ */
-
-/* Codex placeholder */
-.grimoire-settings-codex-placeholder {
-  padding: 40px 20px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: var(--font-ui-small);
 }
 
 /* Custom section descriptions - align with rows */

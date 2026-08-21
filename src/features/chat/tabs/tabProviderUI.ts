@@ -358,7 +358,9 @@ export function ensureTitleGenerationService(tab: TabData, plugin: GrimoirePlugi
 
 export function cleanupTabRuntime(tab: TabData): void {
   if (tab.service && typeof tab.service.cleanup === 'function') {
-    tab.service.cleanup();
+    // Discarded on purpose: the contract returns void, and the async
+    // implementations report their own failures rather than rejecting.
+    void tab.service.cleanup();
   }
   tab.service = null;
   tab.serviceInitialized = false;

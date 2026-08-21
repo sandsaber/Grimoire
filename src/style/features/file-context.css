@@ -109,14 +109,6 @@
   color: var(--interactive-accent);
 }
 
-.grimoire-mention-desc {
-  font-size: 11px;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Context file items in @-mention dropdown */
 .grimoire-mention-item.context-file .grimoire-mention-icon {
   color: var(--grimoire-brand);

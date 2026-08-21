@@ -298,7 +298,7 @@
           "medium": "Mittel",
           "high": "Hoch",
           "xhigh": "Sehr hoch",
-          "max": "Maximum"
+          "max": "Maximal"
         }
       },
       "navigation": {
@@ -688,7 +688,7 @@
       "desc": "Wenn aktiviert, fügen Enter und Command/Ctrl+Enter Zeilenumbrüche ein, statt zu senden. Verwenden Sie zum Senden die Send-Schaltfläche."
     },
     "theme": {
-      "name": "Theme",
+      "name": "Design",
       "followsObsidian": "Folgt Obsidian"
     },
     "usageIndicators": {
@@ -775,7 +775,7 @@
         "advancedOptions": "Erweiterte Optionen",
         "model": "Modell",
         "modelDesc": "Modellüberschreibung für diesen Agenten",
-        "tools": "Tools",
+        "tools": "Werkzeuge",
         "toolsDesc": "Kommagetrennte Liste zulässiger Tools (leer = alle)",
         "disallowedTools": "Nicht erlaubte Tools",
         "disallowedToolsDesc": "Kommagetrennte Liste der zu verbietenden Tools",
@@ -793,7 +793,7 @@
       "desc": "Umgebungsvariablen für Claude SDK (KEY=VALUE-Format, eine pro Zeile). Export-Präfix unterstützt."
     },
     "envSnippets": {
-      "name": "Snippets",
+      "name": "Schnipsel",
       "addBtn": "Snippet hinzufügen",
       "noSnippets": "Keine gespeicherten Umgebungsvariablen-Snippets. Klicken Sie auf +, um Ihre aktuelle Konfiguration zu speichern.",
       "nameRequired": "Bitte geben Sie einen Namen für das Snippet ein",
@@ -948,7 +948,7 @@
       }
     },
     "hub": {
-      "general": "Allgemein", "providers": "Anbieter", "workspace": "Erweitert", "about": "Über", "cliDetected": "CLI erkannt", "cliNotDetected": "CLI nicht erkannt", "geminiLegacy": "Gemini CLI (Legacy)", "providerDetails": "{provider}-Einstellungen", "skills": "Skills", "agents": "Subagenten", "mcp": "MCP", "environment": "Umgebung", "commands": "Befehle", "search": "Name, Beschreibung, Quelle oder Anbieter suchen", "name": "Name", "source": "Quelle", "provider": "Anbieter", "actions": "Aktionen", "manage": "Verwalten", "manageTitle": "{section} verwalten", "edit": "Bearbeiten", "delete": "Löschen", "deleteConfirm": "„{name}“ löschen?", "deleted": "„{name}“ gelöscht", "deleteFailed": "Löschen fehlgeschlagen: {message}", "providerOptions": "Erweiterte Anbieteroptionen", "readonly": "Schreibgeschützt", "available": "Verfügbar", "connected": "Verbunden", "disabled": "Deaktiviert", "shared": "Geteilt", "loading": "Ressourcen werden geladen…", "unsupported": "Dieser Anbieter unterstützt diese Ressourcenkategorie nicht.", "none": "Keine passenden erweiterten Ressourcen.", "aboutCopy": "Grimoire verbindet lokale KI-Agenten in Obsidian. Version und Versionshinweise sind hier verfügbar.", "native": "Nativ", "nativeCli": "Native CLI", "nativeMcpDescription": "Native MCP-Unterstützung", "runtimeCommandsPending": "Starten Sie einmal einen {provider}-Chat, um die nativen Befehle zu laden.", "releases": "Veröffentlichungen"
+      "general": "Allgemein", "providers": "Anbieter", "workspace": "Erweitert", "about": "Über", "cliDetected": "CLI erkannt", "cliNotDetected": "CLI nicht erkannt", "geminiLegacy": "Gemini CLI (Legacy)", "providerDetails": "{provider}-Einstellungen", "skills": "Fähigkeiten", "agents": "Subagenten", "mcp": "MCP", "environment": "Umgebung", "commands": "Befehle", "search": "Name, Beschreibung, Quelle oder Anbieter suchen", "name": "Name", "source": "Quelle", "provider": "Anbieter", "actions": "Aktionen", "manage": "Verwalten", "manageTitle": "{section} verwalten", "edit": "Bearbeiten", "delete": "Löschen", "deleteConfirm": "„{name}“ löschen?", "deleted": "„{name}“ gelöscht", "deleteFailed": "Löschen fehlgeschlagen: {message}", "providerOptions": "Erweiterte Anbieteroptionen", "readonly": "Schreibgeschützt", "available": "Verfügbar", "connected": "Verbunden", "disabled": "Deaktiviert", "shared": "Geteilt", "loading": "Ressourcen werden geladen…", "unsupported": "Dieser Anbieter unterstützt diese Ressourcenkategorie nicht.", "none": "Keine passenden erweiterten Ressourcen.", "aboutCopy": "Grimoire verbindet lokale KI-Agenten in Obsidian. Version und Versionshinweise sind hier verfügbar.", "native": "Nativ", "nativeCli": "Native CLI", "nativeMcpDescription": "Native MCP-Unterstützung", "runtimeCommandsPending": "Starten Sie einmal einen {provider}-Chat, um die nativen Befehle zu laden.", "releases": "Veröffentlichungen"
     },
     "grok": {
       "cliPath": {
