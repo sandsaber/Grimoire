@@ -132,11 +132,29 @@ describe('wire vocabulary coverage', () => {
   it('has a recording for each provider that has reached the kernel', () => {
     // The four proof providers, Grok — whose recording was taken at the start
     // of its own wave, which is the order the plan asks for and the one the
-    // first four did not always get — and MiMoCode, taken the day its CLI
-    // arrived. MiMoCode's is partial and says so in its own `limitations`: the
-    // account cannot generate, so the turn it recorded answered nothing.
+    // first four did not always get — and the two of wave 6, each taken when
+    // its CLI arrived. Two of these are partial and say so in the file rather
+    // than by being thin: MiMoCode's account cannot generate, so the turn it
+    // recorded answered nothing, and Kimi Code's machine is not logged in, so
+    // `session/new` is the refusal an unauthenticated CLI gives. Both halves
+    // are real traffic; neither is the prompt traffic a flip finally needs.
     expect(recordings.map(recording => recording.providerId).sort())
-      .toEqual(['antigravity', 'claude', 'codex', 'grok', 'mimocode', 'opencode']);
+      .toEqual(['antigravity', 'claude', 'codex', 'grok', 'kimicode', 'mimocode', 'opencode']);
+  });
+
+  it('says which recordings are partial rather than letting them look whole', () => {
+    // A thin recording and a complete one are the same shape on disk. The
+    // difference has to be written down, or a flip reads "we have a recording"
+    // and plans against traffic nobody captured.
+    const partial = recordings
+      .filter(recording => Boolean(
+        (recording as { coverage?: unknown; limitations?: unknown }).coverage
+        ?? (recording as { limitations?: unknown }).limitations,
+      ))
+      .map(recording => recording.providerId)
+      .sort();
+
+    expect(partial).toEqual(['kimicode', 'mimocode']);
   });
 
   it.each(recordings)('$providerId names the CLI version it was taken from', recording => {

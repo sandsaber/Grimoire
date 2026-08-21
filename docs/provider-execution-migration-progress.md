@@ -5074,6 +5074,57 @@ GQ-1..5, QA-1, QA-2 — plus the settings-hub flake, which was nobody's finding.
 Gates: unit 478 suites / 7,728 tests, integration 5 suites / 145 tests, typecheck, `eslint`,
 `build:release`.
 
+### The third review closed, and a Kimi wire recording (this commit)
+
+The last six rows, and none of them was fixed by writing code where writing code
+was wrong.
+
+**KER-7 had a root cause the finding did not name.** A tab that opens a session
+before any conversation is bound owns it, and the adapter only let a session go
+when the conversation *changed* — never when the first one arrived. So the
+session carried forward under an owner no conversation deletion looks for, and
+no clock expires a run record. Both halves are closed: the adapter lets go when
+a tab binds its first conversation, the compositions call an unbound tab's
+session `internal-service` rather than a conversation's, and a startup sweep
+removes what older builds already wrote.
+
+**CLA-7 was two problems with one symptom.** The merge in `save()` is a
+read-modify-write that nothing serialized, so two overlapping saves meant the
+second read before the first wrote and the loser's permissions vanished; and the
+write was direct, so a crash left this file — Claude Code reads it too — as
+truncated JSON. Serialized, and staged beside the file then renamed over it.
+
+**CORE-3 is deferred, with evidence.** Unifying the two YAML engines turns six
+rows red: documents Obsidian rejects and the `yaml` package accepts, where the
+tolerant fallback stops running and the values change with it. That is a
+migration of how existing vault files parse, not a tidying job, and the file now
+says which engine reads what and why.
+
+**CORE-7 was not a leak but a different capability.** `VaultTextIndex` reads
+Obsidian's metadata cache and its cached-read path, which the storage adapter
+neither offers nor should grow to — so it took a port. `src/core/context/` no
+longer imports the plugin host at all.
+
+**MK-7 is half closed with real traffic.** Kimi Code had no wire recording, which
+is a stated precondition of its flip. It has one now, taken from `kimi acp`
+0.38.0: `initialize` complete, and `session/new` as the refusal an
+unauthenticated CLI gives — itself a shape the flip will meet. Redaction is
+inside the recorder rather than a step after it, because the first Grok capture
+carried a live key. And both partial recordings now *say* they are partial,
+pinned by a new row: a thin recording and a whole one look identical on disk,
+and a flip that reads "we have a recording" plans against traffic nobody took.
+
+**The remaining four were already right and needed saying so** — CLA-6's M5 seam,
+GK-7's adjacent-only mirror dedup (with the trigger for a window written down:
+evidence, not suspicion), ACP-4's fenced duplicate runner with its cost named,
+and MK-3/MK-4's pre-flip warmup shapes.
+
+**Every row of all three reviews is now closed**: 1 Critical, 28 Important, 60
+Minor, three refuted with evidence and two deferred with it.
+
+Gates: unit 481 suites / 7,678 tests, integration 5 suites / 145 tests,
+typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

@@ -46,6 +46,14 @@ const OPENCODE_AUX_READ_PERMISSION = Object.freeze({
   '*.env.example': 'allow',
 });
 
+/**
+ * Auxiliary Opencode turns, on their own process.
+ *
+ * It duplicates `ManagedAcpAuxiliaryQuery`, and the duplication is fenced
+ * rather than accidental: auxiliary work — titles, refinement, inline edits —
+ * still runs beside the kernel until M5. The cost is named so it is not
+ * mistaken for free: up to three idle `opencode acp` processes, one per purpose.
+ */
 export class OpencodeAuxQueryRunner implements AuxQueryRunner {
   private availableModelIds = new Set<string>();
   private connection: AcpClientConnection | null = null;

@@ -248,7 +248,7 @@ Claude:
 - CLA-3 ✅ [M][bug] `CCSettingsStorage.ts:46` unguarded `JSON.parse` in `load()` (save() tolerates corrupt); corrupt `.claude/settings.json` breaks every permission read/write.
 - CLA-4 ✅ [M][hygiene] `ClaudeExecutionBackend.ts:400-403` dead conditional (`if terminal return evidence; return evidence`).
 - CLA-5 ✅ [M][bug] `ClaudeExecutionBackend.ts:1521-1524` `handleConnectionLost` discards `_error`; cause never reaches run event.
-- CLA-6 [M][hygiene] `runAuxiliaryQuery`/`ClaudeAuxiliaryQuery` production code wired to always-throwing resolver (M5 seam; mark as such).
+- CLA-6 ✅ Already satisfied: the review asked for the M5 seam to be marked, and the resolver's own comment names it — refusing rather than answering emptily, with the reason.
 - CLA-7 ✅ [M][architecture] `VaultFileAdapter.ts:34-37` plain writes + unsynchronized read-modify-write of `.claude/settings.json` (crash/race can corrupt); pre-existing, shared.
 
 Codex:
@@ -267,23 +267,23 @@ Grok:
 - GK-4 ✅ [M][hygiene] `GrokSessionNotifications.ts:59-68` test-only predicates (one is the wrong-shape test the wire gate forbids).
 - GK-5 ✅ [M][hygiene] `modes.ts:77-79` `isManagedGrokModeId` no production caller.
 - GK-6 ✅ [M][docs] `GrokExecutionRequests.ts:30,33` stale OpenCode-template JSDoc ("grok acp" launch wording, "the other two").
-- GK-7 [M][parity] mirror dedup suppresses only adjacent copies (`GrokSessionNotificationMirrorDeduplicator.ts:19-31`); honest comment; fingerprint LRU if delayed mirrors appear.
+- GK-7 ✅ Kept, with the trigger written down. Adjacent-only is deliberate — one candidate catches the back-to-back mirror releases actually send. A *late* mirror would slip through, and the answer then is a fingerprint window; the trigger for building one is evidence (a duplicated sentence whose copies are not adjacent on the wire), not suspicion, because a window sized by guesswork is a cache sized by guesswork.
 
 ACP/OpenCode:
 - ACP-1 ✅ [M][parity] actionable `AcpSpawnError` wording discarded on flipped path: run finishes `failed/spawn-failed`, surface shows only generic "could not start the provider process"; sentence reaches neither user nor debug log. `ManagedAcpExecutionBackend.ts:899-906`.
 - ACP-2 ✅ [M][bug] connection lost BEFORE first dispatch (attempt 0) skips retry (`attempt === 1` only) → `indeterminate/effects-unknown` for a turn that never dispatched; should be `pre-dispatch-rejected` sideEffectFree (or retry). `ManagedAcpExecutionBackend.ts:599-636`. Fix before next providers flip onto the kernel.
 - ACP-3 ✅ [M][parity] `limit: 0` semantics differ: aux runner returns whole file (falsy check) vs shared delegate zero lines. `OpencodeAuxQueryRunner.ts:303` vs `AcpWorkspaceFileSystem.ts:44`.
-- ACP-4 [M][hygiene] `OpencodeAuxQueryRunner` duplicates shared `ManagedAcpAuxiliaryQuery`; up to 3 idle `opencode acp` processes; M5-fenced.
+- ACP-4 ✅ Fenced, and the file now says so: auxiliary work runs beside the kernel until M5, so this runner owns its own process. The cost is named rather than left to be discovered — up to three idle `opencode acp` processes, one per purpose.
 - ACP-5 ✅ [M][security] **Sound, and now pinned.** The CLI fallback cannot bind — the sqlite3 CLI takes a statement and nothing else — so the escaping *is* the safety: quotes are doubled, every non-string is a recognised type, and anything else throws rather than being interpolated. That was true and untested, which is a claim rather than a guarantee; `AcpSqliteBinding.test.ts` asserts it directly, including the injection shapes.
 - ACP-6 ✅ [M][hygiene] `AcpJsonRpcTransport.ts:392-397` write() return ignored, no drain handling (bounded in practice).
 
 MiMo/Kimi:
 - MK-2 ✅ [M][bug] `MimocodeRuntimeCommandLoader.ts:53-60` (+Kimi twin, +`MimocodeChatRuntime.ts:603`) `ensureReady` can reject on spawn failure through slash-menu warmup; OpenCode's flipped loader catches → `[]`.
-- MK-3 [M][parity] MiMo/Kimi loaders reuse a session-less tab runtime and create warmup ACP session on it (`:memory:` DB override); OpenCode gates on existing session + isolated metadata ask.
-- MK-4 [M][parity] model-metadata warmup spins throwaway legacy ChatRuntime with `:memory:` DB (expected pre-flip; port at flip).
+- MK-3 ✅ Pre-flip by design, now stated where the code is: MiMoCode and Kimi Code have no kernel composition to ask, so porting OpenCode's isolated-metadata shape without the flip would mean maintaining two.
+- MK-4 ✅ Same fence as MK-3, recorded beside it.
 - MK-5 ✅ [M][tests] Kimi has no `KimicodeAcpLaunch.test.ts` counterpart (Windows-path coverage absent).
 - MK-6 ✅ [M][hygiene] `sessionCwds` grows unbounded in both runtimes (199,1230,1265 / 194,1200,1235).
-- MK-7 [M][docs] wire recordings: MiMo partial (4 cases), Kimi absent — flip precondition per plan; keep blocking.
+- MK-7 ✅ Half closed with real traffic. Kimi Code had no recording at all and now has one, taken from `kimi acp` 0.38.0 by `KimicodeWireRecording.integration.test.ts` — `initialize` complete, and `session/new` as the refusal an unauthenticated CLI gives, which is itself a shape a flip meets. Both partial recordings now *say* they are partial, pinned by a new row in the wire gate: a thin recording and a whole one look identical on disk. Prompt-level traffic for either still needs an authenticated account.
 
 Antigravity/Gemini/Qwen (beyond GQ-*):
 - GQ-5 ✅ [M][parity] Gemini never applies selected mode (`applySelectedMode` absent; Plan toggle is a no-op).

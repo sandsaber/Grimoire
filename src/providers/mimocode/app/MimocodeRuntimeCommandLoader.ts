@@ -28,6 +28,13 @@ export class MimocodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
       return [];
     }
 
+    // **Pre-flip by design.** OpenCode's flipped loader gates on an existing
+    // session and asks through an isolated metadata session; this one reuses a
+    // session-less tab runtime and opens a warmup ACP session on it, with an
+    // in-memory database so nothing persists. That difference is the legacy
+    // path, not a defect in it — MiMoCode has no kernel composition to ask yet,
+    // and porting the shape without the flip would mean maintaining two.
+    //
     // Rebinding an already-live tab runtime to a history-backed conversation with
     // no session id must stay cold until the first send. If command discovery
     // creates a real session on that bound runtime, the first turn can skip
