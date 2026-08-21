@@ -3,6 +3,7 @@ import '@/providers';
 import { createMockEl } from '@test/helpers/mockElement';
 import { Menu, Notice } from 'obsidian';
 
+import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
 import { ConversationController, type ConversationControllerDeps } from '@/features/chat/controllers/ConversationController';
 import { ChatState } from '@/features/chat/state/ChatState';
 import { confirm } from '@/shared/modals/ConfirmModal';
@@ -847,7 +848,7 @@ describe('ConversationController', () => {
     });
 
     describe('renderHistoryDropdown', () => {
-      it('uses registered provider CSS variables and falls back to Claude for invalid IDs', () => {
+      it('uses registered provider CSS variables, and the product default for invalid IDs', () => {
         const container = createMockEl();
         (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
           { id: 'claude', providerId: 'claude', title: 'Claude', createdAt: 1000, messageCount: 1, preview: '' },
@@ -870,10 +871,13 @@ describe('ConversationController', () => {
             .style['--grimoire-history-provider-color'])
             .toBe(`var(--grimoire-provider-${providerId})`);
         }
+        // The product default, not one provider's colour picked out of the
+        // list: an unregistered provider used to show Claude's dot, which reads
+        // as a claim about which provider the conversation belongs to.
         expect(getHistoryItem(container, 'invalid')
           .querySelector('.grimoire-history-provider-dot')
           .style['--grimoire-history-provider-color'])
-          .toBe('var(--grimoire-provider-claude)');
+          .toBe(`var(--grimoire-provider-${DEFAULT_CHAT_PROVIDER_ID})`);
       });
 
       it('should render history items to provided container', () => {

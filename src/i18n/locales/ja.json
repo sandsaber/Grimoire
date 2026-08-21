@@ -401,7 +401,13 @@
         "renderFailed": "メッセージ内容をレンダリングできませんでした。",
         "copyMessage": "メッセージをコピー",
         "copyResponse": "回答をコピー",
-        "awaitingYou": "入力待ち"
+        "awaitingYou": "入力待ち",
+        "noticeBlocked": "ブロック済み",
+        "noticeLabel": "お知らせ",
+        "errorLabel": "エラー",
+        "queuedPrefix": "待機中",
+        "steeringPrefix": "誘導中",
+        "newChatTitle": "新しいチャット"
       },
       "errors": {
         "generic": "エラー: {message}",

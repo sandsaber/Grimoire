@@ -401,7 +401,13 @@
         "renderFailed": "消息内容渲染失败。",
         "copyMessage": "复制消息",
         "copyResponse": "复制回复",
-        "awaitingYou": "等待你的操作"
+        "awaitingYou": "等待你的操作",
+        "noticeBlocked": "已阻止",
+        "noticeLabel": "提示",
+        "errorLabel": "错误",
+        "queuedPrefix": "已排队",
+        "steeringPrefix": "引导中",
+        "newChatTitle": "新建对话"
       },
       "errors": {
         "generic": "错误：{message}",

@@ -1753,7 +1753,7 @@ export function getTabTitle(tab: TabData, plugin: GrimoirePlugin): string {
       return conversation.title;
     }
   }
-  return 'New Chat';
+  return t('chat.ui.messages.newChatTitle');
 }
 
 /** Shared between Tab.ts and TabManager.ts to avoid duplication. */

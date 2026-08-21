@@ -401,7 +401,13 @@
         "renderFailed": "Failed to render message content.",
         "copyMessage": "Copy message",
         "copyResponse": "Copy response",
-        "awaitingYou": "Awaiting you"
+        "awaitingYou": "Awaiting you",
+        "noticeBlocked": "Blocked",
+        "noticeLabel": "Notice",
+        "errorLabel": "Error",
+        "queuedPrefix": "Queued",
+        "steeringPrefix": "Steering",
+        "newChatTitle": "New Chat"
       },
       "errors": {
         "generic": "Error: {message}",

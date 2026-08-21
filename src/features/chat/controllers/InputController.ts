@@ -600,7 +600,9 @@ export class InputController {
         rawErrorMessage,
         ProviderRegistry.getProviderDisplayName(providerId),
       ).message;
-      await streamController.appendText(`\n\n**Error:** ${errorMsg}`);
+      await streamController.appendText(
+        `\n\n**${t('chat.ui.messages.errorLabel')}:** ${errorMsg}`,
+      );
     } finally {
       streamController.stopTurnSilenceIndicator();
       const finalAssistantMsg = this.activeStreamingAssistantMessage ?? assistantMsg;
@@ -638,7 +640,10 @@ export class InputController {
       if (!wasInvalidated && state.streamGeneration === streamGeneration) {
         const didCancelThisTurn = wasInterrupted || state.cancelRequested;
         if (didCancelThisTurn) {
-          await streamController.appendText('\n\n<span class="grimoire-interrupted">Interrupted</span> <span class="grimoire-interrupted-hint">· What should Grimoire do instead?</span>');
+          await streamController.appendText(
+            `\n\n<span class="grimoire-interrupted">${t('chat.ui.messages.interrupted')}</span> `
+            + `<span class="grimoire-interrupted-hint">${t('chat.ui.messages.interruptedHint')}</span>`,
+          );
         }
         streamController.hideThinkingIndicator();
         state.isStreaming = false;
@@ -755,7 +760,9 @@ export class InputController {
       const isPendingSteerOnly = !state.queuedMessage && !!this.pendingSteerMessage;
       indicatorEl.createSpan({
         cls: 'grimoire-queue-indicator-text',
-        text: `${isPendingSteerOnly ? '⌙ Steering: ' : '⌙ Queued: '}${this.getQueuedMessageDisplay(visibleQueuedMessage)}`,
+        text: `⌙ ${isPendingSteerOnly
+          ? t('chat.ui.messages.steeringPrefix')
+          : t('chat.ui.messages.queuedPrefix')}: ${this.getQueuedMessageDisplay(visibleQueuedMessage)}`,
       });
 
       if (state.queuedMessage) {

@@ -1073,7 +1073,11 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   }
 
   setAutoTurnCallback(callback: unknown): void {
-    this.callbacks.autoTurn = callback as ((runId: unknown) => void) | undefined;
+    // Cast to the field's own type, not to the shape this callback used to
+    // have: `(runId: unknown) => void` was what K1 corrected, and a cast that
+    // still names it reintroduces the mismatch at the one place the two
+    // modules meet.
+    this.callbacks.autoTurn = callback as AutoTurnCallback | undefined;
   }
 
   /** What the host presenter needs, in one place rather than seven getters. */

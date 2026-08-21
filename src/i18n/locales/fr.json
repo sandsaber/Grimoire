@@ -401,7 +401,13 @@
         "renderFailed": "Impossible d’afficher le contenu du message.",
         "copyMessage": "Copier le message",
         "copyResponse": "Copier la réponse",
-        "awaitingYou": "En attente de vous"
+        "awaitingYou": "En attente de vous",
+        "noticeBlocked": "Bloqué",
+        "noticeLabel": "Avis",
+        "errorLabel": "Erreur",
+        "queuedPrefix": "En file d'attente",
+        "steeringPrefix": "Pilotage",
+        "newChatTitle": "Nouveau chat"
       },
       "errors": {
         "generic": "Erreur : {message}",

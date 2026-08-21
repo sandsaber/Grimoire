@@ -401,7 +401,13 @@
         "renderFailed": "메시지 콘텐츠를 렌더링하지 못했습니다.",
         "copyMessage": "메시지 복사",
         "copyResponse": "응답 복사",
-        "awaitingYou": "응답 대기 중"
+        "awaitingYou": "응답 대기 중",
+        "noticeBlocked": "차단됨",
+        "noticeLabel": "알림",
+        "errorLabel": "오류",
+        "queuedPrefix": "대기 중",
+        "steeringPrefix": "조정 중",
+        "newChatTitle": "새 채팅"
       },
       "errors": {
         "generic": "오류: {message}",

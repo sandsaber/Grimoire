@@ -1,3 +1,5 @@
+import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
+
 import { getDefaultHiddenProviderCommands } from '../../core/providers/commands/hiddenCommands';
 import { type GrimoireSettings } from '../../core/types/settings';
 import { DEFAULT_CODEX_PRIMARY_MODEL } from '../../providers/codex/types/models';
@@ -49,7 +51,7 @@ export const DEFAULT_GRIMOIRE_SETTINGS: GrimoireSettings = {
 
   providerConfigs: getBuiltInProviderDefaultConfigs(),
 
-  settingsProvider: 'codex',
+  settingsProvider: DEFAULT_CHAT_PROVIDER_ID,
   savedProviderModel: {},
   savedProviderEffort: {},
   savedProviderServiceTier: {},

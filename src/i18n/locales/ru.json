@@ -401,7 +401,13 @@
         "renderFailed": "Не удалось отобразить содержимое сообщения.",
         "copyMessage": "Копировать сообщение",
         "copyResponse": "Копировать ответ",
-        "awaitingYou": "Ожидание вас"
+        "awaitingYou": "Ожидание вас",
+        "noticeBlocked": "Заблокировано",
+        "noticeLabel": "Уведомление",
+        "errorLabel": "Ошибка",
+        "queuedPrefix": "В очереди",
+        "steeringPrefix": "Корректировка",
+        "newChatTitle": "Новый чат"
       },
       "errors": {
         "generic": "Ошибка: {message}",

@@ -401,7 +401,13 @@
         "renderFailed": "無法呈現訊息內容。",
         "copyMessage": "複製訊息",
         "copyResponse": "複製回覆",
-        "awaitingYou": "等待您的回覆"
+        "awaitingYou": "等待您的回覆",
+        "noticeBlocked": "已封鎖",
+        "noticeLabel": "提示",
+        "errorLabel": "錯誤",
+        "queuedPrefix": "已排隊",
+        "steeringPrefix": "引導中",
+        "newChatTitle": "新增對話"
       },
       "errors": {
         "generic": "錯誤：{message}",

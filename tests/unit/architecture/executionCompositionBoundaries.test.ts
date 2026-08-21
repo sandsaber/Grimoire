@@ -99,9 +99,12 @@ function importsPlugin(source: string): boolean {
  */
 function* specifiersIn(source: string): Generator<string> {
   const patterns = [
-    /from '([^']+)'/g,
-    /\bimport\s*\(\s*'([^']+)'\s*\)/g,
-    /\brequire\s*\(\s*'([^']+)'\s*\)/g,
+    /from ['"]([^'"]+)['"]/g,
+    // A side-effect import names no binding, which is exactly how a module is
+    // pulled in for what it registers rather than for what it exports.
+    /^\s*import\s+['"]([^'"]+)['"]/gm,
+    /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+    /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
   ];
   for (const pattern of patterns) {
     for (const [, specifier] of source.matchAll(pattern)) {
@@ -181,8 +184,14 @@ describe('execution composition boundaries', () => {
       const required = "const m = require('../../providers/codex/settings');";
       const dynamicPlugin = "const p = await import('@/main');";
       const dynamicSpawn = "const { spawn } = await import('node:child_process');";
+      // A side-effect import and a double-quoted one: neither names a binding
+      // the other patterns could have caught.
+      const sideEffect = "import '@/providers/codex/settings';";
+      const doubleQuoted = 'import { Y } from "@/providers/codex/settings";';
 
       expect(importsFrom('src/core/x/Y.ts', dynamic, 'providers')).toBe(true);
+      expect(importsFrom('src/core/x/Y.ts', sideEffect, 'providers')).toBe(true);
+      expect(importsFrom('src/core/x/Y.ts', doubleQuoted, 'providers')).toBe(true);
       expect(importsFrom('src/core/runtime/ChatRuntime.ts', required, 'providers')).toBe(true);
       expect(importsPlugin(dynamicPlugin)).toBe(true);
       expect(launchesProcess(dynamicSpawn)).toBe(true);

@@ -401,7 +401,13 @@
         "renderFailed": "Nachrichteninhalt konnte nicht gerendert werden.",
         "copyMessage": "Nachricht kopieren",
         "copyResponse": "Antwort kopieren",
-        "awaitingYou": "Wartet auf dich"
+        "awaitingYou": "Wartet auf dich",
+        "noticeBlocked": "Blockiert",
+        "noticeLabel": "Hinweis",
+        "errorLabel": "Fehler",
+        "queuedPrefix": "In Warteschlange",
+        "steeringPrefix": "Steuerung",
+        "newChatTitle": "Neuer Chat"
       },
       "errors": {
         "generic": "Fehler: {message}",

@@ -401,7 +401,13 @@
         "renderFailed": "Não foi possível renderizar o conteúdo da mensagem.",
         "copyMessage": "Copiar mensagem",
         "copyResponse": "Copiar resposta",
-        "awaitingYou": "Aguardando você"
+        "awaitingYou": "Aguardando você",
+        "noticeBlocked": "Bloqueado",
+        "noticeLabel": "Aviso",
+        "errorLabel": "Erro",
+        "queuedPrefix": "Na fila",
+        "steeringPrefix": "Direcionando",
+        "newChatTitle": "Novo chat"
       },
       "errors": {
         "generic": "Erro: {message}",

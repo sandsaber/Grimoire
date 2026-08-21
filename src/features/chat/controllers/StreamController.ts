@@ -261,7 +261,9 @@ export class StreamController {
 
       case 'notice':
         this.flushPendingTools();
-        await this.appendText(`\n\n⚠️ **${chunk.level === 'warning' ? 'Blocked' : 'Notice'}:** ${chunk.content}`);
+        await this.appendText(`\n\n⚠️ **${chunk.level === 'warning'
+          ? t('chat.ui.messages.noticeBlocked')
+          : t('chat.ui.messages.noticeLabel')}:** ${chunk.content}`);
         break;
 
       case 'status':
@@ -271,7 +273,10 @@ export class StreamController {
       case 'error':
         // Flush pending tools before rendering error message
         this.flushPendingTools();
-        await this.appendText(`\n\n❌ **Error:** ${this.normalizeErrorMessage(chunk.content)}`);
+        await this.appendText(
+          `\n\n❌ **${t('chat.ui.messages.errorLabel')}:** `
+          + `${this.normalizeErrorMessage(chunk.content)}`,
+        );
         break;
 
       case 'done':

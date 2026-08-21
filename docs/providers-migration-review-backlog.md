@@ -235,14 +235,14 @@ Kernel/persistence:
 - KER-8 [M][hygiene] `LocalShellBackend.ts:472-515` duplicates `ExecutionEventQueue.ts` verbatim as `AsyncEventQueue`.
 
 Core platform:
-- CORE-1 [M][tests] `executionCompositionBoundaries.test.ts:100-111` specifier regex misses side-effect `import '...'` and double-quoted specifiers (AST walker in moduleReachability handles both). Reuse walker.
-- CORE-2 [M][hygiene] `src/core/mcp/McpTester.ts:269,303` uses `window.setTimeout` in core.
+- CORE-1 ✅ [M][tests] `executionCompositionBoundaries.test.ts:100-111` specifier regex misses side-effect `import '...'` and double-quoted specifiers (AST walker in moduleReachability handles both). Reuse walker.
+- CORE-2 ❌ [M][hygiene] **Refuted.** `McpTester` sits under `src/core/` but its only caller is the settings UI, and Obsidian's own review asks for `window.setTimeout` so a timer scheduled from a popped-out settings window belongs to that window. The rule keeping the browser object out of core is about the execution kernel's boundary, which this is not part of; the reason is now written in the file.
 - CORE-3 [M][hygiene] two YAML stacks: `utils/frontmatter.ts` vs `utils/yamlFrontmatter.ts`.
 - CORE-4 [M][hygiene] 28 repo-wide copies of `isRecord`.
-- CORE-5 [M][hygiene] `src/app/settings/defaultSettings.ts:52` hard-codes 'codex' instead of DEFAULT_CHAT_PROVIDER_ID.
+- CORE-5 ✅ [M][hygiene] `src/app/settings/defaultSettings.ts:52` hard-codes 'codex' instead of DEFAULT_CHAT_PROVIDER_ID.
 - CORE-6 [M][architecture] `GrimoireSettingsStorage.ts:26-37,421-432` hard-codes three providers for legacy migration; should not survive M3 unnamed.
 - CORE-7 [M][architecture] `src/core/context/VaultTextIndex.ts:1,19` vault calls outside the sanctioned storage adapter directory.
-- CORE-8 [M][security] `ApprovalManager.ts:111` prefix match without boundary for non-bash/file tools: rule `{"a":"` matches any input starting `{"a":"`. User-authored rules only; defaults fail closed.
+- CORE-8 ✅ [M][security] `ApprovalManager.ts:111` prefix match without boundary for non-bash/file tools: rule `{"a":"` matches any input starting `{"a":"`. User-authored rules only; defaults fail closed.
 
 Claude:
 - CLA-3 [M][bug] `CCSettingsStorage.ts:46` unguarded `JSON.parse` in `load()` (save() tolerates corrupt); corrupt `.claude/settings.json` breaks every permission read/write.
@@ -296,10 +296,10 @@ Antigravity/Gemini/Qwen (beyond GQ-*):
 - GQ-12 [M][hygiene] `AntigravityCliResolver.ts:48-57` redundant double resolution chain.
 
 Features/shared:
-- FE-1 [M][hygiene] hardcoded English strings bypassing `t()`: `StreamController.ts:264,274` ('Blocked'/'Notice', '❌ **Error:**', '**Error:**', 'Interrupted · …'), `InputController.ts:603,641,758`, `Tab.ts:1756` ('New Chat' default title).
+- FE-1 ✅ [M][hygiene] hardcoded English strings bypassing `t()`: `StreamController.ts:264,274` ('Blocked'/'Notice', '❌ **Error:**', '**Error:**', 'Interrupted · …'), `InputController.ts:603,641,758`, `Tab.ts:1756` ('New Chat' default title).
 - FE-2 [M][architecture] `SubagentManager.ts:83` defaults `taskResultInterpreter` to Claude's; rebound per tab; future path skipping bind misinterprets. Make required.
-- FE-3 [M][hygiene] `ConversationController.ts:952-956` unknown-provider dot color falls back to Claude's CSS var.
-- FE-4 [M][hygiene] `ExecutionChatRuntimeAdapter.ts:1061` stale cast `(runId: unknown) => void` re-imports the K1/R6-removed shape (field typed correctly at :1186).
+- FE-3 ✅ [M][hygiene] `ConversationController.ts:952-956` unknown-provider dot color falls back to Claude's CSS var.
+- FE-4 ✅ [M][hygiene] `ExecutionChatRuntimeAdapter.ts:1061` stale cast `(runId: unknown) => void` re-imports the K1/R6-removed shape (field typed correctly at :1186).
 - FE-5 [M][hygiene] `Tab.ts:1737`, `tabProviderUI.ts:361` floating cleanup promises.
 
 Style/i18n/release:
