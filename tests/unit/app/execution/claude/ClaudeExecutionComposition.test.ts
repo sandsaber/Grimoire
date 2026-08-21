@@ -288,6 +288,27 @@ describe('Claude execution composition', () => {
     await host.dispose();
   });
 
+  it('lets a conversation go of a session the SDK will not resume', async () => {
+    // The SDK answers a resume with a *different* session id when it no longer
+    // holds the one asked for. The turn is refused — correctly, it is not the
+    // conversation it claimed to be — but the binding that produced it was
+    // still stored, so the next turn asked for the same missing session and was
+    // refused the same way, and the next. A conversation that lost its context
+    // is recoverable; one that cannot take another turn is not.
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({
+      providerState: { claude: { providerSessionId: 'a-session-the-sdk-forgot' } },
+      sessionId: 'a-session-the-sdk-forgot',
+    });
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+    // The fake answers with `native-session`, which is not what was resumed.
+
+    expect(runtime.consumeSessionInvalidation()).toBe(true);
+    execution.dispose();
+    await host.dispose();
+  });
+
   it('counts what the SDK says the turn cost', async () => {
     claudePlanUsageStore.reset();
     const plugin = createPlugin();

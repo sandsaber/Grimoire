@@ -221,6 +221,18 @@ export interface ClaudeExecutionBackendContext {
   readonly sessionInstanceIdFactory: () => SessionInstanceId;
   readonly interactionIdFactory: () => InteractionId;
   readonly rewindBackup?: ClaudeRewindBackupPort;
+  /**
+   * Says that the session this conversation names cannot be resumed.
+   *
+   * The SDK answers a resume with a *different* session id when it no longer
+   * has the one asked for. The turn is refused — it is not the conversation it
+   * claimed to be — but the binding that produced it is still stored, so the
+   * next turn asks for the same missing session and is refused the same way.
+   * Told about it, the tab can let the binding go and open a new session, which
+   * is the difference between a conversation that lost its context and one that
+   * cannot take another turn at all.
+   */
+  readonly onSessionUnusable?: (executionSessionId: string) => void;
   readonly now?: () => number;
   readonly runTimeoutMs?: number;
   readonly resultCommitTimeoutMs?: number;
@@ -1263,6 +1275,11 @@ class ClaudeExecutionSession implements ExecutionSession {
 
   private async rejectSessionIdentity(): Promise<void> {
     await this.closeQuery();
+    // The kernel's record of what this session was asked for stays as it is —
+    // a refused identity must not adopt the wrong id, and it must not forget
+    // the right one either. What changes is that the tab is told, so the
+    // *conversation's* binding can be let go.
+    this.context.onSessionUnusable?.(String(this.executionSessionId));
     this.activeRun?.handleSessionIdentityMismatch();
   }
 

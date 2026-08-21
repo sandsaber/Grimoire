@@ -98,6 +98,8 @@ export class ClaudeExecution {
    * unresolvable in another.
    */
   private readonly presenters = new Set<ClaudeInteractionPresenter>();
+  /** Per execution session: the tab to tell when its session stops resuming. */
+  private readonly unusableSessionListeners = new Map<string, () => void>();
   private readonly disposers: Array<() => void> = [];
   private backend: ClaudeExecutionBackend | undefined;
 
@@ -171,6 +173,10 @@ export class ClaudeExecution {
       // the preview says is about to change, restored if the apply fails. The
       // backend cannot take one itself — it has no vault — so it reaches the
       // same helper through here.
+      // Routed by execution session because the backend is one object for every
+      // tab: the session that was refused is the one whose conversation has to
+      // let its binding go.
+      onSessionUnusable: id => this.unusableSessionListeners.get(id)?.(),
       rewindBackup: {
         create: filesChanged => createClaudeRewindBackup(
           filesChanged ? [...filesChanged] : undefined,
@@ -344,7 +350,14 @@ export class ClaudeExecution {
         // Captured on the way out: a rewind runs against the session this tab
         // is executing in, and the id is minted here rather than reported back.
         nextExecutionSessionId: () => {
+          if (currentExecutionSession) {
+            this.unusableSessionListeners.delete(currentExecutionSession);
+          }
           currentExecutionSession = opaqueId('es');
+          this.unusableSessionListeners.set(
+            currentExecutionSession,
+            () => adapter?.noteSessionUnusable(),
+          );
           return executionSessionId(currentExecutionSession);
         },
         nextRunId: () => runId(opaqueId('run')),
@@ -355,6 +368,9 @@ export class ClaudeExecution {
         // The tab closing is when the prompts it raised stop being anyone's.
         presenter.dismissAll();
         this.presenters.delete(presenter);
+        if (currentExecutionSession) {
+          this.unusableSessionListeners.delete(currentExecutionSession);
+        }
       },
     );
     adapter = runtime;

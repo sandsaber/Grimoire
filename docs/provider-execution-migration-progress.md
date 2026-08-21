@@ -5040,6 +5040,40 @@ five consecutive full runs are clean.
 Gates: unit 478 suites / 7,725 tests, integration 5 suites / 145 tests, typecheck, `eslint`,
 `build:release`.
 
+### CLA-2 and MK-1 — the last two Important of the third review (this commit)
+
+**MK-1** is mechanical: MiMoCode and KimiCode each hand-rolled the approval mappers that already
+exist in `src/providers/acp/acpApprovals.ts`, reusing the shared names without importing them. They
+import them now. The one behavioural difference between the copies and the original is pinned by a
+new row in both suites: a `select-option` decision was checked *last* locally and *first* in the
+shared mapper, so a provider offering a fourth option by name was answered differently depending on
+which copy ran.
+
+**CLA-2 is closed differently from how it was filed**, and the difference is the point. The finding
+was that the legacy runtime's history injection — resume answers with a different session id, so
+rebuild the context in the next prompt — was dropped at the flip. True. What the re-check found
+underneath it is worse than the lost context: the refused resume left the conversation's binding
+*stored*, so the next turn asked for the same missing session and was refused the same way, and the
+one after that. A conversation that lost its context is recoverable by anyone who reads it; one that
+cannot take another turn is not.
+
+So the wedge is fixed first: the backend tells the tab which session stopped resuming, routed by
+execution session id because one backend serves every tab, and the tab lets the binding go through
+the one-shot the save path already reads. What deliberately did **not** change is the kernel's record
+of what the session was asked for — a refused identity must not adopt the wrong id, and must not
+forget the right one either, which an existing row pins.
+
+**Still owed:** re-injecting the conversation history so the next turn keeps its context rather than
+only its ability to run. `src/providers/claude/AGENTS.md:17` describes that injection as provider
+behaviour and it is not implemented on this path. Owner: M5, with the auxiliary work — it needs the
+transcript, an encoder and a size policy, which is a feature rather than a repair.
+
+With these two, **every Important of the third review is closed**: KER-1..4, CLA-1, CLA-2, MK-1,
+GQ-1..5, QA-1, QA-2 — plus the settings-hub flake, which was nobody's finding.
+
+Gates: unit 478 suites / 7,728 tests, integration 5 suites / 145 tests, typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

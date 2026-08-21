@@ -196,12 +196,24 @@ the failure mode on the *revert* path, which is the safety argument the entire m
 | KER-3 ✅ | Startup loads every run and interaction record of every undeleted conversation into memory, terminal runs of skipped-disposed sessions included, and `VaultDurableStorage.list()` reads each file in full just to enumerate ids. C1 bounded the maps within one process; a restart is still O(all records). | `loadPersistedControls` iterates `runs.listRecordIds()` unconditionally; `list()` calls `read` per path | confirmed |
 | KER-4 ✅ | `deleteOwnedRecords` takes no admission, while `createSession` registers in the map only after its provider await — so deleting a conversation during its first session creation either misses the record or strands a live session whose records are gone. | no `beginAdmission()` in `deleteOwnedRecords`; `sessions.set` is 53 lines after the provider await | confirmed |
 | CLA-1 ✅ | The Claude composition never calls `content.beginTurn()` at the turn boundary, where Grok and OpenCode both do. `sawStreamText`/`sawStreamThinking` therefore persist across turns in one conversation, and a later turn whose assistant message arrives without its own deltas renders empty. | `beginTurn()` has exactly one caller — `forgetConversation()`, which runs on conversation change | confirmed |
-| CLA-2 | SDK amnesia recovery — resume answering with a different session id, then rebuilding context by injecting history — was dropped at the flip. The new path rejects the identity and finishes, and the next turn rebuilds the same intent with no injection anywhere. | `rg amnesia\|historyRebuild` is empty in `src/`, while `src/providers/claude/AGENTS.md:17` still documents the injection as provider behaviour | confirmed |
-| MK-1 | MiMoCode and KimiCode each hand-roll `mapApprovalDecision` / `buildAcpApprovalDecisionOptions` / `selectPermissionOption`, reusing the shared helpers' names without importing them. Equivalent today; the local copies check `select-option` last where the shared one checks first. | both files define all three locally; only `src/providers/acp/index.ts` re-exports the shared module, and only Gemini consumes it | confirmed |
+| CLA-2 ✅ | SDK amnesia recovery — resume answering with a different session id, then rebuilding context by injecting history — was dropped at the flip. The new path rejects the identity and finishes, and the next turn rebuilds the same intent with no injection anywhere. | `rg amnesia\|historyRebuild` is empty in `src/`, while `src/providers/claude/AGENTS.md:17` still documents the injection as provider behaviour | confirmed |
+| MK-1 ✅ | MiMoCode and KimiCode each hand-roll `mapApprovalDecision` / `buildAcpApprovalDecisionOptions` / `selectPermissionOption`, reusing the shared helpers' names without importing them. Equivalent today; the local copies check `select-option` last where the shared one checks first. | both files define all three locally; only `src/providers/acp/index.ts` re-exports the shared module, and only Gemini consumes it | confirmed |
 | GQ-1 ✅ | **Gemini and Qwen gate containment and write approval on the global `settings.permissionMode`**, which `ProviderSettingsCoordinator` overwrites with whichever provider was projected last. Another provider's Auto-approve toggle therefore disables Gemini/Qwen path containment and skips write approvals. Every flipped provider reads the per-provider snapshot instead. | five sites read `this.plugin.settings.permissionMode` directly; neither file mentions `getProviderSettingsSnapshot`; the coordinator writes the projected value at line 329 | confirmed |
 | GQ-2 ✅ | Gemini's notification switch handles `message_chunk`, `tool_call`, `tool_call_update` and `usage` and drops `plan` and `current_mode`, while its capabilities declare `supportsPlanMode: true`. | switch read in full; `capabilities.ts:9` declares it | confirmed |
 | GQ-3 ✅ | Antigravity declares `reasoningControl: 'effort'` and renders the picker; nothing in the print path reads `effortLevel`. A control that changes nothing. | the only `effortLevel` references under `src/providers/antigravity/` are the two UI writes | confirmed |
 | GQ-4 ✅ | Gemini and Qwen erase a valid session binding on **any** load failure — `catch { return false; }` — where the shared `isAcpMissingSessionError` exists precisely to tell a missing session from a transient one. | neither provider references `isAcpMissingSessionError` | confirmed |
+
+### Where the third review stands
+
+**Every Important is closed.** KER-1..4, CLA-1, CLA-2, MK-1, GQ-1..5, QA-1, QA-2 — plus GQ-5 and the
+settings-hub flake, neither of which was filed as Important. The Minor list below is what is left.
+
+One is closed differently from how it was filed. CLA-2 asked either to port the legacy history
+injection or to record the gap; what the re-check found underneath it was worse than the missing
+context and simpler to fix: a conversation whose SDK session went missing could not take *another
+turn at all*, because the refused resume left the binding stored and the next turn asked for the
+same missing session. The binding is let go now. **Re-injecting the history remains owed** — see the
+journal entry, and `src/providers/claude/AGENTS.md` still describes it as provider behaviour.
 
 ### The shape of it
 

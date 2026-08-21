@@ -904,6 +904,21 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
    * out, and synchronous like the contract, so the disposal it triggers cannot
    * make a settings change wait on a provider.
    */
+  /**
+   * The provider says the session this conversation names cannot be used.
+   *
+   * Distinct from `resetSession`, which drops the kernel session and keeps the
+   * conversation's binding: this also tells the surface to let that binding go,
+   * through the one-shot the save path already reads. Without it a provider
+   * that refuses a resume refuses it again on the next turn, and the next, from
+   * the same stored id — a conversation that cannot take another turn rather
+   * than one that lost its context.
+   */
+  noteSessionUnusable(): void {
+    this.session.markInvalidated();
+    this.resetSession();
+  }
+
   resetSession(): void {
     const executionSessionId = this.executionSessionId;
     this.executionSessionId = null;

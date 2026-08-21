@@ -1353,4 +1353,34 @@ describe('MimocodeChatRuntime', () => {
       expect((runtime).resolveSessionPath('session-1', '/etc/hosts')).toBe('/etc/hosts');
     });
   });
+
+  it('answers a picked option with the option the user picked', async () => {
+    // The one behavioural difference between the local mappers and the shared
+    // one they duplicated: a `select-option` decision was checked last here and
+    // first there. Equivalent for the three standard decisions, and not for a
+    // fourth option a provider offers by name — which is the drift a copy
+    // invites.
+    const runtime = new MimocodeChatRuntime(createMockPlugin());
+    runtime.setApprovalCallback(jest.fn().mockResolvedValue({
+      type: 'select-option',
+      value: 'approve-always',
+    }));
+
+    await expect((runtime as any).handlePermissionRequest({
+      options: [
+        { kind: 'allow_once', name: 'Allow once', optionId: 'approve-now' },
+        { kind: 'allow_always', name: 'Always allow', optionId: 'approve-always' },
+      ],
+      sessionId: 'session-1',
+      toolCall: {
+        kind: 'other',
+        rawInput: {},
+        title: 'anything',
+        toolCallId: 'tool-1',
+      },
+    })).resolves.toEqual({
+      outcome: { optionId: 'approve-always', outcome: 'selected' },
+    });
+  });
+
 });

@@ -15,7 +15,6 @@ import type {
 import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
 import type {
   ApprovalCallback,
-  ApprovalDecisionOption,
   AskUserQuestionCallback,
   AutoTurnCallback,
   ChatRewindMode,
@@ -29,7 +28,6 @@ import type {
   SubagentRuntimeState,
 } from '../../../core/runtime/types';
 import type {
-  ApprovalDecision,
   ChatMessage,
   Conversation,
   ExitPlanModeCallback,
@@ -65,6 +63,7 @@ import {
   type AcpUsageUpdate,
   type AcpWriteTextFileRequest,
   approveAcpWriteTextFile,
+  buildAcpApprovalDecisionOptions,
   buildAcpPersistedSessionFields,
   buildAcpSessionLoadFailureDebugEvent,
   buildAcpUsageInfo,
@@ -73,6 +72,7 @@ import {
   extractAcpSessionThoughtLevelState,
   isAcpMissingSessionError,
   isAcpRetryableTransportClose,
+  mapAcpApprovalDecision,
   planAcpEnsureReadySessionPhase,
   resolveWorkspacePath,
   runAcpEnsureReadyForQuery,
@@ -1407,7 +1407,7 @@ export class KimicodeChatRuntime implements ChatRuntime {
       },
     );
 
-    return mapApprovalDecision(decision, request.options);
+    return mapAcpApprovalDecision(decision, request.options);
   }
 
   private setSupportedCommands(commands: SlashCommand[]): void {
@@ -1770,73 +1770,3 @@ function formatPermissionLabel(permissionId: string): string {
     .join(' ');
 }
 
-function mapApprovalDecision(
-  decision: ApprovalDecision,
-  options: readonly {
-    kind: 'allow_once' | 'allow_always' | 'reject_once' | 'reject_always';
-    optionId: string;
-  }[],
-): AcpRequestPermissionResponse {
-  if (decision === 'allow') {
-    return selectPermissionOption(options, ['allow_once', 'allow_always']);
-  }
-
-  if (decision === 'allow-always') {
-    return selectPermissionOption(options, ['allow_always', 'allow_once']);
-  }
-
-  if (decision === 'deny') {
-    return selectPermissionOption(options, ['reject_once', 'reject_always']);
-  }
-
-  if (typeof decision === 'object' && decision.type === 'select-option') {
-    return {
-      outcome: {
-        optionId: decision.value,
-        outcome: 'selected',
-      },
-    };
-  }
-
-  return { outcome: { outcome: 'cancelled' } };
-}
-
-function buildAcpApprovalDecisionOptions(
-  options: readonly {
-    kind: 'allow_once' | 'allow_always' | 'reject_once' | 'reject_always';
-    name: string;
-    optionId: string;
-  }[],
-): ApprovalDecisionOption[] {
-  return options.map((option) => ({
-    label: option.name,
-    presentation: option.kind === 'allow_once'
-      ? 'allow'
-      : option.kind === 'allow_always'
-      ? 'always'
-      : 'reject',
-    value: option.optionId,
-  }));
-}
-
-function selectPermissionOption(
-  options: readonly {
-    kind: 'allow_once' | 'allow_always' | 'reject_once' | 'reject_always';
-    optionId: string;
-  }[],
-  preferredKinds: readonly ('allow_once' | 'allow_always' | 'reject_once' | 'reject_always')[],
-): AcpRequestPermissionResponse {
-  for (const kind of preferredKinds) {
-    const option = options.find((entry) => entry.kind === kind);
-    if (option) {
-      return {
-        outcome: {
-          optionId: option.optionId,
-          outcome: 'selected',
-        },
-      };
-    }
-  }
-
-  return { outcome: { outcome: 'cancelled' } };
-}
