@@ -3,7 +3,10 @@ import type {
   InteractionRequest,
   InteractionResolution,
 } from '@/core/execution/ExecutionContracts';
-import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
+import type {
+  ExecutionEvent,
+  ExecutionEventEnvelope,
+} from '@/core/execution/ExecutionEvents';
 import {
   executionSessionId,
   interactionId as toInteractionId,
@@ -21,6 +24,7 @@ import {
   ExecutionInteractionBridge,
   ExecutionRunStream,
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type { AutoTurnResult } from '@/core/runtime/types';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
@@ -263,13 +267,69 @@ describe('adapter members that were missing until the coverage gate found them',
   });
 });
 
+describe('a turn the backend started on its own', () => {
+  it('reaches the surface as a turn, not as a run id', async () => {
+    const envelopes: ((envelope: ExecutionEventEnvelope) => void)[] = [];
+    const adapter = createBareAdapter(
+      codexProviderModule.capabilities,
+      {},
+      {
+        observe: (_session: unknown, listener: (envelope: ExecutionEventEnvelope) => void) => {
+          envelopes.push(listener);
+          return () => undefined;
+        },
+        createSession: async () => undefined,
+      },
+    );
+    await adapter.ensureReady();
+    const auto: AutoTurnResult[] = [];
+    adapter.setAutoTurnCallback((result: AutoTurnResult) => { auto.push(result); });
+    const backendRun = toRunId(`run-${'9'.repeat(32)}`);
+    let sequence = 0;
+    const push = (event: ExecutionEvent): void => {
+      sequence += 1;
+      for (const listener of envelopes) {
+        listener({
+          schemaVersion: 1,
+          backendId: executionBackendId('provider-fake'),
+          backendGeneration: 1,
+          executionSessionId: executionSessionId(`es-${'d'.repeat(32)}`),
+          sessionInstanceId: sessionInstanceId(`si-${'d'.repeat(32)}`),
+          eventId: `auto-${sequence}`,
+          sequence,
+          occurredAt: 1,
+          scope: { kind: 'run', runId: backendRun },
+          event,
+        });
+      }
+    };
+
+    push({ kind: 'run-started' });
+    push({ kind: 'output-delta', channel: 'assistant', text: 'unasked answer' });
+    push({ kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+    for (let attempt = 0; attempt < 50 && auto.length === 0; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 1));
+    }
+
+    // The surface renders a turn nobody asked for from its chunks — that is
+    // what `AutoTurnResult` is. The adapter was calling the callback with a run
+    // id, which the only consumer destructures as `result.chunks`; the throw
+    // would have been swallowed inside the registry's observer.
+    expect(auto).toEqual([{
+      chunks: [{ type: 'text', content: 'unasked answer' }],
+      metadata: expect.objectContaining({ wasSent: true }),
+    }]);
+  });
+});
+
 function createBareAdapter(
   capabilities: ProviderCapabilityDescriptor,
   workspace: ProviderWorkspaceSlots,
+  registry: unknown = {},
 ): ExecutionChatRuntimeAdapter {
   return new ExecutionChatRuntimeAdapter(
     {
-      registry: {} as never,
+      registry: registry as never,
       backendId: executionBackendId('provider-fake'),
       capabilities,
       owner: () => ({ kind: 'conversation', ownerId: 'bare' }),

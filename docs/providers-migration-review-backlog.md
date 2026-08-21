@@ -44,8 +44,8 @@ by the length of the session. **C1 is closed.**
 
 | # | Finding | Evidence | Status |
 |---|---|---|---|
-| K1 | **The auto-turn callback has two different shapes.** The adapter calls `autoTurn(runId)` with `unknown` (`ExecutionChatRuntimeAdapter.ts:1016`, declared `1060`); the only consumer takes an `AutoTurnResult` and reads `result.chunks` (`Tab.ts:1795`). A backend-initiated run would throw inside the registry's observer and be swallowed. Latent today because nothing initiates one. | both call sites read | confirmed |
-| K2 | `wasSent` is derived from `terminal !== null` (`ExecutionChatRuntimeAdapter.ts:244`), so a cancelled-but-dispatched turn reports `false` and its resume checkpoint is never cleared. Should read the registry's dispatch state. | — | reported |
+| K1 ✅ | **The auto-turn callback has two different shapes.** The adapter calls `autoTurn(runId)` with `unknown` (`ExecutionChatRuntimeAdapter.ts:1016`, declared `1060`); the only consumer takes an `AutoTurnResult` and reads `result.chunks` (`Tab.ts:1795`). A backend-initiated run would throw inside the registry's observer and be swallowed. Latent today because nothing initiates one. | both call sites read | confirmed |
+| K2 ❌ | **Refuted.** `wasSent` is false only for `invalidated`, and the terminal policy allows exactly two reasons there — `pre-dispatch-rejected` and `side-effect-free-rejection`, both meaning the turn never reached the provider. A dispatch that might have landed is `indeterminate`, which reports true, and a cancelled turn is already pinned at `wasSent: true` by `ExecutionAdapterConformance.test.ts`. | `ExecutionTerminalPolicy.ts` + the existing row | refuted |
 | K3 | Every durable event rewrites the whole session record, including an unbounded `runIds` array — roughly six file writes per event. | — | reported |
 | K4 | `window.setTimeout` in provider-neutral core (`ExecutionChatRuntimeAdapter.ts:811`) where an injectable scheduler already exists; the DOM boundary gate does not cover that file. | — | reported |
 | K5 | `shutdown()` can wait forever on a hung `createSession` (`ExecutionLifecycleRegistry.ts:988`) — no grace period. | — | reported |
@@ -84,7 +84,7 @@ held.
 | # | Finding | Evidence | Status |
 |---|---|---|---|
 | S1 | "Always allow" promotes the agent's whole `suggestions.replaceRules` to `behavior: 'allow'` without showing them (`ClaudePermissionUpdates.ts:17`); a rule of `{toolName: 'Bash'}` with no pattern is permanent auto-approval of every command. Pre-existing, preserved by the flip. Fix: show the rules in the card and clamp to the pattern displayed. | — | reported |
-| S2 | D7 path redaction misses Linux: the pattern matches `/Users`, `/Volumes`, `/tmp`, `/var`, `C:\` (`DebugLogService.ts:57`), so `/home/...` leaks through `stderrPreview`. | — | reported |
+| S2 ✅ | D7 path redaction misses Linux: the pattern matches `/Users`, `/Volumes`, `/tmp`, `/var`, `C:\` (`DebugLogService.ts:57`), so `/home/...` leaks through `stderrPreview`. | — | reported |
 | S3 | Session metadata filenames embed an unvalidated provider-supplied id and are written non-atomically (`SessionStorage.ts:294`) — the control store solves exactly this for its own records; the metadata file does not. | — | reported |
 
 No Critical security finding in the new code. Fail-closed bridges, D2 enforced mechanically, atomic

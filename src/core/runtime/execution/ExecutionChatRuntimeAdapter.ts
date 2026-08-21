@@ -369,6 +369,11 @@ const FAILURE_MESSAGES: Readonly<Record<RunTerminalReason, string>> = {
   'shutdown-unknown': 'Grimoire shut down before this run could be settled.',
 };
 
+/** The run an envelope is about, where it is about one. */
+function scopedRunId(envelope: ExecutionEventEnvelope): string | null {
+  return envelope.scope.kind === 'session' ? null : String(envelope.scope.runId);
+}
+
 function describeFailure(reason: RunTerminalReason): string {
   return FAILURE_MESSAGES[reason];
 }
@@ -609,6 +614,8 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
    */
   private readonly callbacks: MutableInteractionCallbacks = {};
   private sideChannels: (() => void) | null = null;
+  /** Turns the backend started on its own, until each of them settles. */
+  private readonly backendRuns = new Map<string, ExecutionRunStream>();
   private establishing: Promise<boolean> | undefined;
   private active: { runId: RunId; stream: ExecutionRunStream; release: () => void } | null = null;
   private lastCompleted: ExecutionRunStream | null = null;
@@ -676,6 +683,11 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
       ...(nativeSessionRef ? { nativeSessionRef } : {}),
     });
     this.executionSessionId = executionSessionId;
+    // Attached here rather than only when this tab starts a run: an interaction
+    // or a turn the backend began on its own belongs to the conversation, and
+    // a tab that has not sent anything yet is exactly when one arrives
+    // unasked-for. Idempotent, so the run path's call still stands.
+    this.attachSideChannels(executionSessionId);
     this.announceReady(true);
     return true;
   }
@@ -1034,9 +1046,58 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
         // A run this adapter did not start, owned by this conversation: the
         // backend began a turn of its own, which the UI has to be told about
         // because nothing in it asked for one.
-        this.callbacks.autoTurn?.(envelope.scope.kind === 'session' ? null : envelope.scope.runId);
+        this.followBackendRun(envelope);
+      }
+      const runId = scopedRunId(envelope);
+      if (runId) {
+        this.backendRuns.get(runId)?.accept(envelope);
       }
     });
+  }
+
+  /**
+   * Collects a turn the backend started, and hands it over as a turn.
+   *
+   * The surface renders one from its chunks — that is what `AutoTurnResult` is
+   * — so reporting a run id would be reporting something the only consumer
+   * cannot read. Streamed here because the adapter is what knows how an
+   * envelope becomes a chunk, and dropped as soon as it settles: an
+   * unanswered stream is a closure held per turn nobody asked for.
+   */
+  private followBackendRun(envelope: ExecutionEventEnvelope): void {
+    const id = scopedRunId(envelope);
+    if (!id || !this.callbacks.autoTurn || this.backendRuns.has(id)) {
+      return;
+    }
+    const stream = new ExecutionRunStream(
+      id as RunId,
+      this.ports.describeFailure,
+      this.ports.presentProviderContent,
+    );
+    this.backendRuns.set(id, stream);
+    void (async () => {
+      const chunks: StreamChunk[] = [];
+      try {
+        for await (const chunk of stream.chunks()) {
+          chunks.push(chunk);
+        }
+        const notify = this.callbacks.autoTurn as
+          ((result: { chunks: StreamChunk[]; metadata: ChatTurnMetadata }) => unknown) | undefined;
+        // The provider's own reading wins where it has one, exactly as it does
+        // for a turn the tab asked for.
+        await notify?.({
+          chunks,
+          metadata: {
+            ...stream.consumeTurnMetadata(),
+            ...this.ports.consumeProviderTurnMetadata?.(),
+          },
+        });
+      } catch (error) {
+        this.ports.reportCleanupFailure?.(error);
+      } finally {
+        this.backendRuns.delete(id);
+      }
+    })();
   }
 
   private ownsRun(envelope: ExecutionEventEnvelope): boolean {

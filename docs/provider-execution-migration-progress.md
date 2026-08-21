@@ -4739,6 +4739,36 @@ because it is not: Grok's three updates are why. There is a `default` now, answe
 Gates: unit 477 suites / 7,664 tests, integration 5 suites / 145 tests, typecheck, `eslint` clean.
 
 
+### Review K1, K2 and S2 — a turn nobody asked for, and a path on Linux (this commit)
+
+**K1, and the second thing it uncovered.** The adapter called the auto-turn callback with a run id;
+the only consumer takes an `AutoTurnResult` and reads `result.chunks`, so a backend-initiated turn
+would have thrown inside the registry's observer, where the throw is swallowed. The adapter now
+*streams* such a run — it is the thing that knows how an envelope becomes a chunk — and hands over
+the turn, dropping the stream as it settles.
+
+Writing the test found the rest of it: **the observer was only attached when this tab started a
+run**. A turn the backend begins on its own arrives when the tab has asked for nothing, which is
+precisely when there was no subscription to hear it. It is attached when the session is established
+now; both halves have a row that goes red without them.
+
+**K2 is refused, with evidence.** The review read `wasSent` as reporting `false` for a cancelled
+turn. It does not: `wasSent` is false only for `invalidated`, and the terminal policy allows exactly
+two reasons there — `pre-dispatch-rejected` and `side-effect-free-rejection`, both meaning the turn
+never reached the provider. A dispatch that *might* have landed is `indeterminate`, which reports
+true, and a cancelled turn already has a row asserting `wasSent: true`. Nothing changed; the backlog
+records it as refuted rather than quietly dropped.
+
+**S2.** The D7 path redaction listed `/Users`, `/Volumes`, `/private`, `/tmp`, `/var` and Windows
+drive letters — macOS and Windows. On Linux a home directory went into the debug log verbatim,
+usually through a CLI's own stderr. `/home`, `/root`, `/opt`, `/srv`, `/mnt`, `/media`, `/etc` and
+`/usr` are redacted too now. The row keeps the error word and drops the paths, because a log that
+redacts the message as well is a log nobody can debug from.
+
+Gates: unit 477 suites / 7,666 tests, integration 5 suites / 145 tests, typecheck, `eslint`, and
+`build:release` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

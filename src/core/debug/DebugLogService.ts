@@ -54,7 +54,14 @@ function redactSensitiveText(value: string): string {
   return truncate(value)
     .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[redacted-email]')
     .replace(/\b(?:sk|rk|pk|api|key|token)[-_][A-Za-z0-9._-]{8,}\b/gi, '[redacted-secret]')
-    .replace(/(?:\/(?:Users|Volumes|private|tmp|var)\/|[A-Za-z]:\\)[^\s"'`]+/g, '[redacted-path]');
+    // D7 forbids absolute paths outside the vault. The list used to be
+    // macOS-and-Windows — `/Users`, `/Volumes`, `/private`, `/tmp`, `/var` — so
+    // on Linux a home directory went into the log verbatim, most often through
+    // a CLI's own stderr.
+    .replace(
+      /(?:\/(?:Users|Volumes|private|tmp|var|home|root|opt|srv|mnt|media|etc|usr)\/|[A-Za-z]:\\)[^\s"'`]+/g,
+      '[redacted-path]',
+    );
 }
 
 function sanitizeIdentifier(value: string, fallback: string): string {
