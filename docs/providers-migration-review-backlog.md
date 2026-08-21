@@ -224,6 +224,93 @@ Two clusters, and they are not the same kind of problem:
 
 The Minor list is long but ordinary: dead exports the flips were supposed to take with them, duplicated helpers, unlocalized strings, two fixture files carrying `/home/m5/...` paths (QA-1, QA-2 — worth doing early, they leak a username on every wire-gate run).
 
+### Minor
+
+Carried over in full, because the report they came from is a temporary file. `✅` is closed.
+
+Kernel/persistence:
+- KER-5 [M][bug] Codex + Claude compositions never release per-tab `onSettled` subscriptions at tab close (only at plugin dispose); Grok/OpenCode do release — parity drift. `src/app/execution/codex/CodexExecutionComposition.ts:327-331,307-310`; `src/app/execution/claude/ClaudeExecutionComposition.ts:252,345-350`.
+- KER-6 [M][bug] `startRun` adds runId to `session.knownRunIds` before `commitWrites`; failed commit leaves phantom id. `ExecutionLifecycleRegistry.ts:412-416`.
+- KER-7 [M][parity] Tab-scope-owned session (created before conversation binds) never matches D4 conversation-owner deletion; owner immutable in schema. `ClaudeExecutionComposition.ts:334` (same fallback in all compositions).
+- KER-8 [M][hygiene] `LocalShellBackend.ts:472-515` duplicates `ExecutionEventQueue.ts` verbatim as `AsyncEventQueue`.
+
+Core platform:
+- CORE-1 [M][tests] `executionCompositionBoundaries.test.ts:100-111` specifier regex misses side-effect `import '...'` and double-quoted specifiers (AST walker in moduleReachability handles both). Reuse walker.
+- CORE-2 [M][hygiene] `src/core/mcp/McpTester.ts:269,303` uses `window.setTimeout` in core.
+- CORE-3 [M][hygiene] two YAML stacks: `utils/frontmatter.ts` vs `utils/yamlFrontmatter.ts`.
+- CORE-4 [M][hygiene] 28 repo-wide copies of `isRecord`.
+- CORE-5 [M][hygiene] `src/app/settings/defaultSettings.ts:52` hard-codes 'codex' instead of DEFAULT_CHAT_PROVIDER_ID.
+- CORE-6 [M][architecture] `GrimoireSettingsStorage.ts:26-37,421-432` hard-codes three providers for legacy migration; should not survive M3 unnamed.
+- CORE-7 [M][architecture] `src/core/context/VaultTextIndex.ts:1,19` vault calls outside the sanctioned storage adapter directory.
+- CORE-8 [M][security] `ApprovalManager.ts:111` prefix match without boundary for non-bash/file tools: rule `{"a":"` matches any input starting `{"a":"`. User-authored rules only; defaults fail closed.
+
+Claude:
+- CLA-3 [M][bug] `CCSettingsStorage.ts:46` unguarded `JSON.parse` in `load()` (save() tolerates corrupt); corrupt `.claude/settings.json` breaks every permission read/write.
+- CLA-4 [M][hygiene] `ClaudeExecutionBackend.ts:400-403` dead conditional (`if terminal return evidence; return evidence`).
+- CLA-5 [M][bug] `ClaudeExecutionBackend.ts:1521-1524` `handleConnectionLost` discards `_error`; cause never reaches run event.
+- CLA-6 [M][hygiene] `runAuxiliaryQuery`/`ClaudeAuxiliaryQuery` production code wired to always-throwing resolver (M5 seam; mark as such).
+- CLA-7 [M][architecture] `VaultFileAdapter.ts:34-37` plain writes + unsynchronized read-modify-write of `.claude/settings.json` (crash/race can corrupt); pre-existing, shared.
+
+Codex:
+- CX-1 ✅ [M][hygiene] `CodexSessionFileTail.ts` 792-line legacy JSONL tail parser, zero importers in src/; flip manifest said it would die with the legacy runtime.
+- CX-2 [M][docs] `codex/AGENTS.md:30` says enabled defaults false; `settings.ts:43` defaults true (pinned by test).
+- CX-3 [M][bug] `CodexAuxQueryRunner.ts:40` restarts only when process/transport are null; after process death both non-null → inline-edit/refine fail on every later call until reload.
+- CX-4 [M][hygiene] `CodexNotificationRouter.ts:80` `seenWebSearchIds` never cleared (unbounded growth).
+- CX-5 [M][hygiene] `CodexExecutionConnection.ts:151` only first registered `onServerRequest` handler dispatched.
+- CX-6 [M][hygiene] `CodexExecutionRequests.ts:224-226` `sandboxPolicyFor` evaluated twice per resolve.
+- Tracked unchanged (not new): result-reference→turn provenance (M5); six unmodelled notifications pinned (no growth); scratch-dir release still next-turn; steering now REAL through kernel (improved); plan-turn-silent-success still open.
+
+Grok:
+- GK-1 ✅ [M][bug] `GrokExecutionComposition.ts:496-507` `syncConversation` never removes old conversation's entries from `writeApprovers`/`surfaceReaders`/`sessionPaths`/`questionAskers`; `ownedSessions` only grows; late-settling run from previous conversation resolves against NEW session's directory.
+- GK-2 ✅ [M][hygiene] `grokSubagentNormalization.ts:247-277` `normalizeGrokSubagentExtensionNotification` production-dead (consumer was deleted runtime) — G1 defect class.
+- GK-3 [M][hygiene] `GrokHistoryStore.ts:274-323` ~130 lines test-only mapping code.
+- GK-4 [M][hygiene] `GrokSessionNotifications.ts:59-68` test-only predicates (one is the wrong-shape test the wire gate forbids).
+- GK-5 ✅ [M][hygiene] `modes.ts:77-79` `isManagedGrokModeId` no production caller.
+- GK-6 [M][docs] `GrokExecutionRequests.ts:30,33` stale OpenCode-template JSDoc ("grok acp" launch wording, "the other two").
+- GK-7 [M][parity] mirror dedup suppresses only adjacent copies (`GrokSessionNotificationMirrorDeduplicator.ts:19-31`); honest comment; fingerprint LRU if delayed mirrors appear.
+
+ACP/OpenCode:
+- ACP-1 [M][parity] actionable `AcpSpawnError` wording discarded on flipped path: run finishes `failed/spawn-failed`, surface shows only generic "could not start the provider process"; sentence reaches neither user nor debug log. `ManagedAcpExecutionBackend.ts:899-906`.
+- ACP-2 ✅ [M][bug] connection lost BEFORE first dispatch (attempt 0) skips retry (`attempt === 1` only) → `indeterminate/effects-unknown` for a turn that never dispatched; should be `pre-dispatch-rejected` sideEffectFree (or retry). `ManagedAcpExecutionBackend.ts:599-636`. Fix before next providers flip onto the kernel.
+- ACP-3 [M][parity] `limit: 0` semantics differ: aux runner returns whole file (falsy check) vs shared delegate zero lines. `OpencodeAuxQueryRunner.ts:303` vs `AcpWorkspaceFileSystem.ts:44`.
+- ACP-4 [M][hygiene] `OpencodeAuxQueryRunner` duplicates shared `ManagedAcpAuxiliaryQuery`; up to 3 idle `opencode acp` processes; M5-fenced.
+- ACP-5 [M][security] `AcpSqliteReader.ts:154-176` sqlite3 CLI fallback interpolates params with manual escaping instead of binding (primary node:sqlite path binds correctly; not exploitable today).
+- ACP-6 [M][hygiene] `AcpJsonRpcTransport.ts:392-397` write() return ignored, no drain handling (bounded in practice).
+
+MiMo/Kimi:
+- MK-2 [M][bug] `MimocodeRuntimeCommandLoader.ts:53-60` (+Kimi twin, +`MimocodeChatRuntime.ts:603`) `ensureReady` can reject on spawn failure through slash-menu warmup; OpenCode's flipped loader catches → `[]`.
+- MK-3 [M][parity] MiMo/Kimi loaders reuse a session-less tab runtime and create warmup ACP session on it (`:memory:` DB override); OpenCode gates on existing session + isolated metadata ask.
+- MK-4 [M][parity] model-metadata warmup spins throwaway legacy ChatRuntime with `:memory:` DB (expected pre-flip; port at flip).
+- MK-5 [M][tests] Kimi has no `KimicodeAcpLaunch.test.ts` counterpart (Windows-path coverage absent).
+- MK-6 [M][hygiene] `sessionCwds` grows unbounded in both runtimes (199,1230,1265 / 194,1200,1235).
+- MK-7 [M][docs] wire recordings: MiMo partial (4 cases), Kimi absent — flip precondition per plan; keep blocking.
+
+Antigravity/Gemini/Qwen (beyond GQ-*):
+- GQ-5 ✅ [M][parity] Gemini never applies selected mode (`applySelectedMode` absent; Plan toggle is a no-op).
+- GQ-6 ✅ [M][hygiene] `AntigravityTranscriptRecovery.ts:19` exported recover fn referenced nowhere.
+- GQ-7 [M][hygiene] `QwenChatRuntime.ts:1081-1100,791-799` duplicates shared approval mappers (same class as MK-1).
+- GQ-8 ✅ [M][hygiene] `AntigravityProviderModule.ts:42-61` duplicated normalizers whose comment says they'd die at the flip; flip shipped, dedup didn't.
+- GQ-9 ✅ [M][hygiene] `antigravity/models.ts:64` `return model === X ? null : null`.
+- GQ-10 ✅ [M][hygiene] `i18n/locales/en.json:423` dead `sessionResumeFailed` copy key (all locales).
+- GQ-11 [M][tests] Gemini suite: no plan/current_mode coverage, no transient-vs-missing load coverage.
+- GQ-12 [M][hygiene] `AntigravityCliResolver.ts:48-57` redundant double resolution chain.
+
+Features/shared:
+- FE-1 [M][hygiene] hardcoded English strings bypassing `t()`: `StreamController.ts:264,274` ('Blocked'/'Notice', '❌ **Error:**', '**Error:**', 'Interrupted · …'), `InputController.ts:603,641,758`, `Tab.ts:1756` ('New Chat' default title).
+- FE-2 [M][architecture] `SubagentManager.ts:83` defaults `taskResultInterpreter` to Claude's; rebound per tab; future path skipping bind misinterprets. Make required.
+- FE-3 [M][hygiene] `ConversationController.ts:952-956` unknown-provider dot color falls back to Claude's CSS var.
+- FE-4 [M][hygiene] `ExecutionChatRuntimeAdapter.ts:1061` stale cast `(runId: unknown) => void` re-imports the K1/R6-removed shape (field typed correctly at :1186).
+- FE-5 [M][hygiene] `Tab.ts:1737`, `tabProviderUI.ts:361` floating cleanup promises.
+
+Style/i18n/release:
+- ST-1 [M][hygiene] ~19 dead CSS selectors across `settings/env-snippets.css`, `components/header.css`, `settings/base.css`, `mcp-settings.css`, `base/container.css`, `features/file-context.css`, `features/ask-user-question.css` + mirrors in `accessibility.css:24-28` (zero TS references).
+- ST-2 [M][hygiene] `lockfile-age-exceptions.json` all 42 entries expired 2026-08-06..11; nothing prunes/warns.
+- ST-3 [M][parity] `ja.json` 14 values byte-identical to English (several translatable); de.json 41 (mostly cognates).
+
+Tests/QA:
+- QA-1 ✅ [M][hygiene] `tests/fixtures/provider-traces/wire/grok-wire.json:457+` dozens of unredacted `/home/m5/...` absolute paths in tool payloads; leaks username; wire gate replays it every run. Extend the "no content, only shape" test to assert no home paths.
+- QA-2 ✅ [M][hygiene] `mimocode-wire.json:6` real home path in transport metadata.
+
 ### Prior reviews
 
 Both confirmed closed by this round, with three residues filed as Minor: FE-4 (a stale cast left where K1's shape was removed), ACP-1 (the spawn wording still not reaching a surface), and KER-3 as the restart-shaped caveat on C1. K2 remains refuted, and the reviewers agreed.
