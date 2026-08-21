@@ -344,6 +344,38 @@ describe('QueryOptionsBuilder', () => {
       expect(options.allowDangerouslySkipPermissions).toBe(true);
     });
 
+    it('carries the bypass consent in every mode, and bypasses in only one', () => {
+      // The consent gate is set even in the modes that ask, because the CLI
+      // refuses `setPermissionMode('bypassPermissions')` on a session that was
+      // not launched with it — so a query started in normal mode could never be
+      // switched to full access without restarting the process. Tightening this
+      // to "only where it is used" breaks the toolbar switch at the moment
+      // somebody uses it, and nothing else in the suite would notice.
+      const modes = ['normal', 'plan', 'full_access'] as const;
+      const resolved = modes.map(permissionMode => {
+        const options = QueryOptionsBuilder.buildPersistentQueryOptions({
+          ...createMockContext({
+            settings: createMockSettings({ permissionMode }),
+          }),
+          abortController: new AbortController(),
+          hooks: {},
+        });
+        return {
+          permissionMode,
+          consented: options.allowDangerouslySkipPermissions,
+          sdkMode: options.permissionMode,
+        };
+      });
+
+      // And the other side of the trade: one mode reaches bypass, and it is the
+      // one the user picks.
+      expect(resolved).toEqual([
+        { permissionMode: 'normal', consented: true, sdkMode: 'default' },
+        { permissionMode: 'plan', consented: true, sdkMode: 'plan' },
+        { permissionMode: 'full_access', consented: true, sdkMode: 'bypassPermissions' },
+      ]);
+    });
+
     it('sets full access mode options correctly', () => {
       const ctx = {
         ...createMockContext(),

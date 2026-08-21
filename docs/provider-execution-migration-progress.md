@@ -4973,6 +4973,34 @@ Obsidian and a scratch vault, not for a developer — 18 rows for Claude, 14 for
 Gates: unit 478 suites / 7,698 tests, integration 5 suites / 145 tests plus four live suites run by
 hand, typecheck, `eslint`, `build:release`.
 
+### The one thing the Claude harness found that was ours (this commit)
+
+Two of the three things the first Claude run turned up were the SDK's, and are written down in that
+matrix. The third was a flag: `allowDangerouslySkipPermissions` is set in **every** permission mode,
+including the ones whose whole purpose is to ask, and the comment justifying it pointed at
+`ClaudeChatRuntime` — deleted at the flip.
+
+Probed rather than reasoned about, because the answer decides whether it is a defect. It is not: the
+CLI refuses `setPermissionMode('bypassPermissions')` on a session that was not launched with the
+flag — *"because the session was not launched with --dangerously-skip-permissions"* — so a query
+started in normal mode could never be switched to full access without restarting the process and
+losing the session. The flag is load-bearing, and tightening it to "only where it is used" would
+break the toolbar switch at the moment somebody used it, with nothing in the suite noticing.
+
+So what changed is the part that was actually wrong: the comment now says why, and a test pins both
+halves of the trade — the consent is carried in all three modes, and `full_access` is the only one
+that reaches `bypassPermissions`. The other side of that safety argument is already enforced
+elsewhere: an agent's own `setMode` suggestion riding an approval is refused in
+`buildPermissionUpdates`, which was S1.
+
+**A flake worth naming rather than waving through:** one run of the unit suite failed
+`GrimoireSettingTab settings hub › renders each top-level tab once and reuses it on later switches`,
+a suite this commit does not touch. It passes in isolation and in two consecutive full runs
+afterwards. Owner: whoever meets the next red on it — if it repeats, it is shared state between
+suites rather than noise.
+
+Gates: unit 478 suites / 7,699 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
