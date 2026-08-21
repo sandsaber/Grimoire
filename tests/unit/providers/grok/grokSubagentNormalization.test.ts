@@ -5,7 +5,6 @@ import {
   extractGrokWaitResult,
   GROK_SUBAGENT_SPAWN_TOOL,
   GROK_SUBAGENT_WAIT_TOOL,
-  normalizeGrokSubagentExtensionNotification,
 } from '@/providers/grok/normalization/grokSubagentNormalization';
 
 describe('grokSubagentNormalization', () => {
@@ -112,29 +111,4 @@ describe('grokSubagentNormalization', () => {
     );
   });
 
-  it('normalizes xAI completion notifications into shared subagent results', () => {
-    expect(normalizeGrokSubagentExtensionNotification({
-      sessionId: 'session-1',
-      update: {
-        output: 'Finished report',
-        status: 'completed',
-        subagent_id: 'agent-1',
-        sessionUpdate: 'subagent_finished',
-      },
-    }, 'session-1')).toEqual({
-      agentId: 'agent-1',
-      result: 'Finished report',
-      status: 'completed',
-      type: 'async_subagent_result',
-    });
-
-    expect(normalizeGrokSubagentExtensionNotification({
-      sessionId: 'other-session',
-      update: {
-        status: 'completed',
-        subagent_id: 'agent-1',
-        sessionUpdate: 'subagent_finished',
-      },
-    }, 'session-1')).toBeNull();
-  });
 });

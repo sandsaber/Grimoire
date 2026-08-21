@@ -1,5 +1,5 @@
 import type { ProviderSubagentLifecycleAdapter } from '../../../core/providers/types';
-import type { StreamChunk, SubagentInfo, ToolCallInfo } from '../../../core/types';
+import type { SubagentInfo, ToolCallInfo } from '../../../core/types';
 
 export const GROK_SUBAGENT_SPAWN_TOOL = 'spawn_subagent';
 export const GROK_SUBAGENT_WAIT_TOOL = 'get_command_or_subagent_output';
@@ -241,38 +241,6 @@ export function buildGrokSubagentInfo(
     status: completion.status,
     toolCalls: [],
     ...(spawnResult.agentId ? { agentId: spawnResult.agentId } : {}),
-  };
-}
-
-export function normalizeGrokSubagentExtensionNotification(
-  params: unknown,
-  activeSessionId: string | null,
-): Extract<StreamChunk, { type: 'async_subagent_result' }> | null {
-  if (!activeSessionId || !isRecord(params)) return null;
-  const sessionId = firstString(params.sessionId, params.session_id);
-  if (sessionId !== activeSessionId || !isRecord(params.update)) return null;
-
-  const update = params.update;
-  if (update.sessionUpdate !== 'subagent_finished') return null;
-
-  const agentId = firstString(update.subagent_id, update.subagentId);
-  const rawStatus = firstString(update.status)?.toLowerCase();
-  if (!agentId || !rawStatus) return null;
-
-  const status = rawStatus === 'completed' || rawStatus === 'success'
-    ? 'completed'
-    : rawStatus === 'error' || rawStatus === 'failed' || rawStatus === 'cancelled' || rawStatus === 'canceled'
-      ? 'error'
-      : null;
-  if (!status) return null;
-
-  return {
-    agentId,
-    ...(firstString(update.output, update.result, update.error) !== undefined
-      ? { result: firstString(update.output, update.result, update.error) }
-      : {}),
-    status,
-    type: 'async_subagent_result',
   };
 }
 

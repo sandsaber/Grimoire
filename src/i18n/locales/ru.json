@@ -420,7 +420,6 @@
           "startFailed": "Не удалось запустить {provider}. Проверьте путь к CLI и состояние входа.",
           "notReady": "Среда выполнения {provider} не готова.",
           "sessionCreateFailed": "Не удалось создать сеанс для {provider}.",
-          "sessionResumeFailed": "Не удалось возобновить предыдущий сеанс {provider}. Запускается новый; история в Grimoire сохранена.",
           "emptyResponse": "{provider} завершил работу без ответа. Проверьте учётные данные и журналы провайдера, затем повторите попытку.",
           "requestFailed": "Сбой запроса к {provider}",
           "antigravityDisabled": "Antigravity отключён. Включите его в настройках провайдера.",

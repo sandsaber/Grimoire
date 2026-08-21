@@ -735,12 +735,6 @@ export const ORPHANED_MODULES: OrphanRecord[] = [
     owner: 'Product decision — never wired; keep or delete outside the migration.',
   },
   {
-    module: 'src/providers/codex/runtime/CodexSessionFileTail.ts',
-    reason:
-      'Legacy Codex session-JSONL tail parser, 792 lines, superseded by the app-server notification stream in CodexNotificationRouter.ts, which is where token usage and context windows come from today.',
-    owner: 'M2-flips (Codex) — deleted with the legacy Codex chat runtime.',
-  },
-  {
     module: 'src/i18n/constants.ts',
     reason:
       'Locale metadata for staged i18n work that has no production consumer on this branch.',

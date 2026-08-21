@@ -420,7 +420,6 @@
           "startFailed": "{provider} を開始できませんでした。CLI のパスとログイン状態を確認してください。",
           "notReady": "{provider} ランタイムの準備ができていません。",
           "sessionCreateFailed": "{provider} のセッションを作成できませんでした。",
-          "sessionResumeFailed": "以前の {provider} セッションを再開できませんでした。新しいセッションを開始します。Grimoire の履歴は保持されます。",
           "emptyResponse": "{provider} は応答を返さずに完了しました。プロバイダーの認証情報とログを確認してから再試行してください。",
           "requestFailed": "{provider} リクエストに失敗しました",
           "antigravityDisabled": "Antigravity は無効です。プロバイダー設定で有効にしてください。",

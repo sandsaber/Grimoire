@@ -61,7 +61,9 @@ export function encodeAntigravityModelId(rawModelId: string): string {
 
 export function decodeAntigravityModelId(model: string): string | null {
   if (!model.startsWith(ANTIGRAVITY_MODEL_PREFIX)) {
-    return model === ANTIGRAVITY_SYNTHETIC_MODEL_ID ? null : null;
+    // Both branches of the ternary that was here answered `null`; the synthetic
+    // id is not prefixed either, so it lands in exactly the same place.
+    return null;
   }
 
   const rawModelId = normalizeAntigravityModelSelector(model.slice(ANTIGRAVITY_MODEL_PREFIX.length));

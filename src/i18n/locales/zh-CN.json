@@ -420,7 +420,6 @@
           "startFailed": "无法启动 {provider}。请检查 CLI 路径和登录状态。",
           "notReady": "{provider} 运行时尚未就绪。",
           "sessionCreateFailed": "无法为 {provider} 创建会话。",
-          "sessionResumeFailed": "无法恢复之前的 {provider} 会话。将开始新会话；Grimoire 中的聊天记录会保留。",
           "emptyResponse": "{provider} 已完成，但没有返回响应。请检查供应商凭据和日志，然后重试。",
           "requestFailed": "{provider} 请求失败",
           "antigravityDisabled": "Antigravity 已禁用。请在供应商设置中启用它。",

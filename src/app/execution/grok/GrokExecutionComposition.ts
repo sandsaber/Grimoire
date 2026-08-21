@@ -340,6 +340,25 @@ export class GrokExecution {
     let sessionDirPath: string | null = null;
     let workspacePath: string | null = null;
     const ownedSessions = new Set<string>();
+    /**
+     * Lets go of every native session this tab registered callbacks for.
+     *
+     * Called when the tab closes, and when it moves to another conversation.
+     * The second is the one that was missing: the callbacks read *this tab's*
+     * current state, so an entry left behind under the previous conversation's
+     * session id answered a late-settling run of that conversation with the new
+     * conversation's session directory — and approved its writes with the new
+     * conversation's callback.
+     */
+    const releaseOwnedSessions = (): void => {
+      for (const sessionId of ownedSessions) {
+        this.writeApprovers.delete(sessionId);
+        this.surfaceReaders.delete(sessionId);
+        this.sessionPaths.delete(sessionId);
+        this.questionAskers.delete(sessionId);
+      }
+      ownedSessions.clear();
+    };
     let sawTurnCost = false;
     const boundConversation = (): BoundConversation | null => conversation;
     // Minted once, and only used while no conversation is bound: a fallback
@@ -499,6 +518,7 @@ export class GrokExecution {
           // previous one was set to says nothing about this one.
           content.forgetConversation();
           sessionConfig.forgetSession();
+          releaseOwnedSessions();
           sessionCommands = [];
           sessionDirPath = null;
           workspacePath = null;
@@ -580,13 +600,7 @@ export class GrokExecution {
         presenter.dismissAll();
         releaseSettled();
         this.presenters.delete(presenter);
-        for (const sessionId of ownedSessions) {
-          this.writeApprovers.delete(sessionId);
-          this.surfaceReaders.delete(sessionId);
-          this.sessionPaths.delete(sessionId);
-          this.questionAskers.delete(sessionId);
-        }
-        ownedSessions.clear();
+        releaseOwnedSessions();
       },
     );
     adapter = runtime;

@@ -420,7 +420,6 @@
           "startFailed": "無法啟動 {provider}。請檢查 CLI 路徑和登入狀態。",
           "notReady": "{provider} 執行階段尚未就緒。",
           "sessionCreateFailed": "無法為 {provider} 建立工作階段。",
-          "sessionResumeFailed": "無法還原先前的 {provider} 工作階段。將開始新工作階段；Grimoire 中的對話紀錄會保留。",
           "emptyResponse": "{provider} 已完成，但未傳回回應。請檢查提供者憑證和日誌，然後重試。",
           "requestFailed": "{provider} 請求失敗",
           "antigravityDisabled": "Antigravity 已停用。請在供應商設定中啟用它。",

@@ -451,6 +451,32 @@ describe('Grok execution composition', () => {
     await host.dispose();
   });
 
+  it('lets go of a conversation\'s sessions when the tab moves to another', async () => {
+    // The callbacks registered per native session read *this tab's* current
+    // state. Left behind when the tab moved on, an entry under the previous
+    // conversation's session id answered a late-settling run of that
+    // conversation with the new conversation's session directory — and would
+    // have put its question to the new conversation's user.
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+    runtime.setAskUserQuestionCallback(async () => ({ 'anyone?': 'yes' }));
+    runtime.syncConversationState(
+      { id: 'conversation-1', providerState: {}, sessionId: null } as never,
+    );
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    runtime.syncConversationState(
+      { id: 'conversation-2', providerState: {}, sessionId: null } as never,
+    );
+
+    await expect((execution as any).askUserQuestion({
+      questions: [{ multiSelect: false, options: [], question: 'anyone?' }],
+      sessionId: 'grok-session',
+    })).resolves.toEqual({ outcome: 'cancelled' });
+    execution.dispose();
+    await host.dispose();
+  });
+
   it('cancels a question whose session belongs to no open tab', async () => {
     const { execution, host } = await createHarness();
 

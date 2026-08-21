@@ -832,6 +832,30 @@ describe('OpencodeExecutionBackend', () => {
     expectTerminal(await events, 'indeterminate', 'cancellation-unknown');
   });
 
+   
+  it('reports a turn the transport died before sending as one that never ran', async () => {
+    // A connection lost before the first dispatch used to reconcile — asking a
+    // provider what became of a run it never received — and the answer to that
+    // question is `unknown`, so the turn ended `indeterminate`: "Grimoire could
+    // not establish what this run changed", about a run that changed nothing
+    // because it was never sent.
+    let fixture!: ReturnType<typeof createFixture>;
+    fixture = createFixture({
+      reconciliation: { kind: 'unknown', effectsPossible: true },
+      // The window this row is about: the session is bound and the turn has not
+      // been sent. Losing the transport here reaches the recovery path with an
+      // attempt number of zero, which is the case it had no branch for.
+      dynamicApply: async () => {
+        fixture.client.loseConnection();
+      },
+    });
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+
+    expectTerminal(await events, 'invalidated', 'pre-dispatch-rejected');
+    expect(fixture.client.promptRequests).toHaveLength(0);
+  });
+
   // eslint-disable-next-line jest/expect-expect -- expectTerminal owns the assertion.
   it('names an uninstalled CLI as one, rather than as a session that may be gone', async () => {
     // Every ACP provider words `pre-dispatch-rejected` as a saved session that
@@ -1081,7 +1105,12 @@ class FakeManagedAcpClient implements ManagedAcpClient {
   loseConnection(): void {
     const error = new Error('transport closed');
     for (const listener of this.lossListeners) listener(error);
-    this.promptCompletion.reject(error);
+    // Only when a turn is actually in flight. Rejecting a prompt nobody asked
+    // for leaves a rejection with no handler, which takes the whole run down —
+    // and a transport dying before the first dispatch is a real case.
+    if (this.promptRequests.length > 0) {
+      this.promptCompletion.reject(error);
+    }
   }
   requestPermission(request: AcpRequestPermissionRequest) {
     if (!this.permissionHandler) throw new Error('No permission handler.');

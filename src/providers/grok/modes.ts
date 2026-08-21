@@ -30,12 +30,6 @@ export const GROK_FALLBACK_MODES: ReadonlyArray<GrokMode> = Object.freeze([
   },
 ]);
 
-const GROK_MANAGED_MODE_IDS = new Set([
-  GROK_BUILD_MODE_ID,
-  GROK_LEGACY_YOLO_MODE_ID,
-  ...GROK_FALLBACK_MODES.map((mode) => mode.id),
-]);
-
 export function normalizeGrokAvailableModes(value: unknown): GrokMode[] {
   if (!Array.isArray(value)) {
     return [];
@@ -72,10 +66,6 @@ export function normalizeGrokAvailableModes(value: unknown): GrokMode[] {
 
 export function getEffectiveGrokModes(modes: GrokMode[]): GrokMode[] {
   return modes.length > 0 ? modes : [...GROK_FALLBACK_MODES];
-}
-
-export function isManagedGrokModeId(value: string): boolean {
-  return GROK_MANAGED_MODE_IDS.has(value);
 }
 
 export function getManagedGrokModes(modes: GrokMode[]): GrokMode[] {

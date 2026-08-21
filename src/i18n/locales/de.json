@@ -420,7 +420,6 @@
           "startFailed": "Start von {provider} fehlgeschlagen. Prüfe CLI-Pfad und Anmeldestatus.",
           "notReady": "{provider}-Laufzeit ist nicht bereit.",
           "sessionCreateFailed": "Sitzung für {provider} konnte nicht erstellt werden.",
-          "sessionResumeFailed": "Vorherige {provider}-Sitzung konnte nicht fortgesetzt werden. Es wird eine neue gestartet; der Chatverlauf in Grimoire bleibt erhalten.",
           "emptyResponse": "{provider} wurde ohne Antwort beendet. Prüfe die Provider-Anmeldedaten und Protokolle und versuche es erneut.",
           "requestFailed": "Anfrage an {provider} fehlgeschlagen",
           "antigravityDisabled": "Antigravity ist deaktiviert. Aktiviere es in den Anbietereinstellungen.",

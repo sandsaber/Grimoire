@@ -15,26 +15,6 @@ export function createAntigravityPrintLogPath(): string {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   return path.join(os.tmpdir(), `grimoire-antigravity-print-${suffix}.log`);
 }
-
-export async function recoverAntigravityPrintOutputFromTranscript(
-  logFilePath: string,
-  runtimeEnv: NodeJS.ProcessEnv,
-): Promise<string> {
-  const logText = await fs.readFile(logFilePath, 'utf8').catch(() => '');
-  const locations = resolveTranscriptLocations(logText, runtimeEnv);
-  if (!locations) {
-    return '';
-  }
-  for (const transcriptPath of locations) {
-    const transcriptText = await fs.readFile(transcriptPath, 'utf8').catch(() => '');
-    const content = extractLastAntigravityModelContent(transcriptText, false).output;
-    if (content) {
-      return content;
-    }
-  }
-  return '';
-}
-
 export async function recoverAntigravityPrintTranscriptBounded(
   logFilePath: string,
   runtimeEnv: NodeJS.ProcessEnv,

@@ -420,7 +420,6 @@
           "startFailed": "Failed to start {provider}. Check the CLI path and login state.",
           "notReady": "{provider} runtime is not ready.",
           "sessionCreateFailed": "Failed to create a session for {provider}.",
-          "sessionResumeFailed": "Could not resume the previous {provider} session. Starting a new one; chat history in Grimoire is kept.",
           "emptyResponse": "{provider} completed without returning a response. Check provider credentials and logs, then retry.",
           "requestFailed": "{provider} request failed",
           "antigravityDisabled": "Antigravity is disabled. Enable it in provider settings.",

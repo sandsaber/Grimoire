@@ -603,6 +603,16 @@ class ManagedAcpExecutionSession implements ExecutionSession {
     attempt: number,
   ): Promise<void> {
     if (!run.claimRecovery(attempt)) return;
+    if (!run.hasDispatched) {
+      // The connection died before this turn was ever sent. Reconciling would
+      // ask a provider what became of a run it never received, and the honest
+      // answer to that is not `indeterminate` — it is that nothing ran. The
+      // client is closed below by the same path, so the next turn launches a
+      // process rather than dispatching into a dead one.
+      await this.closeClient();
+      run.rejectBeforeDispatch();
+      return;
+    }
     if (!run.sawObservableActivity && attempt === 1) {
       try {
         const termination = await this.closeClient();
@@ -882,6 +892,7 @@ class ManagedAcpExecutionRun implements ExecutionRun {
 
   get isTerminal(): boolean { return this.terminal; }
   get sawObservableActivity(): boolean { return this.observedProviderActivity; }
+  get hasDispatched(): boolean { return this.dispatched; }
   get currentAttempt(): number { return this.attempt; }
   get nativeSessionRef(): string | undefined { return this.sessionRef; }
 

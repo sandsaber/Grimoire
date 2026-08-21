@@ -420,7 +420,6 @@
           "startFailed": "No se pudo iniciar {provider}. Comprueba la ruta de la CLI y el estado de inicio de sesión.",
           "notReady": "El entorno de ejecución de {provider} no está listo.",
           "sessionCreateFailed": "No se pudo crear una sesión para {provider}.",
-          "sessionResumeFailed": "No se pudo reanudar la sesión anterior de {provider}. Se inicia una nueva; el historial en Grimoire se conserva.",
           "emptyResponse": "{provider} terminó sin devolver una respuesta. Comprueba las credenciales y los registros del proveedor e inténtalo de nuevo.",
           "requestFailed": "Falló la solicitud a {provider}",
           "antigravityDisabled": "Antigravity está desactivado. Actívalo en la configuración del proveedor.",

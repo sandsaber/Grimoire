@@ -19,6 +19,7 @@ import {
   DEFAULT_ANTIGRAVITY_PROVIDER_SETTINGS,
   normalizeAntigravityModelAliases,
   normalizeAntigravityVisibleModels,
+  normalizeHostnameCliPaths,
 } from './settings';
 
 /**
@@ -41,24 +42,13 @@ import {
 
 /**
  * Normalizers this module needs that the provider's settings module does not
- * export yet.
+ * export.
  *
- * v1 added them to `settings.ts` and rewired the two existing accessors to use
- * them. That is a production change, and this milestone's exit gate says
- * production is untouched — the byte-identical release build is what makes the
- * claim checkable. They live here until the Antigravity flip, when the module
- * becomes the settings authority and the legacy accessors go away.
+ * `normalizeHostnameCliPaths` used to be here too, with the note that it lived
+ * here "until the Antigravity flip, when the module becomes the settings
+ * authority". The flip shipped; it is imported from `settings.ts` now, which is
+ * where one rule with two implementations belongs.
  */
-function normalizeHostnameCliPaths(value: unknown): Record<string, string> {
-  if (!isRecord(value)) {
-    return {};
-  }
-  return Object.fromEntries(
-    Object.entries(value)
-      .filter(([host, cliPath]) => host.trim() !== '' && typeof cliPath === 'string')
-      .map(([host, cliPath]) => [host, (cliPath as string).trim()]),
-  );
-}
 
 function normalizeCustomModels(value: unknown): string {
   return typeof value === 'string' ? value : '';
