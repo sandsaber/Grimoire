@@ -222,6 +222,7 @@ export class ExecutionLifecycleRegistry {
   >();
   private readonly eventTasks = new Set<Promise<void>>();
   private readonly admissionWaiters = new Set<() => void>();
+  private readonly ownerQueues = new Map<string, Promise<void>>();
   private state: RegistryState = 'initializing';
   private migrationRequired: UnreadableControlRecordError | null = null;
   private activeAdmissions = 0;
@@ -317,6 +318,13 @@ export class ExecutionLifecycleRegistry {
   }
 
   async createSession(command: CreateExecutionSessionCommand): Promise<ExecutionSessionId> {
+    requireOwner(command.owner);
+    return this.enqueueOwner(command.owner, () => this.createSessionUnlocked(command));
+  }
+
+  private async createSessionUnlocked(
+    command: CreateExecutionSessionCommand,
+  ): Promise<ExecutionSessionId> {
     const releaseAdmission = this.beginAdmission();
     try {
       const backend = this.requireBackend(command.backendId);
@@ -1081,8 +1089,22 @@ export class ExecutionLifecycleRegistry {
    * transaction, so a deletion that stopped half-way is finished at the next
    * start instead of leaving a session gone with its runs behind.
    */
+  /**
+   * Removes everything an owner has, once nothing is still creating it.
+   *
+   * Serialized against `createSession` for the same owner, because a creation
+   * in flight is work this delete cannot see: a session registers only after
+   * its provider answers, so a conversation deleted during its first session
+   * creation either missed a record that did not exist yet, or removed the
+   * records of a session that went on to register — live, holding a provider
+   * process, owned by a conversation that no longer exists.
+   */
   async deleteOwnedRecords(owner: ExecutionOwner): Promise<void> {
     requireOwner(owner);
+    return this.enqueueOwner(owner, () => this.deleteOwnedRecordsUnlocked(owner));
+  }
+
+  private async deleteOwnedRecordsUnlocked(owner: ExecutionOwner): Promise<void> {
     const sessionIds = await this.findSessionsOwnedBy(owner);
     // Closed here rather than demanded of the caller. A conversation is deleted
     // from a surface where cancelling is fire-and-forget and disposal is a void
@@ -1306,20 +1328,45 @@ export class ExecutionLifecycleRegistry {
     }
   }
 
+  /**
+   * Rebuilds what this process needs to hold, and only that.
+   *
+   * C1 bounded the in-memory maps by the tabs that are open — within one
+   * process. A restart went the other way and loaded every run and interaction
+   * of every conversation the vault has ever had, terminal ones included, so a
+   * heavy vault paid for its whole history on every start with no path to let
+   * any of it go until the conversation was deleted.
+   *
+   * What a restart actually needs is the work that is still live, plus whatever
+   * belongs to a session it is about to reopen. A finished run of a session
+   * nobody reopened is neither: its record stays on disk, where deletion and an
+   * honest history read it, and this process reads it again if it is ever
+   * asked.
+   */
   private async loadPersistedControls(): Promise<void> {
     await this.loadPersistedSettingsTransitions();
-    for (const id of await this.repositories.interactions.listRecordIds()) {
-      const current = await requireCurrent(this.repositories.interactions.read(id));
-      const typedId = interactionId(current.payload.interactionId);
-      this.interactions.set(typedId, {
-        record: current.payload,
+    const reopening = await this.findReopeningSessionIds();
+    const kept = new Set<string>();
+    for (const id of await this.repositories.runs.listRecordIds()) {
+      const current = await requireCurrent(this.repositories.runs.read(id));
+      const record = current.payload;
+      if (record.terminal && !reopening.has(record.executionSessionId)) {
+        continue;
+      }
+      kept.add(record.runId);
+      this.runs.set(runId(record.runId), {
+        record,
         revision: current.revision,
       });
     }
-    for (const id of await this.repositories.runs.listRecordIds()) {
-      const current = await requireCurrent(this.repositories.runs.read(id));
-      const typedId = runId(current.payload.runId);
-      this.runs.set(typedId, {
+    for (const id of await this.repositories.interactions.listRecordIds()) {
+      const current = await requireCurrent(this.repositories.interactions.read(id));
+      // An interaction belongs to a run; one whose run was left on disk has
+      // nobody who could be shown it.
+      if (!kept.has(current.payload.runId)) {
+        continue;
+      }
+      this.interactions.set(interactionId(current.payload.interactionId), {
         record: current.payload,
         revision: current.revision,
       });
@@ -1398,6 +1445,18 @@ export class ExecutionLifecycleRegistry {
     }
   }
 
+  /** The sessions this start will reopen, read before anything is kept for them. */
+  private async findReopeningSessionIds(): Promise<Set<string>> {
+    const reopening = new Set<string>();
+    for (const id of await this.repositories.sessions.listRecordIds()) {
+      const current = await requireCurrent(this.repositories.sessions.read(id));
+      if (current.payload.status !== 'disposed') {
+        reopening.add(current.payload.executionSessionId);
+      }
+    }
+    return reopening;
+  }
+
   private async loadPersistedSettingsTransitions(): Promise<void> {
     for (const id of await this.repositories.settingsTransitions.listRecordIds()) {
       const current = await requireCurrent(this.repositories.settingsTransitions.read(id));
@@ -1407,6 +1466,11 @@ export class ExecutionLifecycleRegistry {
       }
       if (current.payload.status === 'completed') {
         backend.generation = Math.max(backend.generation, current.payload.toGeneration);
+        // Absorbed into the generation, which is the whole of what a completed
+        // transition carries. Kept, it is read again by every later startup and
+        // rescanned by every terminal that asks whether a backend is quiescent
+        // — D3 retains these only until consumed.
+        await this.repositories.settingsTransitions.removeIfPresent(id);
       } else {
         backend.state = 'draining';
         if (current.payload.status === 'applying') {
@@ -1467,25 +1531,44 @@ export class ExecutionLifecycleRegistry {
     }
   }
 
+  /**
+   * Reads what the last unload left, and then takes it away.
+   *
+   * D3 calls these "purely operational" and retains them "until consumed at
+   * next startup". Consuming without removing is what made one file per unload
+   * accumulate for the life of the vault, each one listed and read in full by
+   * every later startup. A checkpoint that has been read has done its whole
+   * job: the runs it named have been reconciled, and the next unload writes its
+   * own.
+   *
+   * Completed ones are removed too, without being read further — a completed
+   * checkpoint is one a previous startup, or the shutdown itself, already
+   * consumed.
+   */
   private async completeRecoveredShutdownCheckpoints(): Promise<void> {
     for (const id of await this.repositories.shutdownCheckpoints.listRecordIds()) {
       const current = await requireCurrent(this.repositories.shutdownCheckpoints.read(id));
-      if (current.payload.status === 'completed') {
-        continue;
+      if (current.payload.status !== 'completed') {
+        const unresolvedRunIds = current.payload.runIds.filter(id => {
+          const run = this.runs.get(runId(id));
+          // Absent means it was not loaded, and a run is only left on disk when
+          // it is finished and its session is not being reopened. Reading the
+          // absence as "unresolved" would report every old turn of every closed
+          // conversation as work this shutdown could not account for.
+          return run !== undefined && !run.record.terminal;
+        });
+        await this.repositories.shutdownCheckpoints.update(
+          id,
+          current.revision,
+          record => ({
+            ...record,
+            status: 'completed',
+            unresolvedRunIds,
+            completedAt: this.now(),
+          }),
+        );
       }
-      const unresolvedRunIds = current.payload.runIds.filter(id => (
-        !this.runs.get(runId(id))?.record.terminal
-      ));
-      await this.repositories.shutdownCheckpoints.update(
-        id,
-        current.revision,
-        record => ({
-          ...record,
-          status: 'completed',
-          unresolvedRunIds,
-          completedAt: this.now(),
-        }),
-      );
+      await this.repositories.shutdownCheckpoints.removeIfPresent(id);
     }
   }
 
@@ -2399,6 +2482,28 @@ export class ExecutionLifecycleRegistry {
     backend.disposed = true;
     backend.state = 'disposed';
     await backend.backend.dispose();
+  }
+
+  /**
+   * Serializes work that is about one owner rather than one session.
+   *
+   * Only two things are: creating a session for it, and deleting everything it
+   * has. They are exactly the pair that must not interleave.
+   */
+  private enqueueOwner<TResult>(
+    owner: ExecutionOwner,
+    task: () => Promise<TResult>,
+  ): Promise<TResult> {
+    const key = `${owner.kind}:${owner.ownerId}`;
+    const previous = this.ownerQueues.get(key) ?? Promise.resolve();
+    const operation = previous.catch(() => undefined).then(task);
+    const tail = operation.then(() => undefined, () => undefined);
+    this.ownerQueues.set(key, tail);
+    return operation.finally(() => {
+      if (this.ownerQueues.get(key) === tail) {
+        this.ownerQueues.delete(key);
+      }
+    });
   }
 
   private enqueueSession<TResult>(

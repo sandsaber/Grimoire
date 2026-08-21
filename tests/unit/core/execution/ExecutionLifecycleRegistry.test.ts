@@ -817,7 +817,11 @@ describe('ExecutionLifecycleRegistry', () => {
     const created = jest.spyOn(fixture.backend, 'createSession')
       .mockReturnValue(hung.promise);
     const admission = fixture.registry.createSession(sessionCommand());
-    await Promise.resolve();
+    // A few turns, not one: creation is serialized per owner now, so the call
+    // into the provider is a queue hop away rather than a microtask away.
+    for (let turn = 0; turn < 8 && created.mock.calls.length === 0; turn += 1) {
+      await Promise.resolve();
+    }
     expect(created).toHaveBeenCalledTimes(1);
 
     // An admission is held for the whole of `createSession`, provider included.
@@ -922,6 +926,52 @@ describe('ExecutionLifecycleRegistry', () => {
     expect(restored.backend.getRun(RUN_ID)).toBeNull();
   });
 
+  it('does not carry a closed conversation\'s finished turns into the next start', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage);
+    for (const [session, run] of [[SESSION_ID, RUN_ID], [SESSION_ID_2, RUN_ID_2]] as const) {
+      await first.registry.createSession({ ...sessionCommand(), executionSessionId: session });
+      await first.registry.startRun(session, request(run, 'none'));
+      first.backend.emit(run, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, {
+        deliveryId: `terminal-${run}`,
+        destination: 'both',
+      });
+    }
+    await settle(first.registry);
+    // Only the first is closed: a disposed session is one nobody reopens.
+    await first.registry.disposeSession(SESSION_ID);
+
+    const restored = createFixture(storage, { transactionOffset: 5_000, instanceOffset: 50 });
+    await restored.registry.start();
+
+    // The disposed session's finished turn stays on disk — deletion and an
+    // honest history read it — and out of this process, which otherwise paid
+    // for the vault's whole history on every start with no way to let go of it.
+    expect(restored.registry.getRun(RUN_ID)).toBeNull();
+    await expect(restored.repositories.runs.read(RUN_ID))
+      .resolves.toMatchObject({ kind: 'current' });
+    // The session that is still open keeps its own: it is about to be reopened.
+    expect(restored.registry.getRun(RUN_ID_2)).not.toBeNull();
+  });
+
+  it('leaves no checkpoint or completed transition behind across restarts', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage);
+    await startDefaultRun(first);
+    await first.registry.shutdown(`sd-${'d'.repeat(32)}`);
+    const second = createFixture(storage, { transactionOffset: 2_000, instanceOffset: 20 });
+    await second.registry.start();
+    await second.registry.shutdown(`sd-${'e'.repeat(32)}`);
+
+    // Two unloads, two checkpoints written — and at most the last one left,
+    // because a startup consumes what it finds. D3: "consumed at next startup".
+    const third = createFixture(storage, { transactionOffset: 3_000, instanceOffset: 30 });
+    await third.registry.start();
+
+    await expect(third.repositories.shutdownCheckpoints.listRecordIds()).resolves.toEqual([]);
+    await expect(third.repositories.settingsTransitions.listRecordIds()).resolves.toEqual([]);
+  });
+
   it('reconciles an incomplete shutdown checkpoint before accepting restored work', async () => {
     const storage = new TestDurableStorage();
     const first = await startedFixture(storage, { transactionOffset: 0 });
@@ -947,9 +997,12 @@ describe('ExecutionLifecycleRegistry', () => {
       kind: 'interrupted',
       reason: 'recovery-exhausted-safe',
     });
-    expect((await currentRecord(
-      restored.repositories.shutdownCheckpoints.read(checkpointId),
-    )).payload).toMatchObject({ status: 'completed', unresolvedRunIds: [] });
+    // Consumed, which D3 says is the whole of its retention: the runs it named
+    // have been reconciled and the next unload writes its own. Kept, one file
+    // per unload accumulated for the life of the vault, each listed and read in
+    // full by every later startup.
+    await expect(restored.repositories.shutdownCheckpoints.read(checkpointId))
+      .resolves.toMatchObject({ kind: 'absent' });
     await expect(restored.registry.createSession({
       ...sessionCommand(),
       executionSessionId: SESSION_ID_2,
@@ -1119,6 +1172,38 @@ describe('ExecutionLifecycleRegistry — deleting a conversation', () => {
     await expect(fixture.repositories.runs.read(RUN_ID)).resolves.toMatchObject({ kind: 'absent' });
     await expect(fixture.repositories.sessions.read(SESSION_ID))
       .resolves.toMatchObject({ kind: 'absent' });
+  });
+
+  it('does not delete around a session that is still being created', async () => {
+    const fixture = await startedFixture();
+    const opened = deferred<void>();
+    const created = jest.spyOn(fixture.backend, 'createSession');
+    const real = created.getMockImplementation();
+    created.mockImplementation(async config => {
+      // The window the race lived in: a session registers only after its
+      // provider answers, so a delete that ran here saw no session to close and
+      // no records to remove — and the creation went on to register a live one,
+      // holding a provider process, owned by a conversation that no longer
+      // exists.
+      await opened.promise;
+      return (real ?? fixture.backend.constructor.prototype.createSession).call(
+        fixture.backend,
+        config,
+      );
+    });
+
+    const creating = fixture.registry.createSession(sessionCommand());
+    const deleting = fixture.registry.deleteOwnedRecords(OWNER);
+    opened.resolve();
+    await creating;
+    await deleting;
+
+    // Whichever order they ran in, nothing is left half-owned: no session in
+    // the map, and no record naming a conversation that is gone.
+    expect(fixture.registry.getSession(SESSION_ID)).toBeNull();
+    await expect(fixture.repositories.sessions.read(SESSION_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+    created.mockRestore();
   });
 
   it('refuses to remove records a lease still holds', async () => {

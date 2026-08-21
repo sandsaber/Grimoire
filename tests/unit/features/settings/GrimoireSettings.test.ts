@@ -820,7 +820,12 @@ describe('GrimoireSettingTab settings hub', () => {
     const buttons = Array.from<any>(container.querySelectorAll('.grimoire-settings-tab'));
 
     buttons[1].dispatchEvent('click');
-    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    // Waited for rather than slept through. A tab renders behind two nested
+    // `requestAnimationFrame` calls, which the test environment polyfills as
+    // two chained macrotasks — and under a full parallel suite run those do not
+    // reliably land inside a fixed 50ms, so this failed about one run in four
+    // with the render simply not having happened yet.
+    await waitFor(() => providerRender.mock.calls.length === 1);
     buttons[0].dispatchEvent('click');
     buttons[1].dispatchEvent('click');
 
@@ -856,3 +861,12 @@ describe('GrimoireSettingTab settings hub', () => {
     expect(preventDefault).toHaveBeenCalled();
   });
 });
+
+/** Waits for a condition the surface reaches on its own schedule. */
+async function waitFor(predicate: () => boolean, attempts = 200): Promise<void> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (predicate()) return;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error('Condition was not reached.');
+}

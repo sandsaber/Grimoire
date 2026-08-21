@@ -73,6 +73,16 @@ export class VaultDurableStorage implements DurableStorage {
     });
   }
 
+  /**
+   * The records under a prefix, recovering any interrupted write first.
+   *
+   * Recovery is why this cannot be a bare directory listing: a write torn
+   * between the temporary file and the rename leaves the destination missing
+   * and the value in a sibling, so a listing that only looked would report a
+   * record as gone. What it does not need is the *content* — this used to read
+   * every file in full just to decide it existed, which on a heavy vault is the
+   * whole control store read on every startup.
+   */
   async list(prefix: string): Promise<string[]> {
     const files = await this.adapter.listFilesRecursive(prefix);
     const basePaths = new Set(files.map(path => (
@@ -84,7 +94,11 @@ export class VaultDurableStorage implements DurableStorage {
     )));
     const recovered: string[] = [];
     for (const path of [...basePaths].sort()) {
-      if (await this.read(path) !== null) {
+      const present = await this.enqueue(path, async () => {
+        await this.recover(path);
+        return this.adapter.exists(path);
+      });
+      if (present) {
         recovered.push(path);
       }
     }

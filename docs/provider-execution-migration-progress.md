@@ -4997,9 +4997,48 @@ elsewhere: an agent's own `setMode` suggestion riding an approval is refused in
 `GrimoireSettingTab settings hub › renders each top-level tab once and reuses it on later switches`,
 a suite this commit does not touch. It passes in isolation and in two consecutive full runs
 afterwards. Owner: whoever meets the next red on it — if it repeats, it is shared state between
-suites rather than noise.
+suites rather than noise. **It repeated, and the guess above was wrong**: see the KER-2/3/4 entry
+below for what it actually was.
 
 Gates: unit 478 suites / 7,699 tests, typecheck, `eslint`, `build:release`.
+
+### The third review's kernel cluster — KER-2, KER-3, KER-4, and the flake (this commit)
+
+Three lifecycle and growth edges, none of which questions the design. What they had in common is
+the unhappy path: a restart, a sweep, a race.
+
+**KER-2 — consumed and then kept.** D3 retains shutdown checkpoints and settings transitions "until
+consumed at next startup". Startup consumed them and left them, so one file per unload accumulated
+for the life of the vault, each one listed and read in full by every later startup, and every
+terminal rescanned every transition to ask whether a backend was quiescent. Both are removed once
+read now, which bounds the pair at what the last unload wrote.
+
+**KER-3 — C1 was only true within one process.** The maps were bounded by the tabs that are open;
+a restart went the other way and loaded every run and interaction the vault has ever held, terminal
+ones included, with no path to let go of any of it until the conversation was deleted. A start now
+keeps live work plus whatever belongs to a session it is about to reopen, and leaves a finished run
+of a closed conversation on disk — where deletion and an honest history read it. The second half was
+underneath: `VaultDurableStorage.list()` read every file in full to decide it existed, so
+enumerating the control store read the control store. It recovers and probes now, which is what the
+read was actually for.
+
+**KER-4 — a delete could race a session into existence.** A session registers only after its
+provider answers, so a conversation deleted during its first session creation either missed a record
+that did not exist yet, or removed the records of a session that went on to register — live, holding
+a provider process, owned by a conversation that no longer exists. Creation and deletion are the
+only two operations that are about an *owner* rather than a session, and they are exactly the pair
+that must not interleave, so they share a queue now.
+
+**The flake, and a correction.** The settings-hub test that failed once during the previous commit
+failed again, and the note there guessed shared state between suites. That was wrong. A settings tab
+renders behind two nested `requestAnimationFrame` calls, which the test environment polyfills as two
+chained macrotasks; the test waited a fixed 50ms for them. Under a full parallel run those did not
+reliably land inside it, and the render simply had not happened — reproducible in roughly one run in
+four, which is how it was caught. It waits for the render now instead of sleeping through it, and
+five consecutive full runs are clean.
+
+Gates: unit 478 suites / 7,725 tests, integration 5 suites / 145 tests, typecheck, `eslint`,
+`build:release`.
 
 ## Current blocker
 
