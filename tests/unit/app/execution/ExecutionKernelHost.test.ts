@@ -1,7 +1,10 @@
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { EXECUTION_RUNS_PATH } from '@/core/execution/ExecutionControlPaths';
+import {
+  EXECUTION_RUNS_PATH,
+  TRANSACTION_INTENTS_PATH,
+} from '@/core/execution/ExecutionControlPaths';
 import { executionSessionId, sessionInstanceId } from '@/core/execution/ExecutionIds';
 import { DeterministicFakeBackend } from '@/core/execution/testing/DeterministicFakeBackend';
 import type { DurableStorage } from '@/core/persistence/DurableStorage';
@@ -24,6 +27,7 @@ describe('execution kernel host', () => {
   function createHost(storage: DurableStorage = new TestDurableStorage()): {
     host: ExecutionKernelHost;
     failures: unknown[];
+    backend: DeterministicFakeBackend;
   } {
     const failures: unknown[] = [];
     const host = new ExecutionKernelHost({
@@ -31,13 +35,12 @@ describe('execution kernel host', () => {
       scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
       reportShutdownFailure: error => failures.push(error),
     });
-    host.registerBackend({
-      backend: new DeterministicFakeBackend({
-        sessionInstanceIdFactory: () => sessionInstanceId(`si-${'1'.repeat(32)}`),
-        now: () => 1,
-      }),
+    const backend = new DeterministicFakeBackend({
+      sessionInstanceIdFactory: () => sessionInstanceId(`si-${'1'.repeat(32)}`),
+      now: () => 1,
     });
-    return { host, failures };
+    host.registerBackend({ backend });
+    return { host, failures, backend };
   }
 
   /** Storage that holds the first read of startup open until released. */
@@ -225,13 +228,59 @@ describe('execution kernel host', () => {
         payload: { writtenBy: 'a newer build' },
       }),
     );
-    const { host, failures } = createHost(storage);
+    const { host, failures, backend } = createHost(storage);
     await host.start();
 
     await host.dispose();
 
     expect(host.migrationRequirement()?.recordKind).toBe('future');
     expect(failures).toEqual([]);
+    // The gate never opened, so there is no work to cancel and no checkpoint to
+    // write — but the backend was registered before any of that and owns a
+    // provider process. Leaving it running is what a reverted build did on its
+    // first unload, for the life of the application.
+    expect(backend.disposeCount).toBe(1);
+  });
+
+  it('reports a pending intent this build cannot read as a migration, not a crash', async () => {
+    // The record a reverted build actually meets: a newer build wrote a
+    // transaction intent, was interrupted, and the older build now finds it
+    // during startup recovery. Raised as a plain error it fails startup as a
+    // defect — the migration requirement stays null, so nothing can tell the
+    // user why, and no backend is disposed either.
+    const storage = new TestDurableStorage();
+    await storage.writeAtomic(
+      `${TRANSACTION_INTENTS_PATH}/tx-${'4'.repeat(32)}.json`,
+      JSON.stringify({
+        schemaVersion: 99,
+        recordId: `tx-${'4'.repeat(32)}`,
+        revision: 1,
+        updatedAt: 1_000,
+        payload: { writtenBy: 'a newer build' },
+      }),
+    );
+    const { host, failures, backend } = createHost(storage);
+
+    await expect(host.start()).resolves.toBeUndefined();
+
+    expect(host.migrationRequirement()?.recordKind).toBe('future');
+    await host.dispose();
+    expect(failures).toEqual([]);
+    expect(backend.disposeCount).toBe(1);
+  });
+
+  it('says the same about an intent it cannot parse at all', async () => {
+    const storage = new TestDurableStorage();
+    await storage.writeAtomic(
+      `${TRANSACTION_INTENTS_PATH}/tx-${'5'.repeat(32)}.json`,
+      'not json at all',
+    );
+    const { host } = createHost(storage);
+
+    await expect(host.start()).resolves.toBeUndefined();
+
+    expect(host.migrationRequirement()?.recordKind).toBe('corrupt');
+    await host.dispose();
   });
 
   it('writes control records under the decided path once work happens', async () => {

@@ -454,7 +454,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/brainstorming/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/brainstorming/SKILL.md",
                   "bareName": "brainstorming",
                   "qualifiedName": "user:brainstorming"
                 }
@@ -465,7 +465,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/dispatching-parallel-agents/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/dispatching-parallel-agents/SKILL.md",
                   "bareName": "dispatching-parallel-agents",
                   "qualifiedName": "user:dispatching-parallel-agents"
                 }
@@ -476,7 +476,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/executing-plans/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/executing-plans/SKILL.md",
                   "bareName": "executing-plans",
                   "qualifiedName": "user:executing-plans"
                 }
@@ -487,7 +487,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/find-skills/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/find-skills/SKILL.md",
                   "bareName": "find-skills",
                   "qualifiedName": "user:find-skills"
                 }
@@ -498,7 +498,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/finishing-a-development-branch/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/finishing-a-development-branch/SKILL.md",
                   "bareName": "finishing-a-development-branch",
                   "qualifiedName": "user:finishing-a-development-branch"
                 }
@@ -511,7 +511,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/meta-cognition-parallel/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/meta-cognition-parallel/SKILL.md",
                   "bareName": "meta-cognition-parallel",
                   "qualifiedName": "user:meta-cognition-parallel"
                 }
@@ -522,7 +522,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/receiving-code-review/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/receiving-code-review/SKILL.md",
                   "bareName": "receiving-code-review",
                   "qualifiedName": "user:receiving-code-review"
                 }
@@ -533,7 +533,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/requesting-code-review/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/requesting-code-review/SKILL.md",
                   "bareName": "requesting-code-review",
                   "qualifiedName": "user:requesting-code-review"
                 }
@@ -546,7 +546,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-call-graph/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-call-graph/SKILL.md",
                   "bareName": "rust-call-graph",
                   "qualifiedName": "user:rust-call-graph"
                 }
@@ -559,7 +559,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-code-navigator/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-code-navigator/SKILL.md",
                   "bareName": "rust-code-navigator",
                   "qualifiedName": "user:rust-code-navigator"
                 }
@@ -572,7 +572,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-daily/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-daily/SKILL.md",
                   "bareName": "rust-daily",
                   "qualifiedName": "user:rust-daily"
                 }
@@ -585,7 +585,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-deps-visualizer/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-deps-visualizer/SKILL.md",
                   "bareName": "rust-deps-visualizer",
                   "qualifiedName": "user:rust-deps-visualizer"
                 }
@@ -596,7 +596,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-learner/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-learner/SKILL.md",
                   "bareName": "rust-learner",
                   "qualifiedName": "user:rust-learner"
                 }
@@ -609,7 +609,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-refactor-helper/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-refactor-helper/SKILL.md",
                   "bareName": "rust-refactor-helper",
                   "qualifiedName": "user:rust-refactor-helper"
                 }
@@ -620,7 +620,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-router/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-router/SKILL.md",
                   "bareName": "rust-router",
                   "qualifiedName": "user:rust-router"
                 }
@@ -633,7 +633,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-symbol-analyzer/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-symbol-analyzer/SKILL.md",
                   "bareName": "rust-symbol-analyzer",
                   "qualifiedName": "user:rust-symbol-analyzer"
                 }
@@ -646,7 +646,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-trait-explorer/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-trait-explorer/SKILL.md",
                   "bareName": "rust-trait-explorer",
                   "qualifiedName": "user:rust-trait-explorer"
                 }
@@ -657,7 +657,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/subagent-driven-development/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/subagent-driven-development/SKILL.md",
                   "bareName": "subagent-driven-development",
                   "qualifiedName": "user:subagent-driven-development"
                 }
@@ -668,7 +668,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/systematic-debugging/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/systematic-debugging/SKILL.md",
                   "bareName": "systematic-debugging",
                   "qualifiedName": "user:systematic-debugging"
                 }
@@ -679,7 +679,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/test-driven-development/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/test-driven-development/SKILL.md",
                   "bareName": "test-driven-development",
                   "qualifiedName": "user:test-driven-development"
                 }
@@ -690,7 +690,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/unsafe-checker/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/unsafe-checker/SKILL.md",
                   "bareName": "unsafe-checker",
                   "qualifiedName": "user:unsafe-checker"
                 }
@@ -701,7 +701,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/using-git-worktrees/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/using-git-worktrees/SKILL.md",
                   "bareName": "using-git-worktrees",
                   "qualifiedName": "user:using-git-worktrees"
                 }
@@ -712,7 +712,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/using-superpowers/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/using-superpowers/SKILL.md",
                   "bareName": "using-superpowers",
                   "qualifiedName": "user:using-superpowers"
                 }
@@ -723,7 +723,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/verification-before-completion/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/verification-before-completion/SKILL.md",
                   "bareName": "verification-before-completion",
                   "qualifiedName": "user:verification-before-completion"
                 }
@@ -734,7 +734,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/writing-plans/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/writing-plans/SKILL.md",
                   "bareName": "writing-plans",
                   "qualifiedName": "user:writing-plans"
                 }
@@ -745,7 +745,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/writing-skills/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/writing-skills/SKILL.md",
                   "bareName": "writing-skills",
                   "qualifiedName": "user:writing-skills"
                 }
@@ -756,7 +756,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/skills/karpathy-guidelines/SKILL.md",
+                  "path": "/home/grimoire/.claude/skills/karpathy-guidelines/SKILL.md",
                   "bareName": "karpathy-guidelines",
                   "qualifiedName": "user:karpathy-guidelines"
                 }
@@ -769,7 +769,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/build-with-ai/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/build-with-ai/SKILL.md",
                   "bareName": "build-with-ai",
                   "qualifiedName": "bundled:build-with-ai"
                 }
@@ -780,7 +780,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/code-review/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/code-review/SKILL.md",
                   "bareName": "code-review",
                   "qualifiedName": "bundled:code-review"
                 }
@@ -791,7 +791,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/create-skill/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/create-skill/SKILL.md",
                   "bareName": "create-skill",
                   "qualifiedName": "bundled:create-skill"
                 }
@@ -802,7 +802,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/create-workflow/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/create-workflow/SKILL.md",
                   "bareName": "create-workflow",
                   "qualifiedName": "bundled:create-workflow"
                 }
@@ -815,7 +815,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/design/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/design/SKILL.md",
                   "bareName": "design",
                   "qualifiedName": "bundled:design"
                 }
@@ -828,7 +828,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/execute-plan/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/execute-plan/SKILL.md",
                   "bareName": "execute-plan",
                   "qualifiedName": "bundled:execute-plan"
                 }
@@ -839,7 +839,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/imagine/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/imagine/SKILL.md",
                   "bareName": "imagine",
                   "qualifiedName": "bundled:imagine"
                 }
@@ -852,7 +852,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/implement/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/implement/SKILL.md",
                   "bareName": "implement",
                   "qualifiedName": "bundled:implement"
                 }
@@ -865,7 +865,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/pr-babysit/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/pr-babysit/SKILL.md",
                   "bareName": "pr-babysit",
                   "qualifiedName": "bundled:pr-babysit"
                 }
@@ -878,7 +878,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/resume-claude/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-claude/SKILL.md",
                   "bareName": "resume-claude",
                   "qualifiedName": "bundled:resume-claude"
                 }
@@ -891,7 +891,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/resume-codex/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-codex/SKILL.md",
                   "bareName": "resume-codex",
                   "qualifiedName": "bundled:resume-codex"
                 }
@@ -904,7 +904,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/resume-cursor/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-cursor/SKILL.md",
                   "bareName": "resume-cursor",
                   "qualifiedName": "bundled:resume-cursor"
                 }
@@ -917,7 +917,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/review/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/review/SKILL.md",
                   "bareName": "review",
                   "qualifiedName": "bundled:review"
                 }
@@ -928,7 +928,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/skill-design-principles/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/skill-design-principles/SKILL.md",
                   "bareName": "skill-design-principles",
                   "qualifiedName": "bundled:skill-design-principles"
                 }
@@ -939,7 +939,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/agent-sdk-dev/commands/new-sdk-app.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/agent-sdk-dev/commands/new-sdk-app.md",
                   "bareName": "new-sdk-app",
                   "qualifiedName": "agent-sdk-dev:new-sdk-app",
                   "pluginName": "agent-sdk-dev"
@@ -951,7 +951,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-code-setup/skills/claude-automation-recommender/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-code-setup/skills/claude-automation-recommender/SKILL.md",
                   "bareName": "claude-automation-recommender",
                   "qualifiedName": "claude-code-setup:claude-automation-recommender",
                   "pluginName": "claude-code-setup"
@@ -963,7 +963,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/skills/claude-md-improver/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/skills/claude-md-improver/SKILL.md",
                   "bareName": "claude-md-improver",
                   "qualifiedName": "claude-md-management:claude-md-improver",
                   "pluginName": "claude-md-management"
@@ -975,7 +975,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/commands/revise-claude-md.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/commands/revise-claude-md.md",
                   "bareName": "revise-claude-md",
                   "qualifiedName": "claude-md-management:revise-claude-md",
                   "pluginName": "claude-md-management"
@@ -987,7 +987,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-review/commands/code-review.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-review/commands/code-review.md",
                   "bareName": "code-review",
                   "qualifiedName": "code-review:code-review",
                   "pluginName": "code-review"
@@ -1001,7 +1001,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/feature-dev/commands/feature-dev.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/feature-dev/commands/feature-dev.md",
                   "bareName": "feature-dev",
                   "qualifiedName": "feature-dev:feature-dev",
                   "pluginName": "feature-dev"
@@ -1013,7 +1013,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/frontend-design/skills/frontend-design/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/frontend-design/skills/frontend-design/SKILL.md",
                   "bareName": "frontend-design",
                   "qualifiedName": "frontend-design:frontend-design",
                   "pluginName": "frontend-design"
@@ -1025,7 +1025,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/cancel-ralph.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/cancel-ralph.md",
                   "bareName": "cancel-ralph",
                   "qualifiedName": "ralph-loop:cancel-ralph",
                   "pluginName": "ralph-loop"
@@ -1037,7 +1037,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/help.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/help.md",
                   "bareName": "help",
                   "qualifiedName": "ralph-loop:help",
                   "pluginName": "ralph-loop"
@@ -1051,7 +1051,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/ralph-loop.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/ralph-loop.md",
                   "bareName": "ralph-loop",
                   "qualifiedName": "ralph-loop:ralph-loop",
                   "pluginName": "ralph-loop"
@@ -1063,7 +1063,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/brainstorming/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/brainstorming/SKILL.md",
                   "bareName": "brainstorming",
                   "qualifiedName": "superpowers:brainstorming",
                   "pluginName": "superpowers"
@@ -1075,7 +1075,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/dispatching-parallel-agents/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/dispatching-parallel-agents/SKILL.md",
                   "bareName": "dispatching-parallel-agents",
                   "qualifiedName": "superpowers:dispatching-parallel-agents",
                   "pluginName": "superpowers"
@@ -1087,7 +1087,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/executing-plans/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/executing-plans/SKILL.md",
                   "bareName": "executing-plans",
                   "qualifiedName": "superpowers:executing-plans",
                   "pluginName": "superpowers"
@@ -1099,7 +1099,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/finishing-a-development-branch/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/finishing-a-development-branch/SKILL.md",
                   "bareName": "finishing-a-development-branch",
                   "qualifiedName": "superpowers:finishing-a-development-branch",
                   "pluginName": "superpowers"
@@ -1111,7 +1111,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/receiving-code-review/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/receiving-code-review/SKILL.md",
                   "bareName": "receiving-code-review",
                   "qualifiedName": "superpowers:receiving-code-review",
                   "pluginName": "superpowers"
@@ -1123,7 +1123,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/requesting-code-review/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/requesting-code-review/SKILL.md",
                   "bareName": "requesting-code-review",
                   "qualifiedName": "superpowers:requesting-code-review",
                   "pluginName": "superpowers"
@@ -1135,7 +1135,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/subagent-driven-development/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/subagent-driven-development/SKILL.md",
                   "bareName": "subagent-driven-development",
                   "qualifiedName": "superpowers:subagent-driven-development",
                   "pluginName": "superpowers"
@@ -1147,7 +1147,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
                   "bareName": "systematic-debugging",
                   "qualifiedName": "superpowers:systematic-debugging",
                   "pluginName": "superpowers"
@@ -1159,7 +1159,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
                   "bareName": "test-driven-development",
                   "qualifiedName": "superpowers:test-driven-development",
                   "pluginName": "superpowers"
@@ -1171,7 +1171,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-git-worktrees/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-git-worktrees/SKILL.md",
                   "bareName": "using-git-worktrees",
                   "qualifiedName": "superpowers:using-git-worktrees",
                   "pluginName": "superpowers"
@@ -1183,7 +1183,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
                   "bareName": "using-superpowers",
                   "qualifiedName": "superpowers:using-superpowers",
                   "pluginName": "superpowers"
@@ -1195,7 +1195,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
                   "bareName": "verification-before-completion",
                   "qualifiedName": "superpowers:verification-before-completion",
                   "pluginName": "superpowers"
@@ -1207,7 +1207,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-plans/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-plans/SKILL.md",
                   "bareName": "writing-plans",
                   "qualifiedName": "superpowers:writing-plans",
                   "pluginName": "superpowers"
@@ -1219,7 +1219,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-skills/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-skills/SKILL.md",
                   "bareName": "writing-skills",
                   "qualifiedName": "superpowers:writing-skills",
                   "pluginName": "superpowers"
@@ -1386,7 +1386,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/brainstorming/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/brainstorming/SKILL.md",
                   "bareName": "brainstorming",
                   "qualifiedName": "user:brainstorming"
                 }
@@ -1397,7 +1397,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/dispatching-parallel-agents/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/dispatching-parallel-agents/SKILL.md",
                   "bareName": "dispatching-parallel-agents",
                   "qualifiedName": "user:dispatching-parallel-agents"
                 }
@@ -1408,7 +1408,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/executing-plans/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/executing-plans/SKILL.md",
                   "bareName": "executing-plans",
                   "qualifiedName": "user:executing-plans"
                 }
@@ -1419,7 +1419,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/find-skills/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/find-skills/SKILL.md",
                   "bareName": "find-skills",
                   "qualifiedName": "user:find-skills"
                 }
@@ -1430,7 +1430,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/finishing-a-development-branch/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/finishing-a-development-branch/SKILL.md",
                   "bareName": "finishing-a-development-branch",
                   "qualifiedName": "user:finishing-a-development-branch"
                 }
@@ -1443,7 +1443,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/meta-cognition-parallel/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/meta-cognition-parallel/SKILL.md",
                   "bareName": "meta-cognition-parallel",
                   "qualifiedName": "user:meta-cognition-parallel"
                 }
@@ -1454,7 +1454,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/receiving-code-review/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/receiving-code-review/SKILL.md",
                   "bareName": "receiving-code-review",
                   "qualifiedName": "user:receiving-code-review"
                 }
@@ -1465,7 +1465,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/requesting-code-review/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/requesting-code-review/SKILL.md",
                   "bareName": "requesting-code-review",
                   "qualifiedName": "user:requesting-code-review"
                 }
@@ -1478,7 +1478,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-call-graph/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-call-graph/SKILL.md",
                   "bareName": "rust-call-graph",
                   "qualifiedName": "user:rust-call-graph"
                 }
@@ -1491,7 +1491,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-code-navigator/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-code-navigator/SKILL.md",
                   "bareName": "rust-code-navigator",
                   "qualifiedName": "user:rust-code-navigator"
                 }
@@ -1504,7 +1504,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-daily/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-daily/SKILL.md",
                   "bareName": "rust-daily",
                   "qualifiedName": "user:rust-daily"
                 }
@@ -1517,7 +1517,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-deps-visualizer/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-deps-visualizer/SKILL.md",
                   "bareName": "rust-deps-visualizer",
                   "qualifiedName": "user:rust-deps-visualizer"
                 }
@@ -1528,7 +1528,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-learner/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-learner/SKILL.md",
                   "bareName": "rust-learner",
                   "qualifiedName": "user:rust-learner"
                 }
@@ -1541,7 +1541,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-refactor-helper/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-refactor-helper/SKILL.md",
                   "bareName": "rust-refactor-helper",
                   "qualifiedName": "user:rust-refactor-helper"
                 }
@@ -1552,7 +1552,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-router/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-router/SKILL.md",
                   "bareName": "rust-router",
                   "qualifiedName": "user:rust-router"
                 }
@@ -1565,7 +1565,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-symbol-analyzer/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-symbol-analyzer/SKILL.md",
                   "bareName": "rust-symbol-analyzer",
                   "qualifiedName": "user:rust-symbol-analyzer"
                 }
@@ -1578,7 +1578,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-trait-explorer/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-trait-explorer/SKILL.md",
                   "bareName": "rust-trait-explorer",
                   "qualifiedName": "user:rust-trait-explorer"
                 }
@@ -1589,7 +1589,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/subagent-driven-development/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/subagent-driven-development/SKILL.md",
                   "bareName": "subagent-driven-development",
                   "qualifiedName": "user:subagent-driven-development"
                 }
@@ -1600,7 +1600,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/systematic-debugging/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/systematic-debugging/SKILL.md",
                   "bareName": "systematic-debugging",
                   "qualifiedName": "user:systematic-debugging"
                 }
@@ -1611,7 +1611,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/test-driven-development/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/test-driven-development/SKILL.md",
                   "bareName": "test-driven-development",
                   "qualifiedName": "user:test-driven-development"
                 }
@@ -1622,7 +1622,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/unsafe-checker/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/unsafe-checker/SKILL.md",
                   "bareName": "unsafe-checker",
                   "qualifiedName": "user:unsafe-checker"
                 }
@@ -1633,7 +1633,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/using-git-worktrees/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/using-git-worktrees/SKILL.md",
                   "bareName": "using-git-worktrees",
                   "qualifiedName": "user:using-git-worktrees"
                 }
@@ -1644,7 +1644,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/using-superpowers/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/using-superpowers/SKILL.md",
                   "bareName": "using-superpowers",
                   "qualifiedName": "user:using-superpowers"
                 }
@@ -1655,7 +1655,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/verification-before-completion/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/verification-before-completion/SKILL.md",
                   "bareName": "verification-before-completion",
                   "qualifiedName": "user:verification-before-completion"
                 }
@@ -1666,7 +1666,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/writing-plans/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/writing-plans/SKILL.md",
                   "bareName": "writing-plans",
                   "qualifiedName": "user:writing-plans"
                 }
@@ -1677,7 +1677,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/writing-skills/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/writing-skills/SKILL.md",
                   "bareName": "writing-skills",
                   "qualifiedName": "user:writing-skills"
                 }
@@ -1688,7 +1688,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/skills/karpathy-guidelines/SKILL.md",
+                  "path": "/home/grimoire/.claude/skills/karpathy-guidelines/SKILL.md",
                   "bareName": "karpathy-guidelines",
                   "qualifiedName": "user:karpathy-guidelines"
                 }
@@ -1701,7 +1701,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/build-with-ai/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/build-with-ai/SKILL.md",
                   "bareName": "build-with-ai",
                   "qualifiedName": "bundled:build-with-ai"
                 }
@@ -1712,7 +1712,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/code-review/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/code-review/SKILL.md",
                   "bareName": "code-review",
                   "qualifiedName": "bundled:code-review"
                 }
@@ -1723,7 +1723,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/create-skill/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/create-skill/SKILL.md",
                   "bareName": "create-skill",
                   "qualifiedName": "bundled:create-skill"
                 }
@@ -1734,7 +1734,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/create-workflow/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/create-workflow/SKILL.md",
                   "bareName": "create-workflow",
                   "qualifiedName": "bundled:create-workflow"
                 }
@@ -1747,7 +1747,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/design/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/design/SKILL.md",
                   "bareName": "design",
                   "qualifiedName": "bundled:design"
                 }
@@ -1760,7 +1760,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/execute-plan/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/execute-plan/SKILL.md",
                   "bareName": "execute-plan",
                   "qualifiedName": "bundled:execute-plan"
                 }
@@ -1771,7 +1771,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/imagine/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/imagine/SKILL.md",
                   "bareName": "imagine",
                   "qualifiedName": "bundled:imagine"
                 }
@@ -1784,7 +1784,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/implement/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/implement/SKILL.md",
                   "bareName": "implement",
                   "qualifiedName": "bundled:implement"
                 }
@@ -1797,7 +1797,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/pr-babysit/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/pr-babysit/SKILL.md",
                   "bareName": "pr-babysit",
                   "qualifiedName": "bundled:pr-babysit"
                 }
@@ -1810,7 +1810,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/resume-claude/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-claude/SKILL.md",
                   "bareName": "resume-claude",
                   "qualifiedName": "bundled:resume-claude"
                 }
@@ -1823,7 +1823,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/resume-codex/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-codex/SKILL.md",
                   "bareName": "resume-codex",
                   "qualifiedName": "bundled:resume-codex"
                 }
@@ -1836,7 +1836,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/resume-cursor/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-cursor/SKILL.md",
                   "bareName": "resume-cursor",
                   "qualifiedName": "bundled:resume-cursor"
                 }
@@ -1849,7 +1849,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/review/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/review/SKILL.md",
                   "bareName": "review",
                   "qualifiedName": "bundled:review"
                 }
@@ -1860,7 +1860,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/skill-design-principles/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/skill-design-principles/SKILL.md",
                   "bareName": "skill-design-principles",
                   "qualifiedName": "bundled:skill-design-principles"
                 }
@@ -1871,7 +1871,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/agent-sdk-dev/commands/new-sdk-app.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/agent-sdk-dev/commands/new-sdk-app.md",
                   "bareName": "new-sdk-app",
                   "qualifiedName": "agent-sdk-dev:new-sdk-app",
                   "pluginName": "agent-sdk-dev"
@@ -1883,7 +1883,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-code-setup/skills/claude-automation-recommender/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-code-setup/skills/claude-automation-recommender/SKILL.md",
                   "bareName": "claude-automation-recommender",
                   "qualifiedName": "claude-code-setup:claude-automation-recommender",
                   "pluginName": "claude-code-setup"
@@ -1895,7 +1895,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/skills/claude-md-improver/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/skills/claude-md-improver/SKILL.md",
                   "bareName": "claude-md-improver",
                   "qualifiedName": "claude-md-management:claude-md-improver",
                   "pluginName": "claude-md-management"
@@ -1907,7 +1907,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/commands/revise-claude-md.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/commands/revise-claude-md.md",
                   "bareName": "revise-claude-md",
                   "qualifiedName": "claude-md-management:revise-claude-md",
                   "pluginName": "claude-md-management"
@@ -1919,7 +1919,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-review/commands/code-review.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-review/commands/code-review.md",
                   "bareName": "code-review",
                   "qualifiedName": "code-review:code-review",
                   "pluginName": "code-review"
@@ -1933,7 +1933,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/feature-dev/commands/feature-dev.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/feature-dev/commands/feature-dev.md",
                   "bareName": "feature-dev",
                   "qualifiedName": "feature-dev:feature-dev",
                   "pluginName": "feature-dev"
@@ -1945,7 +1945,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/frontend-design/skills/frontend-design/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/frontend-design/skills/frontend-design/SKILL.md",
                   "bareName": "frontend-design",
                   "qualifiedName": "frontend-design:frontend-design",
                   "pluginName": "frontend-design"
@@ -1957,7 +1957,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/cancel-ralph.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/cancel-ralph.md",
                   "bareName": "cancel-ralph",
                   "qualifiedName": "ralph-loop:cancel-ralph",
                   "pluginName": "ralph-loop"
@@ -1969,7 +1969,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/help.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/help.md",
                   "bareName": "help",
                   "qualifiedName": "ralph-loop:help",
                   "pluginName": "ralph-loop"
@@ -1983,7 +1983,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/ralph-loop.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/ralph-loop.md",
                   "bareName": "ralph-loop",
                   "qualifiedName": "ralph-loop:ralph-loop",
                   "pluginName": "ralph-loop"
@@ -1995,7 +1995,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/brainstorming/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/brainstorming/SKILL.md",
                   "bareName": "brainstorming",
                   "qualifiedName": "superpowers:brainstorming",
                   "pluginName": "superpowers"
@@ -2007,7 +2007,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/dispatching-parallel-agents/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/dispatching-parallel-agents/SKILL.md",
                   "bareName": "dispatching-parallel-agents",
                   "qualifiedName": "superpowers:dispatching-parallel-agents",
                   "pluginName": "superpowers"
@@ -2019,7 +2019,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/executing-plans/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/executing-plans/SKILL.md",
                   "bareName": "executing-plans",
                   "qualifiedName": "superpowers:executing-plans",
                   "pluginName": "superpowers"
@@ -2031,7 +2031,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/finishing-a-development-branch/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/finishing-a-development-branch/SKILL.md",
                   "bareName": "finishing-a-development-branch",
                   "qualifiedName": "superpowers:finishing-a-development-branch",
                   "pluginName": "superpowers"
@@ -2043,7 +2043,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/receiving-code-review/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/receiving-code-review/SKILL.md",
                   "bareName": "receiving-code-review",
                   "qualifiedName": "superpowers:receiving-code-review",
                   "pluginName": "superpowers"
@@ -2055,7 +2055,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/requesting-code-review/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/requesting-code-review/SKILL.md",
                   "bareName": "requesting-code-review",
                   "qualifiedName": "superpowers:requesting-code-review",
                   "pluginName": "superpowers"
@@ -2067,7 +2067,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/subagent-driven-development/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/subagent-driven-development/SKILL.md",
                   "bareName": "subagent-driven-development",
                   "qualifiedName": "superpowers:subagent-driven-development",
                   "pluginName": "superpowers"
@@ -2079,7 +2079,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
                   "bareName": "systematic-debugging",
                   "qualifiedName": "superpowers:systematic-debugging",
                   "pluginName": "superpowers"
@@ -2091,7 +2091,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
                   "bareName": "test-driven-development",
                   "qualifiedName": "superpowers:test-driven-development",
                   "pluginName": "superpowers"
@@ -2103,7 +2103,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-git-worktrees/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-git-worktrees/SKILL.md",
                   "bareName": "using-git-worktrees",
                   "qualifiedName": "superpowers:using-git-worktrees",
                   "pluginName": "superpowers"
@@ -2115,7 +2115,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
                   "bareName": "using-superpowers",
                   "qualifiedName": "superpowers:using-superpowers",
                   "pluginName": "superpowers"
@@ -2127,7 +2127,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
                   "bareName": "verification-before-completion",
                   "qualifiedName": "superpowers:verification-before-completion",
                   "pluginName": "superpowers"
@@ -2139,7 +2139,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-plans/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-plans/SKILL.md",
                   "bareName": "writing-plans",
                   "qualifiedName": "superpowers:writing-plans",
                   "pluginName": "superpowers"
@@ -2151,7 +2151,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-skills/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-skills/SKILL.md",
                   "bareName": "writing-skills",
                   "qualifiedName": "superpowers:writing-skills",
                   "pluginName": "superpowers"
@@ -3833,7 +3833,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/brainstorming/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/brainstorming/SKILL.md",
                   "bareName": "brainstorming",
                   "qualifiedName": "user:brainstorming"
                 }
@@ -3844,7 +3844,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/dispatching-parallel-agents/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/dispatching-parallel-agents/SKILL.md",
                   "bareName": "dispatching-parallel-agents",
                   "qualifiedName": "user:dispatching-parallel-agents"
                 }
@@ -3855,7 +3855,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/executing-plans/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/executing-plans/SKILL.md",
                   "bareName": "executing-plans",
                   "qualifiedName": "user:executing-plans"
                 }
@@ -3866,7 +3866,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/find-skills/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/find-skills/SKILL.md",
                   "bareName": "find-skills",
                   "qualifiedName": "user:find-skills"
                 }
@@ -3877,7 +3877,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/finishing-a-development-branch/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/finishing-a-development-branch/SKILL.md",
                   "bareName": "finishing-a-development-branch",
                   "qualifiedName": "user:finishing-a-development-branch"
                 }
@@ -3890,7 +3890,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/meta-cognition-parallel/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/meta-cognition-parallel/SKILL.md",
                   "bareName": "meta-cognition-parallel",
                   "qualifiedName": "user:meta-cognition-parallel"
                 }
@@ -3901,7 +3901,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/receiving-code-review/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/receiving-code-review/SKILL.md",
                   "bareName": "receiving-code-review",
                   "qualifiedName": "user:receiving-code-review"
                 }
@@ -3912,7 +3912,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/requesting-code-review/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/requesting-code-review/SKILL.md",
                   "bareName": "requesting-code-review",
                   "qualifiedName": "user:requesting-code-review"
                 }
@@ -3925,7 +3925,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-call-graph/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-call-graph/SKILL.md",
                   "bareName": "rust-call-graph",
                   "qualifiedName": "user:rust-call-graph"
                 }
@@ -3938,7 +3938,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-code-navigator/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-code-navigator/SKILL.md",
                   "bareName": "rust-code-navigator",
                   "qualifiedName": "user:rust-code-navigator"
                 }
@@ -3951,7 +3951,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-daily/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-daily/SKILL.md",
                   "bareName": "rust-daily",
                   "qualifiedName": "user:rust-daily"
                 }
@@ -3964,7 +3964,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-deps-visualizer/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-deps-visualizer/SKILL.md",
                   "bareName": "rust-deps-visualizer",
                   "qualifiedName": "user:rust-deps-visualizer"
                 }
@@ -3975,7 +3975,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-learner/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-learner/SKILL.md",
                   "bareName": "rust-learner",
                   "qualifiedName": "user:rust-learner"
                 }
@@ -3988,7 +3988,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-refactor-helper/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-refactor-helper/SKILL.md",
                   "bareName": "rust-refactor-helper",
                   "qualifiedName": "user:rust-refactor-helper"
                 }
@@ -3999,7 +3999,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-router/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-router/SKILL.md",
                   "bareName": "rust-router",
                   "qualifiedName": "user:rust-router"
                 }
@@ -4012,7 +4012,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-symbol-analyzer/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-symbol-analyzer/SKILL.md",
                   "bareName": "rust-symbol-analyzer",
                   "qualifiedName": "user:rust-symbol-analyzer"
                 }
@@ -4025,7 +4025,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/rust-trait-explorer/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/rust-trait-explorer/SKILL.md",
                   "bareName": "rust-trait-explorer",
                   "qualifiedName": "user:rust-trait-explorer"
                 }
@@ -4036,7 +4036,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/subagent-driven-development/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/subagent-driven-development/SKILL.md",
                   "bareName": "subagent-driven-development",
                   "qualifiedName": "user:subagent-driven-development"
                 }
@@ -4047,7 +4047,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/systematic-debugging/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/systematic-debugging/SKILL.md",
                   "bareName": "systematic-debugging",
                   "qualifiedName": "user:systematic-debugging"
                 }
@@ -4058,7 +4058,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/test-driven-development/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/test-driven-development/SKILL.md",
                   "bareName": "test-driven-development",
                   "qualifiedName": "user:test-driven-development"
                 }
@@ -4069,7 +4069,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/unsafe-checker/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/unsafe-checker/SKILL.md",
                   "bareName": "unsafe-checker",
                   "qualifiedName": "user:unsafe-checker"
                 }
@@ -4080,7 +4080,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/using-git-worktrees/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/using-git-worktrees/SKILL.md",
                   "bareName": "using-git-worktrees",
                   "qualifiedName": "user:using-git-worktrees"
                 }
@@ -4091,7 +4091,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/using-superpowers/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/using-superpowers/SKILL.md",
                   "bareName": "using-superpowers",
                   "qualifiedName": "user:using-superpowers"
                 }
@@ -4102,7 +4102,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/verification-before-completion/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/verification-before-completion/SKILL.md",
                   "bareName": "verification-before-completion",
                   "qualifiedName": "user:verification-before-completion"
                 }
@@ -4113,7 +4113,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/writing-plans/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/writing-plans/SKILL.md",
                   "bareName": "writing-plans",
                   "qualifiedName": "user:writing-plans"
                 }
@@ -4124,7 +4124,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.agents/skills/writing-skills/SKILL.md",
+                  "path": "/home/grimoire/.agents/skills/writing-skills/SKILL.md",
                   "bareName": "writing-skills",
                   "qualifiedName": "user:writing-skills"
                 }
@@ -4135,7 +4135,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/skills/karpathy-guidelines/SKILL.md",
+                  "path": "/home/grimoire/.claude/skills/karpathy-guidelines/SKILL.md",
                   "bareName": "karpathy-guidelines",
                   "qualifiedName": "user:karpathy-guidelines"
                 }
@@ -4148,7 +4148,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/build-with-ai/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/build-with-ai/SKILL.md",
                   "bareName": "build-with-ai",
                   "qualifiedName": "bundled:build-with-ai"
                 }
@@ -4159,7 +4159,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/code-review/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/code-review/SKILL.md",
                   "bareName": "code-review",
                   "qualifiedName": "bundled:code-review"
                 }
@@ -4170,7 +4170,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/create-skill/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/create-skill/SKILL.md",
                   "bareName": "create-skill",
                   "qualifiedName": "bundled:create-skill"
                 }
@@ -4181,7 +4181,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/create-workflow/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/create-workflow/SKILL.md",
                   "bareName": "create-workflow",
                   "qualifiedName": "bundled:create-workflow"
                 }
@@ -4194,7 +4194,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/design/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/design/SKILL.md",
                   "bareName": "design",
                   "qualifiedName": "bundled:design"
                 }
@@ -4207,7 +4207,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/execute-plan/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/execute-plan/SKILL.md",
                   "bareName": "execute-plan",
                   "qualifiedName": "bundled:execute-plan"
                 }
@@ -4218,7 +4218,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/imagine/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/imagine/SKILL.md",
                   "bareName": "imagine",
                   "qualifiedName": "bundled:imagine"
                 }
@@ -4231,7 +4231,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/implement/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/implement/SKILL.md",
                   "bareName": "implement",
                   "qualifiedName": "bundled:implement"
                 }
@@ -4244,7 +4244,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/pr-babysit/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/pr-babysit/SKILL.md",
                   "bareName": "pr-babysit",
                   "qualifiedName": "bundled:pr-babysit"
                 }
@@ -4257,7 +4257,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/resume-claude/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-claude/SKILL.md",
                   "bareName": "resume-claude",
                   "qualifiedName": "bundled:resume-claude"
                 }
@@ -4270,7 +4270,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/resume-codex/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-codex/SKILL.md",
                   "bareName": "resume-codex",
                   "qualifiedName": "bundled:resume-codex"
                 }
@@ -4283,7 +4283,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/resume-cursor/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-cursor/SKILL.md",
                   "bareName": "resume-cursor",
                   "qualifiedName": "bundled:resume-cursor"
                 }
@@ -4296,7 +4296,7 @@
                 },
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/review/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/review/SKILL.md",
                   "bareName": "review",
                   "qualifiedName": "bundled:review"
                 }
@@ -4307,7 +4307,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "bundled",
-                  "path": "/home/m5/.grok/bundled/skills/skill-design-principles/SKILL.md",
+                  "path": "/home/grimoire/.grok/bundled/skills/skill-design-principles/SKILL.md",
                   "bareName": "skill-design-principles",
                   "qualifiedName": "bundled:skill-design-principles"
                 }
@@ -4318,7 +4318,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/agent-sdk-dev/commands/new-sdk-app.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/agent-sdk-dev/commands/new-sdk-app.md",
                   "bareName": "new-sdk-app",
                   "qualifiedName": "agent-sdk-dev:new-sdk-app",
                   "pluginName": "agent-sdk-dev"
@@ -4330,7 +4330,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-code-setup/skills/claude-automation-recommender/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-code-setup/skills/claude-automation-recommender/SKILL.md",
                   "bareName": "claude-automation-recommender",
                   "qualifiedName": "claude-code-setup:claude-automation-recommender",
                   "pluginName": "claude-code-setup"
@@ -4342,7 +4342,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/skills/claude-md-improver/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/skills/claude-md-improver/SKILL.md",
                   "bareName": "claude-md-improver",
                   "qualifiedName": "claude-md-management:claude-md-improver",
                   "pluginName": "claude-md-management"
@@ -4354,7 +4354,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/commands/revise-claude-md.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/commands/revise-claude-md.md",
                   "bareName": "revise-claude-md",
                   "qualifiedName": "claude-md-management:revise-claude-md",
                   "pluginName": "claude-md-management"
@@ -4366,7 +4366,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-review/commands/code-review.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-review/commands/code-review.md",
                   "bareName": "code-review",
                   "qualifiedName": "code-review:code-review",
                   "pluginName": "code-review"
@@ -4380,7 +4380,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/feature-dev/commands/feature-dev.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/feature-dev/commands/feature-dev.md",
                   "bareName": "feature-dev",
                   "qualifiedName": "feature-dev:feature-dev",
                   "pluginName": "feature-dev"
@@ -4392,7 +4392,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/frontend-design/skills/frontend-design/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/frontend-design/skills/frontend-design/SKILL.md",
                   "bareName": "frontend-design",
                   "qualifiedName": "frontend-design:frontend-design",
                   "pluginName": "frontend-design"
@@ -4404,7 +4404,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/cancel-ralph.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/cancel-ralph.md",
                   "bareName": "cancel-ralph",
                   "qualifiedName": "ralph-loop:cancel-ralph",
                   "pluginName": "ralph-loop"
@@ -4416,7 +4416,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/help.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/help.md",
                   "bareName": "help",
                   "qualifiedName": "ralph-loop:help",
                   "pluginName": "ralph-loop"
@@ -4430,7 +4430,7 @@
                 },
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/ralph-loop.md",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/ralph-loop.md",
                   "bareName": "ralph-loop",
                   "qualifiedName": "ralph-loop:ralph-loop",
                   "pluginName": "ralph-loop"
@@ -4442,7 +4442,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/brainstorming/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/brainstorming/SKILL.md",
                   "bareName": "brainstorming",
                   "qualifiedName": "superpowers:brainstorming",
                   "pluginName": "superpowers"
@@ -4454,7 +4454,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/dispatching-parallel-agents/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/dispatching-parallel-agents/SKILL.md",
                   "bareName": "dispatching-parallel-agents",
                   "qualifiedName": "superpowers:dispatching-parallel-agents",
                   "pluginName": "superpowers"
@@ -4466,7 +4466,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/executing-plans/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/executing-plans/SKILL.md",
                   "bareName": "executing-plans",
                   "qualifiedName": "superpowers:executing-plans",
                   "pluginName": "superpowers"
@@ -4478,7 +4478,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/finishing-a-development-branch/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/finishing-a-development-branch/SKILL.md",
                   "bareName": "finishing-a-development-branch",
                   "qualifiedName": "superpowers:finishing-a-development-branch",
                   "pluginName": "superpowers"
@@ -4490,7 +4490,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/receiving-code-review/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/receiving-code-review/SKILL.md",
                   "bareName": "receiving-code-review",
                   "qualifiedName": "superpowers:receiving-code-review",
                   "pluginName": "superpowers"
@@ -4502,7 +4502,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/requesting-code-review/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/requesting-code-review/SKILL.md",
                   "bareName": "requesting-code-review",
                   "qualifiedName": "superpowers:requesting-code-review",
                   "pluginName": "superpowers"
@@ -4514,7 +4514,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/subagent-driven-development/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/subagent-driven-development/SKILL.md",
                   "bareName": "subagent-driven-development",
                   "qualifiedName": "superpowers:subagent-driven-development",
                   "pluginName": "superpowers"
@@ -4526,7 +4526,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
                   "bareName": "systematic-debugging",
                   "qualifiedName": "superpowers:systematic-debugging",
                   "pluginName": "superpowers"
@@ -4538,7 +4538,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
                   "bareName": "test-driven-development",
                   "qualifiedName": "superpowers:test-driven-development",
                   "pluginName": "superpowers"
@@ -4550,7 +4550,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-git-worktrees/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-git-worktrees/SKILL.md",
                   "bareName": "using-git-worktrees",
                   "qualifiedName": "superpowers:using-git-worktrees",
                   "pluginName": "superpowers"
@@ -4562,7 +4562,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
                   "bareName": "using-superpowers",
                   "qualifiedName": "superpowers:using-superpowers",
                   "pluginName": "superpowers"
@@ -4574,7 +4574,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
                   "bareName": "verification-before-completion",
                   "qualifiedName": "superpowers:verification-before-completion",
                   "pluginName": "superpowers"
@@ -4586,7 +4586,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-plans/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-plans/SKILL.md",
                   "bareName": "writing-plans",
                   "qualifiedName": "superpowers:writing-plans",
                   "pluginName": "superpowers"
@@ -4598,7 +4598,7 @@
                 "input": null,
                 "_meta": {
                   "scope": "user",
-                  "path": "/home/m5/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-skills/SKILL.md",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-skills/SKILL.md",
                   "bareName": "writing-skills",
                   "qualifiedName": "superpowers:writing-skills",
                   "pluginName": "superpowers"

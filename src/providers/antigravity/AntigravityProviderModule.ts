@@ -112,7 +112,7 @@ const antigravityChatUi: ProviderChatUiContribution<AntigravityProviderSettings>
       ?? modelId.replace(/^antigravity:/, ''),
     contextWindow: () => undefined,
   },
-  reasoningControl: { kind: 'effort', tiers: ['low', 'medium', 'high'] },
+  reasoningControl: { kind: 'none' },
   permissionToggles: [],
   icon: 'antigravity',
 };

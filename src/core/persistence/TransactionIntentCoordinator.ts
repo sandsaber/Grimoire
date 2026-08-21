@@ -1,7 +1,7 @@
 import { TRANSACTION_INTENTS_PATH } from '../execution/ExecutionControlPaths';
 import { validateControlRecordPayload } from './ControlRecordPayloadPolicy';
 import type { DurableStorage } from './DurableStorage';
-import type { RecordSchema, VersionedRecord } from './VersionedRecord';
+import { type RecordSchema, UnreadableControlRecordError, type VersionedRecord } from './VersionedRecord';
 import { VersionedRepository } from './VersionedRepository';
 
 export type TransactionCrashPoint =
@@ -172,13 +172,24 @@ export class TransactionIntentCoordinator {
     const results: TransactionExecutionResult[] = [];
     for (const transactionId of await this.repository.listRecordIds()) {
       const read = await this.repository.read(transactionId);
+      // Raised as the shared unreadable-record error, not as a plain one. This
+      // is the exact record a reverted build meets — a newer build left an
+      // intent it cannot parse — and D5 says such a store opens read-only and
+      // is reported. A plain `Error` here fails startup as a defect instead:
+      // the host's migration requirement stays null, the user is told nothing,
+      // and because the acceptance gate never opens, unload skips shutdown and
+      // no registered backend is ever disposed.
       if (read.kind === 'future') {
-        throw new Error(
-          `Transaction "${transactionId}" uses future schema version ${read.schemaVersion}.`,
+        throw new UnreadableControlRecordError(
+          'future',
+          `transaction "${transactionId}" uses schema version ${read.schemaVersion}`,
         );
       }
       if (read.kind === 'corrupt') {
-        throw new Error(`Transaction "${transactionId}" is corrupt: ${read.error}`);
+        throw new UnreadableControlRecordError(
+          'corrupt',
+          `transaction "${transactionId}": ${read.error}`,
+        );
       }
       if (read.kind === 'current' || read.kind === 'migrated') {
         if (read.record.payload.status === 'pending') {

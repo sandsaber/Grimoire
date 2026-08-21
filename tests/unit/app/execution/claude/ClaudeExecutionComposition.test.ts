@@ -10,6 +10,7 @@ import { executionSessionId, runId } from '@/core/execution/ExecutionIds';
 import type { StreamChunk } from '@/core/types';
 import { claudePlanUsageStore } from '@/providers/claude/app/ClaudePlanUsageStore';
 import { getClaudeWorkspaceServices } from '@/providers/claude/app/ClaudeWorkspaceServices';
+import { ClaudeContentPresenter } from '@/providers/claude/execution/ClaudeContentPresenter';
 import { CLAUDE_EXECUTION_DESCRIPTOR } from '@/providers/claude/execution/ClaudeExecutionBackend';
 import type { ClaudeSdkQueryFunction } from '@/providers/claude/execution/ClaudeSdkExecutionAdapter';
 import { updateClaudeProviderSettings } from '@/providers/claude/settings';
@@ -260,6 +261,29 @@ describe('Claude execution composition', () => {
     // reload, and nothing to fork from.
     expect(runtime.getSessionId()).toBe('native-session');
     expect(runtime.consumeTurnMetadata()).toMatchObject({ wasSent: true });
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('starts each turn with the presenter\'s per-turn state cleared', async () => {
+    // The presenter tracks whether *this turn* streamed, so it can still render
+    // an answer that arrived only on the result message. The composition never
+    // reset it: after the first turn that streamed, every later turn in the
+    // conversation looked like one that had, and a turn whose answer came with
+    // no deltas rendered empty. Grok and OpenCode reset it at this same
+    // boundary — where a turn is encoded, the one place a turn is known to be
+    // starting.
+    const beginTurn = jest.spyOn(ClaudeContentPresenter.prototype, 'beginTurn');
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+    // The conversation is never switched here, so `forgetConversation` — the
+    // only other caller — cannot account for what this asserts.
+    beginTurn.mockClear();
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(beginTurn).toHaveBeenCalled();
+    beginTurn.mockRestore();
     execution.dispose();
     await host.dispose();
   });

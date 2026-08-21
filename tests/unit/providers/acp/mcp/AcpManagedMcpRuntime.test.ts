@@ -80,8 +80,12 @@ describe('ACP managed MCP runtime integration', () => {
 
     await expect(runtime.createSession('/tmp/grimoire-acp-mcp-vault'))
       .resolves.toBe('created-session');
-    await expect(runtime.loadSession('resumed-session', '/tmp/grimoire-acp-mcp-vault'))
-      .resolves.toBe(true);
+    // Two of the four now answer *what happened* rather than whether it worked:
+    // a session that is gone and one the agent could not load right now are
+    // different answers, and only the first may erase a binding. The other two
+    // still answer a boolean, and both shapes mean the same thing to this row.
+    const loaded = await runtime.loadSession('resumed-session', '/tmp/grimoire-acp-mcp-vault');
+    expect(loaded === true || loaded === 'loaded').toBe(true);
 
     const expectedServers = [{
       args: ['server.js'],

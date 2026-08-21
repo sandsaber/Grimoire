@@ -256,7 +256,15 @@ export class ClaudeExecution {
         request,
         getClaudeWorkspaceServices().mcpManager,
       ),
-      encodeRequestRef: (turn: PreparedChatTurn) => this.requests.reference({
+      encodeRequestRef: (turn: PreparedChatTurn) => {
+        // The turn boundary, and the one place a turn is known to be starting.
+        // Without it `sawStreamText` and `sawStreamThinking` stayed true for the
+        // life of a conversation, so a later turn whose assistant message
+        // arrives with no deltas of its own rendered nothing — the presenter's
+        // "a turn that streamed nothing still renders" path never ran again
+        // after the first turn that did stream. Grok and OpenCode do this here.
+        content.beginTurn();
+        return this.requests.reference({
         prompt: turn.prompt,
         ...(turn.request.images?.length ? { images: [...turn.request.images] } : {}),
         // Read at dispatch, not now: a turn queued before another one finishes
@@ -272,7 +280,8 @@ export class ClaudeExecution {
             ? (provider as () => { hasRunning: boolean })()
             : { hasRunning: false };
         },
-      }),
+        });
+      },
       reasoningControl: CLAUDE_PROVIDER_CAPABILITIES.reasoningControl,
       // The session this conversation is on, which the kernel records and a
       // resume asks for. The presenter's copy comes first because a new

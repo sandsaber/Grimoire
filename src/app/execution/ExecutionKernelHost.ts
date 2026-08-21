@@ -137,6 +137,13 @@ export class ExecutionKernelHost {
       // finishes — so waiting costs no guarantee.
       await this.starting?.catch(() => undefined);
       if (!this.gateOpen) {
+        // The gate never opened — the store requires migration, or startup
+        // failed outright. There is no work to cancel and no checkpoint to
+        // write, but the backends were registered before any of that and each
+        // owns a provider process. Returning here left every one of them
+        // running for the life of the application, which is exactly what a
+        // reverted build does on its first unload.
+        await this.registry.disposeRegisteredBackends();
         return;
       }
       await this.registry.shutdown(checkpointId);

@@ -1,6 +1,13 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
+import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
+import type { PermissionMode } from '@/core/types';
+import {
+  buildAcpSessionLoadFailureDebugEvent,
+  isAcpMissingSessionError,
+} from '@/providers/acp/acpSessionResume';
+
 import { applyOrchestratorModeInstructions } from '../../../core/prompt/mainAgent';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
@@ -256,10 +263,16 @@ export class QwenChatRuntime implements ChatRuntime {
 
     if (this.sessionId) {
       if (this.loadedSessionId !== this.sessionId) {
-        const loaded = await this.loadSession(this.sessionId, cwd);
-        if (!loaded) {
+        const outcome = await this.loadSession(this.sessionId, cwd);
+        if (outcome === 'missing') {
           this.sessionInvalidated = true;
           this.clearActiveSession();
+        } else if (outcome === 'unavailable') {
+          // The binding is good and the agent could not load it now. Keeping it
+          // is the whole point: the tab reports not-ready and the next attempt
+          // resumes the same conversation.
+          this.setReady(false);
+          return false;
         }
       }
       return true;
@@ -577,9 +590,12 @@ export class QwenChatRuntime implements ChatRuntime {
     }
   }
 
-  private async loadSession(sessionId: string, cwd: string): Promise<boolean> {
+  private async loadSession(
+    sessionId: string,
+    cwd: string,
+  ): Promise<'loaded' | 'missing' | 'unavailable'> {
     if (!this.connection) {
-      return false;
+      return 'unavailable';
     }
 
     try {
@@ -599,9 +615,22 @@ export class QwenChatRuntime implements ChatRuntime {
         models: response.models ?? null,
         modes: response.modes ?? null,
       });
-      return true;
-    } catch {
-      return false;
+      return 'loaded';
+    } catch (error) {
+      // A load that failed is not a session that is gone. The shared policy
+      // tells the two apart, and only the first justifies erasing a binding the
+      // conversation still names: a timeout, a dead transport or an agent that
+      // was busy would otherwise silently start a new conversation and leave
+      // the old one unreachable. A transient failure leaves the tab not ready,
+      // which the next attempt can fix.
+      const missing = isAcpMissingSessionError(error);
+      this.plugin.recordDebugLog?.(buildAcpSessionLoadFailureDebugEvent({
+        cwd,
+        error,
+        providerId: 'qwen',
+        sessionId,
+      }));
+      return missing ? 'missing' : 'unavailable';
     }
   }
 
@@ -844,11 +873,31 @@ export class QwenChatRuntime implements ChatRuntime {
     };
   }
 
+  /**
+   * This provider's own permission mode, not whichever one was projected last.
+   *
+   * `settings.permissionMode` is a shared field: the settings coordinator
+   * projects the active provider's value into it, so reading it directly
+   * answers for whoever was toggled most recently. That is how another
+   * provider's Auto-approve came to switch off *this* provider's workspace
+   * containment and skip its write approvals. Every flipped provider reads the
+   * per-provider snapshot; these two were the ones the change never reached.
+   */
+  private permissionMode(): PermissionMode {
+    return ProviderSettingsCoordinator
+      .getProviderSettingsSnapshot(this.plugin.settings, 'qwen')
+      .permissionMode;
+  }
+
+  private fullAccess(): boolean {
+    return this.permissionMode() === 'full_access';
+  }
+
   private async writeTextFile(request: AcpWriteTextFileRequest): Promise<Record<string, never>> {
     const resolvedPath = this.resolveSessionPath(request.sessionId, request.path);
     await approveAcpWriteTextFile({
       approvalCallback: this.approvalCallback,
-      fullAccess: this.plugin.settings.permissionMode === 'full_access',
+      fullAccess: this.fullAccess(),
       providerLabel: 'Qwen',
       requestPath: request.path,
       resolvedPath,
@@ -865,7 +914,7 @@ export class QwenChatRuntime implements ChatRuntime {
       ?? process.cwd();
     // Active (full-access) mode opts into unrestricted file access; safe and
     // plan modes confine ACP-delegated reads/writes to the session workspace.
-    const allowOutsideWorkspace = this.plugin.settings.permissionMode === 'full_access';
+    const allowOutsideWorkspace = this.fullAccess();
     return resolveWorkspacePath(cwd, rawPath, { allowOutsideWorkspace });
   }
 
@@ -911,7 +960,7 @@ export class QwenChatRuntime implements ChatRuntime {
 
   private async applySelectedMode(sessionId: string): Promise<void> {
     if (!this.connection || typeof this.connection.setMode !== 'function') return;
-    const requested = this.plugin.settings.permissionMode
+    const requested = this.permissionMode()
       || getQwenProviderSettings(this.plugin.settings).selectedMode;
     const modeId = mapGrimoireModeToQwen(requested);
     if (modeId === this.currentSessionModeId) return;

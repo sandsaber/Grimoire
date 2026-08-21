@@ -47,7 +47,10 @@ describe('Antigravity provider registration', () => {
 
     expect(runtime).toBeInstanceOf(ExecutionChatRuntimeAdapter);
     expect(runtime.providerId).toBe('antigravity');
-    expect(runtime.getCapabilities().reasoningControl).toBe('effort');
+    // 'none', because nothing in the print path reads an effort level. A
+    // declaration is a promise to the toolbar, and this one had nothing behind
+    // it.
+    expect(runtime.getCapabilities().reasoningControl).toBe('none');
   });
 
   it('creates Antigravity workspace services', async () => {

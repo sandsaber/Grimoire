@@ -1,8 +1,11 @@
+import '@/providers';
+
 import * as fs from 'node:fs/promises';
 
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import type { StreamChunk } from '@/core/types';
 import type { AcpContentBlock } from '@/providers/acp';
+import { JsonRpcErrorResponse } from '@/providers/acp';
 import { QwenChatRuntime } from '@/providers/qwen/runtime/QwenChatRuntime';
 import { getQwenProviderSettings, updateQwenProviderSettings } from '@/providers/qwen/settings';
 
@@ -352,7 +355,8 @@ describe('QwenChatRuntime', () => {
       loadSession: jest.fn().mockResolvedValue({ models: null, modes: null }),
     };
 
-    await expect((runtime as any).loadSession('requested-id', '/tmp/grimoire-qwen-test-vault')).resolves.toBe(true);
+    await expect((runtime as any).loadSession('requested-id', '/tmp/grimoire-qwen-test-vault'))
+      .resolves.toBe('loaded');
     expect(runtime.getSessionId()).toBe('requested-id');
   });
 
@@ -925,4 +929,53 @@ describe('QwenChatRuntime', () => {
       expect((runtime).resolveSessionPath('session-1', '/etc/hosts')).toBe('/etc/hosts');
     });
   });
+
+  it('reads its own permission mode, not whichever provider was toggled last', async () => {
+    // `settings.permissionMode` is a shared field the settings coordinator
+    // projects the active provider's value into. Reading it directly answered
+    // for whoever was toggled most recently, so another provider's Auto-approve
+    // switched off *this* provider's containment and skipped its write
+    // approvals. Here the shared field says full access and this provider's own
+    // saved mode says Safe.
+    const plugin = createMockPlugin();
+    plugin.settings.permissionMode = 'full_access';
+    plugin.settings.savedProviderPermissionMode = { qwen: 'normal' };
+    const runtime = new QwenChatRuntime(plugin);
+    const approvalCallback = jest.fn().mockResolvedValue('deny');
+    runtime.setApprovalCallback(approvalCallback);
+
+    await expect((runtime as any).writeTextFile({
+      content: 'new page',
+      path: 'Notes/Contaminated.md',
+      sessionId: 'session-1',
+    })).rejects.toThrow(/was not approved/);
+
+    expect(approvalCallback).toHaveBeenCalled();
+  });
+
+  it('keeps a valid session binding when a load fails for any other reason', async () => {
+    // Erasing the binding on every failure meant a timeout or a dead transport
+    // silently started a new conversation and left the old one unreachable. The
+    // shared policy exists to tell a missing session from a transient one.
+    const runtime = new QwenChatRuntime(createMockPlugin());
+    (runtime as any).connection = {
+      loadSession: jest.fn().mockRejectedValue(new Error('socket hang up')),
+    };
+
+    await expect((runtime as any).loadSession('bound-id', '/tmp/grimoire-qwen-test-vault'))
+      .resolves.toBe('unavailable');
+  });
+
+  it('lets go of a session the agent says is gone', async () => {
+    const runtime = new QwenChatRuntime(createMockPlugin());
+    (runtime as any).connection = {
+      loadSession: jest.fn().mockRejectedValue(
+        new JsonRpcErrorResponse('session/load', -32603, 'Session not found'),
+      ),
+    };
+
+    await expect((runtime as any).loadSession('bound-id', '/tmp/grimoire-qwen-test-vault'))
+      .resolves.toBe('missing');
+  });
+
 });

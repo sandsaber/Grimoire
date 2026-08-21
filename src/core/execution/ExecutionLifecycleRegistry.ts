@@ -1,4 +1,5 @@
 import type { VersionedRecord } from '../persistence/VersionedRecord';
+import { UnreadableControlRecordError } from '../persistence/VersionedRecord';
 import { type ExecutionBackendId,executionBackendId } from './ExecutionBackendDescriptor';
 import type {
   CancellationReason,
@@ -291,6 +292,26 @@ export class ExecutionLifecycleRegistry {
    * The record that made startup stop, or `null` when the store is readable.
    * The host presents this instead of the registry failing to construct.
    */
+  /**
+   * Closes the backends of a registry that never opened.
+   *
+   * `shutdown` is the ordinary path and it requires a registry that accepted
+   * work: it cancels runs, disposes sessions and writes a checkpoint, none of
+   * which exists here. What does exist is the backends, registered before
+   * startup — and a startup that failed, or a store that requires migration,
+   * used to leave every one of them alive with whatever process it owns. That
+   * is the reverted-build path, where the leak lasts until the application
+   * quits.
+   *
+   * Safe to call after `shutdown`, which disposes each backend once.
+   */
+  async disposeRegisteredBackends(): Promise<void> {
+    await this.settleWithin(
+      [...this.backends.values()].map(backend => this.disposeBackendOnce(backend)),
+    );
+    this.state = 'closed';
+  }
+
   getMigrationRequirement(): UnreadableControlRecordError | null {
     return this.migrationRequired;
   }
@@ -2570,12 +2591,10 @@ function write(
  * or undecodable. Distinct from a programming error so startup can fail closed
  * on it without swallowing real defects.
  */
-export class UnreadableControlRecordError extends Error {
-  constructor(readonly recordKind: 'future' | 'corrupt', readonly detail: string) {
-    super(`Control record is unreadable (${recordKind}): ${detail}`);
-    this.name = 'UnreadableControlRecordError';
-  }
-}
+// Re-exported from where it is raised: it is a property of reading a versioned
+// record, not of the registry, and both this file and the intent coordinator
+// have to raise the same one for D5 to hold.
+export { UnreadableControlRecordError };
 
 async function requireCurrent<TRecord>(
   read: Promise<

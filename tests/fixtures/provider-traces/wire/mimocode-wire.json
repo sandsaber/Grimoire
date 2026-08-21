@@ -3,7 +3,7 @@
   "providerId": "mimocode",
   "kind": "wire-recording",
   "recordedAgainst": "mimocode 0.1.13",
-  "transport": "stdio JSON-RPC 2.0 (`/home/m5/.mimocode/bin/mimo acp`)",
+  "transport": "stdio JSON-RPC 2.0 (`/home/grimoire/.mimocode/bin/mimo acp`)",
   "cases": [
     "initialize",
     "session/new",

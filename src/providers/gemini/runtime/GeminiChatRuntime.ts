@@ -1,6 +1,13 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
+import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
+import type { PermissionMode } from '@/core/types';
+import {
+  buildAcpSessionLoadFailureDebugEvent,
+  isAcpMissingSessionError,
+} from '@/providers/acp/acpSessionResume';
+
 import { applyOrchestratorModeInstructions } from '../../../core/prompt/mainAgent';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
@@ -138,6 +145,9 @@ export class GeminiChatRuntime implements ChatRuntime {
   private connection: AcpClientConnection | null = null;
   private contextUsage: Parameters<typeof buildAcpUsageInfo>[0]['contextWindow'] = null;
   private currentSessionModelId: string | null = null;
+  /** The mode the session is actually in, as the agent last reported it. */
+  private currentSessionModeId: string | null = null;
+  private permissionModeSyncCallback: ((sdkMode: string) => void) | null = null;
   private currentLaunchKey: string | null = null;
   private currentTurnMetadata: ChatTurnMetadata = {};
   private loadedSessionId: string | null = null;
@@ -233,10 +243,16 @@ export class GeminiChatRuntime implements ChatRuntime {
 
     if (this.sessionId) {
       if (this.loadedSessionId !== this.sessionId) {
-        const loaded = await this.loadSession(this.sessionId, cwd);
-        if (!loaded) {
+        const outcome = await this.loadSession(this.sessionId, cwd);
+        if (outcome === 'missing') {
           this.sessionInvalidated = true;
           this.clearActiveSession();
+        } else if (outcome === 'unavailable') {
+          // The binding is good and the agent could not load it now. Keeping it
+          // is the whole point: the tab reports not-ready and the next attempt
+          // resumes the same conversation.
+          this.setReady(false);
+          return false;
         }
       }
       return true;
@@ -291,6 +307,7 @@ export class GeminiChatRuntime implements ChatRuntime {
     const sessionId = this.sessionId!;
     try {
       await this.applySelectedModel(sessionId, queryOptions);
+      await this.applySelectedMode(sessionId);
     } catch (error) {
       yield {
         type: 'error',
@@ -417,7 +434,16 @@ export class GeminiChatRuntime implements ChatRuntime {
 
   setExitPlanModeCallback(_callback: ExitPlanModeCallback | null): void {}
 
-  setPermissionModeSyncCallback(_callback: ((sdkMode: string) => void) | null): void {}
+  /**
+   * The surface's way of hearing that the session changed mode by itself.
+   *
+   * Stored rather than discarded: this runtime declares plan support, and a
+   * toolbar that never hears about a mode the agent moved into keeps showing
+   * the one that was picked.
+   */
+  setPermissionModeSyncCallback(callback: ((sdkMode: string) => void) | null): void {
+    this.permissionModeSyncCallback = callback;
+  }
 
   setSubagentHookProvider(_getState: () => SubagentRuntimeState): void {}
 
@@ -542,9 +568,12 @@ export class GeminiChatRuntime implements ChatRuntime {
     }
   }
 
-  private async loadSession(sessionId: string, cwd: string): Promise<boolean> {
+  private async loadSession(
+    sessionId: string,
+    cwd: string,
+  ): Promise<'loaded' | 'missing' | 'unavailable'> {
     if (!this.connection) {
-      return false;
+      return 'unavailable';
     }
 
     try {
@@ -566,9 +595,22 @@ export class GeminiChatRuntime implements ChatRuntime {
         models: response.models ?? null,
         modes: response.modes ?? null,
       });
-      return true;
-    } catch {
-      return false;
+      return 'loaded';
+    } catch (error) {
+      // A load that failed is not a session that is gone. The shared policy
+      // tells the two apart, and only the first justifies erasing a binding the
+      // conversation still names: a timeout, a dead transport or an agent that
+      // was busy would otherwise silently start a new conversation and leave
+      // the old one unreachable. A transient failure leaves the tab not ready,
+      // which the next attempt can fix.
+      const missing = isAcpMissingSessionError(error);
+      this.plugin.recordDebugLog?.(buildAcpSessionLoadFailureDebugEvent({
+        cwd,
+        error,
+        providerId: 'gemini',
+        sessionId,
+      }));
+      return missing ? 'missing' : 'unavailable';
     }
   }
 
@@ -583,6 +625,17 @@ export class GeminiChatRuntime implements ChatRuntime {
     }
 
     const normalized = this.sessionUpdateNormalizer.normalize(notification.update);
+    if (normalized.type === 'current_mode') {
+      // The agent's own word for the mode it is in. Dropped, the toolbar kept
+      // showing whatever was last picked even after the session moved.
+      this.currentSessionModeId = normalized.currentModeId;
+      updateGeminiProviderSettings(this.plugin.settings, {
+        selectedMode: normalized.currentModeId,
+      });
+      void this.plugin.saveSettings?.();
+      this.emitPermissionModeSync(normalized.currentModeId);
+      return;
+    }
     if (normalized.type === 'config_options') {
       this.syncSessionDiscovery({
         configOptions: normalized.configOptions,
@@ -606,6 +659,10 @@ export class GeminiChatRuntime implements ChatRuntime {
           this.activeTurn.queue.push(chunk);
         }
         return;
+      // `plan` beside them: a declared capability that reached the surface as
+      // nothing. Every other ACP-family runtime forwards it, and this switch
+      // dropped it into `default` while `capabilities.ts` promised plan support.
+      case 'plan':
       case 'tool_call':
       case 'tool_call_update':
         for (const chunk of normalized.streamChunks) {
@@ -723,11 +780,31 @@ export class GeminiChatRuntime implements ChatRuntime {
     };
   }
 
+  /**
+   * This provider's own permission mode, not whichever one was projected last.
+   *
+   * `settings.permissionMode` is a shared field: the settings coordinator
+   * projects the active provider's value into it, so reading it directly
+   * answers for whoever was toggled most recently. That is how another
+   * provider's Auto-approve came to switch off *this* provider's workspace
+   * containment and skip its write approvals. Every flipped provider reads the
+   * per-provider snapshot; these two were the ones the change never reached.
+   */
+  private permissionMode(): PermissionMode {
+    return ProviderSettingsCoordinator
+      .getProviderSettingsSnapshot(this.plugin.settings, 'gemini')
+      .permissionMode;
+  }
+
+  private fullAccess(): boolean {
+    return this.permissionMode() === 'full_access';
+  }
+
   private async writeTextFile(request: AcpWriteTextFileRequest): Promise<Record<string, never>> {
     const resolvedPath = this.resolveSessionPath(request.sessionId, request.path);
     await approveAcpWriteTextFile({
       approvalCallback: this.approvalCallback,
-      fullAccess: this.plugin.settings.permissionMode === 'full_access',
+      fullAccess: this.fullAccess(),
       providerLabel: 'Gemini',
       requestPath: request.path,
       resolvedPath,
@@ -744,7 +821,7 @@ export class GeminiChatRuntime implements ChatRuntime {
       ?? process.cwd();
     // Active (full-access) mode opts into unrestricted file access; safe and
     // plan modes confine ACP-delegated reads/writes to the session workspace.
-    const allowOutsideWorkspace = this.plugin.settings.permissionMode === 'full_access';
+    const allowOutsideWorkspace = this.fullAccess();
     return resolveWorkspacePath(cwd, rawPath, { allowOutsideWorkspace });
   }
 
@@ -771,6 +848,35 @@ export class GeminiChatRuntime implements ChatRuntime {
     return typeof savedGeminiModel === 'string'
       ? decodeGeminiModelId(savedGeminiModel)
       : providerSettings.visibleModels[0] ?? null;
+  }
+
+  /**
+   * Puts the session into the mode the toolbar shows.
+   *
+   * Gemini discovered its modes and stored the selection, and sent it nowhere:
+   * picking Plan changed a settings field and nothing else, while the
+   * capability record declared plan support. The agent is what has to be told,
+   * and `session/set_mode` is how — the same call Qwen makes at the same point
+   * in a turn.
+   */
+  private async applySelectedMode(sessionId: string): Promise<void> {
+    if (!this.connection || typeof this.connection.setMode !== 'function') {
+      return;
+    }
+    const modeId = getGeminiProviderSettings(this.plugin.settings).selectedMode;
+    if (!modeId || modeId === this.currentSessionModeId) {
+      return;
+    }
+    await this.connection.setMode({ modeId, sessionId });
+    this.currentSessionModeId = modeId;
+  }
+
+  private emitPermissionModeSync(modeId: string): void {
+    try {
+      this.permissionModeSyncCallback?.(modeId);
+    } catch {
+      // UI synchronization is non-critical to the provider session.
+    }
   }
 
   private async applySelectedModel(

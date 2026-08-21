@@ -42,3 +42,21 @@ export type VersionedRecordReadResult<TPayload> =
     readonly error: string;
     readonly raw: string;
   };
+
+/**
+ * A record this build cannot read, and therefore must not act on.
+ *
+ * Persistence decision D5: a store holding a `future` or `corrupt` record opens
+ * read-only and the host reports it, rather than guessing at a shape it does
+ * not know. It lives here, beside the read result that produces those two
+ * kinds, because every reader of a versioned record needs to raise the same
+ * thing — a coordinator that raised a plain `Error` instead had its store read
+ * as a defect, which fails startup opaquely and leaves the host with nothing to
+ * tell the user.
+ */
+export class UnreadableControlRecordError extends Error {
+  constructor(readonly recordKind: 'future' | 'corrupt', readonly detail: string) {
+    super(`Control record is unreadable (${recordKind}): ${detail}`);
+    this.name = 'UnreadableControlRecordError';
+  }
+}
