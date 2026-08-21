@@ -4687,6 +4687,36 @@ through the content presenter, the way OpenCode's row has since wave 4, and the 
 Gates: unit 477 suites / 7,658 tests, typecheck, `eslint` over `src` and `tests` clean.
 
 
+### Review L1, L2 and L3 — the Claude pass (this commit)
+
+**L1.** `ClaudePlanUsageStore.recordSdkMessage` had no caller anywhere. The plan indicator for this
+provider is fed from the SDK's own `result` and rate-limit messages and from nothing else, so it was
+fed by nothing at all — the same class wave 2 found and fixed for Codex, which Claude never got. The
+content presenter now hands every message to an `onUsageMessage` port and the composition records it,
+refreshing the indicators when the store took something. Pinned end to end: the fake SDK's result
+carries a cost, and the composition test reads it back out of the store.
+
+**L3.** The Stop hook was built with `() => ({ hasRunning: false })` — hardcoded, with a comment
+saying the runtime half would own it. So a stop that arrived while a subagent was working ended the
+turn under it, which is exactly what the hook exists to prevent. The tab already installs a provider
+through `setSubagentHookProvider`; the turn now carries it, because the hook goes into the SDK
+options a *turn* is started with and the answer belongs to a *tab*. The composition's own hook stays
+as the fallback for a turn that carries none.
+
+**L2.** `claude-wire.json` has been in the tree since M0b with nothing asserting anything about it —
+the row this file was created for. It now replays the recording through the content presenter, like
+OpenCode's and Grok's rows.
+
+Two attempts at that row measured nothing, and both are worth keeping in mind for the next one:
+counting a message as consumed because the usage *port was called* marks everything consumed, since
+every message passes through it — so the row asks whether the store **took** something instead. And
+counting the session id as consumption marks everything consumed too, because every message carries
+`session_id`; `system/init` is therefore listed as unmodelled with the reason written down, rather
+than credited for something this row cannot see.
+
+Gates: unit 477 suites / 7,662 tests, typecheck, `eslint`, and `build:release` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

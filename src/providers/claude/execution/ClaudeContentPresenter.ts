@@ -26,6 +26,15 @@ export interface ClaudeContentPresenterPorts {
    * chose while the model is already planning.
    */
   readonly onPlanModeEntered?: () => void;
+  /**
+   * Every message, for whatever counts what a turn cost.
+   *
+   * The plan indicator is fed from the SDK's own `result` and rate-limit
+   * messages and from nothing else, so a path that renders chunks and drops the
+   * message leaves the indicator empty. Wave 2 found this class for Codex; the
+   * Claude store had no caller at all.
+   */
+  readonly onUsageMessage?: (message: SDKMessage | Record<string, unknown>) => void;
 }
 
 /**
@@ -102,6 +111,7 @@ export class ClaudeContentPresenter {
     if (!message || typeof (message as { type?: unknown }).type !== 'string') {
       return [];
     }
+    this.ports.onUsageMessage?.(message);
     if ('session_id' in message && typeof message.session_id === 'string' && message.session_id) {
       this.sessionId = message.session_id;
     }

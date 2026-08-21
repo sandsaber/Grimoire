@@ -11,7 +11,10 @@ import { ClaudeContentPresenter } from '@/providers/claude/execution/ClaudeConte
  * rendered with, minus the one copy of the text the kernel already carries.
  */
 describe('Claude content presenter', () => {
-  function createPresenter(overrides: { onPlanModeEntered?: () => void } = {}): ClaudeContentPresenter {
+  function createPresenter(overrides: {
+    onPlanModeEntered?: () => void;
+    onUsageMessage?: (message: unknown) => void;
+  } = {}): ClaudeContentPresenter {
     return new ClaudeContentPresenter({
       settings: () => ({ intendedModel: 'claude-opus-5' }),
       ...overrides,
@@ -40,6 +43,25 @@ describe('Claude content presenter', () => {
       },
     } as unknown as SDKMessage;
   }
+
+  it('hands every message to whatever counts what a turn cost', async () => {
+    const seen: unknown[] = [];
+    const presenter = createPresenter({ onUsageMessage: message => seen.push(message) });
+    const result = {
+      type: 'result',
+      subtype: 'success',
+      session_id: 'native-session',
+      uuid: 'result-1',
+      modelUsage: { 'claude-opus-5': { costUSD: 0.42 } },
+    } as unknown as SDKMessage;
+
+    presenter.present(result);
+
+    // The plan indicator is fed from the SDK's own result and rate-limit
+    // messages, and nothing else carries them. Wave 2 found this exact gap for
+    // Codex; Claude kept it — the store had no caller at all.
+    expect(seen).toEqual([result]);
+  });
 
   it('renders the tool call a card is drawn from', () => {
     const presenter = createPresenter();

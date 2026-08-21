@@ -72,9 +72,9 @@ by the length of the session. **C1 is closed.**
 
 | # | Finding | Evidence | Status |
 |---|---|---|---|
-| L1 | **`ClaudePlanUsageStore.recordSdkMessage` has no production caller** (`src/providers/claude/app/ClaudePlanUsageStore.ts:25`) — the plan-limit indicator loses its data. Wave 2 found and fixed exactly this class for Codex; Claude never got the equivalent. | grep: declaration only | confirmed |
-| L2 | `claude-wire.json` exists and no test imports it — the wire row named in the journal as owed is still owed. | — | reported |
-| L3 | Stop-during-subagent is disabled: the hook is hardcoded `{ hasRunning: false }` (`ClaudeExecutionComposition.ts:401`), where the legacy path blocked Stop while a subagent ran. | — | reported |
+| L1 ✅ | **`ClaudePlanUsageStore.recordSdkMessage` has no production caller** (`src/providers/claude/app/ClaudePlanUsageStore.ts:25`) — the plan-limit indicator loses its data. Wave 2 found and fixed exactly this class for Codex; Claude never got the equivalent. | grep: declaration only | confirmed |
+| L2 ✅ | `claude-wire.json` exists and no test imports it — the wire row named in the journal as owed is still owed. | — | reported |
+| L3 ✅ | Stop-during-subagent is disabled: the hook is hardcoded `{ hasRunning: false }` (`ClaudeExecutionComposition.ts:401`), where the legacy path blocked Stop while a subagent ran. | — | reported |
 
 Codex and Antigravity came back clean — flip discipline, process ownership and sandbox policy all
 held.

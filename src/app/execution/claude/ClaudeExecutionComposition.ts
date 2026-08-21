@@ -24,6 +24,7 @@ import type { ChatTurnRequest, PreparedChatTurn } from '@/core/runtime/types';
 import type { PermissionMode } from '@/core/types/settings';
 import type GrimoirePlugin from '@/main';
 import { createClaudeModuleContext } from '@/providers/claude/app/ClaudeModuleContext';
+import { claudePlanUsageStore } from '@/providers/claude/app/ClaudePlanUsageStore';
 import { getClaudeWorkspaceServices } from '@/providers/claude/app/ClaudeWorkspaceServices';
 import { CLAUDE_PROVIDER_CAPABILITIES } from '@/providers/claude/capabilities';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
@@ -222,6 +223,14 @@ export class ClaudeExecution {
             : {}),
         };
       },
+      // What the turn cost, and what the plan has left. Both are in the SDK's
+      // own messages and in nothing else the surface reads, so a path that
+      // renders chunks and drops the message leaves the indicator empty.
+      onUsageMessage: message => {
+        if (claudePlanUsageStore.recordSdkMessage(message)) {
+          this.refreshSelectors();
+        }
+      },
       // The SDK approves `EnterPlanMode` itself, so this tool call in the
       // stream is the only sign the turn began planning.
       onPlanModeEntered: () => {
@@ -252,6 +261,15 @@ export class ClaudeExecution {
         // must resume the session that one created rather than the one this tab
         // was on when the user pressed send.
         session: () => claudeSessionIntent(boundConversation(), content.lastSessionId()),
+        // Whether *this tab* has a subagent running, asked when the SDK wants
+        // to stop. Read late for the same reason as the session: the surface
+        // installs its provider after this runtime is built.
+        subagentState: () => {
+          const provider = adapter?.interactionCallbacks().subagentState;
+          return typeof provider === 'function'
+            ? (provider as () => { hasRunning: boolean })()
+            : { hasRunning: false };
+        },
       }),
       reasoningControl: CLAUDE_PROVIDER_CAPABILITIES.reasoningControl,
       // The session this conversation is on, which the kernel records and a
@@ -331,6 +349,13 @@ export class ClaudeExecution {
     return runtime;
   }
 
+  /** Redraws the model and plan indicators of every open view. */
+  private refreshSelectors(): void {
+    for (const view of this.plugin.getAllViews()) {
+      view.refreshModelSelector();
+    }
+  }
+
   /** Drops every reference held, and takes down whatever is on screen. */
   dispose(): void {
     // Taken down before the subscriptions are dropped: unsubscribing first
@@ -396,10 +421,9 @@ export class ClaudeExecution {
         mcpManager: workspace.mcpManager,
         pluginManager: workspace.pluginManager,
       },
-      // The one hook the legacy runtime installs, and it is about subagents
-      // rather than settings: a stop that arrives while a subagent is running
-      // must not end the turn under it. Answered as "nothing running" until the
-      // runtime half can say otherwise, which is the increment that owns it.
+      // The fallback for a turn that carries no answer of its own: every turn
+      // a tab sends does, and it is the tab that knows whether a subagent is
+      // running. A turn without one blocks nothing.
       hooks: { Stop: [createStopSubagentHook(() => ({ hasRunning: false }))] },
     };
   }

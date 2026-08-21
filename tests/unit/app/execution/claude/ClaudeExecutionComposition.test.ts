@@ -8,6 +8,7 @@ import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
 import { executionSessionId, runId } from '@/core/execution/ExecutionIds';
 import type { StreamChunk } from '@/core/types';
+import { claudePlanUsageStore } from '@/providers/claude/app/ClaudePlanUsageStore';
 import { getClaudeWorkspaceServices } from '@/providers/claude/app/ClaudeWorkspaceServices';
 import { CLAUDE_EXECUTION_DESCRIPTOR } from '@/providers/claude/execution/ClaudeExecutionBackend';
 import type { ClaudeSdkQueryFunction } from '@/providers/claude/execution/ClaudeSdkExecutionAdapter';
@@ -154,6 +155,9 @@ describe('Claude execution composition', () => {
             user_message_uuid: sent.uuid,
             uuid: 'result-1',
             session_id: 'native-session',
+            // What the SDK reports a finished turn cost. Nothing else carries
+            // it, which is why the plan indicator is fed from this message.
+            modelUsage: { 'claude-opus-5': { costUSD: 0.42 } },
           } as unknown as SDKMessage;
         }
       })();
@@ -256,6 +260,48 @@ describe('Claude execution composition', () => {
     // reload, and nothing to fork from.
     expect(runtime.getSessionId()).toBe('native-session');
     expect(runtime.consumeTurnMetadata()).toMatchObject({ wasSent: true });
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('counts what the SDK says the turn cost', async () => {
+    claudePlanUsageStore.reset();
+    const plugin = createPlugin();
+    const { execution, host } = await createHarness(plugin);
+    const runtime = execution.createRuntime();
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    // The store had no caller at all: the indicator was fed by nothing, which
+    // is the class wave 2 found and fixed for Codex.
+    expect(claudePlanUsageStore.getCachedUsage({
+      plugin,
+      providerId: 'claude',
+      settings: plugin.settings,
+    })?.spend).toContain('0.42');
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('refuses to stop a turn while the tab has a subagent running', async () => {
+    const { execution, host, startedWith } = await createHarness();
+    const runtime = execution.createRuntime();
+    let hasRunning = true;
+    runtime.setSubagentHookProvider(() => ({ hasRunning }));
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    // The SDK's Stop hook is the only thing that can refuse: a stop that lands
+    // while a subagent is working would end the turn under it. The tab knows
+    // whether one is; the composition was answering "nothing running" for every
+    // turn regardless.
+    const stop = (startedWith[0] as unknown as {
+      hooks?: { Stop?: readonly { hooks: readonly (() => Promise<unknown>)[] }[] };
+    }).hooks?.Stop?.[0]?.hooks?.[0];
+    await expect(stop?.()).resolves.toMatchObject({ decision: 'block' });
+
+    hasRunning = false;
+    await expect(stop?.()).resolves.toEqual({});
     execution.dispose();
     await host.dispose();
   });

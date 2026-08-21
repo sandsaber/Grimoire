@@ -2,6 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import type { AcpSessionNotification } from '@/providers/acp/types';
+import { ClaudePlanUsageStore } from '@/providers/claude/app/ClaudePlanUsageStore';
+import { ClaudeContentPresenter } from '@/providers/claude/execution/ClaudeContentPresenter';
 import { CODEX_EXECUTION_NOTIFICATION_METHODS } from '@/providers/codex/runtime/CodexExecutionConnection';
 import { GrokContentPresenter } from '@/providers/grok/execution/GrokContentPresenter';
 import { GROK_SESSION_NOTIFICATION_METHODS } from '@/providers/grok/runtime/GrokSessionNotifications';
@@ -54,6 +56,23 @@ const UNMODELLED_BY_PROVIDER: Readonly<Record<string, readonly string[]>> = {
     'rawResponse/completed',
     'remoteControl/status/changed',
     'thread/started',
+  ],
+  /**
+   * What a Claude turn sends that no surface is drawn from.
+   *
+   * `system/hook_started` and `system/hook_response` are Grimoire's own hooks
+   * reporting themselves, and `system/thinking_tokens` is a budget notice; none
+   * of the three is content. `system/init` is here for a different reason — its
+   * session id *is* read, but from the `session_id` field every message carries,
+   * so this row cannot tell it apart from a message that was ignored.
+   * `rate_limit_event` and `result/success` are absent because the plan store
+   * takes something from both.
+   */
+  claude: [
+    'system/hook_response',
+    'system/hook_started',
+    'system/init',
+    'system/thinking_tokens',
   ],
   // Empty since wave 4's content surface: the commands update and the usage
   // update are both consumed now, by the presenter rather than the backend —
@@ -194,6 +213,36 @@ describe('wire vocabulary coverage', () => {
     expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.grok].sort());
   });
 
+  it('records every Claude message type nothing draws the surface from', () => {
+    const recording = recordings.find(candidate => candidate.providerId === 'claude');
+    const observed = (recording as { messageTypesObserved?: readonly string[] })
+      ?.messageTypesObserved ?? [];
+    const consumed = new Set(
+      ((recording?.exchange ?? []) as readonly Record<string, unknown>[]).flatMap(message => {
+        const effects: string[] = [];
+        const usage = new ClaudePlanUsageStore();
+        const presenter = new ClaudeContentPresenter({
+          settings: () => ({ intendedModel: 'claude-opus-5' }),
+          onPlanModeEntered: () => effects.push('plan'),
+          // Asked whether the store *took* something rather than whether the
+          // port was called: every message passes through it by design, so
+          // counting the call would call every message consumed.
+          onUsageMessage: next => {
+            if (usage.recordSdkMessage(next)) effects.push('usage');
+          },
+        });
+        const chunks = presenter.present(message);
+        return chunks.length > 0 || effects.length > 0 ? [messageTypeOf(message)] : [];
+      }),
+    );
+    const missing = observed.filter(type => !consumed.has(type)).sort();
+
+    // The row this file was missing: the recording has been here since M0b and
+    // nothing asserted anything about it, which is how a provider's whole
+    // vocabulary can go unread without a gate noticing.
+    expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.claude].sort());
+  });
+
   it('records every Grok notification method nothing subscribes to', () => {
     const observed = recordings.find(recording => recording.providerId === 'grok')
       ?.serverMethodsObserved ?? [];
@@ -227,6 +276,13 @@ describe('wire vocabulary coverage', () => {
  */
 function readModelledCodexNotifications(): readonly string[] {
   return CODEX_EXECUTION_NOTIFICATION_METHODS;
+}
+
+/** How a recorded Claude message is named in `messageTypesObserved`. */
+function messageTypeOf(message: Record<string, unknown>): string {
+  const type = typeof message.type === 'string' ? message.type : '';
+  const subtype = typeof message.subtype === 'string' ? message.subtype : '';
+  return subtype ? `${type}/${subtype}` : type;
 }
 
 /** Every session update Grok's recording carried, on either channel. */

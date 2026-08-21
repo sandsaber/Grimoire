@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 
 import type { Options } from '@anthropic-ai/claude-agent-sdk';
 
+import { createStopSubagentHook } from '@/providers/claude/hooks/SubagentHooks';
+
 import type { ImageAttachment } from '../../../core/types';
 import {
   type PersistentQueryContext,
@@ -30,6 +32,15 @@ export interface ClaudeExecutionRequest {
   readonly allowedTools?: readonly string[];
   readonly orchestratorMode?: boolean;
   readonly externalContextPaths?: readonly string[];
+  /**
+   * Whether the tab has a subagent running, asked when the SDK wants to stop.
+   *
+   * Per turn because it is per tab: the Stop hook is installed into the SDK
+   * options a turn is started with, and a stop that lands while a subagent is
+   * working must not end the turn under it. A turn that carries no answer keeps
+   * the environment's, which blocks nothing.
+   */
+  readonly subagentState?: () => { readonly hasRunning: boolean };
 }
 
 /**
@@ -91,7 +102,12 @@ export class ClaudeExecutionRequests implements ClaudeExecutionRequestResolver {
     evict(this.startups, this.limit);
     const startupRef = this.nextReference();
     this.startups.set(startupRef, {
-      environment,
+      environment: request.subagentState
+        ? {
+          ...environment,
+          hooks: { Stop: [createStopSubagentHook(request.subagentState)] },
+        }
+        : environment,
       ...(externalContextPaths ? { externalContextPaths } : {}),
       ...(request.orchestratorMode === undefined
         ? {}
