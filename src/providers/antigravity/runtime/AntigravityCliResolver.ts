@@ -46,12 +46,14 @@ export class AntigravityCliResolver {
     pathText: string | undefined = process.env.PATH,
   ): string | null {
     const hostnamePath = (hostnamePaths?.[this.cachedHostname] ?? '').trim();
+    // Resolved once. The configured path was computed, then computed again as
+    // the first two arms of the chain below — the same two calls, in the same
+    // order, deciding the same thing twice.
     const configuredPath = resolveConfiguredCliPath(hostnamePath)
       ?? resolveConfiguredCliPath(legacyPath.trim());
     const envVars = parseEnvironmentVariables(envText);
     const enhancedPath = getEnhancedPath(envVars.PATH, configuredPath ?? (legacyPath.trim() || undefined));
-    return resolveConfiguredCliPath(hostnamePath)
-      ?? resolveConfiguredCliPath(legacyPath.trim())
+    return configuredPath
       ?? resolveExecutableFromPath('agy', pathText)
       ?? resolveExecutableFromPath('agy', enhancedPath)
       ?? resolveCommonAgyPath();

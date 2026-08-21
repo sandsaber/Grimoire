@@ -27,12 +27,15 @@ export interface GrokExecutionRequest {
 
 
 /**
- * Everything ambient a launched `grok acp` runs under, read at dispatch.
+ * Everything ambient a launched `grok agent … stdio` runs under, read at
+ * dispatch.
  *
- * The artifacts are the part that makes this provider different from the other
- * two: Grok is configured by files Grimoire writes before the process
- * starts — a config and a system prompt — so what a turn runs under is decided
- * by a directory as much as by a command line.
+ * What makes this provider different is that the launch carries the policy:
+ * permission mode and reasoning effort are process arguments, so changing
+ * either restarts the process rather than reconfiguring an open session. The
+ * artifacts are a managed home Grok reads its config and system prompt from,
+ * which is why what a turn runs under is decided by a directory as much as by
+ * a command line.
  */
 export interface GrokInvocationEnvironment {
   readonly executable: string;

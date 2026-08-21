@@ -263,7 +263,20 @@ export class ClaudeExecution {
       () => adapter?.interactionCallbacks() ?? {},
     );
     this.presenters.add(presenter);
-    this.disposers.push(this.interactions.onSettled(ref => presenter.dismiss(ref)));
+    // Released by the tab that owns it, and again at plugin dispose for a tab
+    // that never closed. Only the second existed: a vault opened and closed all
+    // day accumulated one subscription per tab, each holding a presenter for a
+    // view that is gone. Grok and OpenCode release theirs at tab close.
+    const unsubscribeSettled = this.interactions.onSettled(ref => presenter.dismiss(ref));
+    let settledReleased = false;
+    const releaseSettled = (): void => {
+      if (settledReleased) {
+        return;
+      }
+      settledReleased = true;
+      unsubscribeSettled();
+    };
+    this.disposers.push(releaseSettled);
 
     const ports: ExecutionChatRuntimeHostPorts = {
       prepareTurn: (request: ChatTurnRequest) => encodeClaudeTurn(
@@ -375,6 +388,7 @@ export class ClaudeExecution {
       () => {
         // The tab closing is when the prompts it raised stop being anyone's.
         presenter.dismissAll();
+        releaseSettled();
         this.presenters.delete(presenter);
         if (currentExecutionSession) {
           this.unusableSessionListeners.delete(currentExecutionSession);

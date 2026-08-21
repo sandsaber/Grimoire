@@ -229,10 +229,10 @@ The Minor list is long but ordinary: dead exports the flips were supposed to tak
 Carried over in full, because the report they came from is a temporary file. `✅` is closed.
 
 Kernel/persistence:
-- KER-5 [M][bug] Codex + Claude compositions never release per-tab `onSettled` subscriptions at tab close (only at plugin dispose); Grok/OpenCode do release — parity drift. `src/app/execution/codex/CodexExecutionComposition.ts:327-331,307-310`; `src/app/execution/claude/ClaudeExecutionComposition.ts:252,345-350`.
-- KER-6 [M][bug] `startRun` adds runId to `session.knownRunIds` before `commitWrites`; failed commit leaves phantom id. `ExecutionLifecycleRegistry.ts:412-416`.
+- KER-5 ✅ [M][bug] Codex + Claude compositions never release per-tab `onSettled` subscriptions at tab close (only at plugin dispose); Grok/OpenCode do release — parity drift. `src/app/execution/codex/CodexExecutionComposition.ts:327-331,307-310`; `src/app/execution/claude/ClaudeExecutionComposition.ts:252,345-350`.
+- KER-6 ✅ [M][bug] `startRun` adds runId to `session.knownRunIds` before `commitWrites`; failed commit leaves phantom id. `ExecutionLifecycleRegistry.ts:412-416`.
 - KER-7 [M][parity] Tab-scope-owned session (created before conversation binds) never matches D4 conversation-owner deletion; owner immutable in schema. `ClaudeExecutionComposition.ts:334` (same fallback in all compositions).
-- KER-8 [M][hygiene] `LocalShellBackend.ts:472-515` duplicates `ExecutionEventQueue.ts` verbatim as `AsyncEventQueue`.
+- KER-8 ✅ [M][hygiene] `LocalShellBackend.ts:472-515` duplicates `ExecutionEventQueue.ts` verbatim as `AsyncEventQueue`.
 
 Core platform:
 - CORE-1 ✅ [M][tests] `executionCompositionBoundaries.test.ts:100-111` specifier regex misses side-effect `import '...'` and double-quoted specifiers (AST walker in moduleReachability handles both). Reuse walker.
@@ -263,10 +263,10 @@ Codex:
 Grok:
 - GK-1 ✅ [M][bug] `GrokExecutionComposition.ts:496-507` `syncConversation` never removes old conversation's entries from `writeApprovers`/`surfaceReaders`/`sessionPaths`/`questionAskers`; `ownedSessions` only grows; late-settling run from previous conversation resolves against NEW session's directory.
 - GK-2 ✅ [M][hygiene] `grokSubagentNormalization.ts:247-277` `normalizeGrokSubagentExtensionNotification` production-dead (consumer was deleted runtime) — G1 defect class.
-- GK-3 [M][hygiene] `GrokHistoryStore.ts:274-323` ~130 lines test-only mapping code.
-- GK-4 [M][hygiene] `GrokSessionNotifications.ts:59-68` test-only predicates (one is the wrong-shape test the wire gate forbids).
+- GK-3 ✅ [M][hygiene] `GrokHistoryStore.ts:274-323` ~130 lines test-only mapping code.
+- GK-4 ✅ [M][hygiene] `GrokSessionNotifications.ts:59-68` test-only predicates (one is the wrong-shape test the wire gate forbids).
 - GK-5 ✅ [M][hygiene] `modes.ts:77-79` `isManagedGrokModeId` no production caller.
-- GK-6 [M][docs] `GrokExecutionRequests.ts:30,33` stale OpenCode-template JSDoc ("grok acp" launch wording, "the other two").
+- GK-6 ✅ [M][docs] `GrokExecutionRequests.ts:30,33` stale OpenCode-template JSDoc ("grok acp" launch wording, "the other two").
 - GK-7 [M][parity] mirror dedup suppresses only adjacent copies (`GrokSessionNotificationMirrorDeduplicator.ts:19-31`); honest comment; fingerprint LRU if delayed mirrors appear.
 
 ACP/OpenCode:
@@ -288,12 +288,12 @@ MiMo/Kimi:
 Antigravity/Gemini/Qwen (beyond GQ-*):
 - GQ-5 ✅ [M][parity] Gemini never applies selected mode (`applySelectedMode` absent; Plan toggle is a no-op).
 - GQ-6 ✅ [M][hygiene] `AntigravityTranscriptRecovery.ts:19` exported recover fn referenced nowhere.
-- GQ-7 [M][hygiene] `QwenChatRuntime.ts:1081-1100,791-799` duplicates shared approval mappers (same class as MK-1).
+- GQ-7 ✅ [M] Already closed: Qwen's copies went with MK-1's dedup, which took every hand-rolled approval mapper at once.
 - GQ-8 ✅ [M][hygiene] `AntigravityProviderModule.ts:42-61` duplicated normalizers whose comment says they'd die at the flip; flip shipped, dedup didn't.
 - GQ-9 ✅ [M][hygiene] `antigravity/models.ts:64` `return model === X ? null : null`.
 - GQ-10 ✅ [M][hygiene] `i18n/locales/en.json:423` dead `sessionResumeFailed` copy key (all locales).
-- GQ-11 [M][tests] Gemini suite: no plan/current_mode coverage, no transient-vs-missing load coverage.
-- GQ-12 [M][hygiene] `AntigravityCliResolver.ts:48-57` redundant double resolution chain.
+- GQ-11 ✅ [M] Already closed: the GQ-2 and GQ-4 fixes each landed with the coverage this asked for — plan and `current_mode` forwarding, and transient-versus-missing load.
+- GQ-12 ✅ [M][hygiene] `AntigravityCliResolver.ts:48-57` redundant double resolution chain.
 
 Features/shared:
 - FE-1 ✅ [M][hygiene] hardcoded English strings bypassing `t()`: `StreamController.ts:264,274` ('Blocked'/'Notice', '❌ **Error:**', '**Error:**', 'Interrupted · …'), `InputController.ts:603,641,758`, `Tab.ts:1756` ('New Chat' default title).
@@ -304,7 +304,7 @@ Features/shared:
 
 Style/i18n/release:
 - ST-1 [M][hygiene] ~19 dead CSS selectors across `settings/env-snippets.css`, `components/header.css`, `settings/base.css`, `mcp-settings.css`, `base/container.css`, `features/file-context.css`, `features/ask-user-question.css` + mirrors in `accessibility.css:24-28` (zero TS references).
-- ST-2 [M][hygiene] `lockfile-age-exceptions.json` all 42 entries expired 2026-08-06..11; nothing prunes/warns.
+- ST-2 ✅ [M][hygiene] `lockfile-age-exceptions.json` all 42 entries expired 2026-08-06..11; nothing prunes/warns.
 - ST-3 [M][parity] `ja.json` 14 values byte-identical to English (several translatable); de.json 41 (mostly cognates).
 
 Tests/QA:

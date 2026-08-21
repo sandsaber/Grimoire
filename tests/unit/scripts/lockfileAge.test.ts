@@ -150,4 +150,23 @@ describe('lockfile release-age gate', () => {
       now, fetch: packumentFetch({ '1.0.0': '2026-07-01T00:00:00.000Z' }),
     })).rejects.toThrow('does not match registry dist.integrity');
   });
+
+  it('reports an expired exception as prunable rather than keeping it forever', async () => {
+    // A waiver that has expired waives nothing: the package it covered is
+    // either old enough now or already failing on its own. Forty-two of them
+    // accumulated in the repository before anyone noticed, because nothing
+    // said so — the gate passed and said only that it passed.
+    const result = await validateLockfileAge(
+      lock({ 'node_modules/example': registryEntry('example', '1.0.0') }),
+      npmrc,
+      {
+        now,
+        fetch: packumentFetch({ '1.0.0': '2026-07-01T00:00:00.000Z' }),
+        exceptions: exception({ expiresAt: '2026-08-01T00:00:00.000Z' }),
+      },
+    );
+
+    expect(result.expiredExceptions).toEqual(['example@1.0.0']);
+  });
+
 });

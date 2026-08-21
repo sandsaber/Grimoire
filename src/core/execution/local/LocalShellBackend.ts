@@ -15,6 +15,7 @@ import type {
   RunTerminalReason,
   Unsubscribe,
 } from '../ExecutionContracts';
+import { ExecutionEventQueue } from '../ExecutionEventQueue';
 import type { ProviderExecutionEvent } from '../ExecutionEvents';
 import type { SessionInstanceId } from '../ExecutionIds';
 
@@ -201,7 +202,7 @@ class LocalShellSession implements ExecutionSession {
 
 class LocalShellRun implements ExecutionRun {
   readonly events: AsyncIterable<ProviderExecutionEvent>;
-  private readonly queue = new AsyncEventQueue<ProviderExecutionEvent>();
+  private readonly queue = new ExecutionEventQueue<ProviderExecutionEvent>();
   private child: LocalShellChildProcess | undefined;
   private terminal = false;
   private cancellation: CancellationReason | undefined;
@@ -468,52 +469,6 @@ class LocalShellRun implements ExecutionRun {
     return this.options.forcedTerminationMs ?? 2_000;
   }
 }
-
-class AsyncEventQueue<T> implements AsyncIterable<T> {
-  private readonly values: T[] = [];
-  private readonly readers: Array<(result: IteratorResult<T>) => void> = [];
-  private closed = false;
-  count = 0;
-
-  push(value: T): void {
-    if (this.closed) {
-      return;
-    }
-    this.count += 1;
-    const reader = this.readers.shift();
-    if (reader) {
-      reader({ value, done: false });
-    } else {
-      this.values.push(value);
-    }
-  }
-
-  close(): void {
-    if (this.closed) {
-      return;
-    }
-    this.closed = true;
-    for (const reader of this.readers.splice(0)) {
-      reader({ value: undefined as never, done: true });
-    }
-  }
-
-  [Symbol.asyncIterator](): AsyncIterator<T> {
-    return {
-      next: () => {
-        const value = this.values.shift();
-        if (value !== undefined) {
-          return Promise.resolve({ value, done: false });
-        }
-        if (this.closed) {
-          return Promise.resolve({ value: undefined as never, done: true });
-        }
-        return new Promise<IteratorResult<T>>((resolve) => this.readers.push(resolve));
-      },
-    };
-  }
-}
-
 function delay(scheduler: LocalShellScheduler, delayMs: number): Promise<void> {
   return new Promise((resolve) => {
     scheduler.setTimeout(resolve, delayMs);

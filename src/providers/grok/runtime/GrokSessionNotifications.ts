@@ -14,20 +14,6 @@ export const GROK_SESSION_NOTIFICATION_METHODS = [
 
 const GROK_WRAPPED_SESSION_NOTIFICATION_NAME = 'x.ai/session_notification';
 
-const ACP_SESSION_UPDATE_TYPES = new Set([
-  'agent_message_chunk',
-  'agent_thought_chunk',
-  'available_commands_update',
-  'config_option_update',
-  'current_mode_update',
-  'plan',
-  'session_info_update',
-  'tool_call',
-  'tool_call_update',
-  'usage_update',
-  'user_message_chunk',
-]);
-
 export type GrokSessionNotificationSource =
   | 'standard'
   | (typeof GROK_SESSION_UPDATE_NOTIFICATION_METHODS)[number]
@@ -54,17 +40,6 @@ export function parseGrokSessionNotification(
     return parseSessionNotification(params.params);
   }
   return typeof params.method === 'string' ? null : parseSessionNotification(params);
-}
-
-export function isGrokTurnCompletedUpdate(update: unknown): boolean {
-  return isRecord(update)
-    && (update.sessionUpdate === 'turn_completed' || update.type === 'turn_completed');
-}
-
-export function isSupportedAcpSessionUpdate(update: unknown): boolean {
-  return isRecord(update)
-    && typeof update.sessionUpdate === 'string'
-    && ACP_SESSION_UPDATE_TYPES.has(update.sessionUpdate);
 }
 
 function parseSessionNotification(value: unknown): AcpSessionNotification | null {

@@ -438,11 +438,15 @@ export class ExecutionLifecycleRegistry {
           runIds: [...session.record.runIds, request.runId],
           updatedAt: timestamp,
         };
-        session.knownRunIds.add(request.runId);
         await this.commitWrites([
           write('sessions', executionSessionId, session.revision, nextSessionRecord),
           write('runs', request.runId, null, runRecord),
         ]);
+        // After the write, not before: a commit that failed would otherwise
+        // leave this process remembering a run that was never recorded, and
+        // `startRun` refuses an id it already knows — so the retry of a failed
+        // start would be refused as a duplicate.
+        session.knownRunIds.add(request.runId);
         await this.refreshSession(session);
         const createdRun = await requireCurrent(this.repositories.runs.read(request.runId));
         const runEntry: RunEntry = {

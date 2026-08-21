@@ -4,7 +4,6 @@ import { GrokSessionNotificationMirrorDeduplicator } from '@/providers/grok/runt
 import {
   GROK_SESSION_UPDATE_NOTIFICATION_METHODS,
   GROK_WRAPPED_SESSION_NOTIFICATION_METHOD,
-  isGrokTurnCompletedUpdate,
   parseGrokSessionNotification,
 } from '@/providers/grok/runtime/GrokSessionNotifications';
 
@@ -65,11 +64,6 @@ describe('GrokSessionNotifications', () => {
     })).toBeNull();
   });
 
-  it('recognizes Grok turn completion extension updates', () => {
-    expect(isGrokTurnCompletedUpdate({ sessionUpdate: 'turn_completed' })).toBe(true);
-    expect(isGrokTurnCompletedUpdate({ type: 'turn_completed' })).toBe(true);
-    expect(isGrokTurnCompletedUpdate({ sessionUpdate: 'agent_message_chunk' })).toBe(false);
-  });
 });
 
 describe('GrokSessionNotificationMirrorDeduplicator', () => {

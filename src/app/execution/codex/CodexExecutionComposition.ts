@@ -188,7 +188,9 @@ export class CodexExecution {
     const boundConversation = (): BoundConversation | null => conversation;
     // Read late: the surface installs its callbacks on the runtime after this
     // constructs, so a presenter that captured them now would capture nothing.
-    const presenter = this.createInteractionPresenter(() => adapter?.interactionCallbacks() ?? {});
+    const { presenter, release: releaseSettled } = this.createInteractionPresenter(
+      () => adapter?.interactionCallbacks() ?? {},
+    );
     const isPlanTurn = (): boolean => ProviderSettingsCoordinator
       .getProviderSettingsSnapshot(this.plugin.settings, 'codex').permissionMode === 'plan';
     const content = new CodexContentPresenter(isPlanTurn);
@@ -307,6 +309,7 @@ export class CodexExecution {
       () => {
         this.requests.releaseScope(scope);
         presenter.dismissAll();
+        releaseSettled();
       },
     );
     return adapter;
@@ -321,15 +324,25 @@ export class CodexExecution {
    */
   createInteractionPresenter(
     callbacks: ConstructorParameters<typeof CodexInteractionPresenter>[1],
-  ): CodexInteractionPresenter {
+  ): { presenter: CodexInteractionPresenter; release: () => void } {
     const presenter = new CodexInteractionPresenter(this.interactions, callbacks);
     this.presenters.add(presenter);
     const unsubscribe = this.interactions.onSettled(ref => presenter.dismiss(ref));
-    this.disposers.push(() => {
+    // Released by the tab that owns it, and again at plugin dispose for a tab
+    // that never closed. Only the second existed: a vault opened and closed all
+    // day accumulated one subscription per tab, each holding a presenter for a
+    // view that is gone. Grok and OpenCode release theirs at tab close.
+    let released = false;
+    const release = (): void => {
+      if (released) {
+        return;
+      }
+      released = true;
       unsubscribe();
       this.presenters.delete(presenter);
-    });
-    return presenter;
+    };
+    this.disposers.push(release);
+    return { presenter, release };
   }
 
   /**

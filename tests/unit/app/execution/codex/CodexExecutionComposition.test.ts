@@ -650,7 +650,7 @@ describe('Codex execution composition', () => {
   it('takes a prompt down when its interaction ends somewhere else', async () => {
     const execution = createExecution(createPlugin());
     let dismissed = 0;
-    const presenter = execution.createInteractionPresenter(() => ({
+    const { presenter } = execution.createInteractionPresenter(() => ({
       approval: async () => new Promise<never>(() => undefined),
       approvalDismisser: () => {
         dismissed += 1;
@@ -684,7 +684,7 @@ describe('Codex execution composition', () => {
   it('takes everything down and releases what a turn was holding, on unload', async () => {
     const execution = createExecution(createPlugin());
     let dismissed = 0;
-    const presenter = execution.createInteractionPresenter(() => ({
+    const { presenter } = execution.createInteractionPresenter(() => ({
       approval: async () => new Promise<never>(() => undefined),
       approvalDismisser: () => {
         dismissed += 1;
