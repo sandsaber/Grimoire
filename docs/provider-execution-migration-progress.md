@@ -5125,6 +5125,40 @@ Minor, three refuted with evidence and two deferred with it.
 Gates: unit 481 suites / 7,678 tests, integration 5 suites / 145 tests,
 typecheck, `eslint`, `build:release`.
 
+### Wave 6 opens: both wire recordings taken (this commit)
+
+The plan puts a recording before a flip, and wave 6's two providers were the
+reason it had not started: MiMoCode's was partial and Kimi Code's was absent.
+Both are taken now, from the CLIs themselves rather than from a sibling's
+adapter — `mimo 0.1.13` and `kimi acp` 0.38.0 — by one shared recorder, because
+writing it twice for two providers that speak the same protocol is the drift
+recordings exist to catch.
+
+**Both are partial, and both say so.** MiMoCode's account still cannot generate:
+the turn returns `end_turn` with zero tokens and no assistant content. Kimi
+Code's machine is not logged in, so `session/new` answers "Authentication
+required" — itself a shape the flip will meet on a fresh install. The handshake,
+the session's config options and the empty-turn shape are evidence; the prompt
+traffic is not, and a new row in the wire gate pins which recordings are partial,
+because a thin one and a whole one look identical on disk.
+
+Three things the recorder got wrong before it was right, each caught by a gate
+rather than by reading:
+
+- it called MiMoCode's recording **complete** on the strength of the two updates
+  a session emits when it *opens* — a turn that returned nothing was marked as
+  answered. Coverage now asks whether the turn produced assistant content;
+- it sent `value: null` to `session/set_config_option` and recorded `Invalid
+  params` — the shape of a malformed call rather than the round trip a turn
+  makes. It sends the option's own current value now;
+- its elision appended the marker *after* slicing to the 200-character bound, so
+  every elided string came out at 211 — over the bound the fixture gate enforces,
+  which said so in fifty-four places.
+
+The first re-recording also replaced MiMoCode's fixture with a thinner one that
+had lost `session/set_config_option` entirely. The new one matches the old
+coverage exactly — same cases, same updates, same ten exchanges — taken fresh.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -5133,6 +5167,11 @@ overrides it.**
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
 ### Where the session of 2026-08-21 ended
+
+**All three reviews are closed** — 1 Critical, 28 Important, 60 Minor, three refuted with evidence
+and two deferred with it. The third review's own record is the second half of
+[`docs/providers-migration-review-backlog.md`](providers-migration-review-backlog.md), with a status
+on every row.
 
 **Two reviews, both worked through.** The first review's prioritized order is done and the second
 review's six findings are fixed, with both recorded in
@@ -5158,13 +5197,19 @@ sits down with a vault; it needs Obsidian and about an hour, and no knowledge of
 
 Wave 5 is complete: **Grok executes through the kernel**, its legacy runtime is deleted, and thirteen
 live rows are green against CLI 1.0.5. Four ACP providers remain on the legacy path — MiMoCode, Kimi
-Code, Qwen, Gemini — and MiMoCode is the next wave: its CLI is installed, its wire recording is taken
-(partial, and labelled as such), and it mirrors OpenCode closely enough that the shared backend,
-bridge, presenter and filesystem should cover most of it.
+Code, Qwen, Gemini — and MiMoCode is the next wave: its CLI is installed and it mirrors OpenCode
+closely enough that the shared backend, bridge, presenter and filesystem should cover most of it.
 
-**Owed before the next wave starts**, both named in the entries above: four manual smoke matrices
-(Codex, Claude, OpenCode, Grok — the rendering rows only a person can run), and MiMoCode's own wire
-recording completed by a generating account.
+**Wave 6's recording precondition is met.** Both MiMoCode and Kimi Code have wire recordings taken
+from their own CLIs, and both are labelled partial with the reason — MiMoCode's account does not
+generate, Kimi Code's machine is not logged in. What that means for the flip: the handshake, the
+session's configuration and the empty-turn shape are evidence, and the prompt traffic will be met
+first by the live smoke harness rather than by the recording. That is a weaker start than Grok had
+and it is written down here rather than discovered later.
+
+**Still owed, and it is a person rather than a commit:** the four manual smoke matrices (Codex,
+Claude, OpenCode, Grok — the rendering rows only a person can run), and a generating MiMoCode account
+or a logged-in Kimi Code one to complete either recording.
 
 ### Where the session of 2026-08-19 ended
 

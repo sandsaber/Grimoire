@@ -4,8 +4,7 @@
   "kind": "wire-recording",
   "recordedAgainst": "kimi 0.38.0",
   "transport": "stdio JSON-RPC 2.0 (`kimi acp`)",
-  "coverage": "unauthenticated",
-  "note": "Recorded on a machine where `kimi` is installed but not logged in: `initialize` is complete and `session/new` is the refusal an unauthenticated CLI gives. Prompt-level cases need an account.",
+  "coverage": "partial",
   "cases": [
     "initialize",
     "session/new"
@@ -101,7 +100,7 @@
         "id": 2,
         "method": "session/new",
         "params": {
-          "cwd": "/tmp/grimoire-kimicode-wire-mVofoO",
+          "cwd": "/tmp/grimoire-kimicode-wire-d5or5X",
           "mcpServers": []
         }
       }
@@ -118,5 +117,9 @@
         }
       }
     }
+  ],
+  "limitations": [
+    "The CLI refused to open a session: \"Authentication required\". That is a real shape a flip meets.",
+    "The handshake is evidence; the prompt traffic still needs an account that generates."
   ]
 }

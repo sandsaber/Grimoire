@@ -2,13 +2,14 @@
   "schemaVersion": 1,
   "providerId": "mimocode",
   "kind": "wire-recording",
-  "recordedAgainst": "mimocode 0.1.13",
-  "transport": "stdio JSON-RPC 2.0 (`/home/grimoire/.mimocode/bin/mimo acp`)",
+  "recordedAgainst": "mimo 0.1.13",
+  "transport": "stdio JSON-RPC 2.0 (`mimo acp`)",
+  "coverage": "partial",
   "cases": [
     "initialize",
     "session/new",
     "session/set_config_option",
-    "session/prompt:empty"
+    "session/prompt"
   ],
   "sessionUpdatesObserved": [
     "available_commands_update",
@@ -17,6 +18,7 @@
   "serverMethodsObserved": [
     "session/update"
   ],
+  "payloadPolicy": "Strings over 200 characters are elided: the recording is evidence of protocol shape, not of content.",
   "exchange": [
     {
       "seq": 1,
@@ -82,7 +84,7 @@
         "id": 2,
         "method": "session/new",
         "params": {
-          "cwd": "<tmp>",
+          "cwd": "/tmp/grimoire-mimocode-wire-QDSdEZ",
           "mcpServers": []
         }
       }
@@ -94,7 +96,7 @@
         "jsonrpc": "2.0",
         "id": 2,
         "result": {
-          "sessionId": "<session-id>",
+          "sessionId": "ses_-ffe5fd9eb2b92ffeA9iKMROv8",
           "configOptions": [
             {
               "id": "model",
@@ -299,27 +301,12 @@
     },
     {
       "seq": 5,
-      "direction": "client->server",
-      "message": {
-        "jsonrpc": "2.0",
-        "id": 3,
-        "method": "session/set_config_option",
-        "params": {
-          "sessionId": "<session-id>",
-          "configId": "model",
-          "type": "select",
-          "value": "mimo/mimo-auto"
-        }
-      }
-    },
-    {
-      "seq": 6,
       "direction": "server->client",
       "message": {
         "jsonrpc": "2.0",
         "method": "session/update",
         "params": {
-          "sessionId": "<session-id>",
+          "sessionId": "ses_-ffe5fd9eb2b92ffeA9iKMROv8",
           "update": {
             "sessionUpdate": "available_commands_update",
             "availableCommands": [
@@ -353,115 +340,115 @@
               },
               {
                 "name": "arxiv",
-                "description": "<elided 660 chars>"
+                "description": "Use this skill whenever the user wants to find, read, cite, track, download, or analyze academic papers on arXiv. That includes: searching papers by topic, author, category, or arXiv ID; fet… (elided)"
               },
               {
                 "name": "claude-code",
-                "description": "<elided 208 chars>"
+                "description": "Operate Claude Code CLI (v2.1+) via the terminal only when the user explicitly requests Claude Code or names this skill. Covers print mode (-p), interactive tmux sessions, and background (--… (elided)"
               },
               {
                 "name": "codex",
-                "description": "<elided 518 chars>"
+                "description": "Run, configure, and troubleshoot OpenAI Codex CLI in non-interactive headless environments. Use for Codex automation in Bash or PowerShell, native Windows or WSL2, shell scripts, CI/CD, Dock… (elided)"
               },
               {
                 "name": "compose-next",
-                "description": "<elided 516 chars>"
+                "description": "Use for multi-step feature work, bug fixes, or refactors where requirements need to settle, a feature document should carry design + tasks + delivery evidence, and the change deserves indepe… (elided)"
               },
               {
                 "name": "data-analytics",
-                "description": "<elided 307 chars>"
+                "description": "Use this skill for quantitative product or business analysis: data quality checks, metric diagnostics, KPI design and reporting, dashboards, analytical reports, charts, notebooks, market siz… (elided)"
               },
               {
                 "name": "deep-research",
-                "description": "<elided 385 chars>"
+                "description": "Deep research on any topic using parallel sub-agents and built-in tools only (WebSearch/WebFetch + free APIs, no keys). Use when the user asks for a thorough multi-source investigation with … (elided)"
               },
               {
                 "name": "design-blueprint",
-                "description": "<elided 843 chars>"
+                "description": "Produces a structured design specification (DESIGN.md + structural layout + Decision Trace) before any visual artifact is built — the \"blueprint\" phase that keeps AI-generated design from fe… (elided)"
               },
               {
                 "name": "docx-official",
-                "description": "<elided 608 chars>"
+                "description": "Use this skill whenever a Microsoft Word (.docx) file is being produced, opened, transformed, or read. That includes: drafting reports, letters, contracts, RFPs, technical documents, or any … (elided)"
               },
               {
                 "name": "drive-mimo",
-                "description": "<elided 447 chars>"
+                "description": "Use when you need to programmatically drive another MiMoCode (mimo) process — supports both headless `mimo run` with JSON events and interactive TUI via tmux for full terminal interaction te… (elided)"
               },
               {
                 "name": "evolve",
-                "description": "<elided 670 chars>"
+                "description": "Use when you want to modify ANY aspect of yourself — your capabilities (new/overridden tools), your behavior (hooks that intercept every tool call, LLM request, session and subagent lifecycl… (elided)"
               },
               {
                 "name": "frontend-design",
-                "description": "<elided 549 chars>"
+                "description": "Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Use whenever the task produces or modifies anything a user will see rendered — websites… (elided)"
               },
               {
                 "name": "grok-build",
-                "description": "<elided 471 chars>"
+                "description": "Reference and workflow guidance for the Grok Build CLI (`grok`), including interactive and headless runs, authentication, sessions, worktrees, permissions, sandboxing, MCP servers, plugins, … (elided)"
               },
               {
                 "name": "html-to-video-pipeline",
-                "description": "<elided 1132 chars>"
+                "description": "Reliable HTML-to-MP4 rendering via headless browser recording (Playwright/Puppeteer) + ffmpeg — the ordering, gotchas, and verification steps you MUST get right or the output silently rots. … (elided)"
               },
               {
                 "name": "learn-everything",
-                "description": "<elided 752 chars>"
+                "description": "Turn an uploaded PDF, paper, book chapter, document, URL, or user-provided topic into a structured, interactive learning course. Use when the user wants to learn, study, understand, master, … (elided)"
               },
               {
                 "name": "loop",
-                "description": "<elided 416 chars>"
+                "description": "Schedule a prompt to fire on a fixed cadence (recurring loop). Use when the user asks to \"run X every N minutes/hours/days\", \"loop X\", \"babysit Y\", \"be proactive about Y every N\", or invokes… (elided)"
               },
               {
                 "name": "memory-search",
-                "description": "<elided 427 chars>"
+                "description": "Query the raw trajectory SQLite database directly when the built-in memory and history tools are insufficient. Use when you need structured analysis across sessions: finding repeated errors,… (elided)"
               },
               {
                 "name": "mimocode-docs",
-                "description": "<elided 1051 chars>"
+                "description": "Use whenever the user asks about MiMoCode itself: features, TUI or CLI commands, keybindings, terminal compatibility, rendering glitches, TUI lag, SSH or remote rendering, agent modes (build… (elided)"
               },
               {
                 "name": "modern-python-toolchain",
-                "description": "<elided 432 chars>"
+                "description": "Modern Python project setup with uv, ruff, and pyright. Use when initializing a new Python project, configuring the Python environment, setting up linting/formatting, or when a project needs… (elided)"
               },
               {
                 "name": "pdf-official",
-                "description": "<elided 608 chars>"
+                "description": "Use this skill whenever a PDF file is being produced, opened, transformed, filled, or read. That includes: extracting text or tables from an existing PDF; combining, carving, rotating, cropp… (elided)"
               },
               {
                 "name": "playwright",
-                "description": "<elided 209 chars>"
+                "description": "Use when the task requires automating a real browser from the terminal (navigation, form filling, snapshots, screenshots, data extraction, UI-flow debugging) via `playwright-cli` or the bund… (elided)"
               },
               {
                 "name": "pptx-official",
-                "description": "<elided 812 chars>"
+                "description": "Use this skill whenever a Microsoft PowerPoint (.pptx) file is being produced, opened, transformed, or read. That includes: authoring slide decks, pitch decks, executive readouts, training m… (elided)"
               },
               {
                 "name": "product-design",
-                "description": "<elided 289 chars>"
+                "description": "Use this skill when Product Design is explicitly invoked or the main task is product design exploration, UX research, flow auditing or critique, visual ideation, cloning a live product surfa… (elided)"
               },
               {
                 "name": "research-paper-writing",
-                "description": "<elided 631 chars>"
+                "description": "Write, rewrite, and polish academic papers (ML/CV/NLP style). Use when the user drafts or revises Abstract, Introduction, Related Work, Method, Experiments, or Conclusion; asks \"does this fl… (elided)"
               },
               {
                 "name": "sales",
-                "description": "<elided 320 chars>"
+                "description": "Use this skill whenever Sales is explicitly invoked or the task involves customer meeting preparation, call follow-up, account prioritization, account signals, deal strategy, business cases,… (elided)"
               },
               {
                 "name": "skill-creator",
-                "description": "<elided 225 chars>"
+                "description": "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledg… (elided)"
               },
               {
                 "name": "super-research",
-                "description": "<elided 2447 chars>"
+                "description": "Autonomous research skill for open-ended, high-volume research work — an agent left running for a while (minutes to overnight) that produces honest, comparable, auditable evidence instead of… (elided)"
               },
               {
                 "name": "xlsx-official",
-                "description": "<elided 815 chars>"
+                "description": "Spreadsheet toolkit. Reach for it whenever the artifact on either side of the conversation is a workbook file — .xlsx, .xlsm, .xltx, .csv, .tsv — and the user wants that artifact produced, c… (elided)"
               },
               {
                 "name": "compose:ask",
-                "description": "<elided 235 chars>"
+                "description": "Use whenever you need a decision, clarification, or approval from the user — covers how to ask with the question tool, and how to resolve the decision yourself when no user is available (que… (elided)"
               },
               {
                 "name": "compose:brainstorm",
@@ -477,7 +464,7 @@
               },
               {
                 "name": "compose:feedback",
-                "description": "<elided 234 chars>"
+                "description": "Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not pe… (elided)"
               },
               {
                 "name": "compose:merge",
@@ -493,7 +480,7 @@
               },
               {
                 "name": "compose:report",
-                "description": "Use after implementation is verified and before merge \u2014 consolidates multiple spec iterations into a single final-state report, marks related specs, and records key lessons"
+                "description": "Use after implementation is verified and before merge — consolidates multiple spec iterations into a single final-state report, marks related specs, and records key lessons"
               },
               {
                 "name": "compose:review",
@@ -509,7 +496,7 @@
               },
               {
                 "name": "compose:verify",
-                "description": "<elided 225 chars>"
+                "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims… (elided)"
               },
               {
                 "name": "compose:worktree",
@@ -517,7 +504,7 @@
               },
               {
                 "name": "karpathy-guidelines",
-                "description": "<elided 553 chars>"
+                "description": "Disciplined engineering habits that keep coding work minimal, verifiable, and honest — read the code before changing it, change only what was asked, define success criteria up front, and rep… (elided)"
               },
               {
                 "name": "brainstorming",
@@ -525,7 +512,7 @@
               },
               {
                 "name": "coding-guidelines",
-                "description": "<elided 272 chars>"
+                "description": "Use when asking about Rust code style or best practices. Keywords: naming, formatting, comment, clippy, rustfmt, lint, code style, best practice, P.NAM, G.FMT, code review, naming convention… (elided)"
               },
               {
                 "name": "dispatching-parallel-agents",
@@ -533,31 +520,31 @@
               },
               {
                 "name": "domain-cli",
-                "description": "<elided 262 chars>"
+                "description": "Use when building CLI tools. Keywords: CLI, command line, terminal, clap, structopt, argument parsing, subcommand, interactive, TUI, ratatui, crossterm, indicatif, progress bar, colored outp… (elided)"
               },
               {
                 "name": "domain-cloud-native",
-                "description": "<elided 202 chars>"
+                "description": "Use when building cloud-native apps. Keywords: kubernetes, k8s, docker, container, grpc, tonic, microservice, service mesh, observability, tracing, metrics, health check, cloud, deployment, … (elided)"
               },
               {
                 "name": "domain-embedded",
-                "description": "<elided 261 chars>"
+                "description": "Use when developing embedded/no_std Rust. Keywords: embedded, no_std, microcontroller, MCU, ARM, RISC-V, bare metal, firmware, HAL, PAC, RTIC, embassy, interrupt, DMA, peripheral, GPIO, SPI,… (elided)"
               },
               {
                 "name": "domain-fintech",
-                "description": "Use when building fintech apps. Keywords: fintech, trading, decimal, currency, financial, money, transaction, ledger, payment, exchange rate, precision, rounding, accounting, \u91d1\u878d, \u4ea4\u6613\u7cfb\u7edf, \u8d27\u5e01, \u652f\u4ed8"
+                "description": "Use when building fintech apps. Keywords: fintech, trading, decimal, currency, financial, money, transaction, ledger, payment, exchange rate, precision, rounding, accounting, 金融, 交易系统, 货币, 支付"
               },
               {
                 "name": "domain-iot",
-                "description": "Use when building IoT apps. Keywords: IoT, Internet of Things, sensor, MQTT, device, edge computing, telemetry, actuator, smart home, gateway, protocol, \u7269\u8054\u7f51, \u4f20\u611f\u5668, \u8fb9\u7f18\u8ba1\u7b97, \u667a\u80fd\u5bb6\u5c45"
+                "description": "Use when building IoT apps. Keywords: IoT, Internet of Things, sensor, MQTT, device, edge computing, telemetry, actuator, smart home, gateway, protocol, 物联网, 传感器, 边缘计算, 智能家居"
               },
               {
                 "name": "domain-ml",
-                "description": "Use when building ML/AI apps in Rust. Keywords: machine learning, ML, AI, tensor, model, inference, neural network, deep learning, training, prediction, ndarray, tch-rs, burn, candle, \u673a\u5668\u5b66\u4e60, \u4eba\u5de5\u667a\u80fd, \u6a21\u578b\u63a8\u7406"
+                "description": "Use when building ML/AI apps in Rust. Keywords: machine learning, ML, AI, tensor, model, inference, neural network, deep learning, training, prediction, ndarray, tch-rs, burn, candle, 机器学习, 人工智能, 模型推理"
               },
               {
                 "name": "domain-web",
-                "description": "<elided 304 chars>"
+                "description": "Use when building web services. Keywords: web server, HTTP, REST API, GraphQL, WebSocket, axum, actix, warp, rocket, tower, hyper, reqwest, middleware, router, handler, extractor, state mana… (elided)"
               },
               {
                 "name": "executing-plans",
@@ -565,7 +552,7 @@
               },
               {
                 "name": "find-skills",
-                "description": "<elided 303 chars>"
+                "description": "Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or express interest in extending capabilitie… (elided)"
               },
               {
                 "name": "finishing-a-development-branch",
@@ -573,67 +560,67 @@
               },
               {
                 "name": "m01-ownership",
-                "description": "<elided 280 chars>"
+                "description": "CRITICAL: Use for ownership/borrow/lifetime issues. Triggers: E0382, E0597, E0506, E0507, E0515, E0716, E0106, value moved, borrowed value does not live long enough, cannot move out of, use … (elided)"
               },
               {
                 "name": "m02-resource",
-                "description": "<elided 229 chars>"
+                "description": "CRITICAL: Use for smart pointers and resource management. Triggers: Box, Rc, Arc, Weak, RefCell, Cell, smart pointer, heap allocation, reference counting, RAII, Drop, should I use Box or Rc,… (elided)"
               },
               {
                 "name": "m03-mutability",
-                "description": "<elided 203 chars>"
+                "description": "CRITICAL: Use for mutability issues. Triggers: E0596, E0499, E0502, cannot borrow as mutable, already borrowed as immutable, mut, &mut, interior mutability, Cell, RefCell, Mutex, RwLock, 可变性… (elided)"
               },
               {
                 "name": "m04-zero-cost",
-                "description": "<elided 234 chars>"
+                "description": "CRITICAL: Use for generics, traits, zero-cost abstraction. Triggers: E0277, E0308, E0599, generic, trait, impl, dyn, where, monomorphization, static dispatch, dynamic dispatch, impl Trait, t… (elided)"
               },
               {
                 "name": "m05-type-driven",
-                "description": "<elided 213 chars>"
+                "description": "CRITICAL: Use for type-driven design. Triggers: type state, PhantomData, newtype, marker trait, builder pattern, make invalid states unrepresentable, compile-time validation, sealed trait, Z… (elided)"
               },
               {
                 "name": "m06-error-handling",
-                "description": "<elided 205 chars>"
+                "description": "CRITICAL: Use for error handling. Triggers: Result, Option, Error, ?, unwrap, expect, panic, anyhow, thiserror, when to panic vs return Result, custom error, error propagation, 错误处理, Result … (elided)"
               },
               {
                 "name": "m07-concurrency",
-                "description": "<elided 218 chars>"
+                "description": "CRITICAL: Use for concurrency/async. Triggers: E0277 Send Sync, cannot be sent between threads, thread, spawn, channel, mpsc, Mutex, RwLock, Atomic, async, await, Future, tokio, deadlock, ra… (elided)"
               },
               {
                 "name": "m09-domain",
-                "description": "CRITICAL: Use for domain modeling. Triggers: domain model, DDD, domain-driven design, entity, value object, aggregate, repository pattern, business rules, validation, invariant, \u9886\u57df\u6a21\u578b, \u9886\u57df\u9a71\u52a8\u8bbe\u8ba1, \u4e1a\u52a1\u89c4\u5219"
+                "description": "CRITICAL: Use for domain modeling. Triggers: domain model, DDD, domain-driven design, entity, value object, aggregate, repository pattern, business rules, validation, invariant, 领域模型, 领域驱动设计, 业务规则"
               },
               {
                 "name": "m10-performance",
-                "description": "CRITICAL: Use for performance optimization. Triggers: performance, optimization, benchmark, profiling, flamegraph, criterion, slow, fast, allocation, cache, SIMD, make it faster, \u6027\u80fd\u4f18\u5316, \u57fa\u51c6\u6d4b\u8bd5"
+                "description": "CRITICAL: Use for performance optimization. Triggers: performance, optimization, benchmark, profiling, flamegraph, criterion, slow, fast, allocation, cache, SIMD, make it faster, 性能优化, 基准测试"
               },
               {
                 "name": "m11-ecosystem",
-                "description": "<elided 382 chars>"
+                "description": "Use when integrating crates or ecosystem questions. Keywords: E0425, E0433, E0603, crate, cargo, dependency, feature flag, workspace, which crate to use, using external C libraries, creating… (elided)"
               },
               {
                 "name": "m12-lifecycle",
-                "description": "<elided 357 chars>"
+                "description": "Use when designing resource lifecycles. Keywords: RAII, Drop, resource lifecycle, connection pool, lazy initialization, connection pool design, resource cleanup patterns, cleanup, scope, Onc… (elided)"
               },
               {
                 "name": "m13-domain-error",
-                "description": "<elided 371 chars>"
+                "description": "Use when designing domain error handling. Keywords: domain error, error categorization, recovery strategy, retry, fallback, domain error hierarchy, user-facing vs internal errors, error code… (elided)"
               },
               {
                 "name": "m14-mental-model",
-                "description": "<elided 374 chars>"
+                "description": "Use when learning Rust concepts. Keywords: mental model, how to think about ownership, understanding borrow checker, visualizing memory layout, analogy, misconception, explaining ownership, … (elided)"
               },
               {
                 "name": "m15-anti-pattern",
-                "description": "<elided 365 chars>"
+                "description": "Use when reviewing code for anti-patterns. Keywords: anti-pattern, common mistake, pitfall, code smell, bad practice, code review, is this an anti-pattern, better way to do this, common mist… (elided)"
               },
               {
                 "name": "meta-cognition-parallel",
-                "description": "EXPERIMENTAL: Three-layer parallel meta-cognition analysis. Triggers on: /meta-parallel, \u4e09\u5c42\u5206\u6790, parallel analysis, \u5e76\u884c\u5143\u8ba4\u77e5"
+                "description": "EXPERIMENTAL: Three-layer parallel meta-cognition analysis. Triggers on: /meta-parallel, 三层分析, parallel analysis, 并行元认知"
               },
               {
                 "name": "receiving-code-review",
-                "description": "<elided 234 chars>"
+                "description": "Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not pe… (elided)"
               },
               {
                 "name": "requesting-code-review",
@@ -641,39 +628,39 @@
               },
               {
                 "name": "rust-call-graph",
-                "description": "Visualize Rust function call graphs using LSP. Triggers on: /call-graph, call hierarchy, who calls, what calls, \u8c03\u7528\u56fe, \u8c03\u7528\u5173\u7cfb, \u8c01\u8c03\u7528\u4e86, \u8c03\u7528\u4e86\u8c01"
+                "description": "Visualize Rust function call graphs using LSP. Triggers on: /call-graph, call hierarchy, who calls, what calls, 调用图, 调用关系, 谁调用了, 调用了谁"
               },
               {
                 "name": "rust-code-navigator",
-                "description": "Navigate Rust code using LSP. Triggers on: /navigate, go to definition, find references, where is defined, \u8df3\u8f6c\u5b9a\u4e49, \u67e5\u627e\u5f15\u7528, \u5b9a\u4e49\u5728\u54ea, \u8c01\u7528\u4e86\u8fd9\u4e2a"
+                "description": "Navigate Rust code using LSP. Triggers on: /navigate, go to definition, find references, where is defined, 跳转定义, 查找引用, 定义在哪, 谁用了这个"
               },
               {
                 "name": "rust-daily",
-                "description": "CRITICAL: Use for Rust news and daily/weekly/monthly reports. Triggers on:\nrust news, rust daily, rust weekly, TWIR, rust blog,\nRust \u65e5\u62a5, Rust \u5468\u62a5, Rust \u65b0\u95fb, Rust \u52a8\u6001\n"
+                "description": "CRITICAL: Use for Rust news and daily/weekly/monthly reports. Triggers on:\nrust news, rust daily, rust weekly, TWIR, rust blog,\nRust 日报, Rust 周报, Rust 新闻, Rust 动态\n"
               },
               {
                 "name": "rust-deps-visualizer",
-                "description": "Visualize Rust project dependencies as ASCII art. Triggers on: /deps-viz, dependency graph, show dependencies, visualize deps, \u4f9d\u8d56\u56fe, \u4f9d\u8d56\u53ef\u89c6\u5316, \u663e\u793a\u4f9d\u8d56"
+                "description": "Visualize Rust project dependencies as ASCII art. Triggers on: /deps-viz, dependency graph, show dependencies, visualize deps, 依赖图, 依赖可视化, 显示依赖"
               },
               {
                 "name": "rust-learner",
-                "description": "<elided 387 chars>"
+                "description": "Use when asking about Rust versions or crate info. Keywords: latest version, what's new, changelog, Rust 1.x, Rust release, stable, nightly, crate info, crates.io, lib.rs, docs.rs, API docum… (elided)"
               },
               {
                 "name": "rust-refactor-helper",
-                "description": "Safe Rust refactoring with LSP analysis. Triggers on: /refactor, rename symbol, move function, extract, \u91cd\u6784, \u91cd\u547d\u540d, \u63d0\u53d6\u51fd\u6570, \u5b89\u5168\u91cd\u6784"
+                "description": "Safe Rust refactoring with LSP analysis. Triggers on: /refactor, rename symbol, move function, extract, 重构, 重命名, 提取函数, 安全重构"
               },
               {
                 "name": "rust-router",
-                "description": "<elided 853 chars>"
+                "description": "CRITICAL: Use for ALL Rust questions including errors, design, and coding.\nHIGHEST PRIORITY for: 比较, 对比, compare, vs, versus, 区别, difference, 最佳实践, best practice,\ntokio vs, async-std vs, 比较 … (elided)"
               },
               {
                 "name": "rust-symbol-analyzer",
-                "description": "Analyze Rust project structure using LSP symbols. Triggers on: /symbols, project structure, list structs, list traits, list functions, \u7b26\u53f7\u5206\u6790, \u9879\u76ee\u7ed3\u6784, \u5217\u51fa\u6240\u6709, \u6709\u54ea\u4e9bstruct"
+                "description": "Analyze Rust project structure using LSP symbols. Triggers on: /symbols, project structure, list structs, list traits, list functions, 符号分析, 项目结构, 列出所有, 有哪些struct"
               },
               {
                 "name": "rust-trait-explorer",
-                "description": "Explore Rust trait implementations using LSP. Triggers on: /trait-impl, find implementations, who implements, trait \u5b9e\u73b0, \u8c01\u5b9e\u73b0\u4e86, \u5b9e\u73b0\u4e86\u54ea\u4e9btrait"
+                "description": "Explore Rust trait implementations using LSP. Triggers on: /trait-impl, find implementations, who implements, trait 实现, 谁实现了, 实现了哪些trait"
               },
               {
                 "name": "subagent-driven-development",
@@ -689,7 +676,7 @@
               },
               {
                 "name": "unsafe-checker",
-                "description": "<elided 339 chars>"
+                "description": "CRITICAL: Use for unsafe Rust code review and FFI. Triggers on: unsafe, raw pointer, FFI, extern, transmute, *mut, *const, union, #[repr(C)], libc, std::ffi, MaybeUninit, NonNull, SAFETY com… (elided)"
               },
               {
                 "name": "using-git-worktrees",
@@ -701,7 +688,7 @@
               },
               {
                 "name": "verification-before-completion",
-                "description": "<elided 225 chars>"
+                "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims… (elided)"
               },
               {
                 "name": "writing-plans",
@@ -713,23 +700,23 @@
               },
               {
                 "name": "imagegen",
-                "description": "<elided 570 chars>"
+                "description": "Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Co… (elided)"
               },
               {
                 "name": "openai-docs",
-                "description": "<elided 459 chars>"
+                "description": "Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge—including 'you,' 'your,' 'this app,' or 'this coding a… (elided)"
               },
               {
                 "name": "plugin-creator",
-                "description": "<elided 471 chars>"
+                "description": "Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by defa… (elided)"
               },
               {
                 "name": "review-agent",
-                "description": "<elided 229 chars>"
+                "description": "Perform a read-only, defect-first review of a specified code change and return every actionable finding. Use when another agent delegates review of uncommitted changes, a base-branch diff, a… (elided)"
               },
               {
                 "name": "skill-installer",
-                "description": "<elided 225 chars>"
+                "description": "Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from anot… (elided)"
               },
               {
                 "name": "compact",
@@ -737,6 +724,20 @@
               }
             ]
           }
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "session/set_config_option",
+        "params": {
+          "sessionId": "ses_-ffe5fd9eb2b92ffeA9iKMROv8",
+          "configId": "model",
+          "value": "xiaomi/mimo-v2.5-pro-ultraspeed"
         }
       }
     },
@@ -753,7 +754,7 @@
               "name": "Model",
               "category": "model",
               "type": "select",
-              "currentValue": "mimo/mimo-auto",
+              "currentValue": "xiaomi/mimo-v2.5-pro-ultraspeed",
               "options": [
                 {
                   "value": "mimo/mimo-auto",
@@ -857,11 +858,11 @@
         "id": 4,
         "method": "session/prompt",
         "params": {
-          "sessionId": "<session-id>",
+          "sessionId": "ses_-ffe5fd9eb2b92ffeA9iKMROv8",
           "prompt": [
             {
               "type": "text",
-              "text": "Reply with exactly: OK"
+              "text": "Reply with exactly: ok"
             }
           ]
         }
@@ -874,11 +875,11 @@
         "jsonrpc": "2.0",
         "method": "session/update",
         "params": {
-          "sessionId": "<session-id>",
+          "sessionId": "ses_-ffe5fd9eb2b92ffeA9iKMROv8",
           "update": {
             "sessionUpdate": "usage_update",
             "used": 0,
-            "size": 1000000,
+            "size": 1048576,
             "cost": {
               "amount": 0,
               "currency": "USD"
@@ -905,12 +906,8 @@
       }
     }
   ],
-  "payloadPolicy": "Strings over 200 characters are elided: the recording is evidence of protocol shape, not of content.",
   "limitations": [
-    "The turn answered nothing: this account cannot generate with either offered",
-    "model (400 Not supported model, in the agent log and not on the wire).",
-    "The handshake, the config option and the empty-turn shape are evidence;",
-    "message chunks and tool calls are not, and this provider still owes a",
-    "recording of a turn that answers."
+    "The turn returned without assistant content: this account cannot generate.",
+    "The handshake is evidence; the prompt traffic still needs an account that generates."
   ]
 }
