@@ -38,13 +38,6 @@ import type {
 import { coercePermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
-import {
-  sameDiscoveredModels,
-  sameModes,
-  sameStringList,
-  sameStringMap,
-  sameThinkingOptionsByModel,
-} from '../../../utils/collections';
 import { getEnhancedPath } from '../../../utils/env';
 import { getVaultPath } from '../../../utils/path';
 import {
@@ -67,9 +60,6 @@ import {
   buildAcpPersistedSessionFields,
   buildAcpSessionLoadFailureDebugEvent,
   buildAcpUsageInfo,
-  extractAcpSessionModelState,
-  extractAcpSessionModeState,
-  extractAcpSessionThoughtLevelState,
   isAcpMissingSessionError,
   isAcpRetryableTransportClose,
   mapAcpApprovalDecision,
@@ -81,11 +71,11 @@ import {
 import { toAcpMcpServers } from '../../acp/mcp/toAcpMcpServers';
 import { mimocodePlanUsageStore } from '../app/MimocodePlanUsageStore';
 import { MIMOCODE_PROVIDER_CAPABILITIES } from '../capabilities';
-import { updateMimocodeDiscoveryState } from '../discoveryState';
 import {
   buildMimocodePermissionPresentation,
   normalizeApprovalInput,
 } from '../execution/MimocodePermissionPresentation';
+import { MimocodeSessionConfigState } from '../execution/MimocodeSessionConfigState';
 import {
   formatMimocodeSessionError,
   loadLatestMimocodeSessionError,
@@ -93,26 +83,13 @@ import {
 import { loadMimocodeSessionCost } from '../history/MimocodeUsageMetadataStore';
 import { ensureProviderProjectionMap } from '../internal/providerProjection';
 import {
-  buildMimocodeBaseModels,
   decodeMimocodeModelId,
   encodeMimocodeModelId,
-  isMimocodeModelSelectionId,
-  MIMOCODE_DEFAULT_THINKING_LEVEL,
-  MIMOCODE_SYNTHETIC_MODEL_ID,
-  normalizeMimocodeDiscoveredModels,
-  normalizeMimocodeModelVariants,
   resolveMimocodeBaseModelRawId,
   resolveMimocodeUnsupportedModelFallback,
 } from '../models';
-import {
-  getManagedMimocodeModes,
-  isManagedMimocodeModeId,
-  normalizeMimocodeAvailableModes,
-  resolveMimocodeModeForPermissionMode,
-  resolvePermissionModeForManagedMimocodeMode,
-} from '../modes';
 import { createMimocodeToolStreamAdapter } from '../normalization/mimocodeToolNormalization';
-import { getMimocodeProviderSettings, updateMimocodeProviderSettings } from '../settings';
+import { getMimocodeProviderSettings } from '../settings';
 import { getMimocodeState, type MimocodeProviderState } from '../types';
 import { buildMimocodePromptBlocks, buildMimocodePromptText } from './buildMimocodePrompt';
 import { prepareMimocodeLaunchArtifacts } from './MimocodeLaunchArtifacts';
@@ -184,11 +161,19 @@ export class MimocodeChatRuntime implements ChatRuntime {
   private contextUsage: AcpUsageUpdate | null = null;
   private currentDatabasePath: string | null = null;
   private currentLaunchKey: string | null = null;
-  private currentSessionEffortConfigId: string | null = null;
-  private currentSessionEffortValue: string | null = null;
-  private currentSessionEffortValues = new Set<string>();
-  private currentSessionModelId: string | null = null;
-  private currentSessionModeId: string | null = null;
+  /**
+   * What the live session is configured with, and what the vault knows of it.
+   *
+   * Moved out whole rather than copied: the flip needs the same answers from a
+   * composition that has no runtime, and two copies of this would be two
+   * opinions about which model a turn runs under.
+   */
+  private readonly sessionConfig = new MimocodeSessionConfigState({
+    settingsBag: () => this.plugin.settings,
+    saveSettings: () => this.plugin.saveSettings(),
+    refreshSelectors: () => { this.refreshModelSelectors(); },
+    syncPermissionMode: (permissionMode) => { this.emitPermissionModeSync(permissionMode); },
+  });
   private currentTurnSawAcpCost = false;
   private currentTurnMetadata: ChatTurnMetadata = {};
   private cleanupPromise: Promise<void> | null = null;
@@ -258,11 +243,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
     const previousSessionId = this.sessionId;
     const nextSessionId = conversation?.sessionId ?? null;
     if (this.sessionId !== nextSessionId) {
-      this.currentSessionEffortConfigId = null;
-      this.currentSessionEffortValue = null;
-      this.currentSessionEffortValues = new Set<string>();
-      this.currentSessionModelId = null;
-      this.currentSessionModeId = null;
+      this.sessionConfig.forgetSession();
       this.sessionInvalidated = false;
       this.setSupportedCommands([]);
     }
@@ -313,7 +294,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
       type: 'select',
       value: selectedBaseRawModelId,
     });
-    this.currentSessionModelId = selectedBaseRawModelId;
+    this.sessionConfig.markApplied({ modelId: selectedBaseRawModelId });
     await this.syncSessionModelState({
       configOptions: response.configOptions,
     }, {
@@ -784,8 +765,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
       this.activeTurn?.queue.close();
       this.activeTurn = null;
     }
-    this.currentSessionModelId = null;
-    this.currentSessionModeId = null;
+    this.sessionConfig.forgetProcessSelection();
     this.setSupportedCommands([]);
 
     this.unregisterTransportClose?.();
@@ -842,34 +822,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
   }
 
   private resolveSelectedRawModelId(queryOptions?: ChatRuntimeQueryOptions): string | null {
-    const providerSettings = this.getProviderSettings();
-    const selectedModel = typeof queryOptions?.model === 'string'
-      ? queryOptions.model
-      : typeof providerSettings.model === 'string'
-      ? providerSettings.model
-      : '';
-
-    if (!isMimocodeModelSelectionId(selectedModel)) {
-      return null;
-    }
-
-    const selectedBaseRawModelId = decodeMimocodeModelId(selectedModel);
-    if (!selectedBaseRawModelId) {
-      return null;
-    }
-
-    const discoveredModels = getMimocodeProviderSettings(providerSettings).discoveredModels;
-    const normalizedBaseRawModelId = resolveMimocodeBaseModelRawId(selectedBaseRawModelId, discoveredModels);
-    if (!normalizedBaseRawModelId) {
-      return null;
-    }
-
-    const availableModelIds = new Set(discoveredModels.map((model) => model.rawId));
-    if (availableModelIds.size > 0 && !availableModelIds.has(normalizedBaseRawModelId)) {
-      return null;
-    }
-
-    return normalizedBaseRawModelId;
+    return this.sessionConfig.resolveSelectedRawModelId(queryOptions);
   }
 
   getAuxiliaryModel(): string | null {
@@ -877,50 +830,11 @@ export class MimocodeChatRuntime implements ChatRuntime {
   }
 
   private getActiveDisplayModel(queryOptions?: ChatRuntimeQueryOptions): string | undefined {
-    const providerSettings = this.getProviderSettings();
-    const selectedModel = typeof queryOptions?.model === 'string'
-      ? queryOptions.model
-      : typeof providerSettings.model === 'string'
-      ? providerSettings.model
-      : '';
-
-    if (
-      selectedModel
-      && selectedModel !== MIMOCODE_SYNTHETIC_MODEL_ID
-      && isMimocodeModelSelectionId(selectedModel)
-    ) {
-      const selectedRawModelId = this.resolveSelectedRawModelId(queryOptions);
-      return selectedRawModelId
-        ? encodeMimocodeModelId(selectedRawModelId)
-        : selectedModel;
-    }
-
-    return this.currentSessionModelId
-      ? encodeMimocodeModelId(this.currentSessionModelId)
-      : (selectedModel && isMimocodeModelSelectionId(selectedModel) ? selectedModel : undefined);
+    return this.sessionConfig.getActiveDisplayModel(queryOptions);
   }
 
   private resolveSelectedModeId(): string | null {
-    const providerSettings = this.getProviderSettings();
-    const mimocodeSettings = getMimocodeProviderSettings(providerSettings);
-    const availableModes = getManagedMimocodeModes(mimocodeSettings.availableModes);
-    const mappedModeId = resolveMimocodeModeForPermissionMode(
-      providerSettings.permissionMode,
-      mimocodeSettings.availableModes,
-    );
-    if (mappedModeId) {
-      return mappedModeId;
-    }
-
-    if (mimocodeSettings.selectedMode) {
-      if (
-        availableModes.some((mode) => mode.id === mimocodeSettings.selectedMode)
-      ) {
-        return mimocodeSettings.selectedMode;
-      }
-    }
-
-    return availableModes[0]?.id || null;
+    return this.sessionConfig.resolveSelectedModeId();
   }
 
   private async applySelectedMode(sessionId: string): Promise<void> {
@@ -929,7 +843,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
     }
 
     const selectedModeId = this.resolveSelectedModeId();
-    if (!selectedModeId || selectedModeId === this.currentSessionModeId) {
+    if (!selectedModeId || selectedModeId === this.sessionConfig.sessionModeId) {
       return;
     }
 
@@ -939,7 +853,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
       type: 'select',
       value: selectedModeId,
     });
-    this.currentSessionModeId = selectedModeId;
+    this.sessionConfig.markApplied({ modeId: selectedModeId });
     await this.syncSessionModeState({
       configOptions: response.configOptions,
     });
@@ -954,7 +868,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
     }
 
     const selectedRawModelId = this.resolveSelectedRawModelId(queryOptions);
-    if (!selectedRawModelId || selectedRawModelId === this.currentSessionModelId) {
+    if (!selectedRawModelId || selectedRawModelId === this.sessionConfig.sessionModelId) {
       return;
     }
 
@@ -964,7 +878,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
       type: 'select',
       value: selectedRawModelId,
     });
-    this.currentSessionModelId = selectedRawModelId;
+    this.sessionConfig.markApplied({ modelId: selectedRawModelId });
     await this.syncSessionModelState({
       configOptions: response.configOptions,
     }, {
@@ -973,36 +887,26 @@ export class MimocodeChatRuntime implements ChatRuntime {
   }
 
   private resolveSelectedEffortValue(): string | null {
-    const providerSettings = this.getProviderSettings();
-    const selectedEffort = typeof providerSettings.effortLevel === 'string'
-      ? providerSettings.effortLevel.trim()
-      : '';
-    if (!selectedEffort || selectedEffort === MIMOCODE_DEFAULT_THINKING_LEVEL) {
-      return null;
-    }
-
-    return this.currentSessionEffortValues.has(selectedEffort)
-      ? selectedEffort
-      : null;
+    return this.sessionConfig.resolveSelectedEffortValue();
   }
 
   private async applySelectedEffort(sessionId: string): Promise<void> {
-    if (!this.connection || !this.currentSessionEffortConfigId) {
+    if (!this.connection || !this.sessionConfig.effortConfigId) {
       return;
     }
 
     const selectedEffort = this.resolveSelectedEffortValue();
-    if (!selectedEffort || selectedEffort === this.currentSessionEffortValue) {
+    if (!selectedEffort || selectedEffort === this.sessionConfig.effortValue) {
       return;
     }
 
     const response = await this.connection.setConfigOption({
-      configId: this.currentSessionEffortConfigId,
+      configId: this.sessionConfig.effortConfigId,
       sessionId,
       type: 'select',
       value: selectedEffort,
     });
-    this.currentSessionEffortValue = selectedEffort;
+    this.sessionConfig.markApplied({ effortValue: selectedEffort });
     await this.syncSessionModelState({
       configOptions: response.configOptions,
     });
@@ -1015,163 +919,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
     currentRawModelId?: string | null;
     seedActiveSelection?: boolean;
   } = {}): Promise<void> {
-    const acpState = extractAcpSessionModelState(params);
-    const forcedCurrentRawModelId = typeof options.currentRawModelId === 'string'
-      ? options.currentRawModelId.trim()
-      : '';
-    const currentRawModelId = forcedCurrentRawModelId || acpState.currentModelId || this.currentSessionModelId;
-    const discoveredModels = normalizeMimocodeDiscoveredModels(
-      acpState.availableModels.map((model) => ({
-        ...(model.description ? { description: model.description } : {}),
-        label: model.name,
-        rawId: model.id,
-      })),
-    );
-    if (currentRawModelId) {
-      this.currentSessionModelId = currentRawModelId;
-    }
-
-    const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
-    const currentSettings = getMimocodeProviderSettings(settingsBag);
-    const currentBaseRawModelId = currentRawModelId
-      ? resolveMimocodeBaseModelRawId(currentRawModelId, discoveredModels)
-      : null;
-    const thoughtLevelState = extractAcpSessionThoughtLevelState(params);
-    const currentThinkingOptions = normalizeMimocodeModelVariants(
-      thoughtLevelState.availableLevels.map((level) => ({
-        ...(level.description ? { description: level.description } : {}),
-        label: level.name,
-        value: level.id,
-      })),
-    );
-    const currentThinkingLevel = thoughtLevelState.currentLevel;
-    this.currentSessionEffortConfigId = currentThinkingOptions.length > 0
-      ? thoughtLevelState.configId
-      : null;
-    this.currentSessionEffortValue = currentThinkingOptions.length > 0
-      ? currentThinkingLevel
-      : null;
-    this.currentSessionEffortValues = new Set(currentThinkingOptions.map((option) => option.value));
-
-    const nextThinkingOptionsByModel = { ...currentSettings.thinkingOptionsByModel };
-    if (currentBaseRawModelId) {
-      if (currentThinkingOptions.length > 0) {
-        nextThinkingOptionsByModel[currentBaseRawModelId] = currentThinkingOptions;
-      } else {
-        delete nextThinkingOptionsByModel[currentBaseRawModelId];
-      }
-    }
-
-    const discoveredBaseModelIds = buildMimocodeBaseModels(discoveredModels)
-      .map((model) => model.rawId);
-    const nextVisibleModels = currentSettings.visibleModels.length === 0
-      ? (discoveredBaseModelIds.length > 0
-        ? discoveredBaseModelIds
-        : (currentBaseRawModelId ? [currentBaseRawModelId] : []))
-      : currentSettings.visibleModels;
-    const currentPreferredThinking = currentBaseRawModelId
-      ? currentSettings.preferredThinkingByModel[currentBaseRawModelId]
-      : '';
-    const shouldSeedCurrentThinking = currentBaseRawModelId
-      && currentThinkingLevel
-      && (
-        !currentPreferredThinking
-        || (
-          currentThinkingOptions.length > 0
-          && !this.currentSessionEffortValues.has(currentPreferredThinking)
-        )
-      );
-    const nextPreferredThinkingByModel = shouldSeedCurrentThinking && currentBaseRawModelId && currentThinkingLevel
-      ? {
-        ...currentSettings.preferredThinkingByModel,
-        [currentBaseRawModelId]: currentThinkingLevel,
-      }
-      : currentSettings.preferredThinkingByModel;
-    const shouldSeedVisibleModels = !sameStringList(currentSettings.visibleModels, nextVisibleModels);
-    const shouldSeedPreferredThinking = !sameStringMap(
-      currentSettings.preferredThinkingByModel,
-      nextPreferredThinkingByModel,
-    );
-    const shouldUpdateDiscoveredModels = discoveredModels.length > 0
-      && !sameDiscoveredModels(currentSettings.discoveredModels, discoveredModels);
-    const shouldUpdateThinkingOptions = !sameThinkingOptionsByModel(
-      currentSettings.thinkingOptionsByModel,
-      nextThinkingOptionsByModel,
-    );
-    const discoveryChanged = shouldUpdateDiscoveredModels
-      && updateMimocodeDiscoveryState(settingsBag, { discoveredModels });
-    let changed = shouldSeedVisibleModels || shouldSeedPreferredThinking;
-
-    if (currentBaseRawModelId && options.seedActiveSelection !== false) {
-      const seeded = this.seedActiveModelSelection(
-        settingsBag,
-        encodeMimocodeModelId(currentBaseRawModelId),
-        currentThinkingLevel,
-      );
-      changed = changed || seeded;
-    }
-
-    if (shouldUpdateThinkingOptions || shouldSeedPreferredThinking || shouldSeedVisibleModels) {
-      updateMimocodeProviderSettings(settingsBag, {
-        ...(shouldSeedPreferredThinking ? { preferredThinkingByModel: nextPreferredThinkingByModel } : {}),
-        ...(shouldUpdateThinkingOptions ? { thinkingOptionsByModel: nextThinkingOptionsByModel } : {}),
-        ...(shouldSeedVisibleModels ? { visibleModels: nextVisibleModels } : {}),
-      });
-    }
-
-    if (!changed && !discoveryChanged && !shouldUpdateThinkingOptions) {
-      return;
-    }
-
-    if (changed || shouldUpdateThinkingOptions) {
-      await this.plugin.saveSettings();
-    }
-    this.refreshModelSelectors();
-  }
-
-  private seedActiveModelSelection(
-    settingsBag: Record<string, unknown>,
-    modelSelection: string,
-    thinkingLevel: string | null,
-  ): boolean {
-    let changed = false;
-    const savedProviderModel = ensureProviderProjectionMap(settingsBag, 'savedProviderModel');
-    const savedModel = typeof savedProviderModel.mimocode === 'string'
-      ? savedProviderModel.mimocode
-      : '';
-    if (!savedModel || savedModel === MIMOCODE_SYNTHETIC_MODEL_ID) {
-      savedProviderModel.mimocode = modelSelection;
-      changed = true;
-    }
-
-    if (thinkingLevel) {
-      const savedProviderEffort = ensureProviderProjectionMap(settingsBag, 'savedProviderEffort');
-      const savedEffort = typeof savedProviderEffort.mimocode === 'string'
-        ? savedProviderEffort.mimocode.trim()
-        : '';
-      if (!savedEffort || savedEffort === MIMOCODE_DEFAULT_THINKING_LEVEL) {
-        savedProviderEffort.mimocode = thinkingLevel;
-        changed = true;
-      }
-    }
-
-    if (ProviderRegistry.resolveSettingsProviderId(settingsBag) !== this.providerId) {
-      return changed;
-    }
-
-    const activeModel = typeof settingsBag.model === 'string' ? settingsBag.model : '';
-    if (!activeModel || activeModel === MIMOCODE_SYNTHETIC_MODEL_ID) {
-      settingsBag.model = modelSelection;
-      changed = true;
-    }
-    if (thinkingLevel) {
-      const activeEffort = typeof settingsBag.effortLevel === 'string' ? settingsBag.effortLevel : '';
-      if (!activeEffort || activeEffort === MIMOCODE_DEFAULT_THINKING_LEVEL) {
-        settingsBag.effortLevel = thinkingLevel;
-        changed = true;
-      }
-    }
-    return changed;
+    await this.sessionConfig.syncSessionModelState(params, options);
   }
 
   private async syncSessionModeState(params: {
@@ -1180,37 +928,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
     emitPermissionSync?: boolean;
     modes?: AcpSessionModeState | null;
   }): Promise<void> {
-    const acpState = extractAcpSessionModeState(params);
-    const availableModes = normalizeMimocodeAvailableModes(acpState.availableModes);
-    const currentModeId = params.currentModeId ?? acpState.currentModeId;
-    if (currentModeId) {
-      this.currentSessionModeId = currentModeId;
-      // session/new and session/load report the CLI default agent (`build`).
-      // Pushing that into the toolbar overwrites the user's Safe/Plan/Auto pick
-      // before applySelectedMode can run.
-      if (params.emitPermissionSync !== false) {
-        this.emitPermissionModeSync(currentModeId);
-      }
-    }
-
-    const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
-    const currentSettings = getMimocodeProviderSettings(settingsBag);
-    const shouldSeedSelectedMode = typeof currentModeId === 'string'
-      && !currentSettings.selectedMode
-      && isManagedMimocodeModeId(currentModeId);
-    const discoveryChanged = availableModes.length > 0
-      && !sameModes(currentSettings.availableModes, availableModes)
-      && updateMimocodeDiscoveryState(settingsBag, { availableModes });
-
-    if (!discoveryChanged && !shouldSeedSelectedMode) {
-      return;
-    }
-
-    if (shouldSeedSelectedMode && currentModeId) {
-      updateMimocodeProviderSettings(settingsBag, { selectedMode: currentModeId });
-      await this.plugin.saveSettings();
-    }
-    this.refreshModelSelectors();
+    await this.sessionConfig.syncSessionModeState(params);
   }
 
   private refreshModelSelectors(): void {
@@ -1219,9 +937,8 @@ export class MimocodeChatRuntime implements ChatRuntime {
     }
   }
 
-  private emitPermissionModeSync(modeId: string): void {
-    const permissionMode = resolvePermissionModeForManagedMimocodeMode(modeId);
-    if (!permissionMode || !this.permissionModeSyncCallback) {
+  private emitPermissionModeSync(permissionMode: 'normal' | 'plan' | 'full_access'): void {
+    if (!this.permissionModeSyncCallback) {
       return;
     }
 
@@ -1617,7 +1334,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
     settingsBag.model = modelSelection;
     // Force the next turn to send set_config_option; the failed ACP session is
     // still bound to the rejected model until the provider confirms the fallback.
-    this.currentSessionModelId = null;
+    this.sessionConfig.forgetSessionModel();
     await this.plugin.saveSettings();
     this.refreshModelSelectors();
   }
@@ -1628,8 +1345,7 @@ export class MimocodeChatRuntime implements ChatRuntime {
     }
     this.sessionId = null;
     this.loadedSessionId = null;
-    this.currentSessionModelId = null;
-    this.currentSessionModeId = null;
+    this.sessionConfig.forgetProcessSelection();
     this.setSupportedCommands([]);
   }
 }

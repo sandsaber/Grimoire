@@ -5233,6 +5233,58 @@ breaks, five caught, restored green.
 
 Gates: unit 487 suites / 7,729 tests, typecheck, `eslint`.
 
+### Wave 6: the three large parts, and a second extraction (this commit)
+
+`MimocodeContentPresenter`, `MimocodeExecutionRequests` and
+`MimocodeSessionConfigState`. The first two are dark and listed as such; the
+third is not, for the same reason the permission vocabulary is not.
+
+**`MimocodeSessionConfigState` was moved out of the runtime, not written beside
+it.** Five fields and seven methods — which model, mode and thinking level a
+turn runs under, and what to do with the lists a session reports back — left
+`MimocodeChatRuntime`, which now holds one `sessionConfig` and delegates. Before
+touching anything I diffed the runtime's copy against OpenCode's extracted class
+with the provider names normalised away: the bodies are the same modulo
+`this.plugin.*` becoming `this.ports.*`, which is what made the move safe to do
+mechanically.
+
+Two things the diff surfaced that a straight copy would have got wrong. The
+runtime clears *five* fields when the conversation changes but only *two* when
+the process dies, and OpenCode's class exposes only the wide reset; widening the
+narrow one would have been a behaviour change wearing a refactor's clothes, so
+`forgetProcessSelection` and `forgetSessionModel` exist and say in their comments
+why they are narrower. And the port I first wrote handed
+`emitPermissionModeSync` an already-resolved permission mode where that helper
+expected a mode *id* and resolved it a second time — three of the runtime's own
+tests went red on it, which is exactly what they are for.
+
+Seven of the runtime's tests read the moved fields through `as any`. Six now read
+them at their new address. The seventh poked three private fields to fake a
+session that offers a thinking level; it now seeds them by calling
+`syncSessionModelState` with the config option a session would actually answer
+with, which is the path `applySelectedEffort` depends on anyway.
+
+**Two modules arrived untested and it showed.** Breaking the content presenter's
+double-print guard changed nothing red, because nothing exercised it — so
+`MimocodeContentPresenter.test.ts` and `MimocodeExecutionRequests.test.ts` were
+written before moving on, with the recorded session's own values in them: the
+model id, the `build` mode, the `init`/`review` commands and the 1 MiB context
+window `mimo acp` actually reported. Not the answer traffic, which that account
+cannot produce; the chunk shapes there are the normalizer's, and the test says so.
+
+One break went uncaught and is worth writing down rather than papering over:
+filtering `text` chunks for *both* roles instead of only the assistant's fails
+no test — because a user chunk never produces one. The role check is defensive,
+not load-bearing, and no test should claim otherwise.
+
+Every other break caught: a widened process reset, a model reset that also drops
+the mode, `desiredEffortValue` gated like its sibling, the runtime keeping its
+own copy of `resolveSelectedModeId`, the assistant text unfiltered, a prompt held
+after dispatch, the wrong subcommand, and the launch key travelling into a
+control record unhashed.
+
+Gates: unit 490 suites / 7,756 tests, typecheck, `eslint`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -5247,12 +5299,21 @@ provider module, its execution descriptor and five provider-owned execution part
 listed in the parity manifest's `execution-platform-dark` entry — except
 `MimocodePermissionPresentation.ts`, which was moved out of the legacy runtime and is live now.
 
-**What is left before the MiMoCode flip:** `MimocodeContentPresenter`, `MimocodeExecutionRequests`
-and `MimocodeSessionConfigState` (the three large provider-owned parts), then
-`MimocodeExecutionComposition` in `src/app/execution/mimocode/`, then the flip itself as one
-revertible commit pointing `registration.ts` at the composition, then a live smoke harness and
-matrix. Derive each from OpenCode's — `AGENTS.md` requires these two to stay in step — and read every
-derived file end to end, because a derived file inherits claims along with code.
+**All of MiMoCode's provider-owned execution parts now exist.** Eight modules under
+`src/providers/mimocode/execution/`: the backend descriptor, the content presenter, the dynamic-config
+applier, the execution requests store, the filesystem delegate, the interaction bridge and presenter,
+the permission vocabulary, the projection result sink and the session config state. Six are dark and
+attributed in the manifest; `MimocodePermissionPresentation.ts` and `MimocodeSessionConfigState.ts`
+are live, because both were moved out of `MimocodeChatRuntime` rather than written beside it.
+
+**What is left before the MiMoCode flip:** `MimocodeExecutionComposition` in
+`src/app/execution/mimocode/` (derive from `OpencodeExecutionComposition.ts`, 36 KB, plus
+`OpencodeMetadataSession.ts`), then the flip itself as one revertible commit pointing
+`registration.ts` at `plugin.getMimocodeExecution().createRuntime()`, then a live smoke harness and
+matrix. Derive from OpenCode's — `AGENTS.md` requires these two to stay in step — and read every
+derived file end to end, because a derived file inherits claims along with code. The normalized diff
+that made the config-state move safe is the technique worth repeating: `sed` the provider names to a
+common token in both files and diff, so what is left is only what actually differs.
 
 ### Where the session of 2026-08-21 ended
 

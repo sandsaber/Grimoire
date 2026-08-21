@@ -725,15 +725,18 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/mimocode/MimocodeProviderModule.ts',
       'src/providers/mimocode/execution/MimocodeExecutionBackend.ts',
       // The provider-owned parts the composition will be built from. Dark for
-      // the same reason and until the same commit. Not listed beside them:
-      // `MimocodePermissionPresentation.ts`, which is reachable the moment it
-      // exists — it was moved out of the legacy runtime rather than written
-      // beside it, and that runtime imports it now.
+      // the same reason and until the same commit. Two are missing from this
+      // list on purpose: `MimocodePermissionPresentation.ts` and
+      // `MimocodeSessionConfigState.ts` were moved out of the legacy runtime
+      // rather than written beside it, so that runtime imports them and they
+      // are reachable the moment they exist.
       'src/providers/mimocode/execution/MimocodeAcpDynamicConfig.ts',
       'src/providers/mimocode/execution/MimocodeAcpFileSystem.ts',
       'src/providers/mimocode/execution/MimocodeInteractionBridge.ts',
       'src/providers/mimocode/execution/MimocodeInteractionPresenter.ts',
       'src/providers/mimocode/execution/MimocodeProjectionResultSink.ts',
+      'src/providers/mimocode/execution/MimocodeContentPresenter.ts',
+      'src/providers/mimocode/execution/MimocodeExecutionRequests.ts',
     ],
   },
 ];

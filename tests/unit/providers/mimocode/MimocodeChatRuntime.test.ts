@@ -117,7 +117,7 @@ describe('MimocodeChatRuntime', () => {
     ]);
     expect(plugin.settings.model).toBe('mimocode:xiaomi/mimo-v2.5-pro');
     expect(plugin.settings.savedProviderModel.mimocode).toBe('mimocode:xiaomi/mimo-v2.5-pro');
-    expect((runtime as any).currentSessionModelId).toBeNull();
+    expect((runtime as any).sessionConfig.sessionModelId).toBeNull();
     expect(plugin.saveSettings).toHaveBeenCalled();
   });
 
@@ -725,7 +725,7 @@ describe('MimocodeChatRuntime', () => {
       { description: 'Planning-first agent', id: 'plan', name: 'Plan' },
     ]);
     expect(plugin.settings.providerConfigs.mimocode.selectedMode).toBe('plan');
-    expect((runtime as any).currentSessionModeId).toBe('build');
+    expect((runtime as any).sessionConfig.sessionModeId).toBe('build');
     expect(plugin.saveSettings).not.toHaveBeenCalled();
     expect(refreshModelSelector).toHaveBeenCalledTimes(1);
   });
@@ -886,7 +886,7 @@ describe('MimocodeChatRuntime', () => {
 
     await expect((runtime as any).createSession('/tmp/vault')).resolves.toBe('session-1');
 
-    expect((runtime as any).currentSessionModeId).toBe(MIMOCODE_BUILD_MODE_ID);
+    expect((runtime as any).sessionConfig.sessionModeId).toBe(MIMOCODE_BUILD_MODE_ID);
     expect(syncCallback).not.toHaveBeenCalled();
   });
 
@@ -1223,7 +1223,7 @@ describe('MimocodeChatRuntime', () => {
 
     await expect(runtime.warmModelMetadata('mimocode:deepseek/deepseek-v4-pro')).resolves.toBe(true);
 
-    expect((runtime as any).currentSessionModelId).toBe('deepseek/deepseek-v4-pro');
+    expect((runtime as any).sessionConfig.sessionModelId).toBe('deepseek/deepseek-v4-pro');
     expect(plugin.settings.model).toBe('mimocode:deepseek/deepseek-v4-pro');
     expect(plugin.settings.savedProviderModel.mimocode).toBe('mimocode:deepseek/deepseek-v4-pro');
     expect(plugin.settings.providerConfigs.mimocode.thinkingOptionsByModel).toEqual({
@@ -1272,10 +1272,20 @@ describe('MimocodeChatRuntime', () => {
       }],
     });
     (runtime as any).connection = { setConfigOption };
-    (runtime as any).currentSessionEffortConfigId = 'effort';
-    (runtime as any).currentSessionEffortValue = 'low';
-    (runtime as any).currentSessionEffortValues = new Set(['low', 'high']);
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
+    await (runtime as any).syncSessionModelState({
+      configOptions: [{
+        category: 'thought_level',
+        currentValue: 'low',
+        id: 'effort',
+        name: 'Effort',
+        options: [
+          { name: 'Low', value: 'low' },
+          { name: 'High', value: 'high' },
+        ],
+        type: 'select',
+      }],
+    });
 
     await (runtime as any).applySelectedEffort('session-1');
 
