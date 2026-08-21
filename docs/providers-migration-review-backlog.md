@@ -270,19 +270,19 @@ Grok:
 - GK-7 [M][parity] mirror dedup suppresses only adjacent copies (`GrokSessionNotificationMirrorDeduplicator.ts:19-31`); honest comment; fingerprint LRU if delayed mirrors appear.
 
 ACP/OpenCode:
-- ACP-1 [M][parity] actionable `AcpSpawnError` wording discarded on flipped path: run finishes `failed/spawn-failed`, surface shows only generic "could not start the provider process"; sentence reaches neither user nor debug log. `ManagedAcpExecutionBackend.ts:899-906`.
+- ACP-1 ✅ [M][parity] actionable `AcpSpawnError` wording discarded on flipped path: run finishes `failed/spawn-failed`, surface shows only generic "could not start the provider process"; sentence reaches neither user nor debug log. `ManagedAcpExecutionBackend.ts:899-906`.
 - ACP-2 ✅ [M][bug] connection lost BEFORE first dispatch (attempt 0) skips retry (`attempt === 1` only) → `indeterminate/effects-unknown` for a turn that never dispatched; should be `pre-dispatch-rejected` sideEffectFree (or retry). `ManagedAcpExecutionBackend.ts:599-636`. Fix before next providers flip onto the kernel.
-- ACP-3 [M][parity] `limit: 0` semantics differ: aux runner returns whole file (falsy check) vs shared delegate zero lines. `OpencodeAuxQueryRunner.ts:303` vs `AcpWorkspaceFileSystem.ts:44`.
+- ACP-3 ✅ [M][parity] `limit: 0` semantics differ: aux runner returns whole file (falsy check) vs shared delegate zero lines. `OpencodeAuxQueryRunner.ts:303` vs `AcpWorkspaceFileSystem.ts:44`.
 - ACP-4 [M][hygiene] `OpencodeAuxQueryRunner` duplicates shared `ManagedAcpAuxiliaryQuery`; up to 3 idle `opencode acp` processes; M5-fenced.
-- ACP-5 [M][security] `AcpSqliteReader.ts:154-176` sqlite3 CLI fallback interpolates params with manual escaping instead of binding (primary node:sqlite path binds correctly; not exploitable today).
+- ACP-5 ✅ [M][security] **Sound, and now pinned.** The CLI fallback cannot bind — the sqlite3 CLI takes a statement and nothing else — so the escaping *is* the safety: quotes are doubled, every non-string is a recognised type, and anything else throws rather than being interpolated. That was true and untested, which is a claim rather than a guarantee; `AcpSqliteBinding.test.ts` asserts it directly, including the injection shapes.
 - ACP-6 [M][hygiene] `AcpJsonRpcTransport.ts:392-397` write() return ignored, no drain handling (bounded in practice).
 
 MiMo/Kimi:
-- MK-2 [M][bug] `MimocodeRuntimeCommandLoader.ts:53-60` (+Kimi twin, +`MimocodeChatRuntime.ts:603`) `ensureReady` can reject on spawn failure through slash-menu warmup; OpenCode's flipped loader catches → `[]`.
+- MK-2 ✅ [M][bug] `MimocodeRuntimeCommandLoader.ts:53-60` (+Kimi twin, +`MimocodeChatRuntime.ts:603`) `ensureReady` can reject on spawn failure through slash-menu warmup; OpenCode's flipped loader catches → `[]`.
 - MK-3 [M][parity] MiMo/Kimi loaders reuse a session-less tab runtime and create warmup ACP session on it (`:memory:` DB override); OpenCode gates on existing session + isolated metadata ask.
 - MK-4 [M][parity] model-metadata warmup spins throwaway legacy ChatRuntime with `:memory:` DB (expected pre-flip; port at flip).
-- MK-5 [M][tests] Kimi has no `KimicodeAcpLaunch.test.ts` counterpart (Windows-path coverage absent).
-- MK-6 [M][hygiene] `sessionCwds` grows unbounded in both runtimes (199,1230,1265 / 194,1200,1235).
+- MK-5 ✅ [M][tests] Kimi has no `KimicodeAcpLaunch.test.ts` counterpart (Windows-path coverage absent).
+- MK-6 ✅ [M][hygiene] `sessionCwds` grows unbounded in both runtimes (199,1230,1265 / 194,1200,1235).
 - MK-7 [M][docs] wire recordings: MiMo partial (4 cases), Kimi absent — flip precondition per plan; keep blocking.
 
 Antigravity/Gemini/Qwen (beyond GQ-*):

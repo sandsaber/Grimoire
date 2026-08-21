@@ -300,9 +300,13 @@ export class OpencodeAuxQueryRunner implements AuxQueryRunner {
 
     const lines = content.split(/\r?\n/);
     const startIndex = Math.max(0, (request.line ?? 1) - 1);
-    const endIndex = request.limit
-      ? startIndex + Math.max(0, request.limit)
-      : lines.length;
+    // Absence, not falsiness: `limit: 0` asks for no lines, and reading it as
+    // "no limit" returned the whole file — the opposite answer, and the
+    // opposite of what the shared workspace filesystem gives for the same
+    // request.
+    const endIndex = request.limit === undefined || request.limit === null
+      ? lines.length
+      : startIndex + Math.max(0, request.limit);
 
     return {
       content: lines.slice(startIndex, endIndex).join('\n'),

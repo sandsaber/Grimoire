@@ -38,7 +38,13 @@ export type AcpLaunchMockTransport = {
 
 export interface AcpLaunchMockPluginParams {
   cliPath: string;
-  providerId: 'opencode' | 'mimocode';
+  /**
+   * The three ACP CLIs this helper launches for.
+   *
+   * Kimi Code was missing, which is why it had no launch row: the helper it
+   * would have used did not admit it.
+   */
+  providerId: 'opencode' | 'mimocode' | 'kimicode';
   vaultPath?: string;
 }
 

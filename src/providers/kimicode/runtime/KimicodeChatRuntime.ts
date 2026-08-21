@@ -163,6 +163,9 @@ class StreamChunkQueue {
   }
 }
 
+/** How many sessions a runtime remembers a working directory for. */
+const KIMICODE_SESSION_CWD_LIMIT = 256;
+
 export class KimicodeChatRuntime implements ChatRuntime {
   readonly providerId = 'kimicode' as const;
 
@@ -192,6 +195,18 @@ export class KimicodeChatRuntime implements ChatRuntime {
   private readonly supportedCommandWaiters: Array<(commands: SlashCommand[]) => void> = [];
   private supportedCommands: SlashCommand[] = [];
   private sessionCwds = new Map<string, string>();
+
+  /**
+   * Remembers where a session runs, without remembering every session ever.
+   *
+   * A runtime lives as long as its tab, and this map only ever grew: a working
+   * day of resumed conversations kept a directory for each. What it is read for
+   * is the session a request just arrived on.
+   */
+  private setSessionCwd(sessionId: string, cwd: string): void {
+    this.sessionCwds.set(sessionId, cwd);
+    trimOldestMapEntries(this.sessionCwds, KIMICODE_SESSION_CWD_LIMIT);
+  }
   private sessionId: string | null = null;
   private readonly sessionUpdateNormalizer = new AcpSessionUpdateNormalizer();
   private readonly toolStreamAdapter = createKimicodeToolStreamAdapter();
@@ -1197,7 +1212,7 @@ export class KimicodeChatRuntime implements ChatRuntime {
       this.sessionInvalidated = false;
       this.loadedSessionId = response.sessionId;
       this.sessionId = response.sessionId;
-      this.sessionCwds.set(response.sessionId, cwd);
+      this.setSessionCwd(response.sessionId, cwd);
       await this.syncSessionModelState({
         configOptions: response.configOptions ?? null,
         models: response.models ?? null,
@@ -1232,7 +1247,7 @@ export class KimicodeChatRuntime implements ChatRuntime {
       const boundSessionId = response.sessionId ?? sessionId;
       this.loadedSessionId = boundSessionId;
       this.sessionId = boundSessionId;
-      this.sessionCwds.set(boundSessionId, cwd);
+      this.setSessionCwd(boundSessionId, cwd);
       await this.syncSessionModelState({
         configOptions: response.configOptions ?? null,
         models: response.models ?? null,
@@ -1770,3 +1785,13 @@ function formatPermissionLabel(permissionId: string): string {
     .join(' ');
 }
 
+/** Keeps a per-session lookup bounded, oldest first. */
+function trimOldestMapEntries<K, V>(map: Map<K, V>, maximum: number): void {
+  while (map.size > maximum) {
+    const oldest = map.keys().next().value;
+    if (oldest === undefined) {
+      return;
+    }
+    map.delete(oldest);
+  }
+}

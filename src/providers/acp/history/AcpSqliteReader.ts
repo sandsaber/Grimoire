@@ -151,7 +151,17 @@ function normalizeRows<Row extends Record<string, unknown>>(value: unknown): Row
   ));
 }
 
-function bindSqliteQuery(sql: string, params: unknown[]): string {
+/**
+ * The query the sqlite3 CLI is given, with parameters inlined.
+ *
+ * Exported for the gate below it rather than for a caller: the primary reader
+ * binds parameters through `node:sqlite`, and this fallback cannot — the CLI
+ * takes a statement and nothing else. So the escaping *is* the safety, and it
+ * is asserted directly instead of trusted: strings have their quotes doubled,
+ * every non-string is a type this function recognises, and anything else
+ * throws rather than being interpolated.
+ */
+export function bindSqliteQuery(sql: string, params: unknown[]): string {
   let parameterIndex = 0;
   const bound = sql.replaceAll('?', () => {
     if (parameterIndex >= params.length) {

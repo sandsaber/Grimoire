@@ -533,10 +533,22 @@ export class GrokExecution {
        * failure that names nothing — the same shape OpenCode has, and the same
        * dead end for a person reading it.
        */
-      describeFailure: reason => (reason === 'pre-dispatch-rejected'
-        ? 'Grok Build could not start this turn. If this conversation was resumed from a saved '
-          + 'session, that session may no longer exist — starting a new chat will create one.'
-        : undefined),
+      describeFailure: reason => {
+        // Two different failures that used to read as one. A CLI that is not
+        // installed is `spawn-failed`, and the neutral sentence for it —
+        // "Grimoire could not start the provider process" — names no action;
+        // the actionable half is that a desktop app does not inherit the shell
+        // PATH, so an absolute path in settings is what fixes it.
+        if (reason === 'spawn-failed') {
+          return 'Grimoire could not start the Grok CLI. Set an absolute CLI path in the '
+            + 'Grok settings — desktop apps do not inherit the shell PATH.';
+        }
+        if (reason === 'pre-dispatch-rejected') {
+          return 'Grok Build could not start this turn. If this conversation was resumed from a saved '
+            + 'session, that session may no longer exist — starting a new chat will create one.';
+        }
+        return undefined;
+      },
       presentProviderContent: payload => content.present(payload),
       consumeProviderTurnMetadata: () => content.consumeTurnMetadata(),
       interactionPresenter: presenter,

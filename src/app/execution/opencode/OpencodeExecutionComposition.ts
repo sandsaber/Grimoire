@@ -396,10 +396,22 @@ export class OpencodeExecution {
        * conversation would otherwise repeat the neutral sentence forever with
        * nothing to act on.
        */
-      describeFailure: reason => (reason === 'pre-dispatch-rejected'
-        ? 'OpenCode could not start this turn. If this conversation was resumed from a saved '
-          + 'session, that session may no longer exist — starting a new chat will create one.'
-        : undefined),
+      describeFailure: reason => {
+        // Two different failures that used to read as one. A CLI that is not
+        // installed is `spawn-failed`, and the neutral sentence for it —
+        // "Grimoire could not start the provider process" — names no action;
+        // the actionable half is that a desktop app does not inherit the shell
+        // PATH, so an absolute path in settings is what fixes it.
+        if (reason === 'spawn-failed') {
+          return 'Grimoire could not start the OpenCode CLI. Set an absolute CLI path in the '
+            + 'OpenCode settings — desktop apps do not inherit the shell PATH.';
+        }
+        if (reason === 'pre-dispatch-rejected') {
+          return 'OpenCode could not start this turn. If this conversation was resumed from a saved '
+            + 'session, that session may no longer exist — starting a new chat will create one.';
+        }
+        return undefined;
+      },
       presentProviderContent: payload => content.present(payload),
       consumeProviderTurnMetadata: () => {
         // A vendor that reports no cost on the wire has still charged for the

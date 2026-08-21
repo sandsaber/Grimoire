@@ -50,6 +50,10 @@ export class KimicodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
         });
       }
 
+      // Wrapped, because this is the slash menu warming up. `ensureReady`
+      // launches a CLI, and a spawn failure there rejected all the way out
+      // through opening a menu — OpenCode's flipped loader answers an empty
+      // list instead, which is what a menu with nothing to show looks like.
       const ready = await runtime.ensureReady({
         allowSessionCreation: shouldWarmBlankSession || shouldWarmPreSessionConversation,
       });
@@ -58,6 +62,8 @@ export class KimicodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
       }
 
       return await runtime.getSupportedCommands();
+    } catch {
+      return [];
     } finally {
       if (runtime !== context.runtime) {
         runtime.cleanup();
