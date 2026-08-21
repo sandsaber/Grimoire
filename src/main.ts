@@ -1106,11 +1106,12 @@ export default class GrimoirePlugin extends Plugin {
   /**
    * Removes what the execution kernel recorded about a conversation (D4).
    *
-   * Last, and after the tabs holding it have been moved off it: the registry
-   * refuses to take records away from a session that is still working, and by
-   * this point the tabs have been reset onto a new conversation. Retention is
-   * tied to the conversation's lifetime and to nothing else — no clock expires
-   * a run record — so this call is the only thing that ever removes one.
+   * Last, and after the tabs holding it have been moved off it. The waiting is
+   * the registry's: cancelling a tab's turn is fire-and-forget and its disposal
+   * is a void call on a queue, so a caller can only ask — `deleteOwnedRecords`
+   * cancels and disposes what the conversation owns before removing anything.
+   * Retention is tied to the conversation's lifetime and to nothing else — no
+   * clock expires a run record — so this is the only thing that removes one.
    *
    * Reported rather than thrown: a conversation the user deleted is gone from
    * the vault either way, and a failure here must not leave them looking at a

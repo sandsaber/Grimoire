@@ -34,10 +34,12 @@ import {
   ExecutionAdapterSession,
   ExecutionChatRuntimeAdapter,
   type ExecutionChatRuntimeAdapterContext,
+  type ExecutionChatRuntimeHostPorts,
   ExecutionRunStream,
   startExecutionRun,
   toLegacyCapabilities,
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type { AutoTurnResult } from '@/core/runtime/types';
 import type {
   ChatTurnRequest,
   PreparedChatTurn,
@@ -156,6 +158,26 @@ async function createHarness(options: { ownSession?: boolean } = {}): Promise<Ha
       };
       return registry.ingest(delivery);
     },
+  };
+}
+
+/** What the registry hands a session observer for a run it is watching. */
+function sideChannel(
+  runId: RunId,
+  event: ExecutionEvent,
+  sequence: number,
+): ExecutionEventEnvelope {
+  return {
+    schemaVersion: 1,
+    backendId: executionBackendId('provider-fake'),
+    backendGeneration: 1,
+    executionSessionId: SESSION_ID,
+    sessionInstanceId: INSTANCE_ID,
+    eventId: `side-${sequence}`,
+    sequence,
+    occurredAt: sequence,
+    scope: { kind: 'run', runId },
+    event,
   };
 }
 
@@ -470,7 +492,10 @@ describe('the assembled ChatRuntime adapter', () => {
     return ref === undefined ? undefined : refPayloads.get(ref);
   }
 
-  function createAdapter(harness: Harness): ExecutionChatRuntimeAdapter<CodexProviderSettings> {
+  function createAdapter(
+    harness: Harness,
+    ports: Partial<ExecutionChatRuntimeHostPorts> = {},
+  ): ExecutionChatRuntimeAdapter<CodexProviderSettings> {
     return new ExecutionChatRuntimeAdapter(
       harness.context,
       {
@@ -492,6 +517,7 @@ describe('the assembled ChatRuntime adapter', () => {
         },
         reasoningControl: 'effort',
         currentSessionId: () => 'native-session',
+        ...ports,
       },
       codexProviderModule.features({
         listSkills: async () => [],
@@ -569,6 +595,43 @@ describe('the assembled ChatRuntime adapter', () => {
     expect(harness.sessionOwner()).toEqual({ kind: 'conversation', ownerId: 'conversation-2' });
   });
 
+  it('follows the session it moved to, not the one it left', async () => {
+    const harness = await createHarness({ ownSession: true });
+    const observed: string[] = [];
+    let released = 0;
+    const observe = harness.registry.observe.bind(harness.registry);
+    jest.spyOn(harness.registry, 'observe').mockImplementation((id, listener) => {
+      observed.push(String(id));
+      const stop = observe(id, listener);
+      return () => {
+        released += 1;
+        stop();
+      };
+    });
+    const adapter = createAdapter(harness);
+    harness.bindConversation('conversation-1');
+    adapter.syncConversationState(
+      { id: 'conversation-1', providerState: {}, sessionId: null },
+    );
+    await adapter.ensureReady();
+
+    harness.bindConversation('conversation-2');
+    adapter.syncConversationState(
+      { id: 'conversation-2', providerState: {}, sessionId: null },
+    );
+    await adapter.ensureReady();
+
+    // Approvals, questions and backend-initiated turns all arrive on one
+    // session-scoped observer, and only one is ever installed. A tab that kept
+    // the observer for the conversation it left would stream the new one's
+    // answer — the per-run observer is separate — and never show the approval
+    // that turn is blocked on. New Chat and a history switch both take this
+    // path, so it is the ordinary one.
+    expect(observed).toHaveLength(2);
+    expect(observed[1]).not.toBe(observed[0]);
+    expect(released).toBe(1);
+  });
+
   it('streams a turn and closes only on the terminal', async () => {
     const harness = await createHarness({ ownSession: true });
     const adapter = createAdapter(harness);
@@ -591,6 +654,91 @@ describe('the assembled ChatRuntime adapter', () => {
     expect(await collected).toEqual([{ type: 'text', content: 'answer' }]);
     expect(readRef(harness.dispatched(runId)?.requestRef)).toBe('hello');
     expect(adapter.consumeTurnMetadata()).toEqual({ wasSent: true });
+  });
+
+  it('leaves an in-flight turn the native ids the provider is holding for it', async () => {
+    const harness = await createHarness({ ownSession: true });
+    const side: Array<(envelope: ExecutionEventEnvelope) => void> = [];
+    const observe = harness.registry.observe.bind(harness.registry);
+    jest.spyOn(harness.registry, 'observe').mockImplementation((id, listener) => {
+      side.push(listener);
+      return observe(id, listener);
+    });
+    let consumed = 0;
+    const adapter = createAdapter(harness, {
+      consumeProviderTurnMetadata: () => {
+        consumed += 1;
+        return { userMessageId: 'provider-message' };
+      },
+    });
+    const turns: AutoTurnResult[] = [];
+    adapter.setAutoTurnCallback((result: AutoTurnResult) => {
+      turns.push(result);
+    });
+    const userRun = toRunId(`run-${'1'.padStart(32, '0')}`);
+    const collected = drain(adapter.query(adapter.prepareTurn({ text: 'hello' })));
+    for (let attempt = 0; attempt < 200 && !harness.dispatched(userRun); attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+
+    // A run this adapter did not start, settling while the tab's own turn is
+    // still going. The provider's metadata port is per tab and consuming it is
+    // destructive, so reading it here hands the user's turn's native ids to a
+    // turn nobody asked for — and rewind refuses to run without them.
+    const backendRun = toRunId(`run-${'9'.repeat(32)}`);
+    side[0]?.(sideChannel(backendRun, { kind: 'run-started' }, 1));
+    side[0]?.(sideChannel(
+      backendRun,
+      { kind: 'output-delta', channel: 'assistant', text: 'unbidden' },
+      2,
+    ));
+    side[0]?.(sideChannel(
+      backendRun,
+      { kind: 'terminal', terminal: 'succeeded', reason: 'completed' },
+      3,
+    ));
+    await new Promise(resolve => setTimeout(resolve, 5));
+
+    expect(turns).toHaveLength(1);
+    expect(consumed).toBe(0);
+    expect(turns[0]?.metadata.userMessageId).toBeUndefined();
+    expect(turns[0]?.chunks).toEqual([{ type: 'text', content: 'unbidden' }]);
+
+    await harness.emit(userRun, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, 'd-9');
+    await collected;
+    // Still there for the turn that earned it.
+    expect(adapter.consumeTurnMetadata().userMessageId).toBe('provider-message');
+  });
+
+  it('drops a backend turn the tab stopped following', async () => {
+    const harness = await createHarness({ ownSession: true });
+    const side: Array<(envelope: ExecutionEventEnvelope) => void> = [];
+    const observe = harness.registry.observe.bind(harness.registry);
+    jest.spyOn(harness.registry, 'observe').mockImplementation((id, listener) => {
+      side.push(listener);
+      return observe(id, listener);
+    });
+    const adapter = createAdapter(harness);
+    const turns: AutoTurnResult[] = [];
+    adapter.setAutoTurnCallback((result: AutoTurnResult) => {
+      turns.push(result);
+    });
+    await adapter.ensureReady();
+
+    const backendRun = toRunId(`run-${'8'.repeat(32)}`);
+    side[0]?.(sideChannel(backendRun, { kind: 'run-started' }, 1));
+    side[0]?.(sideChannel(
+      backendRun,
+      { kind: 'output-delta', channel: 'assistant', text: 'unbidden' },
+      2,
+    ));
+    // The conversation moves on before the turn nobody asked for finishes.
+    // Delivering it now would render one conversation's turn into another's
+    // transcript; leaving it collecting would hold the closure for good.
+    adapter.resetSession();
+    await new Promise(resolve => setTimeout(resolve, 5));
+
+    expect(turns).toEqual([]);
   });
 
   it('projects the capability record the UI reads', async () => {

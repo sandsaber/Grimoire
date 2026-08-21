@@ -27,6 +27,7 @@ import type { SlashCommand } from '../../types/settings';
 import type {
   ApprovalCallback,
   AskUserQuestionCallback,
+  AutoTurnCallback,
   ChatRewindMode,
   ChatRewindResult,
   ChatRuntimeQueryOptions,
@@ -235,6 +236,23 @@ export class ExecutionRunStream {
   /** Records the intent. The run decides when, and whether, it stopped. */
   requestCancel(): void {
     this.cancelRequested = true;
+  }
+
+  /**
+   * Ends the stream because nobody is reading it any more.
+   *
+   * Not a terminal the run reported — the run may still be going. This is the
+   * reader giving up, and it exists because `chunks()` waits forever for a
+   * terminal that an unsubscribed adapter will never deliver. Whoever awaited
+   * it is expected to check that the stream is still the one it registered
+   * before doing anything with what it collected.
+   */
+  abandon(): void {
+    if (this.terminal !== null) {
+      return;
+    }
+    this.terminal = 'cancelled';
+    this.notify();
   }
 
   cancelDispatched(): boolean {
@@ -803,8 +821,7 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     const executionSessionId = this.executionSessionId;
     this.executionSessionId = null;
     this.announceReady(false);
-    this.sideChannels?.();
-    this.sideChannels = null;
+    this.detachSideChannels();
     if (!executionSessionId) {
       return;
     }
@@ -880,10 +897,28 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     this.boundSessionId = undefined;
     this.boundConversationId = undefined;
     this.announceReady(false);
+    // The observer is bound to the session being dropped, and
+    // `attachSideChannels` installs at most one — so leaving it attached means
+    // the next session's interactions and backend-initiated turns reach
+    // nothing, while its content still streams through the per-run observer.
+    // The tab then renders an answer and never renders the approval the turn is
+    // blocked on. `cleanup()` always did this; the conversation-switch path
+    // made it the common one.
+    this.detachSideChannels();
     if (executionSessionId) {
       void this.context.registry.disposeSession(executionSessionId)
         .catch(error => this.ports.reportCleanupFailure?.(error));
     }
+  }
+
+  /** Drops the session observer, and whatever it was still following. */
+  private detachSideChannels(): void {
+    this.sideChannels?.();
+    this.sideChannels = null;
+    for (const stream of this.backendRuns.values()) {
+      stream.abandon();
+    }
+    this.backendRuns.clear();
   }
 
   async reloadMcpServers(): Promise<void> {
@@ -1081,21 +1116,29 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
         for await (const chunk of stream.chunks()) {
           chunks.push(chunk);
         }
-        const notify = this.callbacks.autoTurn as
-          ((result: { chunks: StreamChunk[]; metadata: ChatTurnMetadata }) => unknown) | undefined;
-        // The provider's own reading wins where it has one, exactly as it does
-        // for a turn the tab asked for.
-        await notify?.({
+        if (this.backendRuns.get(id) !== stream) {
+          // Abandoned: the conversation moved on while this ran. Rendering it
+          // now would put one conversation's turn into another's transcript.
+          return;
+        }
+        await this.callbacks.autoTurn?.({
           chunks,
           metadata: {
             ...stream.consumeTurnMetadata(),
-            ...this.ports.consumeProviderTurnMetadata?.(),
+            // The provider's port is per tab, not per run, and consuming is
+            // destructive: reading it here while the tab's own turn is in
+            // flight hands that turn's native ids to this one and leaves the
+            // turn the user asked for without them. A backend turn running
+            // alone is the only one that can safely claim what the port holds.
+            ...(this.active ? {} : this.ports.consumeProviderTurnMetadata?.()),
           },
         });
       } catch (error) {
         this.ports.reportCleanupFailure?.(error);
       } finally {
-        this.backendRuns.delete(id);
+        if (this.backendRuns.get(id) === stream) {
+          this.backendRuns.delete(id);
+        }
       }
     })();
   }
@@ -1111,19 +1154,9 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   }
 }
 
-/**
- * Turns an opened interaction into the UI's answer.
- *
- * The kernel carries an interaction as identity plus an opaque
- * `presentationRef` and a set of response ids — never the tool name, input, or
- * description the approval callback expects, because those are provider payload
- * and core does not decode payload. Rendering therefore needs a provider-owned
- * presenter, and the adapter's whole part is: ask, then resolve through the
- * registry with the chosen response id.
- *
- * Returning `null` means the user dismissed it without choosing, which is not
- * the same as choosing the first option and must not be flattened into one.
- */
+/** Turns one provider content item into the chunks a surface renders. */
+export type ProviderContentPresenter = (payload: unknown) => readonly StreamChunk[];
+
 /**
  * The callbacks a surface installs, as the presenter reads them back.
  *
@@ -1132,14 +1165,12 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
  * renamed or mistyped key compiles on both sides and every approval silently
  * answers itself.
  */
-export type ProviderContentPresenter = (payload: unknown) => readonly StreamChunk[];
-
 export interface ExecutionInteractionCallbacks {
   readonly approval?: ApprovalCallback;
   readonly approvalDismisser?: () => void;
   readonly question?: AskUserQuestionCallback;
   readonly planDecision?: ExitPlanModeCallback;
-  readonly autoTurn?: (runId: unknown) => void;
+  readonly autoTurn?: AutoTurnCallback;
   /**
    * Installed by the surface and read by nothing yet.
    *

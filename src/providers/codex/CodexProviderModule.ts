@@ -36,8 +36,8 @@ import { DEFAULT_CODEX_MODEL_SET, formatCodexModelLabel } from './types/models';
  * auxiliary execution, chat UI, history, and native agents — nine of the
  * inventory's rows — while typing its feature ports as a bare `ports` bag.
  *
- * Dark: nothing constructs this. `registration.ts` and `CodexWorkspaceServices`
- * remain the only wiring until the Codex flip.
+ * Live: `CodexExecutionComposition` builds every flipped tab's contributions
+ * from here, alongside `registration.ts` and `CodexWorkspaceServices`.
  *
  * Codex is the widest module of the four proofs, which is the point of proving
  * it second: it exercises nearly every slot, where Antigravity exercised the

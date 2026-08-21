@@ -4793,6 +4793,79 @@ That closes the review's prioritized list. Gates: unit 477 suites / 7,668 tests,
 and `build:release` clean.
 
 
+### Second review — six findings, all real (this commit)
+
+A second review, this time a single reader over `d9f715e..2c80d7f`: the Grok flip plus the whole
+prioritized backlog the first review produced. Six findings, and every one held up against the tree.
+Recorded as the second half of
+[`docs/providers-migration-review-backlog.md`](providers-migration-review-backlog.md); this entry is
+what the fixes taught, not a second copy of the list.
+
+**The one that would have shipped.** Making control records belong to the conversation (D4) gave the
+adapter a reason to drop its session when the conversation changes — and `resetSession()` dropped the
+session without dropping the observer bound to it. `attachSideChannels` installs at most one, so the
+next session got none: content still streamed, because the per-run observer is separate, while every
+approval, every question and every backend-initiated turn went nowhere. New Chat and a history
+switch in the same tab both take that path, on every flipped provider. `cleanup()` had always done it
+correctly, which is the tell — one of two call sites was written and the other was assumed. The new
+test watches which session id the adapter observes across a switch, and that the first subscription
+is released.
+
+**Three of the six could not be fixed where they were reported.** That is the part worth carrying:
+
+- **deletion cannot ask a surface to have stopped first.** `deleteConversation` cancelled
+  fire-and-forget and disposed with `void`, then removed records — so a live run made the removal
+  throw while the chat was already gone from the UI, or an idle session was yanked out of the map
+  with its ACP process still running. Neither is fixable by adding an `await` at the call site,
+  because there is nothing there to await. `deleteOwnedRecords` now cancels the owner's live runs and
+  disposes its sessions itself, through the same queue every other session operation takes, and
+  `disposeSession` became idempotent because a tab reset and a delete both legitimately ask for the
+  same session. The refusal that survives is the **lease**: cancelling reaches a run, and nothing
+  reaches a holder still reading the session. The test that asserted the old refusal now asserts the
+  new closing, with a second test pinning the lease.
+- **a Stop needed evidence, not a better verdict.** `noteTurnEnded` ran only from
+  `completeFromPrompt`, and Stop goes through `terminate()`, which reconciled and finished in a
+  microtask — so the prompt's own answer always arrived after the terminal. Both ACP reconcilers
+  answer `unknown`, so Stop read as "Grimoire could not establish whether this run completed" for the
+  one outcome the user asked for and watched happen, and the cancelled turn's cost was lost. ACP
+  answers a cancelled turn *on the prompt itself*, so `terminate()` now waits for that answer — the
+  control timeout bounds it, and the last look happens on the way past, once, whichever path gets
+  there first. The answer is then handed to the reconciler as `RunRecoveryQuery.nativeStopReason`
+  rather than short-circuiting it: **a turn reporting itself cancelled says nothing about a process
+  whose termination could not be proven**, and those are different questions. The conformance row
+  that pins the second one stayed green without being touched, which is what says the distinction is
+  real. `acpCancellationEvidence` is the shared helper both compositions read it with.
+- **the two ACP fakes were wrong about cancellation.** Both swallowed `session/cancel` and left the
+  prompt open forever — an agent no ACP implementation is. Teaching them to answer is what let the
+  waiting land without changing a line of the shared conformance suite; the one test that genuinely
+  models a disagreement (the agent had already finished when the cancel arrived) says so explicitly
+  now instead of by omission.
+
+**A missing CLI is a failed spawn, not a rejected turn.** A3 gave the launcher the right words and
+nothing carried them: `start()` mapped everything before dispatch to `invalidated` /
+`pre-dispatch-rejected`, which both ACP providers word as a saved session that may no longer exist.
+`describeAcpSpawnError` now returns a typed `AcpSpawnError` for the errnos that mean the process
+never ran, and the run answers `failed` / `spawn-failed` — the reason the local-shell and Antigravity
+backends already gave. Only `ENOENT` is reworded; an error this code cannot explain is classified but
+left in its own words.
+
+**The rest.** `followBackendRun` consumed the per-tab metadata port, which would have taken a live
+turn's native ids for a turn nobody asked for — latent, and it is the code the K1 fix added. It reads
+the port only when no turn of its own is running, and an abandoned backend stream is dropped rather
+than rendered into whatever conversation the tab moved to. Five compositions still described
+themselves as dark, two JSDoc blocks sat on the wrong symbols, and `autoTurn` was still typed
+`(runId: unknown) => void` after K1 changed what it receives.
+
+Every one of the eight new tests was run against the code with its fix removed, and every one went
+red — including the two that needed a second attempt, because the first version of each passed
+either way. The last-look test passed without the `terminate()` call, because the prompt path takes
+the look when the agent answers; the one that pins it is the agent that never answers. And the
+abandoned-turn test passed without `abandon()`, because an unsettled stream delivers nothing anyway;
+what it actually pins is the guard that refuses to deliver.
+
+Gates: unit 477 suites / 7,677 tests, integration 5 suites / 145 tests, typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -4800,14 +4873,20 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
-### Where the session of 2026-08-20 ended
+### Where the session of 2026-08-21 ended
 
-**Where the review backlog stands:** the whole prioritized order is done —
-[`docs/providers-migration-review-backlog.md`](providers-migration-review-backlog.md) has the status
-column. C1 (all three parts), the Grok pass (G1–G5), the Claude pass (L1–L3), ACP robustness
-(A1–A3), and the hygiene items K1 and S2; K2 was refuted with evidence rather than fixed.
+**Two reviews, both worked through.** The first review's prioritized order is done and the second
+review's six findings are fixed, with both recorded in
+[`docs/providers-migration-review-backlog.md`](providers-migration-review-backlog.md) under a status
+column. From the first: C1 (all three parts), the Grok pass (G1–G5), the Claude pass (L1–L3), ACP
+robustness (A1–A3), and the hygiene items K1 and S2; K2 was refuted with evidence rather than fixed.
+From the second: R1–R6, all six confirmed against the tree before being touched.
 
-**What is left from that review**, none of it started: K3 (the session record rewritten per durable
+**What R1 means for anything already installed:** a build from before this commit loses permission
+prompts after a New Chat or a history switch in the same tab, for every flipped provider. It is the
+reason not to hand out a build from that range.
+
+**What is left from the first review**, none of it started: K3 (the session record rewritten per durable
 event), K4 (`window.setTimeout` in provider-neutral core), K5 (`shutdown()` waiting forever on a hung
 `createSession`), S1 ("always allow" promoting rules the user was never shown), S3 (session metadata
 filenames and their non-atomic write), and the two QA notes. Beside them, the four manual smoke

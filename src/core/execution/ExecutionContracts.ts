@@ -190,6 +190,15 @@ export interface RunRecoveryQuery {
   readonly nativeSessionRef?: string;
   readonly nativeRunRef?: string;
   readonly cancellationRequested: boolean;
+  /**
+   * The provider's own word for how the turn ended, when the turn answered.
+   *
+   * A protocol stop reason, never provider payload. It exists because
+   * `cancellationRequested` says only that a stop was asked for; a backend that
+   * heard the turn end has strictly more to offer, and reconciling without it
+   * makes every stopped turn an unknown one.
+   */
+  readonly nativeStopReason?: string;
   readonly resultExpectation: ResultExpectation;
 }
 

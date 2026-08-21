@@ -43,17 +43,14 @@ import {
  * CLIs Grimoire launches with a curated model list and a per-model thinking
  * level, so the codec is the same shape with Grok's own environment keys.
  *
- * Dark: nothing constructs this. `registration.ts` and `GrokWorkspaceServices`
- * remain the only wiring until the Grok flip.
- *
  * Two declarations differ from the live capability record, both deliberately:
  *
- * - **no rewind.** `GrokChatRuntime.rewind()` answers `canRewind: false` for
- *   every input, while `GROK_PROVIDER_CAPABILITIES.supportsRewind` is `true` —
- *   so today every Grok assistant message carries a rewind button whose menu
- *   can only fail. Declared `unsupported` here, which removes the dead
- *   affordance at the flip. Named rather than silent: it is the one product
- *   behaviour Grok's flip changes;
+ * - **no rewind.** The legacy runtime answered `canRewind: false` for every
+ *   input while `GROK_PROVIDER_CAPABILITIES.supportsRewind` said `true`, so
+ *   every Grok assistant message carried a rewind button whose menu could only
+ *   fail. Declared `unsupported` here, which is what removed it at the flip.
+ *   Named rather than silent: it is the one product behaviour Grok's flip
+ *   changed;
  * - **no per-run MCP selection.** As with OpenCode, Grimoire owns
  *   `.grimoire/mcp/grok.json` and injects those servers into the ACP session;
  *   the chat tab's per-run selector is what `supportsMcpTools: false` gates.

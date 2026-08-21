@@ -117,7 +117,13 @@ class ConformanceClient implements ManagedAcpClient {
   async setMode() { return {}; }
   async setModel() { return {}; }
   async setConfigOption() { return { configOptions: [] }; }
-  cancel(): void {}
+  cancel(): void {
+    // What a real agent does with `session/cancel`: it ends the turn it was
+    // asked about and answers the prompt saying so. A fake that swallowed the
+    // notification modelled an agent that never replies, which is the case the
+    // control timeout covers rather than the ordinary one.
+    this.promptCompletion.resolve({ stopReason: 'cancelled' });
+  }
   onSessionNotification(listener: (notification: AcpSessionNotification) => void) {
     this.notifications.add(listener);
     return () => this.notifications.delete(listener);

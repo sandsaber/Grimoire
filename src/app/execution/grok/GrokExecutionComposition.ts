@@ -41,6 +41,7 @@ import type {
 import type { ChatMessage } from '@/core/types';
 import type GrimoirePlugin from '@/main';
 import { isAcpMissingSessionError, JsonRpcErrorResponse } from '@/providers/acp';
+import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import { AcpWorkspaceFileSystem } from '@/providers/acp/execution/AcpWorkspaceFileSystem';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
@@ -119,8 +120,10 @@ const GROK_RECOVERED_ANSWER_LIMIT_BYTES = 1_000_000;
 /**
  * Grok chat execution, assembled from the running plugin.
  *
- * **Dark.** Nothing constructs this yet: `registration.ts` still points
- * `createRuntime` at `GrokChatRuntime`, and the flip is a later checkpoint.
+ * **Live.** `registration.ts` builds every Grok chat runtime from here, and
+ * `GrokChatRuntime` is gone. Reverting the flip means restoring that file and
+ * this composition's `createRuntime`, in one commit; the control records it
+ * writes are inert to anything else.
  *
  * The second provider on the shared managed-ACP backend, and the first to cost
  * only what wave 4 said the remaining waves should. What is here is Grok's and
@@ -231,12 +234,14 @@ export class GrokExecution {
         recoverAnswer: input => this.recoverAnswer(input.nativeSessionRef),
       }),
       reconciler: {
-        // What is known about a run this process did not see finish: nothing.
-        // Grok's own session log could answer it — the legacy runtime reads
-        // answers back from it — and until it is read the honest evidence is
-        // `unknown` with effects possible, which is what makes the kernel
-        // refuse to re-dispatch.
-        reconcile: async () => ({ kind: 'unknown', effectsPossible: true }),
+        // A turn that answered the cancel it was sent is a turn known to
+        // have stopped, and ACP delivers that answer on the prompt itself.
+        // For anything else — a run this process did not see finish — what
+        // is known is nothing. Grok's own session log could answer that, and
+        // until it is read the honest evidence is `unknown` with effects
+        // possible, which is what makes the kernel refuse to re-dispatch.
+        reconcile: async query => acpCancellationEvidence(query)
+          ?? { kind: 'unknown', effectsPossible: true },
       },
       auxiliaryQueries: {
         execute: async () => {
@@ -762,15 +767,6 @@ export class GrokExecution {
   }
 
   /**
-   * Whether an ACP-delegated write may happen, asked of the tab that owns the
-   * session it came in on.
-   *
-   * The legacy runtime asked its own approval callback, because a runtime was
-   * one tab. The client factory is one process for every tab, so the tab is
-   * found by the session the write arrived on — and a write whose session
-   * belongs to no open tab is refused rather than allowed by default.
-   */
-  /**
    * A question Grok asked, put to the tab whose session it came in on.
    *
    * Not an interaction the kernel carries: ACP's `ask_user_question` is a
@@ -800,6 +796,15 @@ export class GrokExecution {
     }
   }
 
+  /**
+   * Whether an ACP-delegated write may happen, asked of the tab that owns the
+   * session it came in on.
+   *
+   * The legacy runtime asked its own approval callback, because a runtime was
+   * one tab. The client factory is one process for every tab, so the tab is
+   * found by the session the write arrived on — and a write whose session
+   * belongs to no open tab is refused rather than allowed by default.
+   */
   private async approveWrite(input: {
     readonly sessionId: string;
     readonly requestPath: string;

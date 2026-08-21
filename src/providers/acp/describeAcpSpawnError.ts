@@ -1,5 +1,7 @@
 import { existsSync } from 'node:fs';
 
+import { AcpSpawnError } from './AcpSpawnError';
+
 /**
  * What a failed spawn means, in words the person can act on.
  *
@@ -11,22 +13,37 @@ import { existsSync } from 'node:fs';
  *
  * Shared because both paths to an ACP process need it: the legacy subprocess
  * and the managed launcher the flips run on.
+ *
+ * The result is an `AcpSpawnError` for the errnos that mean the process never
+ * ran, so a caller can classify it rather than only print it. Anything else is
+ * returned untouched: an error this function cannot explain is one it must not
+ * relabel.
  */
+const SPAWN_ERRNOS = new Set(['ENOENT', 'EACCES', 'EPERM', 'ENOTDIR']);
+
 export function describeAcpSpawnError(error: Error, command: string, cwd: string): Error {
-  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+  const code = (error as NodeJS.ErrnoException).code;
+  if (code === undefined || !SPAWN_ERRNOS.has(code)) {
     return error;
   }
 
+  if (code !== 'ENOENT') {
+    // Classified but not reworded. `ENOENT` is the one that reads as something
+    // it is not; a permission or path-type error already says what happened,
+    // and the legacy subprocess path shows this message verbatim.
+    return new AcpSpawnError(error.message, error);
+  }
+
   if (!existsSync(cwd)) {
-    return new Error(
+    return new AcpSpawnError(
       `Failed to start "${command}": working directory not found: "${cwd}".`,
-      { cause: error },
+      error,
     );
   }
 
-  return new Error(
+  return new AcpSpawnError(
     `Failed to start "${command}": command not found. Set an absolute CLI path `
     + 'in the provider settings — desktop apps do not inherit the shell PATH.',
-    { cause: error },
+    error,
   );
 }

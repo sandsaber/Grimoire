@@ -39,6 +39,7 @@ import type {
 import type { ApprovalCallback } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
 import type GrimoirePlugin from '@/main';
+import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
@@ -174,11 +175,14 @@ export class OpencodeExecution {
       interactionBridge: this.interactions,
       resultSink: new OpencodeProjectionResultSink(),
       reconciler: {
-        // What is known about a run this process did not see finish: nothing.
-        // OpenCode's own session database could answer it, and until it is read
-        // the honest evidence is `unknown` with effects possible — which is
-        // what makes the kernel refuse to re-dispatch.
-        reconcile: async () => ({ kind: 'unknown', effectsPossible: true }),
+        // A turn that answered the cancel it was sent is a turn known to
+        // have stopped, and ACP delivers that answer on the prompt itself.
+        // For anything else — a run this process did not see finish — what
+        // is known is nothing. OpenCode's own session database could answer
+        // that, and until it is read the honest evidence is `unknown` with
+        // effects possible, which makes the kernel refuse to re-dispatch.
+        reconcile: async query => acpCancellationEvidence(query)
+          ?? { kind: 'unknown', effectsPossible: true },
       },
       auxiliaryQueries: {
         execute: async () => {

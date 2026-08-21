@@ -1057,16 +1057,40 @@ describe('ExecutionLifecycleRegistry — deleting a conversation', () => {
     await expect(fixture.registry.deleteOwnedRecords(OWNER)).resolves.toBeUndefined();
   });
 
-  it('refuses to remove records out from under a live session', async () => {
+  it('stops a live run itself rather than asking the caller to have stopped it', async () => {
     const fixture = await startedFixture();
     await fixture.registry.createSession(sessionCommand());
     await fixture.registry.startRun(SESSION_ID, request(RUN_ID, 'none'));
 
-    // D4: records are never removed while a lease is held or a run is live —
-    // that would strand a running turn with no record of who owns it.
+    // D4: a conversation is deleted from a surface where cancelling is
+    // fire-and-forget and disposal is a void call on a queue, so a caller can
+    // only ask. Refusing here is what left the chat gone from the UI and its
+    // records in the vault — the growth D4 exists to stop.
+    await expect(fixture.registry.deleteOwnedRecords(OWNER)).resolves.toBeUndefined();
+
+    expect(fixture.registry.getSession(SESSION_ID)).toBeNull();
+    await expect(fixture.repositories.runs.read(RUN_ID)).resolves.toMatchObject({ kind: 'absent' });
+    await expect(fixture.repositories.sessions.read(SESSION_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+  });
+
+  it('refuses to remove records a lease still holds', async () => {
+    const fixture = await startedFixture();
+    await fixture.registry.createSession(sessionCommand());
+    const lease = fixture.registry.acquireLease(
+      lifecycleLeaseId(`lease-${'7'.repeat(32)}`),
+      SESSION_ID,
+      'projection',
+    );
+
+    // The refusal that survives: cancelling reaches a run, and nothing reaches
+    // a lease. A holder is still reading the session, and taking its records
+    // away underneath would strand exactly what the lease was taken for.
     await expect(fixture.registry.deleteOwnedRecords(OWNER))
-      .rejects.toThrow(/still (has|running)/i);
-    await expect(fixture.repositories.runs.read(RUN_ID)).resolves.toMatchObject({ kind: 'current' });
+      .rejects.toThrow(/still has lifecycle owners/i);
+    await expect(fixture.repositories.sessions.read(SESSION_ID))
+      .resolves.toMatchObject({ kind: 'current' });
+    lease.release();
   });
 
   it('finishes a deletion that was interrupted half-way', async () => {

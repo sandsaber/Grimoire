@@ -965,7 +965,13 @@ export class ExecutionLifecycleRegistry {
 
   async disposeSession(executionSessionId: ExecutionSessionId): Promise<void> {
     await this.enqueueSession(executionSessionId, async () => {
-      const session = this.requireSession(executionSessionId);
+      const session = this.sessions.get(executionSessionId);
+      if (!session) {
+        // Already disposed. A tab moving off a conversation and that
+        // conversation being deleted both ask for this, and the second asking
+        // is not a failure — it is the same session, closed once.
+        return;
+      }
       if (!this.canDisposeSession(executionSessionId)) {
         throw new Error(`Execution session "${executionSessionId}" still has lifecycle owners.`);
       }
@@ -1037,11 +1043,16 @@ export class ExecutionLifecycleRegistry {
   async deleteOwnedRecords(owner: ExecutionOwner): Promise<void> {
     requireOwner(owner);
     const sessionIds = await this.findSessionsOwnedBy(owner);
+    // Closed here rather than demanded of the caller. A conversation is deleted
+    // from a surface where cancelling is fire-and-forget and disposal is a void
+    // call on a queue, so a caller that "cancelled first" has only asked. The
+    // registry is the one that can wait: it cancels the owner's live runs and
+    // disposes each session through the same queue every other session
+    // operation takes. Removing the records of a session still in the map would
+    // otherwise strand the provider process that session owns.
     for (const id of sessionIds.map(executionSessionId)) {
-      if (this.sessions.has(id) && !this.canDisposeSession(id)) {
-        throw new Error(
-          `Execution session "${id}" still has lifecycle owners; cancel its work before deleting.`,
-        );
+      if (this.sessions.has(id)) {
+        await this.closeSessionForDeletion(id);
       }
     }
     const runIds = await this.findRunsOwnedBy(owner, sessionIds);
@@ -1066,6 +1077,28 @@ export class ExecutionLifecycleRegistry {
       this.sessions.delete(executionSessionId(id));
       this.envelopeObservers.delete(executionSessionId(id));
     }
+  }
+
+  /**
+   * Stops what a session is doing, then disposes it, for a delete.
+   *
+   * A refusal is left to propagate: a session that would not close still owns a
+   * provider process, and taking its records away while it runs is exactly the
+   * corruption the ownership check exists to prevent. Better a delete that
+   * reports than a control store describing a session nobody can account for.
+   */
+  private async closeSessionForDeletion(id: ExecutionSessionId): Promise<void> {
+    const session = this.sessions.get(id);
+    if (!session) {
+      return;
+    }
+    for (const owned of session.record.runIds) {
+      const run = this.runs.get(runId(owned));
+      if (run && !run.record.terminal) {
+        await this.cancelRun(runId(owned), { code: 'user' });
+      }
+    }
+    await this.disposeSession(id);
   }
 
   private async findSessionsOwnedBy(owner: ExecutionOwner): Promise<string[]> {

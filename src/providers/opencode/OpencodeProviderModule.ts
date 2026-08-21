@@ -37,8 +37,9 @@ import {
  * Code, Grok, Qwen, and Gemini all reach production through the same shared
  * `src/providers/acp/` transport this backend uses.
  *
- * Dark: nothing constructs this. `registration.ts` and
- * `OpencodeWorkspaceServices` remain the only wiring until the OpenCode flip.
+ * Live: `OpencodeExecutionComposition` builds every flipped tab's
+ * contributions from here, alongside `registration.ts` and
+ * `OpencodeWorkspaceServices`.
  *
  * The one structural difference from the first three modules is its settings
  * split, which the codec has to respect: `OpencodeProviderSettings` extends the

@@ -3,6 +3,7 @@ import trace from '@test/fixtures/provider-traces/opencode-execution.json';
 import type {
   ExecutionRequest,
   RunRecoveryEvidence,
+  RunRecoveryQuery,
 } from '@/core/execution/ExecutionContracts';
 import type { ProviderExecutionEvent } from '@/core/execution/ExecutionEvents';
 import {
@@ -12,6 +13,8 @@ import {
   sessionInstanceId,
 } from '@/core/execution/ExecutionIds';
 import type { ResultCommitOutcome } from '@/core/execution/ResultCommit';
+import { AcpSpawnError } from '@/providers/acp/AcpSpawnError';
+import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import type {
   ManagedAcpClient,
   ManagedAcpClientFactory,
@@ -470,6 +473,9 @@ describe('OpencodeExecutionBackend', () => {
     const run = session.createRun(request('1'));
     const events = collectEvents(run);
     await waitFor(() => fixture.client.promptRequests.length === 1);
+    // The turn this cancel is racing had already finished, so the agent answers
+    // the turn it completed rather than the one it was told to stop.
+    fixture.client.cancelStopReason = 'end_turn';
 
     await run.cancel();
 
@@ -725,6 +731,126 @@ describe('OpencodeExecutionBackend', () => {
     expectTerminal(captured, 'interrupted', 'known-process-exit');
   });
 
+  it('gives the provider its last look when the user stops the turn', async () => {
+    // The path a Stop actually takes. `completeFromPrompt` was the only caller
+    // of the last look, and a user Stop goes through `terminate()` — which
+    // reconciled and finished in a microtask, so the prompt's own answer
+    // arrived after the terminal and the cancelled turn's cost was lost.
+    const looks: string[] = [];
+    const fixture = createFixture({
+      noteTurnEnded: input => {
+        looks.push('looked');
+        input.presentContent({ kind: 'session-usage', usage: { totalTokens: 256 } });
+      },
+    });
+    const session = await createSession(fixture.backend);
+    const run = session.createRun(request('1'));
+    const events = collectEvents(run);
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    await run.cancel();
+    const captured = await events;
+
+    // Once, not twice: the prompt answering the cancel takes the same look.
+    expect(looks).toEqual(['looked']);
+    const learned = captured.findIndex(event => (
+      event.event.kind === 'provider-content'
+      && (event.event.payload as { kind?: string }).kind === 'session-usage'
+    ));
+    expect(learned).toBeGreaterThan(-1);
+    expect(learned).toBeLessThan(captured.map(event => event.event.kind).indexOf('terminal'));
+  });
+
+  it('gives the provider its last look when the agent never answers the stop', async () => {
+    // The case `terminate()` itself has to cover. When the agent answers the
+    // cancel, `completeFromPrompt` takes the look on the way past; when it
+    // never answers, the turn ends on the control timeout and this is the only
+    // caller left. Without it a wedged agent loses the turn's cost outright.
+    const looks: string[] = [];
+    const fixture = createFixture({
+      reconciliation: { kind: 'unknown', effectsPossible: true },
+      noteTurnEnded: () => {
+        looks.push('looked');
+      },
+    });
+    // An agent that swallows `session/cancel` and keeps the prompt open.
+    fixture.client.cancelStopReason = null;
+    const session = await createSession(fixture.backend);
+    const run = session.createRun(request('1'));
+    const events = collectEvents(run);
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    const cancellation = run.cancel();
+    await waitFor(() => fixture.client.cancelledSessions.length === 1);
+    await flushPromises();
+    fixture.scheduler.fireLast();
+    await cancellation;
+
+    expect(looks).toEqual(['looked']);
+    expectTerminal(await events, 'indeterminate', 'cancellation-unknown');
+  });
+
+  it('reports a stopped turn as cancelled when the agent says it stopped', async () => {
+    // The reconciler answers `unknown` — every ACP provider's does until it can
+    // read its own session store — so a Stop used to end `indeterminate`, which
+    // the surface words as "could not establish whether this run completed" for
+    // the one outcome the user asked for and watched happen. ACP answers a
+    // cancelled turn on the prompt itself, and that answer reaches the
+    // reconciler as the turn's own stop reason.
+    const seen: Array<string | undefined> = [];
+    const fixture = createFixture({
+      reconciliation: { kind: 'unknown', effectsPossible: true },
+      onReconcile: query => {
+        seen.push(query.nativeStopReason);
+        return acpCancellationEvidence(query);
+      },
+    });
+    const session = await createSession(fixture.backend);
+    const run = session.createRun(request('1'));
+    const events = collectEvents(run);
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    await run.cancel();
+
+    expect(seen).toEqual(['cancelled']);
+    expectTerminal(await events, 'cancelled', 'cancellation-confirmed');
+  });
+
+  // eslint-disable-next-line jest/expect-expect -- expectTerminal owns the assertion.
+  it('keeps a stopped turn indeterminate when the provider still cannot say', async () => {
+    // The evidence is offered, never imposed. A provider that cannot account
+    // for its process says so, and a turn reporting itself cancelled does not
+    // answer a question about a process whose termination was never proven.
+    const fixture = createFixture({ reconciliation: { kind: 'unknown', effectsPossible: true } });
+    const session = await createSession(fixture.backend);
+    const run = session.createRun(request('1'));
+    const events = collectEvents(run);
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    await run.cancel();
+
+    expectTerminal(await events, 'indeterminate', 'cancellation-unknown');
+  });
+
+  // eslint-disable-next-line jest/expect-expect -- expectTerminal owns the assertion.
+  it('names an uninstalled CLI as one, rather than as a session that may be gone', async () => {
+    // Every ACP provider words `pre-dispatch-rejected` as a saved session that
+    // may no longer exist, which is the right sentence for a failed bind and
+    // exactly the wrong one for a binary that is not on PATH. The launcher
+    // already produced the words; nothing carried them past the classifier.
+    const fixture = createFixture({
+      clientFactory: {
+        create: async () => {
+          throw new AcpSpawnError('Failed to start "opencode": command not found.', undefined);
+        },
+      },
+    });
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+
+    expectTerminal(await events, 'failed', 'spawn-failed');
+  });
+
   it('carries what the provider learned about a turn, before that turn ends', async () => {
     const fixture = createFixture({
       noteTurnEnded: input => {
@@ -795,6 +921,7 @@ function createFixture(options: {
     readonly nativeSessionRef: string;
     readonly presentContent: (payload: unknown) => void;
   }) => void;
+  readonly onReconcile?: (query: RunRecoveryQuery) => RunRecoveryEvidence | null;
   readonly dynamicApply?: () => Promise<void>;
   readonly interactionPrepare?: () => Promise<OpencodePreparedInteraction>;
   readonly auxiliaryExecute?: (requestRef: string, signal: AbortSignal) => Promise<string>;
@@ -838,7 +965,9 @@ function createFixture(options: {
       },
     },
     reconciler: {
-      reconcile: async () => options.reconciliation ?? { kind: 'stopped-safe' },
+      reconcile: async query => options.onReconcile?.(query)
+        ?? options.reconciliation
+        ?? { kind: 'stopped-safe' },
     },
     auxiliaryQueries: { execute: options.auxiliaryExecute ?? (async () => 'auxiliary') },
     scheduler,
@@ -915,6 +1044,7 @@ class FakeManagedAcpClient implements ManagedAcpClient {
       ? { configOptions: this.newSessionConfigOptions as never }
       : {};
   }
+  cancelStopReason: string | null = 'cancelled';
   prompt(request: Parameters<ManagedAcpClient['prompt']>[0]) {
     this.promptRequests.push(request);
     return this.promptCompletion.promise;
@@ -922,7 +1052,16 @@ class FakeManagedAcpClient implements ManagedAcpClient {
   async setMode() { return {}; }
   async setModel() { return {}; }
   async setConfigOption() { return { configOptions: [] }; }
-  cancel(sessionId: string): void { this.cancelledSessions.push(sessionId); }
+  cancel(sessionId: string): void {
+    this.cancelledSessions.push(sessionId);
+    // A real agent answers `session/cancel` on the prompt it was sent about.
+    // The stop reason is settable because the interesting disagreement is an
+    // agent that had already finished when the cancel arrived, and answers the
+    // turn it completed rather than the one it was told to stop.
+    if (this.cancelStopReason) {
+      this.promptCompletion.resolve({ stopReason: this.cancelStopReason });
+    }
+  }
   onSessionNotification(listener: (notification: AcpSessionNotification) => void) {
     this.notificationListeners.add(listener);
     return () => this.notificationListeners.delete(listener);

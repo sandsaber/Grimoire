@@ -43,8 +43,8 @@ import { DEFAULT_CLAUDE_MODELS } from './types/models';
  * and session command discovery. Two of the three contract defects this
  * milestone has fixed were found here and in Codex rather than in review.
  *
- * Dark: nothing constructs this. `registration.ts` and `ClaudeWorkspaceServices`
- * remain the only wiring until the Claude flip.
+ * Live: `ClaudeExecutionComposition` builds every flipped tab's contributions
+ * from here, alongside `registration.ts` and `ClaudeWorkspaceServices`.
  *
  * The absences are claims:
  *

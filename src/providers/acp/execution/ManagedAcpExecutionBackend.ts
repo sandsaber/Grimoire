@@ -42,6 +42,7 @@ import {
   settleResultCommit,
 } from '@/core/execution/ResultCommit';
 import { isAcpMissingSessionError } from '@/providers/acp/acpSessionResume';
+import { AcpSpawnError } from '@/providers/acp/AcpSpawnError';
 import type { AcpContentPayload } from '@/providers/acp/execution/AcpContentPayload';
 import type {
   ManagedAcpClient,
@@ -562,14 +563,16 @@ class ManagedAcpExecutionSession implements ExecutionSession {
     if (!client || !sessionId || run.isTerminal) return;
     const attempt = run.beginDispatch(sessionId, invocation.messageId);
     if (attempt === 1) run.emitRunStarted();
-    void client.prompt({
+    // Handed to the run rather than only fired: a cancel has to be able to wait
+    // for the turn it cancelled to answer, and this promise is that answer.
+    run.notePrompt(client.prompt({
       ...(invocation.messageId ? { messageId: invocation.messageId } : {}),
       prompt: [...invocation.prompt],
       sessionId,
     }).then(
       response => run.completeFromPrompt(response, attempt),
       error => this.recover(run, invocation, error, attempt),
-    );
+    ));
   }
 
   requestCancel(run: ManagedAcpExecutionRun): void {
@@ -863,6 +866,9 @@ class ManagedAcpExecutionRun implements ExecutionRun {
   private terminationIntent?: 'cancel' | 'shutdown' | 'timeout' | 'output-limit';
   private nativeRunRef?: string;
   private sessionRef?: string;
+  private promptTask?: Promise<void>;
+  private notedTurnEnd = false;
+  private nativeStopReason?: string;
 
   constructor(
     private readonly request: ExecutionRequest,
@@ -890,6 +896,15 @@ class ManagedAcpExecutionRun implements ExecutionRun {
       this.session.dispatch(this, invocation);
     } catch (error) {
       if (this.terminal) return;
+      if (error instanceof AcpSpawnError) {
+        // Nothing ran, so `invalidated` would be true — and useless. Every ACP
+        // provider words a pre-dispatch rejection as a session that may have
+        // gone, which for a CLI that is not installed is advice to start a new
+        // chat about the wrong problem. `spawn-failed` is the reason the
+        // local-shell and Antigravity backends already give for this.
+        this.finish('failed', 'spawn-failed');
+        return;
+      }
       const sideEffectFree = error instanceof ExecutionDispatchError
         ? error.sideEffectFree
         : !this.dispatched;
@@ -985,6 +1000,10 @@ class ManagedAcpExecutionRun implements ExecutionRun {
 
   async completeFromPrompt(response: AcpPromptResponse, attempt: number): Promise<void> {
     if (this.terminal || attempt !== this.attempt || this.recoveringAttempt === attempt) return;
+    // The agent's own word for how the turn ended, kept for reconciliation: a
+    // provider asked what became of a run it was told to stop can answer from
+    // this, where otherwise it has only the fact that a stop was requested.
+    this.nativeStopReason = response.stopReason;
     // The tokens this prompt cost are in the answer and nowhere else: the
     // window update arrives while the turn is still running and knows only how
     // full the context is. Forwarded whatever the stop reason, because a turn
@@ -1024,7 +1043,11 @@ class ManagedAcpExecutionRun implements ExecutionRun {
    */
   private async noteTurnEnded(): Promise<void> {
     const sink = this.context.resultSink;
-    if (!sink.noteTurnEnded || !this.sessionRef) return;
+    if (this.notedTurnEnd || !sink.noteTurnEnded || !this.sessionRef) return;
+    // Once per turn, whichever path gets there first. Both the prompt answering
+    // and the cancel that asked it to stop want the look, and a provider that
+    // reads a cost off its session log would otherwise count it twice.
+    this.notedTurnEnd = true;
     try {
       await sink.noteTurnEnded({
         nativeSessionRef: this.sessionRef,
@@ -1124,6 +1147,21 @@ class ManagedAcpExecutionRun implements ExecutionRun {
         return;
       }
       this.session.requestCancel(this);
+      // ACP answers a cancelled turn on the prompt itself, so the turn being
+      // stopped is the thing to ask. Bounded like every other control round
+      // trip: an agent that never answers must not hold the Stop button, and
+      // the reconciler below is what covers that case.
+      await this.awaitPromptSettlement();
+      if (this.terminal) return;
+      // The provider's last look at a turn it was told to stop. A cancelled
+      // turn still spent tokens and still moved the context, and those are
+      // recorded nowhere the kernel can see.
+      await this.noteTurnEnded();
+      if (this.terminal) return;
+      // Still the reconciler's answer, not the prompt's: a turn that reported
+      // itself cancelled says nothing about a process whose termination could
+      // not be proven, and those are different questions. What the prompt
+      // answered rides along in the query so a provider can use it.
       const evidence = await this.session.reconcileRun(this);
       if (this.terminal) return;
       if (evidence.kind === 'terminal') {
@@ -1151,6 +1189,23 @@ class ManagedAcpExecutionRun implements ExecutionRun {
     return this.terminationTask;
   }
 
+  notePrompt(task: Promise<void>): void {
+    this.promptTask = task;
+    // The chain already routes both outcomes; this only keeps a handler that
+    // throws from surfacing as an unhandled rejection on the copy kept here.
+    void task.catch(() => undefined);
+  }
+
+  /** Waits, with a bound, for the turn to answer the cancel it was sent. */
+  private async awaitPromptSettlement(): Promise<void> {
+    if (!this.promptTask) return;
+    await completesWithin(
+      this.promptTask,
+      this.context.scheduler,
+      this.context.controlTimeoutMs ?? 2_000,
+    );
+  }
+
   recoveryQuery(): RunRecoveryQuery {
     return {
       backendId: this.context.descriptor.backendId,
@@ -1161,6 +1216,7 @@ class ManagedAcpExecutionRun implements ExecutionRun {
       ...(this.sessionRef ? { nativeSessionRef: this.sessionRef } : {}),
       ...(this.nativeRunRef ? { nativeRunRef: this.nativeRunRef } : {}),
       cancellationRequested: Boolean(this.terminationIntent),
+      ...(this.nativeStopReason ? { nativeStopReason: this.nativeStopReason } : {}),
       resultExpectation: this.request.resultExpectation,
     };
   }
