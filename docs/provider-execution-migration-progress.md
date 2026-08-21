@@ -4649,6 +4649,25 @@ Gates: unit 476 suites / 7,644 tests, typecheck, `eslint` over `src` and `tests`
 `build:release` clean.
 
 
+### Review G3 — a turn the user stopped still spent tokens (this commit)
+
+The surface-filling hook was hung off `storeResult`, which only runs when an answer is committed —
+so a cancelled turn read nothing, and for many Grok turns the session log is the only record of what
+they cost. The legacy runtime read it when the prompt returned, whatever the stop reason.
+
+`noteTurnEnded` is that moment: the prompt has returned, no terminal has been emitted, and the
+provider gets its last look at the turn. `storeResult` goes back to committing an answer and nothing
+else. The two Grok readings — the context window it never sends over the wire, and the cost it often
+does not — now happen for cancelled turns too, which the composition test proves by stopping one and
+finding its badge.
+
+Removing the call reds four rows across two suites, including both of the ones that only exist
+because Grok has to go and read things.
+
+Gates: unit 476 suites / 7,645 tests, integration 5 suites / 145 tests, typecheck, `eslint`, and
+`build:release` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

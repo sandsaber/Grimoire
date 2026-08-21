@@ -667,15 +667,40 @@ describe('OpencodeExecutionBackend', () => {
     expectTerminal(captured, 'failed', 'missing-required-result');
   });
 
-  it('carries what the provider learned while committing, before the turn ends', async () => {
+  it('gives the provider its last look at a turn that was cancelled', async () => {
+    // Grok reads what a turn cost off its own session log, and a cancelled turn
+    // still spent tokens. The legacy runtime read it when the prompt returned,
+    // whatever the stop reason; a hook that only runs when an answer is
+    // committed loses every cancelled turn's cost.
     const fixture = createFixture({
-      resultStore: async input => {
+      noteTurnEnded: input => {
+        input.presentContent({ kind: 'session-usage', usage: { totalTokens: 512 } });
+      },
+    });
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    fixture.client.completePrompt({ stopReason: 'cancelled', userMessageId: 'message-1' });
+    const captured = await events;
+
+    const learned = captured.findIndex(event => (
+      event.event.kind === 'provider-content'
+      && (event.event.payload as { kind?: string }).kind === 'session-usage'
+    ));
+    expect(learned).toBeGreaterThan(-1);
+    expect(learned).toBeLessThan(captured.map(event => event.event.kind).indexOf('terminal'));
+    expectTerminal(captured, 'interrupted', 'known-process-exit');
+  });
+
+  it('carries what the provider learned about a turn, before that turn ends', async () => {
+    const fixture = createFixture({
+      noteTurnEnded: input => {
         // Grok never sends a context-window update on the wire — its wire
         // recording observes none — and its own session log is the only source.
-        // Read while the answer is being committed, which is the last moment
-        // the turn is still open.
+        // Read when the prompt returns, which is the last moment the turn is
+        // still open.
         input.presentContent({ kind: 'session-usage', usage: { totalTokens: 4096 } });
-        return { kind: 'committed', result: { resultId: 'result-1', storage: 'projection' } };
       },
     });
     const session = await createSession(fixture.backend);
@@ -732,11 +757,12 @@ function createFixture(options: {
   readonly reconciliation?: RunRecoveryEvidence;
   readonly isMissingSessionError?: (error: unknown) => boolean;
   readonly maxResultBytes?: number;
-  readonly resultStore?: (input: {
-    readonly output: string;
-    readonly presentContent: (payload: unknown) => void;
-  }) => Promise<ResultCommitOutcome>;
+  readonly resultStore?: (input: { readonly output: string }) => Promise<ResultCommitOutcome>;
   readonly recoverOutput?: () => Promise<string | null>;
+  readonly noteTurnEnded?: (input: {
+    readonly nativeSessionRef: string;
+    readonly presentContent: (payload: unknown) => void;
+  }) => void;
   readonly dynamicApply?: () => Promise<void>;
   readonly interactionPrepare?: () => Promise<OpencodePreparedInteraction>;
   readonly auxiliaryExecute?: (requestRef: string, signal: AbortSignal) => Promise<string>;
@@ -767,8 +793,11 @@ function createFixture(options: {
     },
     resultSink: {
       ...(options.recoverOutput ? { recoverOutput: options.recoverOutput } : {}),
-      storeResult: async ({ output, presentContent }) => {
-        if (options.resultStore) return options.resultStore({ output, presentContent });
+      ...(options.noteTurnEnded
+        ? { noteTurnEnded: async (input: never) => options.noteTurnEnded?.(input) }
+        : {}),
+      storeResult: async ({ output }) => {
+        if (options.resultStore) return options.resultStore({ output });
         stored.push(output);
         return {
           kind: 'committed',

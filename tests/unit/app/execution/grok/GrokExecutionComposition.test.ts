@@ -73,6 +73,7 @@ describe('Grok execution composition', () => {
   /** One ACP agent, without an agent. */
   function createFakeAcp(options: {
     asksPermission?: boolean;
+    cancelsTheTurn?: boolean;
     modeIsUnsupported?: boolean;
     reportsNativeModes?: boolean;
     reportsNoModes?: boolean;
@@ -176,7 +177,7 @@ describe('Grok execution composition', () => {
                 },
               });
             }
-            return { stopReason: 'end_turn' };
+            return { stopReason: options.cancelsTheTurn ? 'cancelled' : 'end_turn' };
           },
           setMode: async request => {
             if (options.modeIsUnsupported) {
@@ -211,6 +212,7 @@ describe('Grok execution composition', () => {
 
   async function createHarness(options: {
     asksPermission?: boolean;
+    cancelsTheTurn?: boolean;
     plugin?: any;
     modeIsUnsupported?: boolean;
     reportsNativeModes?: boolean;
@@ -457,6 +459,28 @@ describe('Grok execution composition', () => {
       sessionId: 'nobodys-session',
     })).resolves.toEqual({ outcome: 'cancelled' });
 
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('counts what a cancelled turn spent', async () => {
+    // A turn the user stopped still spent tokens, and for many Grok turns the
+    // only record of what they cost is the session log. The legacy runtime read
+    // it when the prompt returned, whatever the stop reason.
+    const plugin = createPlugin();
+    const vault = plugin.app.vault.adapter.basePath;
+    writeSessionLog(vault, 'grok-session', {
+      signals: { contextTokensUsed: 4_096, contextWindowTokens: 500_000 },
+    });
+    const { execution, host } = await createHarness({ plugin, cancelsTheTurn: true });
+    const runtime = execution.createRuntime();
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'usage',
+      usage: expect.objectContaining({ contextTokens: 4_096 }),
+    }));
     execution.dispose();
     await host.dispose();
   });

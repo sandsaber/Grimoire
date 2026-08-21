@@ -119,17 +119,22 @@ export interface ManagedAcpExecutionResultSink {
     readonly nativeSessionRef: string;
     readonly nativeRunRef?: string;
     readonly signal: AbortSignal;
-    /**
-     * Content this provider learned somewhere other than the wire.
-     *
-     * Grok never sends a context-window update over ACP — its wire recording
-     * observes none — and its own session log is the only source. Handed to the
-     * sink because committing the answer is the last moment the turn is still
-     * open: the result and the terminal are emitted after this returns, so a
-     * badge filled here reaches the turn that earned it rather than the next one.
-     */
-    readonly presentContent: (payload: unknown) => void;
   }): Promise<ResultCommitOutcome>;
+  /**
+   * The turn is ending; this is the provider's last look at it.
+   *
+   * Called when the prompt returns, whatever the stop reason, and before any
+   * terminal — so what it finds reaches the turn that earned it rather than the
+   * next one. Two things need it, both Grok's: no Grok turn reports a context
+   * window over ACP at all, and a cancelled turn still spent tokens whose cost
+   * is only in the session log. Hanging it off `storeResult` would lose exactly
+   * the cancelled ones, since nothing is committed for those.
+   */
+  noteTurnEnded?(input: {
+    readonly nativeSessionRef: string;
+    readonly nativeRunRef?: string;
+    readonly presentContent: (payload: unknown) => void;
+  }): Promise<void>;
   /**
    * The answer a turn produced without sending it, where the provider can find
    * one.
@@ -979,6 +984,8 @@ class ManagedAcpExecutionRun implements ExecutionRun {
       kind: 'provider-content',
       payload: { kind: 'prompt-result', response } satisfies AcpContentPayload,
     });
+    await this.noteTurnEnded();
+    if (this.terminal || attempt !== this.attempt) return;
     const responseRunRef = response.userMessageId?.trim();
     if (responseRunRef && this.nativeRunRef && responseRunRef !== this.nativeRunRef) {
       this.finish('indeterminate', 'effects-unknown');
@@ -998,6 +1005,26 @@ class ManagedAcpExecutionRun implements ExecutionRun {
     }
     this.completionTask = this.commitCompletion(output, attempt);
     await this.completionTask;
+  }
+
+  /**
+   * The provider's last look at a turn, whatever became of it.
+   *
+   * Failures are swallowed: a badge that could not be filled is a badge, and
+   * the turn's own outcome is not this call's to change.
+   */
+  private async noteTurnEnded(): Promise<void> {
+    const sink = this.context.resultSink;
+    if (!sink.noteTurnEnded || !this.sessionRef) return;
+    try {
+      await sink.noteTurnEnded({
+        nativeSessionRef: this.sessionRef,
+        ...(this.nativeRunRef ? { nativeRunRef: this.nativeRunRef } : {}),
+        presentContent: payload => this.presentProviderContent(payload),
+      });
+    } catch {
+      // See above.
+    }
   }
 
   /** What the provider can still find, for a turn that streamed nothing. */
@@ -1031,7 +1058,6 @@ class ManagedAcpExecutionRun implements ExecutionRun {
         nativeSessionRef: this.sessionRef!,
         ...(this.nativeRunRef ? { nativeRunRef: this.nativeRunRef } : {}),
         signal: abort.signal,
-        presentContent: payload => this.presentProviderContent(payload),
       }),
       abort,
       this.context.scheduler,

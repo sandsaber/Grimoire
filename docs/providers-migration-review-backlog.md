@@ -64,7 +64,7 @@ by the length of the session. **C1 is closed.**
 |---|---|---|---|
 | G1 ✅ | **`resolveGrokAcpModeId` is dead code** (`src/providers/grok/modes.ts:165`) — referenced only by its own test. It is the mapping that keeps Grimoire's synthetic `grimoire-*` mode ids off the wire, and issue #52 is that class of bug: on a release that reports native modes, every turn now sends a synthetic id to `session/set_mode` and takes `-32602`. | grep: declaration + `tests/unit/providers/grok/modes.test.ts` only | confirmed |
 | G2 ✅ | `current_mode_update` and `config_option_update` no longer sync session state — the new content presenter has no case for either. | — | reported |
-| G3 | The cost of a cancelled turn is lost; the legacy path read it off the session log before honouring the cancel. | — | reported |
+| G3 ✅ | The cost of a cancelled turn is lost; the legacy path read it off the session log before honouring the cancel. | — | reported |
 | G4 | Grok's wire-vocabulary gate still asserts "not admitted" for the three vendor updates the flip consumes, so a regression that dropped them again would not go red. | — | reported |
 | G5 | No execution-backend conformance suite for Grok, though OpenCode, Codex, Claude and Antigravity each have one. | — | reported |
 

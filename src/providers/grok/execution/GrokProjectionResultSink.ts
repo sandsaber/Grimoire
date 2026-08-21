@@ -17,13 +17,12 @@ import type { ManagedAcpExecutionResultSink } from '@/providers/acp/execution/Ma
  */
 export interface GrokResultSinkPorts {
   /**
-   * What the surface still needs, read before the turn closes.
+   * What the surface still needs, read as the turn ends.
    *
    * Grok sends no context-window update over ACP and, for many turns, no cost
-   * either; both are in its own session log. Committing is the last moment the
-   * turn is still open, so this is where the tab that owns the session goes and
-   * reads them. A failure here is not a failed turn: the answer is committed
-   * either way, and the badge is what goes without.
+   * either; both are in its own session log. The prompt returning is the last
+   * moment the turn is still open — and it returns for a cancelled turn too,
+   * which still spent tokens and would otherwise never be counted.
    */
   readonly fillSurface?: (input: {
     readonly nativeSessionRef: string;
@@ -49,20 +48,22 @@ export class GrokProjectionResultSink implements ManagedAcpExecutionResultSink {
     return (await this.ports.recoverAnswer?.(input)) ?? null;
   }
 
+  async noteTurnEnded(input: {
+    readonly nativeSessionRef: string;
+    readonly presentContent: (payload: unknown) => void;
+  }): Promise<void> {
+    await this.ports.fillSurface?.(input);
+  }
+
   async storeResult(input: {
     readonly output: string;
     readonly nativeSessionRef: string;
     readonly nativeRunRef?: string;
     readonly signal: AbortSignal;
-    readonly presentContent: (payload: unknown) => void;
   }): Promise<ResultCommitOutcome> {
     if (input.signal.aborted) {
       return { kind: 'aborted' };
     }
-    await this.ports.fillSurface?.({
-      nativeSessionRef: input.nativeSessionRef,
-      presentContent: input.presentContent,
-    }).catch(() => undefined);
     return { kind: 'committed', result: resultRef(input) };
   }
 }
