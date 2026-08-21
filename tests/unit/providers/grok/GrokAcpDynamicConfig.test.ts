@@ -67,10 +67,22 @@ describe('Grok ACP dynamic configuration', () => {
     return { client, modes, models, configOptions, order };
   }
 
+  /** What a session that offers both modes answered when it opened. */
+  const SESSION_MODES = {
+    availableModes: [
+      { id: 'ask', name: 'Safe' },
+      { id: 'always-approve', name: 'Auto-approve' },
+    ],
+    currentModeId: 'ask',
+  };
+
   function apply(
     fake: Fake,
     config: GrokAcpDynamicConfig,
     sessionConfigOptions?: readonly AcpSessionConfigOption[],
+    // `null` rather than `undefined`, which would take the default: a session
+    // that named no modes is the case this parameter exists to express.
+    sessionModes: typeof SESSION_MODES | null = SESSION_MODES,
   ): Promise<void> {
     const applier = new GrokAcpDynamicConfigApplier({ resolve: async () => config });
     return applier.apply({
@@ -79,6 +91,7 @@ describe('Grok ACP dynamic configuration', () => {
       dynamicRef: 'dynamic-1',
       signal: new AbortController().signal,
       ...(sessionConfigOptions ? { sessionConfigOptions } : {}),
+      ...(sessionModes ? { sessionModes } : {}),
     });
   }
 
@@ -93,6 +106,36 @@ describe('Grok ACP dynamic configuration', () => {
     expect(fake.order).toEqual(['model', 'mode']);
     expect(fake.models).toEqual(['grok-4.6']);
     expect(fake.modes).toEqual(['always-approve']);
+  });
+
+  it('never asks a session for a mode it did not name', async () => {
+    const fake = createFake();
+
+    // A vault that has not opened a session yet answers in Grimoire's own
+    // vocabulary. Sending `grimoire-full-access` reaches `session/set_mode` as
+    // `-32602 Invalid params` and aborts the turn before the prompt — issue #52.
+    await apply(fake, { modeId: 'grimoire-full-access' });
+
+    expect(fake.modes).toEqual(['always-approve']);
+  });
+
+  it('sends nothing when the session named nothing to send', async () => {
+    const fake = createFake();
+
+    // A release that carries its policy on the command line offers no modes at
+    // all, and the launch already carried it.
+    await apply(fake, { modeId: 'grimoire-full-access' }, undefined, null);
+
+    expect(fake.order).toEqual([]);
+  });
+
+  it('sends nothing when the session is already in the mode that was asked for', async () => {
+    const fake = createFake();
+
+    // A set that changes nothing is a round trip the turn waits for.
+    await apply(fake, { modeId: 'ask' });
+
+    expect(fake.order).toEqual([]);
   });
 
   it('falls back to the advertised config option when the release has no mode method', async () => {

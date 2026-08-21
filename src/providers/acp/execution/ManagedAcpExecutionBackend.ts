@@ -56,6 +56,7 @@ import type {
   AcpRequestPermissionRequest,
   AcpRequestPermissionResponse,
   AcpSessionConfigOption,
+  AcpSessionModeState,
   AcpSessionNotification,
 } from '@/providers/acp/types';
 
@@ -88,6 +89,14 @@ export interface ManagedAcpExecutionDynamicApplier {
      * queued. This is the only moment both are known.
      */
     readonly sessionConfigOptions?: readonly AcpSessionConfigOption[];
+    /**
+     * The modes the session named, where it named any.
+     *
+     * Beside the config options for the same reason: a turn is composed in the
+     * vault's own vocabulary, and only an id the live session offered may be
+     * sent back to it. This is the one moment both are known.
+     */
+    readonly sessionModes?: AcpSessionModeState;
   }): Promise<void>;
 }
 
@@ -531,6 +540,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
         dynamicRef: invocation.dynamicRef,
         signal: this.clientAbort?.signal ?? new AbortController().signal,
         ...(opened?.configOptions ? { sessionConfigOptions: opened.configOptions } : {}),
+        ...(opened?.modes ? { sessionModes: opened.modes } : {}),
       }),
       this.context.scheduler,
       this.context.controlTimeoutMs ?? 2_000,
@@ -602,6 +612,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
           dynamicRef: invocation.dynamicRef,
           signal: this.clientAbort!.signal,
           ...(reopened?.configOptions ? { sessionConfigOptions: reopened.configOptions } : {}),
+          ...(reopened?.modes ? { sessionModes: reopened.modes } : {}),
         });
         run.releaseRecovery();
         this.dispatch(run, invocation);

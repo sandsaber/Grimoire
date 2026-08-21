@@ -53,6 +53,16 @@ export interface GrokContentPresenterPorts {
   readonly displayModel: () => string | undefined;
   /** The commands the session offers, which arrive as an update, not an answer. */
   readonly onCommands?: (commands: readonly SlashCommand[]) => void;
+  /**
+   * What the session says it is set to now, when that changes mid-conversation.
+   *
+   * A `/mode` typed into the composer moves the session under the tab, and a
+   * tab that never hears it keeps asking for the mode it believes the session
+   * is in — translated against a current mode that is no longer current.
+   */
+  readonly onCurrentMode?: (currentModeId: string) => void;
+  /** The options a session re-advertises, thinking levels among them. */
+  readonly onConfigOptions?: (configOptions: readonly AcpSessionConfigOption[]) => void;
   /** What the vendor charged for one turn, for the plan-limit indicator. */
   readonly onCost?: (cost: ProviderCostValue) => void;
   /**
@@ -197,6 +207,12 @@ export class GrokContentPresenter {
           normalized.toolCallUpdate,
           normalized.streamChunks,
         );
+      case 'current_mode':
+        this.ports.onCurrentMode?.(normalized.currentModeId);
+        return [];
+      case 'config_options':
+        this.ports.onConfigOptions?.(normalized.configOptions);
+        return [];
       case 'usage':
         this.contextUsage = normalized.usage;
         return this.usageChunks();

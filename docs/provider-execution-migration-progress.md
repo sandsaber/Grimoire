@@ -4614,6 +4614,41 @@ bounded by the tabs that are open rather than by the length of the session.
 Gates: unit 473 suites / 7,637 tests, typecheck, `eslint` over `src` and `tests` clean.
 
 
+### Review G1 and G2 — the mode a session will actually accept (this commit)
+
+**G1.** `resolveGrokAcpModeId` was dead code after the flip: the composition read the vault's mode
+and the applier sent it. The vault answers in *Grimoire's* vocabulary — `grimoire-full-access`,
+`grimoire-safe`, which are the ids of the fallback modes every vault holds before a session has
+spoken — and those are not Grok's. Sending one comes back as `-32602 Invalid params` and aborts the
+turn before the prompt, which is issue #52's class, reintroduced by the flip.
+
+The translation is back, and in a better place. It cannot live where the turn is composed: a turn is
+composed before its session exists, so nothing there knows what the session will name. It now lives
+in the applier, which is the one moment both are known — and the backend passes it the session's
+`modes` beside the config options it already passed, for exactly that reason. Three rules, each with
+a row that goes red without it: never send an id the session did not name, send nothing when the
+session named nothing (a release carrying its policy on the command line — the launch already did),
+and send nothing when the session is already in that mode, because a set that changes nothing is a
+round trip the turn waits for.
+
+A first attempt put the translation on the session state and it silently sent nothing at all: the
+state has no session modes at compose time either. The composition test is what caught it, and the
+state's version is gone rather than left beside the real one.
+
+**G2.** `current_mode_update` and `config_option_update` reached the presenter's `default:` and were
+dropped. A `/mode` typed into the composer moves the session under the tab; a tab that never hears it
+keeps asking for the mode it believes the session is in — and now that the ask is *translated*
+against the current mode, a stale one is worse than it was. Both are forwarded to the session state,
+the way OpenCode's presenter already forwarded them.
+
+**A default parameter that ate a test.** The applier's helper took
+`sessionModes: … | undefined = SESSION_MODES`, so the row for "the session named nothing" passed
+`undefined` and got the default — proving the opposite of what it claimed. It takes `null` now.
+
+Gates: unit 476 suites / 7,644 tests, typecheck, `eslint` over `src` and `tests`, and
+`build:release` clean.
+
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

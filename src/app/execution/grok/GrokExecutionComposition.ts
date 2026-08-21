@@ -365,6 +365,15 @@ export class GrokExecution {
           source: 'session' as const,
         }));
       },
+      // What the session says it is set to now: a `/mode` in the composer moves
+      // it under the tab, and the next turn is translated against whatever the
+      // state last heard.
+      onCurrentMode: currentModeId => this.settle(
+        sessionConfig.syncSessionModeState({ currentModeId }),
+      ),
+      onConfigOptions: configOptions => this.settle(
+        sessionConfig.syncSessionModelState({ configOptions: [...configOptions] }),
+      ),
       onCost: cost => {
         // What the vendor said this turn cost, in the unit it bills in. A turn
         // that reports one needs no session-log read; one that does not is what
@@ -623,13 +632,13 @@ export class GrokExecution {
     sessionConfig: GrokSessionConfigState,
     options?: ChatRuntimeQueryOptions,
   ): GrokAcpDynamicConfig | undefined {
+    // The vault's wish, in the vault's own vocabulary. Translating it needs
+    // what the session named, which is known when the turn is applied and not
+    // when it is composed — so the applier does it.
     const modeId = sessionConfig.resolveSelectedModeId();
     const modelId = sessionConfig.resolveSelectedRawModelId(options);
     const dynamic: GrokAcpDynamicConfig = {
-      // Only a session that reported a native mode is sent one: a release that
-      // carries its policy on the command line has none, and Grimoire's own
-      // toolbar ids mean nothing to it.
-      ...(modeId && sessionConfig.sessionModeId ? { modeId } : {}),
+      ...(modeId ? { modeId } : {}),
       ...(modelId ? { modelId } : {}),
     };
     return Object.keys(dynamic).length > 0 ? dynamic : undefined;

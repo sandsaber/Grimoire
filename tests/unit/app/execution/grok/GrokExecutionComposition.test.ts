@@ -74,6 +74,7 @@ describe('Grok execution composition', () => {
   function createFakeAcp(options: {
     asksPermission?: boolean;
     modeIsUnsupported?: boolean;
+    reportsNativeModes?: boolean;
     reportsNoModes?: boolean;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
@@ -117,7 +118,16 @@ describe('Grok execution composition', () => {
         let notify: ((notification: AcpSessionNotification) => void) | undefined;
         const client: ManagedAcpClient = {
           initialize: async () => undefined,
-          newSession: async () => (options.reportsNoModes ? {
+          newSession: async () => (options.reportsNativeModes ? {
+            sessionId: 'grok-session',
+            modes: {
+              availableModes: [
+                { id: 'ask', name: 'Safe' },
+                { id: 'always-approve', name: 'Auto-approve' },
+              ],
+              currentModeId: 'ask',
+            },
+          } : options.reportsNoModes ? {
             sessionId: 'grok-session',
           } : {
             sessionId: 'grok-session',
@@ -203,6 +213,7 @@ describe('Grok execution composition', () => {
     asksPermission?: boolean;
     plugin?: any;
     modeIsUnsupported?: boolean;
+    reportsNativeModes?: boolean;
     reportsNoModes?: boolean;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
@@ -369,6 +380,22 @@ describe('Grok execution composition', () => {
         contextWindowIsAuthoritative: true,
       }),
     }));
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('asks for a mode in the session own words, never in Grimoire\'s', async () => {
+    // A vault that has not opened a session yet holds Grimoire's toolbar modes,
+    // whose ids are not Grok's. Sending one reaches `session/set_mode` as
+    // `-32602 Invalid params` and aborts the turn before the prompt — issue #52.
+    const { execution, host, modes } = await createHarness({ reportsNativeModes: true });
+    const runtime = execution.createRuntime();
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(modes).toEqual([
+      { modeId: 'always-approve', sessionId: 'grok-session' },
+    ]);
     execution.dispose();
     await host.dispose();
   });

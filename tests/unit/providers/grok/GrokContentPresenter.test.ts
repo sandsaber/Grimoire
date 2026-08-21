@@ -18,14 +18,20 @@ describe('Grok content presenter', () => {
     readonly costs: ProviderCostValue[];
     readonly models: Array<{ modelId: string; reasoningEffort?: string }>;
     readonly commands: string[][];
+    readonly modes: string[];
+    readonly configOptions: unknown[];
   }
 
   function createPresenter(): { presenter: GrokContentPresenter; recorded: Recorded } {
-    const recorded: Recorded = { costs: [], models: [], commands: [] };
+    const recorded: Recorded = {
+      costs: [], models: [], commands: [], modes: [], configOptions: [],
+    };
     const presenter = new GrokContentPresenter({
       displayModel: () => 'grok-4.6',
       onCommands: commands => recorded.commands.push(commands.map(command => command.name)),
+      onConfigOptions: options => recorded.configOptions.push(options),
       onCost: cost => recorded.costs.push(cost),
+      onCurrentMode: modeId => recorded.modes.push(modeId),
       onModelChanged: change => recorded.models.push(change),
     });
     return { presenter, recorded };
@@ -156,6 +162,48 @@ describe('Grok content presenter', () => {
         contextWindowIsAuthoritative: true,
       }),
     }));
+  });
+
+  it('hears the session say its mode changed', () => {
+    const { presenter, recorded } = createPresenter();
+
+    const chunks = presenter.present({
+      kind: 'session-update',
+      notification: {
+        sessionId: 'grok-session',
+        update: { sessionUpdate: 'current_mode_update', currentModeId: 'always-approve' },
+      },
+    });
+
+    // A `/mode` typed into the composer changes the session under the tab. A
+    // tab that never hears it keeps sending the mode it thinks the session is
+    // in — and the id it sends is translated against a stale current mode.
+    expect(chunks).toEqual([]);
+    expect(recorded.modes).toEqual(['always-approve']);
+  });
+
+  it('hears the session say its options changed', () => {
+    const { presenter, recorded } = createPresenter();
+    const configOptions = [{
+      category: 'thought_level',
+      currentValue: 'high',
+      id: 'effort',
+      name: 'Effort',
+      options: [{ name: 'Low', value: 'low' }, { name: 'High', value: 'high' }],
+      type: 'select',
+    }];
+
+    presenter.present({
+      kind: 'session-update',
+      notification: {
+        sessionId: 'grok-session',
+        update: { sessionUpdate: 'config_option_update', configOptions },
+      },
+    });
+
+    // The thinking levels a model offers arrive this way when they change
+    // mid-session, and the toolbar is drawn from what the vault kept.
+    expect(recorded.configOptions).toEqual([configOptions]);
   });
 
   it('replays the whole recording without inventing a chunk', () => {

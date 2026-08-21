@@ -1,6 +1,7 @@
 import { JsonRpcErrorResponse } from '@/providers/acp';
 import type { ManagedAcpExecutionDynamicApplier } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
 import type { AcpSessionConfigOption } from '@/providers/acp/types';
+import { resolveGrokAcpModeId } from '@/providers/grok/modes';
 
 /** What one Grok turn asks its session to be set to, once the session exists. */
 export interface GrokAcpDynamicConfig {
@@ -38,9 +39,46 @@ export class GrokAcpDynamicConfigApplier implements ManagedAcpExecutionDynamicAp
       await input.client.setModel({ modelId: config.modelId.trim(), sessionId: input.sessionId });
     }
     throwIfAborted(input.signal);
-    if (config.modeId?.trim()) {
-      await this.applyMode(input, config.modeId.trim());
+    const modeId = this.resolveModeId(input, config.modeId?.trim());
+    if (modeId) {
+      await this.applyMode(input, modeId);
     }
+  }
+
+  /**
+   * The mode this session will accept, from the one the vault asked for.
+   *
+   * A turn is composed in Grimoire's own vocabulary — `grimoire-full-access`,
+   * `grimoire-safe` — and those are not Grok's ids: sending one comes back as
+   * `-32602 Invalid params` and aborts the turn before the prompt, which is
+   * issue #52. Translated here because this is the only moment both the wish
+   * and what the session named are known; a session that named nothing is a
+   * release carrying its policy on the command line, and the launch already did.
+   */
+  private resolveModeId(
+    input: Parameters<ManagedAcpExecutionDynamicApplier['apply']>[0],
+    selectedModeId: string | undefined,
+  ): string | null {
+    if (!selectedModeId) {
+      return null;
+    }
+    const advertised = [
+      ...(input.sessionModes?.availableModes ?? []).map(mode => mode.id),
+      ...modeOptionValues(input.sessionConfigOptions),
+    ].filter(id => typeof id === 'string' && id.trim());
+    const currentModeId = input.sessionModes?.currentModeId
+      ?? currentModeOptionValue(input.sessionConfigOptions)
+      ?? null;
+    if (advertised.length === 0 && !currentModeId) {
+      return null;
+    }
+    const target = resolveGrokAcpModeId(
+      selectedModeId,
+      currentModeId,
+      [...new Set([...advertised, ...(currentModeId ? [currentModeId] : [])])],
+    );
+    // A set that changes nothing is a round trip the turn waits for.
+    return target && target !== currentModeId ? target : null;
   }
 
   private async applyMode(
@@ -79,6 +117,29 @@ export class GrokAcpDynamicConfigApplier implements ManagedAcpExecutionDynamicAp
       }
     }
   }
+}
+
+/** A mode option is a select, and only a select lists what it accepts. */
+function modeSelectOption(
+  configOptions: readonly AcpSessionConfigOption[] | undefined,
+): Extract<AcpSessionConfigOption, { type: 'select' }> | null {
+  const option = configOptions?.find(candidate => candidate.category === 'mode');
+  return option?.type === 'select' ? option : null;
+}
+
+/** Flattened, because a select may present its values in groups. */
+function modeOptionValues(
+  configOptions: readonly AcpSessionConfigOption[] | undefined,
+): string[] {
+  return (modeSelectOption(configOptions)?.options ?? []).flatMap(entry => (
+    'group' in entry ? entry.options.map(option => option.value) : [entry.value]
+  ));
+}
+
+function currentModeOptionValue(
+  configOptions: readonly AcpSessionConfigOption[] | undefined,
+): string | null {
+  return modeSelectOption(configOptions)?.currentValue ?? null;
 }
 
 function modeConfigId(
