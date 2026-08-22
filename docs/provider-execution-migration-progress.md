@@ -5414,6 +5414,51 @@ one, would waste their hour.
 Gates: unit 490 suites / 7,736 tests, integration 5 suites / 145 tests (59
 env-gated skips), typecheck, `eslint`, `build:release`.
 
+### Kimi Code: everything but the composition, dark (this commit)
+
+Ten execution modules, the provider module, the trace fixture and eight test
+files. Eight modules are dark and attributed;
+`KimicodePermissionPresentation.ts` and `KimicodeSessionConfigState.ts` are live,
+because both were moved out of `KimicodeChatRuntime` rather than written beside
+it — the same two, for the same reason, as MiMoCode.
+
+**Before deriving anything, I measured how derivable it was.** Normalized diffs
+against OpenCode: `capabilities.ts` and `models.ts` differ in **zero** lines,
+`settings.ts` in four (import order), `registration.ts` in five. And the
+permission vocabulary — 21 sentences — matches Kimi Code's own legacy runtime
+exactly, checked by extracting both and comparing the sentence sets rather than
+by reading them.
+
+**`modes.ts` differs in sixteen lines, and that is the one that matters.** Kimi
+Code's mode ids are the CLI's own — `auto`, `default`, `plan`, plus `build` and a
+legacy `grimoire-yolo` for compatibility — where OpenCode and MiMoCode mint
+`grimoire-full-access` and `grimoire-safe`. A derivation that carried the
+sibling's ids across would map every permission mode to nothing. Recorded in the
+module header rather than left for the flip to discover.
+
+**Kimi Code's recording is the thinnest of the six, and three claims were
+rewritten because of it.** `kimi acp` answered `session/new` with
+"Authentication required", so no session has ever opened: its models, modes,
+config options and answer traffic are all unobserved. The dynamic-config
+comment, the content presenter's "reported once at session open" claim and the
+presenter test's header all said things MiMoCode's recording supports and Kimi
+Code's does not. Each now says what it actually stands on — `KimicodeChatRuntime`
+driving this CLI on the legacy path, and the three ACP providers already flipped.
+
+The presenter test also carried MiMoCode's *values* — `xiaomi/mimo-v2.5-pro-ultraspeed`,
+a 1 MiB window, the `init`/`review` command pair. Those read as evidence and are
+not, so they are gone: the ids are ones Kimi Code's own model tests already use,
+and the header says plainly that none of it is observed.
+
+**Six breaks, five caught, and the miss was worth the round trip.** Setting an
+effort level without asking the session changed nothing red — because the test
+passed an *empty* option list, and the guard returns early before reaching the
+check that was broken. A second case now passes a non-empty list with no
+thought level in it, which is the shape that reaches the guard. MiMoCode's
+equivalent was re-broken to confirm it still catches its own version.
+
+Gates: unit 499 suites / 7,816 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -5445,12 +5490,14 @@ account. Everything up to the answer is confirmed against the real CLI. One head
 generating account settles rows 1, 2, 5, 6, 7, 8, 12, 13 and 15; until then MiMoCode is flipped but
 **not certified**, and the matrix says so in its own Record table rather than in this file only.
 
-**Next: Kimi Code**, wave 6's second half, which starts from the same partial position — its wire
-recording is `partial` too, for a different reason (that machine is not logged in). Expect the same
-shape of derivation: module and descriptor, the provider-owned parts, the composition, the flip, the
-harness. Two techniques carried forward from MiMoCode — the normalized diff (`sed` both providers'
-names to one token, then diff, so only real differences remain) and breaking the composition in five
-or six places before trusting a derived test suite.
+**Kimi Code is built up to the composition.** Ten execution modules plus the provider module, all
+tested, eight of them dark and attributed. What is left is the same two steps MiMoCode took:
+`KimicodeExecutionComposition` and `KimicodeMetadataSession` under `src/app/execution/kimicode/` with
+`KimicodeModuleContext` beside them, then the flip as one revertible commit —
+`registration.ts` at `plugin.getKimicodeExecution().createRuntime()`, `main.ts` constructing and
+registering it, `KimicodeChatRuntime` deleted, and the four metadata surfaces moved onto
+`execution.metadata`. Then the harness, which for this provider will need a logged-in machine before
+it can say anything: `kimi acp` cannot open a session at all here.
 
 Two techniques worth repeating on the next provider. The normalized diff — `sed` both files' provider
 names to one token and diff — is what made the config-state move safe to do mechanically. And break

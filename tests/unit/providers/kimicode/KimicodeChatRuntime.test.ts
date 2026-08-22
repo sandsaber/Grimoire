@@ -627,7 +627,7 @@ describe('KimicodeChatRuntime', () => {
       { description: 'Planning-first agent', id: 'plan', name: 'Plan' },
     ]);
     expect(plugin.settings.providerConfigs.kimicode.selectedMode).toBe('plan');
-    expect((runtime as any).currentSessionModeId).toBe('build');
+    expect((runtime as any).sessionConfig.sessionModeId).toBe('build');
     expect(plugin.saveSettings).not.toHaveBeenCalled();
     expect(refreshModelSelector).toHaveBeenCalledTimes(1);
   });
@@ -788,7 +788,7 @@ describe('KimicodeChatRuntime', () => {
 
     await expect((runtime as any).createSession('/tmp/vault')).resolves.toBe('session-1');
 
-    expect((runtime as any).currentSessionModeId).toBe(KIMICODE_BUILD_MODE_ID);
+    expect((runtime as any).sessionConfig.sessionModeId).toBe(KIMICODE_BUILD_MODE_ID);
     expect(syncCallback).not.toHaveBeenCalled();
   });
 
@@ -1125,7 +1125,7 @@ describe('KimicodeChatRuntime', () => {
 
     await expect(runtime.warmModelMetadata('kimicode:deepseek/deepseek-v4-pro')).resolves.toBe(true);
 
-    expect((runtime as any).currentSessionModelId).toBe('deepseek/deepseek-v4-pro');
+    expect((runtime as any).sessionConfig.sessionModelId).toBe('deepseek/deepseek-v4-pro');
     expect(plugin.settings.model).toBe('kimicode:deepseek/deepseek-v4-pro');
     expect(plugin.settings.savedProviderModel.kimicode).toBe('kimicode:deepseek/deepseek-v4-pro');
     expect(plugin.settings.providerConfigs.kimicode.thinkingOptionsByModel).toEqual({
@@ -1174,9 +1174,22 @@ describe('KimicodeChatRuntime', () => {
       }],
     });
     (runtime as any).connection = { setConfigOption };
-    (runtime as any).currentSessionEffortConfigId = 'effort';
-    (runtime as any).currentSessionEffortValue = 'low';
-    (runtime as any).currentSessionEffortValues = new Set(['low', 'high']);
+    // Seeded through the session's own answer rather than by poking three
+    // fields: what makes an effort option settable is that a session reported
+    // it, and that is the path `applySelectedEffort` depends on.
+    await (runtime as any).syncSessionModelState({
+      configOptions: [{
+        category: 'thought_level',
+        currentValue: 'low',
+        id: 'effort',
+        name: 'Effort',
+        options: [
+          { name: 'Low', value: 'low' },
+          { name: 'High', value: 'high' },
+        ],
+        type: 'select',
+      }],
+    });
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
     await (runtime as any).applySelectedEffort('session-1');

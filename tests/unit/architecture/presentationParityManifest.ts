@@ -735,6 +735,23 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // M5. The transport, the launcher and the client adapter beside it went
       // live with OpenCode's flip and are listed as wired.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
+      // Wave 6's second half, built ahead of its own flip: Kimi Code's module,
+      // the descriptor its backend runs under, and the provider-owned parts the
+      // composition will be built from. Dark until `registration.ts` points
+      // `createRuntime` at that composition. Two of its execution modules are
+      // missing from this list on purpose — `KimicodePermissionPresentation.ts`
+      // and `KimicodeSessionConfigState.ts` were moved out of the legacy runtime
+      // rather than written beside it, so that runtime imports them and they are
+      // reachable the moment they exist.
+      'src/providers/kimicode/KimicodeProviderModule.ts',
+      'src/providers/kimicode/execution/KimicodeAcpDynamicConfig.ts',
+      'src/providers/kimicode/execution/KimicodeAcpFileSystem.ts',
+      'src/providers/kimicode/execution/KimicodeContentPresenter.ts',
+      'src/providers/kimicode/execution/KimicodeExecutionBackend.ts',
+      'src/providers/kimicode/execution/KimicodeExecutionRequests.ts',
+      'src/providers/kimicode/execution/KimicodeInteractionBridge.ts',
+      'src/providers/kimicode/execution/KimicodeInteractionPresenter.ts',
+      'src/providers/kimicode/execution/KimicodeProjectionResultSink.ts',
     ],
   },
 ];
