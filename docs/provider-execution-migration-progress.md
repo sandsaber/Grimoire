@@ -5751,6 +5751,46 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
+### Where the session of 2026-08-23 ended
+
+**Wave 6 is complete and wave 7 is half-built.** Six providers execute through the kernel: Codex,
+Claude, OpenCode, Grok, MiMoCode, Kimi Code. Two ACP runtimes remain on the legacy path — Qwen Code
+and Gemini CLI — and Gemini's replacement is built up to the composition.
+
+**Neither wave-6 flip is certified, and neither blocker is Grimoire's.** MiMoCode's account cannot
+generate: its matrix ran, five rows green and eight red, recorded in its own Record table. Kimi Code
+is not authenticated, so its harness has never been run and no matrix is written for it. Do not
+re-run the recorder or a harness hoping this changed — that was tried on 2026-08-22 and produced only
+a new temp path in a fixture diff.
+
+**The fourth review is closed.** Thirteen findings, nothing refuted, recorded with a status column in
+[`docs/wave7-review-backlog.md`](wave7-review-backlog.md). Three would have been felt by a user: every
+Gemini turn died with Auto-approve on, one stray character in `.claude/settings.json` destroyed it,
+and a conversation could become permanently invisible after an interrupted write.
+
+**Wave 7's recordings are taken, and Gemini's is `complete`** — the first since Grok's. It opened a
+session, took a prompt and answered. Qwen's is `partial`: "Authentication required". So Gemini is the
+one provider of this wave that can be certified live here, which is why it was built first even
+though the plan lists Qwen before it.
+
+**What is left for Gemini, in order:** `GeminiExecutionComposition` and `GeminiMetadataSession` under
+`src/app/execution/gemini/` with `GeminiModuleContext` beside them — derive from **Grok's**, not from
+the OpenCode family's, because that is the shape this provider matches; then the flip as one
+revertible commit; then the live harness and matrix, which for once will have something to say.
+Watch for the parts Gemini does *not* have: no launch artifacts, no config options, no tool stream
+adapter, no native history to read a result back from.
+
+**Then Qwen Code**, which starts from Kimi Code's position: authenticated nowhere here, so buildable
+and flippable but not certifiable. Its runtime is genuinely its own — 397 normalized lines apart from
+Gemini's — so measure before deriving, as this session did for every provider.
+
+**Two techniques worth repeating.** The normalized diff (`sed` both providers' names to one token,
+then diff) is what makes a derivation safe to do mechanically and shows exactly where it is not. And
+break the code in five or six places before trusting any test suite: this session's most valuable
+findings — a live CLI-name regression in MiMoCode, a three-suite temp-file race, a harness running
+against a half-applied session, a coverage gate blind to complete recordings — all came from breaks
+that refused to go red.
+
 ### Where the session of 2026-08-22 ended
 
 **Wave 6 is mid-build.** Both wire recordings are taken (partial, and labelled so). MiMoCode has its
