@@ -5695,6 +5695,27 @@ break goes red.
 
 Gates: unit 501 suites / 7,838 tests, typecheck, `eslint`, `build:release`.
 
+### Gemini's session config state, moved out — and G2 had a second door (this commit)
+
+`GeminiSessionConfigState` is the seventh extraction of this kind and the
+smallest, which is the point rather than an omission: this provider's session
+carries no config options, so there is no thinking level to hold, no `configId`
+to remember one under, and no per-model option map to seed.
+
+**Reading it end to end found the fourth review's G2 through a door the review
+did not name.** The finding was about the `current_mode` update storing the
+agent's raw id into `selectedMode`. `syncSessionDiscovery` does the same thing —
+and it is the door that opens *first*: `session/new` reports the agent's own
+default, so a fresh vault stored `default` into the field the toolbar reads back
+through `resolvePermissionMode`, which cannot render it. Fixed with the same
+mapping and its own test, and the break goes red.
+
+That is the second time this session that reading a file for extraction found a
+defect the review had only half-found. It is the argument for extracting by
+reading rather than by moving text.
+
+Gates: unit 501 suites / 7,839 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

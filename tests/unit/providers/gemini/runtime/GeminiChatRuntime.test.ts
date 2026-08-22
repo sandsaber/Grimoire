@@ -610,6 +610,28 @@ describe('GeminiChatRuntime', () => {
       expect(setMode).toHaveBeenCalledWith({ modeId, sessionId: 'session-1' });
     });
 
+    it('stores a mode the toolbar can render when a session first opens', async () => {
+      const plugin = createMockPlugin();
+      const runtime = new GeminiChatRuntime(plugin) as any;
+
+      // The other door into `selectedMode`, and the one that opens first:
+      // `session/new` reports the agent's own default rather than a switch, and
+      // the toolbar reads that field back. It happens on the first session a
+      // vault ever opens, not only when a mode changes.
+      runtime.syncSessionDiscovery({
+        modes: {
+          availableModes: [
+            { id: 'default', name: 'Default' },
+            { id: 'yolo', name: 'YOLO' },
+          ],
+          currentModeId: 'default',
+        },
+      });
+
+      expect(getGeminiProviderSettings(plugin.settings).selectedMode).toBe('normal');
+      expect(runtime.sessionConfig.sessionModeId).toBe('default');
+    });
+
     it('shows the toolbar a value it can render when the agent reports its own', async () => {
       const plugin = createMockPlugin();
       const runtime = new GeminiChatRuntime(plugin) as any;
@@ -630,7 +652,7 @@ describe('GeminiChatRuntime', () => {
       expect(getGeminiProviderSettings(plugin.settings).selectedMode).toBe('normal');
       // The agent's own word is what the *session* is compared against, so it
       // is kept in the agent's vocabulary here.
-      expect(runtime.currentSessionModeId).toBe('autoEdit');
+      expect(runtime.sessionConfig.sessionModeId).toBe('autoEdit');
     });
 
     it('maps the agent yolo mode back to Auto-approve', async () => {

@@ -50,6 +50,9 @@ import {
 import { appendEditorContext } from '../../../utils/editor';
 import { getVaultPath } from '../../../utils/path';
 import { buildContextFromHistory, buildPromptWithHistoryContext } from '../../../utils/session';
+import type {
+  extractAcpSessionModelState,
+  extractAcpSessionModeState} from '../../acp';
 import {
   AcpClientConnection,
   type AcpContentBlock,
@@ -64,8 +67,6 @@ import {
   approveAcpWriteTextFile,
   buildAcpApprovalDecisionOptions,
   buildAcpUsageInfo,
-  extractAcpSessionModelState,
-  extractAcpSessionModeState,
   mapAcpApprovalDecision,
   resolveWorkspacePath,
 } from '../../acp';
@@ -76,18 +77,12 @@ import { GEMINI_PROVIDER_CAPABILITIES } from '../capabilities';
 import {
   buildGeminiPermissionPresentation,
 } from '../execution/GeminiPermissionPresentation';
-import {
-  decodeGeminiModelId,
-  encodeGeminiModelId,
-  GEMINI_SYNTHETIC_MODEL_ID,
-} from '../models';
+import { GeminiSessionConfigState } from '../execution/GeminiSessionConfigState';
 import {
   mapGeminiModeToGrimoire,
   mapGrimoireModeToGemini,
 } from '../modes';
 import {
-  type GeminiDiscoveredModel,
-  type GeminiMode,
   getGeminiProviderSettings,
   updateGeminiProviderSettings,
 } from '../settings';
@@ -152,9 +147,20 @@ export class GeminiChatRuntime implements ChatRuntime {
   private approvalCallback: ApprovalCallback | null = null;
   private connection: AcpClientConnection | null = null;
   private contextUsage: Parameters<typeof buildAcpUsageInfo>[0]['contextWindow'] = null;
-  private currentSessionModelId: string | null = null;
+  /**
+   * What the live session is configured with, and what the vault knows of it.
+   *
+   * Moved out whole rather than copied: the flip needs the same answers from a
+   * composition that has no runtime, and two copies of this would be two
+   * opinions about which model a turn runs under.
+   */
+  private readonly sessionConfig = new GeminiSessionConfigState({
+    settingsBag: () => this.plugin.settings,
+    saveSettings: async () => { await this.plugin.saveSettings?.(); },
+  });
+
   /** The mode the session is actually in, as the agent last reported it. */
-  private currentSessionModeId: string | null = null;
+
   private permissionModeSyncCallback: ((sdkMode: string) => void) | null = null;
   private currentLaunchKey: string | null = null;
   private currentTurnMetadata: ChatTurnMetadata = {};
@@ -204,13 +210,13 @@ export class GeminiChatRuntime implements ChatRuntime {
     const nextSessionId = conversation?.sessionId ?? null;
     if (this.sessionId !== nextSessionId) {
       this.sessionInvalidated = false;
-      this.currentSessionModelId = null;
+      this.sessionConfig.forgetSession();
       // The mode goes with the model, and for the same reason: both are what
       // *that* session was set to, and both are what `applySelectedMode` and
       // `applySelectedModel` skip the call on. Kept across a session change,
       // the next turn believes the new session is already in a mode nobody set
       // it to — and runs it in the agent's default while the toolbar says Plan.
-      this.currentSessionModeId = null;
+
     }
     this.sessionId = nextSessionId;
   }
@@ -541,8 +547,7 @@ export class GeminiChatRuntime implements ChatRuntime {
     this.setReady(false);
     this.activeTurn?.queue.close();
     this.activeTurn = null;
-    this.currentSessionModelId = null;
-    this.currentSessionModeId = null;
+    this.sessionConfig.forgetSession();
 
     this.unregisterTransportClose?.();
     this.unregisterTransportClose = null;
@@ -648,7 +653,7 @@ export class GeminiChatRuntime implements ChatRuntime {
       // — that is what `set_mode` is skipped on — and translated where it
       // reaches the vault and the toolbar, which speak Grimoire's three values
       // and cannot render `autoEdit` at all.
-      this.currentSessionModeId = normalized.currentModeId;
+      this.sessionConfig.markApplied({ modeId: normalized.currentModeId });
       const permissionMode = mapGeminiModeToGrimoire(normalized.currentModeId);
       updateGeminiProviderSettings(this.plugin.settings, { selectedMode: permissionMode });
       void this.plugin.saveSettings?.();
@@ -715,42 +720,12 @@ export class GeminiChatRuntime implements ChatRuntime {
     models?: Parameters<typeof extractAcpSessionModelState>[0]['models'];
     modes?: Parameters<typeof extractAcpSessionModeState>[0]['modes'];
   }): void {
-    const modelState = extractAcpSessionModelState(params);
-    const modeState = extractAcpSessionModeState(params);
-    const updates: Parameters<typeof updateGeminiProviderSettings>[1] = {};
-
-    if (modelState.currentModelId) {
-      this.currentSessionModelId = modelState.currentModelId;
-    }
-
-    if (modelState.availableModels.length > 0) {
-      const discoveredRawIds = modelState.availableModels
-        .map((model) => model.id.trim())
-        .filter(Boolean);
-      updates.discoveredModels = modelState.availableModels.map((model): GeminiDiscoveredModel => ({
-        description: model.description ?? undefined,
-        label: model.name || model.id,
-        rawId: model.id,
-      }));
-      updates.visibleModels = discoveredRawIds;
-    }
-
-    if (modeState.availableModes.length > 0) {
-      updates.availableModes = modeState.availableModes.map((mode): GeminiMode => ({
-        description: mode.description ?? undefined,
-        id: mode.id,
-        name: mode.name,
-      }));
-    }
-
-    if (modeState.currentModeId) {
-      updates.selectedMode = modeState.currentModeId;
-    }
-
-    if (Object.keys(updates).length > 0) {
-      updateGeminiProviderSettings(this.plugin.settings, updates);
+    if (this.sessionConfig.syncSessionDiscovery(params)) {
       void this.plugin.saveSettings?.();
     }
+    // Mirrored while the legacy runtime still reads these two directly. They go
+    // when the flip does.
+
   }
 
   private async handlePermissionRequest(
@@ -844,28 +819,11 @@ export class GeminiChatRuntime implements ChatRuntime {
   }
 
   private getActiveModel(): string | null {
-    const rawModelId = this.currentSessionModelId ?? this.resolveSelectedRawModelId();
-    return rawModelId
-      ? encodeGeminiModelId(rawModelId)
-      : GEMINI_SYNTHETIC_MODEL_ID;
+    return this.sessionConfig.getActiveDisplayModel();
   }
 
   private resolveSelectedRawModelId(queryOptions?: ChatRuntimeQueryOptions): string | null {
-    if (queryOptions?.model !== undefined) {
-      return typeof queryOptions.model === 'string'
-        ? decodeGeminiModelId(queryOptions.model)
-        : null;
-    }
-    const providerSettings = getGeminiProviderSettings(this.plugin.settings);
-    const savedProviderModel = this.plugin.settings.savedProviderModel;
-    const savedGeminiModel = savedProviderModel
-      && typeof savedProviderModel === 'object'
-      && !Array.isArray(savedProviderModel)
-      ? (savedProviderModel as Record<string, unknown>).gemini
-      : null;
-    return typeof savedGeminiModel === 'string'
-      ? decodeGeminiModelId(savedGeminiModel)
-      : providerSettings.visibleModels[0] ?? null;
+    return this.sessionConfig.resolveSelectedRawModelId(queryOptions);
   }
 
   /**
@@ -886,14 +844,12 @@ export class GeminiChatRuntime implements ChatRuntime {
     // `default`/`autoEdit`/`yolo`/`plan`: sending the toolbar's word is a mode
     // the agent does not have, and it is awaited inside the turn's own try — so
     // the rejection ends the turn before the prompt is ever sent.
-    const modeId = mapGrimoireModeToGemini(
-      this.permissionMode() || getGeminiProviderSettings(this.plugin.settings).selectedMode,
-    );
-    if (modeId === this.currentSessionModeId) {
+    const modeId = mapGrimoireModeToGemini(this.sessionConfig.resolveSelectedModeId());
+    if (modeId === this.sessionConfig.sessionModeId) {
       return;
     }
     await this.connection.setMode({ modeId, sessionId });
-    this.currentSessionModeId = modeId;
+    this.sessionConfig.markApplied({ modeId });
   }
 
   private emitPermissionModeSync(modeId: string): void {
@@ -912,11 +868,11 @@ export class GeminiChatRuntime implements ChatRuntime {
       return;
     }
     const selectedModel = this.resolveSelectedRawModelId(queryOptions);
-    if (!selectedModel || selectedModel === this.currentSessionModelId) {
+    if (!selectedModel || selectedModel === this.sessionConfig.sessionModelId) {
       return;
     }
     await this.connection.setModel({ modelId: selectedModel, sessionId });
-    this.currentSessionModelId = selectedModel;
+    this.sessionConfig.markApplied({ modelId: selectedModel });
   }
 
   private formatRuntimeError(error: unknown): string {
@@ -928,8 +884,7 @@ export class GeminiChatRuntime implements ChatRuntime {
   private clearActiveSession(): void {
     this.sessionId = null;
     this.loadedSessionId = null;
-    this.currentSessionModelId = null;
-    this.currentSessionModeId = null;
+    this.sessionConfig.forgetSession();
   }
 
   private setReady(ready: boolean): void {
