@@ -6,7 +6,6 @@ import { MimocodeTitleGenerationService } from './auxiliary/MimocodeTitleGenerat
 import { MIMOCODE_PROVIDER_CAPABILITIES } from './capabilities';
 import { mimocodeSettingsReconciler } from './env/MimocodeSettingsReconciler';
 import { MimocodeConversationHistoryService } from './history/MimocodeConversationHistoryService';
-import { MimocodeChatRuntime } from './runtime/MimocodeChatRuntime';
 import { getMimocodeProviderSettings, updateMimocodeProviderSettings } from './settings';
 import { mimocodeChatUIConfig } from './ui/MimocodeChatUIConfig';
 
@@ -16,7 +15,7 @@ export const mimocodeProviderRegistration: ProviderRegistration = {
   chatUIConfig: mimocodeChatUIConfig,
   createInlineEditService: (plugin) => new MimocodeInlineEditService(plugin),
   createInstructionRefineService: (plugin) => new MimocodeInstructionRefineService(plugin),
-  createRuntime: ({ plugin }) => new MimocodeChatRuntime(plugin),
+  createRuntime: ({ plugin }) => plugin.getMimocodeExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new MimocodeTitleGenerationService(plugin),
   displayName: 'MiMoCode',
   environmentKeyPatterns: [/^MIMOCODE_/i],

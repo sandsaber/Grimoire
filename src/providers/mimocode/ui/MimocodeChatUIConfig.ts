@@ -18,7 +18,6 @@ import {
   resolveMimocodeModeForPermissionMode,
   resolvePermissionModeForManagedMimocodeMode,
 } from '../modes';
-import { MimocodeChatRuntime } from '../runtime/MimocodeChatRuntime';
 import { getMimocodeProviderSettings, updateMimocodeProviderSettings } from '../settings';
 
 const MIMOCODE_MODELS: ProviderUIOption[] = [
@@ -31,7 +30,6 @@ const MIMOCODE_FALLBACK_THINKING_OPTIONS: ProviderReasoningOption[] = [
 ];
 const MIMOCODE_FALLBACK_THINKING_DEFAULT = 'high';
 const DEFAULT_CONTEXT_WINDOW = 200_000;
-const MIMOCODE_METADATA_WARMUP_DB = ':memory:';
 const MIMOCODE_PERMISSION_MODE_TOGGLE: ProviderPermissionModeToggleConfig = {
   inactiveValue: 'normal',
   inactiveLabel: 'Safe',
@@ -183,17 +181,12 @@ export const mimocodeChatUIConfig: ProviderChatUIConfig = {
       return;
     }
 
-    const runtime = new MimocodeChatRuntime(context.plugin);
     try {
-      runtime.syncConversationState({
-        providerState: { databasePath: MIMOCODE_METADATA_WARMUP_DB },
-        sessionId: null,
-      });
-      await runtime.warmModelMetadata(model);
+      // Opportunistic: the first real turn discovers the same thing if this
+      // session cannot open, or if the kernel has not started yet.
+      await context.plugin.getMimocodeExecution().metadata.discoverMetadata({ rawModelId });
     } catch {
-      // Metadata warmup is opportunistic; the first real turn can still discover it.
-    } finally {
-      runtime.cleanup();
+      // Metadata warmup never blocks the toolbar.
     }
   },
 

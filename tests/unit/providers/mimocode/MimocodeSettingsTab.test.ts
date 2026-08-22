@@ -12,10 +12,8 @@ const mockRefreshAgentMentions = jest.fn().mockResolvedValue(undefined);
 const mockInvalidateProviderCommandCaches = jest.fn();
 const mockRefreshModelSelector = jest.fn();
 const mockCliResolverReset = jest.fn();
-const mockRuntimeEnsureReady = jest.fn().mockResolvedValue(false);
-const mockRuntimeSyncConversationState = jest.fn();
-const mockRuntimeCleanup = jest.fn();
-const mockRuntimeWarmModelMetadata = jest.fn().mockResolvedValue(false);
+/** The isolated session the settings tab asks, in place of a whole runtime. */
+const mockDiscoverMetadata = jest.fn().mockResolvedValue(false);
 const mockAgentStorage = {};
 const mockCreatedAgentSettings: Array<{
   app: unknown;
@@ -110,28 +108,6 @@ jest.mock('@/providers/mimocode/app/MimocodeWorkspaceServices', () => ({
     },
     refreshAgentMentions: mockRefreshAgentMentions,
   })),
-}));
-
-jest.mock('@/providers/mimocode/runtime/MimocodeChatRuntime', () => ({
-  MimocodeChatRuntime: class MockMimocodeChatRuntime {
-    constructor(readonly plugin: any) {}
-
-    syncConversationState(...args: unknown[]) {
-      return mockRuntimeSyncConversationState(...args);
-    }
-
-    ensureReady(...args: unknown[]) {
-      return mockRuntimeEnsureReady(this.plugin, ...args);
-    }
-
-    warmModelMetadata(...args: unknown[]) {
-      return mockRuntimeWarmModelMetadata(this.plugin, ...args);
-    }
-
-    cleanup() {
-      return mockRuntimeCleanup();
-    }
-  },
 }));
 
 jest.mock('@/utils/env', () => ({
@@ -379,6 +355,7 @@ function createPlugin(overrides: Record<string, unknown> = {}): any {
   };
 
   return {
+    getMimocodeExecution: () => ({ metadata: { discoverMetadata: mockDiscoverMetadata } }),
     settings: {
       providerConfigs: {
         mimocode: {
@@ -440,8 +417,7 @@ describe('MimocodeSettingsTab', () => {
     createdDomElements.length = 0;
     mockCreatedAgentSettings.length = 0;
     jest.clearAllMocks();
-    mockRuntimeEnsureReady.mockResolvedValue(false);
-    mockRuntimeWarmModelMetadata.mockResolvedValue(false);
+    mockDiscoverMetadata.mockResolvedValue(false);
     mockedExistsSync.mockReturnValue(false);
     mockedStatSync.mockReturnValue({ isFile: () => true } as fs.Stats);
     setLocale('en');
@@ -548,7 +524,7 @@ describe('MimocodeSettingsTab', () => {
   });
 
   it('loads the MiMoCode model catalog when the model browser is expanded', async () => {
-    mockRuntimeEnsureReady.mockImplementation(async (plugin: any) => {
+    mockDiscoverMetadata.mockImplementation(async () => {
       plugin.settings.providerConfigs.mimocode.discoveredModels = [
         { label: 'DeepSeek/DeepSeek V4 Pro', rawId: 'deepseek/deepseek-v4-pro' },
       ];
@@ -578,20 +554,14 @@ describe('MimocodeSettingsTab', () => {
     catalogEl.open = true;
     await catalogEl.dispatchMockEvent('toggle');
 
-    expect(mockRuntimeSyncConversationState).toHaveBeenCalledWith({
-      providerState: { databasePath: ':memory:' },
-      sessionId: null,
-    });
-    expect(mockRuntimeEnsureReady).toHaveBeenCalledWith(
-      plugin,
-      { allowSessionCreation: true },
-    );
-    expect(mockRuntimeCleanup).toHaveBeenCalledTimes(1);
+    // The isolation moved with the question: the metadata session launches
+    // against an in-memory database, so nothing here binds a session to a tab.
+    expect(mockDiscoverMetadata).toHaveBeenCalledTimes(1);
     expect(context.refreshModelSelectors).toHaveBeenCalledTimes(1);
   });
 
   it('loads the MiMoCode model catalog immediately when a fresh picker starts expanded', async () => {
-    mockRuntimeEnsureReady.mockImplementation(async (plugin: any) => {
+    mockDiscoverMetadata.mockImplementation(async () => {
       plugin.settings.providerConfigs.mimocode.discoveredModels = [
         { label: 'DeepSeek/DeepSeek V4 Pro', rawId: 'deepseek/deepseek-v4-pro' },
       ];
@@ -619,20 +589,12 @@ describe('MimocodeSettingsTab', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(mockRuntimeSyncConversationState).toHaveBeenCalledWith({
-      providerState: { databasePath: ':memory:' },
-      sessionId: null,
-    });
-    expect(mockRuntimeEnsureReady).toHaveBeenCalledWith(
-      plugin,
-      { allowSessionCreation: true },
-    );
-    expect(mockRuntimeCleanup).toHaveBeenCalledTimes(1);
+    expect(mockDiscoverMetadata).toHaveBeenCalledTimes(1);
     expect(context.refreshModelSelectors).toHaveBeenCalledTimes(1);
   });
 
   it('warms and persists thinking metadata when a model is added to the visible list', async () => {
-    mockRuntimeWarmModelMetadata.mockResolvedValue(true);
+    mockDiscoverMetadata.mockResolvedValue(true);
     const plugin = createPlugin({
       providerConfigs: {
         mimocode: {
@@ -668,10 +630,12 @@ describe('MimocodeSettingsTab', () => {
     expect(plugin.settings.providerConfigs.mimocode.visibleModels).toEqual([
       'deepseek/deepseek-v4-pro',
     ]);
-    expect(mockRuntimeWarmModelMetadata).toHaveBeenCalledWith(
-      plugin,
-      'mimocode:deepseek/deepseek-v4-pro',
-    );
+    // The metadata a model carries is asked for by raw id, in an isolated
+    // session that binds nothing. The legacy runtime was told the *encoded*
+    // selection id and decoded it again; the metadata session takes the raw one.
+    expect(mockDiscoverMetadata).toHaveBeenCalledWith({
+      rawModelId: 'deepseek/deepseek-v4-pro',
+    });
     expect(context.refreshModelSelectors).toHaveBeenCalled();
   });
 });

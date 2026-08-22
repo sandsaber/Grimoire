@@ -275,7 +275,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     capabilities: MIMOCODE_PROVIDER_CAPABILITIES,
     isolationEvidence: 'mimocode/auxiliary/',
     evidence: [
-      'src/providers/mimocode/runtime/MimocodeChatRuntime.ts',
+      'src/providers/mimocode/execution/MimocodeExecutionBackend.ts',
       'src/providers/mimocode/runtime/MimocodeAuxQueryRunner.ts',
       'src/providers/mimocode/runtime/MimocodeLaunchArtifacts.ts',
     ],

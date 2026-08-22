@@ -1,20 +1,18 @@
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { GeminiChatRuntime } from '@/providers/gemini/runtime/GeminiChatRuntime';
 import { KimicodeChatRuntime } from '@/providers/kimicode/runtime/KimicodeChatRuntime';
-import { MimocodeChatRuntime } from '@/providers/mimocode/runtime/MimocodeChatRuntime';
 import { QwenChatRuntime } from '@/providers/qwen/runtime/QwenChatRuntime';
 
 /**
- * The four ACP runtimes still on the legacy path.
+ * The three ACP runtimes still on the legacy path.
  *
- * OpenCode left this list at its flip and Grok at its own: their servers reach
- * a session through the kernel now, asserted where they are passed — each
- * provider's `*ExecutionComposition.test.ts` for the launch key that restarts
- * on a change, and `OpencodeExecutionBackend.test.ts` for the `session/new`
- * that carries them.
+ * OpenCode left this list at its flip, Grok at its own, and MiMoCode at wave
+ * 6's: their servers reach a session through the kernel now, asserted where
+ * they are passed — each provider's `*ExecutionComposition.test.ts` for the
+ * launch key that restarts on a change, and `OpencodeExecutionBackend.test.ts`
+ * for the `session/new` that carries them.
  */
 const cases = [
-  ['mimocode', MimocodeChatRuntime],
   ['kimicode', KimicodeChatRuntime],
   ['qwen', QwenChatRuntime],
   ['gemini', GeminiChatRuntime],

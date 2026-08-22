@@ -16,6 +16,7 @@ import { ClaudeExecution } from './app/execution/claude/ClaudeExecutionCompositi
 import { CodexExecution } from './app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
 import { GrokExecution } from './app/execution/grok/GrokExecutionComposition';
+import { MimocodeExecution } from './app/execution/mimocode/MimocodeExecutionComposition';
 import { OpencodeExecution } from './app/execution/opencode/OpencodeExecutionComposition';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
@@ -103,6 +104,7 @@ export default class GrimoirePlugin extends Plugin {
   private claudeExecution: ClaudeExecution | null = null;
   private opencodeExecution: OpencodeExecution | null = null;
   private grokExecution: GrokExecution | null = null;
+  private mimocodeExecution: MimocodeExecution | null = null;
   private unloading = false;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
@@ -356,6 +358,7 @@ export default class GrimoirePlugin extends Plugin {
     this.claudeExecution?.dispose();
     this.opencodeExecution?.dispose();
     this.grokExecution?.dispose();
+    this.mimocodeExecution?.dispose();
     void this.executionKernelHost?.dispose();
     void this.persistOpenTabStates();
   }
@@ -422,6 +425,14 @@ export default class GrimoirePlugin extends Plugin {
     return this.grokExecution;
   }
 
+  /** The MiMoCode execution this plugin instance owns; see the note above. */
+  getMimocodeExecution(): MimocodeExecution {
+    if (!this.mimocodeExecution) {
+      throw new Error('MiMoCode execution is not available before plugin load.');
+    }
+    return this.mimocodeExecution;
+  }
+
   /**
    * Brings the kernel up before anything can ask it for work.
    *
@@ -473,6 +484,12 @@ export default class GrimoirePlugin extends Plugin {
     // flags, its own update envelope, and a plan indicator that asks the live
     // process.
     host.registerBackend(this.grokExecution.createBackendRegistration());
+    this.mimocodeExecution = new MimocodeExecution(this, host.registry);
+    // The third ACP provider, and the one that added nothing to the shared
+    // stack: same managed backend, same client adapter, same launcher. What is
+    // its own is beside this — the `mimo acp` launch, its own database per
+    // conversation, and a thinking level that lives inside the model id.
+    host.registerBackend(this.mimocodeExecution.createBackendRegistration());
     this.executionKernelHost = host;
     try {
       await host.start();

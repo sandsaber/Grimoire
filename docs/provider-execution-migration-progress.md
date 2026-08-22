@@ -5327,6 +5327,48 @@ so the gap cost coverage rather than correctness.
 
 Gates: unit 491 suites / 7,777 tests, typecheck, `eslint`, `build:release`.
 
+### The MiMoCode flip (this commit)
+
+`registration.ts` points `createRuntime` at `plugin.getMimocodeExecution()
+.createRuntime()`, `main.ts` constructs and registers a `MimocodeExecution`
+beside the other three, and `MimocodeChatRuntime.ts` is deleted — 1,850 lines,
+with its 51 KB test file. One commit, and reverting it puts every MiMoCode tab
+back on the legacy path: the `.grimoire/control/**` records the kernel writes
+are inert to it.
+
+The third ACP provider, and the one that proves the platform: it added nothing
+to the shared stack. Same managed backend, same client adapter, same launcher,
+same permission bridge. What is MiMoCode's is the `mimo acp` launch, a database
+per conversation, and a thinking level that lives inside the model id.
+
+**The four metadata surfaces moved with it.** `MimocodeSettingsTab`,
+`MimocodeChatUIConfig`, `MimocodeWorkspaceServices` and
+`MimocodeRuntimeCommandLoader` each used to construct a whole
+`MimocodeChatRuntime` and drive it as far as a session, only to read the reply.
+They now share one isolated metadata session against an in-memory database.
+`MimocodeRuntimeCommandLoader` gained the behaviour OpenCode's has and this one
+did not: a blank tab has a runtime and no session, and asking that runtime
+returns nothing at all — which is how a fresh tab ends up with an empty slash
+menu until the first message is sent.
+
+One assertion changed meaning rather than address, and it is worth naming: the
+settings tab used to warm metadata by handing the runtime an *encoded* selection
+id (`mimocode:deepseek/...`) which the runtime decoded again. The metadata
+session takes the raw id, so the test now asserts `{ rawModelId }`. Same model,
+one less round trip.
+
+MiMoCode also leaves `AcpManagedMcpRuntime.test.ts`, which now covers three
+legacy ACP runtimes rather than four.
+
+**A flake seen once and not reproduced.** One full unit run failed a single test
+during this work; its name was not captured, and thirteen subsequent full runs —
+ten idle, three under six busy cores — were green. Recorded rather than passed
+over: an unexplained failure that stops happening is still an unexplained
+failure, and the next person to see one here should know it is the second.
+
+Gates: unit 490 suites / 7,734 tests, integration 5 suites / 145 tests (47
+env-gated skips), typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -5348,19 +5390,16 @@ the permission vocabulary, the projection result sink and the session config sta
 attributed in the manifest; `MimocodePermissionPresentation.ts` and `MimocodeSessionConfigState.ts`
 are live, because both were moved out of `MimocodeChatRuntime` rather than written beside it.
 
-**The whole assembly exists and is tested; only the flip is left.** Eleven modules — eight under
-`src/providers/mimocode/execution/`, plus `MimocodeExecutionComposition`, `MimocodeMetadataSession`
-and `MimocodeModuleContext`. Nine are dark and attributed in the manifest;
-`MimocodePermissionPresentation.ts` and `MimocodeSessionConfigState.ts` are live, because both were
-moved out of `MimocodeChatRuntime` rather than written beside it.
+**MiMoCode is flipped.** Four providers now execute through the kernel: Codex, Claude, OpenCode,
+Grok and MiMoCode — five. `MimocodeChatRuntime` is deleted, the four metadata surfaces share one
+isolated session, and the eleven modules that replaced it are listed as wired in the parity manifest.
 
-**What is left before the MiMoCode flip:** one revertible commit that adds a `mimocodeExecution` to
-`main.ts` (constructed and registered beside the other three, backend registration included) and
-points `registration.ts` at `plugin.getMimocodeExecution().createRuntime()`, deleting
-`MimocodeChatRuntime` and moving the four metadata surfaces
-(`MimocodeSettingsTab`, `MimocodeChatUIConfig`, `MimocodeWorkspaceServices`,
-`MimocodeRuntimeCommandLoader`) onto `execution.metadata`. Then a live smoke harness under
-`tests/integration/app/execution/mimocode/`, env-gated like the other four, and a matrix doc.
+**What is left for MiMoCode:** a live smoke harness under
+`tests/integration/app/execution/mimocode/`, env-gated like the other four (`GRIMOIRE_MIMOCODE_LIVE=1`),
+plus a `docs/mimocode-flip-smoke-matrix.md` and a row in `liveMatrixRecords.test.ts`. The harness
+matters more here than for the others: MiMoCode's wire recording is partial, so the answer traffic
+this flip assumes has never been observed from `mimo` itself. Then Kimi Code, which is wave 6's
+second half and starts from the same partial position.
 
 Two techniques worth repeating on the next provider. The normalized diff — `sed` both files' provider
 names to one token and diff — is what made the config-state move safe to do mechanically. And break

@@ -86,10 +86,8 @@ const METADATA_DATABASE = ':memory:';
 /**
  * MiMoCode chat execution, assembled from the running plugin.
  *
- * **Dark.** Nothing constructs this yet: `registration.ts` still points
- * `createRuntime` at `MimocodeChatRuntime`, `main.ts` builds no
- * `MimocodeExecution`, and the legacy runtime is still what a MiMoCode tab
- * runs on. The flip is a later checkpoint and one revertible commit.
+ * **Flipped.** `registration.ts` points `createRuntime` here, `main.ts`
+ * constructs one per load, and `MimocodeChatRuntime` is gone.
  *
  * The third ACP provider on the kernel, and it adds nothing to the shared
  * stack. What OpenCode's flip proved and Grok's confirmed is that the protocol

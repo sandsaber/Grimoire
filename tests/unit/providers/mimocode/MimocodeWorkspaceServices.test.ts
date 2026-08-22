@@ -1,5 +1,4 @@
 import { createMimocodeWorkspaceServices } from '@/providers/mimocode/app/MimocodeWorkspaceServices';
-import { MimocodeChatRuntime } from '@/providers/mimocode/runtime/MimocodeChatRuntime';
 import { getMimocodeProviderSettings, updateMimocodeProviderSettings } from '@/providers/mimocode/settings';
 
 describe('createMimocodeWorkspaceServices', () => {
@@ -14,17 +13,16 @@ describe('createMimocodeWorkspaceServices', () => {
       settings,
       saveSettings: jest.fn().mockResolvedValue(undefined),
     };
-    const syncConversationStateSpy = jest.spyOn(MimocodeChatRuntime.prototype, 'syncConversationState');
-    const ensureReadySpy = jest
-      .spyOn(MimocodeChatRuntime.prototype, 'ensureReady')
-      .mockImplementation(async function ensureReady(this: MimocodeChatRuntime) {
-        updateMimocodeProviderSettings((this as any).plugin.settings, {
-          discoveredModels: [{ label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' }],
-          visibleModels: ['openai/gpt-5.6'],
-        });
-        return true;
+    // The catalog asks the isolated metadata session, which is what opening a
+    // session and reading its reply has become.
+    const discoverMetadata = jest.fn().mockImplementation(async () => {
+      updateMimocodeProviderSettings(settings, {
+        discoveredModels: [{ label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' }],
+        visibleModels: ['openai/gpt-5.6'],
       });
-    const cleanupSpy = jest.spyOn(MimocodeChatRuntime.prototype, 'cleanup').mockImplementation(() => undefined);
+      return true;
+    });
+    (plugin as any).getMimocodeExecution = () => ({ metadata: { discoverMetadata } });
     const vaultAdapter = {
       delete: jest.fn(),
       ensureFolder: jest.fn(),
@@ -42,12 +40,7 @@ describe('createMimocodeWorkspaceServices', () => {
     });
 
     expect(changed).toBe(true);
-    expect(syncConversationStateSpy).toHaveBeenCalledWith({
-      providerState: { databasePath: ':memory:' },
-      sessionId: null,
-    });
-    expect(ensureReadySpy).toHaveBeenCalledWith({ allowSessionCreation: true });
-    expect(cleanupSpy).toHaveBeenCalled();
+    expect(discoverMetadata).toHaveBeenCalledTimes(1);
     expect(getMimocodeProviderSettings(settings).discoveredModels).toEqual([
       { label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' },
     ]);
@@ -65,8 +58,8 @@ describe('createMimocodeWorkspaceServices', () => {
       settings,
       saveSettings: jest.fn().mockResolvedValue(undefined),
     };
-    const ensureReadySpy = jest.spyOn(MimocodeChatRuntime.prototype, 'ensureReady');
-    const cleanupSpy = jest.spyOn(MimocodeChatRuntime.prototype, 'cleanup');
+    const discoverMetadata = jest.fn();
+    (plugin as any).getMimocodeExecution = () => ({ metadata: { discoverMetadata } });
     const vaultAdapter = {
       delete: jest.fn(),
       ensureFolder: jest.fn(),
@@ -83,8 +76,8 @@ describe('createMimocodeWorkspaceServices', () => {
     });
 
     expect(changed).toBe(false);
-    expect(ensureReadySpy).not.toHaveBeenCalled();
-    expect(cleanupSpy).not.toHaveBeenCalled();
+    // No process at all for a catalog that is still fresh.
+    expect(discoverMetadata).not.toHaveBeenCalled();
     expect(plugin.recordDebugLog).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         modelCount: 1,

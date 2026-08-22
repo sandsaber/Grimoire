@@ -13,7 +13,6 @@ import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { MimocodeAgentMentionProvider } from '../agents/MimocodeAgentMentionProvider';
 import { MimocodeCommandCatalog } from '../commands/MimocodeCommandCatalog';
-import { MimocodeChatRuntime } from '../runtime/MimocodeChatRuntime';
 import { MimocodeCliResolver } from '../runtime/MimocodeCliResolver';
 import { getMimocodeProviderSettings } from '../settings';
 import { MimocodeAgentStorage } from '../storage/MimocodeAgentStorage';
@@ -30,7 +29,6 @@ export interface MimocodeWorkspaceServices extends ProviderWorkspaceServices {
   mcpServerManager: McpServerManager;
 }
 
-const MIMOCODE_METADATA_WARMUP_DB = ':memory:';
 
 const mimocodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
   resolveMode() {
@@ -74,18 +72,11 @@ function createMimocodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalo
         hasCachedModels: currentSettings.discoveredModels.length > 0,
         load: async () => {
           const before = JSON.stringify(currentSettings.discoveredModels);
-          const runtime = new MimocodeChatRuntime(plugin);
-          try {
-            runtime.syncConversationState({
-              providerState: { databasePath: MIMOCODE_METADATA_WARMUP_DB },
-              sessionId: null,
-            });
-            const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-            const after = JSON.stringify(getMimocodeProviderSettings(settings).discoveredModels);
-            return loaded && before !== after;
-          } finally {
-            runtime.cleanup();
-          }
+          // One isolated session, opened and closed: what the legacy runtime
+          // was doing here was opening a session and reading its reply.
+          const loaded = await plugin.getMimocodeExecution().metadata.discoverMetadata();
+          const after = JSON.stringify(getMimocodeProviderSettings(settings).discoveredModels);
+          return loaded && before !== after;
         },
       });
     },

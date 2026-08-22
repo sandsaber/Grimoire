@@ -40,10 +40,10 @@ import {
  * two providers mirror each other deliberately, and `AGENTS.md` says a change
  * to one is usually a change to both.
  *
- * **Dark.** Nothing constructs this yet: `registration.ts` still points
- * `createRuntime` at `MimocodeChatRuntime`, and the flip is a later checkpoint.
+ * **Flipped.** `registration.ts` points `createRuntime` at the composition
+ * built from this, and `MimocodeChatRuntime` is gone.
  *
- * What the flip starts from is weaker than Grok's, and the difference is worth
+ * What this flip stood on is weaker than Grok's, and the difference is worth
  * knowing before reading anything below as settled: MiMoCode's wire recording
  * is **partial**. The account it was taken on does not generate, so the
  * handshake, the session's configuration options and the shape of a turn that

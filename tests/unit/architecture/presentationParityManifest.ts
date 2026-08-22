@@ -593,7 +593,25 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/grok/execution/GrokProjectionResultSink.ts',
       'src/providers/grok/execution/GrokSessionConfigState.ts',
       'src/providers/kimicode/runtime/KimicodeChatRuntime.ts',
-      'src/providers/mimocode/runtime/MimocodeChatRuntime.ts',
+      // MiMoCode chat execution, flipped: the third ACP provider on the kernel,
+      // and the isolated session its four metadata surfaces now share. It added
+      // nothing to the shared platform below — the only file here that is not a
+      // name-and-launch difference is the session config state, and that is
+      // MiMoCode's own settings rather than its protocol.
+      'src/app/execution/mimocode/MimocodeExecutionComposition.ts',
+      'src/app/execution/mimocode/MimocodeMetadataSession.ts',
+      'src/providers/mimocode/MimocodeProviderModule.ts',
+      'src/providers/mimocode/app/MimocodeModuleContext.ts',
+      'src/providers/mimocode/execution/MimocodeAcpDynamicConfig.ts',
+      'src/providers/mimocode/execution/MimocodeAcpFileSystem.ts',
+      'src/providers/mimocode/execution/MimocodeContentPresenter.ts',
+      'src/providers/mimocode/execution/MimocodeExecutionBackend.ts',
+      'src/providers/mimocode/execution/MimocodeExecutionRequests.ts',
+      'src/providers/mimocode/execution/MimocodeInteractionBridge.ts',
+      'src/providers/mimocode/execution/MimocodeInteractionPresenter.ts',
+      'src/providers/mimocode/execution/MimocodePermissionPresentation.ts',
+      'src/providers/mimocode/execution/MimocodeProjectionResultSink.ts',
+      'src/providers/mimocode/execution/MimocodeSessionConfigState.ts',
       // The shared managed-ACP platform, live since OpenCode's flip and
       // inherited by the five ACP providers that follow it — the backend
       // itself since wave 5, which found that three lines of it were ever
@@ -717,33 +735,6 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // M5. The transport, the launcher and the client adapter beside it went
       // live with OpenCode's flip and are listed as wired.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
-      // Wave 6, built ahead of its own flip: MiMoCode's module and the
-      // descriptor its backend runs under. Dark until `registration.ts` points
-      // `createRuntime` at the composition, which is a later checkpoint —
-      // listed here so "unreachable" stays something someone stated rather than
-      // a gap nobody noticed.
-      'src/providers/mimocode/MimocodeProviderModule.ts',
-      'src/providers/mimocode/execution/MimocodeExecutionBackend.ts',
-      // The provider-owned parts the composition will be built from. Dark for
-      // the same reason and until the same commit. Two are missing from this
-      // list on purpose: `MimocodePermissionPresentation.ts` and
-      // `MimocodeSessionConfigState.ts` were moved out of the legacy runtime
-      // rather than written beside it, so that runtime imports them and they
-      // are reachable the moment they exist.
-      'src/providers/mimocode/execution/MimocodeAcpDynamicConfig.ts',
-      'src/providers/mimocode/execution/MimocodeAcpFileSystem.ts',
-      'src/providers/mimocode/execution/MimocodeInteractionBridge.ts',
-      'src/providers/mimocode/execution/MimocodeInteractionPresenter.ts',
-      'src/providers/mimocode/execution/MimocodeProjectionResultSink.ts',
-      'src/providers/mimocode/execution/MimocodeContentPresenter.ts',
-      'src/providers/mimocode/execution/MimocodeExecutionRequests.ts',
-      // The composition itself, and the two things only it constructs. Dark
-      // until `main.ts` builds a `MimocodeExecution` and `registration.ts`
-      // points `createRuntime` at it — one commit, revertible, which is why
-      // the whole assembly can exist and be tested before it does.
-      'src/app/execution/mimocode/MimocodeExecutionComposition.ts',
-      'src/app/execution/mimocode/MimocodeMetadataSession.ts',
-      'src/providers/mimocode/app/MimocodeModuleContext.ts',
     ],
   },
 ];
