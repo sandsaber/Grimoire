@@ -5369,6 +5369,51 @@ failure, and the next person to see one here should know it is the second.
 Gates: unit 490 suites / 7,734 tests, integration 5 suites / 145 tests (47
 env-gated skips), typecheck, `eslint`, `build:release`.
 
+### The MiMoCode live run: five green, eight red, and the reason is not the flip (this commit)
+
+The harness exists, it ran against a real `mimo acp`, and it is the first live
+matrix that mostly failed. That is the honest result and it is recorded as one:
+`docs/mimocode-flip-smoke-matrix.md` has a Record row saying which rows passed,
+which failed, and why.
+
+**Every failing row fails for the same reason: this account cannot generate.**
+Every turn returns `end_turn` with zero tokens, and the surface shows *"The
+provider ended the turn without producing a result."* Rows 1, 2, 5, 7, 8, 12,
+13 and 15 all need an answer, and there is none to look at.
+
+Two independent controls say this is the account rather than the integration.
+The wire recording was taken from `mimo acp` **directly**, with no Grimoire in
+the path, and shows the same empty turn — which is why it has said
+`coverage: partial` since it was taken. And row 1 of OpenCode's harness, the
+same code on the same machine, returned thinking, text and usage in the same
+session as MiMoCode's failures.
+
+**What did pass is not nothing.** Row 6 stopped a running turn and left no agent
+behind. Row 9 produced the pre-dispatch failure sentence for a session that no
+longer exists. Row 8 resumed the conversation and got back *the same session id
+it was told* — the resume path, the database carried per conversation, and the
+kernel's session binding, all confirmed against the real CLI. Row 17 filled the
+catalog with 16 models from an empty vault and row 18 listed 103 announced
+commands, both through the isolated metadata session that replaced four
+constructed runtimes.
+
+The harness gained one thing OpenCode's does not have: `summarize` now renders
+an `error` chunk's text instead of the bare word `error`. Without it the first
+run reported twelve rows of `["usage","usage","error"]` and said nothing about
+why — the sentence that named the cause was in the chunk it was dropping.
+
+`liveMatrixRecords.test.ts` now reads five matrices, and MiMoCode's date is
+2026-08-22. The date answers "when did this last run", not "did it pass" — which
+is what that gate has always meant, and this is the first row that makes the
+difference visible.
+
+`docs/manual-smoke-instructions.md` deliberately leaves MiMoCode out: asking a
+person to check whether a tool card renders, in a build where no turn produces
+one, would waste their hour.
+
+Gates: unit 490 suites / 7,736 tests, integration 5 suites / 145 tests (59
+env-gated skips), typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -5394,12 +5439,18 @@ are live, because both were moved out of `MimocodeChatRuntime` rather than writt
 Grok and MiMoCode — five. `MimocodeChatRuntime` is deleted, the four metadata surfaces share one
 isolated session, and the eleven modules that replaced it are listed as wired in the parity manifest.
 
-**What is left for MiMoCode:** a live smoke harness under
-`tests/integration/app/execution/mimocode/`, env-gated like the other four (`GRIMOIRE_MIMOCODE_LIVE=1`),
-plus a `docs/mimocode-flip-smoke-matrix.md` and a row in `liveMatrixRecords.test.ts`. The harness
-matters more here than for the others: MiMoCode's wire recording is partial, so the answer traffic
-this flip assumes has never been observed from `mimo` itself. Then Kimi Code, which is wave 6's
-second half and starts from the same partial position.
+**What is left for MiMoCode: an account that generates.** The harness, the matrix and the record all
+exist and the run happened — five rows green, eight red because no turn produces an answer on this
+account. Everything up to the answer is confirmed against the real CLI. One headless run on a
+generating account settles rows 1, 2, 5, 6, 7, 8, 12, 13 and 15; until then MiMoCode is flipped but
+**not certified**, and the matrix says so in its own Record table rather than in this file only.
+
+**Next: Kimi Code**, wave 6's second half, which starts from the same partial position — its wire
+recording is `partial` too, for a different reason (that machine is not logged in). Expect the same
+shape of derivation: module and descriptor, the provider-owned parts, the composition, the flip, the
+harness. Two techniques carried forward from MiMoCode — the normalized diff (`sed` both providers'
+names to one token, then diff, so only real differences remain) and breaking the composition in five
+or six places before trusting a derived test suite.
 
 Two techniques worth repeating on the next provider. The normalized diff — `sed` both files' provider
 names to one token and diff — is what made the config-state move safe to do mechanically. And break

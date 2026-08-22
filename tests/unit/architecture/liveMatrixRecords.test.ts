@@ -53,6 +53,7 @@ describe('live smoke matrix records', () => {
       'claude-flip-smoke-matrix.md',
       'codex-flip-smoke-matrix.md',
       'grok-flip-smoke-matrix.md',
+      'mimocode-flip-smoke-matrix.md',
       'opencode-flip-smoke-matrix.md',
     ]);
   });
@@ -90,6 +91,10 @@ describe('live smoke matrix records', () => {
       'claude-flip-smoke-matrix.md: 2026-08-21',
       'codex-flip-smoke-matrix.md: 2026-08-21',
       'grok-flip-smoke-matrix.md: 2026-08-21',
+      // Run, and mostly red — for a reason the matrix states rather than the
+      // flip: that account cannot generate. A date here is "when did this last
+      // run", not "did it pass".
+      'mimocode-flip-smoke-matrix.md: 2026-08-22',
       'opencode-flip-smoke-matrix.md: 2026-08-21',
     ]);
   });

@@ -1,13 +1,19 @@
 # The manual half of the smoke matrices — how to run it
 
-Four providers execute through the kernel: Codex, Claude, OpenCode and Grok. Each has a matrix, and
-each matrix has two halves. **The half that runs itself is already run** — a real CLI, real turns,
-the flipped path end to end, recorded in each matrix's own Record table. This document is the other
-half: the rows that need a person, because they are about what the screen shows or about actions
-only a hand can take.
+Five providers execute through the kernel: Codex, Claude, OpenCode, Grok and MiMoCode. Each has a
+matrix, and each matrix has two halves. **The half that runs itself is already run** — a real CLI,
+real turns, the flipped path end to end, recorded in each matrix's own Record table. This document is
+the other half: the rows that need a person, because they are about what the screen shows or about
+actions only a hand can take.
 
 Nothing here needs a developer. It needs Obsidian, a vault you do not mind writing into, and about
-an hour for all four providers.
+an hour for all four providers below.
+
+**MiMoCode is not in this document, and not because it was forgotten.** Its automated half ran and
+mostly failed: the account cannot generate, so no turn produces an answer to look at. Asking someone
+to check whether a tool card renders would waste their hour. Read
+[`docs/mimocode-flip-smoke-matrix.md`](mimocode-flip-smoke-matrix.md) — an account that generates is
+the one thing it needs.
 
 ## Before you start
 
