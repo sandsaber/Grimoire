@@ -5285,6 +5285,48 @@ control record unhashed.
 
 Gates: unit 490 suites / 7,756 tests, typecheck, `eslint`.
 
+### Wave 6: the composition, dark, and a harness that had been lying (this commit)
+
+`MimocodeExecutionComposition`, `MimocodeMetadataSession` and
+`MimocodeModuleContext`, all dark and all attributed. Nothing constructs a
+`MimocodeExecution`: `registration.ts` still points `createRuntime` at
+`MimocodeChatRuntime`, and the flip is the next checkpoint and one commit.
+
+**The composition test runs before the flip, not after.** A flip that has to be
+reverted to be tested is a flip nobody will revert, so the 21-case seam suite
+drives whole turns through the assembled composition with a fake ACP client as
+the only stand-in — the launch, the prompt, the permission, the session config,
+the resume, the metadata process, the MCP restart. What the fake answers with is
+the recorded session's own: the model id, the `build` mode and the 1 MiB window
+`mimo acp` reported. Not the turn's answer, which that account cannot generate;
+those chunks are the protocol's shape and the header says so.
+
+Two header claims corrected on the way through: the derived file called itself
+**Flipped** and "the first ACP provider to reach the kernel". It is neither. And
+two reference prefixes — `ocreq`, `ocix` — survived the name substitution
+because a substitution only reads words; two providers minting `ocreq` would be
+two stores answering to one prefix in a debug log.
+
+**Six breaks, four caught, and the two misses were the point.** Allowing a write
+on a session no open tab owns changed nothing red, and neither did pushing the
+session's own default agent at the toolbar. Tests were written for both — and
+the first refused to fail even then, because the harness ran on `full_access`,
+where every write is allowed before anyone is asked.
+
+**Which uncovered the real find.** The second test still would not fail, and the
+reason was the harness: its fake plugin has no `saveSettings` and no
+`getAllViews`, both of which the session-open handler calls. It threw halfway,
+the composition caught and logged it as designed, and every test in the file had
+been running against a *half-applied* session — models seeded, modes never asked
+about. Which reads exactly like a composition that never asks about modes.
+
+That harness is derived from OpenCode's, and OpenCode is **flipped and live**.
+Its suite had the same hole; Grok's, written later, does not. Both are fixed
+here, and OpenCode's 19 cases still pass with the handler running to the end —
+so the gap cost coverage rather than correctness.
+
+Gates: unit 491 suites / 7,777 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -5306,14 +5348,24 @@ the permission vocabulary, the projection result sink and the session config sta
 attributed in the manifest; `MimocodePermissionPresentation.ts` and `MimocodeSessionConfigState.ts`
 are live, because both were moved out of `MimocodeChatRuntime` rather than written beside it.
 
-**What is left before the MiMoCode flip:** `MimocodeExecutionComposition` in
-`src/app/execution/mimocode/` (derive from `OpencodeExecutionComposition.ts`, 36 KB, plus
-`OpencodeMetadataSession.ts`), then the flip itself as one revertible commit pointing
-`registration.ts` at `plugin.getMimocodeExecution().createRuntime()`, then a live smoke harness and
-matrix. Derive from OpenCode's — `AGENTS.md` requires these two to stay in step — and read every
-derived file end to end, because a derived file inherits claims along with code. The normalized diff
-that made the config-state move safe is the technique worth repeating: `sed` the provider names to a
-common token in both files and diff, so what is left is only what actually differs.
+**The whole assembly exists and is tested; only the flip is left.** Eleven modules — eight under
+`src/providers/mimocode/execution/`, plus `MimocodeExecutionComposition`, `MimocodeMetadataSession`
+and `MimocodeModuleContext`. Nine are dark and attributed in the manifest;
+`MimocodePermissionPresentation.ts` and `MimocodeSessionConfigState.ts` are live, because both were
+moved out of `MimocodeChatRuntime` rather than written beside it.
+
+**What is left before the MiMoCode flip:** one revertible commit that adds a `mimocodeExecution` to
+`main.ts` (constructed and registered beside the other three, backend registration included) and
+points `registration.ts` at `plugin.getMimocodeExecution().createRuntime()`, deleting
+`MimocodeChatRuntime` and moving the four metadata surfaces
+(`MimocodeSettingsTab`, `MimocodeChatUIConfig`, `MimocodeWorkspaceServices`,
+`MimocodeRuntimeCommandLoader`) onto `execution.metadata`. Then a live smoke harness under
+`tests/integration/app/execution/mimocode/`, env-gated like the other four, and a matrix doc.
+
+Two techniques worth repeating on the next provider. The normalized diff — `sed` both files' provider
+names to one token and diff — is what made the config-state move safe to do mechanically. And break
+the composition in five or six places *before* trusting a derived test suite: this wave's most
+valuable finding came from a break that refused to go red.
 
 ### Where the session of 2026-08-21 ended
 

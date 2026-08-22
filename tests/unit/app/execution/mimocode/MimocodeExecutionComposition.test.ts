@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { OpencodeExecution } from '@/app/execution/opencode/OpencodeExecutionComposition';
+import { MimocodeExecution } from '@/app/execution/mimocode/MimocodeExecutionComposition';
 import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
 import { executionSessionId, type InteractionId, runId } from '@/core/execution/ExecutionIds';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
@@ -23,15 +23,15 @@ import type {
   AcpRequestPermissionResponse,
   AcpSessionNotification,
 } from '@/providers/acp/types';
-import { OpencodeContentPresenter } from '@/providers/opencode/execution/OpencodeContentPresenter';
-import { OPENCODE_EXECUTION_DESCRIPTOR } from '@/providers/opencode/execution/OpencodeExecutionBackend';
+import { MimocodeContentPresenter } from '@/providers/mimocode/execution/MimocodeContentPresenter';
+import { MIMOCODE_EXECUTION_DESCRIPTOR } from '@/providers/mimocode/execution/MimocodeExecutionBackend';
 import {
-  getOpencodeProviderSettings,
-  updateOpencodeProviderSettings,
-} from '@/providers/opencode/settings';
+  getMimocodeProviderSettings,
+  updateMimocodeProviderSettings,
+} from '@/providers/mimocode/settings';
 
 /**
- * The half of the OpenCode flip that only exists in production.
+ * The half of the MiMoCode flip that only exists in production.
  *
  * The backend takes three opaque references — the turn, the process to spawn,
  * the session config to apply — and knows what is inside none of them. This
@@ -40,13 +40,19 @@ import {
  *
  * So this drives a whole turn with a fake ACP client as the only stand-in, and
  * asserts the thing the three reference spaces exist for: that the process the
- * launcher would spawn is `opencode acp`, under the config the artifacts just
+ * launcher would spawn is `mimo acp`, under the config the artifacts just
  * wrote, resolved from the reference the turn minted.
+ *
+ * Run before the flip rather than after, because a flip that has to be reverted
+ * to be tested is a flip nobody will revert. What the fake answers with is the
+ * recorded session's own — the model id, the `build` mode and the 1 MiB window
+ * `mimo acp` reported — except the turn's answer, which that account cannot
+ * generate; those chunks are the protocol's shape.
  */
-describe('OpenCode execution composition', () => {
+describe('MiMoCode execution composition', () => {
   const SESSION_ID = executionSessionId(`es-${'2'.repeat(32)}`);
   const RUN_ID = runId(`run-${'2'.repeat(32)}`);
-  const OWNER = { kind: 'conversation' as const, ownerId: 'opencode-tab' };
+  const OWNER = { kind: 'conversation' as const, ownerId: 'mimocode-tab' };
 
   const vaults: string[] = [];
 
@@ -57,7 +63,7 @@ describe('OpenCode execution composition', () => {
   });
 
   function createPlugin(): any {
-    const vault = mkdtempSync(join(tmpdir(), 'grimoire-opencode-composition-'));
+    const vault = mkdtempSync(join(tmpdir(), 'grimoire-mimocode-composition-'));
     vaults.push(vault);
     const settings: Record<string, unknown> = {
       permissionMode: 'full_access',
@@ -65,19 +71,19 @@ describe('OpenCode execution composition', () => {
       userName: 'Michael',
       mediaFolder: 'media',
     };
-    updateOpencodeProviderSettings(settings, { enabled: true });
+    updateMimocodeProviderSettings(settings, { enabled: true });
     return {
       settings,
       manifest: { version: '1.2.3' },
       app: { vault: { adapter: { basePath: vault } } },
-      getResolvedProviderCliPath: () => '/usr/local/bin/opencode',
+      getResolvedProviderCliPath: () => '/usr/local/bin/mimo',
       getActiveEnvironmentVariables: () => '',
       recordDebugLog: () => undefined,
-      // Both are called by the session sync this harness drives. Without them
-      // the handler that seeds the tab throws halfway, the composition catches
-      // it and logs, and every test here ran against a half-applied session —
-      // the models seeded, the modes never asked about. Grok's harness has had
-      // them since its own flip; this one had not.
+      // Both are called by the session sync, and a plugin without them throws
+      // inside the handler that seeds the tab. The composition catches that and
+      // logs it, so what a test sees is a half-applied session — the models
+      // seeded, the modes not — which reads exactly like a composition that
+      // never asked about modes. Present here so the handler runs to the end.
       saveSettings: async () => undefined,
       getAllViews: () => [],
     };
@@ -135,11 +141,15 @@ describe('OpenCode execution composition', () => {
               }
               : {}),
             models: {
-              availableModels: [{ id: 'opencode/big-pickle', name: 'Big Pickle' }],
-              currentModelId: 'opencode/big-pickle',
+              availableModels: [{ id: 'xiaomi/mimo-v2.5-pro-ultraspeed', name: 'Xiaomi/MiMo-V2.5-Pro-UltraSpeed' }],
+              currentModelId: 'xiaomi/mimo-v2.5-pro-ultraspeed',
             },
             modes: {
-              availableModes: [{ id: 'build', name: 'Build' }],
+              availableModes: [{
+                id: 'build',
+                name: 'build',
+                description: 'Executes tools based on configured permissions.',
+              }],
               currentModeId: 'build',
             },
           }),
@@ -149,12 +159,15 @@ describe('OpenCode execution composition', () => {
               throw new JsonRpcErrorResponse('session/load', -32603, 'session not found');
             }
             if (options.sessionLoadFails) {
-              // What OpenCode 1.18.18 actually answers for a session it does
-              // not have: nothing about the session at all.
+              // The shape OpenCode 1.18.18 answers with for a session it does
+              // not have — nothing about the session at all. Kept for MiMoCode
+              // because it is a fork of that CLI and the recording could not
+              // reach this path: what matters to the assertion is that the
+              // error names no session, not which vendor phrased it.
               throw new JsonRpcErrorResponse(
                 'session/load',
                 -32603,
-                'Internal error: OpenCode service failure',
+                'Internal error: MiMoCode service failure',
                 { service: 'session' },
               );
             }
@@ -192,8 +205,8 @@ describe('OpenCode execution composition', () => {
               sessionId: 'acp-session-1',
               update: {
                 sessionUpdate: 'usage_update',
-                used: 16_964,
-                size: 200_000,
+                used: 104_857,
+                size: 1_048_576,
                 cost: { amount: 0.25, currency: 'USD' },
               },
             });
@@ -239,7 +252,7 @@ describe('OpenCode execution composition', () => {
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
   } = {}): Promise<{
-    execution: OpencodeExecution;
+    execution: MimocodeExecution;
     host: ExecutionKernelHost;
     startupRefs: string[];
     prompts: unknown[];
@@ -255,14 +268,14 @@ describe('OpenCode execution composition', () => {
         clearTimeout: handle => clearTimeout(handle as NodeJS.Timeout),
       },
     });
-    const execution = new OpencodeExecution(options.plugin ?? createPlugin(), host.registry);
+    const execution = new MimocodeExecution(options.plugin ?? createPlugin(), host.registry);
     const {
       factory, startupRefs, prompts, permissions, configOptions, loadRequests,
     } = createFakeAcp(options);
     host.registerBackend(execution.createBackendRegistration(factory));
     await host.start();
     await host.registry.createSession({
-      backendId: OPENCODE_EXECUTION_DESCRIPTOR.backendId,
+      backendId: MIMOCODE_EXECUTION_DESCRIPTOR.backendId,
       executionSessionId: SESSION_ID,
       owner: OWNER,
     });
@@ -287,6 +300,16 @@ describe('OpenCode execution composition', () => {
       await new Promise(resolve => { setTimeout(resolve, 5); });
     }
     throw new Error('No interaction was opened.');
+  }
+
+  async function waitFor(predicate: () => boolean): Promise<void> {
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      if (predicate()) {
+        return;
+      }
+      await new Promise(resolve => { setTimeout(resolve, 5); });
+    }
+    throw new Error('The session configuration never settled.');
   }
 
   async function settle(
@@ -335,8 +358,8 @@ describe('OpenCode execution composition', () => {
     const { execution, host, events } = await createHarness();
     const costs: unknown[] = [];
     const opened: unknown[] = [];
-    const presenter = new OpencodeContentPresenter({
-      displayModel: () => 'opencode/big-pickle',
+    const presenter = new MimocodeContentPresenter({
+      displayModel: () => 'xiaomi/mimo-v2.5-pro-ultraspeed',
       onCost: cost => costs.push(cost),
       onSessionOpened: opening => opened.push(opening),
     });
@@ -371,8 +394,8 @@ describe('OpenCode execution composition', () => {
       expect.objectContaining({
         sessionId: 'acp-session-1',
         usage: expect.objectContaining({
-          contextWindow: 200_000,
-          contextTokens: 16_964,
+          contextWindow: 1_048_576,
+          contextTokens: 104_857,
           inputTokens: 15_940,
         }),
       }),
@@ -382,7 +405,7 @@ describe('OpenCode execution composition', () => {
     // says once and nothing repeats.
     expect(opened).toEqual([expect.objectContaining({
       sessionId: 'acp-session-1',
-      models: expect.objectContaining({ currentModelId: 'opencode/big-pickle' }),
+      models: expect.objectContaining({ currentModelId: 'xiaomi/mimo-v2.5-pro-ultraspeed' }),
       modes: expect.objectContaining({ currentModeId: 'build' }),
     })]);
     expect(presenter.lastSessionId()).toBe('acp-session-1');
@@ -415,7 +438,7 @@ describe('OpenCode execution composition', () => {
     expect(execution.interactionBridge.presentation(opened.presentationRef))
       .toEqual(expect.objectContaining({
         toolName: 'bash',
-        description: 'OpenCode wants to run a shell command.',
+        description: 'MiMoCode wants to run a shell command.',
         options: [
           { responseId: 'allow-once', label: 'Allow', presentation: 'allow' },
           { responseId: 'reject-once', label: 'Deny', presentation: 'reject' },
@@ -483,7 +506,7 @@ describe('OpenCode execution composition', () => {
   });
 
   it('says what a turn that never started needs the person to do', async () => {
-    // OpenCode answers an unknown session with a generic service failure, and
+    // MiMoCode answers an unknown session with a generic service failure, and
     // the resume policy keeps a binding rather than replacing it on an error
     // that vague — so without provider wording the conversation repeats the
     // neutral sentence on every turn with nothing to act on.
@@ -533,7 +556,7 @@ describe('OpenCode execution composition', () => {
 
     expect(asked).toEqual([{
       toolName: 'bash',
-      description: 'OpenCode wants to run a shell command.',
+      description: 'MiMoCode wants to run a shell command.',
     }]);
     // What the tab chose, in the agent's own vocabulary: the point of the
     // bridge is that this arrives as a permission rather than as a chunk.
@@ -544,8 +567,70 @@ describe('OpenCode execution composition', () => {
     await host.dispose();
   });
 
+  it('refuses a write on a session no open tab answers for', async () => {
+    const plugin = createPlugin();
+    // Not full access: that mode allows every write before anyone is asked, so
+    // a harness left on it cannot see this decision at all. The mode is pinned
+    // as well as set, because a fresh vault takes its selected mode from the
+    // first session that opens — and `mimo acp` opens in `build`, which is
+    // auto-approve.
+    plugin.settings.permissionMode = 'plan';
+    updateMimocodeProviderSettings(plugin.settings, { selectedMode: 'plan' });
+    const { execution, host } = await createHarness({ plugin });
+    const runtime = execution.createRuntime();
+    const approval = jest.fn(async () => 'allow' as const);
+    runtime.setApprovalCallback(approval);
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    // The client factory is one process for every tab, so the tab is found by
+    // the session the write arrived on. A session no tab owns has nobody to
+    // ask, and the safe way to be wrong is to refuse.
+    await expect((execution as any).approveWrite({
+      sessionId: 'acp-session-nobody-owns',
+      requestPath: 'note.md',
+      resolvedPath: '/vault/note.md',
+    })).resolves.toBe(false);
+    expect(approval).not.toHaveBeenCalled();
+
+    // The session this tab did open is answered by this tab.
+    await expect((execution as any).approveWrite({
+      sessionId: 'acp-session-1',
+      requestPath: 'note.md',
+      resolvedPath: '/vault/note.md',
+    })).resolves.toBe(true);
+    expect(approval).toHaveBeenCalledTimes(1);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('does not push the default agent a new session reports at the toolbar', async () => {
+    const plugin = createPlugin();
+    // The user's pick, which the session's own `build` must not overwrite.
+    plugin.settings.permissionMode = 'plan';
+    const { execution, host } = await createHarness({ plugin });
+    const runtime = execution.createRuntime();
+    const synced: string[] = [];
+    (runtime as unknown as {
+      setPermissionModeSyncCallback: (callback: (mode: string) => void) => void;
+    }).setPermissionModeSyncCallback(mode => synced.push(mode));
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+    // The session sync is started by the content channel and settled off the
+    // turn, so waiting for the turn is not waiting for it. Waited for by the
+    // thing the same call seeds — otherwise an empty `synced` only means the
+    // sync had not run yet, which every wrong version of this would also pass.
+    await waitFor(() => getMimocodeProviderSettings(plugin.settings).availableModes.length > 0);
+
+    // `session/new` answers with MiMoCode's default agent, not a switch: the
+    // toolbar would flip from Plan to Auto-approve before the turn applied the
+    // mode the tab is actually set to.
+    expect(synced).toEqual([]);
+    execution.dispose();
+    await host.dispose();
+  });
+
   it('learns the vault models from the session the turn opened', async () => {
-    // An OpenCode vault learns what its models are by opening a session and
+    // A MiMoCode vault learns what its models are by opening a session and
     // being told; nothing else answers that question.
     const plugin = createPlugin();
     const { execution, host } = await createHarness({ plugin });
@@ -553,15 +638,15 @@ describe('OpenCode execution composition', () => {
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
 
-    expect(getOpencodeProviderSettings(plugin.settings).discoveredModels)
-      .toEqual([expect.objectContaining({ rawId: 'opencode/big-pickle' })]);
+    expect(getMimocodeProviderSettings(plugin.settings).discoveredModels)
+      .toEqual([expect.objectContaining({ rawId: 'xiaomi/mimo-v2.5-pro-ultraspeed' })]);
     execution.dispose();
     await host.dispose();
   });
 
   it('dispatches the turn under the mode the tab is set to', async () => {
     const plugin = createPlugin();
-    updateOpencodeProviderSettings(plugin.settings, { selectedMode: 'plan' });
+    updateMimocodeProviderSettings(plugin.settings, { selectedMode: 'plan' });
     plugin.settings.permissionMode = 'plan';
     const { execution, host, configOptions } = await createHarness({ plugin });
     const runtime = execution.createRuntime();
@@ -582,7 +667,7 @@ describe('OpenCode execution composition', () => {
   it('forces the Claude prompt flag while preserving the project config flag', async () => {
     const plugin = createPlugin();
     plugin.settings.sharedEnvironmentVariables =
-      'OPENCODE_DISABLE_PROJECT_CONFIG=false\nOPENCODE_DISABLE_CLAUDE_CODE_PROMPT=false';
+      'MIMOCODE_DISABLE_PROJECT_CONFIG=false\nMIMOCODE_DISABLE_CLAUDE_CODE_PROMPT=false';
     const { execution, host } = await createHarness({ plugin });
 
     const invocation = await execution.turnRequests.resolve(execution.turnRequests.reference({
@@ -590,24 +675,24 @@ describe('OpenCode execution composition', () => {
     }));
     const launch = await execution.turnRequests.resolveLaunch(invocation.startupRef);
 
-    // The vault's own OpenCode variables are honoured; the one Grimoire owns —
-    // OpenCode reading Claude's prompt files — is not negotiable.
-    expect(launch.environment.OPENCODE_DISABLE_PROJECT_CONFIG).toBe('false');
-    expect(launch.environment.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT).toBe('true');
+    // The vault's own MiMoCode variables are honoured; the one Grimoire owns —
+    // MiMoCode reading Claude's prompt files — is not negotiable.
+    expect(launch.environment.MIMOCODE_DISABLE_PROJECT_CONFIG).toBe('false');
+    expect(launch.environment.MIMOCODE_DISABLE_CLAUDE_CODE_PROMPT).toBe('true');
     execution.dispose();
     await host.dispose();
   });
 
   it('asks its questions in a process bound to no conversation', async () => {
     // The four surfaces that ask what models exist must not bind a session to
-    // a tab or write OpenCode state into the vault while they do it.
+    // a tab or write MiMoCode state into the vault while they do it.
     const { execution, host, startupRefs } = await createHarness();
 
     await execution.metadata.discoverMetadata();
 
     expect(startupRefs).toHaveLength(1);
     const launch = await execution.turnRequests.resolveLaunch(startupRefs[0]);
-    expect(launch.environment.OPENCODE_DB).toBe(':memory:');
+    expect(launch.environment.MIMOCODE_DB).toBe(':memory:');
     expect(launch.arguments).toEqual(['acp']);
     execution.dispose();
     await host.dispose();
@@ -627,7 +712,7 @@ describe('OpenCode execution composition', () => {
     }));
     const launch = await execution.turnRequests.resolveLaunch(invocation.startupRef);
 
-    expect(launch.environment.OPENCODE_DB).toBe(other);
+    expect(launch.environment.MIMOCODE_DB).toBe(other);
     execution.dispose();
     await host.dispose();
   });
@@ -713,7 +798,7 @@ describe('OpenCode execution composition', () => {
   it('resolves the startup reference into the process a launcher would spawn', async () => {
     // The three reference spaces are the point of this composition, and this is
     // where they meet: the turn mints a startup reference, and what it stands
-    // for is `opencode acp` under the config file the artifacts wrote for that
+    // for is `mimocode acp` under the config file the artifacts wrote for that
     // same turn. A launch built anywhere else would run the previous turn's
     // configuration.
     const { execution, host, startupRefs, events } = await createHarness();
@@ -732,11 +817,11 @@ describe('OpenCode execution composition', () => {
     expect(startupRefs).toHaveLength(1);
     const launch = await execution.turnRequests.resolveLaunch(startupRefs[0]);
     expect(launch).toMatchObject({
-      executable: '/usr/local/bin/opencode',
+      executable: '/usr/local/bin/mimo',
       arguments: ['acp'],
     });
-    expect(launch.environment.OPENCODE_CONFIG).toContain('.grimoire');
-    expect(launch.environment.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT).toBe('true');
+    expect(launch.environment.MIMOCODE_CONFIG).toContain('.grimoire');
+    expect(launch.environment.MIMOCODE_DISABLE_CLAUDE_CODE_PROMPT).toBe('true');
     execution.dispose();
     await host.dispose();
   });

@@ -737,6 +737,13 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/mimocode/execution/MimocodeProjectionResultSink.ts',
       'src/providers/mimocode/execution/MimocodeContentPresenter.ts',
       'src/providers/mimocode/execution/MimocodeExecutionRequests.ts',
+      // The composition itself, and the two things only it constructs. Dark
+      // until `main.ts` builds a `MimocodeExecution` and `registration.ts`
+      // points `createRuntime` at it — one commit, revertible, which is why
+      // the whole assembly can exist and be tested before it does.
+      'src/app/execution/mimocode/MimocodeExecutionComposition.ts',
+      'src/app/execution/mimocode/MimocodeMetadataSession.ts',
+      'src/providers/mimocode/app/MimocodeModuleContext.ts',
     ],
   },
 ];
