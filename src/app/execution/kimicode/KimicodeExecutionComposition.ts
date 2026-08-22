@@ -86,10 +86,8 @@ const METADATA_DATABASE = ':memory:';
 /**
  * Kimi Code chat execution, assembled from the running plugin.
  *
- * **Dark.** Nothing constructs this yet: `registration.ts` still points
- * `createRuntime` at `KimicodeChatRuntime`, `main.ts` builds no
- * `KimicodeExecution`, and the legacy runtime is still what a Kimi Code tab
- * runs on. The flip is a later checkpoint and one revertible commit.
+ * **Flipped.** `registration.ts` points `createRuntime` here, `main.ts`
+ * constructs one per load, and `KimicodeChatRuntime` is gone.
  *
  * The fourth ACP provider on the kernel, and the third in a row to add nothing
  * to the shared stack: the client adapter, the transport, the process launcher

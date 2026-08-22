@@ -2,17 +2,26 @@ import type {
   ProviderRuntimeCommandLoader,
   ProviderRuntimeCommandLoaderContext,
 } from '../../../core/providers/types';
-import { KimicodeChatRuntime } from '../runtime/KimicodeChatRuntime';
+import type { SlashCommand } from '../../../core/types';
 import { getKimicodeProviderSettings } from '../settings';
-
-const KIMICODE_METADATA_WARMUP_DB = ':memory:';
 
 export class KimicodeRuntimeCommandLoader implements ProviderRuntimeCommandLoader {
   isAvailable(settings: Record<string, unknown>): boolean {
     return getKimicodeProviderSettings(settings).enabled;
   }
 
-  async loadCommands(context: ProviderRuntimeCommandLoaderContext) {
+  /**
+   * The commands the tab can offer, from the session it is on or from one
+   * opened to ask.
+   *
+   * A live tab runtime answers from the session it already holds — the ACP
+   * agent announced them when that session opened. Anything else is a question
+   * with no session behind it, and it is asked in an isolated process rather
+   * than on the tab's own: a conversation with history and no session id must
+   * stay cold until its first send, or the session created to list commands is
+   * the one that turn resumes, and the history is never bootstrapped into it.
+   */
+  async loadCommands(context: ProviderRuntimeCommandLoaderContext): Promise<SlashCommand[]> {
     const shouldWarmBlankSession = context.allowSessionCreation === true
       && !context.conversation?.sessionId;
     const shouldWarmPreSessionConversation = !!context.conversation
@@ -28,53 +37,39 @@ export class KimicodeRuntimeCommandLoader implements ProviderRuntimeCommandLoade
       return [];
     }
 
-    // **Pre-flip by design.** OpenCode's flipped loader gates on an existing
-    // session and asks through an isolated metadata session; this one reuses a
-    // session-less tab runtime and opens a warmup ACP session on it, with an
-    // in-memory database so nothing persists. That difference is the legacy
-    // path, not a defect in it — Kimi Code has no kernel composition to ask yet,
-    // and porting the shape without the flip would mean maintaining two.
-    //
-    // Rebinding an already-live tab runtime to a history-backed conversation with
-    // no session id must stay cold until the first send. If command discovery
-    // creates a real session on that bound runtime, the first turn can skip
-    // history bootstrap. Keep this warmup isolated instead.
-    const canReuseRuntime = context.runtime?.providerId === 'kimicode'
-      && !shouldWarmPreSessionConversation;
-    const runtime = canReuseRuntime
-      ? context.runtime!
-      : new KimicodeChatRuntime(context.plugin);
+    // A live tab answers from the session it already holds — and only then. A
+    // blank tab has a runtime and no session, and asking it returns nothing at
+    // all, which is how a fresh tab ends up with an empty slash-command menu
+    // until the first message is sent.
+    const boundRuntime = context.runtime?.providerId === 'kimicode'
+      && !shouldWarmPreSessionConversation
+      && Boolean(context.runtime.getSessionId?.())
+      ? context.runtime
+      : null;
+    if (boundRuntime) {
+      return await boundRuntime.getSupportedCommands();
+    }
 
+    // Opportunistic, like every other question asked without a conversation: a
+    // plugin whose kernel has not started yet has no session to ask in, and a
+    // tab that cannot list commands must still open.
+    const announced = await this.announcedCommands(context);
+    return announced.map(command => ({
+      id: `kimicode:${command.name}`,
+      name: command.name,
+      // The provider owns the expansion; an empty template is the honest value.
+      content: '',
+      ...(command.description === undefined ? {} : { description: command.description }),
+    }));
+  }
+
+  private async announcedCommands(
+    context: ProviderRuntimeCommandLoaderContext,
+  ): Promise<readonly { readonly name: string; readonly description?: string }[]> {
     try {
-      if (context.conversation) {
-        runtime.syncConversationState(context.conversation, context.externalContextPaths);
-      } else if (shouldWarmBlankSession) {
-        // Blank-tab warmup uses an isolated in-memory session to fetch metadata
-        // without binding a persisted Kimi Code session to the tab.
-        runtime.syncConversationState({
-          providerState: { databasePath: KIMICODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-      }
-
-      // Wrapped, because this is the slash menu warming up. `ensureReady`
-      // launches a CLI, and a spawn failure there rejected all the way out
-      // through opening a menu — OpenCode's flipped loader answers an empty
-      // list instead, which is what a menu with nothing to show looks like.
-      const ready = await runtime.ensureReady({
-        allowSessionCreation: shouldWarmBlankSession || shouldWarmPreSessionConversation,
-      });
-      if (!ready) {
-        return [];
-      }
-
-      return await runtime.getSupportedCommands();
+      return await context.plugin.getKimicodeExecution().metadata.listCommands();
     } catch {
       return [];
-    } finally {
-      if (runtime !== context.runtime) {
-        runtime.cleanup();
-      }
     }
   }
 }

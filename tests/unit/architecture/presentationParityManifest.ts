@@ -592,7 +592,24 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/grok/execution/GrokPermissionPresentation.ts',
       'src/providers/grok/execution/GrokProjectionResultSink.ts',
       'src/providers/grok/execution/GrokSessionConfigState.ts',
-      'src/providers/kimicode/runtime/KimicodeChatRuntime.ts',
+      // Kimi Code chat execution, flipped: the fourth ACP provider on the
+      // kernel, and the third in a row to add nothing to the shared platform.
+      // What is its own is the launch and its mode ids, which the CLI names
+      // itself where its two siblings use Grimoire-minted ones.
+      'src/app/execution/kimicode/KimicodeExecutionComposition.ts',
+      'src/app/execution/kimicode/KimicodeMetadataSession.ts',
+      'src/providers/kimicode/KimicodeProviderModule.ts',
+      'src/providers/kimicode/app/KimicodeModuleContext.ts',
+      'src/providers/kimicode/execution/KimicodeAcpDynamicConfig.ts',
+      'src/providers/kimicode/execution/KimicodeAcpFileSystem.ts',
+      'src/providers/kimicode/execution/KimicodeContentPresenter.ts',
+      'src/providers/kimicode/execution/KimicodeExecutionBackend.ts',
+      'src/providers/kimicode/execution/KimicodeExecutionRequests.ts',
+      'src/providers/kimicode/execution/KimicodeInteractionBridge.ts',
+      'src/providers/kimicode/execution/KimicodeInteractionPresenter.ts',
+      'src/providers/kimicode/execution/KimicodePermissionPresentation.ts',
+      'src/providers/kimicode/execution/KimicodeProjectionResultSink.ts',
+      'src/providers/kimicode/execution/KimicodeSessionConfigState.ts',
       // MiMoCode chat execution, flipped: the third ACP provider on the kernel,
       // and the isolated session its four metadata surfaces now share. It added
       // nothing to the shared platform below — the only file here that is not a
@@ -735,28 +752,6 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // M5. The transport, the launcher and the client adapter beside it went
       // live with OpenCode's flip and are listed as wired.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
-      // Wave 6's second half, built ahead of its own flip: Kimi Code's module,
-      // the descriptor its backend runs under, and the provider-owned parts the
-      // composition will be built from. Dark until `registration.ts` points
-      // `createRuntime` at that composition. Two of its execution modules are
-      // missing from this list on purpose — `KimicodePermissionPresentation.ts`
-      // and `KimicodeSessionConfigState.ts` were moved out of the legacy runtime
-      // rather than written beside it, so that runtime imports them and they are
-      // reachable the moment they exist.
-      'src/providers/kimicode/KimicodeProviderModule.ts',
-      'src/providers/kimicode/execution/KimicodeAcpDynamicConfig.ts',
-      'src/providers/kimicode/execution/KimicodeAcpFileSystem.ts',
-      'src/providers/kimicode/execution/KimicodeContentPresenter.ts',
-      'src/providers/kimicode/execution/KimicodeExecutionBackend.ts',
-      'src/providers/kimicode/execution/KimicodeExecutionRequests.ts',
-      'src/providers/kimicode/execution/KimicodeInteractionBridge.ts',
-      'src/providers/kimicode/execution/KimicodeInteractionPresenter.ts',
-      'src/providers/kimicode/execution/KimicodeProjectionResultSink.ts',
-      // The composition and the two things only it constructs, dark until
-      // `main.ts` builds a `KimicodeExecution`.
-      'src/app/execution/kimicode/KimicodeExecutionComposition.ts',
-      'src/app/execution/kimicode/KimicodeMetadataSession.ts',
-      'src/providers/kimicode/app/KimicodeModuleContext.ts',
     ],
   },
 ];

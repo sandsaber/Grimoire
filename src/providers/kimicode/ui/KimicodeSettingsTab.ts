@@ -14,11 +14,9 @@ import { maybeGetKimicodeWorkspaceServices } from '../app/KimicodeWorkspaceServi
 import { clearKimicodeDiscoveryState } from '../discoveryState';
 import {
   buildKimicodeBaseModels,
-  encodeKimicodeModelId,
   type KimicodeDiscoveredModel,
   splitKimicodeModelLabel,
 } from '../models';
-import { KimicodeChatRuntime } from '../runtime/KimicodeChatRuntime';
 import {
   getKimicodeProviderSettings,
   KIMICODE_DEFAULT_ENVIRONMENT_VARIABLES,
@@ -28,7 +26,6 @@ import {
 import { KimicodeAgentSettings } from './KimicodeAgentSettings';
 
 const ALL_PROVIDERS_KEY = 'all';
-const KIMICODE_METADATA_WARMUP_DB = ':memory:';
 
 interface EnrichedModel {
   description: string;
@@ -251,20 +248,17 @@ export const kimicodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
     };
 
     const persistModelMetadata = async (rawId: string): Promise<void> => {
-      const runtime = new KimicodeChatRuntime(context.plugin);
       try {
-        runtime.syncConversationState({
-          providerState: { databasePath: KIMICODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-        const loaded = await runtime.warmModelMetadata(encodeKimicodeModelId(rawId));
+        // Opportunistic: a metadata session that cannot open leaves the
+        // question for the first chat turn, which asks it anyway.
+        const loaded = await context.plugin.getKimicodeExecution()
+          .metadata.discoverMetadata({ rawModelId: rawId });
         if (loaded) {
           context.refreshModelSelectors();
         }
       } catch {
-        // Metadata warmup is opportunistic; the first chat turn can still discover it.
-      } finally {
-        runtime.cleanup();
+        // Including a plugin whose kernel has not started: the settings tab
+        // opens either way.
       }
     };
 
@@ -556,13 +550,8 @@ export const kimicodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
       modelCatalogLoadFailed = false;
       renderAll();
 
-      const runtime = new KimicodeChatRuntime(context.plugin);
       try {
-        runtime.syncConversationState({
-          providerState: { databasePath: KIMICODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
+        const loaded = await context.plugin.getKimicodeExecution().metadata.discoverMetadata();
         modelCatalogLoadFailed = !loaded || getKimicodeProviderSettings(settingsBag).discoveredModels.length === 0;
         if (!modelCatalogLoadFailed) {
           context.refreshModelSelectors();
@@ -571,7 +560,6 @@ export const kimicodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
         modelCatalogLoadFailed = true;
       } finally {
         loadingModelCatalog = false;
-        runtime.cleanup();
         renderAll();
       }
     };

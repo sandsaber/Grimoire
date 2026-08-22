@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -42,7 +42,15 @@ describe('OpencodeAcpFileSystem', () => {
   });
 
   it('rejects workspace escape before approval or filesystem access', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'grimoire-opencode-contained-'));
+    // Two levels, and the outer one is why: the file this test tries to escape
+    // to lives *beside* the workspace, and `dirname(mkdtemp(tmpdir()))` is
+    // `/tmp` — shared. Three providers now run this same test with the same
+    // file name, in parallel, each removing it in its own `finally`. One suite
+    // then deletes another's file between its write and its read, which is a
+    // flake that only appears once a second provider has the test.
+    const enclosing = await mkdtemp(join(tmpdir(), 'grimoire-opencode-contained-'));
+    const root = join(enclosing, 'workspace');
+    await mkdir(root, { recursive: true });
     const outside = join(dirname(root), 'outside-secret.md');
     await writeFile(outside, 'secret', 'utf8');
     const approveWrite = jest.fn(async () => true);
@@ -63,8 +71,7 @@ describe('OpencodeAcpFileSystem', () => {
       expect(approveWrite).not.toHaveBeenCalled();
       expect('escape:rejected-before-approval').toBe(trace.cases.filesystemContainment[2]);
     } finally {
-      await rm(root, { recursive: true, force: true });
-      await rm(outside, { force: true });
+      await rm(enclosing, { recursive: true, force: true });
     }
   });
 });

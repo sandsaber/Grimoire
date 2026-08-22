@@ -5493,6 +5493,40 @@ this provider's own is the mode — `default`, which `modes.ts` names alongside
 
 Gates: unit 500 suites / 7,841 tests, typecheck, `eslint`, `build:release`.
 
+### The Kimi Code flip, and the flake finally caught (this commit)
+
+`registration.ts` points `createRuntime` at the composition, `main.ts`
+constructs and registers a `KimicodeExecution`, and `KimicodeChatRuntime.ts` is
+deleted with its test. Six providers now execute through the kernel: Codex,
+Claude, OpenCode, Grok, MiMoCode and Kimi Code. The four metadata surfaces moved
+onto one isolated session, as they did for MiMoCode.
+
+**The flake from two commits ago has a name and a cause.** It was
+`*AcpFileSystem › rejects workspace escape before approval or filesystem
+access`. That test creates a workspace with `mkdtemp(tmpdir())` and then writes
+the file it will try to escape to at `dirname(root)` — which is `/tmp`, shared.
+The file name is the same for every provider. With one provider that is
+harmless. Adding Kimi Code made three suites write and delete `/tmp/outside-secret.md`
+in parallel, each in its own `finally`, and one deletes another's file between
+its write and its read.
+
+That explains the single unreproducible failure recorded at the MiMoCode flip:
+that commit is the one that made it two. Fixed in all three by giving each test
+an enclosing directory of its own, so `dirname(root)` is unique — and the
+comment says why, because the next provider to copy this test will copy it whole.
+
+**Kimi Code is flipped and cannot be certified here**, which is not the same as
+untested. Its wire recording never opened a session — `kimi acp` answers
+`session/new` with "Authentication required" on this machine — so unlike
+MiMoCode there was no live run to record, and no matrix is written for it yet: a
+matrix whose automated half cannot start would be a document about a machine
+rather than about the flip. `docs/mimocode-flip-smoke-matrix.md` stays the model
+for it, and the harness derives in an hour once an account exists.
+
+Gates: unit 499 suites / 7,801 tests, integration 5 suites / 145 tests (59
+env-gated skips), typecheck, `eslint`, `build:release`, plus four consecutive
+full unit runs green after the flake fix.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -5524,14 +5558,20 @@ account. Everything up to the answer is confirmed against the real CLI. One head
 generating account settles rows 1, 2, 5, 6, 7, 8, 12, 13 and 15; until then MiMoCode is flipped but
 **not certified**, and the matrix says so in its own Record table rather than in this file only.
 
-**Kimi Code's whole assembly exists and is tested; only the flip is left.** Eleven dark modules plus
-the two live extractions. What remains is one revertible commit: `registration.ts` at
-`plugin.getKimicodeExecution().createRuntime()`, `main.ts` constructing and registering a
-`KimicodeExecution`, `KimicodeChatRuntime` deleted, and the four metadata surfaces
-(`KimicodeSettingsTab`, `KimicodeChatUIConfig`, `KimicodeWorkspaceServices`,
-`KimicodeRuntimeCommandLoader`) moved onto `execution.metadata`. Then the harness — which for this
-provider needs a logged-in machine before it can say anything at all: `kimi acp` cannot open a
-session here.
+**Wave 6 is complete: both providers are flipped.** Six execute through the kernel — Codex, Claude,
+OpenCode, Grok, MiMoCode, Kimi Code. Two ACP runtimes remain on the legacy path, Qwen Code and
+Gemini CLI, and `AcpManagedMcpRuntime.test.ts` is down to those two.
+
+**Neither wave-6 flip is certified, and neither blocker is Grimoire's.** MiMoCode's account cannot
+generate: its matrix ran, five rows green and eight red, and says so in its own Record table. Kimi
+Code is not authenticated: `kimi acp` refuses `session/new`, so its harness has **never been run**
+and no matrix is written for it. Both are flipped anyway, deliberately. What is confirmed for both is
+everything up to the answer; the answer traffic is not.
+
+**What is left, in order:** an account for each of the two, then their harness runs and matrices.
+After that, wave 7 — Qwen Code and Gemini CLI, the last two ACP providers — and then M5, which is
+where the auxiliary services (titles, refinement, inline edits) leave `*AuxQueryRunner` for the
+kernel's own auxiliary port. `ManagedAcpAuxiliaryQuery.ts` has been dark since wave 4 waiting for it.
 
 Two techniques worth repeating on the next provider. The normalized diff — `sed` both files' provider
 names to one token and diff — is what made the config-state move safe to do mechanically. And break

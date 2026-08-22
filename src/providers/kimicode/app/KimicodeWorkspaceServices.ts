@@ -13,7 +13,6 @@ import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { KimicodeAgentMentionProvider } from '../agents/KimicodeAgentMentionProvider';
 import { KimicodeCommandCatalog } from '../commands/KimicodeCommandCatalog';
-import { KimicodeChatRuntime } from '../runtime/KimicodeChatRuntime';
 import { KimicodeCliResolver } from '../runtime/KimicodeCliResolver';
 import { getKimicodeProviderSettings } from '../settings';
 import { KimicodeAgentStorage } from '../storage/KimicodeAgentStorage';
@@ -30,7 +29,6 @@ export interface KimicodeWorkspaceServices extends ProviderWorkspaceServices {
   mcpServerManager: McpServerManager;
 }
 
-const KIMICODE_METADATA_WARMUP_DB = ':memory:';
 
 const kimicodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
   resolveMode() {
@@ -74,18 +72,11 @@ function createKimicodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalo
         hasCachedModels: currentSettings.discoveredModels.length > 0,
         load: async () => {
           const before = JSON.stringify(currentSettings.discoveredModels);
-          const runtime = new KimicodeChatRuntime(plugin);
-          try {
-            runtime.syncConversationState({
-              providerState: { databasePath: KIMICODE_METADATA_WARMUP_DB },
-              sessionId: null,
-            });
-            const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-            const after = JSON.stringify(getKimicodeProviderSettings(settings).discoveredModels);
-            return loaded && before !== after;
-          } finally {
-            runtime.cleanup();
-          }
+          // One isolated session, opened and closed: what the legacy runtime
+          // was doing here was opening a session and reading its reply.
+          const loaded = await plugin.getKimicodeExecution().metadata.discoverMetadata();
+          const after = JSON.stringify(getKimicodeProviderSettings(settings).discoveredModels);
+          return loaded && before !== after;
         },
       });
     },

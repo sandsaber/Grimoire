@@ -16,6 +16,7 @@ import { ClaudeExecution } from './app/execution/claude/ClaudeExecutionCompositi
 import { CodexExecution } from './app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
 import { GrokExecution } from './app/execution/grok/GrokExecutionComposition';
+import { KimicodeExecution } from './app/execution/kimicode/KimicodeExecutionComposition';
 import { MimocodeExecution } from './app/execution/mimocode/MimocodeExecutionComposition';
 import { OpencodeExecution } from './app/execution/opencode/OpencodeExecutionComposition';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
@@ -105,6 +106,7 @@ export default class GrimoirePlugin extends Plugin {
   private opencodeExecution: OpencodeExecution | null = null;
   private grokExecution: GrokExecution | null = null;
   private mimocodeExecution: MimocodeExecution | null = null;
+  private kimicodeExecution: KimicodeExecution | null = null;
   private unloading = false;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
@@ -359,6 +361,7 @@ export default class GrimoirePlugin extends Plugin {
     this.opencodeExecution?.dispose();
     this.grokExecution?.dispose();
     this.mimocodeExecution?.dispose();
+    this.kimicodeExecution?.dispose();
     void this.executionKernelHost?.dispose();
     void this.persistOpenTabStates();
   }
@@ -433,6 +436,14 @@ export default class GrimoirePlugin extends Plugin {
     return this.mimocodeExecution;
   }
 
+  /** The Kimi Code execution this plugin instance owns; see the note above. */
+  getKimicodeExecution(): KimicodeExecution {
+    if (!this.kimicodeExecution) {
+      throw new Error('Kimi Code execution is not available before plugin load.');
+    }
+    return this.kimicodeExecution;
+  }
+
   /**
    * Brings the kernel up before anything can ask it for work.
    *
@@ -490,6 +501,11 @@ export default class GrimoirePlugin extends Plugin {
     // its own is beside this — the `mimo acp` launch, its own database per
     // conversation, and a thinking level that lives inside the model id.
     host.registerBackend(this.mimocodeExecution.createBackendRegistration());
+    this.kimicodeExecution = new KimicodeExecution(this, host.registry);
+    // The fourth ACP provider, and the last of wave 6. Registered the same way
+    // as the three before it; what is its own is beside this — the `kimi acp`
+    // launch, and mode ids the CLI names itself rather than Grimoire.
+    host.registerBackend(this.kimicodeExecution.createBackendRegistration());
     this.executionKernelHost = host;
     try {
       await host.start();

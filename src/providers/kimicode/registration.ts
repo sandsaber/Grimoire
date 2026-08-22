@@ -6,7 +6,6 @@ import { KimicodeTitleGenerationService } from './auxiliary/KimicodeTitleGenerat
 import { KIMICODE_PROVIDER_CAPABILITIES } from './capabilities';
 import { kimicodeSettingsReconciler } from './env/KimicodeSettingsReconciler';
 import { KimicodeConversationHistoryService } from './history/KimicodeConversationHistoryService';
-import { KimicodeChatRuntime } from './runtime/KimicodeChatRuntime';
 import { getKimicodeProviderSettings, updateKimicodeProviderSettings } from './settings';
 import { kimicodeChatUIConfig } from './ui/KimicodeChatUIConfig';
 
@@ -16,7 +15,7 @@ export const kimicodeProviderRegistration: ProviderRegistration = {
   chatUIConfig: kimicodeChatUIConfig,
   createInlineEditService: (plugin) => new KimicodeInlineEditService(plugin),
   createInstructionRefineService: (plugin) => new KimicodeInstructionRefineService(plugin),
-  createRuntime: ({ plugin }) => new KimicodeChatRuntime(plugin),
+  createRuntime: ({ plugin }) => plugin.getKimicodeExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new KimicodeTitleGenerationService(plugin),
   displayName: 'Kimi Code',
   environmentKeyPatterns: [/^KIMICODE_/i],

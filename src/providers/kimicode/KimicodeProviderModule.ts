@@ -38,10 +38,10 @@ import {
  * record is byte-for-byte OpenCode's. That is the result the waves were for, and
  * it is why this module is derived rather than reasoned out.
  *
- * **Dark.** Nothing constructs this yet: `registration.ts` still points
- * `createRuntime` at `KimicodeChatRuntime`, and the flip is a later checkpoint.
+ * **Flipped.** `registration.ts` points `createRuntime` at the composition
+ * built from this, and `KimicodeChatRuntime` is gone.
  *
- * What this flip will stand on is the thinnest of the six, and the difference is
+ * What this flip stands on is the thinnest of the six, and the difference is
  * worth knowing before reading anything below as settled: Kimi Code's wire
  * recording never opened a session at all. `kimi acp` answered `session/new`
  * with **"Authentication required"** on the machine it was taken from, so what

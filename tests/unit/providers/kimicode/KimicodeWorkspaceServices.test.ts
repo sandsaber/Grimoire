@@ -1,5 +1,4 @@
 import { createKimicodeWorkspaceServices } from '@/providers/kimicode/app/KimicodeWorkspaceServices';
-import { KimicodeChatRuntime } from '@/providers/kimicode/runtime/KimicodeChatRuntime';
 import { getKimicodeProviderSettings, updateKimicodeProviderSettings } from '@/providers/kimicode/settings';
 
 describe('createKimicodeWorkspaceServices', () => {
@@ -14,17 +13,16 @@ describe('createKimicodeWorkspaceServices', () => {
       settings,
       saveSettings: jest.fn().mockResolvedValue(undefined),
     };
-    const syncConversationStateSpy = jest.spyOn(KimicodeChatRuntime.prototype, 'syncConversationState');
-    const ensureReadySpy = jest
-      .spyOn(KimicodeChatRuntime.prototype, 'ensureReady')
-      .mockImplementation(async function ensureReady(this: KimicodeChatRuntime) {
-        updateKimicodeProviderSettings((this as any).plugin.settings, {
-          discoveredModels: [{ label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' }],
-          visibleModels: ['openai/gpt-5.6'],
-        });
-        return true;
+    // The catalog asks the isolated metadata session, which is what opening a
+    // session and reading its reply has become.
+    const discoverMetadata = jest.fn().mockImplementation(async () => {
+      updateKimicodeProviderSettings(settings, {
+        discoveredModels: [{ label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' }],
+        visibleModels: ['openai/gpt-5.6'],
       });
-    const cleanupSpy = jest.spyOn(KimicodeChatRuntime.prototype, 'cleanup').mockImplementation(() => undefined);
+      return true;
+    });
+    (plugin as any).getKimicodeExecution = () => ({ metadata: { discoverMetadata } });
     const vaultAdapter = {
       delete: jest.fn(),
       ensureFolder: jest.fn(),
@@ -42,12 +40,7 @@ describe('createKimicodeWorkspaceServices', () => {
     });
 
     expect(changed).toBe(true);
-    expect(syncConversationStateSpy).toHaveBeenCalledWith({
-      providerState: { databasePath: ':memory:' },
-      sessionId: null,
-    });
-    expect(ensureReadySpy).toHaveBeenCalledWith({ allowSessionCreation: true });
-    expect(cleanupSpy).toHaveBeenCalled();
+    expect(discoverMetadata).toHaveBeenCalledTimes(1);
     expect(getKimicodeProviderSettings(settings).discoveredModels).toEqual([
       { label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' },
     ]);
@@ -65,8 +58,8 @@ describe('createKimicodeWorkspaceServices', () => {
       settings,
       saveSettings: jest.fn().mockResolvedValue(undefined),
     };
-    const ensureReadySpy = jest.spyOn(KimicodeChatRuntime.prototype, 'ensureReady');
-    const cleanupSpy = jest.spyOn(KimicodeChatRuntime.prototype, 'cleanup');
+    const discoverMetadata = jest.fn();
+    (plugin as any).getKimicodeExecution = () => ({ metadata: { discoverMetadata } });
     const vaultAdapter = {
       delete: jest.fn(),
       ensureFolder: jest.fn(),
@@ -83,8 +76,8 @@ describe('createKimicodeWorkspaceServices', () => {
     });
 
     expect(changed).toBe(false);
-    expect(ensureReadySpy).not.toHaveBeenCalled();
-    expect(cleanupSpy).not.toHaveBeenCalled();
+    // No process at all for a catalog that is still fresh.
+    expect(discoverMetadata).not.toHaveBeenCalled();
     expect(plugin.recordDebugLog).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         modelCount: 1,

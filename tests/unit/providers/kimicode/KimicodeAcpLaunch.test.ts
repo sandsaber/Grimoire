@@ -1,31 +1,10 @@
 import '@/providers';
 
-import {
-  type AcpLaunchMockConnection,
-  type AcpLaunchMockProcess,
-  type AcpLaunchMockTransport,
-  createAcpLaunchMockPlugin,
-  createAcpMockConnection,
-  createAcpMockProcess,
-  createAcpMockTransport,
-  WINDOWS_UNICODE_VAULT,
-  wireAcpMocks,
-} from '@test/helpers/acpLaunchMocks';
+import { createAcpLaunchMockPlugin, WINDOWS_UNICODE_VAULT } from '@test/helpers/acpLaunchMocks';
 
-import { KimicodeChatRuntime } from '@/providers/kimicode/runtime/KimicodeChatRuntime';
+import { KimicodeExecution } from '@/app/execution/kimicode/KimicodeExecutionComposition';
+import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
 import { prepareKimicodeLaunchArtifacts } from '@/providers/kimicode/runtime/KimicodeLaunchArtifacts';
-
-import { AcpClientConnection, AcpJsonRpcTransport, AcpSubprocess } from '../../../../src/providers/acp';
-
-jest.mock('../../../../src/providers/acp', () => {
-  const actual = jest.requireActual('../../../../src/providers/acp');
-  return {
-    ...actual,
-    AcpClientConnection: jest.fn(),
-    AcpJsonRpcTransport: jest.fn(),
-    AcpSubprocess: jest.fn(),
-  };
-});
 
 jest.mock('@/providers/kimicode/runtime/KimicodeLaunchArtifacts', () => {
   const actual = jest.requireActual('@/providers/kimicode/runtime/KimicodeLaunchArtifacts');
@@ -35,30 +14,23 @@ jest.mock('@/providers/kimicode/runtime/KimicodeLaunchArtifacts', () => {
   };
 });
 
-const MockAcpClientConnection = AcpClientConnection as jest.MockedClass<typeof AcpClientConnection>;
-const MockAcpJsonRpcTransport = AcpJsonRpcTransport as jest.MockedClass<typeof AcpJsonRpcTransport>;
-const MockAcpSubprocess = AcpSubprocess as jest.MockedClass<typeof AcpSubprocess>;
-const mockPrepareKimicodeLaunchArtifacts = prepareKimicodeLaunchArtifacts as jest.MockedFunction<typeof prepareKimicodeLaunchArtifacts>;
+const mockPrepareKimicodeLaunchArtifacts = prepareKimicodeLaunchArtifacts as jest.MockedFunction<
+typeof prepareKimicodeLaunchArtifacts
+>;
 
+/**
+ * How a vault path reaches Kimi Code, on the platform that punishes getting it
+ * wrong.
+ *
+ * A Windows path with spaces and non-ASCII characters passed as an argument is
+ * a launch that fails or, worse, one that starts in the wrong directory. It is
+ * the working directory of the process and the `cwd` of the session, and never
+ * a word on the command line — the flip moved where that is decided, not
+ * whether it still has to be true.
+ */
 describe('Kimi Code ACP launch', () => {
-  let mockConnection: AcpLaunchMockConnection;
-  let mockProcess: AcpLaunchMockProcess;
-  let mockTransport: AcpLaunchMockTransport;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConnection = createAcpMockConnection();
-    mockProcess = createAcpMockProcess();
-    mockTransport = createAcpMockTransport();
-
-    wireAcpMocks({
-      connection: mockConnection,
-      connectionCtor: MockAcpClientConnection,
-      process: mockProcess,
-      subprocessCtor: MockAcpSubprocess,
-      transport: mockTransport,
-      transportCtor: MockAcpJsonRpcTransport,
-    });
     mockPrepareKimicodeLaunchArtifacts.mockResolvedValue({
       configPath: 'C:\\tmp\\grimoire-kimicode\\config.json',
       configContent: '{}\n',
@@ -68,25 +40,27 @@ describe('Kimi Code ACP launch', () => {
     });
   });
 
-  // MiMoCode has had this row since its launch work; Kimi Code is its twin and
-  // had no counterpart, so the Windows path handling both share was covered on
-  // one side only.
   it('does not pass the workspace path through Kimi Code CLI arguments', async () => {
-    const runtime = new KimicodeChatRuntime(createAcpLaunchMockPlugin({
-      cliPath: 'C:\\Tools\\kimi.exe',
-      providerId: 'kimicode',
-    }));
+    const execution = new KimicodeExecution(
+      createAcpLaunchMockPlugin({ cliPath: 'C:\\Tools\\kimicode.exe', providerId: 'kimicode' }),
+      {} as unknown as ExecutionLifecycleRegistry,
+    );
 
-    await expect(runtime.ensureReady()).resolves.toBe(true);
-
-    expect(MockAcpSubprocess).toHaveBeenCalledWith(expect.objectContaining({
-      args: ['acp'],
-      command: 'C:\\Tools\\kimi.exe',
-      cwd: WINDOWS_UNICODE_VAULT,
+    const invocation = await execution.turnRequests.resolve(execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'what now?' }],
     }));
-    expect(mockConnection.newSession).toHaveBeenCalledWith({
+    const launch = await execution.turnRequests.resolveLaunch(invocation.startupRef);
+
+    expect(launch).toMatchObject({
+      arguments: ['acp'],
       cwd: WINDOWS_UNICODE_VAULT,
-      mcpServers: [],
+      executable: 'C:\\Tools\\kimicode.exe',
     });
+    expect(invocation.cwd).toBe(WINDOWS_UNICODE_VAULT);
+    // The vault path is the working directory and nothing else; a path with
+    // spaces and non-ASCII characters on a command line is a launch that
+    // starts somewhere else or not at all.
+    expect(launch.arguments).toEqual(['acp']);
+    execution.dispose();
   });
 });
