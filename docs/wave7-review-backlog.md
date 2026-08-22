@@ -15,13 +15,13 @@ copy-paste defects, and confirmed the ten items listed under "checked and clean"
 | A2 | Major | `ExecutionChatRuntimeAdapter.ts` `syncConversationState` | `resetSession()` on a conversation switch neither cancels nor clears `active`; `disposeSession` throws on the live run and the kernel session leaks | ✅ cancels, settles, then disposes — beside the caller, not in front of it |
 | G2 | Major | `GeminiChatRuntime.ts` `current_mode` | Stored the agent's raw id into `selectedMode`, which the toolbar reads back and cannot render | ✅ mapped where it reaches the vault |
 | G3 | Major | `GeminiChatRuntime.ts` `currentSessionModeId` | Never reset, unlike its sibling, so a new session short-circuits and runs in the agent's default while the toolbar says Plan | ✅ reset at all three sites |
-| S1 | Major | `SessionStorage.ts` `listMetadata` | Lists via `adapter.listFiles` while writes are durable, so a conversation interrupted mid-rename is never listed and never recoverable | ⬜ |
-| K1 | Major | `ExecutionLifecycleRegistry.ts` `startRun` | No acceptance guard, so a run admitted during shutdown leaves a durable `queued` record the next startup loads as live | ⬜ |
-| K2 | Minor | `ExecutionLifecycleRegistry.ts` `createSessionUnlocked` | The guard throws after the durable record is created, leaving an `active` session the next start reopens | ⬜ |
-| K3 | Minor | `ExecutionLifecycleRegistry.ts` `sweepTabScopedRecords` | Runs before `loadPersistedControls` detects `migrationRequired`, so a reverted build deletes records D5 says it must only read | ⬜ |
-| T1 | Minor | `AcpJsonRpcTransport.ts` | The backpressure fix is a no-op: `awaitingDrain` is written and never read, and `sendRaw` is synchronous | ⬜ |
-| P1 | Minor | `ClaudePermissionUpdates.ts` | `removeRules` and `addDirectories` are still forwarded verbatim, so a suggestion riding one click can delete a `deny` rule | ⬜ |
-| P2 | Minor | `ClaudePermissionUpdates.ts` | `addRules` with an empty list passes `every` vacuously and suppresses the explicit grant, so "Always allow" grants nothing | ⬜ |
+| S1 | Major | `SessionStorage.ts` `listMetadata` | Lists via `adapter.listFiles` while writes are durable, so a conversation interrupted mid-rename is never listed and never recoverable | ✅ lists through `durable.list`, which completes the rename first |
+| K1 | Major | `ExecutionLifecycleRegistry.ts` `startRun` | No acceptance guard, so a run admitted during shutdown leaves a durable `queued` record the next startup loads as live | ✅ the acceptance guard `createSessionUnlocked` already had |
+| K2 | Minor | `ExecutionLifecycleRegistry.ts` `createSessionUnlocked` | The guard throws after the durable record is created, leaving an `active` session the next start reopens | ✅ guarded before the write, and the catch removes the record |
+| K3 | Minor | `ExecutionLifecycleRegistry.ts` `sweepTabScopedRecords` | Runs before `loadPersistedControls` detects `migrationRequired`, so a reverted build deletes records D5 says it must only read | ✅ raises on an unreadable record instead of stepping over it |
+| T1 | Minor | `AcpJsonRpcTransport.ts` | The backpressure fix is a no-op: `awaitingDrain` is written and never read, and `sendRaw` is synchronous | ✅ writes are queued and flushed on `drain`, in order |
+| P1 | Minor | `ClaudePermissionUpdates.ts` | `removeRules` and `addDirectories` are still forwarded verbatim, so a suggestion riding one click can delete a `deny` rule | ✅ `removeRules` and `addDirectories` dropped like `replaceRules` |
+| P2 | Minor | `ClaudePermissionUpdates.ts` | `addRules` with an empty list passes `every` vacuously and suppresses the explicit grant, so "Always allow" grants nothing | ✅ an empty rule list no longer counts as the rule update |
 
 ## Not a finding
 

@@ -470,9 +470,21 @@ export class SessionStorage {
     return Array.from(filesByName.values());
   }
 
+  /**
+   * The metadata files that exist, including the ones only a recovery finds.
+   *
+   * Through the durable store rather than the adapter, and that is the whole
+   * point: `writeAtomic` renames `x.meta.json` to `x.meta.json.backup` before
+   * it renames the pending file into place, so a crash inside that window
+   * leaves no `x.meta.json` at all. The adapter's listing then omits the
+   * conversation, nothing else ever asks for that id, and it is invisible for
+   * good — the exact failure the durable path was added to prevent.
+   * `durable.list` completes the interrupted rename first and reports what is
+   * there afterwards.
+   */
   private async listMetadataFiles(folderPath: string): Promise<string[]> {
     try {
-      const files = await this.adapter.listFiles(folderPath);
+      const files = await this.durable.list(folderPath);
       return files.filter((filePath) => filePath.endsWith('.meta.json'));
     } catch {
       return [];

@@ -60,7 +60,14 @@ export function buildPermissionUpdates(
         // request edited after the click. `{toolName: 'Bash'}` with no pattern
         // was the extreme: permanent approval of every command, granted by a
         // button that said "allow this one".
-        if (!suggestion.rules.every(rule => grantsNoMoreThan(rule, approved))) {
+        // `length` first, because `[].every(...)` is vacuously true: an empty
+        // suggestion passed the clamp, claimed to be the rule update, and
+        // suppressed the explicit grant below — so "Always allow" granted
+        // nothing at all and the same call asked again.
+        if (
+          suggestion.rules.length === 0
+          || !suggestion.rules.every(rule => grantsNoMoreThan(rule, approved))
+        ) {
           continue;
         }
         hasRuleUpdate = true;
@@ -76,6 +83,17 @@ export function buildPermissionUpdates(
           continue;
         }
         processed.push(suggestion);
+      } else if (suggestion.type === 'removeRules' || suggestion.type === 'addDirectories') {
+        // The last two that reached wider than the click. `removeRules` can
+        // delete a `deny` the person wrote — the same hazard `replaceRules` is
+        // dropped for, through a narrower door — and `addDirectories` grants
+        // access to paths the prompt never named.
+        //
+        // What this costs when the agent meant well: it is asked again, per
+        // directory, and the person answers a prompt that says which one. What
+        // keeping it costs is a denial removed by a button that said "allow
+        // this one".
+        continue;
       } else {
         processed.push(suggestion);
       }

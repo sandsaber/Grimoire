@@ -125,21 +125,16 @@ describe('buildPermissionUpdates', () => {
       },
     ];
     const updates = buildPermissionUpdates('Read', { file_path: '/external/path/file.md' }, 'allow-always', suggestions);
-    expect(updates).toHaveLength(2);
     // The glob reaches past the file that was shown, so the rule written is the
-    // one the card described. The directory suggestion is untouched: it widens
-    // nothing on its own, and the SDK chose where it lands.
-    expect(updates[0]).toEqual({
+    // one the card described — and the directory goes with it. `addDirectories`
+    // grants access to a path the prompt never named, which is the same hazard
+    // as the glob and not a smaller one for being a different field.
+    expect(updates).toEqual([{
       type: 'addRules',
       behavior: 'allow',
       rules: [{ toolName: 'Read', ruleContent: '/external/path/file.md' }],
       destination: 'projectSettings',
-    });
-    expect(updates[1]).toEqual({
-      type: 'addDirectories',
-      directories: ['/external/path'],
-      destination: 'session',
-    });
+    }]);
   });
 
   it('includes removeDirectories suggestions without overriding destination', () => {
@@ -197,9 +192,10 @@ describe('buildPermissionUpdates', () => {
       },
     ];
     const updates = buildPermissionUpdates('Read', { file_path: '/new/dir/file.md' }, 'allow', suggestions);
-    expect(updates).toHaveLength(2);
+    // The grant the person actually clicked, and nothing else: the directory
+    // suggestion is dropped rather than carried alongside it.
+    expect(updates).toHaveLength(1);
     expect(updates[0].type).toBe('addRules');
-    expect(updates[1].type).toBe('addDirectories');
   });
 
   it('never promotes a replaceRules suggestion', () => {
@@ -243,17 +239,19 @@ describe('buildPermissionUpdates', () => {
       },
     ];
     const updates = buildPermissionUpdates('Bash', { command: 'git status' }, 'allow', suggestions);
-    expect(updates).toHaveLength(2);
+    expect(updates).toHaveLength(1);
     expect(updates[0].type).toBe('addRules');
     expect(updates[0]).toMatchObject({
       behavior: 'allow',
       rules: [{ toolName: 'Bash', ruleContent: 'git status' }],
       destination: 'session',
     });
-    expect(updates[1].type).toBe('removeRules');
   });
 
-  it('preserves original behavior on removeRules suggestions', () => {
+  it('never carries a removeRules suggestion', () => {
+    // A `deny` the person wrote, removed by a button that said "allow this
+    // one". The same hazard `replaceRules` is dropped for, through a narrower
+    // door — and this one arrived pre-filled with the behavior to strip.
     const suggestions = [
       {
         type: 'removeRules' as const,
@@ -263,10 +261,24 @@ describe('buildPermissionUpdates', () => {
       },
     ];
     const updates = buildPermissionUpdates('Bash', { command: 'git status' }, 'allow-always', suggestions);
-    const removeEntry = updates.find(u => u.type === 'removeRules');
-    expect(removeEntry).toBeDefined();
-    expect(removeEntry!.behavior).toBe('deny');
-    expect(removeEntry!.destination).toBe('session');
+
+    expect(updates.some(update => update.type === 'removeRules')).toBe(false);
+  });
+
+  it('still grants when the agent suggests an empty rule list', () => {
+    // `[].every(...)` is vacuously true, so an empty suggestion used to pass
+    // the clamp, claim to be the rule update, and suppress the explicit grant:
+    // "Always allow" then granted nothing and the same call asked again.
+    const updates = buildPermissionUpdates('Bash', { command: 'git status' }, 'allow-always', [
+      { type: 'addRules' as const, behavior: 'allow' as const, rules: [], destination: 'session' as const },
+    ]);
+
+    expect(updates).toEqual([{
+      type: 'addRules',
+      behavior: 'allow',
+      rules: [{ toolName: 'Bash', ruleContent: 'git status' }],
+      destination: 'projectSettings',
+    }]);
   });
 });
 

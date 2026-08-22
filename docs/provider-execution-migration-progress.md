@@ -5606,6 +5606,59 @@ after a switch would clear the *next* turn's.
 
 Gates: unit 499 suites / 7,818 tests, typecheck, `eslint`.
 
+### The fourth review closed — the last eight (this commit)
+
+All thirteen rows of [`docs/wave7-review-backlog.md`](wave7-review-backlog.md)
+are ✅. Nothing refuted this time: every finding was real against the tree.
+
+**S1 — a conversation could become permanently invisible.** `listMetadata` was
+routed through the durable store to recover interrupted writes, but the *file
+list* still came from the adapter. `writeAtomic` renames the live file to
+`.backup` before renaming the pending one in, so a crash inside that window
+leaves no `.meta.json` — nothing lists the conversation, and nothing in the
+product ever asks for an id it did not first see listed. Now listed through
+`durable.list`, which completes the rename before it reports. The passthrough
+double's `list` was a stub returning `[]`, which is why no suite caught it;
+it passes through now like the rest of that double.
+
+**K1, K2 — two ways to leave a durable record nothing owns.** `startRun` had no
+acceptance guard, so a run admitted while shutdown was giving up wrote a `queued`
+record the checkpoint does not name and `disposeSessionForShutdown` does not
+terminalize. And `createSessionUnlocked`'s guard ran *after* the session record
+was written, so the throw left an `active` session the next start reopens —
+spawning a provider session that never existed. Guard moved ahead of the write,
+kept after it as well because the write is awaited, and the catch now removes
+what it wrote.
+
+**K3 — the sweep broke D5's promise.** `sweepTabScopedRecords` runs before
+`loadPersistedControls`, which is the only place an unreadable record decides
+the store opens read-only. It skipped what it could not read and deleted
+everything else — so a reverted build destroyed a newer build's records on its
+way to concluding it was not allowed to write. It now raises on the first
+unreadable record, and `start()` stops before anything is removed.
+
+**T1 — the backpressure fix was a flag beside the same unbounded buffering.**
+`awaitingDrain` was written and never read to gate a write. Now the lines a
+refusing stream would have buffered are queued and flushed on `drain`, in order,
+because a response overtaking its request would be a reply to nothing. The test
+double had to be corrected too: Node returns `false` from `write` for a chunk it
+*took* — a double that dropped it would assert a message loss the real stream
+does not have.
+
+**P1, P2 — the permission clamp had two doors left open.** `removeRules` and
+`addDirectories` were still forwarded verbatim, so a suggestion riding one
+"Allow once" could delete a `deny` the user wrote or grant a directory the
+prompt never named; both are dropped now, like `replaceRules`. And `addRules`
+with an empty list passed `every` vacuously, claimed to be the rule update and
+suppressed the explicit grant — "Always allow" granted nothing and the same call
+asked again.
+
+Four existing tests asserted the behaviour that was wrong and are replaced by
+tests asserting the behaviour that is right; each is named for what it protects.
+
+Gates: unit 500 suites / 7,823 tests, integration 5 suites / 145 tests (61
+env-gated skips), typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

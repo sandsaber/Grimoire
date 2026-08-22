@@ -1,7 +1,9 @@
 import '@/providers';
 
+import { createDurableInMemoryVaultAdapter } from '@test/helpers/inMemoryVaultAdapter';
 import { createPassthroughDurableStorage } from '@test/helpers/passthroughDurableStorage';
 
+import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
 import {
   applyAssistantResponseMetadataToMessages,
   applyVaultSearchContextsToMessages,
@@ -206,6 +208,31 @@ describe('SessionStorage', () => {
       const result = await storage.loadMetadata('session-error');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('listMetadata recovery', () => {
+    it('finds a conversation whose last write was interrupted mid-rename', async () => {
+      // `writeAtomic` renames the live file to `.backup` before it renames the
+      // pending one into place. A crash inside that window leaves no
+      // `x.meta.json` at all, and nothing else in the product ever asks for an
+      // id it did not first see listed — so listing through the adapter made
+      // the conversation invisible for good, which is the failure the durable
+      // path exists to prevent.
+      const adapter = createDurableInMemoryVaultAdapter({
+        [`${SESSIONS_PATH}/interrupted.meta.json.backup`]: JSON.stringify({
+          id: 'interrupted',
+          title: 'Interrupted',
+          createdAt: 1,
+          updatedAt: 2,
+        }),
+      });
+      const recovering = new SessionStorage(adapter, new VaultDurableStorage(adapter));
+
+      const metas = await recovering.listMetadata();
+
+      expect(metas.map(meta => meta.id)).toEqual(['interrupted']);
+      expect(adapter.files.has(`${SESSIONS_PATH}/interrupted.meta.json`)).toBe(true);
     });
   });
 

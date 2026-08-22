@@ -1,6 +1,7 @@
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import type { ExecutionSession, ResultRef } from '@/core/execution/ExecutionContracts';
+import { EXECUTION_SESSIONS_PATH } from '@/core/execution/ExecutionControlPaths';
 import { SETTINGS_TRANSITIONS_PATH } from '@/core/execution/ExecutionControlPaths';
 import { ExecutionControlRepositories } from '@/core/execution/ExecutionControlRepositories';
 import { ExecutionControlTransactionCoordinator } from '@/core/execution/ExecutionControlTransactionCoordinator';
@@ -1235,6 +1236,43 @@ describe('ExecutionLifecycleRegistry — deleting a conversation', () => {
     await expect(restored.repositories.runs.read(RUN_ID)).resolves.toMatchObject({ kind: 'absent' });
     await expect(restored.repositories.sessions.read(SESSION_ID))
       .resolves.toMatchObject({ kind: 'absent' });
+  });
+
+  it('deletes nothing when the store belongs to a newer build', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage);
+    const tabOwner = { kind: 'internal-service' as const, ownerId: 'grimoiretab-1' };
+    await first.registry.createSession({
+      ...sessionCommand(),
+      executionSessionId: SESSION_ID,
+      owner: tabOwner,
+    });
+    await first.registry.startRun(SESSION_ID, { ...request(RUN_ID, 'none'), owner: tabOwner });
+    first.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, {
+      deliveryId: `terminal-${RUN_ID}`,
+      destination: 'both',
+    });
+    await settle(first.registry);
+    await first.registry.disposeSession(SESSION_ID);
+
+    // A record this build cannot read, of the kind a *newer* build writes. D5
+    // says such a store opens read-only — but the tab sweep runs before the
+    // load that discovers it, and it used to step over what it could not read
+    // and delete everything else. A reverted build then destroyed the newer
+    // build's records on its way to deciding it was not allowed to write.
+    const otherSession = `es-${'c'.repeat(32)}`;
+    await storage.writeAtomic(
+      `${EXECUTION_SESSIONS_PATH}/${otherSession}.json`,
+      JSON.stringify({ schemaVersion: 9_999, revision: 1, payload: {} }),
+    );
+
+    const restored = createFixture(storage, { transactionOffset: 7_100, instanceOffset: 71 });
+    await restored.registry.start();
+
+    expect(restored.registry.getMigrationRequirement()).not.toBeNull();
+    // Nothing swept. The tab-owned records are still there for the build that
+    // can read the store, which is the whole point of opening read-only.
+    await expect(restored.repositories.runs.read(RUN_ID)).resolves.toMatchObject({ kind: 'current' });
   });
 
   it('refuses to remove records a lease still holds', async () => {

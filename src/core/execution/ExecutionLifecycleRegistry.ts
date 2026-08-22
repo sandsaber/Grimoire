@@ -346,6 +346,16 @@ export class ExecutionLifecycleRegistry {
         if (session.executionSessionId !== command.executionSessionId) {
           throw new Error('Backend returned the wrong logical execution session id.');
         }
+        if (this.state !== 'accepting') {
+          // Checked before the record is written, not after. Shutdown gave up
+          // waiting on this admission while the backend session was opening;
+          // creating the record first and throwing afterwards left a durable
+          // session with `status: 'active'` that the catch below does not
+          // remove — and the next startup treats an active record as one to
+          // reopen, spawning a provider session that never existed and that no
+          // adapter holds.
+          throw new Error('Execution lifecycle registry stopped accepting new work.');
+        }
         const timestamp = this.now();
         const snapshot = session.getSnapshot();
         const created = await this.repositories.sessions.create(command.executionSessionId, {
@@ -381,9 +391,10 @@ export class ExecutionLifecycleRegistry {
           knownRunIds: new Set(),
         };
         if (this.state !== 'accepting') {
-          // Shutdown gave up waiting on this admission and moved on. Registering
-          // now would add a session the checkpoint does not name, owning a
-          // process nothing will dispose. The catch below closes it instead.
+          // Checked twice, because the write between the two is awaited:
+          // shutdown can give up during it, and registering then would add a
+          // session the checkpoint does not name, owning a process nothing will
+          // dispose. The catch below closes it and removes the record.
           throw new Error('Execution lifecycle registry stopped accepting new work.');
         }
         entry.unsubscribe = session.subscribe(event => {
@@ -393,7 +404,12 @@ export class ExecutionLifecycleRegistry {
         return command.executionSessionId;
       } catch (error) {
         this.sessions.delete(command.executionSessionId);
-        await this.settleWithin([session.dispose()]);
+        // The record too, where one was written. A session this process failed
+        // to register is not a session the next startup should reopen.
+        await this.settleWithin([
+          session.dispose(),
+          this.repositories.sessions.removeIfPresent(command.executionSessionId),
+        ]);
         throw error;
       }
     } finally {
@@ -408,6 +424,16 @@ export class ExecutionLifecycleRegistry {
     const releaseAdmission = this.beginAdmission();
     try {
       return await this.enqueueSession(executionSessionId, async () => {
+        if (this.state !== 'accepting') {
+          // The same guard `createSessionUnlocked` has, and for the same
+          // reason. `beginAdmission` checks on the way in, but this task then
+          // waits in the session queue — and shutdown's wait for admissions is
+          // bounded, so it can give up while this is still queued. Admitting
+          // then writes a durable `queued` run the checkpoint does not name and
+          // that `disposeSessionForShutdown` does not terminalize: the next
+          // startup loads it as live work belonging to a disposed session.
+          throw new Error('Execution lifecycle registry stopped accepting new work.');
+        }
         const session = this.requireSession(executionSessionId);
         if (session.backend.state !== 'stable') {
           throw new Error(`Execution backend "${session.record.backendId}" is draining.`);
@@ -1467,10 +1493,19 @@ export class ExecutionLifecycleRegistry {
     const owners = new Map<string, ExecutionOwner>();
     for (const id of await this.repositories.sessions.listRecordIds()) {
       const read = await this.repositories.sessions.read(id);
-      if (read.kind !== 'current' && read.kind !== 'migrated') {
+      if (read.kind === 'absent') {
         continue;
       }
-      const owner = read.record.payload.owner;
+      // Raised rather than skipped, and that is the whole difference between
+      // this sweep being safe and it being the first thing a reverted build
+      // does. This runs *before* `loadPersistedControls`, which is where an
+      // unreadable record decides the store opens read-only (D5) — so silently
+      // stepping over a `future` record here meant deleting every session,
+      // run, interaction and reconciliation this build could read, and only
+      // then concluding it was not allowed to write. `start()` catches this
+      // and stops before anything is removed.
+      const record = await requireCurrent(Promise.resolve(read));
+      const owner = record.payload.owner;
       if (owner.kind === 'internal-service') {
         owners.set(`${owner.kind}:${owner.ownerId}`, owner);
       }

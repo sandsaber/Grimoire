@@ -79,6 +79,8 @@ export class AcpJsonRpcTransport {
   private disposed = false;
   /** Whether the output stream has asked us to wait before writing more. */
   private awaitingDrain = false;
+  /** Lines written while it was waiting, in the order they were sent. */
+  private readonly queuedWrites: string[] = [];
   private nextId = 1;
   private readonly notificationHandlers = new Map<string, Set<JsonRpcNotificationHandler>>();
   private readonly pending = new Map<number, PendingRequest>();
@@ -399,15 +401,48 @@ export class AcpJsonRpcTransport {
     // asked us to wait for `drain`, and ignoring it is how a transport ends up
     // buffering without bound — not a problem at the sizes an ACP turn sends,
     // which is why it went unnoticed, but a large image attachment is the shape
-    // that changes that. Backpressure is recorded and the next send waits for
-    // the stream to ask for more.
-    const accepted = this.streams.output.write(`${JSON.stringify(message)}\n`);
-    if (!accepted && !this.awaitingDrain) {
-      this.awaitingDrain = true;
-      this.streams.output.once('drain', () => {
-        this.awaitingDrain = false;
-      });
+    // that changes that.
+    //
+    // Held rather than merely noted. The first version of this recorded the
+    // backpressure in a field nothing read and wrote anyway, which is the same
+    // unbounded buffering with a flag beside it. Queueing keeps the order the
+    // protocol requires — a response that overtook its request would be a reply
+    // to nothing — and hands the bound back to the stream that asked for it.
+    const line = `${JSON.stringify(message)}\n`;
+    if (this.awaitingDrain) {
+      this.queuedWrites.push(line);
+      return;
     }
+    if (!this.streams.output.write(line)) {
+      this.beginDrainWait();
+    }
+  }
+
+  /**
+   * Stops writing until the stream asks for more, then sends what waited.
+   *
+   * Re-entrant by design: a flush can fill the buffer again on any line, and
+   * the rest go back into the queue behind the next `drain` rather than through
+   * it.
+   */
+  private beginDrainWait(): void {
+    this.awaitingDrain = true;
+    this.streams.output.once('drain', () => {
+      this.awaitingDrain = false;
+      while (this.queuedWrites.length > 0) {
+        if (this.disposed) {
+          // Nothing left to write to. Dropped rather than thrown: this runs on
+          // a stream event with no caller to report to.
+          this.queuedWrites.length = 0;
+          return;
+        }
+        const line = this.queuedWrites.shift() as string;
+        if (!this.streams.output.write(line)) {
+          this.beginDrainWait();
+          return;
+        }
+      }
+    });
   }
 
   private trySendRaw(message: JsonRpcMessage): void {

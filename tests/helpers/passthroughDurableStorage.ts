@@ -33,6 +33,16 @@ export function createPassthroughDurableStorage(adapter: VaultFileAdapter): Dura
       return true;
     },
     remove: path => adapter.delete(path),
-    list: async () => [],
+    // Straight through, like the rest. A stub returning nothing was harmless
+    // while no caller listed through the durable store; `SessionStorage` does
+    // now, and an empty listing made every conversation invisible in the suites
+    // that use this double.
+    list: async prefix => {
+      try {
+        return await adapter.listFiles(prefix);
+      } catch {
+        return [];
+      }
+    },
   };
 }
