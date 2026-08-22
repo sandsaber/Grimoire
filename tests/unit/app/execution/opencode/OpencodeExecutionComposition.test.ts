@@ -758,4 +758,25 @@ describe('OpenCode execution composition', () => {
     execution.dispose();
     await host.dispose();
   });
+
+  it('falls back to the command the CLI actually installs', async () => {
+    const plugin = createPlugin();
+    // Nothing resolved: no absolute path in settings, nothing found on PATH.
+    // What is spawned then is this string. It happens to equal the provider id
+    // for this provider and did *not* for MiMoCode, where the flip shipped
+    // `mimocode` for a binary called `mimo` — so the property is pinned
+    // everywhere rather than only where it once broke.
+    plugin.getResolvedProviderCliPath = () => null;
+    const { execution, host } = await createHarness({ plugin });
+
+    const invocation = await execution.turnRequests.resolve(execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'what now?' }],
+    }));
+    const launch = await execution.turnRequests.resolveLaunch(invocation.startupRef);
+
+    expect(launch.executable).toBe('opencode');
+    execution.dispose();
+    await host.dispose();
+  });
+
 });

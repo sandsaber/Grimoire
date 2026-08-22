@@ -3,9 +3,9 @@ import { isAbsolute } from 'node:path';
 
 import { NodeManagedAcpProcessLauncher } from '@/app/execution/acp/NodeManagedAcpProcessLauncher';
 import {
-  type MimocodeMetadataLaunch,
-  MimocodeMetadataSession,
-} from '@/app/execution/mimocode/MimocodeMetadataSession';
+  type KimicodeMetadataLaunch,
+  KimicodeMetadataSession,
+} from '@/app/execution/kimicode/KimicodeMetadataSession';
 import {
   executionSessionId,
   interactionId,
@@ -43,35 +43,35 @@ import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellati
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
-import { createMimocodeModuleContext } from '@/providers/mimocode/app/MimocodeModuleContext';
-import { mimocodePlanUsageStore } from '@/providers/mimocode/app/MimocodePlanUsageStore';
-import { MIMOCODE_PROVIDER_CAPABILITIES } from '@/providers/mimocode/capabilities';
-import type { MimocodeAcpDynamicConfig } from '@/providers/mimocode/execution/MimocodeAcpDynamicConfig';
-import { MimocodeAcpDynamicConfigApplier } from '@/providers/mimocode/execution/MimocodeAcpDynamicConfig';
-import { MimocodeAcpFileSystem } from '@/providers/mimocode/execution/MimocodeAcpFileSystem';
-import { MimocodeContentPresenter } from '@/providers/mimocode/execution/MimocodeContentPresenter';
+import { createKimicodeModuleContext } from '@/providers/kimicode/app/KimicodeModuleContext';
+import { kimicodePlanUsageStore } from '@/providers/kimicode/app/KimicodePlanUsageStore';
+import { KIMICODE_PROVIDER_CAPABILITIES } from '@/providers/kimicode/capabilities';
+import type { KimicodeAcpDynamicConfig } from '@/providers/kimicode/execution/KimicodeAcpDynamicConfig';
+import { KimicodeAcpDynamicConfigApplier } from '@/providers/kimicode/execution/KimicodeAcpDynamicConfig';
+import { KimicodeAcpFileSystem } from '@/providers/kimicode/execution/KimicodeAcpFileSystem';
+import { KimicodeContentPresenter } from '@/providers/kimicode/execution/KimicodeContentPresenter';
 import {
-  MimocodeExecutionBackend,
-  type MimocodeExecutionBackendContext,
-} from '@/providers/mimocode/execution/MimocodeExecutionBackend';
+  KimicodeExecutionBackend,
+  type KimicodeExecutionBackendContext,
+} from '@/providers/kimicode/execution/KimicodeExecutionBackend';
 import {
-  MimocodeExecutionRequests,
-  type MimocodeInvocationEnvironment,
-} from '@/providers/mimocode/execution/MimocodeExecutionRequests';
-import { MimocodeInteractionBridge } from '@/providers/mimocode/execution/MimocodeInteractionBridge';
-import { MimocodeInteractionPresenter } from '@/providers/mimocode/execution/MimocodeInteractionPresenter';
-import { MimocodeProjectionResultSink } from '@/providers/mimocode/execution/MimocodeProjectionResultSink';
-import { MimocodeSessionConfigState } from '@/providers/mimocode/execution/MimocodeSessionConfigState';
-import { loadMimocodeSessionCost } from '@/providers/mimocode/history/MimocodeUsageMetadataStore';
-import { mimocodeProviderModule } from '@/providers/mimocode/MimocodeProviderModule';
+  KimicodeExecutionRequests,
+  type KimicodeInvocationEnvironment,
+} from '@/providers/kimicode/execution/KimicodeExecutionRequests';
+import { KimicodeInteractionBridge } from '@/providers/kimicode/execution/KimicodeInteractionBridge';
+import { KimicodeInteractionPresenter } from '@/providers/kimicode/execution/KimicodeInteractionPresenter';
+import { KimicodeProjectionResultSink } from '@/providers/kimicode/execution/KimicodeProjectionResultSink';
+import { KimicodeSessionConfigState } from '@/providers/kimicode/execution/KimicodeSessionConfigState';
+import { loadKimicodeSessionCost } from '@/providers/kimicode/history/KimicodeUsageMetadataStore';
+import { kimicodeProviderModule } from '@/providers/kimicode/KimicodeProviderModule';
 import {
-  buildMimocodePromptBlocks,
-  buildMimocodePromptText,
-} from '@/providers/mimocode/runtime/buildMimocodePrompt';
-import { prepareMimocodeLaunchArtifacts } from '@/providers/mimocode/runtime/MimocodeLaunchArtifacts';
-import { buildMimocodeRuntimeEnv } from '@/providers/mimocode/runtime/MimocodeRuntimeEnvironment';
-import type { MimocodeProviderSettings } from '@/providers/mimocode/settings';
-import { getMimocodeState } from '@/providers/mimocode/types';
+  buildKimicodePromptBlocks,
+  buildKimicodePromptText,
+} from '@/providers/kimicode/runtime/buildKimicodePrompt';
+import { prepareKimicodeLaunchArtifacts } from '@/providers/kimicode/runtime/KimicodeLaunchArtifacts';
+import { buildKimicodeRuntimeEnv } from '@/providers/kimicode/runtime/KimicodeRuntimeEnvironment';
+import type { KimicodeProviderSettings } from '@/providers/kimicode/settings';
+import { getKimicodeState } from '@/providers/kimicode/types';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
@@ -84,16 +84,24 @@ const MAX_RESULT_BYTES = 256_000;
 const METADATA_DATABASE = ':memory:';
 
 /**
- * MiMoCode chat execution, assembled from the running plugin.
+ * Kimi Code chat execution, assembled from the running plugin.
  *
- * **Flipped.** `registration.ts` points `createRuntime` here, `main.ts`
- * constructs one per load, and `MimocodeChatRuntime` is gone.
+ * **Dark.** Nothing constructs this yet: `registration.ts` still points
+ * `createRuntime` at `KimicodeChatRuntime`, `main.ts` builds no
+ * `KimicodeExecution`, and the legacy runtime is still what a Kimi Code tab
+ * runs on. The flip is a later checkpoint and one revertible commit.
  *
- * The third ACP provider on the kernel, and it adds nothing to the shared
- * stack. What OpenCode's flip proved and Grok's confirmed is that the protocol
- * half is generic — the client adapter, the transport, the process launcher
- * and the managed backend are the same objects here — so what a third
- * composition contributes is the MiMoCode-specific launch and nothing else.
+ * The fourth ACP provider on the kernel, and the third in a row to add nothing
+ * to the shared stack: the client adapter, the transport, the process launcher
+ * and the managed backend are the same objects here as in OpenCode's, Grok's
+ * and MiMoCode's. What a fourth composition contributes is the Kimi Code
+ * launch and nothing else.
+ *
+ * It is also the first composition assembled for a provider whose session has
+ * never been observed. `kimi acp` refused `session/new` with "Authentication
+ * required" on the machine its wire recording was taken from, so what this
+ * stands on is `KimicodeChatRuntime` — which has been driving the same CLI on
+ * the legacy path — rather than on a recording of it.
  * The three reference spaces remain: the turn, the process to spawn and the
  * session config to apply, because an ACP session is configured after it
  * exists rather than when it is created.
@@ -104,9 +112,9 @@ const METADATA_DATABASE = ':memory:';
  * questions in. Everything else is built per tab in `createRuntime`, because it
  * is about one conversation's session.
  */
-export class MimocodeExecution {
-  private readonly requests = new MimocodeExecutionRequests(
-    () => opaqueId('mcreq'),
+export class KimicodeExecution {
+  private readonly requests = new KimicodeExecutionRequests(
+    () => opaqueId('kcreq'),
     // Forwarded, not swallowed: a zero-arity lambda type-checks here and drops
     // the conversation's database, which is the whole reason a turn carries
     // one. Every resume then launches against the default database and the
@@ -119,9 +127,9 @@ export class MimocodeExecution {
    * request through the bridge it was built with. A per-tab bridge would leave
    * the presentation for a request in a map the presenter cannot read.
    */
-  private readonly interactions = new MimocodeInteractionBridge(() => opaqueId('mcix'));
+  private readonly interactions = new KimicodeInteractionBridge(() => opaqueId('kcix'));
 
-  private metadataSession: MimocodeMetadataSession | undefined;
+  private metadataSession: KimicodeMetadataSession | undefined;
   private clientFactory: ManagedAcpClientFactory | undefined;
 
   /**
@@ -132,10 +140,10 @@ export class MimocodeExecution {
    */
   private readonly writeApprovers = new Map<string, () => ApprovalCallback | undefined>();
 
-  private readonly presenters = new Set<MimocodeInteractionPresenter>();
+  private readonly presenters = new Set<KimicodeInteractionPresenter>();
   private readonly disposers: Array<() => void> = [];
 
-  private backend: MimocodeExecutionBackend | undefined;
+  private backend: KimicodeExecutionBackend | undefined;
 
   constructor(
     private readonly plugin: GrimoirePlugin,
@@ -148,39 +156,39 @@ export class MimocodeExecution {
   ) {}
 
   /** What every open permission request is asking, for the tab that shows it. */
-  get interactionBridge(): MimocodeInteractionBridge {
+  get interactionBridge(): KimicodeInteractionBridge {
     return this.interactions;
   }
 
   /** The store every tab runtime will reference its turns through. */
-  get turnRequests(): MimocodeExecutionRequests {
+  get turnRequests(): KimicodeExecutionRequests {
     return this.requests;
   }
 
   /**
-   * The backend, over an application-owned `mimocode acp` process by default.
+   * The backend, over an application-owned `kimicode acp` process by default.
    *
    * The client factory is a parameter because it is the seam between provider
-   * protocol and process ownership: a test that has to launch MiMoCode to check
+   * protocol and process ownership: a test that has to launch Kimi Code to check
    * how a turn is composed is testing the wrong thing.
    */
   createBackend(
     clientFactory: ManagedAcpClientFactory = this.clientFactory ?? this.createClientFactory(),
-  ): MimocodeExecutionBackend {
+  ): KimicodeExecutionBackend {
     this.clientFactory = clientFactory;
-    const context: MimocodeExecutionBackendContext = {
+    const context: KimicodeExecutionBackendContext = {
       clientFactory,
       requestResolver: this.requests,
-      dynamicApplier: new MimocodeAcpDynamicConfigApplier({
+      dynamicApplier: new KimicodeAcpDynamicConfigApplier({
         resolve: dynamicRef => this.requests.resolveDynamic(dynamicRef),
       }),
       interactionBridge: this.interactions,
-      resultSink: new MimocodeProjectionResultSink(),
+      resultSink: new KimicodeProjectionResultSink(),
       reconciler: {
         // A turn that answered the cancel it was sent is a turn known to
         // have stopped, and ACP delivers that answer on the prompt itself.
         // For anything else — a run this process did not see finish — what
-        // is known is nothing. MiMoCode's own session database could answer
+        // is known is nothing. Kimi Code's own session database could answer
         // that, and until it is read the honest evidence is `unknown` with
         // effects possible, which makes the kernel refuse to re-dispatch.
         reconcile: async query => acpCancellationEvidence(query)
@@ -189,11 +197,11 @@ export class MimocodeExecution {
       auxiliaryQueries: {
         execute: async () => {
           // Titles, refinement and inline edits still run on
-          // `MimocodeAuxQueryRunner` until M5, and this composition has no
+          // `KimicodeAuxQueryRunner` until M5, and this composition has no
           // reference space of its own for them. Refused rather than answered
           // emptily: an auxiliary turn that silently returns nothing is the
           // failure mode this migration exists to remove.
-          throw new Error('MiMoCode auxiliary execution is not wired to the kernel yet.');
+          throw new Error('Kimi Code auxiliary execution is not wired to the kernel yet.');
         },
       },
       scheduler: {
@@ -209,7 +217,7 @@ export class MimocodeExecution {
       runTimeoutMs: 10 * 60_000,
       maxResultBytes: MAX_RESULT_BYTES,
     };
-    this.backend = new MimocodeExecutionBackend(context);
+    this.backend = new KimicodeExecutionBackend(context);
     return this.backend;
   }
 
@@ -226,7 +234,7 @@ export class MimocodeExecution {
   }
 
   /**
-   * The MiMoCode chat runtime, over the kernel.
+   * The Kimi Code chat runtime, over the kernel.
    *
    * One per tab, matching how `ProviderRegistry` constructs runtimes today.
    * Four things are built per tab rather than shared, each for the same reason
@@ -235,7 +243,7 @@ export class MimocodeExecution {
    */
   createRuntime(): ChatRuntime {
     let conversation: BoundConversation | null = null;
-    let adapter: MimocodeRuntimeAdapter | undefined;
+    let adapter: KimicodeRuntimeAdapter | undefined;
     let sessionCommands: readonly ProviderCommandDescriptor[] = [];
     // What the last launch resolved for this tab, which is what the
     // conversation is saved pointing at.
@@ -246,10 +254,10 @@ export class MimocodeExecution {
     // Minted once, and only used while no conversation is bound: a fallback
     // minted per read would give one tab's session and its runs different
     // owners, which the registry refuses.
-    const mimocodeTab = opaqueId('mimocodetab');
+    const kimicodeTab = opaqueId('kimicodetab');
 
 
-    const sessionConfig = new MimocodeSessionConfigState({
+    const sessionConfig = new KimicodeSessionConfigState({
       settingsBag: () => this.plugin.settings,
       saveSettings: () => this.plugin.saveSettings(),
       refreshSelectors: () => this.refreshSelectors(),
@@ -263,11 +271,11 @@ export class MimocodeExecution {
       },
     });
 
-    const content = new MimocodeContentPresenter({
+    const content = new KimicodeContentPresenter({
       displayModel: () => sessionConfig.getActiveDisplayModel(),
       // The session's own slash commands, which arrive as an update rather than
       // as an answer to anything. Held here so the tab can list them without a
-      // second MiMoCode process being launched to ask.
+      // second Kimi Code process being launched to ask.
       onCommands: commands => {
         sessionCommands = commands.map(command => ({
           name: command.name,
@@ -294,24 +302,24 @@ export class MimocodeExecution {
         });
         await sessionConfig.syncSessionModeState({
           configOptions: opening.configOptions ? [...opening.configOptions] : null,
-          // MiMoCode reports its own default agent here, not the user's pick.
+          // Kimi Code reports its own default agent here, not the user's pick.
           emitPermissionSync: false,
           modes: opening.modes ?? null,
         });
       })()),
       onCost: cost => {
-        // Only a cost that was actually recorded counts as one: MiMoCode sends
+        // Only a cost that was actually recorded counts as one: Kimi Code sends
         // a usage update every turn for the context badge, usually with no cost
         // in it, and a flag set on the update rather than on the record would
         // disable the fallback that reads the session's own database.
-        if (mimocodePlanUsageStore.recordCost(cost ?? null)) {
+        if (kimicodePlanUsageStore.recordCost(cost ?? null)) {
           sawTurnCost = true;
           this.refreshSelectors();
         }
       },
     });
 
-    const presenter = new MimocodeInteractionPresenter(
+    const presenter = new KimicodeInteractionPresenter(
       this.interactions,
       () => adapter?.interactionCallbacks() ?? {},
     );
@@ -326,7 +334,7 @@ export class MimocodeExecution {
         isCompact: false,
         mcpMentions: request.enabledMcpServers ?? new Set<string>(),
         persistedContent: '',
-        prompt: buildMimocodePromptText(request),
+        prompt: buildKimicodePromptText(request),
         request,
       }),
       encodeRequestRef: (
@@ -345,10 +353,10 @@ export class MimocodeExecution {
         const bootstrap = ports.currentSessionId() ? [] : history ?? [];
         const dynamic = this.dynamicConfiguration(sessionConfig, options);
         const conversationDatabase = databasePath
-          ?? getMimocodeState(conversation?.providerState).databasePath
+          ?? getKimicodeState(conversation?.providerState).databasePath
           ?? undefined;
         return this.requests.reference({
-          prompt: buildMimocodePromptBlocks(turn.request, [...bootstrap], {
+          prompt: buildKimicodePromptBlocks(turn.request, [...bootstrap], {
             ...(options?.orchestratorMode ? { orchestratorMode: true } : {}),
           }),
           ...(dynamic ? { dynamic } : {}),
@@ -356,7 +364,7 @@ export class MimocodeExecution {
           onLaunchResolved: resolved => { databasePath = resolved; },
         });
       },
-      reasoningControl: MIMOCODE_PROVIDER_CAPABILITIES.reasoningControl,
+      reasoningControl: KIMICODE_PROVIDER_CAPABILITIES.reasoningControl,
       /**
        * The ACP session this conversation is actually on.
        *
@@ -390,7 +398,7 @@ export class MimocodeExecution {
        *
        * A translation of the classification, not the agent's error text: for
        * this provider a pre-dispatch rejection is almost always the session
-       * bind, and MiMoCode answers an unknown session with a generic service
+       * bind, and Kimi Code answers an unknown session with a generic service
        * failure that says nothing about the session. The resume policy keeps
        * the binding rather than replacing it on an error that vague, so the
        * conversation would otherwise repeat the neutral sentence forever with
@@ -403,11 +411,11 @@ export class MimocodeExecution {
         // the actionable half is that a desktop app does not inherit the shell
         // PATH, so an absolute path in settings is what fixes it.
         if (reason === 'spawn-failed') {
-          return 'Grimoire could not start the MiMoCode CLI. Set an absolute CLI path in the '
-            + 'MiMoCode settings — desktop apps do not inherit the shell PATH.';
+          return 'Grimoire could not start the Kimi Code CLI. Set an absolute CLI path in the '
+            + 'Kimi Code settings — desktop apps do not inherit the shell PATH.';
         }
         if (reason === 'pre-dispatch-rejected') {
-          return 'MiMoCode could not start this turn. If this conversation was resumed from a saved '
+          return 'Kimi Code could not start this turn. If this conversation was resumed from a saved '
             + 'session, that session may no longer exist — starting a new chat will create one.';
         }
         return undefined;
@@ -415,7 +423,7 @@ export class MimocodeExecution {
       presentProviderContent: payload => content.present(payload),
       consumeProviderTurnMetadata: () => {
         // A vendor that reports no cost on the wire has still charged for the
-        // turn, and MiMoCode's own session database knows what. Read once per
+        // turn, and Kimi Code's own session database knows what. Read once per
         // turn that reported nothing, which is what the legacy runtime did.
         if (!sawTurnCost) {
           this.settle(this.recordSessionCost(content.lastSessionId(), databasePath));
@@ -430,7 +438,7 @@ export class MimocodeExecution {
           error,
           event: 'execution.cleanup.failed',
           level: 'warn',
-          scope: 'mimocode',
+          scope: 'kimicode',
         });
       },
     };
@@ -438,17 +446,17 @@ export class MimocodeExecution {
     // Built here, not passed in: the module's history contribution answers
     // about *this tab's* conversation, so the context has to close over the
     // same one the ports above sync.
-    const contributions = mimocodeProviderModule.features(
-      createMimocodeModuleContext(this.plugin, boundConversation, {
+    const contributions = kimicodeProviderModule.features(
+      createKimicodeModuleContext(this.plugin, boundConversation, {
         databasePath: () => databasePath,
       }),
     );
 
-    const runtime = new MimocodeRuntimeAdapter(
+    const runtime = new KimicodeRuntimeAdapter(
       {
         registry: this.registry,
-        backendId: mimocodeProviderModule.execution.descriptor.backendId,
-        capabilities: mimocodeProviderModule.capabilities,
+        backendId: kimicodeProviderModule.execution.descriptor.backendId,
+        capabilities: kimicodeProviderModule.capabilities,
         // The conversation the tab is showing, read when a session is
         // established: this is what a deleted conversation's control records
         // are found by (D4). The tab's own id stands in only while no
@@ -460,7 +468,7 @@ export class MimocodeExecution {
           // unreachable: deleting a chat looks for its own id and never finds
           // one keyed by a tab. Named for what it is, so the startup sweep can
           // remove what a closed tab left behind.
-          : { kind: 'internal-service', ownerId: mimocodeTab }),
+          : { kind: 'internal-service', ownerId: kimicodeTab }),
         nextExecutionSessionId: () => executionSessionId(opaqueId('es')),
         nextRunId: () => runId(opaqueId('run')),
       },
@@ -474,7 +482,7 @@ export class MimocodeExecution {
         // that makes a running process see them is the launch key's job.
         mcp: {
           loadServers: async () => {
-            const manager = ProviderWorkspaceRegistry.getMcpServerManager('mimocode');
+            const manager = ProviderWorkspaceRegistry.getMcpServerManager('kimicode');
             await manager?.loadServers();
             return (manager?.getServers() ?? []).map(server => ({
               id: server.name,
@@ -504,14 +512,14 @@ export class MimocodeExecution {
   }
 
   /**
-   * What Grimoire asks MiMoCode when nobody is having a conversation.
+   * What Grimoire asks Kimi Code when nobody is having a conversation.
    *
    * The model catalog, the settings tab and the chat toolbar all need the same
    * two answers, and each of them used to build a whole chat runtime to get
    * them. One isolated session serves all of them instead.
    */
-  get metadata(): MimocodeMetadataSession {
-    this.metadataSession ??= new MimocodeMetadataSession({
+  get metadata(): KimicodeMetadataSession {
+    this.metadataSession ??= new KimicodeMetadataSession({
       // The same factory the backend runs on, so a test that hands the backend
       // a fake agent is not answered by a real process launched behind it.
       clientFactory: this.clientFactory ??= this.createClientFactory(),
@@ -546,9 +554,9 @@ export class MimocodeExecution {
    * applier skips whatever is empty.
    */
   private dynamicConfiguration(
-    sessionConfig: MimocodeSessionConfigState,
+    sessionConfig: KimicodeSessionConfigState,
     options?: ChatRuntimeQueryOptions,
-  ): MimocodeAcpDynamicConfig | undefined {
+  ): KimicodeAcpDynamicConfig | undefined {
     const modeId = sessionConfig.resolveSelectedModeId();
     const modelId = sessionConfig.resolveSelectedRawModelId(options);
     const effortValue = sessionConfig.resolveSelectedEffortValue();
@@ -558,7 +566,7 @@ export class MimocodeExecution {
     // every reload. The applier resolves the id from the session's own reply;
     // the legacy runtime applied it after the session opened for this reason.
     const desiredEffort = sessionConfig.desiredEffortValue();
-    const dynamic: MimocodeAcpDynamicConfig = {
+    const dynamic: KimicodeAcpDynamicConfig = {
       ...(modeId ? { modeId } : {}),
       ...(modelId ? { modelId } : {}),
       ...(effortConfigId && effortValue
@@ -570,7 +578,7 @@ export class MimocodeExecution {
   }
 
   /**
-   * What the vendor charged, when only MiMoCode's database knows.
+   * What the vendor charged, when only Kimi Code's database knows.
    *
    * The plan indicator for this provider is spend, and a vendor that omits
    * `cost` from its usage update would otherwise never move it. The store
@@ -584,11 +592,11 @@ export class MimocodeExecution {
     if (!sessionId) {
       return;
     }
-    const cost = await loadMimocodeSessionCost(
+    const cost = await loadKimicodeSessionCost(
       sessionId,
       databasePath ? { databasePath } : undefined,
     );
-    if (mimocodePlanUsageStore.recordSessionTotalCost(sessionId, cost)) {
+    if (kimicodePlanUsageStore.recordSessionTotalCost(sessionId, cost)) {
       this.refreshSelectors();
     }
   }
@@ -614,13 +622,13 @@ export class MimocodeExecution {
         error,
         event: 'execution.sessionConfig.failed',
         level: 'warn',
-        scope: 'mimocode',
+        scope: 'kimicode',
       });
     });
   }
 
   private createClientFactory(): ManagedAcpClientFactory {
-    const fileSystem = new MimocodeAcpFileSystem({
+    const fileSystem = new KimicodeAcpFileSystem({
       // Full access opts into unrestricted file access; safe and plan modes
       // confine an ACP-delegated read or write to the session workspace.
       resolveSession: () => ({
@@ -652,7 +660,7 @@ export class MimocodeExecution {
   private fullAccess(): boolean {
     const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
       this.plugin.settings,
-      'mimocode',
+      'kimicode',
     );
     return settings.permissionMode === 'full_access';
   }
@@ -681,7 +689,7 @@ export class MimocodeExecution {
     const decision = await approval(
       'write',
       { path: input.resolvedPath, relativePath: input.requestPath },
-      `MiMoCode wants to write ${input.requestPath}.`,
+      `Kimi Code wants to write ${input.requestPath}.`,
       { decisionReason: 'File write permission required' },
     );
     return decision === 'allow' || decision === 'allow-always';
@@ -692,18 +700,18 @@ export class MimocodeExecution {
    *
    * The database is in memory, which is what makes it isolated: the legacy
    * warmups passed the same override for the same reason, so that asking what
-   * models exist never binds a session to a tab or writes MiMoCode state into
+   * models exist never binds a session to a tab or writes Kimi Code state into
    * the vault.
    */
-  private async metadataLaunch(): Promise<MimocodeMetadataLaunch> {
+  private async metadataLaunch(): Promise<KimicodeMetadataLaunch> {
     const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
       this.plugin.settings,
-      'mimocode',
+      'kimicode',
     );
     const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
-    const executable = this.plugin.getResolvedProviderCliPath('mimocode') ?? 'mimo';
-    const runtimeEnv = buildMimocodeRuntimeEnv(settings, executable, METADATA_DATABASE);
-    const artifacts = await prepareMimocodeLaunchArtifacts({
+    const executable = this.plugin.getResolvedProviderCliPath('kimicode') ?? 'kimi';
+    const runtimeEnv = buildKimicodeRuntimeEnv(settings, executable, METADATA_DATABASE);
+    const artifacts = await prepareKimicodeLaunchArtifacts({
       runtimeEnv,
       settings: {
         customPrompt: this.plugin.settings.systemPrompt,
@@ -720,13 +728,13 @@ export class MimocodeExecution {
         cwd,
         environment: definedEnvironment({
           ...runtimeEnv,
-          MIMOCODE_CONFIG: artifacts.configPath,
+          KIMICODE_CONFIG: artifacts.configPath,
           PATH: getEnhancedPath(runtimeEnv.PATH, isAbsolute(executable) ? executable : undefined),
         }),
       }),
       cwd,
       mcpServers: toAcpMcpServers([
-        ...(ProviderWorkspaceRegistry.getMcpServerManager('mimocode')?.getServers() ?? []),
+        ...(ProviderWorkspaceRegistry.getMcpServerManager('kimicode')?.getServers() ?? []),
       ]),
     };
   }
@@ -736,39 +744,39 @@ export class MimocodeExecution {
    * was queued.
    *
    * The artifacts are written here, before the reference is minted, because
-   * they are what the launch *is*: MiMoCode reads its config and system prompt
+   * they are what the launch *is*: Kimi Code reads its config and system prompt
    * from files, so a process spawned before they exist runs under the previous
    * turn's configuration.
    */
-  private async environment(databasePath?: string): Promise<MimocodeInvocationEnvironment> {
+  private async environment(databasePath?: string): Promise<KimicodeInvocationEnvironment> {
     const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
       this.plugin.settings,
-      'mimocode',
+      'kimicode',
     );
     const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
-    const executable = this.plugin.getResolvedProviderCliPath('mimocode') ?? 'mimo';
+    const executable = this.plugin.getResolvedProviderCliPath('kimicode') ?? 'kimi';
     // The conversation's own database, when it has one: a session created
     // against one cannot be loaded from another, so a turn launched without it
     // resumes nothing and leaves the history behind.
-    const runtimeEnv = buildMimocodeRuntimeEnv(settings, executable, databasePath ?? null);
+    const runtimeEnv = buildKimicodeRuntimeEnv(settings, executable, databasePath ?? null);
     const promptSettings = {
       customPrompt: this.plugin.settings.systemPrompt,
       mediaFolder: this.plugin.settings.mediaFolder,
       userName: this.plugin.settings.userName,
       vaultPath: cwd,
     };
-    const artifacts = await prepareMimocodeLaunchArtifacts({
+    const artifacts = await prepareKimicodeLaunchArtifacts({
       runtimeEnv,
       settings: promptSettings,
       workspaceRoot: cwd,
     });
-    const mcpServers = ProviderWorkspaceRegistry.getMcpServerManager('mimocode')?.getServers() ?? [];
+    const mcpServers = ProviderWorkspaceRegistry.getMcpServerManager('kimicode')?.getServers() ?? [];
     return {
       executable,
       cwd,
       environment: definedEnvironment({
         ...runtimeEnv,
-        MIMOCODE_CONFIG: artifacts.configPath,
+        KIMICODE_CONFIG: artifacts.configPath,
         PATH: getEnhancedPath(runtimeEnv.PATH, isAbsolute(executable) ? executable : undefined),
       }),
       // The legacy runtime's launch key, unchanged: what a running process
@@ -776,7 +784,7 @@ export class MimocodeExecution {
       launchKey: JSON.stringify({
         command: executable,
         configPath: artifacts.configPath,
-        envText: getRuntimeEnvironmentText(this.plugin.settings, 'mimocode'),
+        envText: getRuntimeEnvironmentText(this.plugin.settings, 'kimicode'),
         promptKey: computeSystemPromptKey(promptSettings),
         // The artifact key already carries the resolved database, which is what
         // makes a tab that moves to a conversation kept in another one restart
@@ -791,7 +799,7 @@ export class MimocodeExecution {
       }),
       mcpServers,
       // What the artifacts resolved, which is the answer the conversation is
-      // saved with — `MIMOCODE_DB` when it was given, the vault default when
+      // saved with — `KIMICODE_DB` when it was given, the vault default when
       // it was not.
       databasePath: artifacts.databasePath,
     };
@@ -807,7 +815,7 @@ export class MimocodeExecution {
  */
 function notWiredHere(slot: string): Promise<never> {
   return Promise.reject(new Error(
-    `MiMoCode MCP slot "${slot}" is served by the workspace registration, not by a chat tab.`,
+    `Kimi Code MCP slot "${slot}" is served by the workspace registration, not by a chat tab.`,
   ));
 }
 
@@ -827,17 +835,17 @@ function opaqueId(prefix: string): string {
 
 
 /**
- * The adapter for one MiMoCode tab, plus the one lifecycle it has no port for.
+ * The adapter for one Kimi Code tab, plus the one lifecycle it has no port for.
  *
  * A tab closing is when the prompts it raised and the turns it queued stop
  * being anyone's; waiting for its next turn is waiting for one that never
  * comes.
  */
-class MimocodeRuntimeAdapter extends ExecutionChatRuntimeAdapter<MimocodeProviderSettings> {
+class KimicodeRuntimeAdapter extends ExecutionChatRuntimeAdapter<KimicodeProviderSettings> {
   constructor(
     context: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[0],
     ports: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[1],
-    features: ProviderFeatureContributions<MimocodeProviderSettings>,
+    features: ProviderFeatureContributions<KimicodeProviderSettings>,
     workspace: ProviderWorkspaceSlots,
     private readonly releaseTab: () => void,
   ) {

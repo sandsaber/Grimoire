@@ -5459,6 +5459,40 @@ equivalent was re-broken to confirm it still catches its own version.
 
 Gates: unit 499 suites / 7,816 tests, typecheck, `eslint`, `build:release`.
 
+### Kimi Code's composition, dark — and a live regression it found (this commit)
+
+`KimicodeExecutionComposition`, `KimicodeMetadataSession`,
+`KimicodeModuleContext` and a 22-case seam suite, all dark and attributed. The
+fourth ACP provider on the kernel, and the third in a row to add nothing to the
+shared stack.
+
+**Six breaks, five caught — and the sixth was a real defect in shipped code.**
+Changing the composition's CLI fallback from `kimi` to `kimicode` failed no test,
+because the harness's plugin always resolves an absolute path and the `??` never
+fires. A test that resolves nothing now exists — and it went red on **MiMoCode**,
+which is flipped and live: its composition fell back to `'mimocode'` for a binary
+called `mimo`. `MimocodeChatRuntime` used `'mimo'`; the flip changed it, because
+a name substitution that replaces `mimocode` everywhere also replaces it where
+the string is a command rather than an id.
+
+What that would have cost a user: a MiMoCode tab with no absolute CLI path in
+settings — the default — spawning `mimocode`, which does not exist, and the flip's
+own `spawn-failed` sentence telling them to set an absolute path. Recoverable,
+and wrong.
+
+The property is now pinned for all four flipped ACP compositions, not only the
+one it broke on. OpenCode's and Grok's were correct because their binary names
+equal their provider ids; both tests were proved by breaking them anyway, since a
+test that can only pass is not evidence.
+
+**Kimi Code's own values are absent by construction.** The derived seam suite
+carried MiMoCode's model id, its 1 MiB window and its `build` mode; none of that
+was observed for a provider whose session has never opened. The one value that is
+this provider's own is the mode — `default`, which `modes.ts` names alongside
+`auto` and `plan` — and the suite header says the rest are shapes, not evidence.
+
+Gates: unit 500 suites / 7,841 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -5490,14 +5524,14 @@ account. Everything up to the answer is confirmed against the real CLI. One head
 generating account settles rows 1, 2, 5, 6, 7, 8, 12, 13 and 15; until then MiMoCode is flipped but
 **not certified**, and the matrix says so in its own Record table rather than in this file only.
 
-**Kimi Code is built up to the composition.** Ten execution modules plus the provider module, all
-tested, eight of them dark and attributed. What is left is the same two steps MiMoCode took:
-`KimicodeExecutionComposition` and `KimicodeMetadataSession` under `src/app/execution/kimicode/` with
-`KimicodeModuleContext` beside them, then the flip as one revertible commit —
-`registration.ts` at `plugin.getKimicodeExecution().createRuntime()`, `main.ts` constructing and
-registering it, `KimicodeChatRuntime` deleted, and the four metadata surfaces moved onto
-`execution.metadata`. Then the harness, which for this provider will need a logged-in machine before
-it can say anything: `kimi acp` cannot open a session at all here.
+**Kimi Code's whole assembly exists and is tested; only the flip is left.** Eleven dark modules plus
+the two live extractions. What remains is one revertible commit: `registration.ts` at
+`plugin.getKimicodeExecution().createRuntime()`, `main.ts` constructing and registering a
+`KimicodeExecution`, `KimicodeChatRuntime` deleted, and the four metadata surfaces
+(`KimicodeSettingsTab`, `KimicodeChatUIConfig`, `KimicodeWorkspaceServices`,
+`KimicodeRuntimeCommandLoader`) moved onto `execution.metadata`. Then the harness — which for this
+provider needs a logged-in machine before it can say anything at all: `kimi acp` cannot open a
+session here.
 
 Two techniques worth repeating on the next provider. The normalized diff — `sed` both files' provider
 names to one token and diff — is what made the config-state move safe to do mechanically. And break

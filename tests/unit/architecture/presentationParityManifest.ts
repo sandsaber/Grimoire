@@ -752,6 +752,11 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/kimicode/execution/KimicodeInteractionBridge.ts',
       'src/providers/kimicode/execution/KimicodeInteractionPresenter.ts',
       'src/providers/kimicode/execution/KimicodeProjectionResultSink.ts',
+      // The composition and the two things only it constructs, dark until
+      // `main.ts` builds a `KimicodeExecution`.
+      'src/app/execution/kimicode/KimicodeExecutionComposition.ts',
+      'src/app/execution/kimicode/KimicodeMetadataSession.ts',
+      'src/providers/kimicode/app/KimicodeModuleContext.ts',
     ],
   },
 ];

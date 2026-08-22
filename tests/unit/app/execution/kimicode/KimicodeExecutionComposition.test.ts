@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { MimocodeExecution } from '@/app/execution/mimocode/MimocodeExecutionComposition';
+import { KimicodeExecution } from '@/app/execution/kimicode/KimicodeExecutionComposition';
 import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
 import { executionSessionId, type InteractionId, runId } from '@/core/execution/ExecutionIds';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
@@ -23,15 +23,15 @@ import type {
   AcpRequestPermissionResponse,
   AcpSessionNotification,
 } from '@/providers/acp/types';
-import { MimocodeContentPresenter } from '@/providers/mimocode/execution/MimocodeContentPresenter';
-import { MIMOCODE_EXECUTION_DESCRIPTOR } from '@/providers/mimocode/execution/MimocodeExecutionBackend';
+import { KimicodeContentPresenter } from '@/providers/kimicode/execution/KimicodeContentPresenter';
+import { KIMICODE_EXECUTION_DESCRIPTOR } from '@/providers/kimicode/execution/KimicodeExecutionBackend';
 import {
-  getMimocodeProviderSettings,
-  updateMimocodeProviderSettings,
-} from '@/providers/mimocode/settings';
+  getKimicodeProviderSettings,
+  updateKimicodeProviderSettings,
+} from '@/providers/kimicode/settings';
 
 /**
- * The half of the MiMoCode flip that only exists in production.
+ * The half of the Kimi Code flip that only exists in production.
  *
  * The backend takes three opaque references — the turn, the process to spawn,
  * the session config to apply — and knows what is inside none of them. This
@@ -40,19 +40,23 @@ import {
  *
  * So this drives a whole turn with a fake ACP client as the only stand-in, and
  * asserts the thing the three reference spaces exist for: that the process the
- * launcher would spawn is `mimo acp`, under the config the artifacts just
+ * launcher would spawn is `kimi acp`, under the config the artifacts just
  * wrote, resolved from the reference the turn minted.
  *
  * Run before the flip rather than after, because a flip that has to be reverted
- * to be tested is a flip nobody will revert. What the fake answers with is the
- * recorded session's own — the model id, the `build` mode and the 1 MiB window
- * `mimo acp` reported — except the turn's answer, which that account cannot
- * generate; those chunks are the protocol's shape.
+ * to be tested is a flip nobody will revert.
+ *
+ * **Nothing the fake answers with was observed from Kimi Code.** Its wire
+ * recording never opened a session — `kimi acp` refused with "Authentication
+ * required" — so the model, the mode, the window and the answer are all shapes
+ * rather than evidence. The one value here that *is* this provider's own is the
+ * mode: `default`, which `modes.ts` names alongside `auto` and `plan`, and which
+ * is not what its two siblings use.
  */
-describe('MiMoCode execution composition', () => {
+describe('Kimi Code execution composition', () => {
   const SESSION_ID = executionSessionId(`es-${'2'.repeat(32)}`);
   const RUN_ID = runId(`run-${'2'.repeat(32)}`);
-  const OWNER = { kind: 'conversation' as const, ownerId: 'mimocode-tab' };
+  const OWNER = { kind: 'conversation' as const, ownerId: 'kimicode-tab' };
 
   const vaults: string[] = [];
 
@@ -63,7 +67,7 @@ describe('MiMoCode execution composition', () => {
   });
 
   function createPlugin(): any {
-    const vault = mkdtempSync(join(tmpdir(), 'grimoire-mimocode-composition-'));
+    const vault = mkdtempSync(join(tmpdir(), 'grimoire-kimicode-composition-'));
     vaults.push(vault);
     const settings: Record<string, unknown> = {
       permissionMode: 'full_access',
@@ -71,12 +75,12 @@ describe('MiMoCode execution composition', () => {
       userName: 'Michael',
       mediaFolder: 'media',
     };
-    updateMimocodeProviderSettings(settings, { enabled: true });
+    updateKimicodeProviderSettings(settings, { enabled: true });
     return {
       settings,
       manifest: { version: '1.2.3' },
       app: { vault: { adapter: { basePath: vault } } },
-      getResolvedProviderCliPath: () => '/usr/local/bin/mimo',
+      getResolvedProviderCliPath: () => '/usr/local/bin/kimi',
       getActiveEnvironmentVariables: () => '',
       recordDebugLog: () => undefined,
       // Both are called by the session sync, and a plugin without them throws
@@ -141,16 +145,16 @@ describe('MiMoCode execution composition', () => {
               }
               : {}),
             models: {
-              availableModels: [{ id: 'xiaomi/mimo-v2.5-pro-ultraspeed', name: 'Xiaomi/MiMo-V2.5-Pro-UltraSpeed' }],
-              currentModelId: 'xiaomi/mimo-v2.5-pro-ultraspeed',
+              availableModels: [{ id: 'anthropic/claude-sonnet-4', name: 'Anthropic/Claude Sonnet 4' }],
+              currentModelId: 'anthropic/claude-sonnet-4',
             },
             modes: {
               availableModes: [{
-                id: 'build',
-                name: 'build',
-                description: 'Executes tools based on configured permissions.',
+                id: 'default',
+                name: 'Default',
+                description: 'Manual approvals; tools execute normally.',
               }],
-              currentModeId: 'build',
+              currentModeId: 'default',
             },
           }),
           loadSession: async request => {
@@ -160,14 +164,14 @@ describe('MiMoCode execution composition', () => {
             }
             if (options.sessionLoadFails) {
               // The shape OpenCode 1.18.18 answers with for a session it does
-              // not have — nothing about the session at all. Kept for MiMoCode
+              // not have — nothing about the session at all. Kept for Kimi Code
               // because it is a fork of that CLI and the recording could not
               // reach this path: what matters to the assertion is that the
               // error names no session, not which vendor phrased it.
               throw new JsonRpcErrorResponse(
                 'session/load',
                 -32603,
-                'Internal error: MiMoCode service failure',
+                'Internal error: Kimi Code service failure',
                 { service: 'session' },
               );
             }
@@ -205,8 +209,8 @@ describe('MiMoCode execution composition', () => {
               sessionId: 'acp-session-1',
               update: {
                 sessionUpdate: 'usage_update',
-                used: 104_857,
-                size: 1_048_576,
+                used: 16_384,
+                size: 262_144,
                 cost: { amount: 0.25, currency: 'USD' },
               },
             });
@@ -252,7 +256,7 @@ describe('MiMoCode execution composition', () => {
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
   } = {}): Promise<{
-    execution: MimocodeExecution;
+    execution: KimicodeExecution;
     host: ExecutionKernelHost;
     startupRefs: string[];
     prompts: unknown[];
@@ -268,14 +272,14 @@ describe('MiMoCode execution composition', () => {
         clearTimeout: handle => clearTimeout(handle as NodeJS.Timeout),
       },
     });
-    const execution = new MimocodeExecution(options.plugin ?? createPlugin(), host.registry);
+    const execution = new KimicodeExecution(options.plugin ?? createPlugin(), host.registry);
     const {
       factory, startupRefs, prompts, permissions, configOptions, loadRequests,
     } = createFakeAcp(options);
     host.registerBackend(execution.createBackendRegistration(factory));
     await host.start();
     await host.registry.createSession({
-      backendId: MIMOCODE_EXECUTION_DESCRIPTOR.backendId,
+      backendId: KIMICODE_EXECUTION_DESCRIPTOR.backendId,
       executionSessionId: SESSION_ID,
       owner: OWNER,
     });
@@ -358,8 +362,8 @@ describe('MiMoCode execution composition', () => {
     const { execution, host, events } = await createHarness();
     const costs: unknown[] = [];
     const opened: unknown[] = [];
-    const presenter = new MimocodeContentPresenter({
-      displayModel: () => 'xiaomi/mimo-v2.5-pro-ultraspeed',
+    const presenter = new KimicodeContentPresenter({
+      displayModel: () => 'anthropic/claude-sonnet-4',
       onCost: cost => costs.push(cost),
       onSessionOpened: opening => opened.push(opening),
     });
@@ -394,8 +398,8 @@ describe('MiMoCode execution composition', () => {
       expect.objectContaining({
         sessionId: 'acp-session-1',
         usage: expect.objectContaining({
-          contextWindow: 1_048_576,
-          contextTokens: 104_857,
+          contextWindow: 262_144,
+          contextTokens: 16_384,
           inputTokens: 15_940,
         }),
       }),
@@ -405,8 +409,8 @@ describe('MiMoCode execution composition', () => {
     // says once and nothing repeats.
     expect(opened).toEqual([expect.objectContaining({
       sessionId: 'acp-session-1',
-      models: expect.objectContaining({ currentModelId: 'xiaomi/mimo-v2.5-pro-ultraspeed' }),
-      modes: expect.objectContaining({ currentModeId: 'build' }),
+      models: expect.objectContaining({ currentModelId: 'anthropic/claude-sonnet-4' }),
+      modes: expect.objectContaining({ currentModeId: 'default' }),
     })]);
     expect(presenter.lastSessionId()).toBe('acp-session-1');
     // The answer itself stays on the kernel's channel; a second copy here
@@ -438,7 +442,7 @@ describe('MiMoCode execution composition', () => {
     expect(execution.interactionBridge.presentation(opened.presentationRef))
       .toEqual(expect.objectContaining({
         toolName: 'bash',
-        description: 'MiMoCode wants to run a shell command.',
+        description: 'Kimi Code wants to run a shell command.',
         options: [
           { responseId: 'allow-once', label: 'Allow', presentation: 'allow' },
           { responseId: 'reject-once', label: 'Deny', presentation: 'reject' },
@@ -506,7 +510,7 @@ describe('MiMoCode execution composition', () => {
   });
 
   it('says what a turn that never started needs the person to do', async () => {
-    // MiMoCode answers an unknown session with a generic service failure, and
+    // Kimi Code answers an unknown session with a generic service failure, and
     // the resume policy keeps a binding rather than replacing it on an error
     // that vague — so without provider wording the conversation repeats the
     // neutral sentence on every turn with nothing to act on.
@@ -556,7 +560,7 @@ describe('MiMoCode execution composition', () => {
 
     expect(asked).toEqual([{
       toolName: 'bash',
-      description: 'MiMoCode wants to run a shell command.',
+      description: 'Kimi Code wants to run a shell command.',
     }]);
     // What the tab chose, in the agent's own vocabulary: the point of the
     // bridge is that this arrives as a permission rather than as a chunk.
@@ -572,10 +576,10 @@ describe('MiMoCode execution composition', () => {
     // Not full access: that mode allows every write before anyone is asked, so
     // a harness left on it cannot see this decision at all. The mode is pinned
     // as well as set, because a fresh vault takes its selected mode from the
-    // first session that opens — and `mimo acp` opens in `build`, which is
-    // auto-approve.
+    // first session that opens, and whichever mode that is has not been
+    // observed for this provider.
     plugin.settings.permissionMode = 'plan';
-    updateMimocodeProviderSettings(plugin.settings, { selectedMode: 'plan' });
+    updateKimicodeProviderSettings(plugin.settings, { selectedMode: 'plan' });
     const { execution, host } = await createHarness({ plugin });
     const runtime = execution.createRuntime();
     const approval = jest.fn(async () => 'allow' as const);
@@ -605,7 +609,7 @@ describe('MiMoCode execution composition', () => {
 
   it('does not push the default agent a new session reports at the toolbar', async () => {
     const plugin = createPlugin();
-    // The user's pick, which the session's own `build` must not overwrite.
+    // The user's pick, which the session's own default must not overwrite.
     plugin.settings.permissionMode = 'plan';
     const { execution, host } = await createHarness({ plugin });
     const runtime = execution.createRuntime();
@@ -619,9 +623,9 @@ describe('MiMoCode execution composition', () => {
     // turn, so waiting for the turn is not waiting for it. Waited for by the
     // thing the same call seeds — otherwise an empty `synced` only means the
     // sync had not run yet, which every wrong version of this would also pass.
-    await waitFor(() => getMimocodeProviderSettings(plugin.settings).availableModes.length > 0);
+    await waitFor(() => getKimicodeProviderSettings(plugin.settings).availableModes.length > 0);
 
-    // `session/new` answers with MiMoCode's default agent, not a switch: the
+    // `session/new` answers with Kimi Code's default agent, not a switch: the
     // toolbar would flip from Plan to Auto-approve before the turn applied the
     // mode the tab is actually set to.
     expect(synced).toEqual([]);
@@ -630,7 +634,7 @@ describe('MiMoCode execution composition', () => {
   });
 
   it('learns the vault models from the session the turn opened', async () => {
-    // A MiMoCode vault learns what its models are by opening a session and
+    // A Kimi Code vault learns what its models are by opening a session and
     // being told; nothing else answers that question.
     const plugin = createPlugin();
     const { execution, host } = await createHarness({ plugin });
@@ -638,15 +642,15 @@ describe('MiMoCode execution composition', () => {
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
 
-    expect(getMimocodeProviderSettings(plugin.settings).discoveredModels)
-      .toEqual([expect.objectContaining({ rawId: 'xiaomi/mimo-v2.5-pro-ultraspeed' })]);
+    expect(getKimicodeProviderSettings(plugin.settings).discoveredModels)
+      .toEqual([expect.objectContaining({ rawId: 'anthropic/claude-sonnet-4' })]);
     execution.dispose();
     await host.dispose();
   });
 
   it('dispatches the turn under the mode the tab is set to', async () => {
     const plugin = createPlugin();
-    updateMimocodeProviderSettings(plugin.settings, { selectedMode: 'plan' });
+    updateKimicodeProviderSettings(plugin.settings, { selectedMode: 'plan' });
     plugin.settings.permissionMode = 'plan';
     const { execution, host, configOptions } = await createHarness({ plugin });
     const runtime = execution.createRuntime();
@@ -667,7 +671,7 @@ describe('MiMoCode execution composition', () => {
   it('forces the Claude prompt flag while preserving the project config flag', async () => {
     const plugin = createPlugin();
     plugin.settings.sharedEnvironmentVariables =
-      'MIMOCODE_DISABLE_PROJECT_CONFIG=false\nMIMOCODE_DISABLE_CLAUDE_CODE_PROMPT=false';
+      'KIMICODE_DISABLE_PROJECT_CONFIG=false\nKIMICODE_DISABLE_CLAUDE_CODE_PROMPT=false';
     const { execution, host } = await createHarness({ plugin });
 
     const invocation = await execution.turnRequests.resolve(execution.turnRequests.reference({
@@ -675,24 +679,24 @@ describe('MiMoCode execution composition', () => {
     }));
     const launch = await execution.turnRequests.resolveLaunch(invocation.startupRef);
 
-    // The vault's own MiMoCode variables are honoured; the one Grimoire owns —
-    // MiMoCode reading Claude's prompt files — is not negotiable.
-    expect(launch.environment.MIMOCODE_DISABLE_PROJECT_CONFIG).toBe('false');
-    expect(launch.environment.MIMOCODE_DISABLE_CLAUDE_CODE_PROMPT).toBe('true');
+    // The vault's own Kimi Code variables are honoured; the one Grimoire owns —
+    // Kimi Code reading Claude's prompt files — is not negotiable.
+    expect(launch.environment.KIMICODE_DISABLE_PROJECT_CONFIG).toBe('false');
+    expect(launch.environment.KIMICODE_DISABLE_CLAUDE_CODE_PROMPT).toBe('true');
     execution.dispose();
     await host.dispose();
   });
 
   it('asks its questions in a process bound to no conversation', async () => {
     // The four surfaces that ask what models exist must not bind a session to
-    // a tab or write MiMoCode state into the vault while they do it.
+    // a tab or write Kimi Code state into the vault while they do it.
     const { execution, host, startupRefs } = await createHarness();
 
     await execution.metadata.discoverMetadata();
 
     expect(startupRefs).toHaveLength(1);
     const launch = await execution.turnRequests.resolveLaunch(startupRefs[0]);
-    expect(launch.environment.MIMOCODE_DB).toBe(':memory:');
+    expect(launch.environment.KIMICODE_DB).toBe(':memory:');
     expect(launch.arguments).toEqual(['acp']);
     execution.dispose();
     await host.dispose();
@@ -712,7 +716,7 @@ describe('MiMoCode execution composition', () => {
     }));
     const launch = await execution.turnRequests.resolveLaunch(invocation.startupRef);
 
-    expect(launch.environment.MIMOCODE_DB).toBe(other);
+    expect(launch.environment.KIMICODE_DB).toBe(other);
     execution.dispose();
     await host.dispose();
   });
@@ -798,7 +802,7 @@ describe('MiMoCode execution composition', () => {
   it('resolves the startup reference into the process a launcher would spawn', async () => {
     // The three reference spaces are the point of this composition, and this is
     // where they meet: the turn mints a startup reference, and what it stands
-    // for is `mimocode acp` under the config file the artifacts wrote for that
+    // for is `kimicode acp` under the config file the artifacts wrote for that
     // same turn. A launch built anywhere else would run the previous turn's
     // configuration.
     const { execution, host, startupRefs, events } = await createHarness();
@@ -817,11 +821,11 @@ describe('MiMoCode execution composition', () => {
     expect(startupRefs).toHaveLength(1);
     const launch = await execution.turnRequests.resolveLaunch(startupRefs[0]);
     expect(launch).toMatchObject({
-      executable: '/usr/local/bin/mimo',
+      executable: '/usr/local/bin/kimi',
       arguments: ['acp'],
     });
-    expect(launch.environment.MIMOCODE_CONFIG).toContain('.grimoire');
-    expect(launch.environment.MIMOCODE_DISABLE_CLAUDE_CODE_PROMPT).toBe('true');
+    expect(launch.environment.KIMICODE_CONFIG).toContain('.grimoire');
+    expect(launch.environment.KIMICODE_DISABLE_CLAUDE_CODE_PROMPT).toBe('true');
     execution.dispose();
     await host.dispose();
   });
@@ -830,8 +834,8 @@ describe('MiMoCode execution composition', () => {
     const plugin = createPlugin();
     // Nothing resolved: no absolute path in settings, and nothing found on
     // PATH. What is spawned then is this string, and the provider id is not it
-    // — `mimocode` is the directory the CLI ships in and the id Grimoire files
-    // it under; `mimo` is the binary. Getting this wrong is "command not
+    // — `kimicode` is the directory the CLI ships in and the id Grimoire files
+    // it under; `kimi` is the binary. Getting this wrong is "command not
     // found" for every user who has not set an absolute path.
     plugin.getResolvedProviderCliPath = () => null;
     const { execution, host } = await createHarness({ plugin });
@@ -841,7 +845,7 @@ describe('MiMoCode execution composition', () => {
     }));
     const launch = await execution.turnRequests.resolveLaunch(invocation.startupRef);
 
-    expect(launch.executable).toBe('mimo');
+    expect(launch.executable).toBe('kimi');
     execution.dispose();
     await host.dispose();
   });
