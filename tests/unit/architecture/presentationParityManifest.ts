@@ -761,6 +761,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/gemini/execution/GeminiAcpFileSystem.ts',
       'src/providers/gemini/execution/GeminiExecutionBackend.ts',
       'src/providers/gemini/execution/GeminiInteractionBridge.ts',
+      'src/providers/gemini/execution/GeminiContentPresenter.ts',
+      'src/providers/gemini/execution/GeminiExecutionRequests.ts',
       'src/providers/gemini/execution/GeminiProjectionResultSink.ts',
     ],
   },

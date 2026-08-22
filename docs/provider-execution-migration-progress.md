@@ -5716,6 +5716,34 @@ reading rather than by moving text.
 
 Gates: unit 501 suites / 7,839 tests, typecheck, `eslint`, `build:release`.
 
+### Gemini's content presenter and requests store, dark (this commit)
+
+The last two provider-owned parts before the composition. Both written from what
+this provider actually does rather than from what its siblings do, and three
+differences are load-bearing enough to be tested rather than commented.
+
+**No tool stream adapter.** Every OpenCode-family runtime and Grok's normalize a
+tool call through one; Gemini has no `normalization/` directory at all. So the
+name on a Gemini tool card is the agent's own word — `read`, not the canonical
+`Read` its siblings map to. The test asserts both halves: what the name *is*,
+and that it is *not* the canonical one. Adding an adapter here would change what
+a Gemini user sees, under cover of a migration.
+
+**The commands the session announces are dropped on purpose.** The recording
+shows `available_commands_update` arriving, and `capabilities.ts` declares
+`supportsProviderCommands: false`. Named in the switch rather than left to the
+default branch, so the absence reads as a decision.
+
+**The launch has no artifacts.** `GeminiChatRuntime`'s launch key is the command
+and the environment text and nothing else — no managed home, no config file, no
+system prompt on disk — so the requests store's environment is the shortest of
+the six. And `--acp` is a flag, not a subcommand, which is what separates this
+wave from the four before it.
+
+Four breaks, four caught.
+
+Gates: unit 503 suites / 7,855 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

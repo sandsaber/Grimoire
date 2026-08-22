@@ -723,9 +723,6 @@ export class GeminiChatRuntime implements ChatRuntime {
     if (this.sessionConfig.syncSessionDiscovery(params)) {
       void this.plugin.saveSettings?.();
     }
-    // Mirrored while the legacy runtime still reads these two directly. They go
-    // when the flip does.
-
   }
 
   private async handlePermissionRequest(
