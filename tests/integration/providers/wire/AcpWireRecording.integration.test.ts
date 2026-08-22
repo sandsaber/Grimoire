@@ -1,12 +1,13 @@
 import { recordAcpWire } from '@test/helpers/recordAcpWire';
 
 /**
- * The wire recordings wave 6 is blocked on.
+ * The wire recordings each flip is blocked on.
  *
- * The plan puts a recording before a flip, and both providers of this wave
- * needed one: MiMoCode's was partial and Kimi Code's was absent. Off by
- * default because it starts a CLI and spends whatever the account has; run it
- * with `GRIMOIRE_WIRE_RECORD=1`, and it rewrites the fixtures in place.
+ * The plan puts a recording before a flip. Wave 6 needed two — MiMoCode's was
+ * partial and Kimi Code's was absent — and wave 7 needs two more: neither Qwen
+ * Code nor Gemini CLI has ever been recorded. Off by default because it starts
+ * a CLI and spends whatever the account has; run it with
+ * `GRIMOIRE_WIRE_RECORD=1`, and it rewrites the fixtures in place.
  *
  * Recording *is* the assertion here. A recording of nothing would be worse than
  * none, because it would look taken — so each row requires the CLI to have
@@ -36,6 +37,32 @@ record('ACP wire recordings', () => {
       command: process.env.GRIMOIRE_KIMICODE_CLI ?? 'kimi',
       args: ['acp'],
       transport: 'stdio JSON-RPC 2.0 (`kimi acp`)',
+    });
+
+    expect((recording.exchange as unknown[]).length).toBeGreaterThan(1);
+    expect(recording.recordedAgainst).toMatch(/\d+\.\d+/);
+  });
+
+  // Wave 7's two, and the first difference between the waves is on the command
+  // line: these are spoken to through a *flag* rather than a subcommand.
+  it('records what Qwen Code answers', async () => {
+    const recording = await recordAcpWire({
+      providerId: 'qwen',
+      command: process.env.GRIMOIRE_QWEN_CLI ?? 'qwen',
+      args: ['--acp'],
+      transport: 'stdio JSON-RPC 2.0 (`qwen --acp`)',
+    });
+
+    expect((recording.exchange as unknown[]).length).toBeGreaterThan(1);
+    expect(recording.recordedAgainst).toMatch(/\d+\.\d+/);
+  });
+
+  it('records what Gemini CLI answers', async () => {
+    const recording = await recordAcpWire({
+      providerId: 'gemini',
+      command: process.env.GRIMOIRE_GEMINI_CLI ?? 'gemini',
+      args: ['--acp'],
+      transport: 'stdio JSON-RPC 2.0 (`gemini --acp`)',
     });
 
     expect((recording.exchange as unknown[]).length).toBeGreaterThan(1);

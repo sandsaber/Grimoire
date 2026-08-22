@@ -5527,6 +5527,36 @@ Gates: unit 499 suites / 7,801 tests, integration 5 suites / 145 tests (59
 env-gated skips), typecheck, `eslint`, `build:release`, plus four consecutive
 full unit runs green after the flake fix.
 
+### Wave 7 opens: two recordings, and one of them is complete (this commit)
+
+Qwen Code and Gemini CLI, recorded from their own CLIs before any of their code
+is touched — which is the order the plan asks for and the order wave 6 got right
+too. The first difference between the waves is on the command line: both are
+spoken to through a **flag**, `--acp`, where the four before them use a
+subcommand.
+
+**Gemini CLI's recording is `complete`** — the first since Grok's. It opened a
+session, took a prompt and answered with `agent_message_chunk` and
+`agent_thought_chunk`. Its session reports four modes of its own (`default`,
+`autoEdit`, `yolo`, `plan`) and a model list, and no config options at all: no
+`session/set_config_option` round trip appears, because there was nothing to set.
+
+**Qwen Code's is `partial`**, and for the same reason as Kimi Code's:
+*"Authentication required: Use Qwen Code CLI to authenticate first."* Its
+`initialize` answers with the auth methods it offers, which is evidence of a
+shape a flip meets; nothing past the handshake is.
+
+**The coverage gate was blind in one direction, and the first complete recording
+found it.** `wireVocabularyCoverage.test.ts` decided "partial" by asking whether
+the `coverage` field was *truthy*. That worked only while the field appeared on
+partial recordings alone — the four oldest fixtures predate the shared recorder
+and carry no `coverage` key, so the test had never seen a complete one that had
+it. The shared recorder writes it either way, so Gemini's `complete` was
+reported as partial by the gate whose whole job is telling the two apart. Now
+read as a value, and proved by marking Gemini partial and watching it go red.
+
+Gates: unit 499 suites / 7,807 tests, typecheck, `eslint`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
