@@ -563,4 +563,116 @@ describe('GeminiChatRuntime', () => {
       .resolves.toBe('missing');
   });
 
+
+  describe('session mode', () => {
+    /**
+     * The two vocabularies a Gemini session lives between.
+     *
+     * The toolbar writes `normal`/`full_access`/`plan` into `selectedMode`; the
+     * recorded session (`gemini 0.55.1`) offers `default`, `autoEdit`, `yolo`
+     * and `plan`. Neither word survives being used as the other, and both
+     * directions had been forwarding rather than translating.
+     */
+    function createRuntimeWithSession(permissionMode: string): {
+      runtime: any;
+      setMode: jest.Mock;
+      plugin: any;
+    } {
+      const plugin = createMockPlugin();
+      plugin.settings.permissionMode = permissionMode;
+      updateGeminiProviderSettings(plugin.settings, { selectedMode: permissionMode });
+      const runtime = new GeminiChatRuntime(plugin) as any;
+      const setMode = jest.fn().mockResolvedValue({});
+      runtime.connection = { setMode };
+      return { runtime, setMode, plugin };
+    }
+
+    it('sends the agent a mode it actually has', async () => {
+      const { runtime, setMode } = createRuntimeWithSession('full_access');
+
+      await runtime.applySelectedMode('session-1');
+
+      // `full_access` is Grimoire's word. Sending it is a mode the agent does
+      // not have, and `applySelectedMode` is awaited inside the turn's own try
+      // — so the rejection ends the turn before the prompt is sent.
+      expect(setMode).toHaveBeenCalledWith({ modeId: 'yolo', sessionId: 'session-1' });
+    });
+
+    it.each([
+      ['normal', 'default'],
+      ['plan', 'plan'],
+      ['full_access', 'yolo'],
+    ])('maps the %s toggle to %s', async (permissionMode, modeId) => {
+      const { runtime, setMode } = createRuntimeWithSession(permissionMode);
+
+      await runtime.applySelectedMode('session-1');
+
+      expect(setMode).toHaveBeenCalledWith({ modeId, sessionId: 'session-1' });
+    });
+
+    it('shows the toolbar a value it can render when the agent reports its own', async () => {
+      const plugin = createMockPlugin();
+      const runtime = new GeminiChatRuntime(plugin) as any;
+      const synced: string[] = [];
+      runtime.permissionModeSyncCallback = (mode: string) => synced.push(mode);
+      runtime.sessionId = 'session-1';
+
+      await runtime.handleSessionNotification({
+        sessionId: 'session-1',
+        update: { sessionUpdate: 'current_mode_update', currentModeId: 'autoEdit' },
+      });
+
+      // `autoEdit` auto-approves edits and still asks before a command, so it
+      // is Safe rather than Auto-approve — and storing the raw id left the
+      // toolbar showing whichever of its three values `coercePermissionMode`
+      // fell back to.
+      expect(synced).toEqual(['normal']);
+      expect(getGeminiProviderSettings(plugin.settings).selectedMode).toBe('normal');
+      // The agent's own word is what the *session* is compared against, so it
+      // is kept in the agent's vocabulary here.
+      expect(runtime.currentSessionModeId).toBe('autoEdit');
+    });
+
+    it('maps the agent yolo mode back to Auto-approve', async () => {
+      const plugin = createMockPlugin();
+      const runtime = new GeminiChatRuntime(plugin) as any;
+      const synced: string[] = [];
+      runtime.permissionModeSyncCallback = (mode: string) => synced.push(mode);
+      runtime.sessionId = 'session-1';
+
+      await runtime.handleSessionNotification({
+        sessionId: 'session-1',
+        update: { sessionUpdate: 'current_mode_update', currentModeId: 'yolo' },
+      });
+
+      expect(synced).toEqual(['full_access']);
+    });
+
+    it('forgets the mode with the session it belonged to', async () => {
+      const { runtime, setMode } = createRuntimeWithSession('plan');
+      await runtime.applySelectedMode('session-1');
+      expect(setMode).toHaveBeenCalledTimes(1);
+
+      // A process restart is a new session, and the mode the old one was in
+      // says nothing about it. Kept, the next turn short-circuits and the new
+      // session runs in the agent's default while the toolbar says Plan.
+      runtime.clearActiveSession();
+      await runtime.applySelectedMode('session-2');
+
+      expect(setMode).toHaveBeenCalledTimes(2);
+      expect(setMode).toHaveBeenLastCalledWith({ modeId: 'plan', sessionId: 'session-2' });
+    });
+
+    it('forgets the mode when the tab moves to another conversation', async () => {
+      const { runtime, setMode } = createRuntimeWithSession('plan');
+      runtime.sessionId = 'session-1';
+      await runtime.applySelectedMode('session-1');
+
+      runtime.syncConversationState({ providerState: {}, sessionId: 'session-2' });
+      await runtime.applySelectedMode('session-2');
+
+      expect(setMode).toHaveBeenCalledTimes(2);
+    });
+  });
+
 });

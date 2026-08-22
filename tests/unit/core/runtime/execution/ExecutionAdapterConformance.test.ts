@@ -743,6 +743,87 @@ describe('the assembled ChatRuntime adapter', () => {
     expect(adapter.consumeTurnMetadata().userMessageId).toBe('provider-message');
   });
 
+  it('cancels the run it is dropping before it disposes the session', async () => {
+    const harness = await createHarness({ ownSession: true });
+    const failures: unknown[] = [];
+    const adapter = createAdapter(harness, {
+      reportCleanupFailure: (error: unknown) => { failures.push(error); },
+    });
+    const userRun = toRunId(`run-${'1'.padStart(32, '0')}`);
+    const collected = drain(adapter.query(adapter.prepareTurn({ text: 'hello' })));
+    for (let attempt = 0; attempt < 200 && !harness.dispatched(userRun); attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    const disposed: string[] = [];
+    const disposeSession = harness.registry.disposeSession.bind(harness.registry);
+    jest.spyOn(harness.registry, 'disposeSession').mockImplementation(async id => {
+      disposed.push(String(id));
+      return disposeSession(id);
+    });
+
+    // A tab moving to another conversation while its turn is still streaming.
+    // Disposing a session with a live run is refused by the registry, and the
+    // rejection used to be swallowed into `reportCleanupFailure` with the
+    // session id already forgotten — the kernel session and its provider
+    // process then had nothing left holding a reference to them.
+    adapter.syncConversationState({
+      id: 'another-conversation',
+      messages: [],
+      providerState: {},
+      sessionId: null,
+    } as never);
+    await collected;
+    for (let attempt = 0; attempt < 200 && disposed.length === 0; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+
+    expect(disposed).toHaveLength(1);
+    expect(failures).toEqual([]);
+  });
+
+  it('does not follow its own run as a backend turn', async () => {
+    const harness = await createHarness({ ownSession: true });
+    const side: Array<(envelope: ExecutionEventEnvelope) => void> = [];
+    const observe = harness.registry.observe.bind(harness.registry);
+    jest.spyOn(harness.registry, 'observe').mockImplementation((id, listener) => {
+      side.push(listener);
+      return observe(id, listener);
+    });
+    const adapter = createAdapter(harness);
+    const turns: AutoTurnResult[] = [];
+    adapter.setAutoTurnCallback((result: AutoTurnResult) => {
+      turns.push(result);
+    });
+    await adapter.ensureReady();
+
+    const userRun = toRunId(`run-${'1'.padStart(32, '0')}`);
+    // The tab's own `run-started`, delivered while `startRun` is still in
+    // flight — the window `startExecutionRun`'s own docstring warns about, and
+    // the only way to reach it is from inside that call. Unrecognised, the
+    // adapter opens a second stream for the turn it is already streaming and
+    // the surface renders it twice: once from the generator, once as an
+    // auto-turn nobody asked for.
+    const startRun = harness.registry.startRun.bind(harness.registry);
+    jest.spyOn(harness.registry, 'startRun').mockImplementation(async (id, request) => {
+      side[0]?.(sideChannel(request.runId, { kind: 'run-started' }, 1));
+      return startRun(id, request);
+    });
+    const collected = drain(adapter.query(adapter.prepareTurn({ text: 'hello' })));
+    for (let attempt = 0; attempt < 200 && !harness.dispatched(userRun); attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    await harness.emit(
+      userRun,
+      { kind: 'output-delta', channel: 'assistant', text: 'answer' },
+      'd-1',
+    );
+    await harness.emit(userRun, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, 'd-2');
+
+    await expect(collected).resolves.toEqual([{ type: 'text', content: 'answer' }]);
+    await new Promise(resolve => setTimeout(resolve, 5));
+    expect(turns).toEqual([]);
+  });
+
   it('drops a backend turn the tab stopped following', async () => {
     const harness = await createHarness({ ownSession: true });
     const side: Array<(envelope: ExecutionEventEnvelope) => void> = [];

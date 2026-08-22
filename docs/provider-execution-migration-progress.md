@@ -5557,6 +5557,55 @@ read as a value, and proved by marking Gemini partial and watching it go red.
 
 Gates: unit 499 suites / 7,807 tests, typecheck, `eslint`.
 
+### Fourth review — the Critical and the four Majors that ship a defect (this commit)
+
+Thirteen findings, recorded with a status column in
+[`docs/wave7-review-backlog.md`](wave7-review-backlog.md). Five closed here, each
+verified against the tree first and each fix proved by breaking it.
+
+**G1, Critical — Gemini was sending a mode the CLI does not have.** The toolbar
+writes `normal`/`full_access`/`plan` into `selectedMode`; the session I recorded
+two commits ago offers `default`, `autoEdit`, `yolo` and `plan`.
+`applySelectedMode` forwarded the toolbar's word verbatim, and it is awaited
+inside the turn's own try — so turning on Auto-approve and sending a message
+ended the turn with an error before the prompt was ever sent. Qwen has had
+`mapGrimoireModeToQwen` for this since its own work; Gemini now has
+`modes.ts` with both directions, written from the recording rather than guessed.
+
+G2 and G3 are the same seam from the other side: the agent's raw `autoEdit`
+was being stored into `selectedMode`, which the toolbar reads back and cannot
+render, and `currentSessionModeId` was never reset — so a restarted session
+short-circuited and ran in the agent's default while the toolbar said Plan.
+
+**C1, Major — one stray character in `.claude/settings.json` destroyed it.**
+`load()` degraded to defaults on a parse failure, which was right for a *read*.
+But every mutator is read-modify-write, and `saveUnlocked` swallowed the same
+failure and merged onto `{}` — so one "Always allow" click rewrote the user's
+file, the one Claude Code itself reads, down to `$schema` and `permissions`,
+losing `hooks`, `env`, `model`, `statusLine` and `enabledPlugins`. The read still
+degrades; the write now refuses and says which file to fix. The test that
+asserted the old behaviour is replaced by one that asserts nothing is written.
+
+**A1, Major — a tab rendered its own turn twice.** `ownsRun` compares against
+`this.active`, which is assigned only after `startExecutionRun` resolves — and
+that function's own docstring says a run can emit before `startRun` does. In
+that window the tab's own `run-started` did not look like its own, so
+`followBackendRun` opened a second stream for it and the surface drew the turn
+from the generator *and* as an auto-turn. Closed by claiming the id at the
+moment it is minted. The test reaches the window the only way it can be reached:
+by firing the envelope from inside `startRun`.
+
+**A2, Major — switching conversations mid-turn leaked the kernel session.**
+`resetSession()` neither cancelled the live run nor cleared `active`, so
+`disposeSession` was refused, the rejection went to `reportCleanupFailure`, and
+the session id was already forgotten. It now cancels first and disposes after
+the run settles — beside the caller rather than in front of it, because
+`resetSession` is synchronous by contract. One thing found while there and fixed
+with it: the query generator's `finally` cleared `active` unconditionally, which
+after a switch would clear the *next* turn's.
+
+Gates: unit 499 suites / 7,818 tests, typecheck, `eslint`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

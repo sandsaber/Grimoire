@@ -55,11 +55,15 @@ export class CCSettingsStorage {
       stored = JSON.parse(content) as Record<string, unknown>;
     } catch {
       // A file this build cannot parse is not a reason to fail every permission
-      // read — `save` has tolerated one since it was written, and only `load`
-      // threw, so a single stray character broke reading *and* writing
-      // permissions everywhere. Defaults are returned so the surface works; the
-      // file itself is left exactly as it is, because it is the user's and it
-      // may be recoverable by hand.
+      // *read* — one stray character used to break reading permissions
+      // everywhere. Defaults are returned so the surface works.
+      //
+      // Reading only. `saveUnlocked` refuses to write over a file it could not
+      // parse, because these two together are a read-modify-write: degrading
+      // the read to defaults and then merging onto `{}` would rewrite the
+      // user's `settings.json` down to `$schema` and `permissions`, destroying
+      // the `hooks`, `env`, `model` and `statusLine` that Claude Code itself
+      // reads — on one "Always allow" click.
       return { ...DEFAULT_CC_SETTINGS };
     }
 
@@ -93,11 +97,20 @@ export class CCSettingsStorage {
     // Preserve CC-specific fields we don't manage
     let existing: Record<string, unknown> = {};
     if (await this.adapter.exists(CC_SETTINGS_PATH)) {
+      const content = await this.adapter.read(CC_SETTINGS_PATH);
       try {
-        const content = await this.adapter.read(CC_SETTINGS_PATH);
         existing = JSON.parse(content) as Record<string, unknown>;
       } catch {
-        // Parse error - start fresh with default settings
+        // Refused rather than merged onto nothing. This file is the user's and
+        // Claude Code's, and everything in it this build does not model —
+        // `hooks`, `env`, `model`, `statusLine`, `enabledPlugins` — survives
+        // only by being read back and written out again. A parse failure means
+        // it cannot be, so the write does not happen: a permission not saved is
+        // recoverable, and a settings file rewritten down to two keys is not.
+        throw new Error(
+          `Grimoire could not update ${CC_SETTINGS_PATH} because it is not valid JSON. `
+          + 'Fix or remove the file, then try again — nothing was written.',
+        );
       }
     }
 

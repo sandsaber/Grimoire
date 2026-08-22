@@ -78,6 +78,10 @@ import {
   GEMINI_SYNTHETIC_MODEL_ID,
 } from '../models';
 import {
+  mapGeminiModeToGrimoire,
+  mapGrimoireModeToGemini,
+} from '../modes';
+import {
   type GeminiDiscoveredModel,
   type GeminiMode,
   getGeminiProviderSettings,
@@ -197,6 +201,12 @@ export class GeminiChatRuntime implements ChatRuntime {
     if (this.sessionId !== nextSessionId) {
       this.sessionInvalidated = false;
       this.currentSessionModelId = null;
+      // The mode goes with the model, and for the same reason: both are what
+      // *that* session was set to, and both are what `applySelectedMode` and
+      // `applySelectedModel` skip the call on. Kept across a session change,
+      // the next turn believes the new session is already in a mode nobody set
+      // it to — and runs it in the agent's default while the toolbar says Plan.
+      this.currentSessionModeId = null;
     }
     this.sessionId = nextSessionId;
   }
@@ -528,6 +538,7 @@ export class GeminiChatRuntime implements ChatRuntime {
     this.activeTurn?.queue.close();
     this.activeTurn = null;
     this.currentSessionModelId = null;
+    this.currentSessionModeId = null;
 
     this.unregisterTransportClose?.();
     this.unregisterTransportClose = null;
@@ -628,12 +639,16 @@ export class GeminiChatRuntime implements ChatRuntime {
     if (normalized.type === 'current_mode') {
       // The agent's own word for the mode it is in. Dropped, the toolbar kept
       // showing whatever was last picked even after the session moved.
+      //
+      // Kept in the agent's vocabulary where it is compared against the session
+      // — that is what `set_mode` is skipped on — and translated where it
+      // reaches the vault and the toolbar, which speak Grimoire's three values
+      // and cannot render `autoEdit` at all.
       this.currentSessionModeId = normalized.currentModeId;
-      updateGeminiProviderSettings(this.plugin.settings, {
-        selectedMode: normalized.currentModeId,
-      });
+      const permissionMode = mapGeminiModeToGrimoire(normalized.currentModeId);
+      updateGeminiProviderSettings(this.plugin.settings, { selectedMode: permissionMode });
       void this.plugin.saveSettings?.();
-      this.emitPermissionModeSync(normalized.currentModeId);
+      this.emitPermissionModeSync(permissionMode);
       return;
     }
     if (normalized.type === 'config_options') {
@@ -863,8 +878,15 @@ export class GeminiChatRuntime implements ChatRuntime {
     if (!this.connection || typeof this.connection.setMode !== 'function') {
       return;
     }
-    const modeId = getGeminiProviderSettings(this.plugin.settings).selectedMode;
-    if (!modeId || modeId === this.currentSessionModeId) {
+    // Translated, not forwarded. The toolbar writes `normal`/`full_access`/
+    // `plan` into `selectedMode`, and Gemini's session offers
+    // `default`/`autoEdit`/`yolo`/`plan`: sending the toolbar's word is a mode
+    // the agent does not have, and it is awaited inside the turn's own try — so
+    // the rejection ends the turn before the prompt is ever sent.
+    const modeId = mapGrimoireModeToGemini(
+      this.permissionMode() || getGeminiProviderSettings(this.plugin.settings).selectedMode,
+    );
+    if (modeId === this.currentSessionModeId) {
       return;
     }
     await this.connection.setMode({ modeId, sessionId });
@@ -904,6 +926,7 @@ export class GeminiChatRuntime implements ChatRuntime {
     this.sessionId = null;
     this.loadedSessionId = null;
     this.currentSessionModelId = null;
+    this.currentSessionModeId = null;
   }
 
   private setReady(ready: boolean): void {

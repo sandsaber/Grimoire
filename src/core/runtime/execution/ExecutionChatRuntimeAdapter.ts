@@ -471,8 +471,17 @@ export async function startExecutionRun(
   session?: ExecutionAdapterSession,
   describeProviderFailure?: FailurePresenter,
   presentProviderContent?: ProviderContentPresenter,
+  /**
+   * Told the run's id at the moment it is minted, before anything is awaited.
+   *
+   * The caller cannot learn it from the return value in time: this function
+   * emits before `startRun` resolves, so a caller that recognises its own run
+   * only once this resolves does not recognise the `run-started` for it.
+   */
+  claimRunId?: (runId: RunId) => void,
 ): Promise<{ runId: RunId; stream: ExecutionRunStream; release: () => void }> {
   const runId = context.nextRunId();
+  claimRunId?.(runId);
   const stream = new ExecutionRunStream(runId, describeProviderFailure, presentProviderContent);
   const unsubscribe = context.registry.observe(executionSessionId, envelope => {
     stream.accept(envelope);
@@ -651,6 +660,8 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   private readonly backendRuns = new Map<string, ExecutionRunStream>();
   private establishing: Promise<boolean> | undefined;
   private active: { runId: RunId; stream: ExecutionRunStream; release: () => void } | null = null;
+  /** The run this tab has minted but not yet finished starting; see `ownsRun`. */
+  private claimedRunId: RunId | null = null;
   private lastCompleted: ExecutionRunStream | null = null;
 
   constructor(
@@ -761,6 +772,7 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
       this.session,
       this.ports.describeFailure,
       this.ports.presentProviderContent,
+      runId => { this.claimedRunId = runId; },
     );
     this.active = started;
     // Interactions and backend-initiated turns arrive on the same stream as the
@@ -774,7 +786,16 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     } finally {
       started.release();
       this.lastCompleted = started.stream;
-      this.active = null;
+      // Only its own. A conversation switch cancels this run and clears both
+      // fields, and the next turn may already have claimed them by the time
+      // this generator's `finally` runs — nulling them then would leave the
+      // live turn unrecognised by `cancel()` and by `ownsRun()`.
+      if (this.active === started) {
+        this.active = null;
+      }
+      if (this.claimedRunId === started.runId) {
+        this.claimedRunId = null;
+      }
     }
   }
 
@@ -938,6 +959,19 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     this.executionSessionId = null;
     this.boundSessionId = undefined;
     this.boundConversationId = undefined;
+    // The run goes with the session. `cleanup()` always cancelled first and
+    // waited for the terminal before disposing; this path did neither, and the
+    // conversation-switch case made it the common one — the registry refuses to
+    // dispose a session with a live run, the rejection is swallowed into
+    // `reportCleanupFailure`, and the kernel session and its provider process
+    // are left with nothing holding a reference to them. The tab meanwhile
+    // still has the previous conversation's answer streaming into it.
+    const active = this.active;
+    this.active = null;
+    this.claimedRunId = null;
+    if (active) {
+      dispatchCancellation(this.context, active.runId, active.stream);
+    }
     this.announceReady(false);
     // The observer is bound to the session being dropped, and
     // `attachSideChannels` installs at most one — so leaving it attached means
@@ -947,10 +981,20 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     // blocked on. `cleanup()` always did this; the conversation-switch path
     // made it the common one.
     this.detachSideChannels();
-    if (executionSessionId) {
-      void this.context.registry.disposeSession(executionSessionId)
-        .catch(error => this.ports.reportCleanupFailure?.(error));
+    if (!executionSessionId) {
+      return;
     }
+    // Synchronous by contract — `main.ts` calls this when settings change and
+    // must not wait on a provider — so the wait for the run to settle happens
+    // beside the caller rather than in front of it. Bounded like `cleanup()`'s:
+    // a provider that never answers leaves the session to the shutdown path,
+    // which terminalizes before disposing.
+    void (async () => {
+      if (active) {
+        await this.awaitTerminal(active.stream);
+      }
+      await this.context.registry.disposeSession(executionSessionId);
+    })().catch(error => this.ports.reportCleanupFailure?.(error));
   }
 
   /** Drops the session observer, and whatever it was still following. */
@@ -1189,8 +1233,24 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
     })();
   }
 
+  /**
+   * Whether an envelope belongs to the run this tab is running.
+   *
+   * `active` is only assigned once `startExecutionRun` resolves, and that
+   * function emits before `startRun` does — so for the width of one dispatch
+   * the tab's *own* `run-started` did not look like its own, and
+   * `followBackendRun` opened a second stream for it. The surface then rendered
+   * the turn twice: once from the generator, once as an auto-turn.
+   *
+   * `claimedRunId` closes that window: it is set at the moment the id is
+   * minted, before anything is awaited, and cleared when the turn ends.
+   */
   private ownsRun(envelope: ExecutionEventEnvelope): boolean {
-    return envelope.scope.kind !== 'session' && envelope.scope.runId === this.active?.runId;
+    if (envelope.scope.kind === 'session') {
+      return false;
+    }
+    return envelope.scope.runId === this.active?.runId
+      || envelope.scope.runId === this.claimedRunId;
   }
 
   private announceReady(ready: boolean): void {

@@ -146,19 +146,32 @@ describe('CCSettingsStorage', () => {
     });
 
     describe('save', () => {
-        it('should handle parse error on existing file', async () => {
+        it('refuses to write over a file it could not read back', async () => {
             mockAdapter.exists.mockResolvedValue(true);
             mockAdapter.read.mockResolvedValue('invalid json{{{');
 
-            await storage.save({
+            // The merge is a read-modify-write, and everything this build does
+            // not model — hooks, env, model, statusLine — survives only by
+            // being read back. It could not be, so nothing is written: writing
+            // would rewrite the user's file, and Claude Code's, down to two
+            // keys on one "Always allow" click.
+            await expect(storage.save({
                 permissions: { allow: [], deny: [], ask: [] }
-            });
+            })).rejects.toThrow('not valid JSON');
 
-            // Should still write successfully after parse error
-            expect(mockAdapter.write).toHaveBeenCalled();
-            const writeCall = mockAdapter.write.mock.calls[0];
-            const writtenContent = JSON.parse(writeCall[1]);
-            expect(writtenContent.permissions).toEqual({ allow: [], deny: [], ask: [] });
+            expect(mockAdapter.write).not.toHaveBeenCalled();
+        });
+
+        it('still answers a permission read when the file cannot be parsed', async () => {
+            mockAdapter.exists.mockResolvedValue(true);
+            mockAdapter.read.mockResolvedValue('invalid json{{{');
+
+            // The read degrades and the write refuses, which is the asymmetry:
+            // one stray character must not break the approval surface, and it
+            // must not be allowed to destroy the file either.
+            await expect(storage.getPermissions()).resolves.toEqual(
+                expect.objectContaining({ allow: expect.any(Array) }),
+            );
         });
 
         it('should not write enabledPlugins from settings argument', async () => {
