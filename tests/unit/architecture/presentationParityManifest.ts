@@ -752,6 +752,16 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // M5. The transport, the launcher and the client adapter beside it went
       // live with OpenCode's flip and are listed as wired.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
+      // Wave 7's first half, built ahead of its own flip: Gemini CLI's backend
+      // descriptor and the provider-owned parts around it. Not listed beside
+      // them: `GeminiPermissionPresentation.ts`, which was moved out of the
+      // legacy runtime rather than written beside it, and `modes.ts`, which the
+      // runtime imports for the same fix.
+      'src/providers/gemini/execution/GeminiAcpDynamicConfig.ts',
+      'src/providers/gemini/execution/GeminiAcpFileSystem.ts',
+      'src/providers/gemini/execution/GeminiExecutionBackend.ts',
+      'src/providers/gemini/execution/GeminiInteractionBridge.ts',
+      'src/providers/gemini/execution/GeminiProjectionResultSink.ts',
     ],
   },
 ];

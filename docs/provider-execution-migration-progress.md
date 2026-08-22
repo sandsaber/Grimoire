@@ -5659,6 +5659,42 @@ tests asserting the behaviour that is right; each is named for what it protects.
 Gates: unit 500 suites / 7,823 tests, integration 5 suites / 145 tests (61
 env-gated skips), typecheck, `eslint`, `build:release`.
 
+### Wave 7: Gemini CLI's execution parts, dark (this commit)
+
+Six modules and a trace fixture. Five are dark and attributed;
+`GeminiPermissionPresentation.ts` is live, because it was moved out of
+`GeminiChatRuntime` rather than written beside it — the same pattern the two
+wave-6 providers used, for the same reason.
+
+**Gemini derives from Grok, not from the OpenCode family, and I measured that
+before assuming it.** Normalized against each other, Gemini's and Qwen's
+runtimes differ in 397 lines out of ~1,100 — these two are not clones of each
+other and neither is an OpenCode clone. What Gemini *does* share is Grok's
+shape: dedicated `session/set_model` and `session/set_mode` where the family
+uses `session/set_config_option`, and a mode vocabulary that is the CLI's own.
+
+**The recording decided three things a derivation would have got wrong.**
+`session/new` answers with `models` and `modes` and **no `configOptions` at
+all** — asserted in the test, not assumed — so this provider's applier has no
+third call and no thought-level branch, which also matches
+`reasoningControl: 'none'` in its capability record. Its modes are `default`,
+`autoEdit`, `yolo`, `plan`. And `supportsNativeHistory: false` means there is no
+session log to read an answer back from, so the result sink has no recovery port
+at all rather than an empty one — Grok's has one because Grok has something to
+read.
+
+The permission presentation is deliberately *not* a vocabulary. OpenCode and
+Grok switch on an id the agent sends; Gemini names its tool in the title, and
+inventing a switch would mean guessing ids the recording never saw — the turn it
+captured needed no permission. The general sentence is what the legacy runtime
+has been showing users, and it is what moved.
+
+Six breaks, five caught. The miss was the filesystem label, which nothing
+exercised; two tests now cover the refusal and the containment, and the label
+break goes red.
+
+Gates: unit 501 suites / 7,838 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

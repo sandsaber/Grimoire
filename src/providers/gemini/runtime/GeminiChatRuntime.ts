@@ -69,9 +69,13 @@ import {
   mapAcpApprovalDecision,
   resolveWorkspacePath,
 } from '../../acp';
+import { normalizeApprovalInput } from '../../acp/execution/AcpPermissionBridge';
 import { toAcpMcpServers } from '../../acp/mcp/toAcpMcpServers';
 import { geminiPlanUsageStore } from '../app/GeminiPlanUsageStore';
 import { GEMINI_PROVIDER_CAPABILITIES } from '../capabilities';
+import {
+  buildGeminiPermissionPresentation,
+} from '../execution/GeminiPermissionPresentation';
 import {
   decodeGeminiModelId,
   encodeGeminiModelId,
@@ -756,23 +760,22 @@ export class GeminiChatRuntime implements ChatRuntime {
       return { outcome: { outcome: 'cancelled' } };
     }
 
-    const rawInput = request.toolCall.rawInput;
-    const input = rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)
-      ? rawInput as Record<string, unknown>
-      : {};
-    const pathValue = ['path', 'filePath', 'filepath'].map((key) => input[key])
-      .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
-      ?? request.toolCall.locations
-        ?.map((location) => (typeof location?.path === 'string' ? location.path.trim() : ''))
-        .find((path) => path.length > 0);
-    const title = request.toolCall.title?.trim() || request.toolCall.kind?.trim() || 'Gemini action';
-    const description = pathValue
-      ? `${title} requests access to ${pathValue}.`
-      : `${title} requests permission.`;
-    const decision = await this.approvalCallback(title, input, description, {
-      ...(pathValue ? { target: pathValue } : {}),
-      decisionOptions: buildAcpApprovalDecisionOptions(request.options),
-    });
+    const input = normalizeApprovalInput(request.toolCall.rawInput);
+    const presentation = buildGeminiPermissionPresentation(
+      request.toolCall.title,
+      request.toolCall.kind,
+      input,
+      request.toolCall.locations,
+    );
+    const decision = await this.approvalCallback(
+      presentation.toolName,
+      input,
+      presentation.description,
+      {
+        ...(presentation.blockedPath ? { target: presentation.blockedPath } : {}),
+        decisionOptions: buildAcpApprovalDecisionOptions(request.options),
+      },
+    );
     return mapAcpApprovalDecision(decision, request.options);
   }
 
