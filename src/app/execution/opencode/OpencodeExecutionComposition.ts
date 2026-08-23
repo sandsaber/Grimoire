@@ -6,6 +6,7 @@ import {
   type OpencodeMetadataLaunch,
   OpencodeMetadataSession,
 } from '@/app/execution/opencode/OpencodeMetadataSession';
+import type { AuxQueryRunner } from '@/core/auxiliary/AuxQueryRunner';
 import {
   executionSessionId,
   interactionId,
@@ -42,6 +43,7 @@ import type GrimoirePlugin from '@/main';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import { describeAcpSessionOpenFailure } from '@/providers/acp/execution/describeAcpSessionOpenFailure';
+import { ManagedAcpAuxiliaryQuery } from '@/providers/acp/execution/ManagedAcpAuxiliaryQuery';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createOpencodeModuleContext } from '@/providers/opencode/app/OpencodeModuleContext';
@@ -56,6 +58,10 @@ import {
   type OpencodeExecutionBackendContext,
 } from '@/providers/opencode/execution/OpencodeExecutionBackend';
 import {
+  auxiliaryRetentionKey,
+  type OpencodeAuxiliaryEnvironment,
+  type OpencodeAuxiliaryPurpose,
+  type OpencodeAuxiliaryRequest,
   OpencodeExecutionRequests,
   type OpencodeInvocationEnvironment,
 } from '@/providers/opencode/execution/OpencodeExecutionRequests';
@@ -64,11 +70,20 @@ import { OpencodeInteractionPresenter } from '@/providers/opencode/execution/Ope
 import { OpencodeProjectionResultSink } from '@/providers/opencode/execution/OpencodeProjectionResultSink';
 import { OpencodeSessionConfigState } from '@/providers/opencode/execution/OpencodeSessionConfigState';
 import { loadOpencodeSessionCost } from '@/providers/opencode/history/OpencodeUsageMetadataStore';
+import {
+  decodeOpencodeModelId,
+  isOpencodeModelSelectionId,
+} from '@/providers/opencode/models';
 import { opencodeProviderModule } from '@/providers/opencode/OpencodeProviderModule';
 import {
   buildOpencodePromptBlocks,
   buildOpencodePromptText,
 } from '@/providers/opencode/runtime/buildOpencodePrompt';
+import {
+  buildOpencodeAuxAgentConfig,
+  OPENCODE_AUX_AGENT_IDS,
+  type OpencodeAuxAgentProfile,
+} from '@/providers/opencode/runtime/OpencodeAuxiliaryAgents';
 import { prepareOpencodeLaunchArtifacts } from '@/providers/opencode/runtime/OpencodeLaunchArtifacts';
 import { buildOpencodeRuntimeEnv } from '@/providers/opencode/runtime/OpencodeRuntimeEnvironment';
 import type { OpencodeProviderSettings } from '@/providers/opencode/settings';
@@ -76,10 +91,30 @@ import { getOpencodeState } from '@/providers/opencode/types';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
+import { ManagedAcpAuxQueryRunner } from '../acp/ManagedAcpAuxQueryRunner';
 import { delayThroughWindow } from '../hostTimers';
 
 /** What a turn may answer with, before it is refused as too large. */
 const MAX_RESULT_BYTES = 256_000;
+
+/**
+ * What an auxiliary turn may answer with, which is much less.
+ *
+ * A title is a line and a refinement is a paragraph. The chat limit is for a
+ * turn that may legitimately produce a file's worth of text; an auxiliary answer
+ * that size is a model that misread its instructions, and reading 256 KB of it
+ * into a title field helps nobody.
+ */
+const AUXILIARY_RESULT_BYTE_LIMIT = 64_000;
+
+/**
+ * How long an auxiliary turn may run before it is abandoned.
+ *
+ * Shorter than a chat turn by an order of magnitude, and it has to be: nobody is
+ * watching it, and the thing waiting is a title that will not appear or a modal
+ * that will not answer.
+ */
+const AUXILIARY_TIMEOUT_MS = 60_000;
 
 /** Where a session opened only to answer a question keeps its state. */
 const METADATA_DATABASE = ':memory:';
@@ -113,6 +148,28 @@ export class OpencodeExecution {
     // one. Every resume then launches against the default database and the
     // session it was told to load is not in it.
     databasePath => this.environment(databasePath),
+    undefined,
+    request => this.auxiliaryEnvironment(request),
+  );
+
+  /**
+   * The auxiliary processes, one per runner that asked for one.
+   *
+   * Built here rather than per tab because auxiliary work belongs to no tab: a
+   * title is generated for a conversation nobody may be looking at, and an
+   * inline edit runs from a modal over a note. Disposed with the backend, which
+   * is what closes the processes it kept.
+   */
+  private readonly auxiliaryQueries = new ManagedAcpAuxiliaryQuery(
+    { resolve: requestRef => this.requests.resolveAuxiliary(requestRef) },
+    // Resolved per launch rather than captured: `createBackend` may be handed a
+    // fake factory by a test, and an auxiliary process launched behind it would
+    // be a real CLI nobody asked for.
+    { create: input => (this.clientFactory ??= this.createClientFactory()).create(input) },
+    { setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      clearTimeout: handle => window.clearTimeout(handle as ReturnType<typeof setTimeout>) },
+    AUXILIARY_RESULT_BYTE_LIMIT,
+    AUXILIARY_TIMEOUT_MS,
   );
 
   /**
@@ -187,16 +244,7 @@ export class OpencodeExecution {
         reconcile: async query => acpCancellationEvidence(query)
           ?? { kind: 'unknown', effectsPossible: true },
       },
-      auxiliaryQueries: {
-        execute: async () => {
-          // Titles, refinement and inline edits still run on
-          // `OpencodeAuxQueryRunner` until M5, and this composition has no
-          // reference space of its own for them. Refused rather than answered
-          // emptily: an auxiliary turn that silently returns nothing is the
-          // failure mode this migration exists to remove.
-          throw new Error('OpenCode auxiliary execution is not wired to the kernel yet.');
-        },
-      },
+      auxiliaryQueries: this.auxiliaryQueries,
       scheduler: {
         setTimeout: (callback: () => void, delayMs: number) => window.setTimeout(callback, delayMs),
         clearTimeout: (handle: unknown) => window.clearTimeout(
@@ -543,6 +591,34 @@ export class OpencodeExecution {
     return this.metadataSession;
   }
 
+  /**
+   * An `AuxQueryRunner` for one auxiliary conversation, answered by the kernel.
+   *
+   * One per caller, and the caller decides what that means: the title service
+   * builds one per title and resets it when the title is done, while inline edit
+   * holds one for as long as the edit lasts. That is the unit a process is kept
+   * for, so it is the unit the conversation id is minted for.
+   */
+  createAuxRunner(purpose: OpencodeAuxiliaryPurpose): AuxQueryRunner {
+    const conversationId = opaqueId('ocaux');
+    return new ManagedAcpAuxQueryRunner({
+      reference: (config, prompt) => this.requests.referenceAuxiliary({
+        purpose,
+        conversationId,
+        systemPrompt: config.systemPrompt,
+        prompt,
+        ...(config.model ? { model: config.model } : {}),
+      }),
+      run: (requestRef, options) => (this.backend ?? this.createBackend())
+        .runAuxiliaryQuery(requestRef, options),
+      release: async () => {
+        await this.backend?.releaseAuxiliaryConversation(
+          auxiliaryRetentionKey(purpose, conversationId),
+        );
+      },
+    });
+  }
+
   /** Drops every reference held, and takes down whatever is on screen. */
   dispose(): void {
     // Taken down before the subscriptions are dropped: unsubscribing first
@@ -555,6 +631,10 @@ export class OpencodeExecution {
     }
     this.presenters.clear();
     this.requests.dispose();
+    // The backend closes these when it is disposed, and a composition disposed
+    // without one still has processes to close: an auxiliary turn needs no chat
+    // session and may have launched on its own.
+    this.settle(this.auxiliaryQueries.dispose());
   }
 
   /**
@@ -760,6 +840,64 @@ export class OpencodeExecution {
    * from files, so a process spawned before they exist runs under the previous
    * turn's configuration.
    */
+  /**
+   * What an auxiliary `opencode acp` is launched under.
+   *
+   * The chat environment's shape with three differences, and each is what makes
+   * an auxiliary turn auxiliary: its **own artifacts directory** per purpose, so
+   * a title's config cannot be the conversation's; its **own agent**, whose
+   * permissions are what stops an unattended turn from writing to the vault;
+   * and its **own system prompt**, which is the caller's rather than the
+   * vault's — a title is asked for by the prompt that asks for a title.
+   *
+   * No MCP servers and no database: an auxiliary turn has no conversation to
+   * resume and nothing to offer a tool.
+   */
+  private async auxiliaryEnvironment(
+    request: OpencodeAuxiliaryRequest,
+  ): Promise<OpencodeAuxiliaryEnvironment> {
+    const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
+      this.plugin.settings,
+      'opencode',
+    );
+    const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
+    const executable = this.plugin.getResolvedProviderCliPath('opencode') ?? 'opencode';
+    const runtimeEnv = buildOpencodeRuntimeEnv(settings, executable);
+    const profile = AUXILIARY_AGENT_PROFILES[request.purpose];
+    const agentId = OPENCODE_AUX_AGENT_IDS[profile];
+    const artifacts = await prepareOpencodeLaunchArtifacts({
+      artifactsSubdir: `opencode/auxiliary/${request.purpose}`,
+      defaultAgentId: agentId,
+      managedAgents: [buildOpencodeAuxAgentConfig(profile)],
+      runtimeEnv,
+      systemPromptKey: request.systemPrompt,
+      systemPromptText: request.systemPrompt,
+      userName: this.plugin.settings.userName,
+      workspaceRoot: cwd,
+    });
+    const modelId = resolveOpencodeAuxiliaryModelId(request.model);
+    return {
+      executable,
+      cwd,
+      environment: definedEnvironment({
+        ...runtimeEnv,
+        OPENCODE_CONFIG: artifacts.configPath,
+        OPENCODE_CONFIG_CONTENT: artifacts.configContent,
+        PATH: getEnhancedPath(runtimeEnv.PATH, isAbsolute(executable) ? executable : undefined),
+      }),
+      // The legacy runner's launch key, unchanged: command, config, environment
+      // and the instructions the artifacts wrote.
+      launchKey: JSON.stringify({
+        artifactKey: artifacts.launchKey,
+        command: executable,
+        configPath: artifacts.configPath,
+        envText: getRuntimeEnvironmentText(this.plugin.settings, 'opencode'),
+      }),
+      agentId,
+      ...(modelId ? { modelId } : {}),
+    };
+  }
+
   private async environment(databasePath?: string): Promise<OpencodeInvocationEnvironment> {
     const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
       this.plugin.settings,
@@ -829,6 +967,38 @@ function notWiredHere(slot: string): Promise<never> {
   return Promise.reject(new Error(
     `OpenCode MCP slot "${slot}" is served by the workspace registration, not by a chat tab.`,
   ));
+}
+
+/**
+ * Which agent each purpose runs as.
+ *
+ * An inline edit reads the note around what it is editing; a title and a
+ * refinement are given everything they need in the prompt. Copied from the
+ * three legacy services rather than decided again — this is their behaviour,
+ * moved.
+ */
+const AUXILIARY_AGENT_PROFILES: Readonly<Record<OpencodeAuxiliaryPurpose, OpencodeAuxAgentProfile>> = {
+  inline: 'readonly',
+  instructions: 'passive',
+  'title-gen': 'passive',
+};
+
+/**
+ * The raw model id behind whatever the caller passed.
+ *
+ * Callers hand over ids from two spaces: the encoded selection id the settings
+ * UI stores, and a raw provider id typed in or carried from elsewhere. Decoding
+ * only the first and passing the second through is what the legacy runner does,
+ * and an id decoded from the wrong space is a model the account does not have.
+ */
+function resolveOpencodeAuxiliaryModelId(model?: string): string | undefined {
+  const trimmed = model?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return isOpencodeModelSelectionId(trimmed)
+    ? decodeOpencodeModelId(trimmed) ?? undefined
+    : trimmed;
 }
 
 function definedEnvironment(

@@ -47,6 +47,7 @@ describe('OpenCode auxiliary requests', () => {
 
   const titleRequest: OpencodeAuxiliaryRequest = {
     purpose: 'title-gen',
+    conversationId: 'aux-1',
     systemPrompt: 'Name the conversation.',
     prompt: 'The user asked about tomatoes.',
   };
@@ -62,7 +63,7 @@ describe('OpenCode auxiliary requests', () => {
       cwd: '/vault',
       prompt: [{ type: 'text', text: 'The user asked about tomatoes.' }],
       mcpServers: [],
-      retentionKey: 'opencode-auxiliary:title-gen',
+      retentionKey: 'opencode-auxiliary:title-gen:aux-1',
       restartFingerprint: createHash('sha256')
         .update('launch:Name the conversation.').digest('hex'),
       // The agent the generated config attaches permissions to. An auxiliary
@@ -112,15 +113,28 @@ describe('OpenCode auxiliary requests', () => {
     // What the legacy runners are as three separate instances, and what a
     // `reset()` on one must not do to the other two.
     expect(keys).toEqual([
-      'opencode-auxiliary:inline',
-      'opencode-auxiliary:instructions',
-      'opencode-auxiliary:title-gen',
+      auxiliaryRetentionKey('inline', 'aux-1'),
+      auxiliaryRetentionKey('instructions', 'aux-1'),
+      auxiliaryRetentionKey('title-gen', 'aux-1'),
     ]);
-    expect(keys.map(key => key)).toEqual([
-      auxiliaryRetentionKey('inline'),
-      auxiliaryRetentionKey('instructions'),
-      auxiliaryRetentionKey('title-gen'),
-    ]);
+  });
+
+  it('gives two runners of the same purpose two conversations', async () => {
+    const { requests } = createStore();
+
+    const first = await requests.resolveAuxiliary(requests.referenceAuxiliary(titleRequest));
+    const second = await requests.resolveAuxiliary(requests.referenceAuxiliary({
+      ...titleRequest,
+      conversationId: 'aux-2',
+    }));
+
+    // Two titles generated at once are two runners, and the title service resets
+    // each when its own title is done. One key for both would put them in one
+    // session and let either `reset()` close the process the other was using.
+    expect(second.retentionKey).not.toBe(first.retentionKey);
+    // Same launch, though: what a process is started for has nothing to do with
+    // which conversation asked for it.
+    expect(second.restartFingerprint).toBe(first.restartFingerprint);
   });
 
   it('changes the restart fingerprint when the instructions change', async () => {

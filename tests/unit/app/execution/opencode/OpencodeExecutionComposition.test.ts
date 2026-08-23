@@ -1,6 +1,6 @@
 import '@/providers';
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -97,12 +97,14 @@ describe('OpenCode execution composition', () => {
     permissions: Array<Promise<AcpRequestPermissionResponse>>;
     configOptions: unknown[];
     loadRequests: Array<{ sessionId: string }>;
+    closes: string[];
   } {
     const startupRefs: string[] = [];
     const prompts: unknown[] = [];
     const permissions: Array<Promise<AcpRequestPermissionResponse>> = [];
     const configOptions: unknown[] = [];
     const loadRequests: Array<{ sessionId: string }> = [];
+    const closes: string[] = [];
     const factory: ManagedAcpClientFactory = {
       create: async (input: ManagedAcpClientFactoryInput) => {
         startupRefs.push(input.startupRef);
@@ -232,12 +234,15 @@ describe('OpenCode execution composition', () => {
             return () => { notify = undefined; };
           },
           onConnectionLost: () => () => undefined,
-          close: async () => 'confirmed' as const,
+          close: async () => {
+            closes.push(input.startupRef);
+            return 'confirmed' as const;
+          },
         };
         return client;
       },
     };
-    return { factory, startupRefs, prompts, permissions, configOptions, loadRequests };
+    return { factory, startupRefs, prompts, permissions, configOptions, loadRequests, closes };
   }
 
   async function createHarness(options: {
@@ -255,6 +260,7 @@ describe('OpenCode execution composition', () => {
     permissions: Array<Promise<AcpRequestPermissionResponse>>;
     configOptions: unknown[];
     loadRequests: Array<{ sessionId: string }>;
+    closes: string[];
     events: ExecutionEventEnvelope[];
   }> {
     const host = new ExecutionKernelHost({
@@ -266,7 +272,7 @@ describe('OpenCode execution composition', () => {
     });
     const execution = new OpencodeExecution(options.plugin ?? createPlugin(), host.registry);
     const {
-      factory, startupRefs, prompts, permissions, configOptions, loadRequests,
+      factory, startupRefs, prompts, permissions, configOptions, loadRequests, closes,
     } = createFakeAcp(options);
     host.registerBackend(execution.createBackendRegistration(factory));
     await host.start();
@@ -278,7 +284,8 @@ describe('OpenCode execution composition', () => {
     const events: ExecutionEventEnvelope[] = [];
     host.registry.observe(SESSION_ID, envelope => events.push(envelope));
     return {
-      execution, host, startupRefs, prompts, permissions, configOptions, loadRequests, events,
+      execution, host, startupRefs, prompts, permissions, configOptions, loadRequests, closes,
+      events,
     };
   }
 
@@ -815,6 +822,157 @@ describe('OpenCode execution composition', () => {
     expect(launch.executable).toBe('opencode');
     execution.dispose();
     await host.dispose();
+  });
+
+  describe('auxiliary work, on the kernel', () => {
+    /**
+     * Dark: the three services still call `OpencodeAuxQueryRunner`. What is
+     * proven here is the path they move to, end to end over the same fake agent
+     * the chat turns run on — the store, the retained process, the seam.
+     */
+    it('answers a title on a process of its own, as the auxiliary agent', async () => {
+      const { execution, host, startupRefs, configOptions, prompts } = await createHarness();
+
+      const title = await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'The user asked about tomatoes.');
+
+      expect(title).toBe('the answer');
+      // Its own launch, and nothing else has launched: no chat turn ran, so a
+      // shared process would mean the auxiliary work had opened the
+      // conversation's own CLI to generate a title.
+      expect(startupRefs).toHaveLength(1);
+      // The agent whose permissions are what stop an unattended turn from
+      // writing to the vault. Set when the session opens, before the prompt.
+      expect(configOptions).toEqual([
+        expect.objectContaining({ configId: 'mode', value: 'grimoire-aux-passive' }),
+      ]);
+      expect(prompts).toHaveLength(1);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('writes an agent that cannot write, and gives inline edit one that can read', async () => {
+      const plugin = createPlugin();
+      const { execution, host } = await createHarness({ plugin });
+      const vault = plugin.app.vault.adapter.basePath as string;
+
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'the message');
+      await execution.createAuxRunner('inline').query({
+        systemPrompt: 'Edit the selection.',
+      }, 'make it shorter');
+
+      // **What actually stops an unattended turn**, and the reason the mode is
+      // set at all: OpenCode has no per-request permission mode, so what a turn
+      // can do is the agent definition the artifacts wrote. Asserting only that
+      // the session was set to an agent id proves the name, not the permissions.
+      const agentOf = (purpose: string, id: string): Record<string, any> => JSON.parse(
+        readFileSync(join(vault, '.grimoire', 'opencode', 'auxiliary', purpose, 'config.json'), 'utf8'),
+      ).agent[id];
+      expect(agentOf('title-gen', 'grimoire-aux-passive').permission).toEqual({
+        '*': 'deny',
+        external_directory: 'deny',
+      });
+      // An inline edit reads the note around what it is editing, and reads
+      // nothing that looks like a credential.
+      const inline = agentOf('inline', 'grimoire-aux-readonly').permission;
+      expect(inline).toMatchObject({ '*': 'deny', grep: 'allow' });
+      expect(inline.read).toMatchObject({ '*': 'allow', '*.env': 'deny' });
+      // Each purpose keeps its own artifacts, so a title's instructions cannot
+      // be the ones an edit runs under.
+      expect(existsSync(join(vault, '.grimoire', 'opencode', 'auxiliary', 'inline', 'system.md')))
+        .toBe(true);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('sets the session to the agent this purpose runs as', async () => {
+      const { execution, host, configOptions } = await createHarness();
+
+      await execution.createAuxRunner('inline').query({
+        systemPrompt: 'Edit the selection.',
+      }, 'make it shorter');
+
+      expect(configOptions).toEqual([
+        expect.objectContaining({ configId: 'mode', value: 'grimoire-aux-readonly' }),
+      ]);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('keeps one runner\'s conversation and gives another its own', async () => {
+      const { execution, host, startupRefs } = await createHarness();
+      const first = execution.createAuxRunner('inline');
+
+      await first.query({ systemPrompt: 'Edit the selection.' }, 'make it shorter');
+      await first.query({ systemPrompt: 'Edit the selection.' }, 'shorter still');
+      await execution.createAuxRunner('inline').query({ systemPrompt: 'Edit the selection.' }, 'a different edit');
+
+      // Inline edit's second message has to reach the first one's session, and
+      // a second edit started elsewhere must not land in the middle of it.
+      expect(startupRefs).toHaveLength(2);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('ends the conversation on reset, and starts a new one after it', async () => {
+      const { execution, host, startupRefs, closes } = await createHarness();
+      const runner = execution.createAuxRunner('title-gen');
+
+      await runner.query({ systemPrompt: 'Name the conversation.' }, 'first');
+      runner.reset();
+      await new Promise(resolve => { setTimeout(resolve, 0); });
+      await runner.query({ systemPrompt: 'Name the conversation.' }, 'second');
+
+      // What the title service does after every title: the process that
+      // generated it is closed, and the next title launches its own.
+      expect(closes).toHaveLength(1);
+      expect(startupRefs).toHaveLength(2);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('applies the model the caller chose, decoding the id space it came in', async () => {
+      const { execution, host, configOptions } = await createHarness();
+
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+        model: 'opencode:big-pickle-provider:big-pickle',
+      }, 'the message');
+
+      // The settings UI stores an encoded selection id and a caller elsewhere
+      // may pass a raw one. An id decoded from the wrong space is a model the
+      // account does not have, which the agent answers by refusing the option.
+      expect(configOptions).toEqual([
+        expect.objectContaining({ configId: 'mode' }),
+        expect.objectContaining({ configId: 'model', value: 'big-pickle-provider:big-pickle' }),
+      ]);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('closes the auxiliary processes when the composition goes away', async () => {
+      const { execution, host, closes } = await createHarness();
+      await execution.createAuxRunner('instructions').query({
+        systemPrompt: 'Refine the instructions.',
+      }, 'make this clearer');
+
+      // The composition alone, without its host: that is the order `main.ts`
+      // unloads in — every composition first, the kernel host after, and the
+      // host's disposal is not awaited. The backend closes these too; this is
+      // the one that runs first.
+      execution.dispose();
+
+      // A plugin unload with an idle auxiliary CLI still running is the leak
+      // the retained process would otherwise be.
+      for (let attempt = 0; attempt < 50 && closes.length === 0; attempt += 1) {
+        await new Promise(resolve => { setTimeout(resolve, 0); });
+      }
+      expect(closes).toHaveLength(1);
+      await host.dispose();
+    });
   });
 
 });

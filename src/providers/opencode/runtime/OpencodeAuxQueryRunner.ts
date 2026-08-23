@@ -20,12 +20,13 @@ import {
 } from '../../acp';
 import { decodeOpencodeModelId, isOpencodeModelSelectionId } from '../models';
 import {
-  type OpencodeManagedAgentConfig,
-  prepareOpencodeLaunchArtifacts,
-} from './OpencodeLaunchArtifacts';
+  buildOpencodeAuxAgentConfig,
+  OPENCODE_AUX_AGENT_IDS,
+  type OpencodeAuxAgentProfile,
+} from './OpencodeAuxiliaryAgents';
+import { prepareOpencodeLaunchArtifacts } from './OpencodeLaunchArtifacts';
 import { buildOpencodeRuntimeEnv } from './OpencodeRuntimeEnvironment';
 
-type OpencodeAuxAgentProfile = 'passive' | 'readonly';
 type OpencodeAuxArtifactPurpose = 'inline' | 'instructions' | 'title-gen';
 
 interface OpencodeAuxQueryRunnerOptions {
@@ -33,18 +34,6 @@ interface OpencodeAuxQueryRunnerOptions {
   artifactPurpose: OpencodeAuxArtifactPurpose;
   allowReadTextFile?: boolean;
 }
-
-const OPENCODE_AUX_AGENT_IDS: Record<OpencodeAuxAgentProfile, string> = {
-  passive: 'grimoire-aux-passive',
-  readonly: 'grimoire-aux-readonly',
-};
-
-const OPENCODE_AUX_READ_PERMISSION = Object.freeze({
-  '*': 'allow',
-  '*.env': 'deny',
-  '*.env.*': 'deny',
-  '*.env.example': 'allow',
-});
 
 /**
  * Auxiliary Opencode turns, on their own process.
@@ -382,42 +371,6 @@ export class OpencodeAuxQueryRunner implements AuxQueryRunner {
       containmentMessage: 'OpenCode aux read access is limited to the current workspace.',
     });
   }
-}
-
-function buildOpencodeAuxAgentConfig(profile: OpencodeAuxAgentProfile): OpencodeManagedAgentConfig {
-  const id = OPENCODE_AUX_AGENT_IDS[profile];
-  if (profile === 'readonly') {
-    return {
-      definition: {
-        description: 'Internal Grimoire read-only agent for OpenCode auxiliary tasks.',
-        mode: 'primary',
-        permission: {
-          '*': 'deny',
-          codesearch: 'allow',
-          external_directory: 'deny',
-          glob: 'allow',
-          grep: 'allow',
-          lsp: 'allow',
-          read: OPENCODE_AUX_READ_PERMISSION,
-          webfetch: 'allow',
-          websearch: 'allow',
-        },
-      },
-      id,
-    };
-  }
-
-  return {
-    definition: {
-      description: 'Internal Grimoire no-tool agent for OpenCode auxiliary tasks.',
-      mode: 'primary',
-      permission: {
-        '*': 'deny',
-        external_directory: 'deny',
-      },
-    },
-    id,
-  };
 }
 
 function selectPermissionOption(

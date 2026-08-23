@@ -6507,7 +6507,10 @@ shutdown exactly as a chat session does).
 
 What is deliberately *not* carried over: the legacy runners attach the CLI's stderr to a failed
 auxiliary error. `ManagedAcpClient` has no stderr, so that is a transport change rather than a policy
-one. Recorded below rather than half-built.
+one. Recorded below rather than half-built. *(Corrected two entries later: the launcher already keeps
+a stderr tail and the transport already rejects pending requests with it, so a process that died
+carries its last words. Only a live process's failures differ, and those carry the agent's own
+sentence instead.)*
 
 Thirteen breaks, thirteen caught. Two were green first: one break was a no-op against a test whose
 ordering made it accidentally correct, and the other found that **the backend's own disposal of the
@@ -6552,6 +6555,37 @@ than a wrong rule.
 
 Gates: unit 516 suites / 8,050 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
 
+### OpenCode's auxiliary work, wired but not yet switched (this commit)
+
+The composition half: `OpencodeExecution` builds the auxiliary environment, constructs the query, and
+hands out `createAuxRunner(purpose)`. The three services still build an `OpencodeAuxQueryRunner`, so
+nothing has moved yet — the switch is one line each and belongs in its own commit.
+
+**The consumer changed the design again, and again by being read.**
+`QueryBackedTitleGenerationService` builds a **runner per title** and resets it when the title is done;
+inline edit holds one for as long as the edit lasts. So the retained conversation is the *runner*, not
+the purpose — keying it by purpose would have put two titles generated at once in one session and let
+either one's `reset()` close the process the other was using. The key carries a conversation id minted
+per runner now, and the fingerprint stays per launch.
+
+**What the composition owns is the launch**: its own artifacts directory per purpose, its own agent,
+its own system prompt — the caller's, because a title is asked for by the prompt that asks for a
+title. No MCP servers and no database: an auxiliary turn has no conversation to resume and nothing to
+offer a tool.
+
+Eleven breaks. Three stayed green and each named a missing test rather than a wrong rule, and the
+first is the one worth keeping: **dropping the managed agent definition from the launch changed
+nothing an assertion could see**, because the test checked that the session was set to an agent *id*.
+The id is a name; the permissions are what stop an unattended turn from writing to the vault. The
+tests read the generated config now — `'*': 'deny'` for a title, and for an inline edit a `read` that
+allows the vault and refuses a dotenv.
+
+The parity gate then said the two modules were bundled, which they now are: constructed at load,
+reachable, and not what the services call. They have their own surface saying exactly that rather than
+a dark entry that would be false.
+
+Gates: unit 516 suites / 8,058 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6585,17 +6619,21 @@ consumer needs a conversation. Corrected, proven, still dark. What is left there
 and the runner adapter per provider, then the flip — and the stderr a failed auxiliary error carries
 today, which needs the client contract to grow.
 
-**The next M5 piece to pick up** is the composition: `OpencodeExecution` builds the auxiliary
-environment — `prepareOpencodeLaunchArtifacts` for the purpose's agent, the runtime env, and the raw
-model id behind whatever the caller passed — and hands a `ManagedAcpAuxQueryRunner` to the title,
-refine and inline-edit services in place of `OpencodeAuxQueryRunner`. Everything under that is built
-and proven: the store, the seam, the port and the retained process. The flip is the wiring plus
-deleting a 443-line runner, and it should be one provider first, not five.
+**The next M5 piece to pick up** is the switch itself: point `OpencodeTitleGenerationService`,
+`OpencodeInstructionRefineService` and `OpencodeInlineEditService` at `execution.createAuxRunner(...)`
+instead of `new OpencodeAuxQueryRunner(...)`, then delete the runner and its test. One line per
+service. Everything under them is built, wired and proven — the store, the seam, the port, the
+retained process and the agents. Read `OpencodeAuxQueryRunner.test.ts` before deleting it: what it
+asserts that the new path's tests do not is the list of things to carry over, and the services reach
+the composition through `plugin`, which is the one wiring question left.
 
-**Still owed there:** the legacy runners attach the CLI's stderr to a failed auxiliary error, and
-`ManagedAcpClient` has no stderr to attach. A transport change rather than a policy one, and worth
-doing before the flip rather than after — a failed auxiliary turn with no stderr is how the empty
-answers of the legacy path were diagnosed.
+**The stderr gap recorded in the entry above is smaller than it was written, and needs no transport
+change.** Checked rather than assumed: `NodeManagedAcpProcessLauncher` already keeps a stderr tail and
+puts it in `describeExit`, the transport rejects every pending request with that error, so an
+auxiliary turn whose process died reaches the caller with the CLI's last words attached. What the
+legacy runner does and this does not is attach a stderr snapshot to failures where the process is
+still *alive* — and those are JSON-RPC errors carrying the agent's own sentence, which is the better
+of the two. Nothing owed; the earlier note overstated it.
 
 ### Where the sixth session of 2026-08-23 ended
 

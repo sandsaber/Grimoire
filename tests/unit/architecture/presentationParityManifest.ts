@@ -791,18 +791,26 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // M5. The transport, the launcher and the client adapter beside it went
       // live with OpenCode's flip and are listed as wired.
       //
-      // It is no longer cold. Read against the consumer it has to replace —
-      // `AuxQueryRunner`, whose `reset()` exists because inline edit continues a
-      // conversation across calls — a query that closed its session each time
-      // would have lost the edit it was asked to continue. It keeps a process
-      // per retention key now, and the flip is a wiring change rather than a
-      // rewrite.
+    ],
+  },
+  {
+    id: 'execution-auxiliary',
+    area: 'shell',
+    description:
+      'Auxiliary execution — titles, refinement, inline edits — on the kernel rather than on a provider runner that owns its own process.',
+    state: 'wired',
+    modules: [
+      // Reachable, and not yet what the services call. `OpencodeExecution`
+      // constructs the query at load and `createAuxRunner` is ready for them,
+      // while `OpencodeTitleGenerationService` and the other two still build an
+      // `OpencodeAuxQueryRunner`. The switch is one line per service, and it is
+      // deliberately not in the same commit as the path it switches to.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
-      // The seam the auxiliary services keep calling while what is behind it
-      // changes: `AuxQueryRunner`, answered by the kernel instead of by a
-      // provider runner that owns its own process. Dark until the composition
-      // hands one to the title, refine and inline-edit services.
       'src/app/execution/acp/ManagedAcpAuxQueryRunner.ts',
+      // The agents an auxiliary turn runs as, shared by both paths while both
+      // exist: what a title or an edit is allowed to do must not depend on
+      // which of the two asked.
+      'src/providers/opencode/runtime/OpencodeAuxiliaryAgents.ts',
     ],
   },
 ];

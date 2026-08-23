@@ -45,6 +45,17 @@ export type OpencodeAuxiliaryPurpose = 'inline' | 'instructions' | 'title-gen';
 export interface OpencodeAuxiliaryRequest {
   readonly purpose: OpencodeAuxiliaryPurpose;
   /**
+   * Which auxiliary conversation this turn belongs to — one per runner.
+   *
+   * The runner is the conversation, not the purpose, and the consumer is what
+   * says so: `QueryBackedTitleGenerationService` builds a **runner per title**
+   * and resets it when the title is done, while inline edit holds one for as
+   * long as the edit lasts. Keying retention by purpose alone would put two
+   * titles generated at once in one session, and let either one's `reset()`
+   * close the process the other was using.
+   */
+  readonly conversationId: string;
+  /**
    * The instructions the process is launched under.
    *
    * Not a per-turn field despite arriving on every call: OpenCode reads its
@@ -251,7 +262,7 @@ export class OpencodeExecutionRequests {
       // One retained process per purpose, relaunched when the launch it was
       // started for is no longer the launch this turn asks for — a system
       // prompt edited in settings, a CLI path changed, an environment rewritten.
-      retentionKey: auxiliaryRetentionKey(request.purpose),
+      retentionKey: auxiliaryRetentionKey(request.purpose, request.conversationId),
       restartFingerprint: fingerprint(environment.launchKey),
       // The agent, when the session opens: it is what the permissions in the
       // generated config are attached to, and an auxiliary turn that ran as the
@@ -298,10 +309,14 @@ function fingerprint(launchKey: string): string {
  * The key one auxiliary conversation is retained under.
  *
  * Exported because the caller that ends a conversation has to name the same one
- * the store minted: `AuxQueryRunner.reset()` knows its purpose and nothing else.
+ * the store minted: `AuxQueryRunner.reset()` knows which runner it is, and the
+ * runner is the conversation.
  */
-export function auxiliaryRetentionKey(purpose: OpencodeAuxiliaryPurpose): string {
-  return `opencode-auxiliary:${purpose}`;
+export function auxiliaryRetentionKey(
+  purpose: OpencodeAuxiliaryPurpose,
+  conversationId: string,
+): string {
+  return `opencode-auxiliary:${purpose}:${conversationId}`;
 }
 
 function evict(store: Map<string, unknown>, limit: number): void {
