@@ -6663,6 +6663,26 @@ which is a different transport and a separate design question.
 
 Gates: unit 519 suites / 8,093 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
 
+### The model setter Grok needs, and a Jest behaviour worth knowing (this commit)
+
+The first of Grok's three prerequisites, done in the shared module where it belongs rather than inside
+its flip: `ManagedAcpAuxiliaryQuery` can now apply the model through `session/set_model` as well as
+through a config option. Which of the two an agent answers is a property of its release — the three
+OpenCode forks carry the model as a config option, Grok has the dedicated setter — so both travel and
+a provider names the one its agent has. Applied before every prompt either way, and best effort
+either way.
+
+**One break of four stayed green, and the reason is about the instrument.**
+`expect([undefined]).toEqual([])` **passes**: Jest's `toEqual` ignores undefined entries, so a setter
+called with an undefined model reads exactly like a setter that was never called. The break that
+removed the guard against precisely that was invisible. Both assertions are `toHaveLength(0)` now,
+with the reason written beside them.
+
+Worth carrying: anywhere a test asserts `toEqual([])` to mean *nothing happened*, a call that happened
+with an undefined argument passes it.
+
+Gates: unit 519 suites / 8,095 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6709,10 +6729,9 @@ written.** Three differences, each of which changes the work:
    `readonly → 'ask'`, `passive → 'plan'`. So there is no `sessionConfiguration` to apply, and what
    makes an auxiliary turn safe is the launch, not the session. `GrokAuxiliaryAgents.ts` would be the
    wrong shape to copy; the mapping belongs beside the artifacts instead.
-2. **The model is applied with `session/set_model`, not `session/set_config_option`.**
-   `ManagedAcpAuxiliaryQuery.configure()` only knows config options today, so **the query needs the
-   second setter before Grok can flip** — the same pair the chat dynamic applier already carries.
-   Do that first, in the shared module, with its own break test.
+2. ~~**The model is applied with `session/set_model`, not `session/set_config_option`.**~~ **Done** —
+   the shared query carries both setters, and a provider names the one its agent has by setting
+   `modelId` rather than a `model` config option.
 3. **`GROK_HOME` and the reasoning effort are launch-time.** The home is derived from the auxiliary
    subdirectory — a partitioning the forks do not have and the kernel path must keep — and the effort
    is passed as a process argument rather than set on the session.

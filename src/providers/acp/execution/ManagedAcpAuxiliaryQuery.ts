@@ -38,6 +38,16 @@ export interface ManagedAcpAuxiliaryInvocation {
   readonly sessionConfiguration?: readonly ManagedAcpAuxiliaryConfigOption[];
   /** Applied before every prompt — the model, which the caller may change between turns. */
   readonly turnConfiguration?: readonly ManagedAcpAuxiliaryConfigOption[];
+  /**
+   * The model, for an agent that has ACP's dedicated setter instead.
+   *
+   * Which of the two an agent answers is a property of its release rather than
+   * of the protocol — the OpenCode forks carry the model as a config option and
+   * Grok has `session/set_model` — so both travel and a provider names the one
+   * its agent has. Applied before every prompt, for the same reason a config
+   * option is: the caller passes a model per query.
+   */
+  readonly modelId?: string;
 }
 
 export interface ManagedAcpAuxiliaryResolver {
@@ -255,6 +265,7 @@ export class ManagedAcpAuxiliaryQuery {
           await this.configure(session, invocation.sessionConfiguration, signal);
         }
         await this.configure(session, invocation.turnConfiguration, signal);
+        await this.configureModel(session, invocation.modelId, signal);
         const sessionId = session.sessionId;
         const response = await withDeadline(
           raceAbort(session.client.prompt({ prompt: [...invocation.prompt], sessionId }), signal),
@@ -314,6 +325,26 @@ export class ManagedAcpAuxiliaryQuery {
         // waiting for would be the query ignoring its own cancellation.
         if (signal.aborted) throw error;
       }
+    }
+  }
+
+  /**
+   * The model, through the setter this agent has rather than the one it does not.
+   *
+   * Best effort like every other configuration here: an auxiliary answer under
+   * the session's default model is worth more than no answer.
+   */
+  private async configureModel(
+    session: RetainedSession,
+    modelId: string | undefined,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const sessionId = session.sessionId;
+    if (!modelId || !sessionId) return;
+    try {
+      await raceAbort(session.client.setModel({ modelId, sessionId }), signal);
+    } catch (error) {
+      if (signal.aborted) throw error;
     }
   }
 
