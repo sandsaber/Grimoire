@@ -78,8 +78,8 @@ const MAX_RESULT_BYTES = 256_000;
 /**
  * Gemini CLI chat execution, assembled from the running plugin.
  *
- * **Dark.** Nothing constructs this yet; the flip is what points
- * `registration.ts` at it and deletes `GeminiChatRuntime`.
+ * **Flipped.** `registration.ts` points `createRuntime` here, `main.ts`
+ * constructs one per load, and `GeminiChatRuntime` is gone.
  *
  * The fifth ACP provider on the kernel and the fourth in a row to add nothing
  * to the shared stack: the client adapter, the transport, the process launcher
@@ -297,8 +297,8 @@ export class GeminiExecution {
         isCompact: false,
         mcpMentions: request.enabledMcpServers ?? new Set<string>(),
         // What the conversation is saved as, which for this provider is the
-        // whole composed prompt — `GeminiChatRuntime.prepareTurn` persisted the
-        // same string it sent.
+        // whole composed prompt — the legacy `prepareTurn` persisted the same
+        // string it sent.
         persistedContent: buildGeminiPromptText(request),
         prompt: buildGeminiPromptText(request),
         request,

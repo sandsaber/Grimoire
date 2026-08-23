@@ -15,6 +15,7 @@ import { AntigravityExecution } from './app/execution/antigravity/AntigravityExe
 import { ClaudeExecution } from './app/execution/claude/ClaudeExecutionComposition';
 import { CodexExecution } from './app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
+import { GeminiExecution } from './app/execution/gemini/GeminiExecutionComposition';
 import { GrokExecution } from './app/execution/grok/GrokExecutionComposition';
 import { KimicodeExecution } from './app/execution/kimicode/KimicodeExecutionComposition';
 import { MimocodeExecution } from './app/execution/mimocode/MimocodeExecutionComposition';
@@ -107,6 +108,7 @@ export default class GrimoirePlugin extends Plugin {
   private grokExecution: GrokExecution | null = null;
   private mimocodeExecution: MimocodeExecution | null = null;
   private kimicodeExecution: KimicodeExecution | null = null;
+  private geminiExecution: GeminiExecution | null = null;
   private unloading = false;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
@@ -362,6 +364,7 @@ export default class GrimoirePlugin extends Plugin {
     this.grokExecution?.dispose();
     this.mimocodeExecution?.dispose();
     this.kimicodeExecution?.dispose();
+    this.geminiExecution?.dispose();
     void this.executionKernelHost?.dispose();
     void this.persistOpenTabStates();
   }
@@ -444,6 +447,14 @@ export default class GrimoirePlugin extends Plugin {
     return this.kimicodeExecution;
   }
 
+  /** The Gemini execution this plugin instance owns; see the note above. */
+  getGeminiExecution(): GeminiExecution {
+    if (!this.geminiExecution) {
+      throw new Error('Gemini execution is not available before plugin load.');
+    }
+    return this.geminiExecution;
+  }
+
   /**
    * Brings the kernel up before anything can ask it for work.
    *
@@ -506,6 +517,12 @@ export default class GrimoirePlugin extends Plugin {
     // as the three before it; what is its own is beside this — the `kimi acp`
     // launch, and mode ids the CLI names itself rather than Grimoire.
     host.registerBackend(this.kimicodeExecution.createBackendRegistration());
+    this.geminiExecution = new GeminiExecution(this, host.registry);
+    // The fifth ACP provider and the first of wave 7. What is its own is
+    // beside this: a `--acp` flag rather than a subcommand, dedicated
+    // `session/set_model` and `session/set_mode` where the OpenCode family
+    // sets a config option, and no launch artifacts at all.
+    host.registerBackend(this.geminiExecution.createBackendRegistration());
     this.executionKernelHost = host;
     try {
       await host.start();

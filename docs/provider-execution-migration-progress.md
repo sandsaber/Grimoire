@@ -5885,6 +5885,46 @@ Covered, and red on the break now.
 Gates: unit 505 suites / 7,895 tests, integration 145 (61 env-gated skips),
 typecheck, `eslint`, `build:release`.
 
+### The Gemini flip (this commit)
+
+`registration.ts` points `createRuntime` at the composition, `main.ts` constructs
+a `GeminiExecution` per load and registers its backend with both side ports, the
+model catalog moved off a whole chat runtime onto the isolated metadata session,
+and `GeminiChatRuntime` is deleted. **Seven providers now execute through the
+kernel**; Qwen Code is the last one on the legacy path.
+
+The deletion took a 700-line test with it, and the coverage moved rather than
+went. Three files took it:
+
+- `modes.test.ts`, which this provider never had — the mapping that was the
+  fourth review's Critical was only ever reached through the runtime;
+- `buildGeminiPrompt.test.ts`, for the eight pieces of the vault a turn carries,
+  the history a replacement session has to be told and a bound one must not be,
+  and the orchestrator frame. Writing it corrected a claim of mine: those
+  instructions go **first**, not last;
+- `GeminiSessionConfigState.test.ts`, for the model catalogue, the two mode
+  doors, and the per-provider permission mode — which the composition test now
+  also asserts end to end, because it is what gates containment and write
+  approvals.
+
+Unit went 7,861 after the deletion and 7,895 after the replacements, which is
+exactly where it stood before: the same number of assertions, one layer closer to
+what they are about.
+
+Two things kept rather than tidied. The display name stays **Gemini CLI
+(Legacy)**: what is legacy is the CLI — Google replaced it with Antigravity —
+not this adapter, and `registration.ts` has said so since before the migration.
+And the module's `manifest.displayName` was corrected *to* match it, because
+product copy is copied rather than improved in passing.
+
+**Not certified.** The flip is wired and green against a fake agent; nothing here
+has met the real CLI since the wire recording. Unlike wave 6's two, that is a
+gap this machine can close — Gemini's recording is `complete` — so the live
+harness and the smoke matrix are the next commit, not a deferred obligation.
+
+Gates: unit 507 suites / 7,895 tests, integration 145 (61 env-gated skips),
+typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

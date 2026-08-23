@@ -54,8 +54,9 @@ export interface GeminiContentPresenterPorts {
  * The chunks a Gemini turn's session updates become.
  *
  * `AcpSessionUpdateNormalizer` is the piece that knows how an ACP tool call, its
- * output, a plan and a usage report are rendered, and `GeminiChatRuntime` drives
- * exactly it today. The flip keeps it rather than writing a second opinion.
+ * output, a plan and a usage report are rendered, and the runtime this
+ * replaces drove exactly it. The flip kept it rather than writing a second
+ * opinion.
  *
  * **No tool stream adapter, and that is this provider's own difference.** Every
  * OpenCode-family runtime and Grok's normalize a tool call through one; Gemini

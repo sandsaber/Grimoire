@@ -577,7 +577,25 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/codex/execution/CodexTurnInput.ts',
       'src/providers/codex/execution/CodexTurnSandboxPolicy.ts',
       'src/providers/codex/runtime/CodexExecutionConnection.ts',
-      'src/providers/gemini/runtime/GeminiChatRuntime.ts',
+      // Gemini CLI chat execution, flipped: the fifth ACP provider on the
+      // kernel and the first of wave 7. It is also the only flip that had to
+      // write the provider's `ProviderModule` first — Gemini reached the kernel
+      // without one. What is its own: a `--acp` flag rather than a subcommand,
+      // dedicated `session/set_model` and `session/set_mode`, no launch
+      // artifacts, and no native transcript to read a result back from.
+      'src/app/execution/gemini/GeminiExecutionComposition.ts',
+      'src/app/execution/gemini/GeminiMetadataSession.ts',
+      'src/providers/gemini/GeminiProviderModule.ts',
+      'src/providers/gemini/app/GeminiModuleContext.ts',
+      'src/providers/gemini/execution/GeminiAcpDynamicConfig.ts',
+      'src/providers/gemini/execution/GeminiAcpFileSystem.ts',
+      'src/providers/gemini/execution/GeminiContentPresenter.ts',
+      'src/providers/gemini/execution/GeminiExecutionBackend.ts',
+      'src/providers/gemini/execution/GeminiExecutionRequests.ts',
+      'src/providers/gemini/execution/GeminiInteractionBridge.ts',
+      'src/providers/gemini/execution/GeminiPermissionPresentation.ts',
+      'src/providers/gemini/execution/GeminiProjectionResultSink.ts',
+      'src/providers/gemini/execution/GeminiSessionConfigState.ts',
       // Grok chat execution, flipped: the second ACP provider on the kernel,
       // and the isolated session its five metadata surfaces now share.
       'src/app/execution/grok/GrokExecutionComposition.ts',
@@ -752,27 +770,6 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // M5. The transport, the launcher and the client adapter beside it went
       // live with OpenCode's flip and are listed as wired.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
-      // Wave 7's first half, built ahead of its own flip: Gemini CLI's backend
-      // descriptor and the provider-owned parts around it. Three are not listed
-      // beside them, because the legacy runtime delegates to all three and they
-      // are in the production bundle already: `GeminiPermissionPresentation.ts`
-      // and `GeminiSessionConfigState.ts`, both moved out of that runtime rather
-      // than written next to it, and `modes.ts`, which it imports for the mode
-      // translation the fourth review asked for.
-      // The module and its context, which Gemini reached the kernel without
-      // having at all: no other provider's flip had to write one first, and the
-      // composition assembled from them.
-      'src/app/execution/gemini/GeminiExecutionComposition.ts',
-      'src/app/execution/gemini/GeminiMetadataSession.ts',
-      'src/providers/gemini/GeminiProviderModule.ts',
-      'src/providers/gemini/app/GeminiModuleContext.ts',
-      'src/providers/gemini/execution/GeminiAcpDynamicConfig.ts',
-      'src/providers/gemini/execution/GeminiAcpFileSystem.ts',
-      'src/providers/gemini/execution/GeminiExecutionBackend.ts',
-      'src/providers/gemini/execution/GeminiInteractionBridge.ts',
-      'src/providers/gemini/execution/GeminiContentPresenter.ts',
-      'src/providers/gemini/execution/GeminiExecutionRequests.ts',
-      'src/providers/gemini/execution/GeminiProjectionResultSink.ts',
     ],
   },
 ];

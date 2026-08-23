@@ -19,9 +19,9 @@ export interface GeminiExecutionRequest {
 /**
  * Everything ambient a launched `gemini --acp` runs under, read at dispatch.
  *
- * Shorter than every other provider's, and the launch key says why:
- * `GeminiChatRuntime` restarts on a change to the command and the environment
- * text, and on nothing else. There are no launch artifacts — no managed home,
+ * Shorter than every other provider's, and the launch key says why: the
+ * runtime this replaces restarted on a change to the command and the
+ * environment text, and on nothing else. There are no launch artifacts — no managed home,
  * no config file, no system prompt written to disk — so what a turn runs under
  * is decided by a command line rather than by a directory. The `--acp` is a
  * flag, not a subcommand, which is the wave-7 difference.
@@ -160,9 +160,10 @@ export class GeminiExecutionRequests {
 /**
  * What makes the backend restart the process rather than reuse the one it has.
  *
- * The legacy runtime's launch key, hashed. `GeminiChatRuntime` restarts on a
- * change to the resolved command or the environment text and on nothing else —
- * there are no artifacts to key on, because this provider writes none.
+ * The legacy runtime's launch key, hashed: the resolved command and the
+ * environment text, and nothing else — there are no artifacts to key on,
+ * because this provider writes none. The composition adds the vault's MCP
+ * servers, which that runtime handled by shutting the process down instead.
  */
 function fingerprint(launchKey: string): string {
   return createHash('sha256').update(launchKey).digest('hex');

@@ -12,7 +12,6 @@ import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { GeminiCommandCatalog } from '../commands/GeminiCommandCatalog';
-import { GeminiChatRuntime } from '../runtime/GeminiChatRuntime';
 import { GeminiCliResolver } from '../runtime/GeminiCliResolver';
 import { getGeminiProviderSettings } from '../settings';
 import { GeminiAgentStorage } from '../storage/GeminiAgentStorage';
@@ -45,14 +44,16 @@ function createGeminiModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog 
     },
     async refreshModels({ settings }) {
       const before = JSON.stringify(getGeminiProviderSettings(settings).discoveredModels);
-      const runtime = new GeminiChatRuntime(plugin);
-      try {
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-        const after = JSON.stringify(getGeminiProviderSettings(settings).discoveredModels);
-        return loaded && before !== after;
-      } finally {
-        runtime.cleanup();
-      }
+      // One isolated session, opened and closed. Building a whole chat runtime
+      // to get here was the only thing that runtime was doing for this surface:
+      // opening a session and reading its reply.
+      //
+      // Its answer is whether anything was learned; what this reports is
+      // whether the *model list* changed, which is the narrower question and the
+      // one the legacy code asked.
+      await plugin.getGeminiExecution().metadata.discoverMetadata();
+      const after = JSON.stringify(getGeminiProviderSettings(settings).discoveredModels);
+      return before !== after;
     },
   };
 }

@@ -25,10 +25,10 @@ export interface GeminiMetadataSessionPorts {
  * What Grimoire asks Gemini when nobody is having a conversation.
  *
  * The model catalog, the settings tab and the chat toolbar all want the same
- * answer — which models this CLI has — and `GeminiWorkspaceServices` gets it
- * today by constructing a whole `GeminiChatRuntime` and driving it as far as a
- * session. Opening a session and reading its reply is the only thing that
- * runtime was doing for them.
+ * answer — which models this CLI has — and `GeminiWorkspaceServices` got it by
+ * constructing a whole `GeminiChatRuntime` and driving it as far as a session,
+ * until this replaced it. Opening a session and reading its reply is the only
+ * thing that runtime was doing for them.
  *
  * The shortest metadata session of the five, and the recording is why. Gemini
  * answers `session/new` with `models` **and** `modes` at once and no config

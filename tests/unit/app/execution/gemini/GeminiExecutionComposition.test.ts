@@ -608,6 +608,54 @@ describe('Gemini execution composition', () => {
     await host.dispose();
   });
 
+  it('says the conversation only to a session that has never heard it', async () => {
+    // A replacement session has to be told what came before; a bound one
+    // already holds it, and saying it again says everything twice.
+    const history = [
+      { id: 'user-previous', role: 'user' as const, content: 'Keep the language rich.', timestamp: 1 },
+    ];
+    const { execution, host, prompts } = await createHarness();
+    const fresh = execution.createRuntime();
+
+    await drain(fresh.query(fresh.prepareTurn({ text: 'go on' }), history));
+
+    const first = prompts[0] as { prompt: Array<{ text?: string }> };
+    expect(first.prompt[0]?.text).toContain('Keep the language rich.');
+
+    const bound = execution.createRuntime();
+    bound.syncConversationState({ providerState: {}, sessionId: 'acp-session-saved' });
+    await drain(bound.query(bound.prepareTurn({ text: 'go on' }), history));
+
+    const second = prompts[1] as { prompt: Array<{ text?: string }> };
+    expect(second.prompt[0]?.text).not.toContain('Keep the language rich.');
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('reads its own permission mode, not whichever provider was toggled last', async () => {
+    // `settings.permissionMode` is shared: the coordinator projects the active
+    // provider's value into it. Reading it directly is how another provider's
+    // Auto-approve came to switch off this one's containment and skip its write
+    // approvals — and the composition is where that question is asked now.
+    const plugin = createPlugin();
+    plugin.settings.permissionMode = 'full_access';
+    plugin.settings.savedProviderPermissionMode = { gemini: 'normal' };
+    const { execution, host } = await createHarness({ plugin });
+    const runtime = execution.createRuntime();
+    const approval = jest.fn(async () => 'deny' as const);
+    runtime.setApprovalCallback(approval);
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    await expect((execution as any).approveWrite({
+      sessionId: 'acp-session-1',
+      requestPath: 'note.md',
+      resolvedPath: '/vault/note.md',
+    })).resolves.toBe(false);
+    expect(approval).toHaveBeenCalledTimes(1);
+    execution.dispose();
+    await host.dispose();
+  });
+
   it('leaves the mode the user picked alone when the session reports its own', async () => {
     const plugin = createPlugin();
     // The user's pick, which the session's own default must not overwrite.

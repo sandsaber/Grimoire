@@ -37,8 +37,8 @@ import {
  * needs before it can name a backend id, a capability record or a history
  * contribution.
  *
- * **Dark.** Nothing constructs this yet; the flip is what points
- * `registration.ts` at a composition built from it.
+ * **Flipped.** `registration.ts` points `createRuntime` at the composition built
+ * from this, and `GeminiChatRuntime` is gone.
  *
  * Derived from Grok's rather than from the OpenCode family's, which is the
  * measured answer and not a preference: this CLI configures a session through
@@ -298,7 +298,10 @@ GeminiProviderSettings
 > = {
   manifest: {
     id: 'gemini',
-    displayName: 'Gemini CLI',
+    // What is legacy here is the CLI, not this adapter: Google replaced Gemini
+    // CLI with Antigravity, and `registration.ts` has said so since before the
+    // migration. The name is product copy, so it is copied rather than tidied.
+    displayName: 'Gemini CLI (Legacy)',
     order: 80,
   },
 

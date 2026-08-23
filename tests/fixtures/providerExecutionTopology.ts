@@ -217,7 +217,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     capabilities: GEMINI_PROVIDER_CAPABILITIES,
     isolationEvidence: 'TitleGenerationService',
     evidence: [
-      'src/providers/gemini/runtime/GeminiChatRuntime.ts',
+      'src/providers/gemini/execution/GeminiExecutionBackend.ts',
       'src/providers/gemini/auxiliary/GeminiNoopServices.ts',
       'src/providers/gemini/capabilities.ts',
     ],

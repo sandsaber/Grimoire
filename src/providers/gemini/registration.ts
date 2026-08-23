@@ -8,7 +8,6 @@ import {
 import { GEMINI_PROVIDER_CAPABILITIES } from './capabilities';
 import { geminiSettingsReconciler } from './env/GeminiSettingsReconciler';
 import { GeminiConversationHistoryService } from './history/GeminiConversationHistoryService';
-import { GeminiChatRuntime } from './runtime/GeminiChatRuntime';
 import { getGeminiProviderSettings, updateGeminiProviderSettings } from './settings';
 import { geminiChatUIConfig } from './ui/GeminiChatUIConfig';
 
@@ -18,7 +17,7 @@ export const geminiProviderRegistration: ProviderRegistration = {
   chatUIConfig: geminiChatUIConfig,
   createInlineEditService: () => new GeminiInlineEditService(),
   createInstructionRefineService: () => new GeminiInstructionRefineService(),
-  createRuntime: ({ plugin }) => new GeminiChatRuntime(plugin),
+  createRuntime: ({ plugin }) => plugin.getGeminiExecution().createRuntime(),
   createTitleGenerationService: () => new GeminiTitleGenerationService(),
   displayName: 'Gemini CLI (Legacy)',
   environmentKeyPatterns: [/^GEMINI_/i, /^GOOGLE_/i, /^VERTEX_/i],

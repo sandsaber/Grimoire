@@ -1,20 +1,18 @@
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
-import { GeminiChatRuntime } from '@/providers/gemini/runtime/GeminiChatRuntime';
 import { QwenChatRuntime } from '@/providers/qwen/runtime/QwenChatRuntime';
 
 /**
- * The two ACP runtimes still on the legacy path.
+ * The one ACP runtime still on the legacy path.
  *
- * OpenCode left this list at its flip, Grok at its own, and MiMoCode and Kimi
- * Code at wave 6's: their servers reach a session through the kernel now,
- * asserted where they are passed — each provider's
+ * OpenCode left this list at its flip, Grok at its own, MiMoCode and Kimi Code
+ * at wave 6's, and Gemini at wave 7's: their servers reach a session through the
+ * kernel now, asserted where they are passed — each provider's
  * `*ExecutionComposition.test.ts` for the launch key that restarts on a change,
  * and `OpencodeExecutionBackend.test.ts` for the `session/new` that carries
  * them.
  */
 const cases = [
   ['qwen', QwenChatRuntime],
-  ['gemini', GeminiChatRuntime],
 ] as const;
 
 function createPlugin(): any {

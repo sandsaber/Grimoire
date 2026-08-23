@@ -17,11 +17,11 @@ import type { AcpContentBlock } from '../../acp';
 /**
  * What one Gemini turn says, and the eight pieces of the vault in it.
  *
- * Moved out of `GeminiChatRuntime`, which now imports it, because the flip
- * deletes that file and a turn composed by the kernel has to say exactly what a
- * turn composed by the runtime said. The order is load-bearing: every appender
- * writes after the user's own text, and the history block wraps whatever the
- * seven before it produced.
+ * Moved out of `GeminiChatRuntime` before the flip deleted that file, because a
+ * turn composed by the kernel has to say exactly what a turn composed by the
+ * runtime said. The order is load-bearing: every appender writes after the
+ * user's own text, and the history block wraps whatever the seven before it
+ * produced.
  */
 
 interface GeminiPromptOptions {
