@@ -6407,6 +6407,42 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
+### Where the sixth session of 2026-08-23 ended
+
+**Every provider executes through the kernel, and every one of them now has a live harness** except
+Kimi Code. M2-flips is done; what remains is certification, and it is account-bound rather than
+code-bound.
+
+**The sixth review closed seven findings**, recorded in
+[`docs/wave7-review-backlog.md`](wave7-review-backlog.md). The two behavioural ones were the same
+mistake twice — **state held by the composition where the session was meant**, in an object that
+serves every open tab. A reasoning level applied on one tab silenced it on all of them; the context
+window was read off whichever connection had opened last. Both would have been invisible: the first
+because this provider reports no level back, the second because a badge with no number looks like a
+provider that has none.
+
+**Gemini's second live run certified the fixes from the first.** The account came back, answered one
+turn, and was exhausted by the second — which is now measured rather than assumed: **about one turn
+per replenishment**. That one turn is the first this branch has ever completed end to end, and it
+carried the refusal notice beside the answer. The quota error that blocked the rest certified the
+third fix by failing: the tab shows *"You have exhausted your daily quota on this model."* where it
+used to show a sentence that meant nothing.
+
+**Qwen's harness found a defect before it could pass a single row.** A user with no credentials was
+told a saved session may have gone and to start a new chat — advice that fails identically every time.
+The agent had said "Authentication required" and nobody was carrying it. Fixed for all six ACP
+providers and confirmed against the same CLI that found it.
+
+**Four defects this session, and none was found by looking for one.** Reading a module against the
+config it replaces. Reading a fake against the recording. Reading a runtime against the composition
+meant to delete it. Running a harness that could not possibly pass. The pattern is the same every
+time: **exercise the thing against reality and read what comes back**, rather than deciding in advance
+what it should say.
+
+**What is left.** Certification: Gemini one turn at a time, MiMoCode and Kimi Code and Qwen not at all
+here. Then M5, which owns auxiliary execution, result provenance and the redo decision — and which is
+now the only milestone with open obligations attached.
+
 ### Where the fifth session of 2026-08-23 ended
 
 **Every provider executes through the kernel.** Codex, Claude, OpenCode, Grok, MiMoCode, Kimi Code,
