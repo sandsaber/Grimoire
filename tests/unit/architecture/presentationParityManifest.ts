@@ -775,10 +775,19 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // — both take `--acp` as a flag and configure a session through dedicated
       // methods — and adds four things Gemini has nothing of: an effort applied
       // as a `/effort` prompt, the session's own commands, ask-user-question,
-      // and `reloadWorkspaceResources`.
+      // and `reloadWorkspaceResources`. Not listed beside them:
+      // `QwenPermissionPresentation.ts`, `QwenSessionConfigState.ts` and
+      // `runtime/buildQwenPrompt.ts`, which were moved out of the legacy runtime
+      // rather than written next to it and are in the production bundle already.
       'src/providers/qwen/QwenProviderModule.ts',
       'src/providers/qwen/app/QwenModuleContext.ts',
+      'src/providers/qwen/execution/QwenAcpDynamicConfig.ts',
+      'src/providers/qwen/execution/QwenAcpFileSystem.ts',
+      'src/providers/qwen/execution/QwenContentPresenter.ts',
       'src/providers/qwen/execution/QwenExecutionBackend.ts',
+      'src/providers/qwen/execution/QwenExecutionRequests.ts',
+      'src/providers/qwen/execution/QwenInteractionBridge.ts',
+      'src/providers/qwen/execution/QwenProjectionResultSink.ts',
     ],
   },
 ];

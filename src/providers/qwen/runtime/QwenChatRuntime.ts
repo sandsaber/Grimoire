@@ -6,7 +6,6 @@ import {
   isAcpMissingSessionError,
 } from '@/providers/acp/acpSessionResume';
 
-import { applyOrchestratorModeInstructions } from '../../../core/prompt/mainAgent';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type { ProviderCapabilities } from '../../../core/providers/types';
@@ -30,31 +29,18 @@ import type {
   ApprovalDecision,
   ChatMessage,
   Conversation,
-  ImageAttachment,
   SlashCommand,
   StreamChunk,
   ToolCallInfo,
 } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
-import { appendBrowserContext } from '../../../utils/browser';
-import { appendCanvasContext } from '../../../utils/canvas';
-import {
-  appendContextFiles,
-  appendCurrentNote,
-  appendExcludedFoldersContext,
-  appendProjectWorkspaceContext,
-  appendVaultSearchContext,
-} from '../../../utils/context';
-import { appendEditorContext } from '../../../utils/editor';
 import { getVaultPath } from '../../../utils/path';
-import { buildContextFromHistory, buildPromptWithHistoryContext } from '../../../utils/session';
 import type {
   extractAcpSessionModelState,
   extractAcpSessionModeState} from '../../acp';
 import {
   AcpClientConnection,
-  type AcpContentBlock,
   AcpJsonRpcTransport,
   type AcpReadTextFileRequest,
   type AcpRequestPermissionRequest,
@@ -68,12 +54,15 @@ import {
   buildAcpUsageInfo,
   resolveWorkspacePath,
 } from '../../acp';
+import { normalizeApprovalInput } from '../../acp/execution/AcpPermissionBridge';
 import { toAcpMcpServers } from '../../acp/mcp/toAcpMcpServers';
 import { qwenPlanUsageStore } from '../app/QwenPlanUsageStore';
 import { QWEN_PROVIDER_CAPABILITIES } from '../capabilities';
+import { buildQwenPermissionPresentation } from '../execution/QwenPermissionPresentation';
 import { QwenSessionConfigState } from '../execution/QwenSessionConfigState';
 import { mapGrimoireModeToQwen } from '../modes';
 import { getQwenProviderSettings } from '../settings';
+import { buildQwenPromptBlocks, buildQwenPromptText } from './buildQwenPrompt';
 import { buildQwenRuntimeEnv } from './QwenRuntimeEnvironment';
 
 interface ActiveTurn {
@@ -347,7 +336,7 @@ export class QwenChatRuntime implements ChatRuntime {
       prompt: buildQwenPromptBlocks(
         turn.request,
         shouldBootstrapHistory ? previousMessages : [],
-        queryOptions,
+        queryOptions?.orchestratorMode ? { orchestratorMode: true } : {},
       ),
       sessionId,
     }).then(async (response) => {
@@ -757,21 +746,19 @@ export class QwenChatRuntime implements ChatRuntime {
       return { outcome: { outcome: 'cancelled' } };
     }
 
-    const rawInput = request.toolCall.rawInput;
-    const input = rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)
-      ? rawInput as Record<string, unknown>
-      : {};
-    const pathValue = ['path', 'filePath', 'filepath'].map((key) => input[key])
-      .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
-      ?? request.toolCall.locations
-        ?.map((location) => (typeof location?.path === 'string' ? location.path.trim() : ''))
-        .find((path) => path.length > 0);
-    const title = request.toolCall.title?.trim() || request.toolCall.kind?.trim() || 'Qwen Code action';
-    const description = pathValue
-      ? `${title} requests access to ${pathValue}.`
-      : `${title} requests permission.`;
-    const decision = await this.approvalCallback(title, input, description, {
-      ...(pathValue ? { target: pathValue } : {}),
+    const input = normalizeApprovalInput(request.toolCall.rawInput);
+    const presentation = buildQwenPermissionPresentation(
+      request.toolCall.title,
+      request.toolCall.kind,
+      input,
+      request.toolCall.locations,
+    );
+    const decision = await this.approvalCallback(
+      presentation.toolName,
+      input,
+      presentation.description,
+      {
+      ...(presentation.blockedPath ? { target: presentation.blockedPath } : {}),
       decisionOptions: request.options.map((option) => ({
         label: option.name,
         presentation: option.kind === 'allow_once'
@@ -781,7 +768,8 @@ export class QwenChatRuntime implements ChatRuntime {
           : 'reject' as const,
         value: option.optionId,
       })),
-    });
+      },
+    );
     return mapQwenApprovalDecision(decision, request.options);
   }
 
@@ -974,81 +962,6 @@ function parseQwenContextUsage(status: QwenContextUsageStatus): { size: number; 
     return null;
   }
   return { size, used };
-}
-
-function buildQwenPromptBlocks(
-  request: ChatTurnRequest,
-  conversationHistory: ChatMessage[] = [],
-  queryOptions?: ChatRuntimeQueryOptions,
-): AcpContentBlock[] {
-  const prompt = buildQwenPromptText(request, conversationHistory);
-  const text = request.orchestratorMode === true || queryOptions?.orchestratorMode === true
-    ? applyOrchestratorModeInstructions(prompt)
-    : prompt;
-  const blocks: AcpContentBlock[] = [{ text, type: 'text' }];
-  for (const image of request.images ?? []) {
-    blocks.push(toAcpImage(image));
-  }
-  return blocks;
-}
-
-function buildQwenPromptText(
-  request: ChatTurnRequest,
-  conversationHistory: ChatMessage[] = [],
-): string {
-  let prompt = request.text;
-
-  if (request.excludedFolders && request.excludedFolders.length > 0) {
-    prompt = appendExcludedFoldersContext(prompt, request.excludedFolders);
-  }
-
-  if (request.currentNotePath) {
-    prompt = appendCurrentNote(prompt, request.currentNotePath);
-  }
-
-  if (request.vaultSearchContext) {
-    prompt = appendVaultSearchContext(prompt, request.vaultSearchContext);
-  }
-
-  if (request.contextFiles && request.contextFiles.length > 0) {
-    prompt = appendContextFiles(prompt, request.contextFiles);
-  }
-
-  if (request.projectWorkspaceContext) {
-    prompt = appendProjectWorkspaceContext(prompt, request.projectWorkspaceContext);
-  }
-
-  if (request.editorSelection) {
-    prompt = appendEditorContext(prompt, request.editorSelection);
-  }
-
-  if (request.browserSelection) {
-    prompt = appendBrowserContext(prompt, request.browserSelection);
-  }
-
-  if (request.canvasSelection) {
-    prompt = appendCanvasContext(prompt, request.canvasSelection);
-  }
-
-  if (conversationHistory.length > 0) {
-    const historyContext = buildContextFromHistory(conversationHistory);
-    prompt = buildPromptWithHistoryContext(
-      historyContext,
-      prompt,
-      prompt,
-      conversationHistory,
-    );
-  }
-
-  return prompt;
-}
-
-function toAcpImage(image: ImageAttachment): AcpContentBlock {
-  return {
-    data: image.data,
-    mimeType: image.mediaType,
-    type: 'image',
-  };
 }
 
 function mapQwenApprovalDecision(

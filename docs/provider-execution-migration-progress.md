@@ -6132,6 +6132,39 @@ Four breaks, four caught.
 Gates: unit 508 suites / 7,928 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### Qwen's execution modules, dark (this commit)
+
+Seven dark modules and two more extractions. Six of the nine are Gemini's under a different name,
+which is what a measured derivation should look like where nothing is actually different — the
+prompt builder is byte-identical under a normalized diff. Three are not.
+
+**The applier has a third call, and it is a prompt.** `session/set_model`, then `session/set_mode`,
+then `/effort <level>` sent as a `session/prompt` of its own. No sibling on this transport configures
+anything by talking to it, and the consequence is that applying a reasoning level **costs a turn the
+vendor charges for** — which is why the state forgets it with the session and why the composition is
+expected to skip it when nothing changed. It goes last, after the mode, which is the order the legacy
+runtime uses and the order that matters: a mode that was going to be refused should not have cost a
+turn first. A refused mode still does not stop it, because running at the wrong level is not the
+answer to a mode that would not set.
+
+**The presenter refuses to draw a nested agent.** Qwen streams a subagent's own thoughts, messages
+and tool calls through the *parent* session, tagged with `_meta.parentToolCallId` and
+`_meta.subagentType`. Drawn in the transcript they interleave concurrently running agents and corrupt
+the visible answer; the parent Agent tool call stays and its children are dropped. Both halves of the
+marking are required — a `_meta` carrying one of them is not a subagent's, and dropping it would
+silently lose the conversation's own activity, which is a break of its own.
+
+**And it keeps the commands Gemini drops**, because this provider surfaces what its session announces.
+
+The two extractions moved live code: `buildQwenPrompt.ts` and `QwenPermissionPresentation.ts`. The
+second kept a fallback name that reads like a typo and is not — `Qwen Code action` is what the runtime
+has been showing users, and product copy is copied rather than tidied. It has its own break.
+
+Seven breaks, seven caught.
+
+Gates: unit 511 suites / 7,963 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
