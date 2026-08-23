@@ -71,7 +71,14 @@ export function listAllSourceModules(options: ModuleGraphOptions = {}): string[]
     .sort();
 }
 
-function collectSpecifiers(absolutePath: string): string[] {
+/**
+ * `includeTypeOnly: false` drops `import type` / `export type`, which is the graph of
+ * what is actually in the bundle: those declarations are erased before anything
+ * is bundled. The default keeps them, which is the graph of what production
+ * code *refers to* — a contract module that exports only interfaces compiles to
+ * nothing and would otherwise read as dropped.
+ */
+function collectSpecifiers(absolutePath: string, includeTypeOnly = true): string[] {
   const parsed = ts.createSourceFile(
     absolutePath,
     readFileSync(absolutePath, 'utf8'),
@@ -91,7 +98,8 @@ function collectSpecifiers(absolutePath: string): string[] {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
       // Covers `import x from 'y'`, `export * from 'y'`, and the side-effect
       // form `import 'y'` that the provider registration hub relies on.
-      add(node.moduleSpecifier);
+      //
+      if (includeTypeOnly || !isTypeOnly(node)) add(node.moduleSpecifier);
     } else if (ts.isCallExpression(node)) {
       if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
         add(node.arguments[0]);
@@ -104,6 +112,13 @@ function collectSpecifiers(absolutePath: string): string[] {
 
   visit(parsed);
   return specifiers;
+}
+
+/** Whether a declaration is erased before the bundle: `import type` / `export type`. */
+function isTypeOnly(node: ts.ImportDeclaration | ts.ExportDeclaration): boolean {
+  return ts.isImportDeclaration(node)
+    ? node.importClause?.isTypeOnly === true
+    : node.isTypeOnly;
 }
 
 function resolveSpecifier(
@@ -130,13 +145,31 @@ function resolveSpecifier(
  * The entry point itself is included.
  */
 export function findReachableModules(options: ModuleGraphOptions = {}): Set<string> {
+  return walk(options, true);
+}
+
+/**
+ * Modules whose **code** the entry point pulls in, ignoring erased imports.
+ *
+ * The distinction earns its keep in one direction only, and it is the direction
+ * a dark module is asserted in: naming a dark module's interface from live code
+ * ships none of it, so a graph that counted the type edge reported the module as
+ * restored the moment a reachable store imported one of its types. Reported as
+ * wired, meanwhile, has to keep counting types, because a contract module is
+ * nothing but types and compiles to nothing at all.
+ */
+export function findBundledModules(options: ModuleGraphOptions = {}): Set<string> {
+  return walk(options, false);
+}
+
+function walk(options: ModuleGraphOptions, includeTypeOnly: boolean): Set<string> {
   const { sourceRoot, baseDir, entryPoint } = resolveOptions(options);
   const visited = new Set<string>([entryPoint]);
   const pending = [entryPoint];
 
   while (pending.length > 0) {
     const current = pending.pop() as string;
-    for (const specifier of collectSpecifiers(current)) {
+    for (const specifier of collectSpecifiers(current, includeTypeOnly)) {
       const target = resolveSpecifier(sourceRoot, current, specifier);
       if (target !== null && !visited.has(target)) {
         visited.add(target);

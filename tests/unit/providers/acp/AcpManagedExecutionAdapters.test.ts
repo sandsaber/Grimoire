@@ -125,19 +125,23 @@ describe('managed ACP execution adapters', () => {
    */
   function auxiliaryQuery(
     client: AuxiliaryClient | ((startupRef: string) => AuxiliaryClient),
-    invocation: Partial<ManagedAcpAuxiliaryInvocation> = {},
+    invocation: Partial<ManagedAcpAuxiliaryInvocation>
+      | (() => Partial<ManagedAcpAuxiliaryInvocation>) = {},
     limits: { maxResultBytes?: number; timeoutMs?: number; scheduler?: TestScheduler } = {},
   ): { launches: string[]; query: ManagedAcpAuxiliaryQuery } {
     const launches: string[] = [];
     const query = new ManagedAcpAuxiliaryQuery(
       {
+        // Read per call, because the store will read the settings per call: a
+        // resolver that answered with what was true when the query was built
+        // could not express a system prompt changing between turns.
         resolve: async requestRef => ({
           startupRef: 'aux-startup',
           cwd: '/vault',
           prompt: [{ type: 'text', text: 'Summarize' }],
           mcpServers: [],
           retentionKey: `retain:${requestRef}`,
-          ...invocation,
+          ...(typeof invocation === 'function' ? invocation() : invocation),
         }),
       },
       {
@@ -174,7 +178,10 @@ describe('managed ACP execution adapters', () => {
 
   it('runs an auxiliary operation in its own session and keeps it for the next turn', async () => {
     const client = new AuxiliaryClient();
-    const { launches, query } = auxiliaryQuery(client);
+    // With a fingerprint, because "kept" has to mean kept *against* one: a
+    // retained process that recorded nothing would compare equal to nothing and
+    // relaunch on every turn, which no assertion about a single turn can see.
+    const { launches, query } = auxiliaryQuery(client, { restartFingerprint: 'launch-a' });
 
     const first = query.execute('aux-ref', new AbortController().signal);
     await answer(client, 'aux-session', 'isolated result');
@@ -266,6 +273,33 @@ describe('managed ACP execution adapters', () => {
     await answer(clients[2], 'aux-session', 'fresh');
     await expect(again).resolves.toBe('fresh');
     expect(clients).toHaveLength(3);
+    await query.dispose();
+  });
+
+  it('relaunches when the process it kept was started for other settings', async () => {
+    const clients: AuxiliaryClient[] = [];
+    let fingerprint = 'launch-a';
+    const { launches, query } = auxiliaryQuery(() => {
+      const client = new AuxiliaryClient();
+      clients.push(client);
+      return client;
+    }, () => ({ retentionKey: 'retain:titles', restartFingerprint: fingerprint }));
+
+    const first = query.execute('titles', new AbortController().signal);
+    await waitFor(() => clients.length === 1);
+    await answer(clients[0], 'aux-session', 'under the old prompt');
+    await first;
+    fingerprint = 'launch-b';
+    const second = query.execute('titles', new AbortController().signal);
+    await waitFor(() => clients.length === 2);
+    await answer(clients[1], 'aux-session', 'under the new one');
+
+    // A system prompt edited in settings must reach the next auxiliary turn. A
+    // retained process that ignored it would go on answering under the old
+    // instructions for as long as it lived.
+    await expect(second).resolves.toBe('under the new one');
+    expect(launches).toHaveLength(2);
+    expect(clients[0].closeCalls).toBe(1);
     await query.dispose();
   });
 

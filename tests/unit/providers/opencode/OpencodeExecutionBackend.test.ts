@@ -638,6 +638,65 @@ describe('OpencodeExecutionBackend', () => {
     await expect(auxiliary).rejects.toThrow('auxiliary aborted');
     expect(observedSignal?.aborted).toBe(true);
   });
+  it('carries the caller\'s cancellation into the auxiliary turn', async () => {
+    // A dialog the user closed has to stop the work, not only stop waiting for
+    // it: an auxiliary turn holds a CLI process, and one nobody is waiting for
+    // goes on spending the account's tokens until it finishes.
+    let observedSignal: AbortSignal | undefined;
+    const fixture = createFixture({
+      auxiliaryExecute: (_requestRef, signal) => {
+        observedSignal = signal;
+        return new Promise<string>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('the caller left')), { once: true });
+        });
+      },
+    });
+    const caller = new AbortController();
+
+    const auxiliary = fixture.backend.runAuxiliaryQuery('aux-ref', { signal: caller.signal });
+    await waitFor(() => observedSignal !== undefined);
+    caller.abort(new Error('the caller left'));
+
+    await expect(auxiliary).rejects.toThrow('the caller left');
+    expect(observedSignal?.aborted).toBe(true);
+    await fixture.backend.dispose();
+  });
+
+  it('does not start an auxiliary turn for a caller that has already cancelled', async () => {
+    // The half a listener cannot cover: `abort` has already fired, so
+    // subscribing to it subscribes to nothing and the turn runs to completion
+    // for a caller that gave up before it started.
+    let observedSignal: AbortSignal | undefined;
+    const fixture = createFixture({
+      auxiliaryExecute: async (_requestRef, signal) => {
+        observedSignal = signal;
+        if (signal.aborted) throw new Error('the caller had already left');
+        return 'answered anyway';
+      },
+    });
+    const caller = new AbortController();
+    caller.abort(new Error('the caller had already left'));
+
+    await expect(fixture.backend.runAuxiliaryQuery('aux-ref', { signal: caller.signal }))
+      .rejects.toThrow('the caller had already left');
+    expect(observedSignal?.aborted).toBe(true);
+    await fixture.backend.dispose();
+  });
+
+  it('ends one auxiliary conversation without touching the others', async () => {
+    const released: string[] = [];
+    const fixture = createFixture({
+      auxiliaryRelease: async retentionKey => { released.push(retentionKey); },
+    });
+
+    // `AuxQueryRunner.reset()`, from the backend's side. The other auxiliary
+    // conversations and every chat session on this backend keep running.
+    await fixture.backend.releaseAuxiliaryConversation('opencode-auxiliary:title-gen');
+
+    expect(released).toEqual(['opencode-auxiliary:title-gen']);
+    await fixture.backend.dispose();
+  });
+
   it('closes the auxiliary processes it kept when the backend disposes', async () => {
     // The other half of the port. Auxiliary work keeps a process between turns —
     // inline edit's second message has to reach the first one's session — so
@@ -978,6 +1037,7 @@ function createFixture(options: {
   readonly interactionPrepare?: () => Promise<OpencodePreparedInteraction>;
   readonly auxiliaryExecute?: (requestRef: string, signal: AbortSignal) => Promise<string>;
   readonly auxiliaryDispose?: () => Promise<void>;
+  readonly auxiliaryRelease?: (retentionKey: string) => Promise<void>;
   readonly requestResolve?: (requestRef: string) => Promise<OpencodeExecutionInvocation>;
 } = {}) {
   const clients = options.clients ?? [new FakeManagedAcpClient('native-session')];
@@ -1025,6 +1085,7 @@ function createFixture(options: {
     auxiliaryQueries: {
       execute: options.auxiliaryExecute ?? (async () => 'auxiliary'),
       ...(options.auxiliaryDispose ? { dispose: options.auxiliaryDispose } : {}),
+      ...(options.auxiliaryRelease ? { release: options.auxiliaryRelease } : {}),
     },
     scheduler,
     sessionInstanceIdFactory: () => sessionInstanceId(`si-${'a'.repeat(32)}`),

@@ -16,15 +16,24 @@ export interface ManagedAcpAuxiliaryInvocation {
   readonly prompt: readonly AcpContentBlock[];
   readonly mcpServers: readonly [];
   /**
-   * What this query is, for as long as it stays the same thing.
+   * Which auxiliary conversation this is — a title, a refinement, an edit.
    *
-   * The process and its session are kept while this is unchanged and thrown
-   * away when it is not, which is how the legacy runners decide to relaunch:
-   * the CLI path, the generated config, the environment and the system prompt
-   * hashed into one string. It is opaque here on purpose — what makes an
-   * auxiliary process the wrong one to reuse is provider knowledge.
+   * One retained process per key, which is what the legacy runners are as
+   * separate instances. Opaque here: what counts as a separate auxiliary
+   * conversation is the provider's decision.
    */
   readonly retentionKey: string;
+  /**
+   * What the retained process was started for, hashed.
+   *
+   * The same thing `ManagedAcpExecutionInvocation.restartFingerprint` is on the
+   * chat side, and for the same reason: a CLI path, a generated config, an
+   * environment or a system prompt that changed means the process still running
+   * under this key was started for something else. Without it a system prompt
+   * edited in settings would go on being ignored for as long as the process
+   * lived — which is exactly what the legacy runners relaunch to avoid.
+   */
+  readonly restartFingerprint?: string;
   /** Applied once, when the session is created — the agent an auxiliary turn runs as. */
   readonly sessionConfiguration?: readonly ManagedAcpAuxiliaryConfigOption[];
   /** Applied before every prompt — the model, which the caller may change between turns. */
@@ -41,6 +50,7 @@ export type ManagedAcpAuxiliaryTextSink = (accumulated: string) => void;
 interface RetainedSession {
   readonly client: ManagedAcpClient;
   readonly key: string;
+  readonly fingerprint: string | undefined;
   sessionId: string | undefined;
   /** Serializes turns on one retained session; two callers must not interleave prompts. */
   queue: Promise<unknown>;
@@ -138,7 +148,13 @@ export class ManagedAcpAuxiliaryQuery {
     signal: AbortSignal,
   ): Promise<RetainedSession> {
     const existing = this.retained.get(invocation.retentionKey);
-    if (existing) return existing;
+    if (existing) {
+      const session = await existing.catch(() => undefined);
+      if (session && session.fingerprint === invocation.restartFingerprint) return session;
+      // Started for something else: the settings behind it changed, and what it
+      // would answer is what the old ones said.
+      await this.release(invocation.retentionKey);
+    }
     // A key that is not in the map means either nothing has launched for it or
     // what launched was for something this turn is not: a different CLI path, a
     // different generated config, a different system prompt. The provider
@@ -180,6 +196,7 @@ export class ManagedAcpAuxiliaryQuery {
     const session: RetainedSession = {
       client,
       key: invocation.retentionKey,
+      fingerprint: invocation.restartFingerprint,
       sessionId: undefined,
       queue: Promise.resolve(),
     };

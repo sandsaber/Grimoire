@@ -1,7 +1,11 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { findReachableModules, findUnreachableModules } from '@test/helpers/moduleReachability';
+import {
+  findBundledModules,
+  findReachableModules,
+  findUnreachableModules,
+} from '@test/helpers/moduleReachability';
 
 import {
   ORPHANED_MODULES,
@@ -19,6 +23,7 @@ import {
  */
 describe('presentation parity', () => {
   const reachable = findReachableModules();
+  const bundled = findBundledModules();
   const unreachable = new Set(findUnreachableModules());
 
   const manifestModules = PARITY_SURFACES.flatMap(surface => surface.modules);
@@ -59,8 +64,11 @@ describe('presentation parity', () => {
   });
 
   it('keeps every pending and intentionally-removed surface out of the bundle', () => {
+    // Bundled rather than referenced: naming a dark module's interface from
+    // live code ships none of it, and treating that as restored would make the
+    // manifest wrong about which modules run.
     const restored = PARITY_SURFACES.filter(surface => surface.state !== 'wired').flatMap(surface =>
-      surface.modules.filter(module => reachable.has(module)).map(module => `${surface.id}: ${module}`),
+      surface.modules.filter(module => bundled.has(module)).map(module => `${surface.id}: ${module}`),
     );
 
     expect(restored).toEqual([]);

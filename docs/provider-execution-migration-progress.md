@@ -6515,6 +6515,43 @@ port had no test at all** — the module's `dispose()` was proven and the wiring
 
 Gates: unit 515 suites / 8,035 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
 
+### The auxiliary path, end to end and still dark — and a gate that was answering the wrong question (this commit)
+
+The second piece of M5's auxiliary checkpoint: the reference space and the seam, so the flip is a
+wiring change. Three parts, none of them reachable yet.
+
+**The store.** OpenCode's request store gains an auxiliary reference space beside the chat one — same
+space on purpose, because it is the same kernel carrying it and a second one would be a second thing
+to keep bounded and a second place a prompt could be retained. It resolves a turn into the launch, the
+conversation it belongs to, the fingerprint that says when that conversation's process was started for
+other settings, and the two configurations: the agent when the session opens, the model before every
+turn.
+
+**The seam.** `ManagedAcpAuxQueryRunner` is `AuxQueryRunner` answered by the kernel. Four lines of
+policy, and they are the four things the legacy runners do around a prompt: pass the caller's
+cancellation down, stream the answer back, hand over the model, end the conversation on `reset`. A
+`reset` whose closing failed must not reach the caller — the title service calls it in a `finally`,
+and a process-management error would replace the generated title.
+
+**The backend.** `runAuxiliaryQuery` takes the caller's signal and its text sink; a new
+`releaseAuxiliaryConversation` ends one conversation without touching the others. A caller that had
+*already* cancelled needed its own line — subscribing to an `abort` that has fired subscribes to
+nothing, and the turn would have run to completion for someone who gave up before it started. That was
+the one break of ten that stayed green.
+
+**And the parity gate was answering the wrong question.** It reported the dark auxiliary module as
+restored — because a live store now names one of its *interfaces*, and the walker counted an
+`import type` as an edge. Erased before anything is bundled: naming a dark module's type ships none of
+it. The obvious fix broke six wired surfaces, which is the finding: a contract module is nothing but
+types and compiles to nothing at all, so "wired" cannot mean "in the bundle" for it. Two graphs now —
+what the source refers to, for wired; what the bundle contains, for dark — and the walker's own test
+pins the difference in both directions.
+
+Sixteen breaks across the three files; the ones that stayed green each named a missing test rather
+than a wrong rule.
+
+Gates: unit 516 suites / 8,050 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6548,10 +6585,17 @@ consumer needs a conversation. Corrected, proven, still dark. What is left there
 and the runner adapter per provider, then the flip — and the stderr a failed auxiliary error carries
 today, which needs the client contract to grow.
 
-**The next M5 piece to pick up** is `OpencodeAuxiliaryRequests`: the store that turns an
-`AuxQueryConfig` into a `requestRef` — a startup ref built from the launch artifacts with the aux
-agent, a retention key that changes when the launch does, and the config options the turn applies. The
-module it feeds is finished.
+**The next M5 piece to pick up** is the composition: `OpencodeExecution` builds the auxiliary
+environment — `prepareOpencodeLaunchArtifacts` for the purpose's agent, the runtime env, and the raw
+model id behind whatever the caller passed — and hands a `ManagedAcpAuxQueryRunner` to the title,
+refine and inline-edit services in place of `OpencodeAuxQueryRunner`. Everything under that is built
+and proven: the store, the seam, the port and the retained process. The flip is the wiring plus
+deleting a 443-line runner, and it should be one provider first, not five.
+
+**Still owed there:** the legacy runners attach the CLI's stderr to a failed auxiliary error, and
+`ManagedAcpClient` has no stderr to attach. A transport change rather than a policy one, and worth
+doing before the flip rather than after — a failed auxiliary turn with no stderr is how the empty
+answers of the legacy path were diagnosed.
 
 ### Where the sixth session of 2026-08-23 ended
 

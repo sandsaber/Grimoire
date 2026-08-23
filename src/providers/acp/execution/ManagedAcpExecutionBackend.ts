@@ -191,6 +191,14 @@ export interface ManagedAcpClientObserver {
   onClientLost(): void;
 }
 
+/** What a caller can say about an auxiliary turn beyond which request it is. */
+export interface ManagedAcpAuxiliaryQueryOptions {
+  /** The caller's own cancellation — a closed dialog, a superseded title. */
+  readonly signal?: AbortSignal;
+  /** The answer so far, for a caller that renders one as it arrives. */
+  readonly onText?: (accumulated: string) => void;
+}
+
 export interface ManagedAcpAuxiliaryPort {
   execute(
     requestRef: string,
@@ -330,20 +338,41 @@ implements ExecutionBackend, InteractionPort, ExecutionRecoveryPort {
     return this.context.reconciler.reconcile(query);
   }
 
-  async runAuxiliaryQuery(requestRef: string): Promise<string> {
+  async runAuxiliaryQuery(
+    requestRef: string,
+    options?: ManagedAcpAuxiliaryQueryOptions,
+  ): Promise<string> {
     if (this.disposing) throw new Error('Managed ACP backend is disposing.');
     const controller = new AbortController();
     this.auxiliaryControllers.add(controller);
+    // The caller's cancel and the backend's shutdown both end this turn, and
+    // the query is given one signal: a dialog the user closed must stop the
+    // work, not only stop waiting for it.
+    const forwardAbort = () => controller.abort(options?.signal?.reason);
+    options?.signal?.addEventListener('abort', forwardAbort, { once: true });
+    if (options?.signal?.aborted) forwardAbort();
     const task = Promise.resolve().then(
-      () => this.context.auxiliaryQueries.execute(requestRef, controller.signal),
+      () => this.context.auxiliaryQueries.execute(requestRef, controller.signal, options?.onText),
     );
     this.auxiliaryTasks.add(task);
     try {
       return await task;
     } finally {
+      options?.signal?.removeEventListener('abort', forwardAbort);
       this.auxiliaryControllers.delete(controller);
       this.auxiliaryTasks.delete(task);
     }
+  }
+
+  /**
+   * Ends one auxiliary conversation, which is what `AuxQueryRunner.reset()` is.
+   *
+   * Not a disposal: the other auxiliary conversations and every chat session on
+   * this backend keep running. A port with nothing retained — a provider whose
+   * auxiliary work is cold — has nothing to do here.
+   */
+  async releaseAuxiliaryConversation(retentionKey: string): Promise<void> {
+    await this.context.auxiliaryQueries.release?.(retentionKey);
   }
 
   dispose(): Promise<void> {

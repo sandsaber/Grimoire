@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import {
+  findBundledModules,
   findReachableModules,
   findUnreachableModules,
   listAllSourceModules,
@@ -37,6 +38,46 @@ describe('moduleReachability', () => {
   function unreachable(): string[] {
     return findUnreachableModules({ baseDir: root });
   }
+
+  function bundled(): Set<string> {
+    return findBundledModules({ baseDir: root });
+  }
+
+  it('separates what the bundle contains from what the source refers to', () => {
+    // The two questions the parity gate asks, which are not the same question:
+    // a module reached only through `import type` is referred to by live code
+    // and is in no bundle, because the declaration is erased before anything is
+    // bundled. Counting the type edge as a bundle edge reported a dark module
+    // as restored the moment a live store named one of its interfaces.
+    writeModule('main.ts', [
+      "import type { Contract } from './contract';",
+      "import { run } from './engine';",
+      'export const plugin = (value: Contract) => run(value);',
+    ].join('\n'));
+    writeModule('contract.ts', 'export interface Contract { readonly id: string }\n');
+    writeModule('engine.ts', "import type { Contract } from './contract';\n"
+      + 'export const run = (value: Contract) => value.id;\n');
+
+    expect([...reachable()].sort()).toEqual(['src/contract.ts', 'src/engine.ts', 'src/main.ts']);
+    expect([...bundled()].sort()).toEqual(['src/engine.ts', 'src/main.ts']);
+  });
+
+  it('counts a module whose value is imported, however its types are used', () => {
+    // The other direction, so the rule cannot be read as "types make a module
+    // invisible": one value import is enough, and the erased ones beside it
+    // change nothing.
+    writeModule('main.ts', [
+      "import type { Contract } from './contract';",
+      "import { CONTRACT_VERSION } from './contract';",
+      'export const plugin = (value: Contract) => `${value}${CONTRACT_VERSION}`;',
+    ].join('\n'));
+    writeModule('contract.ts', [
+      'export interface Contract { readonly id: string }',
+      "export const CONTRACT_VERSION = '1';",
+    ].join('\n'));
+
+    expect([...bundled()].sort()).toEqual(['src/contract.ts', 'src/main.ts']);
+  });
 
   it('includes the entry point itself', () => {
     writeModule('main.ts', 'export const plugin = 1;\n');

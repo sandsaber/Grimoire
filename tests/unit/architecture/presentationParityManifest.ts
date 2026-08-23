@@ -798,6 +798,11 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // per retention key now, and the flip is a wiring change rather than a
       // rewrite.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
+      // The seam the auxiliary services keep calling while what is behind it
+      // changes: `AuxQueryRunner`, answered by the kernel instead of by a
+      // provider runner that owns its own process. Dark until the composition
+      // hands one to the title, refine and inline-edit services.
+      'src/app/execution/acp/ManagedAcpAuxQueryRunner.ts',
     ],
   },
 ];
