@@ -6297,6 +6297,40 @@ agent, and never having met the real CLI past its handshake.
 Gates: unit 514 suites / 7,992 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### The sixth review — one defect, found twice (this commit)
+
+A read of the fourteen commits the fifth review did not cover. Seven findings, recorded with a status
+column in [`docs/wave7-review-backlog.md`](wave7-review-backlog.md). The two behavioural ones are the
+same mistake in two places: **state held by the composition where the session was meant**, in an
+object that serves every open tab.
+
+**A reasoning level applied on one tab silenced it on all of them.** The applier is one object for
+every tab and it reported a bare level, so every tab's state recorded it — and then skipped its own
+`/effort` prompt, which its session had never received. Those tabs ran at the agent's default for the
+life of the conversation, and nothing would ever have said so: this provider sends no `current_effort`
+update, which is the same absence that made the report necessary. The mark names its session now, and
+a tab skips only when it is on that one.
+
+**The context window was read off the wrong connection.** The composition kept one client; the backend
+holds **one per execution session**. On every tab but the most recently opened, the vendor request
+asked an agent about a session it does not have — a badge that silently stops working. `noteTurnEnded`
+hands the sink the connection the turn actually ran on, which is the only one that can answer.
+
+The five smaller ones are claims that stopped being true: a composition still calling itself dark
+after its flip, eight files speaking of a deleted runtime in the present tense, an obligation counting
+four absent members when one had left with a false reason, and **two test comments asserting evidence
+that does not exist** — `qwen 0.55.1` "advertises all four modes… Observed, not imagined", which is
+Gemini's version and Gemini's observation about a session Qwen has never opened.
+
+**Three of nine breaks were green on the first pass**, and none of them because the code was right.
+The two-tab test did not have two tabs open at once; the defect only appears when both exist before
+either runs. And an invariant was gated twice — the setter refused a level without a session and so did
+the getter — so neither break could be distinguished. Collapsed to one gate, with the leftover given a
+case that makes it load-bearing.
+
+Gates: unit 514 suites / 7,994 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6848,9 +6882,11 @@ Open obligations, each with an owner:
 - `ProviderModule` has no slot for `prepareTurn`, which the adapter contract maps as a module
   contribution. The adapter routes it through a host port meanwhile. Owner: M3, when the four legacy
   prompt encoders move;
-- four `ChatRuntime` members are absent by contract, each with its reason in
-  `adapterMemberCoverage.test.ts`: `reloadWorkspaceResources`, `getAuxiliaryModel`, and the two
-  subagent loaders. `resetSession` was on that list with a false reason and is now implemented.
+- **three** `ChatRuntime` members are absent by contract, each with its reason in
+  `adapterMemberCoverage.test.ts`: `getAuxiliaryModel` and the two subagent loaders. Two have left
+  that list with a false reason attached: `resetSession`, and `reloadWorkspaceResources` — recorded as
+  having "no production call site" while `QwenSettingsTab` called it in three places, which the Qwen
+  flip found by asking what it was about to delete.
   Owner: whoever declares a call site for one of the four;
 - the kernel and adapter carry long explanatory comments where a sentence would do. Owner: a focused
   pass, so it does not ride along with behaviour changes;

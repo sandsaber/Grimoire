@@ -37,8 +37,8 @@ import {
 /**
  * Qwen Code's contribution to the provider catalog.
  *
- * The ninth module and the last provider on the legacy path. **Dark**: nothing
- * constructs this yet.
+ * The ninth module and the last provider of the migration. **Flipped**:
+ * `registration.ts` points `createRuntime` at the composition built from it.
  *
  * Derived from Gemini's, which was measured rather than assumed. Both CLIs take
  * `--acp` as a flag where the OpenCode family takes `acp` as a subcommand, both
@@ -72,8 +72,8 @@ import {
  * authenticate first."* on the machine its wire recording was taken from, so
  * what is evidence is the handshake and that refusal — a real shape a flip meets
  * — and nothing else. Its models, its modes and its answer traffic are all
- * unobserved. What stands in for them is `QwenChatRuntime`, which has been
- * driving this CLI on the legacy path.
+ * unobserved. What stands in for them is the runtime this replaced, which had
+ * been driving this CLI on the legacy path.
  */
 
 const KNOWN_SETTINGS_FIELDS = new Set([

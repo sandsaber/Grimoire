@@ -72,3 +72,41 @@ presentation is behaviour-identical to the runtime's, except that it now trims a
 `rawInput`. The requests store's three reference spaces, eviction bound and `--acp` argument match
 both the sibling and the legacy launch spec. The content presenter is a clean subset of Grok's, with
 the vendor-update branch and the tool stream adapter absent for reasons the module states.
+
+## Sixth review — the flips and the contract they needed @ `4020586`
+
+A read of the fourteen commits the fifth review did not cover: Gemini's flip and the three defects its
+live smoke found, the shared prompt-failure classification, the interaction payload, and all of Qwen —
+module, nine execution modules, composition, flip. Seven findings. The two behavioural ones are the
+same defect twice: **composition-wide state where per-session was meant**, in a composition that
+serves every tab.
+
+| # | Severity | Where | Finding | Status |
+|---|---|---|---|---|
+| Q1 | Major | `QwenExecutionComposition.ts` `noteEffortApplied` | The applier's report fanned out to every open tab, so a `/effort` applied on one tab's session marked every other tab as having taken it. Those tabs then skipped their own prompt and ran at the agent's default — for the life of the conversation, silently, because nothing reports a level back | ✅ the mark names its session, and a tab skips only when it is on that one |
+| Q2 | Major | `QwenExecutionComposition.ts` `readContextUsage` | The composition remembered one client while the backend holds **one per execution session**, so the context read asked the wrong connection about a session it does not have — the badge stops working on every tab but the most recently opened | ✅ `noteTurnEnded` hands the sink the connection the turn ran on |
+| Q3 | Minor | `QwenExecution.test.ts`, `QwenExecutionComposition.test.ts` | Two comments assert `qwen 0.55.1` "advertises all four modes… Observed, not imagined". That is **Gemini's** version and Gemini's observation; this CLI's session has never opened | ✅ attributed to the provider that was actually watched |
+| Q4 | Minor | `QwenExecutionComposition.ts` and seven others | The composition still called itself **Dark** after the flip, and eight files spoke of `QwenChatRuntime` in the present tense | ✅ tense and claims match the tree |
+| Q5 | Minor | `provider-execution-migration-progress.md` | The obligation still said four members are absent by contract, listing the one whose stated reason — "no production call site" — was false | ✅ three, with both false reasons named |
+| Q6 | Minor | `ExecutionChatRuntimeAdapter.ts` `reloadWorkspaceResources` | Present-for-everyone and silently empty for seven providers, which is the shape the contract bans — without the argument its neighbour `reloadMcpServers` makes for the same shape | ✅ refuses by name, like its neighbour |
+| Q7 | Minor | `ExecutionLifecycleRegistry.ts` recovery | The question-cancel path mutated a control record outside `enqueueSession`, the one mutation in the class that does. Safe only because startup is sequential | ✅ through the queue |
+
+### What the breaks said
+
+Nine breaks. Three were green on the first pass and each was a different lesson:
+
+- **the two-tab test did not have two tabs open at once.** Created in sequence, the second tab was
+  never told anything and asked for its own level regardless — the defect only appears when both are
+  open before either runs, which is the case a user is actually in;
+- **two gates for one invariant.** The setter refused a level without a session and so did the getter,
+  so neither break could be told from the other. Collapsed to one, and the setter's leftover now has a
+  case that makes it load-bearing: a forgotten session cannot come back and pair with a later level;
+- and the third was the same, one layer down.
+
+### Checked and clean
+
+The `JsonRpcErrorResponse` discriminator is exact — the transport constructs one in a single place and
+raises plain `Error`s everywhere else. `resolveModelIds` prefers Grimoire's `id` over the wire's
+`modelId` and drops an entry with neither, which is what every consumer downstream needs. The question
+bridge's `openQuestions` map is cleared on resolve, on cancel, on the backend's discard path and on
+dispose. Gemini's and Qwen's `reportedSessions` are keyed by session already.

@@ -1598,14 +1598,25 @@ export class ExecutionLifecycleRegistry {
           // agent an answer nobody gave. Turned into a cancellation instead,
           // which is what a closed tab already means and the only honest
           // outcome here.
-          const updated = await this.repositories.interactions.update(
-            interaction.record.interactionId,
-            interaction.revision,
-            record => ({ ...record, status: 'cancelling', updatedAt: this.now() }),
-          );
-          interaction.record = updated.payload;
-          interaction.revision = updated.revision;
-          await this.cancelInteraction(id);
+          // Through the session queue, like every other record mutation in this
+          // class: startup is sequential today, and "it is safe because nothing
+          // else runs yet" is the kind of reason that stops being true quietly.
+          const run = this.runs.get(runId(interaction.record.runId));
+          if (run) {
+            await this.enqueueSession(
+              executionSessionId(run.record.executionSessionId),
+              async () => {
+                const updated = await this.repositories.interactions.update(
+                  interaction.record.interactionId,
+                  interaction.revision,
+                  record => ({ ...record, status: 'cancelling', updatedAt: this.now() }),
+                );
+                interaction.record = updated.payload;
+                interaction.revision = updated.revision;
+              },
+            );
+            await this.cancelInteraction(id);
+          }
           continue;
         }
         await this.resolveInteraction({

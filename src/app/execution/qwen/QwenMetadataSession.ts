@@ -46,7 +46,8 @@ export interface QwenMetadataSessionPorts {
  *
  * **It has never opened.** `qwen 0.21.15` refuses `session/new` with
  * "Authentication required" on the machine this was written on, so what this
- * stands on is `QwenChatRuntime` driving the same CLI, not an observation.
+ * stands on is the runtime it replaced driving the same CLI, not an
+ * observation.
  */
 export class QwenMetadataSession {
   constructor(private readonly ports: QwenMetadataSessionPorts) {}

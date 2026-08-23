@@ -17,7 +17,7 @@ import type { AcpContentBlock } from '../../acp';
 /**
  * What one Qwen turn says, and the eight pieces of the vault in it.
  *
- * Moved out of `QwenChatRuntime` ahead of the flip that deletes it, because a
+ * Moved out of `QwenChatRuntime` before the flip deleted that file, because a
  * turn composed by the kernel has to say exactly what a turn composed by the
  * runtime said. Byte-identical to Gemini's under a normalized diff, which is
  * what a derivation should look like where nothing is actually different. The order is load-bearing: every appender writes after the

@@ -32,8 +32,8 @@ export type QwenAskUserQuestionResponse = AcpRequestPermissionResponse & {
  *
  * Three markings, because three releases mark it three ways: a
  * `_meta.qwenInteractionKind`, a `_meta.toolName`, or a title that reads "Ask
- * user N questions" over a `questions` array. All three are what
- * `QwenChatRuntime` already looks for.
+ * user N questions" over a `questions` array. All three are what the legacy
+ * runtime already looked for.
  *
  * Answers `null` for anything that is an ordinary permission — the caller uses
  * that to decide, so a wrong `null` shows a question as an approval and a wrong

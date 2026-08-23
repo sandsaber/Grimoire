@@ -1030,7 +1030,15 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
    * wrong.
    */
   async reloadWorkspaceResources(): Promise<void> {
-    await this.ports.reloadWorkspaceResources?.();
+    const reload = this.ports.reloadWorkspaceResources;
+    if (!reload) {
+      // Nothing to reload, not silently nothing done: a provider whose launch
+      // does not read the vault's skills, commands or agents has no state to
+      // pick them up into, and `reloadMcpServers` answers the same way one
+      // line below for the same reason.
+      return;
+    }
+    await reload();
   }
 
   async reloadMcpServers(): Promise<void> {

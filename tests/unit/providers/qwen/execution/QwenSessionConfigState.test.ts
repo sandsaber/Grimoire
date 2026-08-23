@@ -121,7 +121,12 @@ describe('QwenSessionConfigState', () => {
       // nobody set it to — and runs in the agent's default while the toolbar
       // says Plan.
       const { state } = createState();
-      state.markApplied({ modeId: 'plan', modelId: 'qwen3-coder-plus', effortLevel: 'max' });
+      state.markApplied({
+        modeId: 'plan',
+        modelId: 'qwen3-coder-plus',
+        effortLevel: 'max',
+        effortSessionId: 'acp-session-1',
+      });
 
       state.forgetSession();
 
@@ -130,7 +135,27 @@ describe('QwenSessionConfigState', () => {
       // The effort matters most of the three: applying it sends a whole prompt,
       // so a level kept across a session change is a turn the new session never
       // received — and one the vendor still charged for.
-      expect(state.sessionEffortLevel).toBeNull();
+      expect(state.sessionEffort).toBeNull();
+
+      // And the session cannot come back: a level recorded afterwards has no
+      // session to pair with, so it stays unusable rather than pairing with the
+      // one the tab has already left.
+      state.markApplied({ effortLevel: 'max' });
+      expect(state.sessionEffort).toBeNull();
+    });
+
+    it('records a level only with the session that took it', () => {
+      // The applier is one object for every tab. A level remembered without its
+      // session lets another tab skip a `/effort` its own session never
+      // received, and then run at the agent's default for the rest of the
+      // conversation — silently, because nothing reports the level back.
+      const { state } = createState();
+
+      state.markApplied({ effortLevel: 'max' });
+      expect(state.sessionEffort).toBeNull();
+
+      state.markApplied({ effortLevel: 'max', effortSessionId: 'acp-session-1' });
+      expect(state.sessionEffort).toEqual({ level: 'max', sessionId: 'acp-session-1' });
     });
 
     it('reports the level the vault is set to, normalized', () => {

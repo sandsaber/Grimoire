@@ -155,6 +155,17 @@ export interface ManagedAcpExecutionResultSink {
     readonly nativeSessionRef: string;
     readonly nativeRunRef?: string;
     readonly presentContent: (payload: unknown) => void;
+    /**
+     * The connection this turn ran on, for a provider that has to ask.
+     *
+     * Qwen is why: its context window is a method ACP does not define, so the
+     * only way to learn it is a `vendorRequest` on the live session. Handed over
+     * here rather than kept by the composition, because a backend holds **one
+     * client per execution session** and a composition serves every tab — a
+     * single remembered client is whichever one connected last, which would ask
+     * the wrong agent about a session it does not have.
+     */
+    readonly client: ManagedAcpClient;
   }): Promise<void>;
   /**
    * The answer a turn produced without sending it, where the provider can find
@@ -511,6 +522,11 @@ class ManagedAcpExecutionSession implements ExecutionSession {
 
   get activeExecutionRun(): ManagedAcpExecutionRun | undefined {
     return this.activeRun;
+  }
+
+  /** The connection this session is on, where it has one. */
+  get currentClient(): ManagedAcpClient | undefined {
+    return this.client;
   }
 
   createRun(request: ExecutionRequest): ExecutionRun {
@@ -1122,12 +1138,15 @@ class ManagedAcpExecutionRun implements ExecutionRun {
     // Once per turn, whichever path gets there first. Both the prompt answering
     // and the cancel that asked it to stop want the look, and a provider that
     // reads a cost off its session log would otherwise count it twice.
+    const client = this.session.currentClient;
+    if (!client) return;
     this.notedTurnEnd = true;
     try {
       await sink.noteTurnEnded({
         nativeSessionRef: this.sessionRef,
         ...(this.nativeRunRef ? { nativeRunRef: this.nativeRunRef } : {}),
         presentContent: payload => this.presentProviderContent(payload),
+        client,
       });
     } catch {
       // See above.

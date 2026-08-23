@@ -54,6 +54,7 @@ export class QwenSessionConfigState {
   private currentSessionModelId: string | null = null;
   private currentSessionModeId: string | null = null;
   private currentSessionEffortLevel: QwenEffortLevel | null = null;
+  private currentSessionEffortSessionId: string | null = null;
 
   constructor(private readonly ports: QwenSessionConfigPorts) {}
 
@@ -67,9 +68,20 @@ export class QwenSessionConfigState {
     return this.currentSessionModeId;
   }
 
-  /** The effort the session was last told to run at. */
-  get sessionEffortLevel(): QwenEffortLevel | null {
-    return this.currentSessionEffortLevel;
+  /**
+   * The effort a session was told to run at, and which session that was.
+   *
+   * Both or nothing, and this getter is the only gate: the applier that reports
+   * a level is one object for every tab, so a level without its session lets a
+   * tab skip a `/effort` its own session never received — and then run at the
+   * agent's default while the vault says otherwise, silently, for the life of
+   * the conversation. The setter records whichever half it is given; refusing
+   * the pair here is what makes half of it unusable rather than dangerous.
+   */
+  get sessionEffort(): { readonly sessionId: string; readonly level: QwenEffortLevel } | null {
+    return this.currentSessionEffortLevel && this.currentSessionEffortSessionId
+      ? { level: this.currentSessionEffortLevel, sessionId: this.currentSessionEffortSessionId }
+      : null;
   }
 
   /** Records what a set actually applied, so the next turn does not repeat it. */
@@ -77,6 +89,8 @@ export class QwenSessionConfigState {
     readonly modeId?: string | null;
     readonly modelId?: string | null;
     readonly effortLevel?: QwenEffortLevel | null;
+    /** Which session took the effort; required with one, ignored without. */
+    readonly effortSessionId?: string | null;
   }): void {
     if (applied.modeId) {
       this.currentSessionModeId = applied.modeId;
@@ -86,6 +100,9 @@ export class QwenSessionConfigState {
     }
     if (applied.effortLevel) {
       this.currentSessionEffortLevel = applied.effortLevel;
+    }
+    if (applied.effortSessionId) {
+      this.currentSessionEffortSessionId = applied.effortSessionId;
     }
   }
 
@@ -101,6 +118,7 @@ export class QwenSessionConfigState {
     this.currentSessionModelId = null;
     this.currentSessionModeId = null;
     this.currentSessionEffortLevel = null;
+    this.currentSessionEffortSessionId = null;
   }
 
   /**

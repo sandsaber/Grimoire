@@ -95,8 +95,8 @@ const MAX_RESULT_BYTES = 256_000;
 /**
  * Qwen CLI chat execution, assembled from the running plugin.
  *
- * **Dark.** Nothing constructs this yet; the flip is what points
- * `registration.ts` at it and deletes `QwenChatRuntime`.
+ * **Flipped.** `registration.ts` points `createRuntime` here, `main.ts`
+ * constructs one per load, and `QwenChatRuntime` is gone.
  *
  * The sixth ACP provider on the kernel and the last provider of the migration.
  * It adds nothing to the shared stack either: the client adapter, the transport,
@@ -152,8 +152,20 @@ export class QwenExecution {
 
   private readonly presenters = new Set<QwenQuestionPresenter>();
 
-  /** Which tab learns that a session took a reasoning level. */
-  private readonly effortMarks = new Map<string, (effortLevel: string) => void>();
+  /**
+   * Every open tab, told which session took which reasoning level.
+   *
+   * Broadcast rather than routed, because the applier reports while the session
+   * is still being prepared and no tab has been told its own session id yet.
+   * Harmless because the mark **names its session**: a tab only skips its
+   * `/effort` when the session that took the level is the one it is on. Told
+   * without that, a second tab would skip a prompt its session never received
+   * and run at the agent's default for the life of the conversation.
+   */
+  private readonly effortMarks = new Map<string, (applied: {
+    readonly sessionId: string;
+    readonly effortLevel: string;
+  }) => void>();
 
   /**
    * What each open question is asking, by the reference its interaction carries.
@@ -165,9 +177,6 @@ export class QwenExecution {
   private readonly openQuestions = new Map<string, readonly QwenAskUserQuestion[]>();
 
   private backend: QwenExecutionBackend | undefined;
-
-  /** The live connection, for the one question that is not a turn. */
-  private client: ManagedAcpClient | undefined;
 
   /**
    * How many times the vault's workspace resources have changed under a
@@ -232,7 +241,7 @@ export class QwenExecution {
         // there is no `current_effort` update the way there is a
         // `current_mode_update`, so without this the skip is impossible and
         // every turn pays for a level the session already has.
-        effortLevel => this.noteEffortApplied(effortLevel),
+        applied => this.noteEffortApplied(applied),
       ),
       interactionBridge: {
         /**
@@ -261,15 +270,8 @@ export class QwenExecution {
         },
       },
       resultSink: new QwenProjectionResultSink({
-        readContextUsage: sessionId => this.readContextUsage(sessionId),
+        readContextUsage: (client, sessionId) => readQwenContextUsage(client, sessionId),
       }),
-      // Held so the turn's last look can ask the live session a question ACP has
-      // no method for. The sink is given a reader rather than a client, because
-      // what it needs is one number and not a connection.
-      clientObserver: {
-        onClientReady: client => { this.client = client; },
-        onClientLost: () => { this.client = undefined; },
-      },
       reconciler: {
         // A turn that answered the cancel it was sent is a turn known to have
         // stopped, and ACP delivers that answer on the prompt itself. For
@@ -339,8 +341,11 @@ export class QwenExecution {
       settingsBag: () => this.plugin.settings,
     });
     const effortMarkKey = opaqueId('qweffort');
-    this.effortMarks.set(effortMarkKey, effortLevel => {
-      sessionConfig.markApplied({ effortLevel: effortLevel as never });
+    this.effortMarks.set(effortMarkKey, applied => {
+      sessionConfig.markApplied({
+        effortLevel: applied.effortLevel as never,
+        effortSessionId: applied.sessionId,
+      });
     });
 
     const content = new QwenContentPresenter({
@@ -430,7 +435,11 @@ export class QwenExecution {
         // bound session already holds the conversation, and sending the history
         // again would say everything twice.
         const bootstrap = ports.currentSessionId() ? [] : history ?? [];
-        const dynamic = this.dynamicConfiguration(sessionConfig, options);
+        const dynamic = this.dynamicConfiguration(
+          sessionConfig,
+          ports.currentSessionId(),
+          options,
+        );
         return this.requests.reference({
           prompt: buildQwenPromptBlocks(turn.request, [...bootstrap], {
             ...(options?.orchestratorMode ? { orchestratorMode: true } : {}),
@@ -623,30 +632,38 @@ export class QwenExecution {
    */
   private dynamicConfiguration(
     sessionConfig: QwenSessionConfigState,
+    currentSessionId: string | null,
     options?: ChatRuntimeQueryOptions,
   ): QwenAcpDynamicConfig | undefined {
     const modeId = sessionConfig.resolveSelectedModeId();
     const modelId = sessionConfig.resolveSelectedRawModelId(options);
     const effortLevel = sessionConfig.resolveSelectedEffortLevel();
+    const applied = sessionConfig.sessionEffort;
     const dynamic: QwenAcpDynamicConfig = {
       ...(modeId ? { modeId } : {}),
       ...(modelId ? { modelId } : {}),
-      ...(effortLevel !== sessionConfig.sessionEffortLevel ? { effortLevel } : {}),
+      // Skipped only when *this tab's* session is the one that took it. A
+      // level recorded without its session lets a second tab skip a prompt its
+      // own session never received.
+      ...(applied?.level === effortLevel && applied.sessionId === currentSessionId
+        ? {}
+        : { effortLevel }),
     };
     return Object.keys(dynamic).length > 0 ? dynamic : undefined;
   }
 
   /**
-   * Remembers the level a session took, for the tab that is on that session.
+   * Tells every open tab which session took which level.
    *
-   * The applier is one object for every tab and the state is per tab, so the
-   * link is the same one the write approvals use: the session the call came in
-   * on. A level applied to a session no open tab owns is simply not recorded,
-   * which costs one redundant prompt rather than a wrong skip.
+   * The tab decides whether that is its own — see `dynamicConfiguration`. A
+   * redundant prompt costs a turn; a wrong skip costs every turn after it.
    */
-  private noteEffortApplied(effortLevel: string): void {
+  private noteEffortApplied(applied: {
+    readonly sessionId: string;
+    readonly effortLevel: string;
+  }): void {
     for (const mark of this.effortMarks.values()) {
-      mark(effortLevel);
+      mark(applied);
     }
   }
 
@@ -660,28 +677,6 @@ export class QwenExecution {
     }
     this.settle(this.plugin.saveSettings());
     this.refreshSelectors();
-  }
-
-  /**
-   * How full the session's context is, asked of the agent that knows.
-   *
-   * `qwen/status/session/context_usage` is a method ACP does not define, so it
-   * travels on `vendorRequest` — the same escape hatch Grok's billing uses. An
-   * agent that does not answer it simply has no window to show, which is a badge
-   * without a number rather than a failure, so every path here returns null.
-   */
-  private async readContextUsage(sessionId: string): Promise<AcpUsageUpdate | null> {
-    const client = this.client;
-    if (!client?.vendorRequest) {
-      return null;
-    }
-    const answered = await Promise.race([
-      // Called on the client rather than detached from it: a vendor request is
-      // a method on a live connection, not a free function.
-      client.vendorRequest(QWEN_CONTEXT_USAGE_METHOD, { detail: false, sessionId }),
-      delayThroughWindow(QWEN_CONTEXT_USAGE_TIMEOUT_MS).then(() => null),
-    ]).catch(() => null);
-    return parseQwenContextUsage(answered);
   }
 
   /** Redraws the model and mode selectors of every open view. */
@@ -951,4 +946,31 @@ class QwenQuestionPresenter {
     this.open.clear();
     this.approvals.dismissAll();
   }
+}
+
+/**
+ * How full a session's context is, asked of the agent that knows.
+ *
+ * `qwen/status/session/context_usage` is a method ACP does not define, so it
+ * travels on `vendorRequest` — the same escape hatch Grok's billing uses. An
+ * agent that does not answer it simply has no window to show, which is a badge
+ * without a number rather than a failure, so every path here returns null.
+ *
+ * A free function on the client the turn was handed, not a method on the
+ * composition: one composition serves every tab and a backend holds one client
+ * per execution session, so a remembered one would be whichever tab connected
+ * last — asking the wrong agent about a session it does not have.
+ */
+async function readQwenContextUsage(
+  client: ManagedAcpClient,
+  sessionId: string,
+): Promise<AcpUsageUpdate | null> {
+  if (!client.vendorRequest) {
+    return null;
+  }
+  const answered = await Promise.race([
+    client.vendorRequest(QWEN_CONTEXT_USAGE_METHOD, { detail: false, sessionId }),
+    delayThroughWindow(QWEN_CONTEXT_USAGE_TIMEOUT_MS).then(() => null),
+  ]).catch(() => null);
+  return parseQwenContextUsage(answered);
 }

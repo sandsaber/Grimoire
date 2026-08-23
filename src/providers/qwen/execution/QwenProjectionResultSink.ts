@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { ResultRef } from '@/core/execution/ExecutionContracts';
 import type { ResultCommitOutcome } from '@/core/execution/ResultCommit';
+import type { ManagedAcpClient } from '@/providers/acp/execution/ManagedAcpClient';
 import type { AcpUsageUpdate } from '@/providers/acp/types';
 import type { QwenContentPayload } from '@/providers/qwen/execution/QwenContentPresenter';
 
@@ -29,8 +30,15 @@ export interface QwenProjectionResultSinkPorts {
    * because no `usage_update` carries the parent window for this provider.
    * Asked here rather than at dispatch for the reason `noteTurnEnded` exists:
    * what it finds has to reach the turn that earned it rather than the next one.
+   *
+   * Takes the connection the turn ran on rather than finding one: a backend
+   * holds one client per execution session and this sink serves every tab, so
+   * anything remembered here would be whichever session connected last.
    */
-  readonly readContextUsage: (sessionId: string) => Promise<AcpUsageUpdate | null>;
+  readonly readContextUsage: (
+    client: ManagedAcpClient,
+    sessionId: string,
+  ) => Promise<AcpUsageUpdate | null>;
 }
 
 export class QwenProjectionResultSink implements QwenExecutionResultSink {
@@ -46,8 +54,9 @@ export class QwenProjectionResultSink implements QwenExecutionResultSink {
   async noteTurnEnded(input: {
     readonly nativeSessionRef: string;
     readonly presentContent: (payload: unknown) => void;
+    readonly client: ManagedAcpClient;
   }): Promise<void> {
-    const usage = await this.ports?.readContextUsage(input.nativeSessionRef)
+    const usage = await this.ports?.readContextUsage(input.client, input.nativeSessionRef)
       .catch(() => null);
     if (usage) {
       input.presentContent({ kind: 'session-usage', usage } satisfies QwenContentPayload);

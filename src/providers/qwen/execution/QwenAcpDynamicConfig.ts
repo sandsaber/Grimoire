@@ -10,8 +10,8 @@ export interface QwenAcpDynamicConfig {
   /**
    * The reasoning level, which this provider sets by *talking to it*.
    *
-   * Not a config option and not a dedicated method: `QwenChatRuntime` sends
-   * `/effort <level>` as a `session/prompt` of its own before the turn's, so
+   * Not a config option and not a dedicated method: the runtime this replaced
+   * sent `/effort <level>` as a `session/prompt` of its own before the turn's, so
    * applying it costs a whole round trip the vendor charges for. That is why it
    * is skipped when the session is already on it, and why the state forgets it
    * with the session rather than after it.
@@ -36,8 +36,16 @@ export type QwenModeRefusedReporter = (input: {
  * and because nothing else can tell the state: this provider has no
  * `current_effort` update the way it has `current_mode_update`. Without it the
  * skip is impossible and every turn pays for a level the session already has.
+ *
+ * Carries the session, because the applier is one object for every tab and the
+ * state is per tab. Told without it, every open tab would record a level only
+ * one of their sessions took — and then skip its own prompt and run at
+ * whatever level its session actually has.
  */
-export type QwenEffortAppliedReporter = (effortLevel: string) => void;
+export type QwenEffortAppliedReporter = (input: {
+  readonly sessionId: string;
+  readonly effortLevel: string;
+}) => void;
 
 /**
  * Qwen's own ordering, over the protocol-generic ACP kernel.
@@ -45,7 +53,7 @@ export type QwenEffortAppliedReporter = (effortLevel: string) => void;
  * Model, then mode, then effort — Gemini's two with a third behind them, and the
  * third is this provider's alone: `/effort <level>` sent as a prompt. Its
  * session has never been observed, so unlike Gemini's this ordering stands on
- * `QwenChatRuntime` rather than on a recording.
+ * the runtime it replaced rather than on a recording.
  *
  * The mode is translated here rather than forwarded. A turn is composed in
  * Grimoire's vocabulary — `normal`, `full_access`, `plan` — and those are not
@@ -104,7 +112,7 @@ export class QwenAcpDynamicConfigApplier implements QwenExecutionDynamicApplier 
       });
       // After, not before: a level the prompt never delivered is one the next
       // turn still has to ask for.
-      this.onEffortApplied?.(effortLevel);
+      this.onEffortApplied?.({ sessionId: input.sessionId, effortLevel });
     }
   }
 

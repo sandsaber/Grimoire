@@ -120,12 +120,13 @@ describe('Qwen dynamic configuration', () => {
   });
 
   it('runs the turn even when the agent will not take the mode', async () => {
-    // Observed, not imagined: `qwen 0.55.1` advertises all four modes in its
-    // reply to `session/new` and then answers `session/set_mode` for `yolo`
-    // with `-32603 Cannot enable privileged approval modes in an untrusted
-    // folder`. The call is awaited before the prompt, so a thrown rejection
-    // ended every turn a user ran with Auto-approve on in a folder Qwen has
-    // not been told to trust.
+    // **Not observed here, and the shape is Gemini's.** `gemini 0.55.1` refuses
+    // `session/set_mode` for its privileged modes in an untrusted folder with
+    // `-32603`, and the call is awaited before the prompt — so a thrown
+    // rejection ended every turn a user ran with Auto-approve on. Whether *this*
+    // CLI does the same is unknown: its session has never opened. That is the
+    // argument for the tolerance rather than against it — a mode that cannot be
+    // set is never a reason to lose the turn.
     const refused: string[] = [];
     const client = {
       setModel: async () => ({}),

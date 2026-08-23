@@ -94,6 +94,7 @@ describe('Qwen execution composition', () => {
     sessionIsGone?: boolean;
     announcesCommands?: boolean;
     answersEffort?: boolean;
+    distinctSessions?: boolean;
     reportsContextUsage?: boolean;
     suppressUsageUpdate?: boolean;
     asksQuestion?: boolean;
@@ -125,9 +126,15 @@ describe('Qwen execution composition', () => {
     // out here rather than per client, because a retry launches a second one and
     // "the first turn" has to mean the first turn of the run.
     let turns = 0;
+    let sessionSeq = 0;
     const factory: ManagedAcpClientFactory = {
       create: async (input: ManagedAcpClientFactoryInput) => {
         startupRefs.push(input.startupRef);
+        // One id per client where a test needs two tabs to be on two sessions;
+        // otherwise the shared id every other case is written against.
+        const sessionId = options.distinctSessions
+          ? `acp-session-${(sessionSeq += 1)}`
+          : 'acp-session-1';
         const askQuestion = (): void => {
           permissions.push(input.requestPermission({
             sessionId: 'acp-session-1',
@@ -161,7 +168,7 @@ describe('Qwen execution composition', () => {
           // CLI names itself, a model list whose current is `auto`, and no
           // config options.
           newSession: async () => ({
-            sessionId: 'acp-session-1',
+            sessionId,
             modes: {
               availableModes: [
                 { id: 'default', name: 'Default', description: 'Prompts for approval' },
@@ -173,7 +180,8 @@ describe('Qwen execution composition', () => {
             },
             models: {
               // `modelId`, which is what the recording says and what this fake
-              // got wrong until the live smoke ran: with `id` here every
+              // got wrong until Gemini's live smoke ran — three recordings
+              // say `modelId`, this provider's among them: with `id` here every
               // consumer read `undefined`, and the one that called `.trim()`
               // threw inside the session open.
               availableModels: [
@@ -350,6 +358,7 @@ describe('Qwen execution composition', () => {
     sessionIsGone?: boolean;
     announcesCommands?: boolean;
     answersEffort?: boolean;
+    distinctSessions?: boolean;
     reportsContextUsage?: boolean;
     suppressUsageUpdate?: boolean;
     asksQuestion?: boolean;
@@ -641,7 +650,8 @@ describe('Qwen execution composition', () => {
   });
 
   it('ends a turn the agent refused in the words the agent used', async () => {
-    // The third finding of the live smoke, and the one that was a regression
+    // The third finding of Gemini's live smoke, shared by every flipped ACP
+    // provider, and the one that was a regression
     // rather than a defect: every legacy ACP runtime yielded the provider's own
     // error text, and the kernel path replaced it with a run whose outcome could
     // not be established. Found with the real thing — `429 You have exhausted
@@ -892,11 +902,13 @@ describe('Qwen execution composition', () => {
   });
 
   it('answers the turn even when the agent will not take the mode', async () => {
-    // The live smoke's first finding, end to end. `qwen 0.55.1` advertises
-    // four modes and then refuses the privileged two in a folder it has not
-    // been told to trust — and the set is awaited before the prompt, so a
-    // thrown rejection killed every turn a user ran with Auto-approve on and
-    // reported it as a session that may no longer exist.
+    // Gemini's live smoke found this, and the tolerance is shared rather than
+    // this provider's own observation: `gemini 0.55.1` advertises four modes
+    // and refuses the privileged two in a folder it has not been told to trust,
+    // and the set is awaited before the prompt — so a thrown rejection killed
+    // every turn run with Auto-approve on. Qwen's session has never opened, so
+    // whether it behaves the same is unknown; surviving a refusal costs nothing
+    // if it does not.
     const plugin = createPlugin();
     plugin.settings.permissionMode = 'full_access';
     updateQwenProviderSettings(plugin.settings, { selectedMode: 'full_access' });
@@ -954,6 +966,32 @@ describe('Qwen execution composition', () => {
 
     expect(effortPrompts(prompts)).toEqual(['/effort max']);
     expect(turnPrompts(prompts)).toHaveLength(2);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('does not let one tab effort stand in for another tab session', async () => {
+    // The applier is one object for every tab, and it reports while the session
+    // is still being prepared — before any tab has been told its own session id.
+    // A level recorded without the session it was applied to let the second tab
+    // skip a `/effort` its own session never received, and then run at the
+    // agent's default for the life of the conversation, silently, because
+    // nothing reports a level back.
+    const plugin = createPlugin();
+    updateQwenProviderSettings(plugin.settings, { effortLevel: 'max' });
+    const { execution, host, prompts } = await createHarness({ plugin, distinctSessions: true });
+
+    // Both open before either runs, which is the case that reproduces: a tab
+    // created afterwards was never told anything and asks for its own level
+    // regardless.
+    const first = execution.createRuntime();
+    const second = execution.createRuntime();
+
+    await drain(first.query(first.prepareTurn({ text: 'first tab' })));
+    await drain(second.query(second.prepareTurn({ text: 'second tab' })));
+
+    // One each, not one shared between them.
+    expect(effortPrompts(prompts)).toEqual(['/effort max', '/effort max']);
     execution.dispose();
     await host.dispose();
   });
