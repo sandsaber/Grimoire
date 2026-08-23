@@ -278,7 +278,13 @@ live('MiMoCode live smoke', () => {
     // so the binding is kept rather than silently replaced, per the resume
     // policy, and the turn says so in words the user can act on.
     expect(errors).toHaveLength(1);
-    expect(errors[0].toLowerCase()).toContain('session');
+    // **The agent's own reason, not just the word "session".** This row used to
+    // assert that the message mentioned a session, which the composition's own
+    // sentence does whatever the agent said — so it stayed green while an
+    // unauthenticated CLI's user was told a saved session may have gone and to
+    // start a new chat. What stopped the turn may be the session and may be the
+    // CLI, and only the agent knows which.
+    expect(errors[0]).toContain('said:');
     expect(runtime.getSessionId()).toBe('ses_grimoire_live_missing');
     await shutdown();
   });

@@ -2,7 +2,10 @@ import type { ChatTurnMetadata } from '@/core/runtime/types';
 import type { SlashCommand, StreamChunk } from '@/core/types';
 import { AcpSessionUpdateNormalizer } from '@/providers/acp/AcpSessionUpdateNormalizer';
 import { buildAcpUsageInfo } from '@/providers/acp/buildAcpUsageInfo';
-import type { AcpContentPayload } from '@/providers/acp/execution/AcpContentPayload';
+import type {
+  AcpContentPayload,
+  AcpTurnRefusal,
+} from '@/providers/acp/execution/AcpContentPayload';
 import type { AcpSessionUpdate } from '@/providers/acp/types';
 import type {
   AcpNewSessionResponse,
@@ -96,7 +99,7 @@ export class QwenContentPresenter {
   private readonly normalizer = new AcpSessionUpdateNormalizer();
   private sessionId: string | undefined;
   private metadata: ChatTurnMetadata = {};
-  private refusal: string | undefined;
+  private refusal: AcpTurnRefusal | undefined;
   private contextUsage: AcpUsageUpdate | null = null;
   private promptUsage: AcpUsage | null = null;
 
@@ -124,9 +127,11 @@ export class QwenContentPresenter {
    *
    * Covers a refused *session* as well as a refused prompt: an agent nobody
    * has authenticated says so here, where the classification alone could only
-   * guess that a saved session had gone missing.
+   * guess that a saved session had gone missing. Which of the two it was rides
+   * along, because a refused load is the one whose words are not the whole
+   * answer — see `AcpTurnRefusalOrigin`.
    */
-  consumeTurnRefusal(): string | undefined {
+  consumeTurnRefusal(): AcpTurnRefusal | undefined {
     const message = this.refusal;
     this.refusal = undefined;
     return message;
@@ -173,7 +178,10 @@ export class QwenContentPresenter {
       return this.usageChunks();
     }
     if (content?.kind === 'turn-refused') {
-      this.refusal = content.message?.trim() || undefined;
+      const message = content.message?.trim();
+      this.refusal = message
+        ? { message, ...(content.origin ? { origin: content.origin } : {}) }
+        : undefined;
       return [];
     }
     if (content?.kind === 'mode-refused' && content.modeId) {

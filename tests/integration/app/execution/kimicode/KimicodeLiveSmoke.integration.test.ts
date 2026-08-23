@@ -8,26 +8,34 @@ import { ownedProcesses } from '@test/helpers/execution/hostProcessTree';
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { OpencodeExecution } from '@/app/execution/opencode/OpencodeExecutionComposition';
+import { KimicodeExecution } from '@/app/execution/kimicode/KimicodeExecutionComposition';
 import type { StreamChunk } from '@/core/types';
-import { opencodePlanUsageStore } from '@/providers/opencode/app/OpencodePlanUsageStore';
-import { loadOpencodeSessionCost } from '@/providers/opencode/history/OpencodeUsageMetadataStore';
-import { getOpencodeProviderSettings, updateOpencodeProviderSettings } from '@/providers/opencode/settings';
+import { kimicodePlanUsageStore } from '@/providers/kimicode/app/KimicodePlanUsageStore';
+import { loadKimicodeSessionCost } from '@/providers/kimicode/history/KimicodeUsageMetadataStore';
+import { getKimicodeProviderSettings, updateKimicodeProviderSettings } from '@/providers/kimicode/settings';
 
 /**
- * The OpenCode flip against a real `opencode acp` process.
+ * The Kimi Code flip against a real `kimi acp` process.
  *
  * The manual smoke matrix has two halves: what the protocol does, and what the
  * surface draws. This is the first half, run headlessly — a real agent, real
  * turns, the flipped path end to end — so the second half is left with only the
  * questions a person has to look at.
  *
+ * **Deliberately MiMoCode's file with the names changed**, down to the row
+ * numbers and the order they run in. These two providers mirror each other by
+ * instruction, their compositions differ only in identifiers, and a harness that
+ * drifted would hide that — so this one is meant to stay diffable against its
+ * sibling after normalizing the provider name, which is how the drift gets
+ * found. A row that is true of one and not the other belongs in the matrix as a
+ * difference, not here as a divergence.
+ *
  * Off by default: it starts a CLI and spends the account's tokens, so CI must
- * never reach it. Run it with `GRIMOIRE_OPENCODE_LIVE=1`.
+ * never reach it. Run it with `GRIMOIRE_KIMICODE_LIVE=1`.
  */
-const live = process.env.GRIMOIRE_OPENCODE_LIVE === '1' ? describe : describe.skip;
+const live = process.env.GRIMOIRE_KIMICODE_LIVE === '1' ? describe : describe.skip;
 
-live('OpenCode live smoke', () => {
+live('Kimi Code live smoke', () => {
   jest.setTimeout(300_000);
 
   /** Every process this file started, released whatever the row did. */
@@ -47,19 +55,19 @@ live('OpenCode live smoke', () => {
       userName: 'Michael',
       ...overrides,
     };
-    updateOpencodeProviderSettings(settings, { enabled: true });
-    if (process.env.GRIMOIRE_OPENCODE_MODEL) {
-      settings.model = process.env.GRIMOIRE_OPENCODE_MODEL;
+    updateKimicodeProviderSettings(settings, { enabled: true });
+    if (process.env.GRIMOIRE_KIMICODE_MODEL) {
+      settings.model = process.env.GRIMOIRE_KIMICODE_MODEL;
     }
     return {
       settings,
       manifest: { version: '0.0.0-live' },
       app: { vault: { adapter: { basePath: vault } } },
       getAllViews: () => [],
-      getResolvedProviderCliPath: () => process.env.GRIMOIRE_OPENCODE_CLI ?? 'opencode',
+      getResolvedProviderCliPath: () => process.env.GRIMOIRE_KIMICODE_CLI ?? 'kimi',
       getActiveEnvironmentVariables: () => '',
       recordDebugLog: (record: Record<string, unknown>) => {
-        if (process.env.GRIMOIRE_OPENCODE_TRACE === '1') {
+        if (process.env.GRIMOIRE_KIMICODE_TRACE === '1') {
           report('LOG', JSON.stringify(record).slice(0, 400));
         }
       },
@@ -72,13 +80,13 @@ live('OpenCode live smoke', () => {
     reuseVault?: string,
   ): Promise<{
     runtime: any;
-    execution: OpencodeExecution;
+    execution: KimicodeExecution;
     plugin: any;
     vault: string;
     /** Stops the agent, which is what a plugin unload does. */
     shutdown(): Promise<void>;
   }> {
-    const vault = reuseVault ?? mkdtempSync(join(tmpdir(), 'grimoire-opencode-live-'));
+    const vault = reuseVault ?? mkdtempSync(join(tmpdir(), 'grimoire-kimicode-live-'));
     mkdirSync(vault, { recursive: true });
     if (!existsSync(join(vault, 'Note.md'))) {
       writeFileSync(join(vault, 'Note.md'), '# Note\n\nThe vault has one note in it.\n');
@@ -91,7 +99,7 @@ live('OpenCode live smoke', () => {
       },
     });
     const plugin = createPlugin(vault, overrides);
-    const execution = new OpencodeExecution(plugin, host.registry);
+    const execution = new KimicodeExecution(plugin, host.registry);
     host.registerBackend(execution.createBackendRegistration());
     await host.start();
     const release = async (): Promise<void> => {
@@ -134,7 +142,9 @@ live('OpenCode live smoke', () => {
           ? `tool_use:${chunk.name}`
           : chunk.type === 'tool_result'
             ? `tool_result:${String(chunk.content).slice(0, 40).replaceAll('\n', ' ')}`
-            : chunk.type
+            : chunk.type === 'error'
+          ? `error:${chunk.content.slice(0, 200).replaceAll('\n', ' ')}`
+          : chunk.type
     ));
   }
 
@@ -145,9 +155,12 @@ live('OpenCode live smoke', () => {
       .join('');
   }
 
-  /** The `opencode acp` processes this run is responsible for. */
+  /** The `kimi acp` processes this run is responsible for. */
   function agents(): string[] {
-    return ownedProcesses(command => command.includes('opencode') && command.includes('acp'))
+    // The binary is `kimi`; the directory it ships in is `.kimi-code`. Matching
+    // the binary matches both, and matching only the directory would miss a
+    // `kimi` resolved from anywhere else.
+    return ownedProcesses(command => command.includes('kimi') && command.includes('acp'))
       .map(row => row.command);
   }
 
@@ -268,10 +281,13 @@ live('OpenCode live smoke', () => {
       .filter((chunk): chunk is Extract<StreamChunk, { type: 'error' }> => chunk.type === 'error')
       .map(chunk => chunk.content);
     report('ROW 9', String(runtime.getSessionId()), JSON.stringify(errors));
-    // OpenCode answers an unknown session with `Internal error: OpenCode
-    // service failure`, which says nothing about the session being missing —
-    // so the binding is kept rather than silently replaced, per the resume
-    // policy, and the turn says so in words the user can act on.
+    // What this CLI answers for an unknown session is **not known here**: no
+    // account on this machine has ever opened one. What the resume policy
+    // requires either way is that the binding survives — invalidate only on an
+    // explicit "no such session", so a transport or auth failure does not
+    // silently throw the conversation away — and that the turn says something
+    // the user can act on. Both are asserted; the agent's exact words are the
+    // matrix's job to record when an account exists.
     expect(errors).toHaveLength(1);
     // **The agent's own reason, not just the word "session".** This row used to
     // assert that the message mentioned a session, which the composition's own
@@ -328,7 +344,7 @@ live('OpenCode live smoke', () => {
 
     const discovered = await execution.metadata.discoverMetadata();
 
-    const models = getOpencodeProviderSettings(plugin.settings).discoveredModels;
+    const models = getKimicodeProviderSettings(plugin.settings).discoveredModels;
     report('ROW 17', String(discovered), String(models.length),
       JSON.stringify(models.slice(0, 3).map(model => model.rawId)));
     expect(discovered).toBe(true);
@@ -348,7 +364,7 @@ live('OpenCode live smoke', () => {
   });
 
   it('row 19: shows the spend when there is spend to show', async () => {
-    opencodePlanUsageStore.reset();
+    kimicodePlanUsageStore.reset();
     const { runtime, plugin, shutdown } = await createHarness();
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'Reply with exactly: OK' })));
@@ -357,13 +373,13 @@ live('OpenCode live smoke', () => {
     const conversation: any = { id: 'conv-cost', messages: [], providerState: {}, sessionId: null };
     const providerState = runtime.buildSessionUpdates({ conversation, sessionInvalidated: false })
       .updates.providerState as { databasePath?: string } | undefined;
-    // What OpenCode's own database says this session cost, which is the source
+    // What Kimi Code's own database says this session cost, which is the source
     // the fallback reads when the vendor reports nothing on the wire.
-    const known = await loadOpencodeSessionCost(String(sessionId), providerState);
+    const known = await loadKimicodeSessionCost(String(sessionId), providerState);
 
-    const usage = opencodePlanUsageStore.getCachedUsage({
+    const usage = kimicodePlanUsageStore.getCachedUsage({
       plugin,
-      providerId: 'opencode',
+      providerId: 'kimicode',
       settings: plugin.settings,
     });
 

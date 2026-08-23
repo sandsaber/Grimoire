@@ -44,6 +44,7 @@ import { isAcpMissingSessionError, JsonRpcErrorResponse } from '@/providers/acp'
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import { AcpWorkspaceFileSystem } from '@/providers/acp/execution/AcpWorkspaceFileSystem';
+import { describeAcpSessionOpenFailure } from '@/providers/acp/execution/describeAcpSessionOpenFailure';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
 import type { ManagedAcpExecutionBackendContext } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
@@ -541,8 +542,14 @@ export class GrokExecution {
         // without saying anything deserves.
         if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected') {
           const refused = content.consumeTurnRefusal();
+          // A refused *load* is the one refusal whose words are not the whole
+          // answer: the session may be fine and the CLI unusable, so the
+          // sentence about starting a new chat has to say what it depends on.
+          if (refused?.origin === 'session-load') {
+            return describeAcpSessionOpenFailure('Grok Build', refused.message);
+          }
           if (refused) {
-            return refused;
+            return refused.message;
           }
         }
         if (reason === 'provider-failure') {
@@ -558,8 +565,7 @@ export class GrokExecution {
             + 'Grok settings — desktop apps do not inherit the shell PATH.';
         }
         if (reason === 'pre-dispatch-rejected') {
-          return 'Grok Build could not start this turn. If this conversation was resumed from a saved '
-            + 'session, that session may no longer exist — starting a new chat will create one.';
+          return describeAcpSessionOpenFailure('Grok Build');
         }
         return undefined;
       },

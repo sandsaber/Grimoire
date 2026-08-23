@@ -3,7 +3,10 @@ import type { SlashCommand, StreamChunk } from '@/core/types';
 import { AcpSessionUpdateNormalizer } from '@/providers/acp/AcpSessionUpdateNormalizer';
 import type { AcpToolStreamAdapter } from '@/providers/acp/AcpToolStreamAdapter';
 import { buildAcpUsageInfo } from '@/providers/acp/buildAcpUsageInfo';
-import type { AcpContentPayload } from '@/providers/acp/execution/AcpContentPayload';
+import type {
+  AcpContentPayload,
+  AcpTurnRefusal,
+} from '@/providers/acp/execution/AcpContentPayload';
 import type {
   AcpNewSessionResponse,
   AcpPromptResponse,
@@ -76,7 +79,7 @@ export class MimocodeContentPresenter {
   private readonly toolStream: AcpToolStreamAdapter = createMimocodeToolStreamAdapter();
   private sessionId: string | undefined;
   private metadata: ChatTurnMetadata = {};
-  private refusal: string | undefined;
+  private refusal: AcpTurnRefusal | undefined;
   private contextUsage: AcpUsageUpdate | null = null;
   private promptUsage: AcpUsage | null = null;
 
@@ -104,9 +107,11 @@ export class MimocodeContentPresenter {
    *
    * Covers a refused *session* as well as a refused prompt: an agent nobody
    * has authenticated says so here, where the classification alone could only
-   * guess that a saved session had gone missing.
+   * guess that a saved session had gone missing. Which of the two it was rides
+   * along, because a refused load is the one whose words are not the whole
+   * answer — see `AcpTurnRefusalOrigin`.
    */
-  consumeTurnRefusal(): string | undefined {
+  consumeTurnRefusal(): AcpTurnRefusal | undefined {
     const message = this.refusal;
     this.refusal = undefined;
     return message;
@@ -157,7 +162,10 @@ export class MimocodeContentPresenter {
       return this.presentSessionConfig(content.session);
     }
     if (content?.kind === 'turn-refused') {
-      this.refusal = content.message?.trim() || undefined;
+      const message = content.message?.trim();
+      this.refusal = message
+        ? { message, ...(content.origin ? { origin: content.origin } : {}) }
+        : undefined;
       return [];
     }
     if (content?.kind !== 'session-update' || !content.notification) {

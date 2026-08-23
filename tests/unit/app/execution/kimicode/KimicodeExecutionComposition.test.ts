@@ -99,6 +99,7 @@ describe('Kimi Code execution composition', () => {
     offersEffort?: boolean;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
+    sessionLoadRefusal?: string;
   } = {}): {
     factory: ManagedAcpClientFactory;
     startupRefs: string[];
@@ -161,6 +162,13 @@ describe('Kimi Code execution composition', () => {
             loadRequests.push(request);
             if (options.sessionIsGone) {
               throw new JsonRpcErrorResponse('session/load', -32603, 'session not found');
+            }
+            if (options.sessionLoadRefusal) {
+              // What an unauthenticated CLI answers a *load* with: nothing
+              // about the session, and nothing a new chat would fix. Recorded
+              // from `kimi acp` and `qwen --acp`, which answer `session/new`
+              // and `session/load` with the same sentence.
+              throw new JsonRpcErrorResponse('session/load', -32000, options.sessionLoadRefusal);
             }
             if (options.sessionLoadFails) {
               // The shape OpenCode 1.18.18 answers with for a session it does
@@ -255,6 +263,7 @@ describe('Kimi Code execution composition', () => {
     plugin?: any;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
+    sessionLoadRefusal?: string;
   } = {}): Promise<{
     execution: KimicodeExecution;
     host: ExecutionKernelHost;
@@ -523,7 +532,36 @@ describe('Kimi Code execution composition', () => {
     const errors = chunks
       .filter((chunk): chunk is Extract<StreamChunk, { type: 'error' }> => chunk.type === 'error')
       .map(chunk => chunk.content);
-    expect(errors).toEqual([expect.stringContaining('session may no longer exist')]);
+    expect(errors).toEqual([
+      'Kimi Code could not open the session this conversation was resumed from. Kimi Code said: '
+        + 'Internal error: Kimi Code service failure. Starting a new chat helps only if the session '
+        + 'itself is gone.',
+    ]);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('says what the agent said when the session was not what stopped it', async () => {
+    // The refusal a live run found, one path over from the one it was fixed on.
+    // An unauthenticated CLI refuses `session/load` with a sentence that has
+    // nothing to do with the session, and the advice above — start a new chat —
+    // then fails identically every time it is followed. Both halves travel, the
+    // agent's first, and the advice says out loud what it depends on.
+    const { execution, host } = await createHarness({
+      sessionLoadRefusal: 'Authentication required',
+    });
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({ providerState: {}, sessionId: 'ses-that-is-gone' });
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks
+      .filter((chunk): chunk is Extract<StreamChunk, { type: 'error' }> => chunk.type === 'error')
+      .map(chunk => chunk.content)).toEqual([
+      'Kimi Code could not open the session this conversation was resumed from. '
+        + 'Kimi Code said: Authentication required. Starting a new chat helps only if the '
+        + 'session itself is gone.',
+    ]);
     execution.dispose();
     await host.dispose();
   });

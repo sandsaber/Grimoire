@@ -41,6 +41,7 @@ import type { ChatMessage } from '@/core/types';
 import type GrimoirePlugin from '@/main';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
+import { describeAcpSessionOpenFailure } from '@/providers/acp/execution/describeAcpSessionOpenFailure';
 import type {
   ManagedAcpClient,
   ManagedAcpClientFactory,
@@ -487,8 +488,14 @@ export class QwenExecution {
         // without saying anything deserves.
         if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected') {
           const refused = content.consumeTurnRefusal();
+          // A refused *load* is the one refusal whose words are not the whole
+          // answer: the session may be fine and the CLI unusable, so the
+          // sentence about starting a new chat has to say what it depends on.
+          if (refused?.origin === 'session-load') {
+            return describeAcpSessionOpenFailure('Qwen', refused.message);
+          }
           if (refused) {
-            return refused;
+            return refused.message;
           }
         }
         if (reason === 'provider-failure') {
@@ -501,9 +508,7 @@ export class QwenExecution {
             + 'Qwen settings — desktop apps do not inherit the shell PATH.';
         }
         if (reason === 'pre-dispatch-rejected') {
-          return 'Qwen could not start this turn. If this conversation was resumed from a '
-            + 'saved session, that session may no longer exist — starting a new chat will '
-            + 'create one.';
+          return describeAcpSessionOpenFailure('Qwen');
         }
         return undefined;
       },

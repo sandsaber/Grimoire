@@ -38,6 +38,7 @@ import type { ChatMessage } from '@/core/types';
 import type GrimoirePlugin from '@/main';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
+import { describeAcpSessionOpenFailure } from '@/providers/acp/execution/describeAcpSessionOpenFailure';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createGeminiModuleContext } from '@/providers/gemini/app/GeminiModuleContext';
@@ -373,8 +374,14 @@ export class GeminiExecution {
         // without saying anything deserves.
         if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected') {
           const refused = content.consumeTurnRefusal();
+          // A refused *load* is the one refusal whose words are not the whole
+          // answer: the session may be fine and the CLI unusable, so the
+          // sentence about starting a new chat has to say what it depends on.
+          if (refused?.origin === 'session-load') {
+            return describeAcpSessionOpenFailure('Gemini', refused.message);
+          }
           if (refused) {
-            return refused;
+            return refused.message;
           }
         }
         if (reason === 'provider-failure') {
@@ -387,9 +394,7 @@ export class GeminiExecution {
             + 'Gemini settings — desktop apps do not inherit the shell PATH.';
         }
         if (reason === 'pre-dispatch-rejected') {
-          return 'Gemini could not start this turn. If this conversation was resumed from a '
-            + 'saved session, that session may no longer exist — starting a new chat will '
-            + 'create one.';
+          return describeAcpSessionOpenFailure('Gemini');
         }
         return undefined;
       },

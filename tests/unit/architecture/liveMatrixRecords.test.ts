@@ -15,6 +15,25 @@ import { join, resolve } from 'node:path';
  * it requires an answer, and `never` is one.
  */
 const DOCS = resolve(process.cwd(), 'docs');
+const HARNESSES = resolve(process.cwd(), 'tests/integration/app/execution');
+
+/**
+ * The providers that have a live harness, by the directory it sits in.
+ *
+ * Read from the tests rather than listed, for the same reason the rows below
+ * are: a provider whose harness exists and whose matrix does not is invisible
+ * here, and looks exactly like a provider with nothing to record. Two were —
+ * Antigravity for four days and Kimi Code from its flip — and neither absence
+ * was noticeable in a list of files that were present.
+ */
+function harnessProviders(): string[] {
+  return readdirSync(HARNESSES, { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .filter(entry => readdirSync(join(HARNESSES, entry.name))
+      .some(file => file.includes('LiveSmoke')))
+    .map(entry => entry.name)
+    .sort();
+}
 
 interface MatrixRecord {
   readonly file: string;
@@ -50,14 +69,36 @@ describe('live smoke matrix records', () => {
     // Guards the reader: a parser that silently matched nothing would make
     // every assertion below vacuously true.
     expect(matrices.map(matrix => matrix.file)).toEqual([
+      'antigravity-flip-smoke-matrix.md',
       'claude-flip-smoke-matrix.md',
       'codex-flip-smoke-matrix.md',
       'gemini-flip-smoke-matrix.md',
       'grok-flip-smoke-matrix.md',
+      'kimicode-flip-smoke-matrix.md',
       'mimocode-flip-smoke-matrix.md',
       'opencode-flip-smoke-matrix.md',
       'qwen-flip-smoke-matrix.md',
     ]);
+  });
+
+  it('finds the harnesses it is meant to be pairing', () => {
+    // Guards the other reader, and it needed guarding: a `readdirSync` filter
+    // that matched nothing left the pairing below asserting that an empty list
+    // contains nothing, which it always does. The same shape as the D7 guard's
+    // own first-run defect, caught the same way — by breaking it.
+    expect(harnessProviders()).toEqual([
+      'antigravity', 'claude', 'codex', 'gemini', 'grok',
+      'kimicode', 'mimocode', 'opencode', 'qwen',
+    ]);
+  });
+
+  it('gives every provider with a live harness a matrix to record it in', () => {
+    const documented = new Set(matrices.map(matrix => matrix.file.replace('-flip-smoke-matrix.md', '')));
+
+    // Not every matrix needs a harness — a provider can have rows only a person
+    // can run — but a harness with nowhere to write down what it found is a run
+    // nobody outside the journal will ever see.
+    expect(harnessProviders().filter(provider => !documented.has(provider))).toEqual([]);
   });
 
   it.each(matrices.map(matrix => matrix.file))('%s records whether it has ever run', file => {
@@ -90,6 +131,10 @@ describe('live smoke matrix records', () => {
     // who wants the answer reads this line rather than four documents. Update
     // it in the same commit as the run it records.
     expect(status).toEqual([
+      // The only provider whose automated half is fully green on this machine,
+      // and the last to get a matrix: its rows lived in the journal for four
+      // days, where the assertion above could not see them.
+      'antigravity-flip-smoke-matrix.md: 2026-08-23',
       'claude-flip-smoke-matrix.md: 2026-08-21',
       'codex-flip-smoke-matrix.md: 2026-08-21',
       // Run, and mostly blocked — by the account's daily quota rather than by
@@ -97,6 +142,11 @@ describe('live smoke matrix records', () => {
       // defects, two of them shipped.
       'gemini-flip-smoke-matrix.md: 2026-08-23',
       'grok-flip-smoke-matrix.md: 2026-08-21',
+      // Run, and every row that needs an answer blocked — this CLI is not
+      // logged in here. Written last of the eight, and worth the run anyway:
+      // it found a shipped defect on a path an authenticated account never
+      // takes. A date is "when did this last run", not "did it pass".
+      'kimicode-flip-smoke-matrix.md: 2026-08-23',
       // Run, and mostly red — for a reason the matrix states rather than the
       // flip: that account cannot generate. A date here is "when did this last
       // run", not "did it pass".

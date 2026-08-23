@@ -1,19 +1,27 @@
 # The manual half of the smoke matrices — how to run it
 
-Five providers execute through the kernel: Codex, Claude, OpenCode, Grok and MiMoCode. Each has a
-matrix, and each matrix has two halves. **The half that runs itself is already run** — a real CLI,
-real turns, the flipped path end to end, recorded in each matrix's own Record table. This document is
-the other half: the rows that need a person, because they are about what the screen shows or about
-actions only a hand can take.
+**Every provider executes through the kernel now: nine of them.** Each has a matrix, and each matrix
+has two halves. **The half that runs itself is already run** — a real CLI, real turns, the flipped
+path end to end, recorded in each matrix's own Record table. This document is the other half: the
+rows that need a person, because they are about what the screen shows or about actions only a hand
+can take.
+
+**Four providers are written out below: Claude, Codex, OpenCode and Grok.** The five that came after
+them keep their manual half in their own matrix, under *The half a person still has to look at* —
+[Antigravity](antigravity-flip-smoke-matrix.md), [Gemini](gemini-flip-smoke-matrix.md),
+[Kimi Code](kimicode-flip-smoke-matrix.md), [MiMoCode](mimocode-flip-smoke-matrix.md) and
+[Qwen](qwen-flip-smoke-matrix.md). That is where to read them; copying them here would be a second
+place to keep in step, and three of those five have no account on the machine they were built on.
 
 Nothing here needs a developer. It needs Obsidian, a vault you do not mind writing into, and about
 an hour for all four providers below.
 
-**MiMoCode is not in this document, and not because it was forgotten.** Its automated half ran and
-mostly failed: the account cannot generate, so no turn produces an answer to look at. Asking someone
-to check whether a tool card renders would waste their hour. Read
-[`docs/mimocode-flip-smoke-matrix.md`](mimocode-flip-smoke-matrix.md) — an account that generates is
-the one thing it needs.
+**Before spending an hour on any of the five, read what its matrix says about accounts**, because
+three of them cannot be checked at all on the machine they were built on. MiMoCode's account cannot
+generate — every turn ends with zero tokens — and Kimi Code's and Qwen's CLIs are not logged in, so no
+session has ever opened. Gemini's account works and replenishes about one turn at a time. Asking
+someone to check whether a tool card renders would waste their hour in the first three cases; what
+those need is an account, not a person.
 
 ## Before you start
 

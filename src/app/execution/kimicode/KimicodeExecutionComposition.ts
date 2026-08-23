@@ -41,6 +41,7 @@ import type { ChatMessage } from '@/core/types';
 import type GrimoirePlugin from '@/main';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
+import { describeAcpSessionOpenFailure } from '@/providers/acp/execution/describeAcpSessionOpenFailure';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createKimicodeModuleContext } from '@/providers/kimicode/app/KimicodeModuleContext';
@@ -394,13 +395,15 @@ export class KimicodeExecution {
       /**
        * The provider's words for a turn that never started.
        *
-       * A translation of the classification, not the agent's error text: for
-       * this provider a pre-dispatch rejection is almost always the session
-       * bind, and Kimi Code answers an unknown session with a generic service
-       * failure that says nothing about the session. The resume policy keeps
-       * the binding rather than replacing it on an error that vague, so the
-       * conversation would otherwise repeat the neutral sentence forever with
-       * nothing to act on.
+       * The agent's own words where it gave any, and a translation of the
+       * classification where it did not: for this provider a pre-dispatch
+       * rejection is almost always the session bind. What `kimi acp` answers
+       * for a session it cannot find is **not known here** — no account on this
+       * machine has ever opened one — and what it answers with no account is
+       * "Authentication required", for `session/new` and `session/load` alike.
+       * The resume policy keeps the binding rather than replacing it on an
+       * error that is not explicitly about a missing session, so a conversation
+       * whose sentence said nothing would repeat it forever.
        */
       describeFailure: reason => {
         // The agent's own words, where it gave any — for a refused prompt and
@@ -410,8 +413,14 @@ export class KimicodeExecution {
         // without saying anything deserves.
         if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected') {
           const refused = content.consumeTurnRefusal();
+          // A refused *load* is the one refusal whose words are not the whole
+          // answer: the session may be fine and the CLI unusable, so the
+          // sentence about starting a new chat has to say what it depends on.
+          if (refused?.origin === 'session-load') {
+            return describeAcpSessionOpenFailure('Kimi Code', refused.message);
+          }
           if (refused) {
-            return refused;
+            return refused.message;
           }
         }
         if (reason === 'provider-failure') {
@@ -427,8 +436,7 @@ export class KimicodeExecution {
             + 'Kimi Code settings — desktop apps do not inherit the shell PATH.';
         }
         if (reason === 'pre-dispatch-rejected') {
-          return 'Kimi Code could not start this turn. If this conversation was resumed from a saved '
-            + 'session, that session may no longer exist — starting a new chat will create one.';
+          return describeAcpSessionOpenFailure('Kimi Code');
         }
         return undefined;
       },

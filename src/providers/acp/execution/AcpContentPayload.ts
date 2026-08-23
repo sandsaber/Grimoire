@@ -12,6 +12,32 @@ import type { AcpNewSessionResponse, AcpPromptResponse, AcpSessionNotification }
  * Shared rather than per provider: the backend that emits these is shared, and
  * a second copy of this union would be a second thing to keep in step.
  */
+/**
+ * Where a refusal came from, where that changes what the tab should say.
+ *
+ * Absent for the refusals whose words *are* the answer — a refused prompt, and a
+ * `session/new` the agent would not open. Nothing Grimoire could add to
+ * "Authentication required" would help, and a new chat demonstrably fails the
+ * same way.
+ *
+ * `'session-load'` is the one that is different, and a live run is what showed
+ * it. The composition's own sentence for a session that will not open says the
+ * saved session may be gone and a new chat will make one — true and actionable
+ * when the agent is being vague about a session it cannot find, which is the
+ * case it was written for (OpenCode answers `Internal error: OpenCode service
+ * failure`). But an unauthenticated `kimi acp` refuses the *load* with
+ * "Authentication required", and then that advice is not merely unhelpful, it
+ * is wrong: a new chat fails identically. Neither half can be dropped, so the
+ * origin travels and the composition says both, the agent's words first.
+ */
+export type AcpTurnRefusalOrigin = 'session-load';
+
+/** What the agent said, and which refusal it was. */
+export interface AcpTurnRefusal {
+  readonly message: string;
+  readonly origin?: AcpTurnRefusalOrigin;
+}
+
 export type AcpContentPayload =
   | { readonly kind: 'session-update'; readonly notification: AcpSessionNotification }
   | { readonly kind: 'prompt-result'; readonly response: AcpPromptResponse }
@@ -35,8 +61,15 @@ export type AcpContentPayload =
    * enum and this is a sentence. The presenter keeps it and the composition
    * hands it back through `describeFailure`, so the tab still renders exactly
    * one error for one failure.
+   *
+   * `origin` is why a refusal is not always the whole answer: see
+   * `AcpTurnRefusalOrigin`.
    */
-  | { readonly kind: 'turn-refused'; readonly message: string }
+  | {
+    readonly kind: 'turn-refused';
+    readonly message: string;
+    readonly origin?: AcpTurnRefusalOrigin;
+  }
   /**
    * A mode the session would not take, on the turn that asked for it.
    *

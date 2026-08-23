@@ -44,7 +44,10 @@ import {
 import { JsonRpcErrorResponse } from '@/providers/acp/AcpJsonRpcTransport';
 import { isAcpMissingSessionError } from '@/providers/acp/acpSessionResume';
 import { AcpSpawnError } from '@/providers/acp/AcpSpawnError';
-import type { AcpContentPayload } from '@/providers/acp/execution/AcpContentPayload';
+import type {
+  AcpContentPayload,
+  AcpTurnRefusalOrigin,
+} from '@/providers/acp/execution/AcpContentPayload';
 import type {
   ManagedAcpClient,
   ManagedAcpClientFactory,
@@ -791,14 +794,16 @@ class ManagedAcpExecutionSession implements ExecutionSession {
    * that a saved session went missing. Presented and then rethrown — the
    * terminal is still `pre-dispatch-rejected`, because nothing ran.
    *
-   * **A failed `session/load` is deliberately not covered**, and not by accident
-   * of where the wrapping happens: `ensureSessionBinding` turns it into a
-   * dispatch error before it escapes. What an agent says about a session it
-   * cannot load is usually nothing anyone can act on — OpenCode answers
-   * `Internal error: OpenCode service failure` — while the composition's own
-   * sentence names the one thing that helps, which is that starting a new chat
-   * makes a session. The agent wins where it knows more; the composition wins
-   * where it does.
+   * **A failed `session/load` is covered too, but differently**, and the
+   * difference was found by running this against a CLI nobody had logged into.
+   * What an agent says about a session it cannot load is often nothing anyone
+   * can act on — OpenCode answers `Internal error: OpenCode service failure` —
+   * and the composition's own sentence names the thing that helps, which is
+   * that starting a new chat makes a session. That was read as "the agent has
+   * nothing to say here", and it is not: `kimi acp` with no account refuses the
+   * *load* with "Authentication required", where the advice to start a new chat
+   * is wrong rather than merely thin. So the words travel with an origin, and
+   * the composition says both — see `AcpTurnRefusalOrigin`.
    */
   private async openSessionBinding(
     run: ManagedAcpExecutionRun,
@@ -806,7 +811,14 @@ class ManagedAcpExecutionSession implements ExecutionSession {
     generation: number,
   ): Promise<AcpNewSessionResponse | undefined> {
     try {
-      return await this.ensureSessionBinding(invocation, generation);
+      return await this.ensureSessionBinding(
+        invocation,
+        generation,
+        // Presented from inside, because a load failure that is not a missing
+        // session is wrapped into a dispatch error there and the agent's words
+        // do not survive the wrapping.
+        error => run.presentTurnRefusal(error.message, 'session-load'),
+      );
     } catch (error) {
       if (error instanceof JsonRpcErrorResponse) {
         run.presentTurnRefusal(error.message);
@@ -818,6 +830,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
   private async ensureSessionBinding(
     invocation: ManagedAcpExecutionInvocation,
     generation: number,
+    onLoadRefusal?: (error: JsonRpcErrorResponse) => void,
   ): Promise<AcpNewSessionResponse | undefined> {
     const client = this.client;
     if (!client) throw new ExecutionDispatchError('Managed ACP client is unavailable.', true);
@@ -842,7 +855,13 @@ class ManagedAcpExecutionSession implements ExecutionSession {
         return { ...response, sessionId: target };
       } catch (error) {
         const missing = (this.context.isMissingSessionError ?? isAcpMissingSessionError)(error);
-        if (!missing) throw new ExecutionDispatchError('Managed ACP session load failed.', true);
+        if (!missing) {
+          // Only where the agent itself answered. A transport that died has no
+          // words, and inventing some would be worse than the sentence the
+          // composition already has.
+          if (error instanceof JsonRpcErrorResponse) onLoadRefusal?.(error);
+          throw new ExecutionDispatchError('Managed ACP session load failed.', true);
+        }
         this.nativeSessionRef = undefined;
         this.loadedSessionRef = undefined;
       }
@@ -1064,11 +1083,15 @@ class ManagedAcpExecutionRun implements ExecutionRun {
    * could not be established, which is what every flipped provider had.
    */
   /** What the agent said when it refused, on the channel the tab reads. */
-  presentTurnRefusal(message: string): void {
+  presentTurnRefusal(message: string, origin?: AcpTurnRefusalOrigin): void {
     if (this.terminal) return;
     this.emit({
       kind: 'provider-content',
-      payload: { kind: 'turn-refused', message } satisfies AcpContentPayload,
+      payload: {
+        kind: 'turn-refused',
+        message,
+        ...(origin ? { origin } : {}),
+      } satisfies AcpContentPayload,
     });
   }
 

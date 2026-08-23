@@ -6433,12 +6433,80 @@ Seven breaks, six caught; the seventh is green because it is not the gate, which
 
 Gates: unit 515 suites / 8,012 tests, typecheck, `eslint`, `build:release`.
 
+### Kimi Code's live harness, and the defect it found before it could pass a row (this commit)
+
+The last flipped provider without one. It is deliberately MiMoCode's harness with the names changed,
+down to the row numbers: these two mirror each other by instruction, their compositions differ only in
+identifiers, and the two files are meant to stay diffable after normalizing the provider name — which
+is how drift between them gets found. The normalized diff is two comments long, both of them places
+where MiMoCode states something observed that Kimi Code has never been able to observe.
+
+**Row 9 found a shipped defect, and row 9 was green while it was there.** `kimi 0.38.0` with no
+account refuses `session/load` the same way it refuses `session/new` — `-32000 "Authentication
+required"` — and the tab said:
+
+> Kimi Code could not start this turn. If this conversation was resumed from a saved session, that
+> session may no longer exist — starting a new chat will create one.
+
+The same defect Qwen's harness found two sessions ago, surviving on the path that fix deliberately did
+not cover. **The carve-out was reasoned and the reasoning was half right.** What an agent says about a
+session it cannot *find* is often unactionable — OpenCode answers `Internal error: OpenCode service
+failure` — and the composition's advice is what helps there. That was read as *the agent has nothing
+to say about a load*, and an unauthenticated CLI is the counterexample: the session is fine, the words
+are the whole answer, and starting a new chat fails identically. Both halves are needed, so the
+refusal now carries where it came from and the composition says both:
+
+> Kimi Code could not open the session this conversation was resumed from. Kimi Code said:
+> Authentication required. Starting a new chat helps only if the session itself is gone.
+
+The agent's words first, and the advice saying out loud what it depends on. Six copies of that
+sentence became one, since the fix had to land in all of them. Confirmed against the same CLI that
+found it, six breaks caught by the six compositions' tests.
+
+**The row was green because it asserted the wrong noun.** `toContain('session')` — which the
+composition's own sentence satisfies whatever the agent said. It asserts the agent's own words now, in
+all three sibling harnesses.
+
+**And Antigravity had no matrix at all.** Its harness has existed since wave 1 and its result lived in
+the journal, where the records gate could not see it: a provider with a harness and no matrix looked
+exactly like a provider with nothing to record, which is the state that gate exists to make visible.
+The gate pairs harnesses with matrices now. Its first break went green — the harness reader could
+match nothing and the pairing would still pass, the same vacuity the D7 guard shipped with one commit
+earlier — so the reader is guarded too.
+
+Antigravity's matrix is written, and it is **the only provider whose automated half is fully green on
+this machine**: run today against `agy 1.1.15`, both rows, the cancelled process tree gone by the
+operating system's account. `manual-smoke-instructions.md` no longer says five providers.
+
+Gates: unit 515 suites / 8,024 tests, integration 5 / 145 (10 live suites skipped), typecheck,
+`eslint`, `build:release`. Live: Kimi Code 2 rows of 12 (the rest need an account), Antigravity 2 of 2.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
 overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
+
+### Where the seventh session of 2026-08-23 ended
+
+**Every provider executes through the kernel, every one has a live harness, and every one has a
+matrix that says when it last ran.** M2-flips is done; what remains is certification, and it is
+account-bound rather than code-bound.
+
+**D7 has its guard**, the oldest obligation on the list, and it corrected the rule it was written to
+prove: redaction rests on default-deny, not on the sensitive-key list, so the safe list is the only
+thing a reviewer has to read.
+
+**Kimi Code's harness found a shipped defect on its first run**, on the path Qwen's fix deliberately
+did not cover — a resumed conversation told to start a new chat when the CLI was simply not logged in.
+Fixed for all six ACP providers and confirmed against the CLI that found it. **Antigravity's matrix
+was missing entirely** and its harness result had been living in this file; the records gate pairs the
+two now, and Antigravity is the only provider fully green on this machine.
+
+**Two gates shipped with the same defect this session and both were caught by breaking them**: a
+reader that matches nothing makes every assertion above it vacuous. Break the reader, not only the
+rule.
 
 ### Where the sixth session of 2026-08-23 ended
 

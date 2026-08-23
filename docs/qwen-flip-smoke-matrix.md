@@ -72,10 +72,15 @@ all six ACP providers, and the same harness confirms it against the real CLI:
 
 > Authentication required: Use Qwen Code CLI to authenticate first.
 
-A failed `session/load` deliberately keeps the composition's own sentence instead: what an agent says
-about a session it cannot load is rarely actionable — OpenCode answers `Internal error: OpenCode
-service failure` — while "starting a new chat will create one" names the thing that helps. The agent
-wins where it knows more; the composition wins where it does.
+A failed `session/load` was deliberately left out at the time: what an agent says about a session it
+cannot load is often unactionable — OpenCode answers `Internal error: OpenCode service failure` —
+while "starting a new chat will create one" names the thing that helps.
+
+**Kimi Code's harness then found the other half of it, one path over.** An unauthenticated CLI refuses
+the *load* the same way it refuses `session/new`, and a user resuming a conversation was told the saved
+session may have gone and to start a new chat — the same advice that fails identically every time,
+reached by the path the first fix did not cover. Both halves now travel, the agent's words first and
+the advice conditioned on them out loud, for all six ACP providers.
 
 ## The half a person still has to look at
 

@@ -79,6 +79,7 @@ describe('Grok execution composition', () => {
     reportsNoModes?: boolean;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
+    sessionLoadRefusal?: string;
     streamsNothing?: boolean;
   } = {}): {
     factory: ManagedAcpClientFactory;
@@ -150,6 +151,13 @@ describe('Grok execution composition', () => {
                 detail: 'No such file or directory (os error 2)',
               });
             }
+            if (options.sessionLoadRefusal) {
+              // What an unauthenticated CLI answers a *load* with: nothing
+              // about the session, and nothing a new chat would fix. Recorded
+              // from `kimi acp` and `qwen --acp`, which answer `session/new`
+              // and `session/load` with the same sentence.
+              throw new JsonRpcErrorResponse('session/load', -32000, options.sessionLoadRefusal);
+            }
             if (options.sessionLoadFails) {
               // What Grok answers for a session it no longer has: a service
               // failure that names nothing about the session.
@@ -219,6 +227,7 @@ describe('Grok execution composition', () => {
     reportsNoModes?: boolean;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
+    sessionLoadRefusal?: string;
     streamsNothing?: boolean;
   } = {}): Promise<{
     plugin: any;
@@ -581,7 +590,35 @@ describe('Grok execution composition', () => {
 
     expect(chunks.filter(chunk => chunk.type === 'error').map(chunk => (
       (chunk).content
-    ))).toEqual([expect.stringContaining('session may no longer exist')]);
+    ))).toEqual([
+      'Grok Build could not open the session this conversation was resumed from. Grok Build said: '
+        + 'Internal error. Starting a new chat helps only if the session itself is gone.',
+    ]);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('says what the agent said when the session was not what stopped it', async () => {
+    // The refusal a live run found, one path over from the one it was fixed on.
+    // An unauthenticated CLI refuses `session/load` with a sentence that has
+    // nothing to do with the session, and the advice above — start a new chat —
+    // then fails identically every time it is followed. Both halves travel, the
+    // agent's first, and the advice says out loud what it depends on.
+    const { execution, host } = await createHarness({
+      sessionLoadRefusal: 'Authentication required',
+    });
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({ providerState: {}, sessionId: 'grok-session-gone' });
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks
+      .filter((chunk): chunk is Extract<StreamChunk, { type: 'error' }> => chunk.type === 'error')
+      .map(chunk => chunk.content)).toEqual([
+      'Grok Build could not open the session this conversation was resumed from. '
+        + 'Grok Build said: Authentication required. Starting a new chat helps only if the '
+        + 'session itself is gone.',
+    ]);
     execution.dispose();
     await host.dispose();
   });
