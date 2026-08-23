@@ -98,16 +98,27 @@ describe('OpenCode execution composition', () => {
     configOptions: unknown[];
     loadRequests: Array<{ sessionId: string }>;
     closes: string[];
+    permissionAnswers: AcpRequestPermissionResponse[];
+    askAnything: () => Promise<void> | undefined;
   } {
+    let askAnythingRef: (() => Promise<void>) | undefined;
     const startupRefs: string[] = [];
     const prompts: unknown[] = [];
     const permissions: Array<Promise<AcpRequestPermissionResponse>> = [];
     const configOptions: unknown[] = [];
     const loadRequests: Array<{ sessionId: string }> = [];
     const closes: string[] = [];
+    const permissionAnswers: AcpRequestPermissionResponse[] = [];
     const factory: ManagedAcpClientFactory = {
       create: async (input: ManagedAcpClientFactoryInput) => {
         startupRefs.push(input.startupRef);
+        const askAnything = async (): Promise<void> => {
+          permissionAnswers.push(await input.requestPermission({
+            sessionId: 'acp-session-1',
+            options: [{ optionId: 'once', kind: 'allow_once', name: 'Allow' }],
+            toolCall: { toolCallId: 'tool-9', title: 'write', rawInput: { path: 'note.md' } },
+          }));
+        };
         const ask = (): void => {
           permissions.push(input.requestPermission({
             sessionId: 'acp-session-1',
@@ -118,6 +129,7 @@ describe('OpenCode execution composition', () => {
             toolCall: { toolCallId: 'tool-1', title: 'bash', rawInput: { command: 'ls' } },
           }));
         };
+        askAnythingRef = askAnything;
         let notify: ((notification: AcpSessionNotification) => void) | undefined;
         const client: ManagedAcpClient = {
           initialize: async () => undefined,
@@ -242,7 +254,10 @@ describe('OpenCode execution composition', () => {
         return client;
       },
     };
-    return { factory, startupRefs, prompts, permissions, configOptions, loadRequests, closes };
+    return {
+      factory, startupRefs, prompts, permissions, configOptions, loadRequests, closes,
+      permissionAnswers, askAnything: () => askAnythingRef?.(),
+    };
   }
 
   async function createHarness(options: {
@@ -261,6 +276,8 @@ describe('OpenCode execution composition', () => {
     configOptions: unknown[];
     loadRequests: Array<{ sessionId: string }>;
     closes: string[];
+    permissionAnswers: AcpRequestPermissionResponse[];
+    askAnything: () => Promise<void> | undefined;
     events: ExecutionEventEnvelope[];
   }> {
     const host = new ExecutionKernelHost({
@@ -273,6 +290,7 @@ describe('OpenCode execution composition', () => {
     const execution = new OpencodeExecution(options.plugin ?? createPlugin(), host.registry);
     const {
       factory, startupRefs, prompts, permissions, configOptions, loadRequests, closes,
+      permissionAnswers, askAnything,
     } = createFakeAcp(options);
     host.registerBackend(execution.createBackendRegistration(factory));
     await host.start();
@@ -285,7 +303,7 @@ describe('OpenCode execution composition', () => {
     host.registry.observe(SESSION_ID, envelope => events.push(envelope));
     return {
       execution, host, startupRefs, prompts, permissions, configOptions, loadRequests, closes,
-      events,
+      permissionAnswers, askAnything, events,
     };
   }
 
@@ -826,9 +844,9 @@ describe('OpenCode execution composition', () => {
 
   describe('auxiliary work, on the kernel', () => {
     /**
-     * Dark: the three services still call `OpencodeAuxQueryRunner`. What is
-     * proven here is the path they move to, end to end over the same fake agent
-     * the chat turns run on — the store, the retained process, the seam.
+     * The path the three auxiliary services now take, end to end over the same
+     * fake agent the chat turns run on — the store, the retained process, the
+     * seam, and the launch that is deliberately not the chat's.
      */
     it('answers a title on a process of its own, as the auxiliary agent', async () => {
       const { execution, host, startupRefs, configOptions, prompts } = await createHarness();
@@ -898,6 +916,42 @@ describe('OpenCode execution composition', () => {
       expect(configOptions).toEqual([
         expect.objectContaining({ configId: 'mode', value: 'grimoire-aux-readonly' }),
       ]);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('launches opencode from PATH when no CLI path is configured', async () => {
+      const plugin = createPlugin();
+      // Nothing resolved: no absolute path in settings, nothing found on PATH.
+      // Carried over from the runner this replaced, where it was its own case:
+      // the auxiliary launch builds its own environment and would otherwise be
+      // the one place the fallback was missing.
+      plugin.getResolvedProviderCliPath = () => null;
+      const { execution, host, startupRefs } = await createHarness({ plugin });
+
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'the message');
+
+      const launch = await execution.turnRequests.resolveLaunch(startupRefs[0]);
+      expect(launch.executable).toBe('opencode');
+      expect(launch.arguments).toEqual(['acp']);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('asks nobody, because there is nobody to ask', async () => {
+      const { execution, host, permissionAnswers, askAnything } = await createHarness();
+
+      await execution.createAuxRunner('inline').query({
+        systemPrompt: 'Edit the selection.',
+      }, 'make it shorter');
+      await askAnything();
+
+      // An auxiliary turn has no surface to raise a prompt on: a modal that
+      // appeared over a note because a title was being generated behind it
+      // would be worse than the refusal.
+      expect(permissionAnswers).toEqual([{ outcome: { outcome: 'cancelled' } }]);
       execution.dispose();
       await host.dispose();
     });

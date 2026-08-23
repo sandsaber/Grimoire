@@ -6586,6 +6586,41 @@ a dark entry that would be false.
 
 Gates: unit 516 suites / 8,058 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
 
+### The first auxiliary flip: OpenCode's titles, refinement and edits (this commit)
+
+`OpencodeAuxQueryRunner` is deleted. The three services ask
+`execution.createAuxRunner(purpose)`, and auxiliary work runs on the kernel for the first time in the
+product. M5's third checkpoint, for one provider.
+
+**Reading the runner before deleting it found a safety regression the flip would have shipped.** The
+legacy runner contained every auxiliary read to the workspace, always. The kernel path would have used
+the chat client factory — whose filesystem opts out of containment in full access, because the user
+asked for it and is watching the turn that uses it. An auxiliary turn is neither: a title generated
+behind a conversation nobody is looking at would have been able to read outside the vault because the
+*chat* was set to full access. Auxiliary work has its own factory now, contained whatever the chat is
+set to, refusing every write, and refusing every permission prompt because there is no surface to
+raise one on.
+
+**The timing mattered too.** The runner touched the plugin only when a query ran; a constructor that
+reaches for the composition makes a service depend on a load order it cannot see. `LazyAuxQueryRunner`
+keeps the old timing: built when something asks it a question, and never built by a `reset` that has
+nothing to end.
+
+Five of the legacy runner's eight cases were already covered by the new path's tests; the three that
+were not are carried over rather than lost — the PATH fallback, the refused permission, and the read
+outside the workspace, which now has a named policy of its own to be tested against.
+
+The topology record gains a third kind, `kernel-isolated`, because what proves the isolation is
+different: a dedicated runner proves it by existing, and a composition that serves both paths proves
+it by launching auxiliary work through its own factory into its own artifacts. The gate asserts the
+second shape rather than pretending it is the first.
+
+Nine breaks. Two stayed green until the services had a test of their own — nothing asserted which
+purpose each service asks for, or that inline edit keeps one conversation across a follow-up, which is
+the entire reason the session is retained.
+
+Gates: unit 517 suites / 8,060 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6619,13 +6654,16 @@ consumer needs a conversation. Corrected, proven, still dark. What is left there
 and the runner adapter per provider, then the flip — and the stderr a failed auxiliary error carries
 today, which needs the client contract to grow.
 
-**The next M5 piece to pick up** is the switch itself: point `OpencodeTitleGenerationService`,
-`OpencodeInstructionRefineService` and `OpencodeInlineEditService` at `execution.createAuxRunner(...)`
-instead of `new OpencodeAuxQueryRunner(...)`, then delete the runner and its test. One line per
-service. Everything under them is built, wired and proven — the store, the seam, the port, the
-retained process and the agents. Read `OpencodeAuxQueryRunner.test.ts` before deleting it: what it
-asserts that the new path's tests do not is the list of things to carry over, and the services reach
-the composition through `plugin`, which is the one wiring question left.
+**The next M5 piece to pick up** is the same flip for the other four managed-ACP providers with real
+auxiliary work — Grok, Kimi Code, MiMoCode, and then Codex, which is a different transport. OpenCode's
+is the template and it is small: an auxiliary environment builder in the composition, three one-line
+services, a `kernel-isolated` topology record, and the runner deleted. Do them one at a time, and read
+each runner before deleting it — OpenCode's had a containment rule the kernel path did not, and only
+reading it side by side found that.
+
+**Claude's auxiliary path is different and should not be swept in with them**: `ClaudeAuxiliaryQuery`
+is cold by design, its inline edit is its own service rather than a `QueryBacked*` one, and nothing
+about a retained session applies.
 
 **The stderr gap recorded in the entry above is smaller than it was written, and needs no transport
 change.** Checked rather than assumed: `NodeManagedAcpProcessLauncher` already keeps a stderr tail and

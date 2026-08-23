@@ -52,6 +52,7 @@ import { OPENCODE_PROVIDER_CAPABILITIES } from '@/providers/opencode/capabilitie
 import type { OpencodeAcpDynamicConfig } from '@/providers/opencode/execution/OpencodeAcpDynamicConfig';
 import { OpencodeAcpDynamicConfigApplier } from '@/providers/opencode/execution/OpencodeAcpDynamicConfig';
 import { OpencodeAcpFileSystem } from '@/providers/opencode/execution/OpencodeAcpFileSystem';
+import { createOpencodeAuxiliaryFileSystem } from '@/providers/opencode/execution/OpencodeAuxiliaryFileSystem';
 import { OpencodeContentPresenter } from '@/providers/opencode/execution/OpencodeContentPresenter';
 import {
   OpencodeExecutionBackend,
@@ -165,7 +166,7 @@ export class OpencodeExecution {
     // Resolved per launch rather than captured: `createBackend` may be handed a
     // fake factory by a test, and an auxiliary process launched behind it would
     // be a real CLI nobody asked for.
-    { create: input => (this.clientFactory ??= this.createClientFactory()).create(input) },
+    { create: input => this.auxiliaryFactory().create(input) },
     { setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
       clearTimeout: handle => window.clearTimeout(handle as ReturnType<typeof setTimeout>) },
     AUXILIARY_RESULT_BYTE_LIMIT,
@@ -181,6 +182,8 @@ export class OpencodeExecution {
 
   private metadataSession: OpencodeMetadataSession | undefined;
   private clientFactory: ManagedAcpClientFactory | undefined;
+  private auxiliaryClientFactory: ManagedAcpClientFactory | undefined;
+  private injectedClientFactory: ManagedAcpClientFactory | undefined;
 
   /**
    * Which tab answers for a write on which ACP session.
@@ -222,12 +225,16 @@ export class OpencodeExecution {
    * protocol and process ownership: a test that has to launch OpenCode to check
    * how a turn is composed is testing the wrong thing.
    */
-  createBackend(
-    clientFactory: ManagedAcpClientFactory = this.clientFactory ?? this.createClientFactory(),
-  ): OpencodeExecutionBackend {
-    this.clientFactory = clientFactory;
+  createBackend(clientFactory?: ManagedAcpClientFactory): OpencodeExecutionBackend {
+    // Injected once, and for both: a test that hands the backend a fake agent
+    // must not have an auxiliary turn launch a real one behind it.
+    if (clientFactory) {
+      this.injectedClientFactory = clientFactory;
+      this.auxiliaryClientFactory = clientFactory;
+    }
+    this.clientFactory = clientFactory ?? this.clientFactory ?? this.createClientFactory();
     const context: OpencodeExecutionBackendContext = {
-      clientFactory,
+      clientFactory: this.clientFactory,
       requestResolver: this.requests,
       dynamicApplier: new OpencodeAcpDynamicConfigApplier({
         resolve: dynamicRef => this.requests.resolveDynamic(dynamicRef),
@@ -716,6 +723,44 @@ export class OpencodeExecution {
         level: 'warn',
         scope: 'opencode',
       });
+    });
+  }
+
+  /**
+   * The factory an auxiliary process is launched through, and it is not the
+   * chat one.
+   *
+   * **What a chat turn may reach and an auxiliary turn may not.** The chat
+   * filesystem opts out of containment in full access — the user asked for it,
+   * and they are watching the turn that uses it. An auxiliary turn has nobody
+   * watching and no surface to ask on: a title being generated in the background
+   * must not read outside the vault because the *chat* was set to full access,
+   * and must not write at all. The legacy runner contained every auxiliary read
+   * for exactly this reason, and it declared no write.
+   */
+  private auxiliaryFactory(): ManagedAcpClientFactory {
+    this.auxiliaryClientFactory ??= this.injectedClientFactory ?? this.createAuxiliaryFactory();
+    return this.auxiliaryClientFactory;
+  }
+
+  private createAuxiliaryFactory(): ManagedAcpClientFactory {
+    const fileSystem = createOpencodeAuxiliaryFileSystem(
+      () => getVaultPath(this.plugin.app) ?? process.cwd(),
+    );
+    return new AcpManagedClientAdapterFactory({
+      clientInfo: {
+        name: 'grimoire-aux',
+        version: this.plugin.manifest?.version ?? '0.0.0',
+      },
+      delegate: {
+        fileSystem: {
+          readTextFile: request => fileSystem.readTextFile(request),
+          writeTextFile: request => fileSystem.writeTextFile(request),
+        },
+      },
+      processLauncher: new NodeManagedAcpProcessLauncher({
+        resolve: startupRef => this.requests.resolveLaunch(startupRef),
+      }),
     });
   }
 

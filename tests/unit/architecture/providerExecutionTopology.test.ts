@@ -76,6 +76,22 @@ describe('provider execution topology', () => {
       },
     );
 
+    it.each(PROVIDER_EXECUTION_TOPOLOGY.filter(record => record.auxiliary === 'kernel-isolated'))(
+      '$providerId launches auxiliary work through its own factory and artifacts',
+      record => {
+        const source = readFileSync(resolve(process.cwd(), record.auxiliaryOwner), 'utf8');
+
+        // The owner here serves both paths, so "not the chat runtime" proves
+        // nothing — what proves the isolation is that the auxiliary launch is
+        // built separately: its own artifacts directory, and its own client
+        // factory, which is what stops an auxiliary turn from reaching what the
+        // chat's full-access filesystem may.
+        expect(source).toContain(record.isolationEvidence);
+        expect(source).toMatch(/auxiliaryFactory|createAuxiliaryFactory/);
+        expect(source).toMatch(/createOpencodeAuxiliaryFileSystem|AuxiliaryFileSystem/);
+      },
+    );
+
     it.each(PROVIDER_EXECUTION_TOPOLOGY)(
       '$providerId names isolation evidence that is specific, not generic',
       record => {

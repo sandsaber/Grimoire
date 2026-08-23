@@ -1,12 +1,12 @@
+import { LazyAuxQueryRunner } from '../../../core/auxiliary/LazyAuxQueryRunner';
 import { QueryBackedInstructionRefineService } from '../../../core/auxiliary/QueryBackedInstructionRefineService';
 import type GrimoirePlugin from '../../../main';
-import { OpencodeAuxQueryRunner } from '../runtime/OpencodeAuxQueryRunner';
 
+/** Instruction refinement, on the execution kernel. */
 export class OpencodeInstructionRefineService extends QueryBackedInstructionRefineService {
   constructor(plugin: GrimoirePlugin) {
-    super(new OpencodeAuxQueryRunner(plugin, {
-      agentProfile: 'passive',
-      artifactPurpose: 'instructions',
-    }));
+    super(new LazyAuxQueryRunner(
+      () => plugin.getOpencodeExecution().createAuxRunner('instructions'),
+    ));
   }
 }

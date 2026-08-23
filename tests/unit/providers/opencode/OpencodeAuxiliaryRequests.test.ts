@@ -12,13 +12,12 @@ import {
 /**
  * The auxiliary half of OpenCode's reference store, and the runner that feeds it.
  *
- * Dark: titles, refinement and inline edits still call `OpencodeAuxQueryRunner`,
- * which owns a process of its own. This is the path they move to, tested before
- * anything is routed through it — the same order every provider flip took.
+ * Live: titles, refinement and inline edits are answered through here, and the
+ * runner that used to own a process of its own is gone.
  *
- * What the store has to get right is what the legacy runner spends most of its
- * lines on: which process this turn belongs to, when that process is the wrong
- * one to reuse, and what the session has to be set to before the prompt.
+ * What the store has to get right is what that runner spent most of its lines
+ * on: which process this turn belongs to, when that process is the wrong one to
+ * reuse, and what the session has to be set to before the prompt.
  */
 describe('OpenCode auxiliary requests', () => {
   function createStore(

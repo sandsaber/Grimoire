@@ -54,6 +54,16 @@ export type ResumeSupport =
 export type AuxiliaryExecution =
   /** Auxiliary services exist and run on their own process or session. */
   | 'isolated'
+  /**
+   * The same isolation, owned by the execution kernel rather than by a runner
+   * of the provider's own.
+   *
+   * Distinguished because what proves the isolation is different: a dedicated
+   * runner proves it by existing, while a composition that serves both paths
+   * proves it by launching auxiliary work through its own factory, into its own
+   * artifacts directory, with a filesystem policy the chat's cannot loosen.
+   */
+  | 'kernel-isolated'
   /** Auxiliary services are registered but do nothing. */
   | 'noop';
 
@@ -286,14 +296,21 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     sessionBoundary: 'acp-session',
     resume: 'native',
     concurrency: 'one ACP session per conversation runtime',
-    auxiliary: 'isolated',
-    auxiliaryOwner: 'src/providers/opencode/runtime/OpencodeAuxQueryRunner.ts',
+    // The first provider whose auxiliary work runs on the kernel. The owner is
+    // the composition, because that is what decides the launch: its own
+    // artifacts directory per purpose, its own agent, and its own client
+    // factory — the one an auxiliary turn is contained by whatever the chat is
+    // set to.
+    auxiliary: 'kernel-isolated',
+    auxiliaryOwner: 'src/app/execution/opencode/OpencodeExecutionComposition.ts',
     sharedResources: MANAGED_ACP_SHARED_RESOURCES('opencode'),
     capabilities: OPENCODE_PROVIDER_CAPABILITIES,
     isolationEvidence: 'opencode/auxiliary/',
     evidence: [
       'src/providers/opencode/execution/OpencodeExecutionBackend.ts',
-      'src/providers/opencode/runtime/OpencodeAuxQueryRunner.ts',
+      'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
+      'src/providers/opencode/execution/OpencodeAuxiliaryFileSystem.ts',
+      'src/providers/opencode/runtime/OpencodeAuxiliaryAgents.ts',
       'src/providers/opencode/runtime/OpencodeLaunchArtifacts.ts',
     ],
   },

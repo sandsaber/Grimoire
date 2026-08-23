@@ -800,17 +800,21 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'Auxiliary execution — titles, refinement, inline edits — on the kernel rather than on a provider runner that owns its own process.',
     state: 'wired',
     modules: [
-      // Reachable, and not yet what the services call. `OpencodeExecution`
-      // constructs the query at load and `createAuxRunner` is ready for them,
-      // while `OpencodeTitleGenerationService` and the other two still build an
-      // `OpencodeAuxQueryRunner`. The switch is one line per service, and it is
-      // deliberately not in the same commit as the path it switches to.
+      // Live for OpenCode, whose three auxiliary services ask the kernel and
+      // whose own runner is deleted. The other five managed-ACP providers still
+      // have theirs; each is one line per service away, and each needs its own
+      // commit rather than a sweep.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
       'src/app/execution/acp/ManagedAcpAuxQueryRunner.ts',
-      // The agents an auxiliary turn runs as, shared by both paths while both
-      // exist: what a title or an edit is allowed to do must not depend on
-      // which of the two asked.
+      // Built when it is asked a question rather than when it is constructed,
+      // which is the timing the provider runners had: a service is built when a
+      // tab initializes, and what it reaches for is built at plugin load.
+      'src/core/auxiliary/LazyAuxQueryRunner.ts',
+      // The agents an auxiliary turn runs as, and the filesystem it is confined
+      // to — contained whatever the chat is set to, because nobody is watching
+      // an auxiliary turn and it has no surface to ask on.
       'src/providers/opencode/runtime/OpencodeAuxiliaryAgents.ts',
+      'src/providers/opencode/execution/OpencodeAuxiliaryFileSystem.ts',
     ],
   },
 ];
