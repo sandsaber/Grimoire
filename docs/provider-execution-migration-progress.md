@@ -5979,7 +5979,49 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
-### Where the session of 2026-08-23 ended
+### Where the second session of 2026-08-23 ended
+
+**Wave 7 is half done: Gemini is flipped.** Seven providers execute through the kernel — Codex,
+Claude, OpenCode, Grok, MiMoCode, Kimi Code, Gemini. **Qwen Code is the last one on the legacy path.**
+
+**The fifth review is closed**, six findings, recorded with a status column in
+[`docs/wave7-review-backlog.md`](wave7-review-backlog.md). Two were behavioural and both were put
+there by wave 7 rather than found in it: a session reporting where it starts was talking a vault out
+of the permission mode its user picked, and an extraction that copied `permissionMode`/`fullAccess`
+instead of moving them left two implementations of the question that gates workspace containment.
+
+**Gemini needed a `ProviderModule` before it could have a composition** — it reached the kernel
+without one, which no earlier flip had to deal with. Then the composition, then the flip, then the
+live harness, in that order.
+
+**The live harness is the thing worth reading.** It found three defects, two of them shipped:
+
+- `session/set_mode` for `yolo` and `autoEdit` is refused in a folder Gemini has not been told to
+  trust, and the refusal was killing every Auto-approve turn before the prompt was sent;
+- the shared model extractor read `id` where the wire sends `modelId`, which broke model discovery
+  for **three** providers — Gemini fatally, MiMoCode and Grok silently;
+- and the one left open: a prompt that fails with a vendor error is handled as a dead connection,
+  retried once, and reported as a run whose outcome could not be established. Shared across five
+  providers.
+
+The second of those is the lesson to carry: **a fake is evidence only to the extent it was copied
+from a recording.** This composition's fake was written from the Gemini recording two commits before
+the run, and got the modes right and the models wrong — so every unit test passed against a shape no
+agent sends.
+
+**Certification is partial and the blocker is the account.** Four rows green; everything needing an
+answer stopped at `429 You have exhausted your daily quota on this model`. Re-run
+`GRIMOIRE_GEMINI_LIVE=1 npm run test -- --selectProjects integration --testPathPatterns GeminiLiveSmoke`
+on a day with quota; the matrix is [`docs/gemini-flip-smoke-matrix.md`](gemini-flip-smoke-matrix.md).
+
+**What is left, in order.** Re-run Gemini's matrix when there is quota, and give the refused-mode
+record a surface — the toolbar still says Auto-approve while the session is in Default. Then the
+shared prompt-error obligation above, which is now the oldest thing blocking a clean flip. Then
+**Qwen Code**, the last provider: its recording is `partial` ("Authentication required"), so it
+starts from Kimi Code's position — buildable and flippable, not certifiable here. Its runtime is
+genuinely its own, 397 normalized lines from Gemini's, so measure before deriving.
+
+### Where the first session of 2026-08-23 ended
 
 **Wave 6 is complete and wave 7 is half-built.** Six providers execute through the kernel: Codex,
 Claude, OpenCode, Grok, MiMoCode, Kimi Code. Two ACP runtimes remain on the legacy path — Qwen Code
