@@ -6210,6 +6210,43 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
+### Where the fourth session of 2026-08-23 ended
+
+**Qwen Code is built to the flip and stopped one step short of it, on purpose.** Its module, context,
+nine execution modules, metadata session and composition are in, dark, with an end-to-end turn green
+over a fake agent. Seven providers execute through the kernel; Qwen is the eighth and last.
+
+**The flip is blocked by one thing, and it is a kernel contract rather than a provider gap.** Qwen
+sends `ask_user_question` down the ACP permission channel and answers it with **structured answers**;
+`InteractionResolution` is `{ interactionId, responseId, resolvedAt }` and has nowhere for them to
+ride. The composition refuses a question by name, a test drives a real one through a real turn and
+asserts that no interaction opens and nobody is asked, and the obligation is recorded above with its
+owner. Shipping around it would mean asking a person to allow or deny a question, or losing a feature
+quietly. **Do not flip Qwen until a resolution can carry a payload.**
+
+**What was found by building it.** Qwen carried the fifth review's G1 in a worse form than Gemini —
+the mode a session reports at open was *committed* to the toolbar, so a vault on Plan was switched to
+Safe and saved, on every open — and the fourth review's G2 beside it, pushing the agent's raw id at a
+callback whose contract says it must be normalized. Both are fixed in the extraction, and a test that
+asserted the raw id is the reminder of how a defect survives a review: it had been written down as
+the expected behaviour.
+
+**The `/effort` prompt is this provider's whole shape.** Setting a reasoning level is a
+`session/prompt` the vendor charges for, so it is the one value not sent every turn — and the skip
+needed a report the applier did not have, because there is no `current_effort` update. It also broke
+five inherited tests, which was the fake lying rather than the code: it answered configuration like a
+turn.
+
+**What is left, in order.** The resolution payload (M5, the obligation above), then the Qwen flip,
+then its live harness — which will run from Kimi Code's position, since `qwen 0.21.15` refuses
+`session/new` with "Authentication required". Gemini's matrix is re-runnable once a day and still owes
+its answer rows.
+
+**The habit that paid twice today**: read the two things side by side. The normalized diff proved
+Qwen's runtime is a strict superset of Gemini's, which made the derivation safe to do mechanically;
+the same habit applied to a module and the config it replaces turned one wrong line into four; and
+applied to a fake and a recording, it is what the `modelId` defect cost to learn.
+
 ### Where the third session of 2026-08-23 ended
 
 **Wave 7 is past its midpoint. Gemini is flipped and certified as far as an account allows; Qwen Code
