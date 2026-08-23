@@ -6304,6 +6304,42 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
+### Where the fifth session of 2026-08-23 ended
+
+**Every provider executes through the kernel.** Codex, Claude, OpenCode, Grok, MiMoCode, Kimi Code,
+Gemini CLI and Qwen Code. **M2-flips has no provider left**, and no legacy `*ChatRuntime` remains on
+this branch.
+
+**The blocker cleared first, and it was a kernel contract.** `InteractionResolution` gained an opaque
+`payload` that is never persisted — D2 forbids a second copy of what a person typed — so Qwen's
+`ask_user_question` opens as `kind: 'question'`, the first of that kind the product has carried, and
+its answers reach the agent. The rule that falls out of never persisting it is written down and
+tested: a question caught mid-resolution by a reload is **cancelled**, because the response id alone
+would tell the agent an answer nobody gave.
+
+**Inventorying what the flip would delete found one feature per pass**, three passes running:
+
+- the **context window** this CLI answers only when asked
+  (`qwen/status/session/context_usage`) — no `usage_update` it sends carries it, so a flip that did
+  not port it would have taken the badge silently. Routed through `vendorRequest` and `noteTurnEnded`,
+  both of which already existed for Grok;
+- **`reloadWorkspaceResources`**, recorded as absent by contract because "no production call site
+  declares it" — `QwenSettingsTab` declares it three times. The record was wrong;
+- and before those, the **subagent stream** Qwen sends down the parent session, which the presenter
+  drops so concurrent agents do not interleave into one transcript.
+
+**The habit that found all three, and the four wrong module descriptions before them: read the two
+things side by side.** A module against the config it replaces. A fake against the recording. A
+runtime against the composition meant to delete it. Every defect this session cost nothing to find
+once two things were actually compared, and nothing was found by looking for it.
+
+**What is left.** Nothing is dark: the parity manifest's `execution-platform-dark` entry holds one
+module, `ManagedAcpAuxiliaryQuery.ts`, waiting on M5. Certification is the open work, and it is
+account-bound rather than code-bound: Gemini can be certified one live run per day and still owes its
+answer rows; MiMoCode, Kimi Code and Qwen cannot be certified here at all. The obligations above name
+their owners — the oldest now being **M5**, which owns auxiliary execution, result provenance and the
+redo decision.
+
 ### Where the fourth session of 2026-08-23 ended
 
 **Qwen Code is built to the flip and stopped one step short of it, on purpose.** Its module, context,
