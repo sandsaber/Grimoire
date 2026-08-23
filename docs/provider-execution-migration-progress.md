@@ -5790,6 +5790,56 @@ Two breaks, two caught, both landing on the assertion that matters rather than a
 Gates: unit 503 suites / 7,855 tests, integration 145 (61 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### Gemini's provider module and its context, dark (this commit)
+
+The piece Gemini never had. Every provider on the kernel contributes a
+`ProviderModule` — the backend descriptor, the capability record, the settings
+codec and the history contribution the composition is built out of — and Gemini
+reached this wave without one, so this is the first flip whose preparation had to
+write the module before it could write the composition.
+
+Derived from Grok's, which is the measured answer rather than a preference: this
+CLI configures a session through `session/set_model` and `session/set_mode` where
+the OpenCode family uses `session/set_config_option`, and the recorded
+`session/new` answers with `models` and `modes` and no config options at all.
+
+Four claims are Gemini's own, and each is read off `capabilities.ts` or the
+recording rather than inherited:
+
+- **`resume: 'native'` with `transcriptHydration: 'unsupported'`** — a pair no
+  sibling on this transport has. `session/load` works; there is no provider
+  transcript behind it. History ownership is therefore Grimoire's projection, and
+  it is the same fact that leaves the result sink without a recovery port;
+- **`reasoningControl: { kind: 'none' }`** — nothing to carry a level in;
+- **`commands: { discovery: 'static', chatSurface: 'grimoire' }`** — and this is
+  the one place the descriptor and the live boolean deliberately disagree. The
+  family asserts `discovery !== 'unsupported'` equals `supportsProviderCommands`;
+  for Gemini that assertion would be false and would hide the distinction.
+  `supportsProviderCommands: false` is about the *session's* commands — the
+  recording captures an `available_commands_update` carrying twenty, and the
+  presenter drops every one — while what Grimoire does list is
+  `.gemini/commands/**/*.toml`, a vault catalogue. So the workspace has no
+  `runtimeCommands` slot: a tab asking for session commands would be answered
+  with a list nothing produces;
+- **the session patch is the session id and nothing beside it.** Every sibling
+  also saves where its session lives — a database path, a managed home — because
+  an id alone resolves to nothing there. Gemini writes no launch artifacts, so
+  there is no `providerState` to build and its module context takes no ports at
+  all.
+
+The environment hash is the six variables that decide *which account answers*,
+read off the recorded `initialize` and its four auth methods. The registration's
+`/^GEMINI_/i` pattern matches every variable this CLI reads, and hashing the
+pattern would invalidate every conversation over a system-prompt path.
+
+Eight breaks, eight caught — including the parity gate, which failed on this
+commit's first run because both new modules were unattributed. That is the gate
+doing its job rather than a mistake worth hiding: dark modules belong in
+`execution-platform-dark`, and the run before this entry proves the manifest is
+not decoration.
+
+Gates: unit 504 suites / 7,875 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
