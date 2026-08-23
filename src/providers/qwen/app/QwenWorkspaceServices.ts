@@ -12,7 +12,6 @@ import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { QwenCommandCatalog } from '../commands/QwenCommandCatalog';
-import { QwenChatRuntime } from '../runtime/QwenChatRuntime';
 import { QwenCliResolver } from '../runtime/QwenCliResolver';
 import { getQwenProviderSettings } from '../settings';
 import { QwenAgentStorage } from '../storage/QwenAgentStorage';
@@ -45,14 +44,12 @@ function createQwenModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
     },
     async refreshModels({ settings }) {
       const before = JSON.stringify(getQwenProviderSettings(settings).discoveredModels);
-      const runtime = new QwenChatRuntime(plugin);
-      try {
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-        const after = JSON.stringify(getQwenProviderSettings(settings).discoveredModels);
-        return loaded && before !== after;
-      } finally {
-        runtime.cleanup();
-      }
+      // One isolated session, opened and closed. Building a whole chat runtime
+      // to get here was the only thing that runtime was doing for this surface:
+      // opening a session and reading its reply.
+      await plugin.getQwenExecution().metadata.discoverMetadata();
+      const after = JSON.stringify(getQwenProviderSettings(settings).discoveredModels);
+      return before !== after;
     },
   };
 }

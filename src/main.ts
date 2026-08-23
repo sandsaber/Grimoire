@@ -20,6 +20,7 @@ import { GrokExecution } from './app/execution/grok/GrokExecutionComposition';
 import { KimicodeExecution } from './app/execution/kimicode/KimicodeExecutionComposition';
 import { MimocodeExecution } from './app/execution/mimocode/MimocodeExecutionComposition';
 import { OpencodeExecution } from './app/execution/opencode/OpencodeExecutionComposition';
+import { QwenExecution } from './app/execution/qwen/QwenExecutionComposition';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
 import { VaultDurableStorage } from './app/storage/VaultDurableStorage';
@@ -109,6 +110,7 @@ export default class GrimoirePlugin extends Plugin {
   private mimocodeExecution: MimocodeExecution | null = null;
   private kimicodeExecution: KimicodeExecution | null = null;
   private geminiExecution: GeminiExecution | null = null;
+  private qwenExecution: QwenExecution | null = null;
   private unloading = false;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
@@ -365,6 +367,7 @@ export default class GrimoirePlugin extends Plugin {
     this.mimocodeExecution?.dispose();
     this.kimicodeExecution?.dispose();
     this.geminiExecution?.dispose();
+    this.qwenExecution?.dispose();
     void this.executionKernelHost?.dispose();
     void this.persistOpenTabStates();
   }
@@ -455,6 +458,14 @@ export default class GrimoirePlugin extends Plugin {
     return this.geminiExecution;
   }
 
+  /** The Qwen execution this plugin instance owns; see the note above. */
+  getQwenExecution(): QwenExecution {
+    if (!this.qwenExecution) {
+      throw new Error('Qwen execution is not available before plugin load.');
+    }
+    return this.qwenExecution;
+  }
+
   /**
    * Brings the kernel up before anything can ask it for work.
    *
@@ -523,6 +534,13 @@ export default class GrimoirePlugin extends Plugin {
     // `session/set_model` and `session/set_mode` where the OpenCode family
     // sets a config option, and no launch artifacts at all.
     host.registerBackend(this.geminiExecution.createBackendRegistration());
+    this.qwenExecution = new QwenExecution(this, host.registry);
+    // The sixth ACP provider and the last of the migration. What is its own
+    // is beside this: a reasoning level applied by talking to the session,
+    // the first `kind: 'question'` interaction the kernel has ever carried,
+    // a context window the CLI answers only when asked, and a subagent
+    // stream it refuses to draw in the conversation.
+    host.registerBackend(this.qwenExecution.createBackendRegistration());
     this.executionKernelHost = host;
     try {
       await host.start();

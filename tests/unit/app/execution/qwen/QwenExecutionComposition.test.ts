@@ -1182,6 +1182,27 @@ describe('Qwen execution composition', () => {
     await host.dispose();
   });
 
+  it('restarts the process when the vault workspace resources change', async () => {
+    // This CLI reads `.qwen/skills`, `.qwen/commands` and `.qwen/agents` when it
+    // starts, and a process already running was told them once. The legacy
+    // runtime shut it down; here the launch key changes, which is what the
+    // settings surface is really asking for when it calls this.
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+
+    const before = await execution.turnRequests.resolve(execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'first' }],
+    }));
+    await runtime.reloadWorkspaceResources?.();
+    const after = await execution.turnRequests.resolve(execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'second' }],
+    }));
+
+    expect(after.restartFingerprint).not.toBe(before.restartFingerprint);
+    execution.dispose();
+    await host.dispose();
+  });
+
   it('restarts the process when the vault MCP servers change', async () => {
     // The legacy runtime shut the process down on an MCP reload so the next
     // turn's session picks the servers up. Here the launch key is what says a

@@ -315,7 +315,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     capabilities: QWEN_PROVIDER_CAPABILITIES,
     isolationEvidence: 'TitleGenerationService',
     evidence: [
-      'src/providers/qwen/runtime/QwenChatRuntime.ts',
+      'src/providers/qwen/execution/QwenExecutionBackend.ts',
       'src/providers/qwen/auxiliary/QwenNoopServices.ts',
       'src/providers/qwen/capabilities.ts',
     ],

@@ -596,6 +596,28 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/gemini/execution/GeminiPermissionPresentation.ts',
       'src/providers/gemini/execution/GeminiProjectionResultSink.ts',
       'src/providers/gemini/execution/GeminiSessionConfigState.ts',
+      // Qwen Code chat execution, flipped: the sixth ACP provider on the kernel
+      // and **the last provider of the migration**. Derived from Gemini's, which
+      // was measured — both take `--acp` as a flag and configure a session
+      // through dedicated methods — and adds four things Gemini has nothing of:
+      // a reasoning level applied by talking to the session, the session's own
+      // commands, the first `kind: 'question'` interaction the kernel has ever
+      // carried, and a context window this CLI answers only when asked.
+      'src/app/execution/qwen/QwenExecutionComposition.ts',
+      'src/app/execution/qwen/QwenMetadataSession.ts',
+      'src/providers/qwen/QwenProviderModule.ts',
+      'src/providers/qwen/app/QwenModuleContext.ts',
+      'src/providers/qwen/execution/QwenAcpDynamicConfig.ts',
+      'src/providers/qwen/execution/QwenAcpFileSystem.ts',
+      'src/providers/qwen/execution/QwenAskUserQuestion.ts',
+      'src/providers/qwen/execution/QwenContentPresenter.ts',
+      'src/providers/qwen/execution/QwenContextUsage.ts',
+      'src/providers/qwen/execution/QwenExecutionBackend.ts',
+      'src/providers/qwen/execution/QwenExecutionRequests.ts',
+      'src/providers/qwen/execution/QwenInteractionBridge.ts',
+      'src/providers/qwen/execution/QwenPermissionPresentation.ts',
+      'src/providers/qwen/execution/QwenProjectionResultSink.ts',
+      'src/providers/qwen/execution/QwenSessionConfigState.ts',
       // Grok chat execution, flipped: the second ACP provider on the kernel,
       // and the isolated session its five metadata surfaces now share.
       'src/app/execution/grok/GrokExecutionComposition.ts',
@@ -675,7 +697,6 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/opencode/execution/OpencodePermissionPresentation.ts',
       'src/providers/opencode/execution/OpencodeProjectionResultSink.ts',
       'src/providers/opencode/execution/OpencodeSessionConfigState.ts',
-      'src/providers/qwen/runtime/QwenChatRuntime.ts',
     ],
   },
 
@@ -770,26 +791,6 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // M5. The transport, the launcher and the client adapter beside it went
       // live with OpenCode's flip and are listed as wired.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
-      // Wave 7's second half, built ahead of its own flip: Qwen Code is the last
-      // provider on the legacy path. Derived from Gemini's, which was measured
-      // — both take `--acp` as a flag and configure a session through dedicated
-      // methods — and adds four things Gemini has nothing of: an effort applied
-      // as a `/effort` prompt, the session's own commands, ask-user-question,
-      // and `reloadWorkspaceResources`. Not listed beside them:
-      // `QwenPermissionPresentation.ts`, `QwenSessionConfigState.ts` and
-      // `runtime/buildQwenPrompt.ts`, which were moved out of the legacy runtime
-      // rather than written next to it and are in the production bundle already.
-      'src/app/execution/qwen/QwenExecutionComposition.ts',
-      'src/app/execution/qwen/QwenMetadataSession.ts',
-      'src/providers/qwen/QwenProviderModule.ts',
-      'src/providers/qwen/app/QwenModuleContext.ts',
-      'src/providers/qwen/execution/QwenAcpDynamicConfig.ts',
-      'src/providers/qwen/execution/QwenAcpFileSystem.ts',
-      'src/providers/qwen/execution/QwenContentPresenter.ts',
-      'src/providers/qwen/execution/QwenExecutionBackend.ts',
-      'src/providers/qwen/execution/QwenExecutionRequests.ts',
-      'src/providers/qwen/execution/QwenInteractionBridge.ts',
-      'src/providers/qwen/execution/QwenProjectionResultSink.ts',
     ],
   },
 ];

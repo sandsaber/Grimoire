@@ -169,6 +169,18 @@ export class QwenExecution {
   /** The live connection, for the one question that is not a turn. */
   private client: ManagedAcpClient | undefined;
 
+  /**
+   * How many times the vault's workspace resources have changed under a
+   * running agent.
+   *
+   * Part of the launch key, which is the only thing that can carry it: this
+   * CLI reads `.qwen/skills`, `.qwen/commands` and `.qwen/agents` when it
+   * starts, and a process already running was told them once. The legacy
+   * runtime shut the process down; here the fingerprint changes and the next
+   * turn spawns one that reads the new files.
+   */
+  private workspaceGeneration = 0;
+
   constructor(
     private readonly plugin: GrimoirePlugin,
     /**
@@ -482,6 +494,9 @@ export class QwenExecution {
       consumeProviderTurnMetadata: () => content.consumeTurnMetadata(),
       interactionPresenter: presenter,
       delay: delayThroughWindow,
+      reloadWorkspaceResources: async () => {
+        this.workspaceGeneration += 1;
+      },
       reportCleanupFailure: error => {
         this.plugin.recordDebugLog({
           error,
@@ -812,6 +827,11 @@ export class QwenExecution {
         command: executable,
         envText: getRuntimeEnvironmentText(this.plugin.settings, 'qwen'),
         mcpServers,
+        // Not the files themselves — a hash of a whole vault directory read on
+        // every dispatch would cost more than the restart it is deciding. What
+        // the settings surface knows is *that* they changed, which is all the
+        // launch key needs.
+        workspaceGeneration: this.workspaceGeneration,
       }),
       mcpServers,
     };

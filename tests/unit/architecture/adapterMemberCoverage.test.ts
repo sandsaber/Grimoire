@@ -26,8 +26,6 @@ const ADAPTER_PATH = 'src/core/runtime/execution/ExecutionChatRuntimeAdapter.ts'
  * from `docs/provider-execution-adapter-contract.md`.
  */
 const DECLARED_ABSENCES: Readonly<Record<string, string>> = {
-  // Row 8: no production call site, and optional in the contract.
-  reloadWorkspaceResources: 'optional, and no production call site declares it',
   // Row 18: model routing is a workspace port, and the adapter has no
   // auxiliary execution of its own until M5.
   getAuxiliaryModel: 'auxiliary model routing belongs to the workspace port at M5',

@@ -8,7 +8,6 @@ import {
 import { QWEN_PROVIDER_CAPABILITIES } from './capabilities';
 import { qwenSettingsReconciler } from './env/QwenSettingsReconciler';
 import { QwenConversationHistoryService } from './history/QwenConversationHistoryService';
-import { QwenChatRuntime } from './runtime/QwenChatRuntime';
 import { getQwenProviderSettings, updateQwenProviderSettings } from './settings';
 import { qwenChatUIConfig } from './ui/QwenChatUIConfig';
 
@@ -18,7 +17,7 @@ export const qwenProviderRegistration: ProviderRegistration = {
   chatUIConfig: qwenChatUIConfig,
   createInlineEditService: () => new QwenInlineEditService(),
   createInstructionRefineService: () => new QwenInstructionRefineService(),
-  createRuntime: ({ plugin }) => new QwenChatRuntime(plugin),
+  createRuntime: ({ plugin }) => plugin.getQwenExecution().createRuntime(),
   createTitleGenerationService: () => new QwenTitleGenerationService(),
   displayName: 'Qwen Code',
   environmentKeyPatterns: [/^QWEN_/i, /^DASHSCOPE_/i, /^WEB_SEARCH_/i],

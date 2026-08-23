@@ -629,6 +629,13 @@ export interface ExecutionChatRuntimeHostPorts {
    * interactions are left for the provider to time out — never auto-answered.
    */
   readonly interactionPresenter?: ExecutionInteractionPresenter;
+  /**
+   * What a provider does when the vault's workspace resources change under it.
+   *
+   * Absent for a provider whose launch does not depend on them; present for one
+   * whose agent reads skills, commands or agents off disk when it starts.
+   */
+  readonly reloadWorkspaceResources?: () => Promise<void>;
 }
 
 /**
@@ -1005,6 +1012,25 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
       stream.abandon();
     }
     this.backendRuns.clear();
+  }
+
+  /**
+   * The vault's own skills, commands and agents changed under a running agent.
+   *
+   * A settings surface edits them and then asks every open runtime to pick them
+   * up. A legacy runtime did that by shutting its process down; a composition
+   * does it by changing what the launch is keyed on, so the next turn spawns a
+   * process that reads the new files. Either way the work belongs to the
+   * provider, which is why this is a host port rather than something the adapter
+   * can do on its own.
+   *
+   * Recorded as absent by contract until wave 7, on the stated grounds that no
+   * production call site declared it. `QwenSettingsTab` declares it in three
+   * places, and the flip that would have removed it is what found the record
+   * wrong.
+   */
+  async reloadWorkspaceResources(): Promise<void> {
+    await this.ports.reloadWorkspaceResources?.();
   }
 
   async reloadMcpServers(): Promise<void> {

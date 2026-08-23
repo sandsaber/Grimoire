@@ -6267,6 +6267,36 @@ and the composition read the same one.
 Gates: unit 514 suites / 8,011 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### The Qwen Code flip — the last provider (this commit)
+
+`registration.ts` points `createRuntime` at the composition, `main.ts` constructs a `QwenExecution`
+per load and registers its backend, the model catalog moved onto the isolated metadata session, and
+`QwenChatRuntime` is deleted. **Every provider now executes through the kernel.** M2-flips has no
+provider left.
+
+`AcpManagedMcpRuntime.test.ts` is deleted with it: it existed to prove that the ACP runtimes still on
+the legacy path passed the vault's MCP servers into their sessions, and there are none.
+
+**The last member the adapter said it did not need.** `reloadWorkspaceResources` was recorded as
+absent by contract, on the grounds that "no production call site declares it" — and `QwenSettingsTab`
+declares it in three places. The record was wrong, and the flip that would have removed the behaviour
+is what found it. The adapter has the member now, delegating to a host port; the composition answers
+it by bumping a generation the launch key carries, so the next turn spawns a process that reads the
+new skills, commands and agents. A hash of the vault directory on every dispatch would cost more than
+the restart it decides, and what the settings surface knows is *that* they changed.
+
+The 1,017-line runtime test went with the file, and its coverage moved rather than went:
+`buildQwenPrompt.test.ts` and `QwenSessionConfigState.test.ts` join the seven that already existed.
+Unit is 7,992 against 8,011 before the deletion, and the difference is the twenty-odd cases that were
+driving a whole runtime to reach something the composition tests now drive end to end.
+
+**Not certified**, and the blocker is the account: `qwen 0.21.15` refuses `session/new` with
+"Authentication required", so this flips from Kimi Code's position — wired, green against a fake
+agent, and never having met the real CLI past its handshake.
+
+Gates: unit 514 suites / 7,992 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
