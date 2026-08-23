@@ -6100,6 +6100,38 @@ Eight breaks, eight caught, including the parity gate on this commit's first run
 
 Gates: unit 508 suites / 7,927 tests, typecheck, `eslint`, `build:release`.
 
+### Qwen's session config state, moved out — and it carried two defects Gemini's reviews had already found (this commit)
+
+The eighth extraction of this kind, and the first where reading the code for the *move* found the same
+two defects twice — because they were the same two, in the provider nobody had reviewed yet.
+
+**A session reporting where it starts was switching the user's permission off, and saving it.** The
+fifth review's G1 in Gemini was that the mode a session opens in got written into `selectedMode`,
+which the toolbar reads back and the next turn resolves from. Qwen did that *and* pushed it at the
+toolbar through `permissionModeSyncCallback` — where `Tab.ts` hands it to `updatePlanModeUI`, which
+**commits**. So opening a session in a vault set to Plan wrote Safe into the settings and rendered it.
+Every session open and every resume, not only a switch.
+
+**And it announced the mode in the agent's own words.** The same three lines wrote the *translated*
+value into the vault and pushed the *raw* one at the toolbar. `Tab.ts` states the contract it was
+breaking — "ACP providers emit already-normalized Grimoire modes (full_access / plan / normal).
+Unknown values stay Safe" — and two of Qwen's four ids only coerced correctly by accident, because
+`LEGACY_YOLO_PERMISSION_MODE` happens to be the string `yolo`. A test asserted the raw id, which is
+how a defect survives a review: it had been written down as the expected behaviour.
+
+Both are fixed where the extraction put them: `syncSessionDiscovery` records the raw id and stops,
+and `adoptCurrentMode` is the one door that moves the toolbar — translated, once, on an actual switch.
+
+The state also carries what Gemini's has nothing of: a reasoning effort, which this provider applies
+by sending `/effort <level>` as a `session/prompt` of its own. `forgetSession` clears it with the
+other two, and that one matters most — a level kept across a session change is a whole prompt the new
+session never received, charged for.
+
+Four breaks, four caught.
+
+Gates: unit 508 suites / 7,928 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

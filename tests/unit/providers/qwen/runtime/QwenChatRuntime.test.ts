@@ -591,19 +591,55 @@ describe('QwenChatRuntime', () => {
     });
 
     expect(getQwenProviderSettings(plugin.settings).selectedMode).toBe('normal');
-    expect(modeSync).toHaveBeenCalledWith('auto-edit');
+    // This asserted `'auto-edit'` — the agent's own id — which is what the
+    // runtime was sending while writing the *translated* value into the vault.
+    // `Tab.ts` says what it expects of every ACP provider: "already-normalized
+    // Grimoire modes (full_access / plan / normal). Unknown values stay Safe."
+    // Two of this CLI's four ids only survived that by accident.
+    expect(modeSync).toHaveBeenCalledWith('normal');
   });
 
   it('clears mode and command state when switching conversations', () => {
     const runtime = new QwenChatRuntime(createMockPlugin());
     (runtime as any).sessionId = 'session-1';
-    (runtime as any).currentSessionModeId = 'plan';
+    (runtime as any).sessionConfig.markApplied({ modeId: 'plan', effortLevel: 'max' });
     (runtime as any).supportedCommands = [{ id: 'acp:compact', name: 'compact', source: 'sdk' }];
 
     runtime.syncConversationState({ sessionId: 'session-2' });
 
-    expect((runtime as any).currentSessionModeId).toBeNull();
+    expect((runtime as any).sessionConfig.sessionModeId).toBeNull();
+    // The effort goes with it, and forgetting it matters more than the other
+    // two: it is applied by sending a whole prompt, so a level kept across a
+    // session change is a turn the new session never received.
+    expect((runtime as any).sessionConfig.sessionEffortLevel).toBeNull();
     expect((runtime as any).supportedCommands).toEqual([]);
+  });
+
+  it('does not adopt the mode a session reports when it opens', () => {
+    // The fifth review's G1, which this provider carried in a worse form than
+    // Gemini did: the reported mode was written into `selectedMode` *and*
+    // pushed at the toolbar, where `updatePlanModeUI` commits it. A vault on
+    // Plan, opening a session that reports `default`, was switched to Safe and
+    // had it saved.
+    const plugin = createMockPlugin();
+    plugin.settings.permissionMode = 'plan';
+    updateQwenProviderSettings(plugin.settings, { selectedMode: 'plan' });
+    const runtime = new QwenChatRuntime(plugin);
+    const modeSync = jest.fn();
+    runtime.setPermissionModeSyncCallback(modeSync);
+
+    (runtime as any).syncSessionDiscovery({
+      modes: {
+        availableModes: [{ id: 'default', name: 'Default' }, { id: 'plan', name: 'Plan' }],
+        currentModeId: 'default',
+      },
+    });
+
+    expect(getQwenProviderSettings(plugin.settings).selectedMode).toBe('plan');
+    expect(modeSync).not.toHaveBeenCalled();
+    // Recorded all the same, in the agent's vocabulary: it is what a redundant
+    // `set_mode` is skipped on.
+    expect((runtime as any).sessionConfig.sessionModeId).toBe('default');
   });
 
   it('applies the explicit query model before prompting instead of the saved global model', async () => {

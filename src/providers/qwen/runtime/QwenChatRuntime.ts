@@ -1,8 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
-import type { PermissionMode } from '@/core/types';
 import {
   buildAcpSessionLoadFailureDebugEvent,
   isAcpMissingSessionError,
@@ -51,6 +49,9 @@ import {
 import { appendEditorContext } from '../../../utils/editor';
 import { getVaultPath } from '../../../utils/path';
 import { buildContextFromHistory, buildPromptWithHistoryContext } from '../../../utils/session';
+import type {
+  extractAcpSessionModelState,
+  extractAcpSessionModeState} from '../../acp';
 import {
   AcpClientConnection,
   type AcpContentBlock,
@@ -65,25 +66,14 @@ import {
   type AcpWriteTextFileRequest,
   approveAcpWriteTextFile,
   buildAcpUsageInfo,
-  extractAcpSessionModelState,
-  extractAcpSessionModeState,
   resolveWorkspacePath,
 } from '../../acp';
 import { toAcpMcpServers } from '../../acp/mcp/toAcpMcpServers';
 import { qwenPlanUsageStore } from '../app/QwenPlanUsageStore';
 import { QWEN_PROVIDER_CAPABILITIES } from '../capabilities';
-import {
-  decodeQwenModelId,
-  encodeQwenModelId,
-  QWEN_SYNTHETIC_MODEL_ID,
-} from '../models';
-import { mapGrimoireModeToQwen, mapQwenModeToGrimoire } from '../modes';
-import {
-  getQwenProviderSettings,
-  type QwenDiscoveredModel,
-  type QwenMode,
-  updateQwenProviderSettings,
-} from '../settings';
+import { QwenSessionConfigState } from '../execution/QwenSessionConfigState';
+import { mapGrimoireModeToQwen } from '../modes';
+import { getQwenProviderSettings } from '../settings';
 import { buildQwenRuntimeEnv } from './QwenRuntimeEnvironment';
 
 interface ActiveTurn {
@@ -156,9 +146,16 @@ export class QwenChatRuntime implements ChatRuntime {
   private askUserQuestionCallback: AskUserQuestionCallback | null = null;
   private connection: AcpClientConnection | null = null;
   private contextUsage: Parameters<typeof buildAcpUsageInfo>[0]['contextWindow'] = null;
-  private currentSessionModelId: string | null = null;
-  private currentSessionModeId: string | null = null;
-  private currentSessionEffortLevel: string | null = null;
+  /**
+   * What the live session is configured with, and what the vault knows of it.
+   *
+   * Moved out whole rather than copied: the flip needs the same answers from a
+   * composition that has no runtime, and two copies of this would be two
+   * opinions about what a turn runs under.
+   */
+  private readonly sessionConfig = new QwenSessionConfigState({
+    settingsBag: () => this.plugin.settings,
+  });
   private currentLaunchKey: string | null = null;
   private currentTurnMetadata: ChatTurnMetadata = {};
   private loadedSessionId: string | null = null;
@@ -209,9 +206,7 @@ export class QwenChatRuntime implements ChatRuntime {
     const nextSessionId = conversation?.sessionId ?? null;
     if (this.sessionId !== nextSessionId) {
       this.sessionInvalidated = false;
-      this.currentSessionModelId = null;
-      this.currentSessionModeId = null;
-      this.currentSessionEffortLevel = null;
+      this.sessionConfig.forgetSession();
       this.supportedCommands = [];
     }
     this.sessionId = nextSessionId;
@@ -545,9 +540,7 @@ export class QwenChatRuntime implements ChatRuntime {
     this.setReady(false);
     this.activeTurn?.queue.close();
     this.activeTurn = null;
-    this.currentSessionModelId = null;
-    this.currentSessionModeId = null;
-    this.currentSessionEffortLevel = null;
+    this.sessionConfig.forgetSession();
     this.supportedCommands = [];
 
     this.unregisterTransportClose?.();
@@ -577,7 +570,6 @@ export class QwenChatRuntime implements ChatRuntime {
       });
       this.loadedSessionId = response.sessionId;
       this.sessionId = response.sessionId;
-      this.currentSessionEffortLevel = null;
       this.sessionCwds.set(response.sessionId, cwd);
       this.syncSessionDiscovery({
         configOptions: response.configOptions ?? null,
@@ -608,7 +600,6 @@ export class QwenChatRuntime implements ChatRuntime {
       // ACP session/load responses need not repeat the session id.
       this.loadedSessionId = sessionId;
       this.sessionId = sessionId;
-      this.currentSessionEffortLevel = null;
       this.sessionCwds.set(sessionId, cwd);
       this.syncSessionDiscovery({
         configOptions: response.configOptions ?? null,
@@ -667,10 +658,9 @@ export class QwenChatRuntime implements ChatRuntime {
     }
 
     if (normalized.type === 'current_mode') {
-      this.currentSessionModeId = normalized.currentModeId;
-      updateQwenProviderSettings(this.plugin.settings, { selectedMode: mapQwenModeToGrimoire(normalized.currentModeId) });
+      const permissionMode = this.sessionConfig.adoptCurrentMode(normalized.currentModeId);
       void this.plugin.saveSettings?.();
-      this.emitPermissionModeSync(normalized.currentModeId);
+      this.emitPermissionModeSync(permissionMode);
       return;
     }
 
@@ -750,42 +740,7 @@ export class QwenChatRuntime implements ChatRuntime {
     models?: Parameters<typeof extractAcpSessionModelState>[0]['models'];
     modes?: Parameters<typeof extractAcpSessionModeState>[0]['modes'];
   }): void {
-    const modelState = extractAcpSessionModelState(params);
-    const modeState = extractAcpSessionModeState(params);
-    const updates: Parameters<typeof updateQwenProviderSettings>[1] = {};
-
-    if (modelState.currentModelId) {
-      this.currentSessionModelId = modelState.currentModelId;
-    }
-
-    if (modelState.availableModels.length > 0) {
-      const discoveredRawIds = modelState.availableModels
-        .map((model) => model.id.trim())
-        .filter(Boolean);
-      updates.discoveredModels = modelState.availableModels.map((model): QwenDiscoveredModel => ({
-        description: model.description ?? undefined,
-        label: model.name || model.id,
-        rawId: model.id,
-      }));
-      updates.visibleModels = discoveredRawIds;
-    }
-
-    if (modeState.availableModes.length > 0) {
-      updates.availableModes = modeState.availableModes.map((mode): QwenMode => ({
-        description: mode.description ?? undefined,
-        id: mode.id,
-        name: mode.name,
-      }));
-    }
-
-    if (modeState.currentModeId) {
-      this.currentSessionModeId = modeState.currentModeId;
-      updates.selectedMode = mapQwenModeToGrimoire(modeState.currentModeId);
-      this.emitPermissionModeSync(modeState.currentModeId);
-    }
-
-    if (Object.keys(updates).length > 0) {
-      updateQwenProviderSettings(this.plugin.settings, updates);
+    if (this.sessionConfig.syncSessionDiscovery(params)) {
       void this.plugin.saveSettings?.();
     }
   }
@@ -883,21 +838,11 @@ export class QwenChatRuntime implements ChatRuntime {
    * containment and skip its write approvals. Every flipped provider reads the
    * per-provider snapshot; these two were the ones the change never reached.
    */
-  private permissionMode(): PermissionMode {
-    return ProviderSettingsCoordinator
-      .getProviderSettingsSnapshot(this.plugin.settings, 'qwen')
-      .permissionMode;
-  }
-
-  private fullAccess(): boolean {
-    return this.permissionMode() === 'full_access';
-  }
-
   private async writeTextFile(request: AcpWriteTextFileRequest): Promise<Record<string, never>> {
     const resolvedPath = this.resolveSessionPath(request.sessionId, request.path);
     await approveAcpWriteTextFile({
       approvalCallback: this.approvalCallback,
-      fullAccess: this.fullAccess(),
+      fullAccess: this.sessionConfig.fullAccess(),
       providerLabel: 'Qwen',
       requestPath: request.path,
       resolvedPath,
@@ -914,33 +859,16 @@ export class QwenChatRuntime implements ChatRuntime {
       ?? process.cwd();
     // Active (full-access) mode opts into unrestricted file access; safe and
     // plan modes confine ACP-delegated reads/writes to the session workspace.
-    const allowOutsideWorkspace = this.fullAccess();
+    const allowOutsideWorkspace = this.sessionConfig.fullAccess();
     return resolveWorkspacePath(cwd, rawPath, { allowOutsideWorkspace });
   }
 
   private getActiveModel(): string | null {
-    const rawModelId = this.currentSessionModelId ?? this.resolveSelectedRawModelId();
-    return rawModelId
-      ? encodeQwenModelId(rawModelId)
-      : QWEN_SYNTHETIC_MODEL_ID;
+    return this.sessionConfig.getActiveDisplayModel();
   }
 
   private resolveSelectedRawModelId(queryOptions?: ChatRuntimeQueryOptions): string | null {
-    if (queryOptions?.model !== undefined) {
-      return typeof queryOptions.model === 'string'
-        ? decodeQwenModelId(queryOptions.model)
-        : null;
-    }
-    const providerSettings = getQwenProviderSettings(this.plugin.settings);
-    const savedProviderModel = this.plugin.settings.savedProviderModel;
-    const savedQwenModel = savedProviderModel
-      && typeof savedProviderModel === 'object'
-      && !Array.isArray(savedProviderModel)
-      ? (savedProviderModel as Record<string, unknown>).qwen
-      : null;
-    return typeof savedQwenModel === 'string'
-      ? decodeQwenModelId(savedQwenModel)
-      : providerSettings.visibleModels[0] ?? null;
+    return this.sessionConfig.resolveSelectedRawModelId(queryOptions);
   }
 
   private async applySelectedModel(
@@ -951,21 +879,19 @@ export class QwenChatRuntime implements ChatRuntime {
       return;
     }
     const selectedModel = this.resolveSelectedRawModelId(queryOptions);
-    if (!selectedModel || selectedModel === this.currentSessionModelId) {
+    if (!selectedModel || selectedModel === this.sessionConfig.sessionModelId) {
       return;
     }
     await this.connection.setModel({ modelId: selectedModel, sessionId });
-    this.currentSessionModelId = selectedModel;
+    this.sessionConfig.markApplied({ modelId: selectedModel });
   }
 
   private async applySelectedMode(sessionId: string): Promise<void> {
     if (!this.connection || typeof this.connection.setMode !== 'function') return;
-    const requested = this.permissionMode()
-      || getQwenProviderSettings(this.plugin.settings).selectedMode;
-    const modeId = mapGrimoireModeToQwen(requested);
-    if (modeId === this.currentSessionModeId) return;
+    const modeId = mapGrimoireModeToQwen(this.sessionConfig.resolveSelectedModeId());
+    if (modeId === this.sessionConfig.sessionModeId) return;
     await this.connection.setMode({ modeId, sessionId });
-    this.currentSessionModeId = modeId;
+    this.sessionConfig.markApplied({ modeId });
   }
 
   private async applySelectedEffort(sessionId: string): Promise<void> {
@@ -974,7 +900,7 @@ export class QwenChatRuntime implements ChatRuntime {
     }
 
     const effortLevel = getQwenProviderSettings(this.plugin.settings).effortLevel;
-    if (effortLevel === this.currentSessionEffortLevel) {
+    if (effortLevel === this.sessionConfig.sessionEffortLevel) {
       return;
     }
 
@@ -982,7 +908,7 @@ export class QwenChatRuntime implements ChatRuntime {
       prompt: [{ text: `/effort ${effortLevel}`, type: 'text' }],
       sessionId,
     });
-    this.currentSessionEffortLevel = effortLevel;
+    this.sessionConfig.markApplied({ effortLevel });
   }
 
   private emitPermissionModeSync(modeId: string): void {
@@ -1002,9 +928,7 @@ export class QwenChatRuntime implements ChatRuntime {
   private clearActiveSession(): void {
     this.sessionId = null;
     this.loadedSessionId = null;
-    this.currentSessionModelId = null;
-    this.currentSessionModeId = null;
-    this.currentSessionEffortLevel = null;
+    this.sessionConfig.forgetSession();
     this.supportedCommands = [];
   }
 
