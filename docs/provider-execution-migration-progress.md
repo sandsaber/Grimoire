@@ -6699,9 +6699,25 @@ today, which needs the client contract to grow.
 **The next M5 piece to pick up** is Grok's auxiliary flip — the last managed-ACP runner — and then
 Codex, which is a different transport and a separate design question. The three forks are the
 template: an auxiliary environment builder in the composition, three one-line services, a
-`kernel-isolated` topology record, and the runner deleted. Grok is **not** a fork of the same CLI, so
-read its runner rather than diffing it: it derives `GROK_HOME` from the auxiliary subdirectory, which
-is a partitioning the other three do not have and the kernel path must keep.
+`kernel-isolated` topology record, and the runner deleted.
+
+**Grok is not a fork of the same CLI, and the diff against Kimi Code's was read before this was
+written.** Three differences, each of which changes the work:
+
+1. **No managed agent and no config file.** Where the forks write an agent definition whose
+   permissions deny writing, Grok passes a `permissionMode` to its launch artifacts —
+   `readonly → 'ask'`, `passive → 'plan'`. So there is no `sessionConfiguration` to apply, and what
+   makes an auxiliary turn safe is the launch, not the session. `GrokAuxiliaryAgents.ts` would be the
+   wrong shape to copy; the mapping belongs beside the artifacts instead.
+2. **The model is applied with `session/set_model`, not `session/set_config_option`.**
+   `ManagedAcpAuxiliaryQuery.configure()` only knows config options today, so **the query needs the
+   second setter before Grok can flip** — the same pair the chat dynamic applier already carries.
+   Do that first, in the shared module, with its own break test.
+3. **`GROK_HOME` and the reasoning effort are launch-time.** The home is derived from the auxiliary
+   subdirectory — a partitioning the forks do not have and the kernel path must keep — and the effort
+   is passed as a process argument rather than set on the session.
+
+Codex is further still: a second app-server process and its own thread, not an ACP session at all.
 
 **Owed on the auxiliary path:** nothing exercises the real auxiliary client factory. The composition
 tests inject one, so what proves an auxiliary turn is contained is the filesystem policy's own test
