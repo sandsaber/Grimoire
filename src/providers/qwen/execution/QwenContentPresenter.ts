@@ -22,7 +22,18 @@ import { mapQwenModeToGrimoire } from '@/providers/qwen/modes';
  * Re-exported under this provider's name because that is what its own modules
  * and tests call it; the union itself belongs beside the backend that emits it.
  */
-export type QwenContentPayload = AcpContentPayload;
+export type QwenContentPayload =
+  | AcpContentPayload
+  /**
+   * How full the context is, which the wire never says for this provider.
+   *
+   * Qwen answers `qwen/status/session/context_usage` and sends no
+   * `usage_update` carrying the parent window, so the composition asks for it
+   * as the turn ends and hands it back on this channel. Qwen-local rather than
+   * in the shared union, because the shared union is what an ACP connection
+   * delivered.
+   */
+  | { readonly kind: 'session-usage'; readonly usage: AcpUsageUpdate | null };
 
 /** What a session answered with when it was created or loaded. */
 export interface QwenSessionOpening {
@@ -152,6 +163,10 @@ export class QwenContentPresenter {
     }
     if (content?.kind === 'session-config') {
       return this.presentSessionConfig(content.session);
+    }
+    if (content?.kind === 'session-usage') {
+      this.contextUsage = content.usage ?? null;
+      return this.usageChunks();
     }
     if (content?.kind === 'prompt-failed') {
       this.promptFailure = content.message?.trim() || undefined;

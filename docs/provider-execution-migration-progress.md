@@ -6240,6 +6240,33 @@ two red once the guard was covered.
 Gates: unit 513 suites / 8,004 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### The context window Qwen only answers when asked (this commit)
+
+Found by inventorying what the flip would delete. `QwenChatRuntime` calls
+`qwen/status/session/context_usage` once per turn, after the prompt returns, because **no
+`usage_update` this provider sends carries the parent window** — so a flip that did not port it would
+have taken the context badge with it, silently.
+
+The route existed: `ManagedAcpClient.vendorRequest`, the escape hatch Grok's billing already uses, and
+`noteTurnEnded`, the sink hook that exists so what a turn's last look finds reaches *that* turn rather
+than the next one. The composition keeps the live client through `clientObserver` — held for one
+question rather than for a connection — and hands the sink a reader, not a client.
+
+Opportunistic on every path, because the extension is optional: an older Qwen has no such method, and
+a window nobody could read is a badge without a number rather than a failed turn.
+
+**Three of the four breaks were green on the first pass, and the reason was the fixture again.** The
+fake was still sending a `usage_update`, so the badge got its numbers from the wire and the vendor call
+proved nothing. With the update suppressed — which is what this provider actually does — all three go
+red. The fourth was a parser guard with no test at all: a window of zero is a division nobody wants,
+and nothing said so until the parser got its own file.
+
+The parser and the method name moved out of the runtime rather than being copied, so the legacy path
+and the composition read the same one.
+
+Gates: unit 514 suites / 8,011 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

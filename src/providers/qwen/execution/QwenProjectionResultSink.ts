@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 
 import type { ResultRef } from '@/core/execution/ExecutionContracts';
 import type { ResultCommitOutcome } from '@/core/execution/ResultCommit';
+import type { AcpUsageUpdate } from '@/providers/acp/types';
+import type { QwenContentPayload } from '@/providers/qwen/execution/QwenContentPresenter';
 
 import type { QwenExecutionResultSink } from './QwenExecutionBackend';
 
@@ -18,7 +20,40 @@ import type { QwenExecutionResultSink } from './QwenExecutionBackend';
  * without streaming an answer; there is no equivalent to read here, so this
  * sink has no recovery port at all rather than an empty one.
  */
+export interface QwenProjectionResultSinkPorts {
+  /**
+   * How full the context is, which this CLI answers only when asked.
+   *
+   * `qwen/status/session/context_usage` is a method ACP does not define and Qwen
+   * does — the legacy runtime calls it once per turn, after the prompt returns,
+   * because no `usage_update` carries the parent window for this provider.
+   * Asked here rather than at dispatch for the reason `noteTurnEnded` exists:
+   * what it finds has to reach the turn that earned it rather than the next one.
+   */
+  readonly readContextUsage: (sessionId: string) => Promise<AcpUsageUpdate | null>;
+}
+
 export class QwenProjectionResultSink implements QwenExecutionResultSink {
+  constructor(private readonly ports?: QwenProjectionResultSinkPorts) {}
+
+  /**
+   * The turn is ending, and this provider's context window is a question.
+   *
+   * Opportunistic on every path: the extension is optional — an older Qwen
+   * simply has no such method — and a window nobody could read is a badge
+   * without a number, not a failed turn.
+   */
+  async noteTurnEnded(input: {
+    readonly nativeSessionRef: string;
+    readonly presentContent: (payload: unknown) => void;
+  }): Promise<void> {
+    const usage = await this.ports?.readContextUsage(input.nativeSessionRef)
+      .catch(() => null);
+    if (usage) {
+      input.presentContent({ kind: 'session-usage', usage } satisfies QwenContentPayload);
+    }
+  }
+
   async storeResult(input: {
     readonly output: string;
     readonly nativeSessionRef: string;

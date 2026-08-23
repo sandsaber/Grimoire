@@ -94,6 +94,8 @@ describe('Qwen execution composition', () => {
     sessionIsGone?: boolean;
     announcesCommands?: boolean;
     answersEffort?: boolean;
+    reportsContextUsage?: boolean;
+    suppressUsageUpdate?: boolean;
     asksQuestion?: boolean;
     dropsFirstPrompt?: boolean;
     refusesMode?: boolean;
@@ -273,7 +275,8 @@ describe('Qwen execution composition', () => {
                 content: [{ type: 'content', content: { type: 'text', text: 'note body' } }],
               },
             });
-            if (!options.windowOnFirstTurnOnly || turns === 1) {
+            if (!options.suppressUsageUpdate
+              && (!options.windowOnFirstTurnOnly || turns === 1)) {
               notify?.({
                 sessionId: 'acp-session-1',
                 update: {
@@ -317,6 +320,14 @@ describe('Qwen execution composition', () => {
             configOptions.push(request);
             return { configOptions: [] };
           },
+          // The one question ACP has no method for. Answered here the way
+          // `qwen 0.21.15` answers it, because nothing else reports this
+          // provider's parent context window.
+          vendorRequest: async (method: string) => (
+            method === 'qwen/status/session/context_usage' && options.reportsContextUsage
+              ? { usage: { contextWindowSize: 1_048_576, totalTokens: 4_096 } }
+              : null
+          ),
           cancel: () => undefined,
           onSessionNotification: listener => {
             notify = listener;
@@ -339,6 +350,8 @@ describe('Qwen execution composition', () => {
     sessionIsGone?: boolean;
     announcesCommands?: boolean;
     answersEffort?: boolean;
+    reportsContextUsage?: boolean;
+    suppressUsageUpdate?: boolean;
     asksQuestion?: boolean;
     dropsFirstPrompt?: boolean;
     refusesMode?: boolean;
@@ -1040,6 +1053,48 @@ describe('Qwen execution composition', () => {
     } as never);
 
     expect(await runtime.getSupportedCommands()).toEqual([]);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('asks the agent how full the context is, because nothing else says', async () => {
+    // No `usage_update` this provider sends carries the parent window — the
+    // legacy runtime reads it from `qwen/status/session/context_usage` once per
+    // turn, after the prompt returns. Ported rather than dropped: the flip must
+    // not take the badge with it.
+    // No `usage_update` at all, which is what this provider actually sends —
+    // so the only place the badge's numbers can come from is the vendor call.
+    const { execution, host } = await createHarness({
+      reportsContextUsage: true,
+      suppressUsageUpdate: true,
+    });
+    const runtime = execution.createRuntime();
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks.filter(chunk => chunk.type === 'usage').at(-1)).toEqual(
+      expect.objectContaining({
+        usage: expect.objectContaining({ contextWindow: 1_048_576, contextTokens: 4_096 }),
+      }),
+    );
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('shows a badge without a number when the agent has no such method', async () => {
+    // The extension is optional: an older Qwen simply does not answer it, and a
+    // window nobody could read is not a failed turn.
+    const { execution, host } = await createHarness({
+      reportsContextUsage: false,
+      suppressUsageUpdate: true,
+    });
+    const runtime = execution.createRuntime();
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks.filter(chunk => chunk.type === 'error')).toEqual([]);
+    expect(chunks.some(chunk => chunk.type === 'text'
+      && chunk.content.includes('the answer'))).toBe(true);
     execution.dispose();
     await host.dispose();
   });

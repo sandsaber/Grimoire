@@ -64,6 +64,11 @@ import {
   type QwenAskUserQuestion,
   type QwenAskUserQuestionResponse,
 } from '../execution/QwenAskUserQuestion';
+import {
+  parseQwenContextUsage,
+  QWEN_CONTEXT_USAGE_METHOD,
+  QWEN_CONTEXT_USAGE_TIMEOUT_MS,
+} from '../execution/QwenContextUsage';
 import { buildQwenPermissionPresentation } from '../execution/QwenPermissionPresentation';
 import { QwenSessionConfigState } from '../execution/QwenSessionConfigState';
 import { mapGrimoireModeToQwen } from '../modes';
@@ -83,15 +88,6 @@ interface QwenLaunchSpec {
   runtimeEnv: NodeJS.ProcessEnv;
 }
 
-interface QwenContextUsageStatus {
-  usage?: {
-    contextWindowSize?: unknown;
-    totalTokens?: unknown;
-  };
-}
-
-const QWEN_CONTEXT_USAGE_METHOD = 'qwen/status/session/context_usage';
-const QWEN_CONTEXT_USAGE_TIMEOUT_MS = 3_000;
 
 class StreamChunkQueue {
   private closed = false;
@@ -715,7 +711,7 @@ export class QwenChatRuntime implements ChatRuntime {
     }
 
     try {
-      const response = await this.transport.request<QwenContextUsageStatus>(
+      const response = await this.transport.request<unknown>(
         QWEN_CONTEXT_USAGE_METHOD,
         { detail: false, sessionId },
         { timeoutMs: QWEN_CONTEXT_USAGE_TIMEOUT_MS },
@@ -952,22 +948,6 @@ function isQwenSubagentUpdate(update: AcpSessionUpdate): boolean {
     && metadata.parentToolCallId.length > 0
     && typeof metadata.subagentType === 'string'
     && metadata.subagentType.length > 0;
-}
-
-function parseQwenContextUsage(status: QwenContextUsageStatus): { size: number; used: number } | null {
-  const used = status.usage?.totalTokens;
-  const size = status.usage?.contextWindowSize;
-  if (
-    typeof used !== 'number'
-    || !Number.isFinite(used)
-    || used < 0
-    || typeof size !== 'number'
-    || !Number.isFinite(size)
-    || size <= 0
-  ) {
-    return null;
-  }
-  return { size, used };
 }
 
 function mapQwenApprovalDecision(

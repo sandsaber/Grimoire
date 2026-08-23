@@ -41,8 +41,12 @@ import type { ChatMessage } from '@/core/types';
 import type GrimoirePlugin from '@/main';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
-import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
+import type {
+  ManagedAcpClient,
+  ManagedAcpClientFactory,
+} from '@/providers/acp/execution/ManagedAcpClient';
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
+import type { AcpUsageUpdate } from '@/providers/acp/types';
 import { createQwenModuleContext } from '@/providers/qwen/app/QwenModuleContext';
 import { qwenPlanUsageStore } from '@/providers/qwen/app/QwenPlanUsageStore';
 import { QWEN_PROVIDER_CAPABILITIES } from '@/providers/qwen/capabilities';
@@ -54,6 +58,11 @@ import {
   type QwenAskUserQuestion,
 } from '@/providers/qwen/execution/QwenAskUserQuestion';
 import { QwenContentPresenter } from '@/providers/qwen/execution/QwenContentPresenter';
+import {
+  parseQwenContextUsage,
+  QWEN_CONTEXT_USAGE_METHOD,
+  QWEN_CONTEXT_USAGE_TIMEOUT_MS,
+} from '@/providers/qwen/execution/QwenContextUsage';
 import {
   QwenExecutionBackend,
   type QwenExecutionBackendContext,
@@ -157,6 +166,9 @@ export class QwenExecution {
 
   private backend: QwenExecutionBackend | undefined;
 
+  /** The live connection, for the one question that is not a turn. */
+  private client: ManagedAcpClient | undefined;
+
   constructor(
     private readonly plugin: GrimoirePlugin,
     /**
@@ -236,7 +248,16 @@ export class QwenExecution {
             : this.interactions.prepare(request);
         },
       },
-      resultSink: new QwenProjectionResultSink(),
+      resultSink: new QwenProjectionResultSink({
+        readContextUsage: sessionId => this.readContextUsage(sessionId),
+      }),
+      // Held so the turn's last look can ask the live session a question ACP has
+      // no method for. The sink is given a reader rather than a client, because
+      // what it needs is one number and not a connection.
+      clientObserver: {
+        onClientReady: client => { this.client = client; },
+        onClientLost: () => { this.client = undefined; },
+      },
       reconciler: {
         // A turn that answered the cancel it was sent is a turn known to have
         // stopped, and ACP delivers that answer on the prompt itself. For
@@ -624,6 +645,28 @@ export class QwenExecution {
     }
     this.settle(this.plugin.saveSettings());
     this.refreshSelectors();
+  }
+
+  /**
+   * How full the session's context is, asked of the agent that knows.
+   *
+   * `qwen/status/session/context_usage` is a method ACP does not define, so it
+   * travels on `vendorRequest` — the same escape hatch Grok's billing uses. An
+   * agent that does not answer it simply has no window to show, which is a badge
+   * without a number rather than a failure, so every path here returns null.
+   */
+  private async readContextUsage(sessionId: string): Promise<AcpUsageUpdate | null> {
+    const client = this.client;
+    if (!client?.vendorRequest) {
+      return null;
+    }
+    const answered = await Promise.race([
+      // Called on the client rather than detached from it: a vendor request is
+      // a method on a live connection, not a free function.
+      client.vendorRequest(QWEN_CONTEXT_USAGE_METHOD, { detail: false, sessionId }),
+      delayThroughWindow(QWEN_CONTEXT_USAGE_TIMEOUT_MS).then(() => null),
+    ]).catch(() => null);
+    return parseQwenContextUsage(answered);
   }
 
   /** Redraws the model and mode selectors of every open view. */
