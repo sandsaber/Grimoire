@@ -70,10 +70,10 @@
       "history/load:provider-native"
     ],
     "isolatedAuxiliary": [
-      "client/launch:cold",
+      "client/launch:retained",
       "session/new:aux-session",
       "session/prompt",
-      "client/close"
+      "session/prompt:retained"
     ]
   },
   "eventCases": {

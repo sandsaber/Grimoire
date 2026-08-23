@@ -15,10 +15,11 @@ import {
 import type { ResultCommitOutcome } from '@/core/execution/ResultCommit';
 import { AcpSpawnError } from '@/providers/acp/AcpSpawnError';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
-import type {
-  ManagedAcpClient,
-  ManagedAcpClientFactory,
-  ManagedAcpClientFactoryInput,
+import {
+  type ManagedAcpClient,
+  type ManagedAcpClientFactory,
+  type ManagedAcpClientFactoryInput,
+  ManagedAcpTerminationUnconfirmedError,
 } from '@/providers/acp/execution/ManagedAcpClient';
 import type {
   AcpPromptResponse,
@@ -637,6 +638,33 @@ describe('OpencodeExecutionBackend', () => {
     await expect(auxiliary).rejects.toThrow('auxiliary aborted');
     expect(observedSignal?.aborted).toBe(true);
   });
+  it('closes the auxiliary processes it kept when the backend disposes', async () => {
+    // The other half of the port. Auxiliary work keeps a process between turns —
+    // inline edit's second message has to reach the first one's session — so
+    // unlike a cold query there is something left to close, and the only thing
+    // that closes it is the shutdown. A backend that disposed without this left
+    // one idle CLI per purpose running until the app quit.
+    let disposals = 0;
+    const fixture = createFixture({ auxiliaryDispose: async () => { disposals += 1; } });
+
+    await expect(fixture.backend.dispose()).resolves.toBeUndefined();
+
+    expect(disposals).toBe(1);
+  });
+
+  it('does not report a clean shutdown when an auxiliary process will not confirm', async () => {
+    const fixture = createFixture({
+      auxiliaryDispose: async () => {
+        throw new ManagedAcpTerminationUnconfirmedError();
+      },
+    });
+
+    // Exactly what a chat session that would not confirm does. An auxiliary
+    // process is a process: one that outlived the plugin is a leak whether it
+    // was running a conversation or generating a title.
+    await expect(fixture.backend.dispose()).rejects.toThrow('termination was not confirmed');
+  });
+
   it('asks the provider for an answer it finished without streaming', async () => {
     // Grok can finish a turn without delivering its final message over ACP
     // while still writing the answer to its own session log — which surfaced,
@@ -949,6 +977,7 @@ function createFixture(options: {
   readonly dynamicApply?: () => Promise<void>;
   readonly interactionPrepare?: () => Promise<OpencodePreparedInteraction>;
   readonly auxiliaryExecute?: (requestRef: string, signal: AbortSignal) => Promise<string>;
+  readonly auxiliaryDispose?: () => Promise<void>;
   readonly requestResolve?: (requestRef: string) => Promise<OpencodeExecutionInvocation>;
 } = {}) {
   const clients = options.clients ?? [new FakeManagedAcpClient('native-session')];
@@ -993,7 +1022,10 @@ function createFixture(options: {
         ?? options.reconciliation
         ?? { kind: 'stopped-safe' },
     },
-    auxiliaryQueries: { execute: options.auxiliaryExecute ?? (async () => 'auxiliary') },
+    auxiliaryQueries: {
+      execute: options.auxiliaryExecute ?? (async () => 'auxiliary'),
+      ...(options.auxiliaryDispose ? { dispose: options.auxiliaryDispose } : {}),
+    },
     scheduler,
     sessionInstanceIdFactory: () => sessionInstanceId(`si-${'a'.repeat(32)}`),
     interactionIdFactory: () => interactionId(`ix-${'b'.repeat(32)}`),

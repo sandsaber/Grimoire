@@ -192,7 +192,20 @@ export interface ManagedAcpClientObserver {
 }
 
 export interface ManagedAcpAuxiliaryPort {
-  execute(requestRef: string, signal: AbortSignal): Promise<string>;
+  execute(
+    requestRef: string,
+    signal: AbortSignal,
+    onText?: (accumulated: string) => void,
+  ): Promise<string>;
+  /**
+   * Ends one auxiliary conversation, keeping the others.
+   *
+   * `AuxQueryRunner.reset()`, from the other side. Optional because a provider
+   * whose auxiliary work is cold — Claude's SDK query is — has nothing to end.
+   */
+  release?(retentionKey: string): Promise<void>;
+  /** Closes every auxiliary process this port kept. Called when the backend disposes. */
+  dispose?(): Promise<void>;
 }
 
 export type ManagedAcpExecutionScheduler = ResultCommitScheduler;
@@ -347,7 +360,14 @@ implements ExecutionBackend, InteractionPort, ExecutionRecoveryPort {
         [...this.interactions.keys()].map(interactionId => this.cancel(interactionId)),
       );
       await Promise.allSettled([...this.auxiliaryTasks]);
-      const lifecycleResults = [...sessionResults, ...interactionResults];
+      // After the tasks, because a query still running holds the process it is
+      // running on: closing underneath it would be the shutdown racing its own
+      // work. Kept in the lifecycle results, so an auxiliary process nobody
+      // could confirm dead fails the shutdown exactly as a chat one does.
+      const auxiliaryResults = this.context.auxiliaryQueries.dispose
+        ? await Promise.allSettled([this.context.auxiliaryQueries.dispose()])
+        : [];
+      const lifecycleResults = [...sessionResults, ...interactionResults, ...auxiliaryResults];
       const terminationFailure = lifecycleResults.some(result => (
         result.status === 'rejected'
         && result.reason instanceof ManagedAcpTerminationUnconfirmedError

@@ -66,10 +66,10 @@
       "escape:rejected-before-approval"
     ],
     "isolatedAuxiliary": [
-      "client/launch:cold",
+      "client/launch:retained",
       "session/new:aux-session",
       "session/prompt",
-      "client/close"
+      "session/prompt:retained"
     ]
   },
   "eventCases": {

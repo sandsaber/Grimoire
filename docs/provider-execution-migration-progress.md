@@ -6481,6 +6481,40 @@ operating system's account. `manual-smoke-instructions.md` no longer says five p
 Gates: unit 515 suites / 8,024 tests, integration 5 / 145 (10 live suites skipped), typecheck,
 `eslint`, `build:release`. Live: Kimi Code 2 rows of 12 (the rest need an account), Antigravity 2 of 2.
 
+### M5 opens: the auxiliary query, read against the consumer it has to replace (this commit)
+
+M2-flips is done, so this is the first M5 material: `refactor: route auxiliary work through execution
+owners`. Nothing is routed yet — this is the module the routing needs, corrected before it is wired.
+
+**It was cold, and cold is wrong.** `ManagedAcpAuxiliaryQuery` has been dark since wave 4, launching a
+process per query and closing it after. Read against `AuxQueryRunner` — the interface titles,
+refinement and inline edits actually call — two of its four members are about a conversation that
+outlives one call: `reset()`, and inline edit's `continueConversation`, which sends a second message
+expecting the first to still be there. Five providers rely on that today: `OpencodeInlineEditService`
+holds one runner whose ACP session persists between calls, and `resetConversation()` is what ends it.
+A cold query would have answered the follow-up on a session that had never heard of the edit.
+
+Cold was not an accident either — `client/launch:cold` is written into six trace fixtures. It was the
+design before anyone read the consumer, and the fixtures say `client/launch:retained` now.
+
+Four more gaps closed the same way, each one a thing a legacy runner does and the dark module did not:
+**configuration** (the aux agent applied when the session opens, the model before every turn, both
+best effort — an answer under the default model beats no answer), **streaming** (`onTextChunk`, which
+the refine dialog renders into), **keyed retention** (one process per purpose, which is what the
+legacy runners are as separate instances, counted in one place now), and **disposal** (the backend
+closes them at shutdown, and an auxiliary process that will not confirm its own death fails the
+shutdown exactly as a chat session does).
+
+What is deliberately *not* carried over: the legacy runners attach the CLI's stderr to a failed
+auxiliary error. `ManagedAcpClient` has no stderr, so that is a transport change rather than a policy
+one. Recorded below rather than half-built.
+
+Thirteen breaks, thirteen caught. Two were green first: one break was a no-op against a test whose
+ordering made it accidentally correct, and the other found that **the backend's own disposal of the
+port had no test at all** — the module's `dispose()` was proven and the wiring to it was not.
+
+Gates: unit 515 suites / 8,035 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6507,6 +6541,17 @@ two now, and Antigravity is the only provider fully green on this machine.
 **Two gates shipped with the same defect this session and both were caught by breaking them**: a
 reader that matches nothing makes every assertion above it vacuous. Break the reader, not only the
 rule.
+
+**M5 has started**, with the auxiliary query rather than the projections: it is the module that was
+already dark and waiting, and reading it against `AuxQueryRunner` found it was built cold when the
+consumer needs a conversation. Corrected, proven, still dark. What is left there is the request store
+and the runner adapter per provider, then the flip — and the stderr a failed auxiliary error carries
+today, which needs the client contract to grow.
+
+**The next M5 piece to pick up** is `OpencodeAuxiliaryRequests`: the store that turns an
+`AuxQueryConfig` into a `requestRef` — a startup ref built from the launch artifacts with the aux
+agent, a retention key that changes when the launch does, and the config options the turn applies. The
+module it feeds is finished.
 
 ### Where the sixth session of 2026-08-23 ended
 

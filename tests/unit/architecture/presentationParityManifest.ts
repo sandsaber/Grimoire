@@ -790,6 +790,13 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // titles, refinement and inline edits stay on the legacy services until
       // M5. The transport, the launcher and the client adapter beside it went
       // live with OpenCode's flip and are listed as wired.
+      //
+      // It is no longer cold. Read against the consumer it has to replace —
+      // `AuxQueryRunner`, whose `reset()` exists because inline edit continues a
+      // conversation across calls — a query that closed its session each time
+      // would have lost the edit it was asked to continue. It keeps a process
+      // per retention key now, and the flip is a wiring change rather than a
+      // rewrite.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
     ],
   },
