@@ -41,6 +41,7 @@ import {
   type ResultCommitScheduler,
   settleResultCommit,
 } from '@/core/execution/ResultCommit';
+import { JsonRpcErrorResponse } from '@/providers/acp/AcpJsonRpcTransport';
 import { isAcpMissingSessionError } from '@/providers/acp/acpSessionResume';
 import { AcpSpawnError } from '@/providers/acp/AcpSpawnError';
 import type { AcpContentPayload } from '@/providers/acp/execution/AcpContentPayload';
@@ -599,10 +600,30 @@ class ManagedAcpExecutionSession implements ExecutionSession {
   private async recover(
     run: ManagedAcpExecutionRun,
     invocation: ManagedAcpExecutionInvocation,
-    _error: unknown,
+    error: unknown,
     attempt: number,
   ): Promise<void> {
     if (!run.claimRecovery(attempt)) return;
+    if (error instanceof JsonRpcErrorResponse) {
+      // **The agent answered.** Everything below this treats a failed prompt as
+      // a connection that died — close the process, launch another, send the
+      // same prompt again, and reconcile to `unknown` when that fails too. For a
+      // dropped pipe that is right. For a turn the provider *refused* it is
+      // three wrongs: the vendor's own words are discarded, the prompt is
+      // charged a second time, and the tab is told "Grimoire could not establish
+      // whether this run completed."
+      //
+      // A `JsonRpcErrorResponse` is the exact discriminator, not a heuristic:
+      // the transport constructs one only when the peer sent an error response,
+      // and every transport failure it raises is a plain `Error`. Found live on
+      // Gemini with `429 You have exhausted your daily quota on this model`,
+      // where the retry spent a second request against a quota already gone.
+      //
+      // The client is left open on purpose: an agent that refused a turn is an
+      // agent that is still there, and its session is still the conversation's.
+      run.failFromProviderRejection(error);
+      return;
+    }
     if (!run.hasDispatched) {
       // The connection died before this turn was ever sent. Reconciling would
       // ask a provider what became of a run it never received, and the honest
@@ -960,6 +981,28 @@ class ManagedAcpExecutionRun implements ExecutionRun {
       kind: 'provider-content',
       payload: { kind: 'session-config', session } satisfies AcpContentPayload,
     });
+  }
+
+  /**
+   * Ends the turn the agent refused, in the agent's own words.
+   *
+   * The message goes out on the content channel and the terminal carries the
+   * classification, because a terminal reason is an enum with no room for a
+   * sentence. A provider that reads the payload renders the vendor's text; one
+   * that does not still gets `provider-failure` instead of a run whose outcome
+   * could not be established, which is what every flipped provider had.
+   */
+  failFromProviderRejection(error: JsonRpcErrorResponse): void {
+    if (this.terminal) return;
+    this.emit({
+      kind: 'provider-content',
+      payload: {
+        kind: 'prompt-failed',
+        message: error.message,
+      } satisfies AcpContentPayload,
+    });
+    // Not side-effect free: the agent may have run tools before it refused.
+    this.finish('failed', 'provider-failure');
   }
 
   claimRecovery(attempt: number): boolean {

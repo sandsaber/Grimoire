@@ -403,6 +403,12 @@ export class KimicodeExecution {
        * nothing to act on.
        */
       describeFailure: reason => {
+        if (reason === 'provider-failure') {
+          // The agent's own words, where it gave any. `undefined` falls through
+          // to the kernel's generic sentence, which is what a provider that
+          // failed without saying anything deserves.
+          return content.consumePromptFailure();
+        }
         // Two different failures that used to read as one. A CLI that is not
         // installed is `spawn-failed`, and the neutral sentence for it —
         // "Grimoire could not start the provider process" — names no action;

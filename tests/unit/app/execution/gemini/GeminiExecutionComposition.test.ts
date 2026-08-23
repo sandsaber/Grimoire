@@ -92,7 +92,9 @@ describe('Gemini execution composition', () => {
   function createFakeAcp(options: {
     asksPermission?: boolean;
     sessionIsGone?: boolean;
+    dropsFirstPrompt?: boolean;
     refusesMode?: boolean;
+    rejectsPrompt?: string;
     sessionLoadFails?: boolean;
     switchesMode?: string;
     windowOnFirstTurnOnly?: boolean;
@@ -177,6 +179,14 @@ describe('Gemini execution composition', () => {
           },
           prompt: async request => {
             prompts.push(request);
+            if (options.rejectsPrompt) {
+              throw new JsonRpcErrorResponse('session/prompt', 429, options.rejectsPrompt);
+            }
+            if (options.dropsFirstPrompt && prompts.length === 1) {
+              // Not a JSON-RPC error response: nothing answered. This is the
+              // shape the transport raises when the pipe is gone.
+              throw new Error('Request aborted: session/prompt');
+            }
             if (options.asksPermission) {
               // ACP asks before it runs anything, and the turn does not finish
               // until the answer comes back — over a pipe, which is why the
@@ -274,7 +284,9 @@ describe('Gemini execution composition', () => {
     asksPermission?: boolean;
     plugin?: any;
     sessionIsGone?: boolean;
+    dropsFirstPrompt?: boolean;
     refusesMode?: boolean;
+    rejectsPrompt?: string;
     sessionLoadFails?: boolean;
     switchesMode?: string;
     windowOnFirstTurnOnly?: boolean;
@@ -534,6 +546,53 @@ describe('Gemini execution composition', () => {
 
     expect(loadRequests).toEqual([expect.objectContaining({ sessionId: 'acp-session-saved' })]);
     expect(runtime.getSessionId()).toBe('acp-session-saved');
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('ends a turn the agent refused in the words the agent used', async () => {
+    // The third finding of the live smoke, and the one that was a regression
+    // rather than a defect: every legacy ACP runtime yielded the provider's own
+    // error text, and the kernel path replaced it with a run whose outcome could
+    // not be established. Found with the real thing — `429 You have exhausted
+    // your daily quota on this model` — which the tab rendered as "Grimoire
+    // could not establish whether this run completed."
+    const { execution, host, prompts } = await createHarness({
+      rejectsPrompt: 'You have exhausted your daily quota on this model.',
+    });
+    const runtime = execution.createRuntime();
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks.filter(chunk => chunk.type === 'error').map(chunk => chunk.content))
+      .toEqual(['You have exhausted your daily quota on this model.']);
+    // Once, not twice. The old path treated a refusal as a dead connection and
+    // sent the same prompt again — a second request against a quota already
+    // gone, and a second chance for the agent to act on it.
+    expect(prompts).toHaveLength(1);
+    expect(chunks.some(chunk => chunk.type === 'notice')).toBe(false);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('still retries a connection that died, which is what the refusal path took', async () => {
+    // The discriminator has to cut both ways, or the fix trades one defect for
+    // another: a dropped pipe is not the agent answering, and the retry it gets
+    // is what makes a transient failure invisible instead of an error the user
+    // has to act on. A plain `Error` is what the transport raises for one.
+    const { execution, host, prompts, startupRefs } = await createHarness({
+      dropsFirstPrompt: true,
+    });
+    const runtime = execution.createRuntime();
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(prompts).toHaveLength(2);
+    // A second process, because the first one is presumed dead.
+    expect(startupRefs).toHaveLength(2);
+    expect(chunks.filter(chunk => chunk.type === 'error')).toEqual([]);
+    expect(chunks.some(chunk => chunk.type === 'text' && chunk.content.includes('the answer')))
+      .toBe(true);
     execution.dispose();
     await host.dispose();
   });

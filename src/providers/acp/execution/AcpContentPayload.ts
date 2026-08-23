@@ -15,4 +15,19 @@ import type { AcpNewSessionResponse, AcpPromptResponse, AcpSessionNotification }
 export type AcpContentPayload =
   | { readonly kind: 'session-update'; readonly notification: AcpSessionNotification }
   | { readonly kind: 'prompt-result'; readonly response: AcpPromptResponse }
-  | { readonly kind: 'session-config'; readonly session: AcpNewSessionResponse };
+  | { readonly kind: 'session-config'; readonly session: AcpNewSessionResponse }
+  /**
+   * What the agent said when it refused the turn.
+   *
+   * A fourth shape, and the one the flips lost: every legacy ACP runtime yielded
+   * the provider's own error text, and the kernel path replaced it with a
+   * terminal reason that has room for no words at all. `429 You have exhausted
+   * your daily quota on this model` became "Grimoire could not establish
+   * whether this run completed."
+   *
+   * Carried here rather than on the terminal because a terminal reason is an
+   * enum and this is a sentence. The presenter keeps it and the composition
+   * hands it back through `describeFailure`, so the tab still renders exactly
+   * one error for one failure.
+   */
+  | { readonly kind: 'prompt-failed'; readonly message: string };

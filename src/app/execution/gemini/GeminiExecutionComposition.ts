@@ -366,6 +366,12 @@ export class GeminiExecution {
        * rather than replacing it on an error that vague.
        */
       describeFailure: reason => {
+        if (reason === 'provider-failure') {
+          // The agent's own words, where it gave any. `undefined` falls through
+          // to the kernel's generic sentence, which is what a provider that
+          // failed without saying anything deserves.
+          return content.consumePromptFailure();
+        }
         if (reason === 'spawn-failed') {
           // A desktop app does not inherit the shell PATH, which is the
           // actionable half the neutral sentence never says.

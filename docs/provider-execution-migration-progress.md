@@ -5972,6 +5972,40 @@ Three breaks, three caught.
 Gates: unit 507 suites / 7,903 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### The vendor's own words, back on the five flipped ACP providers (this commit)
+
+The obligation the live smoke opened yesterday, closed. `ManagedAcpExecutionBackend.recover` took the
+prompt's rejection as `_error` and never read it, so a `session/prompt` that **failed** was handled as
+a connection that **died**: close the process, launch another, send the same prompt again, reconcile
+to `unknown`, and tell the tab "Grimoire could not establish whether this run completed."
+
+For a dropped pipe that is right. For a turn the provider refused it was three wrongs at once — the
+vendor's message discarded, the prompt charged a second time, and a sentence that means nothing.
+`429 You have exhausted your daily quota on this model` is what it looked like in practice.
+
+**The discriminator is exact rather than heuristic.** `AcpJsonRpcTransport` constructs a
+`JsonRpcErrorResponse` in one place and only there: when the peer sent an error response. Every
+transport failure it raises is a plain `Error`. So `error instanceof JsonRpcErrorResponse` *is* "the
+agent answered", and the client is left open on the refusal path, because an agent that refused a
+turn is an agent that is still there.
+
+**The words needed a channel, and the terminal is not one.** A `RunTerminalReason` is an enum; a
+vendor message is a sentence. So the refusal goes out on the content channel as a fourth
+`AcpContentPayload` kind, the presenter keeps it, and the composition hands it back through
+`describeFailure` — which the adapter already asks. One error rendered for one failure, the vendor's
+words where there are any and the kernel's generic sentence where there are not.
+
+This restores something the flips **lost**: every legacy ACP runtime yielded the provider's error
+text, and five compositions had replaced it with a reason code. Applied to all five — Gemini,
+Kimi Code, MiMoCode, OpenCode, Grok — and the four family presenters are byte-identical in the patched
+region under a normalized diff, with Grok differing exactly where its payload union is wider.
+
+Five breaks, five caught. Two of them are the pair that matters: dropping the `instanceof` so every
+failure looks like an answer, and keeping it so none does.
+
+Gates: unit 507 suites / 7,905 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6375,7 +6409,11 @@ Open obligations, each with an owner:
 - the provider backends that carry them must absorb the UTF-8 stream decoding (`utf8Stream`) and
   Grok transcript recovery semantics that landed on `main` after the v1 baseline. Owner: the Grok
   and ACP backends, at their harvest;
-- **a vendor error on the prompt becomes "could not establish whether this run completed".**
+- ~~**a vendor error on the prompt becomes "could not establish whether this run completed".**~~
+  **Closed in the commit below this entry.** A `JsonRpcErrorResponse` is now the discriminator — the
+  transport constructs one only when the peer sent an error response, and raises a plain `Error` for
+  every transport failure — so a refused turn ends as `provider-failure` with the agent's own words,
+  and a dropped pipe keeps the retry that makes it invisible. The original entry follows:
   `ManagedAcpExecutionBackend.recover` takes the rejection as `_error` and never reads it, so a
   `session/prompt` that *failed* is handled as a connection that *died*: the process is closed, a new
   one is launched, the same prompt is sent again, and the run is then reconciled to `unknown`. Found

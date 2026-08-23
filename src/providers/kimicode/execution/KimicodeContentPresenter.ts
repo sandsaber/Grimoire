@@ -76,6 +76,7 @@ export class KimicodeContentPresenter {
   private readonly toolStream: AcpToolStreamAdapter = createKimicodeToolStreamAdapter();
   private sessionId: string | undefined;
   private metadata: ChatTurnMetadata = {};
+  private promptFailure: string | undefined;
   private contextUsage: AcpUsageUpdate | null = null;
   private promptUsage: AcpUsage | null = null;
 
@@ -91,6 +92,20 @@ export class KimicodeContentPresenter {
    */
   lastSessionId(): string | undefined {
     return this.sessionId;
+  }
+
+  /**
+   * What the agent said when it refused the turn.
+   *
+   * Read once, by the composition's `describeFailure`, so the tab renders one
+   * error for one failure — the vendor's own words where there are any, and the
+   * kernel's generic sentence where there are not. Every legacy ACP runtime
+   * yielded this text and the flip lost it; this is where it comes back.
+   */
+  consumePromptFailure(): string | undefined {
+    const message = this.promptFailure;
+    this.promptFailure = undefined;
+    return message;
   }
 
   /** What the finished turn was, in the provider's own terms. */
@@ -122,6 +137,7 @@ export class KimicodeContentPresenter {
    * kept them would append its answer to the previous turn's message.
    */
   beginTurn(): void {
+    this.promptFailure = undefined;
     this.normalizer.reset();
     this.toolStream.reset();
     this.contextUsage = null;
@@ -135,6 +151,10 @@ export class KimicodeContentPresenter {
     }
     if (content?.kind === 'session-config') {
       return this.presentSessionConfig(content.session);
+    }
+    if (content?.kind === 'prompt-failed') {
+      this.promptFailure = content.message?.trim() || undefined;
+      return [];
     }
     if (content?.kind !== 'session-update' || !content.notification) {
       return [];
