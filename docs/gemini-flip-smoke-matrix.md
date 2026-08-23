@@ -27,24 +27,42 @@ Recorded against **gemini 0.55.1** on 2026-08-23, Linux.
 
 | # | Row | Result |
 |---|---|---|
-| 1 | Answers a plain message, and streams it | ⛔ quota |
+| 1 | Answers a plain message, and streams it | ✅ **answered `OK`, with the refusal notice beside it** |
 | 2 | Shows a tool call and its result | ⛔ quota |
 | 5 | Reports the context window and the tokens the prompt cost | ⛔ quota |
-| 6 | Cancels a running turn and leaves no agent behind | ⛔ quota |
+| 6 | Cancels a running turn and leaves no agent behind | ✅ cancelled, no agent left |
 | 7 | Continues the same session on a second turn | ⛔ quota |
 | 8 | Resumes the conversation a fresh load was told about | ⛔ quota |
 | 9 | Says what a session the agent no longer has needs the person to do | ✅ the binding is kept and the turn says so |
-| 12/13 | Asks before it writes, and writes what was allowed | ⛔ quota — but see finding 3 |
-| 15 | Writes nothing when the prompt is refused | ❌ finding 3: the agent never reached the approval |
+| 12/13 | Asks before it writes, and writes what was allowed | ⛔ quota |
+| 15 | Writes nothing when the prompt is refused | ⛔ quota |
 | 16 | Runs the turn in the mode the tab is set to | ✅ Plan reached the session; nothing was written |
 | 17 | Fills the model catalog from an empty vault | ✅ six models and four modes, from one reply |
-| 19 | Shows the spend when there is spend to show | ⚠️ ran without error and reported no spend |
+| 19 | Shows the spend when there is spend to show | ⛔ quota |
 
-**⛔ quota** is not a Grimoire result. Partway through the first run the account answered
-`session/prompt` with `429 You have exhausted your daily quota on this model`, and every row after it
-that needs an answer got nothing. Re-run the matrix on a day with quota before treating any of those
-rows as evidence — and read finding 3 first, because what the user sees for a `429` is the third
-defect.
+**Row 1 is the one to read.** It is the first Gemini turn this branch has ever completed end to end,
+and it carries both of the fixes the previous run's failures produced: the agent refused
+`session/set_mode` for `yolo` exactly as before, the turn **survived it**, and the notice explaining
+that appeared in the transcript beside the answer.
+
+> Gemini did not switch to Auto-approve: Cannot enable privileged approval modes in an untrusted
+> folder. This turn ran in the mode the session was already in.
+>
+> OK
+
+**⛔ quota** is not a Grimoire result, and it is now measured rather than guessed: this account
+replenishes roughly **one turn at a time**. The second run began with quota, answered row 1 in full,
+and was exhausted again by row 2. Every row needing an answer after the first is therefore still
+unverified — and the rows that do not need one (the missing session, the mode reaching the session,
+the model catalogue, the cancel) pass consistently across both runs.
+
+**What the second run did certify is finding 3's fix.** Where the tab used to say "Grimoire could not
+establish whether this run completed", it now says:
+
+> You have exhausted your daily quota on this model.
+
+That is the vendor's own sentence, reaching the surface through the classification added after the
+first run. Confirmed against the real CLI rather than against a fake.
 
 Row 19 is weak by construction: it asserts the turn ran and records what the indicator showed. A plan
 that charges nothing per turn makes an empty indicator honest, so a green here means "nothing
@@ -114,10 +132,10 @@ daily quota on this model` — it is three wrongs at once: the message the vendo
 the turn is charged a second time against a quota that is already gone, and the user is told
 something that means nothing.
 
-This is **shared** across the five flipped managed-ACP providers, not Gemini's. It is recorded rather
-than fixed here because the fix is a change to how the shared backend classifies a rejection — a
-protocol-level error the agent answered with, against a transport-level failure it did not — and
-because the account it was found on has no quota left to prove the fix with today.
+This is **shared** across the flipped managed-ACP providers, not Gemini's. **Fixed and confirmed
+live**: a `JsonRpcErrorResponse` means the agent answered, so the turn ends with the vendor's own
+words and is not retried. The second run is the evidence — the tab shows *"You have exhausted your
+daily quota on this model."*
 
 Related and smaller: an ACP `fs/read_text_file` for a file that does not exist surfaces as a bare
 internal error, which is also what a containment refusal surfaces as. Row 15 is what that costs —
@@ -149,5 +167,6 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
+| 2026-08-23 | gemini 0.55.1 | live: 1, 6, 9, 16, 17 | live: 2, 5, 7, 8, 12/13, 15, 19 | second run, after quota replenished. **Row 1 completed end to end for the first time**, carrying both fixes the first run produced: the mode refusal no longer kills the turn, and the notice explaining it renders beside the answer. Finding 3's fix confirmed too — the tab now shows the vendor's own "You have exhausted your daily quota on this model." where it used to show a meaningless notice. The account replenishes about one turn at a time, so everything after row 1 is still quota-blocked |
 | 2026-08-23 | gemini 0.55.1 | live: 9, 16, 17, 19 | live: 1, 2, 5, 6, 7, 8, 12/13, 15 | the account's daily quota ran out partway through the first run — `session/prompt` answers `429 You have exhausted your daily quota on this model` — so every row needing an answer is unverified. Not the flip. What the run *did* find is three defects, two of them shipped and both fixed here: `session/set_mode` refuses the privileged modes in an untrusted folder and was killing every Auto-approve turn, and the shared model extractor read `id` where the wire sends `modelId`, which broke discovery for Gemini, MiMoCode and Grok. The third is recorded open above: a vendor error on the prompt becomes "could not establish whether this run completed", after a silent second attempt |
 

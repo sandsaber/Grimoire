@@ -143,7 +143,9 @@ live('Gemini live smoke', () => {
             ? `tool_result:${String(chunk.content).slice(0, 40).replaceAll('\n', ' ')}`
             : chunk.type === 'notice'
               ? `notice:${JSON.stringify(chunk).slice(0, 200)}`
-              : chunk.type
+              : chunk.type === 'error'
+                ? `error:${chunk.content.slice(0, 160).replaceAll('\n', ' ')}`
+                : chunk.type
     ));
   }
 

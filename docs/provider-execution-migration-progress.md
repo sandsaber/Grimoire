@@ -6331,6 +6331,37 @@ case that makes it load-bearing.
 Gates: unit 514 suites / 7,994 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### Gemini's second live run — the first turn this branch has ever completed (this commit)
+
+The account replenished, so the matrix ran again. It answered **one turn** and was exhausted by the
+second — which is a measurement rather than a complaint: this account comes back roughly one turn at
+a time, and that is what "Gemini can be certified here" is actually worth.
+
+**That one turn certified both fixes the first run produced.** The agent refused `session/set_mode`
+for `yolo` exactly as before, in exactly the same words. The turn survived it, answered `OK`, and
+carried the notice into the transcript beside the answer:
+
+> Gemini did not switch to Auto-approve: Cannot enable privileged approval modes in an untrusted
+> folder. This turn ran in the mode the session was already in.
+>
+> OK
+
+Row 1 had never passed on this branch.
+
+**And the third finding's fix is confirmed against the real CLI**, by the failure rather than by the
+success: where the tab used to say *"Grimoire could not establish whether this run completed"*, it now
+says *"You have exhausted your daily quota on this model."* The vendor's own sentence, through the
+classification added after the first run — proved by the same quota that blocks everything else.
+
+Five rows green now: the answer, the cancel, the missing session, the mode reaching the session, and
+the model catalogue. The seven that need a second answer are still quota-blocked.
+
+The harness renders an error's words now, the way it already rendered a notice's. Reading `["error"]`
+in a row report and having to re-run to find out which error is a harness that makes its own evidence
+hard to read.
+
+Gates: unit 514 suites / 7,994 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
