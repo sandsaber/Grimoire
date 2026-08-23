@@ -1,16 +1,20 @@
 import { QueryBackedTitleGenerationService } from '../../../core/auxiliary/QueryBackedTitleGenerationService';
 import type GrimoirePlugin from '../../../main';
 import { decodeKimicodeModelId } from '../models';
-import { KimicodeAuxQueryRunner } from '../runtime/KimicodeAuxQueryRunner';
 import { kimicodeChatUIConfig } from '../ui/KimicodeChatUIConfig';
 
+/**
+ * Titles, on the execution kernel.
+ *
+ * A runner per title, which is what this service has always built and what the
+ * retained auxiliary conversation is keyed by: the process that generated one
+ * title is closed when the service resets it, and the next title launches its
+ * own. The composition owns the launch, the agent it runs as, and the process.
+ */
 export class KimicodeTitleGenerationService extends QueryBackedTitleGenerationService {
   constructor(plugin: GrimoirePlugin) {
     super({
-      createRunner: () => new KimicodeAuxQueryRunner(plugin, {
-        agentProfile: 'passive',
-        artifactPurpose: 'title-gen',
-      }),
+      createRunner: () => plugin.getKimicodeExecution().createAuxRunner('title-gen'),
       resolveModel: () => {
         const settings = plugin.settings as unknown as Record<string, unknown>;
         const titleModel = typeof settings.titleGenerationModel === 'string'

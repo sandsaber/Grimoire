@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { ManagedAcpLaunchInvocation } from '../../../app/execution/acp/NodeManagedAcpProcessLauncher';
 import type { ManagedMcpServer } from '../../../core/types';
+import type { ManagedAcpAuxiliaryInvocation } from '../../acp/execution/ManagedAcpAuxiliaryQuery';
 import { toAcpMcpServers } from '../../acp/mcp/toAcpMcpServers';
 import type { AcpContentBlock } from '../../acp/types';
 import type { KimicodeAcpDynamicConfig } from './KimicodeAcpDynamicConfig';
@@ -31,6 +32,61 @@ export interface KimicodeExecutionRequest {
 }
 
 
+
+/**
+ * Which auxiliary conversation a turn belongs to.
+ *
+ * The legacy runners are one instance per purpose, each with its own artifacts
+ * directory and its own idle process; the purpose is what keeps them apart here,
+ * and it is what a `reset()` ends.
+ */
+export type KimicodeAuxiliaryPurpose = 'inline' | 'instructions' | 'title-gen';
+
+/** What one auxiliary turn asks for, before it becomes an opaque reference. */
+export interface KimicodeAuxiliaryRequest {
+  readonly purpose: KimicodeAuxiliaryPurpose;
+  /**
+   * Which auxiliary conversation this turn belongs to — one per runner.
+   *
+   * The runner is the conversation, not the purpose, and the consumer is what
+   * says so: `QueryBackedTitleGenerationService` builds a **runner per title**
+   * and resets it when the title is done, while inline edit holds one for as
+   * long as the edit lasts. Keying retention by purpose alone would put two
+   * titles generated at once in one session, and let either one's `reset()`
+   * close the process the other was using.
+   */
+  readonly conversationId: string;
+  /**
+   * The instructions the process is launched under.
+   *
+   * Not a per-turn field despite arriving on every call: Kimi Code reads its
+   * system prompt from a file the artifacts write, so changing it is a
+   * relaunch. It is part of the launch key for exactly that reason.
+   */
+  readonly systemPrompt: string;
+  readonly prompt: string;
+  /** The model the caller asked for, in whichever id space it had. */
+  readonly model?: string;
+}
+
+/**
+ * Everything ambient a launched auxiliary `kimicode acp` runs under.
+ *
+ * Built by the composition, which is the half that knows this provider: the
+ * artifacts for this purpose's agent, the runtime environment, and the raw model
+ * id behind whatever the caller passed.
+ */
+export interface KimicodeAuxiliaryEnvironment {
+  readonly executable: string;
+  readonly cwd: string;
+  readonly environment: Readonly<Record<string, string>>;
+  /** Everything the launch is keyed by; a change relaunches the process. */
+  readonly launchKey: string;
+  /** The Grimoire-managed agent this purpose runs as, set on the session. */
+  readonly agentId: string;
+  /** The raw model id to apply per turn, where one applies. */
+  readonly modelId?: string;
+}
 
 /**
  * Everything ambient a launched `kimi acp` runs under, read at dispatch.
@@ -72,6 +128,7 @@ const DEFAULT_LIMIT = 64;
  */
 export class KimicodeExecutionRequests {
   private readonly pending = new Map<string, KimicodeExecutionRequest>();
+  private readonly auxiliary = new Map<string, KimicodeAuxiliaryRequest>();
   private readonly startups = new Map<string, ManagedAcpLaunchInvocation>();
   private readonly dynamics = new Map<string, KimicodeAcpDynamicConfig>();
 
@@ -81,6 +138,14 @@ export class KimicodeExecutionRequests {
       databasePath?: string,
     ) => Promise<KimicodeInvocationEnvironment>,
     private readonly limit: number = DEFAULT_LIMIT,
+    /**
+     * Absent until this provider's auxiliary work is routed through the kernel.
+     * Optional rather than throwing at construction, because the chat half of
+     * this store is live and the auxiliary half is not.
+     */
+    private readonly auxiliaryEnvironment?: (
+      request: KimicodeAuxiliaryRequest,
+    ) => Promise<KimicodeAuxiliaryEnvironment>,
   ) {}
 
   /** Holds a turn and returns the reference the kernel will carry. */
@@ -159,9 +224,62 @@ export class KimicodeExecutionRequests {
     return dynamic;
   }
 
+  /**
+   * Holds an auxiliary turn and returns the reference the backend will carry.
+   *
+   * The same reference space as a chat turn, deliberately: it is the same
+   * kernel carrying it, and a second space would be a second thing to keep
+   * bounded and a second place for a prompt to be retained.
+   */
+  referenceAuxiliary(request: KimicodeAuxiliaryRequest): string {
+    evict(this.auxiliary, this.limit);
+    const reference = this.nextReference();
+    this.auxiliary.set(reference, request);
+    return reference;
+  }
+
+  async resolveAuxiliary(requestRef: string): Promise<ManagedAcpAuxiliaryInvocation> {
+    const request = this.auxiliary.get(requestRef);
+    if (!request) {
+      throw new Error('Unknown Kimi Code auxiliary request reference.');
+    }
+    this.auxiliary.delete(requestRef);
+    if (!this.auxiliaryEnvironment) {
+      throw new Error('Kimi Code auxiliary execution has no environment.');
+    }
+    const environment = await this.auxiliaryEnvironment(request);
+    evict(this.startups, this.limit);
+    const startupRef = this.nextReference();
+    this.startups.set(startupRef, {
+      executable: environment.executable,
+      arguments: ['acp'],
+      cwd: environment.cwd,
+      environment: { ...environment.environment },
+    });
+    return {
+      startupRef,
+      cwd: environment.cwd,
+      prompt: [{ type: 'text', text: request.prompt }],
+      mcpServers: [],
+      // One retained process per purpose, relaunched when the launch it was
+      // started for is no longer the launch this turn asks for — a system
+      // prompt edited in settings, a CLI path changed, an environment rewritten.
+      retentionKey: auxiliaryRetentionKey(request.purpose, request.conversationId),
+      restartFingerprint: fingerprint(environment.launchKey),
+      // The agent, when the session opens: it is what the permissions in the
+      // generated config are attached to, and an auxiliary turn that ran as the
+      // default agent would run with the vault's own tool permissions.
+      sessionConfiguration: [{ configId: 'mode', value: environment.agentId }],
+      ...(environment.modelId
+        ? { turnConfiguration: [{ configId: 'model', value: environment.modelId }] }
+        : {}),
+    };
+  }
+
   /** Drops everything held for turns that will never dispatch. */
   dispose(): void {
     this.pending.clear();
+    this.auxiliary.clear();
     this.startups.clear();
     this.dynamics.clear();
   }
@@ -188,6 +306,20 @@ export class KimicodeExecutionRequests {
  */
 function fingerprint(launchKey: string): string {
   return createHash('sha256').update(launchKey).digest('hex');
+}
+
+/**
+ * The key one auxiliary conversation is retained under.
+ *
+ * Exported because the caller that ends a conversation has to name the same one
+ * the store minted: `AuxQueryRunner.reset()` knows which runner it is, and the
+ * runner is the conversation.
+ */
+export function auxiliaryRetentionKey(
+  purpose: KimicodeAuxiliaryPurpose,
+  conversationId: string,
+): string {
+  return `kimicode-auxiliary:${purpose}:${conversationId}`;
 }
 
 function evict(store: Map<string, unknown>, limit: number): void {

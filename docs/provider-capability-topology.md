@@ -64,7 +64,7 @@ on top of the four every provider gets — new session, cancel, history, model s
 | Codex | isolated | `runtime/CodexAuxQueryRunner.ts` |
 | Gemini | no-op | `auxiliary/GeminiNoopServices.ts` |
 | Grok | isolated | `runtime/GrokAuxQueryRunner.ts` |
-| Kimi Code | isolated | `runtime/KimicodeAuxQueryRunner.ts` |
+| Kimi Code | kernel-isolated | `app/execution/kimicode/KimicodeExecutionComposition.ts` |
 | MiMoCode | kernel-isolated | `app/execution/mimocode/MimocodeExecutionComposition.ts` |
 | OpenCode | kernel-isolated | `app/execution/opencode/OpencodeExecutionComposition.ts` |
 | Qwen | no-op | `auxiliary/QwenNoopServices.ts` |
@@ -81,12 +81,12 @@ assumed:
 - **Codex** starts a second app-server process and its own thread for auxiliary work — the class
   that does it says so in its own documentation comment, and owns its process, transport, and
   thread id;
-- **the managed-ACP two** (Grok, Kimi Code) give each auxiliary runner its own
+- **Grok** gives its auxiliary runner its own
   subprocess, transport, and session id, and write launch artifacts under
   `.grimoire/<provider>/auxiliary/<purpose>/` instead of the chat path's `.grimoire/<provider>/`.
   For Grok the managed `GROK_HOME` is derived from that subdirectory, so even the provider home is
   partitioned;
-- **OpenCode and MiMoCode** keep all of that and no longer keep a runner. Their auxiliary work runs on the
+- **OpenCode, MiMoCode and Kimi Code** keep all of that and no longer keep a runner. Their auxiliary work runs on the
   execution kernel: each composition launches it through **its own client factory**, into the same
   `auxiliary/<purpose>/` artifacts, as an agent whose permissions deny writing. The client factory is
   the part worth reading twice — a chat turn in full access opts out of workspace containment

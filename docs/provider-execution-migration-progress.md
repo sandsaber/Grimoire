@@ -6646,6 +6646,23 @@ and it is recorded as one below.
 
 Gates: unit 518 suites / 8,076 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
 
+### Kimi Code's auxiliary flip — the third fork, and the last of the family (this commit)
+
+`KimicodeAuxQueryRunner` is deleted. The three OpenCode forks now run auxiliary work on the kernel, and
+their auxiliary halves are byte-identical after normalizing the provider name — compositions, stores,
+services and tests.
+
+Kimi Code's runner was **identical to MiMoCode's** after normalization, including the `limit: 0` read
+defect, so the flip carries the same fix for a third time without anyone having to port it.
+
+Six breaks, six caught. The one that was green on the first two providers — pointing the auxiliary
+path at the chat client factory — is red here, because the topology gate reads the wiring line now.
+
+What is left of this checkpoint: **Grok**, whose runner is the last managed-ACP one, and **Codex**,
+which is a different transport and a separate design question.
+
+Gates: unit 519 suites / 8,093 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6679,12 +6696,12 @@ consumer needs a conversation. Corrected, proven, still dark. What is left there
 and the runner adapter per provider, then the flip — and the stderr a failed auxiliary error carries
 today, which needs the client contract to grow.
 
-**The next M5 piece to pick up** is the same flip for Kimi Code and Grok, then Codex, which is a
-different transport. OpenCode's and MiMoCode's are the template and it is small: an auxiliary
-environment builder in the composition, three one-line services, a `kernel-isolated` topology record,
-and the runner deleted. Kimi Code is a third fork of the same CLI, so the normalized diff carries most
-of it. Do them one at a time, and read each runner before deleting it — OpenCode's had a containment
-rule the kernel path did not, and MiMoCode's had a `limit: 0` defect OpenCode's had already fixed.
+**The next M5 piece to pick up** is Grok's auxiliary flip — the last managed-ACP runner — and then
+Codex, which is a different transport and a separate design question. The three forks are the
+template: an auxiliary environment builder in the composition, three one-line services, a
+`kernel-isolated` topology record, and the runner deleted. Grok is **not** a fork of the same CLI, so
+read its runner rather than diffing it: it derives `GROK_HOME` from the auxiliary subdirectory, which
+is a partitioning the other three do not have and the kernel path must keep.
 
 **Owed on the auxiliary path:** nothing exercises the real auxiliary client factory. The composition
 tests inject one, so what proves an auxiliary turn is contained is the filesystem policy's own test

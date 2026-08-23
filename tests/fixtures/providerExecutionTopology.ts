@@ -262,14 +262,18 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     sessionBoundary: 'acp-session',
     resume: 'native',
     concurrency: 'one ACP session per conversation runtime',
-    auxiliary: 'isolated',
-    auxiliaryOwner: 'src/providers/kimicode/runtime/KimicodeAuxQueryRunner.ts',
+    // The third fork of the same CLI, and the third auxiliary path on the
+    // kernel: these three do not diverge.
+    auxiliary: 'kernel-isolated',
+    auxiliaryOwner: 'src/app/execution/kimicode/KimicodeExecutionComposition.ts',
     sharedResources: MANAGED_ACP_SHARED_RESOURCES('kimicode'),
     capabilities: KIMICODE_PROVIDER_CAPABILITIES,
     isolationEvidence: 'kimicode/auxiliary/',
     evidence: [
       'src/providers/kimicode/execution/KimicodeExecutionBackend.ts',
-      'src/providers/kimicode/runtime/KimicodeAuxQueryRunner.ts',
+      'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
+      'src/providers/kimicode/execution/KimicodeAuxiliaryFileSystem.ts',
+      'src/providers/kimicode/runtime/KimicodeAuxiliaryAgents.ts',
       'src/providers/kimicode/runtime/KimicodeLaunchArtifacts.ts',
     ],
   },

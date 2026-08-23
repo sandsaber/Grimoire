@@ -887,7 +887,7 @@ export class MimocodeExecution {
    * turn's configuration.
    */
   /**
-   * What an auxiliary `mimocode acp` is launched under.
+   * What an auxiliary `mimo acp` is launched under.
    *
    * The chat environment's shape with three differences, and each is what makes
    * an auxiliary turn auxiliary: its **own artifacts directory** per purpose, so

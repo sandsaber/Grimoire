@@ -800,10 +800,10 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'Auxiliary execution — titles, refinement, inline edits — on the kernel rather than on a provider runner that owns its own process.',
     state: 'wired',
     modules: [
-      // Live for OpenCode and MiMoCode, whose auxiliary services ask the kernel
-      // and whose own runners are deleted. Grok and Kimi Code still have theirs;
-      // each is one line per service away, and each needs its own commit rather
-      // than a sweep.
+      // Live for the three forks of the OpenCode CLI, whose auxiliary services
+      // ask the kernel and whose own runners are deleted. Grok still has its
+      // own, and Codex's is a different transport; each is its own commit
+      // rather than a sweep.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
       'src/app/execution/acp/ManagedAcpAuxQueryRunner.ts',
       // Built when it is asked a question rather than when it is constructed,
@@ -817,6 +817,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/opencode/execution/OpencodeAuxiliaryFileSystem.ts',
       'src/providers/mimocode/runtime/MimocodeAuxiliaryAgents.ts',
       'src/providers/mimocode/execution/MimocodeAuxiliaryFileSystem.ts',
+      'src/providers/kimicode/runtime/KimicodeAuxiliaryAgents.ts',
+      'src/providers/kimicode/execution/KimicodeAuxiliaryFileSystem.ts',
     ],
   },
 ];
