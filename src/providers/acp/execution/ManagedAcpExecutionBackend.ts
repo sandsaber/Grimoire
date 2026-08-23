@@ -118,7 +118,15 @@ export interface ManagedAcpPreparedInteraction {
   readonly presentationRef: string;
   readonly responseIds: readonly string[];
   readonly providerResolvedResponseId: string;
-  resolve(responseId: string): Promise<AcpRequestPermissionResponse>;
+  /**
+   * The option that was chosen, and what was answered where choosing was not the
+   * whole answer.
+   *
+   * `payload` is opaque and arrives from the resolution the surface sent. An
+   * approval never has one; a question does, because ACP's own reply carries
+   * structured answers beside the option id.
+   */
+  resolve(responseId: string, payload?: unknown): Promise<AcpRequestPermissionResponse>;
   cancel(): Promise<AcpRequestPermissionResponse>;
 }
 
@@ -269,7 +277,7 @@ implements ExecutionBackend, InteractionPort, ExecutionRecoveryPort {
     await this.settlePendingInteraction(
       pending,
       resolution.responseId,
-      () => pending.prepared.resolve(resolution.responseId),
+      () => pending.prepared.resolve(resolution.responseId, resolution.payload),
     );
   }
 

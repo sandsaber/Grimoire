@@ -1590,6 +1590,24 @@ export class ExecutionLifecycleRegistry {
     for (const [id, interaction] of this.interactions) {
       if (interaction.record.status === 'resolving'
         && interaction.record.selectedResponseId) {
+        if (interaction.record.kind === 'question') {
+          // **A question cannot be replayed.** Its answer travelled on the
+          // resolution and was never written down — D2 forbids a second copy of
+          // what a person typed — so all that survives a reload is the response
+          // id, and completing the interaction with that alone would tell the
+          // agent an answer nobody gave. Turned into a cancellation instead,
+          // which is what a closed tab already means and the only honest
+          // outcome here.
+          const updated = await this.repositories.interactions.update(
+            interaction.record.interactionId,
+            interaction.revision,
+            record => ({ ...record, status: 'cancelling', updatedAt: this.now() }),
+          );
+          interaction.record = updated.payload;
+          interaction.revision = updated.revision;
+          await this.cancelInteraction(id);
+          continue;
+        }
         await this.resolveInteraction({
           interactionId: id,
           responseId: interaction.record.selectedResponseId,

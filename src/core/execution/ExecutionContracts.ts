@@ -173,6 +173,24 @@ export interface InteractionResolution {
   readonly interactionId: InteractionId;
   readonly responseId: string;
   readonly resolvedAt: number;
+  /**
+   * What the person answered, where choosing an option was not the whole answer.
+   *
+   * Opaque to core, like `requestRef` and `presentationRef`: only the provider
+   * that opened the interaction knows what one of its own answers looks like.
+   * Qwen is why it exists — it asks structured questions over the ACP permission
+   * channel and its reply carries the answers beside the option id, and until
+   * this field a response id was the only thing that could come back.
+   *
+   * **Never persisted, and that is a rule rather than an omission.** D2 forbids
+   * a second copy of what the user typed in the control store, and answers are
+   * exactly that. It travels from the surface to the provider and is gone — so a
+   * resolution that has to be replayed after a restart cannot be replayed
+   * faithfully, and `resolveInteraction` refuses to try: a question caught
+   * mid-resolution by a reload is cancelled rather than completed with an answer
+   * nobody gave.
+   */
+  readonly payload?: unknown;
 }
 
 export interface InteractionPort {

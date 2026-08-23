@@ -154,7 +154,7 @@ export class AcpPermissionBridge implements ManagedAcpInteractionBridge {
         PROVIDER_RESOLVED,
       ],
       providerResolvedResponseId: PROVIDER_RESOLVED,
-      resolve: async responseId => {
+      resolve: async (responseId: string) => {
         this.forget(presentationRef);
         if (responseId === CANCEL || responseId === PROVIDER_RESOLVED) {
           // Dismissing a prompt is not choosing anything, and ACP has a word

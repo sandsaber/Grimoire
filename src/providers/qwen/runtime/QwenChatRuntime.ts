@@ -58,6 +58,12 @@ import { normalizeApprovalInput } from '../../acp/execution/AcpPermissionBridge'
 import { toAcpMcpServers } from '../../acp/mcp/toAcpMcpServers';
 import { qwenPlanUsageStore } from '../app/QwenPlanUsageStore';
 import { QWEN_PROVIDER_CAPABILITIES } from '../capabilities';
+import {
+  getQwenAskUserQuestions,
+  mapQwenQuestionAnswers,
+  type QwenAskUserQuestion,
+  type QwenAskUserQuestionResponse,
+} from '../execution/QwenAskUserQuestion';
 import { buildQwenPermissionPresentation } from '../execution/QwenPermissionPresentation';
 import { QwenSessionConfigState } from '../execution/QwenSessionConfigState';
 import { mapGrimoireModeToQwen } from '../modes';
@@ -776,7 +782,7 @@ export class QwenChatRuntime implements ChatRuntime {
   private async handleAskUserQuestionPermission(
     request: AcpRequestPermissionRequest,
     questions: QwenAskUserQuestion[],
-  ): Promise<QwenAskUserQuestionPermissionResponse> {
+  ): Promise<QwenAskUserQuestionResponse> {
     if (!this.askUserQuestionCallback) {
       return { outcome: { outcome: 'cancelled' } };
     }
@@ -983,91 +989,4 @@ function mapQwenApprovalDecision(
     if (option) return { outcome: { optionId: option.optionId, outcome: 'selected' } };
   }
   return { outcome: { outcome: 'cancelled' } };
-}
-
-interface QwenAskUserQuestion {
-  header?: string;
-  id?: string;
-  multiSelect: boolean;
-  options: Array<{ description?: string; label: string; preview?: string }>;
-  question: string;
-}
-
-type QwenAskUserQuestionPermissionResponse = AcpRequestPermissionResponse & {
-  answers?: Record<string, string>;
-};
-
-function getQwenAskUserQuestions(
-  request: AcpRequestPermissionRequest,
-): QwenAskUserQuestion[] | null {
-  const rawInput = asRecord(request.toolCall.rawInput);
-  const meta = asRecord(request.toolCall._meta);
-  const isQwenQuestion = meta?.qwenInteractionKind === 'user_question'
-    || meta?.toolName === 'ask_user_question'
-    || (Array.isArray(rawInput?.questions) && /^Ask user \d+ questions?$/i.test(request.toolCall.title ?? ''));
-  if (!isQwenQuestion) {
-    return null;
-  }
-
-  const source = Array.isArray(rawInput?.questions)
-    ? rawInput.questions
-    : Array.isArray(meta?.qwenQuestions)
-    ? meta.qwenQuestions
-    : [];
-  const questions = source.map(normalizeQwenAskUserQuestion).filter(
-    (question): question is QwenAskUserQuestion => question !== null,
-  );
-  return questions;
-}
-
-function normalizeQwenAskUserQuestion(value: unknown): QwenAskUserQuestion | null {
-  const question = asRecord(value);
-  if (!question || typeof question.question !== 'string') {
-    return null;
-  }
-
-  return {
-    ...(typeof question.header === 'string' ? { header: question.header } : {}),
-    ...(typeof question.id === 'string' ? { id: question.id } : {}),
-    multiSelect: question.multiSelect === true,
-    options: Array.isArray(question.options)
-      ? question.options.map(normalizeQwenAskUserQuestionOption).filter(
-        (option): option is QwenAskUserQuestion['options'][number] => option !== null,
-      )
-      : [],
-    question: question.question,
-  };
-}
-
-function normalizeQwenAskUserQuestionOption(
-  value: unknown,
-): QwenAskUserQuestion['options'][number] | null {
-  if (typeof value === 'string') {
-    return { label: value };
-  }
-  const option = asRecord(value);
-  if (!option || typeof option.label !== 'string') {
-    return null;
-  }
-  return {
-    ...(typeof option.description === 'string' ? { description: option.description } : {}),
-    label: option.label,
-    ...(typeof option.preview === 'string' ? { preview: option.preview } : {}),
-  };
-}
-
-function mapQwenQuestionAnswers(
-  answers: Record<string, string | string[]>,
-  questions: readonly QwenAskUserQuestion[],
-): Record<string, string> {
-  return Object.fromEntries(questions.flatMap((question, index) => {
-    const answer = (question.id ? answers[question.id] : undefined) ?? answers[question.question];
-    return answer === undefined ? [] : [[String(index), Array.isArray(answer) ? answer.join(', ') : answer]];
-  }));
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
 }

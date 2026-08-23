@@ -3,7 +3,13 @@ import {
   AcpPermissionBridge,
   normalizeApprovalInput,
 } from '@/providers/acp/execution/AcpPermissionBridge';
+import type { ManagedAcpPreparedInteraction } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
 import type { AcpRequestPermissionRequest } from '@/providers/acp/types';
+import {
+  mapQwenQuestionAnswers,
+  type QwenAskUserQuestion,
+  type QwenAskUserQuestionResponse,
+} from '@/providers/qwen/execution/QwenAskUserQuestion';
 import { buildQwenPermissionPresentation } from '@/providers/qwen/execution/QwenPermissionPresentation';
 
 export type {
@@ -43,32 +49,72 @@ export class QwenInteractionBridge extends AcpPermissionBridge {
   }
 }
 
+/** The response id a question is answered under; the answer rides beside it. */
+const ANSWERED = 'answered';
+const CANCEL = 'cancel';
+
 /**
- * Whether this permission request is really a question for the person.
+ * The bridge for the one interaction that is not a permission.
  *
- * Qwen sends `ask_user_question` down the **permission** channel, marked three
- * different ways depending on the release — a `_meta.qwenInteractionKind`, a
- * `_meta.toolName`, or a title that reads "Ask user N questions" over a
- * `questions` array. All three are what `QwenChatRuntime` already looks for, and
- * this is that predicate moved rather than a new opinion about it.
+ * Qwen sends `ask_user_question` down the **permission** channel, and its reply
+ * carries structured answers beside the option id. That is why
+ * `InteractionResolution` has a payload at all: a response id alone cannot say
+ * what somebody typed.
  *
- * It exists here so the flip can *see* the case it cannot yet carry, rather than
- * treating it as an approval and asking someone to allow or deny a question. See
- * the progress journal: the kernel's `InteractionResolution` carries a response
- * id and nothing else, so a question's structured answers have no way home.
+ * Opened as `kind: 'question'`, which the kernel has modelled since M1 and which
+ * nothing had ever carried — so this is the first interaction of that kind in
+ * the product, and the reason the registry now refuses to *replay* one: the
+ * answer is never written down, so a question caught mid-resolution by a reload
+ * is cancelled rather than completed with an answer nobody gave.
  */
-export function isQwenAskUserQuestionRequest(request: AcpRequestPermissionRequest): boolean {
-  const rawInput = asRecord(request.toolCall.rawInput);
-  const meta = asRecord((request.toolCall as { _meta?: unknown })._meta);
-  return meta?.qwenInteractionKind === 'user_question'
-    || meta?.toolName === 'ask_user_question'
-    || (Array.isArray(rawInput?.questions)
-      && /^Ask user \d+ questions?$/i.test(request.toolCall.title ?? ''));
+export function prepareQwenQuestion(
+  request: AcpRequestPermissionRequest,
+  questions: readonly QwenAskUserQuestion[],
+  presentationRef: string,
+  remember: (ref: string, questions: readonly QwenAskUserQuestion[]) => void,
+  forget: (ref: string) => void,
+): ManagedAcpPreparedInteraction {
+  // The option the agent offers for "the person answered". Without one there is
+  // nothing to select, and the honest reply is that nobody answered.
+  const allowOnce = request.options.find(option => option.kind === 'allow_once');
+  remember(presentationRef, questions);
+  return {
+    kind: 'question',
+    presentationRef,
+    responseIds: [ANSWERED, CANCEL],
+    providerResolvedResponseId: CANCEL,
+    resolve: async (responseId, payload) => {
+      forget(presentationRef);
+      const answers = readAnswers(payload);
+      if (responseId !== ANSWERED || !allowOnce || !answers) {
+        return { outcome: { outcome: 'cancelled' } };
+      }
+      return {
+        answers: mapQwenQuestionAnswers(answers, questions),
+        outcome: { optionId: allowOnce.optionId, outcome: 'selected' },
+      } satisfies QwenAskUserQuestionResponse;
+    },
+    cancel: async () => {
+      forget(presentationRef);
+      return { outcome: { outcome: 'cancelled' } };
+    },
+  };
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
+/**
+ * The answers out of an opaque payload, or nothing.
+ *
+ * The payload crossed a boundary core does not read, so nothing upstream
+ * guarantees its shape — and a malformed one must read as "nobody answered"
+ * rather than as an answer of `{}`, which the agent would act on.
+ */
+function readAnswers(payload: unknown): Record<string, string | string[]> | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+  const answers = (payload as { answers?: unknown }).answers;
+  return answers && typeof answers === 'object' && !Array.isArray(answers)
+    ? answers as Record<string, string | string[]>
     : null;
 }
 

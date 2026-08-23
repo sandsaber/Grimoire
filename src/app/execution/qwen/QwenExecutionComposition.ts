@@ -5,6 +5,7 @@ import {
   type QwenMetadataLaunch,
   QwenMetadataSession,
 } from '@/app/execution/qwen/QwenMetadataSession';
+import type { InteractionRequest } from '@/core/execution/ExecutionContracts';
 import {
   executionSessionId,
   interactionId,
@@ -28,6 +29,7 @@ import {
   type BoundConversation,
   ExecutionChatRuntimeAdapter,
   type ExecutionChatRuntimeHostPorts,
+  type ExecutionInteractionAnswer,
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type {
   ApprovalCallback,
@@ -47,6 +49,10 @@ import { QWEN_PROVIDER_CAPABILITIES } from '@/providers/qwen/capabilities';
 import type { QwenAcpDynamicConfig } from '@/providers/qwen/execution/QwenAcpDynamicConfig';
 import { QwenAcpDynamicConfigApplier } from '@/providers/qwen/execution/QwenAcpDynamicConfig';
 import { QwenAcpFileSystem } from '@/providers/qwen/execution/QwenAcpFileSystem';
+import {
+  getQwenAskUserQuestions,
+  type QwenAskUserQuestion,
+} from '@/providers/qwen/execution/QwenAskUserQuestion';
 import { QwenContentPresenter } from '@/providers/qwen/execution/QwenContentPresenter';
 import {
   QwenExecutionBackend,
@@ -57,7 +63,7 @@ import {
   type QwenInvocationEnvironment,
 } from '@/providers/qwen/execution/QwenExecutionRequests';
 import {
-  isQwenAskUserQuestionRequest,
+  prepareQwenQuestion,
   QwenInteractionBridge,
   QwenInteractionPresenter,
 } from '@/providers/qwen/execution/QwenInteractionBridge';
@@ -135,10 +141,19 @@ export class QwenExecution {
    */
   private readonly writeApprovers = new Map<string, () => ApprovalCallback | undefined>();
 
-  private readonly presenters = new Set<QwenInteractionPresenter>();
+  private readonly presenters = new Set<QwenQuestionPresenter>();
 
   /** Which tab learns that a session took a reasoning level. */
   private readonly effortMarks = new Map<string, (effortLevel: string) => void>();
+
+  /**
+   * What each open question is asking, by the reference its interaction carries.
+   *
+   * Beside the permission bridge's own presentations and for the same reason:
+   * the backend is one for every tab, so what a request said has to be findable
+   * from the reference the kernel hands back rather than from a closure.
+   */
+  private readonly openQuestions = new Map<string, readonly QwenAskUserQuestion[]>();
 
   private backend: QwenExecutionBackend | undefined;
 
@@ -199,29 +214,26 @@ export class QwenExecution {
         /**
          * Every permission, and the one thing that is not a permission.
          *
-         * Qwen sends `ask_user_question` down the permission channel. The
-         * legacy runtime answers it through the tab's own question callback and
-         * replies with **structured answers** beside the option id — and the
-         * kernel cannot carry that: `InteractionResolution` is
-         * `{ interactionId, responseId, resolvedAt }`, with nowhere for an
-         * answer to ride, and `prepare` is bounded by `controlTimeoutMs` so the
-         * bridge cannot take the round trip itself either.
+         * Qwen sends `ask_user_question` down the permission channel, and its
+         * reply carries structured answers beside the option id. That is why
+         * `InteractionResolution` has a payload: until it did, a response id was
+         * the only thing that could come back, and this provider's flip waited
+         * on it rather than presenting a question as an approval.
          *
-         * So it is refused here, by name, and **this is why Qwen is not
-         * flipped**: presenting a question as an approval would ask a person to
-         * allow or deny a question, and answering it silently as `cancelled`
-         * without saying so would lose a feature the legacy runtime has. Both
-         * are worse than a flip that waits. See the progress journal's open
-         * obligations.
+         * Opened as `kind: 'question'` — the first interaction of that kind the
+         * product has ever carried, though the kernel has modelled it since M1.
          */
         prepare: async request => {
-          if (isQwenAskUserQuestionRequest(request)) {
-            throw new Error(
-              'Qwen ask-user-question cannot be carried by the kernel yet: an interaction '
-              + 'resolution has no room for the answers it must return.',
-            );
-          }
-          return this.interactions.prepare(request);
+          const questions = getQwenAskUserQuestions(request);
+          return questions
+            ? prepareQwenQuestion(
+              request,
+              questions,
+              opaqueId('qwq'),
+              (ref, asked) => this.openQuestions.set(ref, asked),
+              ref => this.openQuestions.delete(ref),
+            )
+            : this.interactions.prepare(request);
         },
       },
       resultSink: new QwenProjectionResultSink(),
@@ -347,8 +359,12 @@ export class QwenExecution {
       },
     });
 
-    const presenter = new QwenInteractionPresenter(
-      this.interactions,
+    const presenter = new QwenQuestionPresenter(
+      new QwenInteractionPresenter(
+        this.interactions,
+        () => adapter?.interactionCallbacks() ?? {},
+      ),
+      ref => this.openQuestions.get(ref),
       () => adapter?.interactionCallbacks() ?? {},
     );
     this.presenters.add(presenter);
@@ -548,6 +564,7 @@ export class QwenExecution {
       presenter.dismissAll();
     }
     this.presenters.clear();
+    this.openQuestions.clear();
     this.requests.dispose();
   }
 
@@ -808,5 +825,67 @@ class QwenRuntimeAdapter extends ExecutionChatRuntimeAdapter<QwenProviderSetting
     } finally {
       this.releaseTab();
     }
+  }
+}
+
+/**
+ * The two interactions one Qwen tab can be shown, behind one port.
+ *
+ * The adapter installs a single interaction presenter, and this provider opens
+ * two kinds through it. An approval goes to the shared ACP presenter, which
+ * every managed-ACP provider uses; a question goes to the tab's own question
+ * callback, which the chat surface already installs and which no other provider
+ * on this transport has ever had reason to reach.
+ */
+class QwenQuestionPresenter {
+  private readonly open = new Map<string, AbortController>();
+
+  constructor(
+    private readonly approvals: QwenInteractionPresenter,
+    private readonly questions: (presentationRef: string)
+    => readonly QwenAskUserQuestion[] | undefined,
+    private readonly callbacks: () => Readonly<Record<string, unknown>>,
+  ) {}
+
+  async present(request: InteractionRequest): Promise<string | ExecutionInteractionAnswer | null> {
+    const asked = this.questions(request.presentationRef);
+    if (!asked) {
+      return this.approvals.present(request);
+    }
+    const ask = this.callbacks().question as
+      | ((input: Record<string, unknown>, signal?: AbortSignal)
+      => Promise<Record<string, string | string[]> | null>)
+      | undefined;
+    if (typeof ask !== 'function') {
+      // No surface installed one, so nobody can answer. Cancelled rather than
+      // left open: a turn waiting on a prompt nothing will show never ends.
+      return 'cancel';
+    }
+    const abort = new AbortController();
+    this.open.set(request.presentationRef, abort);
+    try {
+      const answers = await ask({ questions: [...asked] }, abort.signal);
+      // The answers ride on the resolution and are never written down, which is
+      // what D2 requires of anything a person typed.
+      return answers === null ? 'cancel' : { responseId: 'answered', payload: { answers } };
+    } catch {
+      return 'cancel';
+    } finally {
+      this.open.delete(request.presentationRef);
+    }
+  }
+
+  dismiss(presentationRef: string): void {
+    this.open.get(presentationRef)?.abort();
+    this.open.delete(presentationRef);
+    this.approvals.dismiss(presentationRef);
+  }
+
+  dismissAll(): void {
+    for (const abort of this.open.values()) {
+      abort.abort();
+    }
+    this.open.clear();
+    this.approvals.dismissAll();
   }
 }

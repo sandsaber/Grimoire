@@ -965,28 +965,54 @@ describe('Qwen execution composition', () => {
     await host.dispose();
   });
 
-  it('opens no interaction for a question it cannot carry an answer to', async () => {
-    // **This is why Qwen is not flipped.** The CLI sends `ask_user_question`
-    // down the permission channel and the legacy runtime answers it with
-    // structured answers beside the option id. The kernel's
-    // `InteractionResolution` is `{ interactionId, responseId, resolvedAt }` —
-    // there is nowhere for an answer to ride — so carrying it would mean asking
-    // a person to allow or deny a question, and answering `cancelled` without
-    // saying so would lose a feature the legacy runtime has.
-    const { execution, host, events } = await createHarness({ asksQuestion: true });
+  it('asks the person the question, and sends the answers back with the choice', async () => {
+    // The first interaction of `kind: 'question'` the product has ever carried.
+    // The kernel has modelled the kind since M1 and nothing opened one, because
+    // a resolution could carry a response id and nothing else — and this
+    // provider's reply needs the answers beside the option id. That is what
+    // `InteractionResolution.payload` is for, and this is the whole path:
+    // agent → bridge → kernel → the tab's question callback → back.
+    const { execution, host, permissions } = await createHarness({ asksQuestion: true });
     const runtime = execution.createRuntime();
-    const asked: string[] = [];
+    const approvals: string[] = [];
+    const shown: unknown[] = [];
     runtime.setApprovalCallback(async (tool: string) => {
-      asked.push(tool);
+      approvals.push(tool);
       return 'allow';
+    });
+    (runtime as unknown as {
+      setAskUserQuestionCallback: (
+        callback: (input: Record<string, unknown>) => Promise<Record<string, string>>,
+      ) => void;
+    }).setAskUserQuestionCallback(async input => {
+      shown.push(input);
+      return { 'Which one?': 'the second' };
     });
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
 
-    // Not shown as an approval, and not shown at all: nobody is asked to allow
-    // or deny "Ask user 2 questions".
-    expect(asked).toEqual([]);
-    expect(events.some(envelope => envelope.event.kind === 'interaction-opened')).toBe(false);
+    // Not an approval. Nobody is asked to allow or deny a question.
+    expect(approvals).toEqual([]);
+    expect(shown).toEqual([{ questions: [expect.objectContaining({ question: 'Which one?' })] }]);
+    // Keyed by position, which is how the agent reads them back.
+    await expect(permissions[0]).resolves.toEqual({
+      answers: { 0: 'the second' },
+      outcome: { optionId: 'once', outcome: 'selected' },
+    });
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('tells the agent nobody answered when the surface has no way to ask', async () => {
+    // A tab that installed no question callback cannot show one, and a turn
+    // waiting on a prompt nothing will draw never ends. Cancelled is the honest
+    // answer and the one the legacy runtime gives.
+    const { execution, host, permissions } = await createHarness({ asksQuestion: true });
+    const runtime = execution.createRuntime();
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    await expect(permissions[0]).resolves.toEqual({ outcome: { outcome: 'cancelled' } });
     execution.dispose();
     await host.dispose();
   });

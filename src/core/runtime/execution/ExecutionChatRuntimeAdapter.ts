@@ -1293,8 +1293,21 @@ type MutableInteractionCallbacks = {
   -readonly [K in keyof ExecutionInteractionCallbacks]: ExecutionInteractionCallbacks[K];
 };
 
+/**
+ * What a surface answered an interaction with.
+ *
+ * A response id alone for an approval, which is all choosing an option is. A
+ * question needs the payload beside it, because the option says *that* the
+ * person answered and the payload says what they said — see
+ * `InteractionResolution.payload`, which never reaches the control store.
+ */
+export interface ExecutionInteractionAnswer {
+  readonly responseId: string;
+  readonly payload?: unknown;
+}
+
 export interface ExecutionInteractionPresenter {
-  present(request: InteractionRequest): Promise<string | null>;
+  present(request: InteractionRequest): Promise<string | ExecutionInteractionAnswer | null>;
 }
 
 /**
@@ -1346,17 +1359,21 @@ export class ExecutionInteractionBridge {
   }
 
   private async settle(request: InteractionRequest): Promise<void> {
-    const responseId = await this.presenter.present(request).catch(() => null);
-    if (responseId === null) {
+    const answer = await this.presenter.present(request).catch(() => null);
+    if (answer === null) {
       // A dismissal is the provider's problem to time out or cancel. Resolving
       // it with an invented answer would be the UI deciding on the user's
       // behalf, which is the one thing an approval prompt must never do.
       return;
     }
+    // A bare id is the old shape and the common one; a question answers with an
+    // id *and* what was said.
+    const resolved = typeof answer === 'string' ? { responseId: answer } : answer;
     await this.registry.resolveInteraction({
       interactionId: request.interactionId,
-      responseId,
+      responseId: resolved.responseId,
       resolvedAt: this.now(),
+      ...(resolved.payload === undefined ? {} : { payload: resolved.payload }),
     }).catch(() => {
       // Already resolved, expired, or fenced: the registry is the authority on
       // which of those happened, and it has already recorded it.

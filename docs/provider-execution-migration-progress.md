@@ -6203,6 +6203,43 @@ it was cleared.
 Gates: unit 512 suites / 7,992 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### The first question the kernel has ever carried (this commit)
+
+The obligation that was blocking Qwen's flip, closed — and it needed a core contract rather than a
+provider workaround.
+
+**`InteractionResolution` gained a payload, and it is never written down.** An approval is fully
+described by the option someone chose; a question is not — Qwen's reply carries structured answers
+beside the option id, and until now a response id was the only thing that could come back. The field
+is opaque to core, like `requestRef` and `presentationRef`, and **D2 decides the rest**: what a person
+typed does not get a second copy in the control store, so the payload travels from the surface to the
+provider and is gone.
+
+**Which forces an honest answer to a question nobody had asked: what happens to an answer caught by a
+reload?** The registry replays a `resolving` interaction on startup from its persisted record, and
+for a question all that survives is the response id. Completing it with that alone would tell the
+agent an answer nobody gave. So a question is **cancelled** on recovery instead — what a closed tab
+already means, and the only outcome that is true. The test that used to cover the replay path was
+using `kind: 'question'` incidentally; it is an approval now, with the question rule beside it.
+
+**The path end to end**: the agent's `ask_user_question` arrives on the ACP permission channel; the
+composition's bridge recognizes it by any of the three markings this CLI has used across releases and
+prepares `kind: 'question'`; the kernel opens it; the tab's own question callback — which the chat
+surface has installed all along and no provider had ever reached — shows it; and the answers come back
+on the resolution and are keyed by position for the agent. `ExecutionInteractionPresenter` now answers
+with an id **or** an id and a payload, which keeps every existing presenter unchanged.
+
+Three refusals guard it, and the last one was a miss the breaks found: a payload of the wrong shape
+reads as **nobody answered** rather than as an empty answer, because `{}` is something the agent would
+act on. Nothing exercised that until the helpers got their own test.
+
+Nine breaks. Six red, one hung — a surface with no question callback leaving the turn open, which is
+the failure the code comments predict and which the suite catches by never finishing — and the last
+two red once the guard was covered.
+
+Gates: unit 513 suites / 8,004 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6697,6 +6734,11 @@ Open obligations, each with an owner:
   backend, before the next flip. Smaller and beside it: an ACP `fs/read_text_file` for a file that does
   not exist surfaces as a bare internal error, indistinguishable from a containment refusal, and
   Gemini abandons its write tool rather than raising the permission request when it sees one;
+- ~~**an interaction resolution has no room for an answer, and Qwen's flip waits on it.**~~
+  **Closed in the commit below this entry.** `InteractionResolution` gained an opaque `payload` that
+  is never persisted, the registry cancels a question caught mid-resolution rather than replaying it
+  without its answer, and Qwen opens the first `kind: 'question'` interaction the product has ever
+  carried. The original entry follows:
 - **an interaction resolution has no room for an answer, and Qwen's flip waits on it.** Qwen sends
   `ask_user_question` down the ACP permission channel, and `QwenChatRuntime` answers it with
   **structured answers** beside the option id. `InteractionResolution` is

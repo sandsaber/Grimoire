@@ -645,8 +645,11 @@ describe('ExecutionLifecycleRegistry', () => {
       interaction: {
         interactionId: INTERACTION_ID,
         runId: RUN_ID,
-        kind: 'question',
-        presentationRef: 'question-restart',
+        // An approval, because that is the kind a response id fully describes.
+        // A question carries an answer beside it, which is never written down —
+        // see the case below.
+        kind: 'approval',
+        presentationRef: 'approval-restart',
         responseIds: ['yes', 'no'],
       },
     });
@@ -666,6 +669,44 @@ describe('ExecutionLifecycleRegistry', () => {
     expect(restored.backend.resolutions).toEqual([
       expect.objectContaining({ interactionId: INTERACTION_ID, responseId: 'yes' }),
     ]);
+  });
+
+  it('cancels a question caught mid-resolution rather than replaying it', async () => {
+    // The answer travelled on the resolution and was never written down — D2
+    // forbids a second copy of what a person typed — so a reload leaves only the
+    // response id. Completing the interaction with that alone would tell the
+    // agent an answer nobody gave, so it is cancelled: what a closed tab already
+    // means, and the only honest outcome here.
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage, { transactionOffset: 0 });
+    await startDefaultRun(first);
+    first.backend.emit(RUN_ID, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: INTERACTION_ID,
+        runId: RUN_ID,
+        kind: 'question',
+        presentationRef: 'question-restart',
+        responseIds: ['yes', 'no'],
+      },
+    });
+    await settle(first.registry);
+    first.backend.interactionResolutionError = new Error('crash boundary');
+    await expect(first.registry.resolveInteraction({
+      interactionId: INTERACTION_ID,
+      responseId: 'yes',
+      resolvedAt: 60,
+      payload: { answers: ['the answer nobody will see again'] },
+    })).rejects.toThrow('crash boundary');
+
+    const restored = createFixture(storage, { transactionOffset: 1_000, instanceOffset: 10 });
+    restored.backend.nativeStatusRecovery.setEvidence(RUN_ID, { kind: 'running', sessionInstanceId: sessionInstanceId(`si-${'c'.repeat(32)}`) });
+    await restored.registry.start();
+
+    expect(restored.registry.getInteraction(INTERACTION_ID)?.status).toBe('cancelled');
+    // Not resolved with a response id and no answer, which is what replaying it
+    // would have been.
+    expect(restored.backend.resolutions).toEqual([]);
   });
 
   it('replays native interaction cancellation before declaring it cancelled', async () => {
