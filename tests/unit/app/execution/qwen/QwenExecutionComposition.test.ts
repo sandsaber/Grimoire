@@ -100,6 +100,7 @@ describe('Qwen execution composition', () => {
     asksQuestion?: boolean;
     dropsFirstPrompt?: boolean;
     refusesMode?: boolean;
+    refusesSession?: string;
     rejectsPrompt?: string;
     sessionLoadFails?: boolean;
     switchesMode?: string;
@@ -167,7 +168,11 @@ describe('Qwen execution composition', () => {
           // The recorded `session/new` reply, values and all: four modes the
           // CLI names itself, a model list whose current is `auto`, and no
           // config options.
-          newSession: async () => ({
+          newSession: async () => {
+            if (options.refusesSession) {
+              throw new JsonRpcErrorResponse('session/new', -32000, options.refusesSession);
+            }
+            return {
             sessionId,
             modes: {
               availableModes: [
@@ -190,7 +195,8 @@ describe('Qwen execution composition', () => {
               ],
               currentModelId: 'qwen3-coder-plus',
             },
-          }),
+            };
+          },
           loadSession: async request => {
             loadRequests.push(request);
             if (options.sessionIsGone) {
@@ -364,6 +370,7 @@ describe('Qwen execution composition', () => {
     asksQuestion?: boolean;
     dropsFirstPrompt?: boolean;
     refusesMode?: boolean;
+    refusesSession?: string;
     rejectsPrompt?: string;
     sessionLoadFails?: boolean;
     switchesMode?: string;
@@ -697,7 +704,29 @@ describe('Qwen execution composition', () => {
     await host.dispose();
   });
 
+  it('says why the agent would not open a session, in the agent words', async () => {
+    // The first thing a user without credentials meets, and what the harness
+    // found: `qwen 0.21.15` answers `session/new` with "Authentication
+    // required", and the classification alone could only guess — it told them a
+    // saved session may have gone and to start a new chat, which would fail the
+    // same way forever.
+    const { execution, host } = await createHarness({
+      refusesSession: 'Authentication required: Use Qwen Code CLI to authenticate first.',
+    });
+    const runtime = execution.createRuntime();
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks.filter(chunk => chunk.type === 'error').map(chunk => chunk.content))
+      .toEqual(['Authentication required: Use Qwen Code CLI to authenticate first.']);
+    execution.dispose();
+    await host.dispose();
+  });
+
   it('says what a turn that never started needs the person to do', async () => {
+    // A *load* failure keeps the composition's own sentence, deliberately: what
+    // an agent says about a session it cannot load is rarely actionable, while
+    // "starting a new chat will create one" is.
     const { execution, host } = await createHarness({ sessionLoadFails: true });
     const runtime = execution.createRuntime();
     runtime.syncConversationState({ providerState: {}, sessionId: 'ses-that-is-gone' });

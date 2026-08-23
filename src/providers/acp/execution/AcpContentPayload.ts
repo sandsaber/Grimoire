@@ -25,12 +25,18 @@ export type AcpContentPayload =
    * your daily quota on this model` became "Grimoire could not establish
    * whether this run completed."
    *
+   * **Both refusals, not only the prompt.** An agent that will not open a
+   * session refuses the turn just as completely, and its reason is usually the
+   * one a first-run user needs most: `qwen 0.21.15` answers `session/new` with
+   * "Authentication required: Use Qwen Code CLI to authenticate first", where
+   * the classification alone could only guess that a saved session had gone.
+   *
    * Carried here rather than on the terminal because a terminal reason is an
    * enum and this is a sentence. The presenter keeps it and the composition
    * hands it back through `describeFailure`, so the tab still renders exactly
    * one error for one failure.
    */
-  | { readonly kind: 'prompt-failed'; readonly message: string }
+  | { readonly kind: 'turn-refused'; readonly message: string }
   /**
    * A mode the session would not take, on the turn that asked for it.
    *

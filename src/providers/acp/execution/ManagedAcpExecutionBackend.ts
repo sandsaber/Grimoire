@@ -569,7 +569,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
     await this.ensureClient(invocation);
     if (run.isTerminal) return;
     const generation = this.clientGeneration;
-    const opened = await this.ensureSessionBinding(invocation, generation);
+    const opened = await this.openSessionBinding(run, invocation, generation);
     if (run.isTerminal || generation !== this.clientGeneration) return;
     if (opened) run.presentSessionConfig(opened);
     if (!this.client || !this.nativeSessionRef) {
@@ -781,6 +781,40 @@ class ManagedAcpExecutionSession implements ExecutionSession {
    * notification afterwards. Nothing is returned when the session the client
    * already holds is reused, because nothing new was said about it.
    */
+  /**
+   * The session this turn needs, and what the agent said if it would not give
+   * one.
+   *
+   * A refused session refuses the turn as completely as a refused prompt, and
+   * the reason is usually the one that matters most: an agent nobody has
+   * authenticated says so here, where the classification alone can only guess
+   * that a saved session went missing. Presented and then rethrown — the
+   * terminal is still `pre-dispatch-rejected`, because nothing ran.
+   *
+   * **A failed `session/load` is deliberately not covered**, and not by accident
+   * of where the wrapping happens: `ensureSessionBinding` turns it into a
+   * dispatch error before it escapes. What an agent says about a session it
+   * cannot load is usually nothing anyone can act on — OpenCode answers
+   * `Internal error: OpenCode service failure` — while the composition's own
+   * sentence names the one thing that helps, which is that starting a new chat
+   * makes a session. The agent wins where it knows more; the composition wins
+   * where it does.
+   */
+  private async openSessionBinding(
+    run: ManagedAcpExecutionRun,
+    invocation: ManagedAcpExecutionInvocation,
+    generation: number,
+  ): Promise<AcpNewSessionResponse | undefined> {
+    try {
+      return await this.ensureSessionBinding(invocation, generation);
+    } catch (error) {
+      if (error instanceof JsonRpcErrorResponse) {
+        run.presentTurnRefusal(error.message);
+      }
+      throw error;
+    }
+  }
+
   private async ensureSessionBinding(
     invocation: ManagedAcpExecutionInvocation,
     generation: number,
@@ -1029,15 +1063,18 @@ class ManagedAcpExecutionRun implements ExecutionRun {
    * that does not still gets `provider-failure` instead of a run whose outcome
    * could not be established, which is what every flipped provider had.
    */
-  failFromProviderRejection(error: JsonRpcErrorResponse): void {
+  /** What the agent said when it refused, on the channel the tab reads. */
+  presentTurnRefusal(message: string): void {
     if (this.terminal) return;
     this.emit({
       kind: 'provider-content',
-      payload: {
-        kind: 'prompt-failed',
-        message: error.message,
-      } satisfies AcpContentPayload,
+      payload: { kind: 'turn-refused', message } satisfies AcpContentPayload,
     });
+  }
+
+  failFromProviderRejection(error: JsonRpcErrorResponse): void {
+    if (this.terminal) return;
+    this.presentTurnRefusal(error.message);
     // Not side-effect free: the agent may have run tools before it refused.
     this.finish('failed', 'provider-failure');
   }

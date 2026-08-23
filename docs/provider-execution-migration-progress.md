@@ -6362,6 +6362,44 @@ hard to read.
 
 Gates: unit 514 suites / 7,994 tests, typecheck, `eslint`, `build:release`.
 
+### Qwen's live harness, and the defect it found before it could pass a row (this commit)
+
+The last provider gets the harness every flipped provider has. It cannot be certified here — `qwen
+0.21.15` refuses `session/new` with "Authentication required" — so this is written so that certifying
+it is a command someone types rather than a thing someone builds first.
+
+**It earned its keep on the run that could not open a session.** Every row reported:
+
+> Qwen could not start this turn. If this conversation was resumed from a saved session, that session
+> may no longer exist — starting a new chat will create one.
+
+Nothing had been resumed. It was the first turn of a fresh conversation, and the cause was the agent
+refusing to authenticate — so the advice would fail identically every time it was followed. That is
+the **first thing a new user of any of these providers meets**, and it was a guess.
+
+The channel already existed: the turn refusal added after Gemini's live smoke, which carried a refused
+*prompt* in the agent's own words. A refused **session** refuses the turn just as completely and its
+reason is the one that matters most, so both travel the same way now — renamed `turn-refused`, because
+the name is what the next reader has — across all six ACP providers. Confirmed against the same CLI
+that found it: the tab says *"Authentication required: Use Qwen Code CLI to authenticate first."*
+
+**A failed `session/load` deliberately keeps the composition's own sentence.** What an agent says about
+a session it cannot load is rarely actionable — OpenCode answers `Internal error: OpenCode service
+failure` — while "starting a new chat will create one" names the thing that helps. That split was
+accidental before this commit, a consequence of where the error happened to be wrapped; it is stated
+and tested now. The agent wins where it knows more; the composition wins where it does.
+
+Four rows in the new matrix are this provider's own and no sibling harness has them: the effort it
+applies by talking to the session, the question it asks over the permission channel, the context window
+from a method ACP does not define, and the subagent stream it must not draw. Row 21 reports "did not
+run" rather than failing when a turn does not reach for a question, because that is the agent's choice
+and a red row would be a lie about it.
+
+Three breaks, three caught.
+
+Gates: unit 514 suites / 7,997 tests, integration 145 (89 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

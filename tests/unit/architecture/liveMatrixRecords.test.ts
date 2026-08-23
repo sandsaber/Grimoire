@@ -56,6 +56,7 @@ describe('live smoke matrix records', () => {
       'grok-flip-smoke-matrix.md',
       'mimocode-flip-smoke-matrix.md',
       'opencode-flip-smoke-matrix.md',
+      'qwen-flip-smoke-matrix.md',
     ]);
   });
 
@@ -101,6 +102,10 @@ describe('live smoke matrix records', () => {
       // run", not "did it pass".
       'mimocode-flip-smoke-matrix.md: 2026-08-22',
       'opencode-flip-smoke-matrix.md: 2026-08-21',
+      // Run, and every row blocked — the CLI is not authenticated here, so no
+      // session has ever opened. A date is "when did this last run", not "did
+      // it pass", and this run found a defect before it could pass anything.
+      'qwen-flip-smoke-matrix.md: 2026-08-23',
     ]);
   });
 });

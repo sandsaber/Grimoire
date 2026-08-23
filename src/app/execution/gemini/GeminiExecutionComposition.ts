@@ -366,11 +366,19 @@ export class GeminiExecution {
        * rather than replacing it on an error that vague.
        */
       describeFailure: reason => {
+        // The agent's own words, where it gave any — for a refused prompt and
+        // for a session it would not open, which is the same refusal one step
+        // earlier and the one a first-run user meets. `undefined` falls through
+        // to the sentences below, which are what a provider that refused
+        // without saying anything deserves.
+        if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected') {
+          const refused = content.consumeTurnRefusal();
+          if (refused) {
+            return refused;
+          }
+        }
         if (reason === 'provider-failure') {
-          // The agent's own words, where it gave any. `undefined` falls through
-          // to the kernel's generic sentence, which is what a provider that
-          // failed without saying anything deserves.
-          return content.consumePromptFailure();
+          return undefined;
         }
         if (reason === 'spawn-failed') {
           // A desktop app does not inherit the shell PATH, which is the

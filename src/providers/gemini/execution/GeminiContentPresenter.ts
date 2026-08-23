@@ -69,7 +69,7 @@ export class GeminiContentPresenter {
   private readonly normalizer = new AcpSessionUpdateNormalizer();
   private sessionId: string | undefined;
   private metadata: ChatTurnMetadata = {};
-  private promptFailure: string | undefined;
+  private refusal: string | undefined;
   private contextUsage: AcpUsageUpdate | null = null;
   private promptUsage: AcpUsage | null = null;
 
@@ -94,10 +94,14 @@ export class GeminiContentPresenter {
    * error for one failure — the vendor's own words where there are any, and the
    * kernel's generic sentence where there are not. Every legacy ACP runtime
    * yielded this text and the flip lost it; this is where it comes back.
+   *
+   * Covers a refused *session* as well as a refused prompt: an agent nobody
+   * has authenticated says so here, where the classification alone could only
+   * guess that a saved session had gone missing.
    */
-  consumePromptFailure(): string | undefined {
-    const message = this.promptFailure;
-    this.promptFailure = undefined;
+  consumeTurnRefusal(): string | undefined {
+    const message = this.refusal;
+    this.refusal = undefined;
     return message;
   }
 
@@ -123,7 +127,7 @@ export class GeminiContentPresenter {
 
   /** Resets what only holds within one turn. */
   beginTurn(): void {
-    this.promptFailure = undefined;
+    this.refusal = undefined;
     this.normalizer.reset();
     this.contextUsage = null;
     this.promptUsage = null;
@@ -137,8 +141,8 @@ export class GeminiContentPresenter {
     if (content?.kind === 'session-config') {
       return this.presentSessionConfig(content.session);
     }
-    if (content?.kind === 'prompt-failed') {
-      this.promptFailure = content.message?.trim() || undefined;
+    if (content?.kind === 'turn-refused') {
+      this.refusal = content.message?.trim() || undefined;
       return [];
     }
     if (content?.kind === 'mode-refused' && content.modeId) {
