@@ -6710,19 +6710,45 @@ two now, and Antigravity is the only provider fully green on this machine.
 reader that matches nothing makes every assertion above it vacuous. Break the reader, not only the
 rule.
 
-**M5 has started**, with the auxiliary query rather than the projections: it is the module that was
-already dark and waiting, and reading it against `AuxQueryRunner` found it was built cold when the
-consumer needs a conversation. Corrected, proven, still dark. What is left there is the request store
-and the runner adapter per provider, then the flip — and the stderr a failed auxiliary error carries
-today, which needs the client contract to grow.
+**M5 has started, and its auxiliary checkpoint is three providers deep.** It began with the auxiliary
+query rather than the projections because that module was already dark and waiting — and reading it
+against `AuxQueryRunner` found it had been built **cold** when the consumer needs a conversation:
+inline edit's `continueConversation` is a second turn on the first turn's session. Corrected, then
+built end to end and flipped for **OpenCode, MiMoCode and Kimi Code**, whose three `*AuxQueryRunner`
+files are deleted. Their auxiliary halves are byte-identical after normalizing the provider name —
+compositions, stores, services and tests — and that is the property to keep.
 
-**The next M5 piece to pick up** is Grok's auxiliary flip — the last managed-ACP runner — and then
-Codex, which is a different transport and a separate design question. The three forks are the
-template: an auxiliary environment builder in the composition, three one-line services, a
-`kernel-isolated` topology record, and the runner deleted.
+**Two defects came out of reading each runner before deleting it**, neither found by looking for one.
+The kernel path would have let an unattended title read outside the vault whenever the *chat* was set
+to full access, because it would have inherited the chat's client factory; auxiliary work has its own
+now, contained whatever the chat is set to, refusing every write and every permission prompt. And
+MiMoCode's and Kimi Code's auxiliary reads carried a `limit: 0` bug that OpenCode's had already fixed
+and nobody had mirrored — the flip carries it away by deleting the file.
+
+**A Jest behaviour worth remembering, found by a break that would not go red:**
+`expect([undefined]).toEqual([])` **passes**. Anywhere a test asserts `toEqual([])` to mean *nothing
+happened*, a call that happened with an undefined argument passes it. Use `toHaveLength(0)`.
+
+### What to pick up tomorrow, in order
+
+1. **Grok's auxiliary flip** — the last managed-ACP runner, and small. Its prerequisites are below;
+   one of the three is already done.
+2. **Then stop before the projections and decide the order.** The plan puts **M3** (provider catalog)
+   and **M4** (revisioned persistence) before the rest of M5, and M4 is not merely earlier but
+   load-bearing: *"M5's multiple views and durable agents are unsafe without revisioned saves already
+   live underneath them."* Finishing M5's auxiliary checkpoint out of order was safe because it
+   touches no persistence; the projections and durable agents are not.
+3. **Codex's auxiliary work** is a separate design question — a second app-server process and its own
+   thread, not an ACP session — and does not have to ride with Grok.
+
+**One thing waiting on the owner rather than on code: D9, redo.** Re-running a request is free and
+needs no new state; undoing a rewind cannot be built on the control store, because D2 forbids a second
+copy of a provider transcript and the file backup is discarded after a successful rewind. Which of the
+two the product wants is the open question.
 
 **Grok is not a fork of the same CLI, and the diff against Kimi Code's was read before this was
-written.** Three differences, each of which changes the work:
+written.** Three differences, each of which changes the work — do not mirror it the way the three
+forks were mirrored:
 
 1. **No managed agent and no config file.** Where the forks write an agent definition whose
    permissions deny writing, Grok passes a `permissionMode` to its launch artifacts —
