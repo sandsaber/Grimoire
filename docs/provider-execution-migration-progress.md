@@ -5840,6 +5840,51 @@ not decoration.
 
 Gates: unit 504 suites / 7,875 tests, typecheck, `eslint`, `build:release`.
 
+### Gemini's composition and metadata session, dark (this commit)
+
+The last piece before the flip, and the end-to-end turn that has to be green
+before the flip is trusted — which is the order this wave promised and the one
+wave 1 proved the need for: a seam both sides stub is a seam nobody tests.
+
+The fifth ACP composition, and the fourth in a row to add nothing to the shared
+stack. What it contributes is mostly subtraction, and each absence is a fact
+about this CLI:
+
+- **no launch artifacts**, so `environment()` writes nothing and the launch key
+  is a command line rather than a directory. It is the legacy runtime's key plus
+  the MCP servers, for the reason Kimi's carries them: that runtime shut its
+  process down on an MCP reload, and a session already open is never told about
+  a list that changed under it;
+- **no conversation-scoped launch state**, so the requests store's environment
+  lambda takes no argument and the module context takes no ports;
+- **no session cost fallback**, because the spend indicator is fed from the wire
+  or not at all;
+- **no `runtimeCommands` slot**, because this provider's commands are the vault's
+  and the ones its session announces are dropped.
+
+Two things came out of writing the test rather than the code. The **first turn
+of a fresh vault sets no model at all**, and that is correct: the model list is
+answered by `session/new`, so a tab's first turn is composed before anything
+knows what to ask for. It runs on the agent's own current model — `auto` in the
+recording — and the turn that discovers the list is what makes the next one able
+to name it. And the **fifth review's G1 fix is now proven end to end**: a vault on
+Plan, meeting a session that reports `default`, keeps Plan and sends
+`set_mode: plan`. The break for it is the whole finding in one line.
+
+The prompt builders moved out of `GeminiChatRuntime` into
+`runtime/buildGeminiPrompt.ts` on the way, because the flip deletes that file and
+a turn composed by the kernel has to say exactly what a turn composed by the
+runtime said.
+
+Ten breaks, nine caught. **The miss was the turn boundary**: removing
+`content.beginTurn()` left every test green, because every turn in the fake
+reports the same context window. The case that catches it is a second turn that
+reports none — without the boundary it shows the first turn's numbers as its own.
+Covered, and red on the break now.
+
+Gates: unit 505 suites / 7,895 tests, integration 145 (61 env-gated skips),
+typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

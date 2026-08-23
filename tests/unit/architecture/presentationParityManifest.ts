@@ -760,7 +760,10 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // than written next to it, and `modes.ts`, which it imports for the mode
       // translation the fourth review asked for.
       // The module and its context, which Gemini reached the kernel without
-      // having at all: no other provider's flip had to write one first.
+      // having at all: no other provider's flip had to write one first, and the
+      // composition assembled from them.
+      'src/app/execution/gemini/GeminiExecutionComposition.ts',
+      'src/app/execution/gemini/GeminiMetadataSession.ts',
       'src/providers/gemini/GeminiProviderModule.ts',
       'src/providers/gemini/app/GeminiModuleContext.ts',
       'src/providers/gemini/execution/GeminiAcpDynamicConfig.ts',

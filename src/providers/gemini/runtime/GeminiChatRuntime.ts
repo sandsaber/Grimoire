@@ -6,7 +6,6 @@ import {
   isAcpMissingSessionError,
 } from '@/providers/acp/acpSessionResume';
 
-import { applyOrchestratorModeInstructions } from '../../../core/prompt/mainAgent';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type { ProviderCapabilities } from '../../../core/providers/types';
@@ -29,28 +28,15 @@ import type {
 import type {
   ChatMessage,
   Conversation,
-  ImageAttachment,
   SlashCommand,
   StreamChunk,
   ToolCallInfo,
 } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
-import { appendBrowserContext } from '../../../utils/browser';
-import { appendCanvasContext } from '../../../utils/canvas';
-import {
-  appendContextFiles,
-  appendCurrentNote,
-  appendExcludedFoldersContext,
-  appendProjectWorkspaceContext,
-  appendVaultSearchContext,
-} from '../../../utils/context';
-import { appendEditorContext } from '../../../utils/editor';
 import { getVaultPath } from '../../../utils/path';
-import { buildContextFromHistory, buildPromptWithHistoryContext } from '../../../utils/session';
 import {
   AcpClientConnection,
-  type AcpContentBlock,
   AcpJsonRpcTransport,
   type AcpReadTextFileRequest,
   type AcpRequestPermissionRequest,
@@ -73,6 +59,7 @@ import { buildGeminiPermissionPresentation } from '../execution/GeminiPermission
 import { GeminiSessionConfigState } from '../execution/GeminiSessionConfigState';
 import { mapGrimoireModeToGemini } from '../modes';
 import { getGeminiProviderSettings } from '../settings';
+import { buildGeminiPromptBlocks, buildGeminiPromptText } from './buildGeminiPrompt';
 import { buildGeminiRuntimeEnv } from './GeminiRuntimeEnvironment';
 
 interface ActiveTurn {
@@ -329,7 +316,7 @@ export class GeminiChatRuntime implements ChatRuntime {
       prompt: buildGeminiPromptBlocks(
         turn.request,
         shouldBootstrapHistory ? previousMessages : [],
-        queryOptions,
+        queryOptions?.orchestratorMode ? { orchestratorMode: true } : {},
       ),
       sessionId,
     }).then((response) => {
@@ -843,79 +830,4 @@ export class GeminiChatRuntime implements ChatRuntime {
       listener(ready);
     }
   }
-}
-
-function buildGeminiPromptBlocks(
-  request: ChatTurnRequest,
-  conversationHistory: ChatMessage[] = [],
-  queryOptions?: ChatRuntimeQueryOptions,
-): AcpContentBlock[] {
-  const prompt = buildGeminiPromptText(request, conversationHistory);
-  const text = request.orchestratorMode === true || queryOptions?.orchestratorMode === true
-    ? applyOrchestratorModeInstructions(prompt)
-    : prompt;
-  const blocks: AcpContentBlock[] = [{ text, type: 'text' }];
-  for (const image of request.images ?? []) {
-    blocks.push(toAcpImage(image));
-  }
-  return blocks;
-}
-
-function buildGeminiPromptText(
-  request: ChatTurnRequest,
-  conversationHistory: ChatMessage[] = [],
-): string {
-  let prompt = request.text;
-
-  if (request.excludedFolders && request.excludedFolders.length > 0) {
-    prompt = appendExcludedFoldersContext(prompt, request.excludedFolders);
-  }
-
-  if (request.currentNotePath) {
-    prompt = appendCurrentNote(prompt, request.currentNotePath);
-  }
-
-  if (request.vaultSearchContext) {
-    prompt = appendVaultSearchContext(prompt, request.vaultSearchContext);
-  }
-
-  if (request.contextFiles && request.contextFiles.length > 0) {
-    prompt = appendContextFiles(prompt, request.contextFiles);
-  }
-
-  if (request.projectWorkspaceContext) {
-    prompt = appendProjectWorkspaceContext(prompt, request.projectWorkspaceContext);
-  }
-
-  if (request.editorSelection) {
-    prompt = appendEditorContext(prompt, request.editorSelection);
-  }
-
-  if (request.browserSelection) {
-    prompt = appendBrowserContext(prompt, request.browserSelection);
-  }
-
-  if (request.canvasSelection) {
-    prompt = appendCanvasContext(prompt, request.canvasSelection);
-  }
-
-  if (conversationHistory.length > 0) {
-    const historyContext = buildContextFromHistory(conversationHistory);
-    prompt = buildPromptWithHistoryContext(
-      historyContext,
-      prompt,
-      prompt,
-      conversationHistory,
-    );
-  }
-
-  return prompt;
-}
-
-function toAcpImage(image: ImageAttachment): AcpContentBlock {
-  return {
-    data: image.data,
-    mimeType: image.mediaType,
-    type: 'image',
-  };
 }
