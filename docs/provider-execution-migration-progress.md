@@ -6139,6 +6139,44 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
+### Where the third session of 2026-08-23 ended
+
+**Wave 7 is past its midpoint. Gemini is flipped and certified as far as an account allows; Qwen Code
+— the last provider on the legacy path — has its module, its context and its session config state.**
+
+**Gemini's two open items are closed.** A mode the agent refuses no longer kills the turn *and* no
+longer runs silently: the turn carries a warning notice naming the mode in the toolbar's vocabulary
+with the agent's own reason behind it, once per session rather than once per turn. And the obligation
+the live smoke opened — a vendor error on the prompt handled as a dead connection, retried, then
+reported as a run whose outcome could not be established — is fixed for **all five** flipped ACP
+providers: a `JsonRpcErrorResponse` means the agent answered, so the turn ends with the vendor's own
+words instead of a reason code. That restores something the flips had lost.
+
+**Two defect classes turned out to be plural.** Neither was found by looking for it:
+
+- reading Gemini's module against its own chat UI config showed that **four modules out of seven**
+  described model ownership the way none of them behaves — by a settings list rather than the id
+  prefix — which at M3 would have shipped a provider whose model selector owns nothing;
+- extracting Qwen's session state found the fifth review's G1 *and* the fourth review's G2 alive in
+  it, the first in a worse form than Gemini's: the mode a session reports at open was pushed at the
+  toolbar, where `updatePlanModeUI` **commits** it, so a vault on Plan was switched to Safe and had
+  it saved on every session open.
+
+**What is left for Qwen, in order.** The remaining execution modules — the applier (model, mode, and
+a `/effort` prompt no sibling has), the filesystem, the permission presentation, the interaction
+bridge, the result sink, the content presenter, the requests store, and `buildQwenPrompt` out of the
+runtime. Then the composition, then the flip. Two things to decide on the way: the **ask-user-question
+interaction**, which would be the first `kind: 'question'` the kernel has ever carried, and whether
+the `/effort` prompt should stay a whole charged turn.
+
+**Qwen cannot be certified here** — `qwen 0.21.15` refuses `session/new` with "Authentication
+required" — so it flips from Kimi Code's position. **Gemini can**, one live run per day: the
+2026-08-23 run found three defects and a second pass the same day returned nothing but quota errors.
+
+**The technique that paid this session**: reading two providers side by side. The normalized diff said
+Qwen's runtime is a strict superset of Gemini's, which is what made deriving it safe — and the same
+habit, applied to a module and the config it replaces, is what turned one wrong line into four.
+
 ### Where the second session of 2026-08-23 ended
 
 **Wave 7 is half done: Gemini is flipped.** Seven providers execute through the kernel — Codex,
