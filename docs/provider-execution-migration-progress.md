@@ -6400,6 +6400,39 @@ Three breaks, three caught.
 Gates: unit 514 suites / 7,997 tests, integration 145 (89 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### D7 gets its guard, and the guard corrects the rule (this commit)
+
+The oldest obligation on the list, closed now that the kernel emits log records. It reads every
+`recordDebugLog` in the execution path, takes the keys each one logs, and runs D7's bans through them.
+
+**It found two things on its first run.** An event nobody had enumerated —
+`execution.connection.lost`, which Claude's composition has been emitting all along — and that
+`execution.setMode.refused` was logging `modeId: '[redacted-string]'`. The record added last session
+to say *which* mode the agent refused had been saying nothing at all. A mode id is provider
+vocabulary, and it is on the safe list now.
+
+**Then the gate had the defect it exists to prevent, and its own comment named it.** "A regex that
+silently matched nothing would make every assertion below vacuously true" — and the key extraction
+matched nothing, because it required a delimiter after each name that the last key of every call site
+does not have. Four of five breaks were green over an empty list. The guard-the-guard assertion
+checked that call *sites* were found and stopped there; it checks the keys now, which is the level the
+mistake was on.
+
+**And the rule turned out not to be the one I set out to prove.** A break that removed `prompt` from
+the sensitive-key pattern stayed green: `prompt` was never *allowed*. D7 rests on **default-deny** — a
+string is redacted unless its key is on the safe list — and the sensitive pattern is a second net for
+names that might otherwise look harmless. So the safe list is the only thing a reviewer has to read,
+and the gate's job is to make adding to it visible. A key nobody has thought about is in the test for
+exactly that reason.
+
+What it leaves is stated rather than implied: an error's own message is carried through, because that
+is the reason to keep a log at all. A provider that put a prompt into an error message would put it
+there — a review question about what providers raise, not a redaction question.
+
+Seven breaks, six caught; the seventh is green because it is not the gate, which is the finding.
+
+Gates: unit 515 suites / 8,012 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6939,10 +6972,12 @@ Open obligations, each with an owner:
   Claude message types" this entry used to claim was an unmeasured number. Owner: each provider's
   flip — and Claude's is owed a gate shaped like OpenCode's replay, since wave 3 has already
   flipped;
-- **three providers still need wire recordings** — Kimi Code, Qwen, Gemini — each before its own
-  flip, and MiMoCode owes the half of its own that a generating account would show. Grok's was taken at the start of wave 5, which is the order the plan asks for.
-  Owner: M2-flips, per provider. The recorder that takes them must redact: see the Grok entry for
-  what the first capture contained;
+- ~~**three providers still need wire recordings** — Kimi Code, Qwen, Gemini.~~ **All nine are taken.**
+  Gemini's is `complete`; Kimi Code's and Qwen's are `partial` because neither machine is
+  authenticated, and MiMoCode's because its account cannot generate — each says so in the file rather
+  than by being thin. What is still owed is the *answer* traffic those three would show, which is an
+  account rather than a recorder. The recorder that took them redacts: see the Grok entry for what the
+  first capture contained;
 - **awaiting an owner decision: redo.** Recorded as D9 in the persistence decisions. Re-running a
   request is free and needs no new state; undoing a rewind cannot be built on the control store,
   because D2 forbids a second copy of a provider transcript without exception, and the file backup
@@ -6982,8 +7017,13 @@ Open obligations, each with an owner:
   flip.** The fix is an optional opaque payload on the resolution, which reaches
   `ExecutionControlSchemas` and the control records, so it is a milestone rather than a patch. Owner:
   M5, before the Qwen flip;
-- D7 (diagnostic redaction) has no automated guard. Owner: M1 follow-up, once the kernel emits log
-  records;
+- ~~D7 (diagnostic redaction) has no automated guard.~~ **Closed in the commit below this entry**, now
+  that the kernel emits log records. `diagnosticRedaction.test.ts` reads every `recordDebugLog` in the
+  execution path, takes the keys each one logs, and holds the rule D7 actually rests on: a string is
+  redacted unless its key is on the service's safe list. What it leaves is stated rather than implied —
+  an error's own message is carried through, because that is the reason to keep a log at all, and a
+  provider that put a prompt into an error message would put it there. That is a review question about
+  what providers raise, not a redaction question;
 - `ProviderModule` has no slot for `prepareTurn`, which the adapter contract maps as a module
   contribution. The adapter routes it through a host port meanwhile. Owner: M3, when the four legacy
   prompt encoders move;
