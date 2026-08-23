@@ -779,6 +779,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // `QwenPermissionPresentation.ts`, `QwenSessionConfigState.ts` and
       // `runtime/buildQwenPrompt.ts`, which were moved out of the legacy runtime
       // rather than written next to it and are in the production bundle already.
+      'src/app/execution/qwen/QwenExecutionComposition.ts',
+      'src/app/execution/qwen/QwenMetadataSession.ts',
       'src/providers/qwen/QwenProviderModule.ts',
       'src/providers/qwen/app/QwenModuleContext.ts',
       'src/providers/qwen/execution/QwenAcpDynamicConfig.ts',

@@ -6165,6 +6165,44 @@ Seven breaks, seven caught.
 Gates: unit 511 suites / 7,963 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### Qwen's composition and metadata session, dark — and the one thing that stops the flip (this commit)
+
+The sixth ACP composition, and the first that cannot be flipped when it is finished.
+
+**`ask_user_question` has nowhere to put its answer.** Qwen sends it down the *permission* channel,
+and the legacy runtime replies with structured answers beside the option id. The kernel's
+`InteractionResolution` carries `{ interactionId, responseId, resolvedAt }` and nothing else, and the
+bridge cannot answer it out of band either — `prepare` is bounded by `controlTimeoutMs` and a person
+is not. Both ways of shipping around it are worse than waiting: presenting a question as an approval
+asks someone to allow or deny a question, and answering `cancelled` quietly loses a feature. So the
+composition refuses it **by name**, the test drives a real question through a real turn and asserts
+that no interaction opens and nobody is asked, and the obligation above says what has to land first.
+
+**The effort is the other thing this composition does that no sibling does.** `/effort <level>` is a
+`session/prompt`, so it costs a turn — which makes it the one value not sent every turn. Writing the
+test found the defect that made the skip impossible: **nothing told the state the session had taken a
+level.** There is no `current_effort` update the way there is a `current_mode_update`, so the applier
+now reports it and the tab that owns the session records it — after the prompt returns, because a
+level the prompt never delivered is one the next turn still has to ask for.
+
+**The `/effort` prompt also broke five inherited tests, and that was the fixture lying rather than the
+code.** Every count and every failure injection landed on the configuration prompt instead of the
+turn. The fake now answers `/effort` the way an agent does — an acknowledgement, no tool call, no
+window, no answer — and the counters count turns. The same lesson as the `modelId` defect: a fake is
+evidence only where it behaves like the thing.
+
+And a case for what that prompt must **not** do: whatever the agent says while answering `/effort`
+stays out of the conversation. What keeps it out is ordering — the applier runs while the session is
+being prepared, before the run has a session reference to match a notification against.
+
+Nine breaks, seven caught on the first pass. Both misses were the session commands, and both were the
+same hole: nothing drove them end to end. The second needed a conversation bound to a session of its
+own — moving to a tab with no session lists nothing anyway, which hid a stale list rather than proving
+it was cleared.
+
+Gates: unit 512 suites / 7,992 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6622,6 +6660,17 @@ Open obligations, each with an owner:
   backend, before the next flip. Smaller and beside it: an ACP `fs/read_text_file` for a file that does
   not exist surfaces as a bare internal error, indistinguishable from a containment refusal, and
   Gemini abandons its write tool rather than raising the permission request when it sees one;
+- **an interaction resolution has no room for an answer, and Qwen's flip waits on it.** Qwen sends
+  `ask_user_question` down the ACP permission channel, and `QwenChatRuntime` answers it with
+  **structured answers** beside the option id. `InteractionResolution` is
+  `{ interactionId, responseId, resolvedAt }` — there is nowhere for those to ride — and the bridge
+  cannot take the round trip itself either, because `prepare` is bounded by `controlTimeoutMs` while
+  a person answering is not. So the composition refuses a question by name rather than presenting it
+  as an approval, which would ask someone to allow or deny a question, or answering it `cancelled`,
+  which would lose a feature the legacy runtime has. **This is the one thing between Qwen and its
+  flip.** The fix is an optional opaque payload on the resolution, which reaches
+  `ExecutionControlSchemas` and the control records, so it is a milestone rather than a patch. Owner:
+  M5, before the Qwen flip;
 - D7 (diagnostic redaction) has no automated guard. Owner: M1 follow-up, once the kernel emits log
   records;
 - `ProviderModule` has no slot for `prepareTurn`, which the adapter contract maps as a module

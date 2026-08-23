@@ -30,6 +30,16 @@ export type QwenModeRefusedReporter = (input: {
 }) => void;
 
 /**
+ * Told when the session actually took a reasoning level.
+ *
+ * Reported rather than assumed, because setting it is a prompt that can fail —
+ * and because nothing else can tell the state: this provider has no
+ * `current_effort` update the way it has `current_mode_update`. Without it the
+ * skip is impossible and every turn pays for a level the session already has.
+ */
+export type QwenEffortAppliedReporter = (effortLevel: string) => void;
+
+/**
  * Qwen's own ordering, over the protocol-generic ACP kernel.
  *
  * Model, then mode, then effort — Gemini's two with a third behind them, and the
@@ -63,6 +73,7 @@ export class QwenAcpDynamicConfigApplier implements QwenExecutionDynamicApplier 
   constructor(
     private readonly resolver: QwenAcpDynamicConfigResolver,
     private readonly onModeRefused?: QwenModeRefusedReporter,
+    private readonly onEffortApplied?: QwenEffortAppliedReporter,
   ) {}
 
   async apply(input: Parameters<QwenExecutionDynamicApplier['apply']>[0]): Promise<void> {
@@ -91,6 +102,9 @@ export class QwenAcpDynamicConfigApplier implements QwenExecutionDynamicApplier 
         prompt: [{ text: `/effort ${effortLevel}`, type: 'text' }],
         sessionId: input.sessionId,
       });
+      // After, not before: a level the prompt never delivered is one the next
+      // turn still has to ask for.
+      this.onEffortApplied?.(effortLevel);
     }
   }
 
