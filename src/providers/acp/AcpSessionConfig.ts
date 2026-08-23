@@ -9,10 +9,14 @@ import type {
   AcpSessionModeState,
 } from './types';
 
+/** A model list every caller can read, whichever name the agent used for an id. */
 export interface AcpResolvedSessionModelState {
-  availableModels: AcpModelInfo[];
+  availableModels: ResolvedModelInfo[];
   currentModelId: string | null;
 }
+
+/** `id` is always present here, which is the whole point of resolving. */
+export type ResolvedModelInfo = AcpModelInfo & { id: string };
 
 export interface AcpResolvedSessionModeState {
   availableModes: AcpSessionMode[];
@@ -49,9 +53,26 @@ export function extractAcpSessionModelState(params: {
     return { availableModels: items, currentModelId: current };
   }
   return {
-    availableModels: params.models?.availableModels ?? [],
+    availableModels: resolveModelIds(params.models?.availableModels),
     currentModelId: params.models?.currentModelId ?? current,
   };
+}
+
+/**
+ * The wire's `modelId` and Grimoire's `id`, resolved into the second.
+ *
+ * A model with neither is dropped rather than carried with an empty id: it
+ * cannot be selected, cannot be labelled, and every consumer downstream trims
+ * it. Gemini's live smoke is what found this — `session/new` answers with
+ * `modelId`, so `.id.trim()` threw and took the session open with it.
+ */
+function resolveModelIds(
+  models: readonly AcpModelInfo[] | undefined,
+): ResolvedModelInfo[] {
+  return (models ?? []).flatMap(model => {
+    const id = (model.id ?? model.modelId ?? '').trim();
+    return id ? [{ ...model, id }] : [];
+  });
 }
 
 export function extractAcpSessionModeState(params: {

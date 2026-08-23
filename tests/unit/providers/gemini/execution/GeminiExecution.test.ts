@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import trace from '@test/fixtures/provider-traces/gemini-execution.json';
 import wire from '@test/fixtures/provider-traces/wire/gemini-wire.json';
 
+import { JsonRpcErrorResponse } from '@/providers/acp';
 import type { ManagedAcpClient } from '@/providers/acp/execution/ManagedAcpClient';
 import type { AcpRequestPermissionRequest } from '@/providers/acp/types';
 import { GeminiAcpDynamicConfigApplier } from '@/providers/gemini/execution/GeminiAcpDynamicConfig';
@@ -73,6 +74,65 @@ describe('Gemini dynamic configuration', () => {
       .find(result => result !== undefined && 'sessionId' in result);
     expect(answered).toBeDefined();
     expect(Object.keys(answered ?? {})).toEqual(['sessionId', 'modes', 'models']);
+  });
+
+  it('runs the turn even when the agent will not take the mode', async () => {
+    // Observed, not imagined: `gemini 0.55.1` advertises all four modes in its
+    // reply to `session/new` and then answers `session/set_mode` for `yolo`
+    // with `-32603 Cannot enable privileged approval modes in an untrusted
+    // folder`. The call is awaited before the prompt, so a thrown rejection
+    // ended every turn a user ran with Auto-approve on in a folder Gemini has
+    // not been told to trust.
+    const refused: string[] = [];
+    const client = {
+      setModel: async () => ({}),
+      setMode: async () => {
+        throw new JsonRpcErrorResponse(
+          'session/set_mode',
+          -32603,
+          'Internal error',
+          { details: 'Cannot enable privileged approval modes in an untrusted folder.' },
+        );
+      },
+    } as unknown as ManagedAcpClient;
+    const applier = new GeminiAcpDynamicConfigApplier(
+      { resolve: async () => ({ modeId: 'full_access' }) },
+      ({ modeId }) => refused.push(modeId),
+    );
+
+    await expect(applier.apply({
+      client,
+      sessionId: 'native-session',
+      dynamicRef: 'opaque-config',
+      signal: new AbortController().signal,
+    })).resolves.toBeUndefined();
+
+    // Recorded, because the session is then in a mode the toolbar does not
+    // show — stricter than promised, which is the safe way to be wrong, and
+    // still wrong.
+    expect(refused).toEqual(['yolo']);
+  });
+
+  it('still stops when the run the mode belonged to was abandoned', async () => {
+    // The one rejection that is not the agent declining a mode: a cancelled
+    // turn must not be swallowed into a prompt nobody is waiting for.
+    const abort = new AbortController();
+    const client = {
+      setMode: async () => {
+        abort.abort(new Error('cancelled'));
+        throw new Error('cancelled');
+      },
+    } as unknown as ManagedAcpClient;
+    const applier = new GeminiAcpDynamicConfigApplier({
+      resolve: async () => ({ modeId: 'plan' }),
+    });
+
+    await expect(applier.apply({
+      client,
+      sessionId: 'native-session',
+      dynamicRef: 'opaque-config',
+      signal: abort.signal,
+    })).rejects.toThrow('cancelled');
   });
 
   it('performs no provider call without an opaque config reference', async () => {

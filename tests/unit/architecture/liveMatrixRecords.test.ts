@@ -52,6 +52,7 @@ describe('live smoke matrix records', () => {
     expect(matrices.map(matrix => matrix.file)).toEqual([
       'claude-flip-smoke-matrix.md',
       'codex-flip-smoke-matrix.md',
+      'gemini-flip-smoke-matrix.md',
       'grok-flip-smoke-matrix.md',
       'mimocode-flip-smoke-matrix.md',
       'opencode-flip-smoke-matrix.md',
@@ -90,6 +91,10 @@ describe('live smoke matrix records', () => {
     expect(status).toEqual([
       'claude-flip-smoke-matrix.md: 2026-08-21',
       'codex-flip-smoke-matrix.md: 2026-08-21',
+      // Run, and mostly blocked — by the account's daily quota rather than by
+      // the flip. What it found before running out is in that matrix: three
+      // defects, two of them shipped.
+      'gemini-flip-smoke-matrix.md: 2026-08-23',
       'grok-flip-smoke-matrix.md: 2026-08-21',
       // Run, and mostly red — for a reason the matrix states rather than the
       // flip: that account cannot generate. A date here is "when did this last

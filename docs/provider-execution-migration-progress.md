@@ -5925,6 +5925,53 @@ harness and the smoke matrix are the next commit, not a deferred obligation.
 Gates: unit 507 suites / 7,895 tests, integration 145 (61 env-gated skips),
 typecheck, `eslint`, `build:release`.
 
+### The Gemini live smoke, and the two shipped defects it found (this commit)
+
+The first wave-7 harness that could run at all, and the first live run since wave 5. It paid for
+itself on the first pass.
+
+**Every Gemini turn died with Auto-approve on.** `gemini 0.55.1` advertises four modes in its reply to
+`session/new` and refuses two of them: `session/set_mode` for `yolo` and for `autoEdit` answers
+`-32603 Cannot enable privileged approval modes in an untrusted folder`. The set is awaited before
+the prompt, so the rejection ended the turn before it was sent — and what the user was told was that
+the session may no longer exist, which is not what happened. The same shape as the fourth review's
+Critical, reached from the other side: the id was right this time and the agent still would not take
+it. A refused mode now leaves the turn running under the mode the session has, recorded through a
+port the composition logs. The refusals observed are all *toward* asking rather than away from it, so
+the session ends up stricter than the toolbar promises — the safe way to be wrong, and still wrong,
+which is what the record is for.
+
+**The model list was being read under a name no agent sends.** `AcpModelInfo` declared `id`; the wire
+sends `modelId`, and three recordings say so — Gemini's, Grok's and MiMoCode's. Every consumer read
+`undefined`. Gemini called `.trim()` on it and threw *inside the session open*, so the metadata
+session answered "no models" and the legacy runtime reported a session it could not create; MiMoCode
+and Grok pass theirs through a normalizer that drops an entry with no id, so they discovered nothing
+over ACP and said nothing about it. Fixed in the shared extractor, which resolves either name into
+one. Row 17 went from zero models to six.
+
+**Why no test caught the second one:** every fake wrote `id`, including the one written for this
+composition two commits ago — from a reading of the recording that got the modes right and the models
+wrong. A fake is only evidence to the extent it is copied from a recording, and this one was copied
+selectively. The fakes now use the recorded shape and the extractor has its own case; both breaks go
+red.
+
+**The third finding is recorded rather than fixed**, in the obligations above: a prompt that fails
+with a vendor error is treated as a dead connection — retried once, then reported as a run whose
+outcome could not be established. Shared across five providers, and the account it was found on has
+no quota left to prove a fix with.
+
+**Certification is partial, and the blocker is not Grimoire's.** Four rows green — the missing
+session, the mode reaching the session, the model catalog, and the spend indicator not contradicting
+itself. Everything needing an *answer* is unverified: partway through the run the account answered
+`429 You have exhausted your daily quota on this model`. Recorded in
+[`docs/gemini-flip-smoke-matrix.md`](gemini-flip-smoke-matrix.md), which
+`liveMatrixRecords.test.ts` now reads.
+
+Three breaks, three caught.
+
+Gates: unit 507 suites / 7,903 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6286,6 +6333,18 @@ Open obligations, each with an owner:
 - the provider backends that carry them must absorb the UTF-8 stream decoding (`utf8Stream`) and
   Grok transcript recovery semantics that landed on `main` after the v1 baseline. Owner: the Grok
   and ACP backends, at their harvest;
+- **a vendor error on the prompt becomes "could not establish whether this run completed".**
+  `ManagedAcpExecutionBackend.recover` takes the rejection as `_error` and never reads it, so a
+  `session/prompt` that *failed* is handled as a connection that *died*: the process is closed, a new
+  one is launched, the same prompt is sent again, and the run is then reconciled to `unknown`. Found
+  live on 2026-08-23 with `429 You have exhausted your daily quota on this model` — the vendor's
+  message discarded, the turn charged twice against a quota already gone, and the tab told nothing it
+  could act on. Shared across the five flipped managed-ACP providers. The fix is to classify a
+  protocol-level rejection apart from a transport-level failure; it is recorded rather than built
+  because the account that found it has no quota left to prove a fix with today. Owner: the managed-ACP
+  backend, before the next flip. Smaller and beside it: an ACP `fs/read_text_file` for a file that does
+  not exist surfaces as a bare internal error, indistinguishable from a containment refusal, and
+  Gemini abandons its write tool rather than raising the permission request when it sees one;
 - D7 (diagnostic redaction) has no automated guard. Owner: M1 follow-up, once the kernel emits log
   records;
 - `ProviderModule` has no slot for `prepareTurn`, which the adapter contract maps as a module

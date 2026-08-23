@@ -141,8 +141,24 @@ export interface AcpSessionModeState {
   currentModeId: AcpSessionModeId;
 }
 
+/**
+ * One model a session offers, in the shape ACP actually sends it.
+ *
+ * `modelId` is the wire's name and `id` is Grimoire's, and for a long time only
+ * the second was declared. Three recordings say otherwise —
+ * `gemini 0.55.1`, `grok`, `mimo` all answer `session/new` with `modelId` — so
+ * every consumer reading `.id` was reading `undefined`: Gemini threw on
+ * `.trim()` and took the session open down with it, and its two siblings
+ * silently discovered no models at all.
+ *
+ * Both are optional and `extractAcpSessionModelState` is what resolves them into
+ * one, so a caller never has to know which name a given CLI used.
+ */
 export interface AcpModelInfo {
-  id: string;
+  /** The wire's name for it, which is what a real agent sends. */
+  modelId?: string;
+  /** Grimoire's, kept because every consumer of this type reads it. */
+  id?: string;
   name: string;
   description?: string | null;
 }

@@ -12,6 +12,12 @@ export interface GeminiAcpDynamicConfigResolver {
   resolve(dynamicRef: string): Promise<GeminiAcpDynamicConfig>;
 }
 
+/** Told when the agent would not take the mode the vault asked for. */
+export type GeminiModeRefusedReporter = (input: {
+  readonly modeId: string;
+  readonly error: unknown;
+}) => void;
+
 /**
  * Gemini's own ordering, over the protocol-generic ACP kernel.
  *
@@ -33,22 +39,58 @@ export interface GeminiAcpDynamicConfigResolver {
  * this provider, so there is nothing for a third call to carry.
  */
 export class GeminiAcpDynamicConfigApplier implements GeminiExecutionDynamicApplier {
-  constructor(private readonly resolver: GeminiAcpDynamicConfigResolver) {}
+  constructor(
+    private readonly resolver: GeminiAcpDynamicConfigResolver,
+    private readonly onModeRefused?: GeminiModeRefusedReporter,
+  ) {}
 
   async apply(input: Parameters<GeminiExecutionDynamicApplier['apply']>[0]): Promise<void> {
     if (!input.dynamicRef) return;
     const config = await this.resolver.resolve(input.dynamicRef);
     throwIfAborted(input.signal);
     if (config.modelId?.trim()) {
+      // Strict, unlike the mode below, and deliberately: no agent has been
+      // observed refusing a model it advertised, and a turn that silently ran
+      // on a different one than the badge shows is a question nobody asked.
       await input.client.setModel({ modelId: config.modelId.trim(), sessionId: input.sessionId });
     }
     throwIfAborted(input.signal);
     const requested = config.modeId?.trim();
     if (requested) {
-      await input.client.setMode({
-        modeId: mapGrimoireModeToGemini(requested),
-        sessionId: input.sessionId,
-      });
+      await this.applyMode(input, mapGrimoireModeToGemini(requested));
+    }
+  }
+
+  /**
+   * The mode the vault asked for, where the agent will take it.
+   *
+   * **A refused mode is not a failed turn**, and the live smoke is why this is
+   * not an assumption: `gemini 0.55.1` advertises all four modes in its reply to
+   * `session/new` and then answers `session/set_mode` for `yolo` and `autoEdit`
+   * with `-32603 Cannot enable privileged approval modes in an untrusted
+   * folder`. The call is awaited before the prompt, so a thrown rejection ended
+   * every turn a user ran with Auto-approve on in a folder Gemini has not been
+   * told to trust — before the prompt was ever sent, and reported as a session
+   * that may no longer exist.
+   *
+   * What happens instead is the turn runs in the mode the session already has.
+   * The refusals observed are all *toward* asking rather than away from it —
+   * the privileged modes are the ones an untrusted folder withholds — so the
+   * session is stricter than the toolbar promises rather than looser, which is
+   * the safe way to be wrong about a permission. It is still wrong, which is
+   * what the report is for.
+   */
+  private async applyMode(
+    input: Parameters<GeminiExecutionDynamicApplier['apply']>[0],
+    modeId: string,
+  ): Promise<void> {
+    try {
+      await input.client.setMode({ modeId, sessionId: input.sessionId });
+    } catch (error) {
+      if (input.signal.aborted) {
+        throw error;
+      }
+      this.onModeRefused?.({ modeId, error });
     }
   }
 }

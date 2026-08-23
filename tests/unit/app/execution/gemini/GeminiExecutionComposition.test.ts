@@ -92,6 +92,7 @@ describe('Gemini execution composition', () => {
   function createFakeAcp(options: {
     asksPermission?: boolean;
     sessionIsGone?: boolean;
+    refusesMode?: boolean;
     sessionLoadFails?: boolean;
     switchesMode?: string;
     windowOnFirstTurnOnly?: boolean;
@@ -148,9 +149,13 @@ describe('Gemini execution composition', () => {
               currentModeId: 'default',
             },
             models: {
+              // `modelId`, which is what the recording says and what this fake
+              // got wrong until the live smoke ran: with `id` here every
+              // consumer read `undefined`, and the one that called `.trim()`
+              // threw inside the session open.
               availableModels: [
-                { id: 'auto', name: 'Auto', description: 'Let Gemini CLI decide' },
-                { id: 'gemini-2.5-pro', name: 'gemini-2.5-pro' },
+                { modelId: 'auto', name: 'Auto', description: 'Let Gemini CLI decide' },
+                { modelId: 'gemini-2.5-pro', name: 'gemini-2.5-pro' },
               ],
               currentModelId: 'auto',
             },
@@ -231,6 +236,14 @@ describe('Gemini execution composition', () => {
           },
           setMode: async request => {
             modes.push(request);
+            if (options.refusesMode) {
+              throw new JsonRpcErrorResponse(
+                'session/set_mode',
+                -32603,
+                'Internal error',
+                { details: 'Cannot enable privileged approval modes in an untrusted folder.' },
+              );
+            }
             return {};
           },
           setModel: async request => {
@@ -261,6 +274,7 @@ describe('Gemini execution composition', () => {
     asksPermission?: boolean;
     plugin?: any;
     sessionIsGone?: boolean;
+    refusesMode?: boolean;
     sessionLoadFails?: boolean;
     switchesMode?: string;
     windowOnFirstTurnOnly?: boolean;
@@ -724,6 +738,37 @@ describe('Gemini execution composition', () => {
       && chunk.usage?.contextTokens === 4_096)).toBe(true);
     expect(second.some(chunk => chunk.type === 'usage'
       && chunk.usage?.contextTokens === 4_096)).toBe(false);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('answers the turn even when the agent will not take the mode', async () => {
+    // The live smoke's first finding, end to end. `gemini 0.55.1` advertises
+    // four modes and then refuses the privileged two in a folder it has not
+    // been told to trust — and the set is awaited before the prompt, so a
+    // thrown rejection killed every turn a user ran with Auto-approve on and
+    // reported it as a session that may no longer exist.
+    const plugin = createPlugin();
+    plugin.settings.permissionMode = 'full_access';
+    updateGeminiProviderSettings(plugin.settings, { selectedMode: 'full_access' });
+    const logged: Array<Record<string, unknown>> = [];
+    plugin.recordDebugLog = (record: Record<string, unknown>) => logged.push(record);
+    const { execution, host, modes } = await createHarness({ plugin, refusesMode: true });
+    const runtime = execution.createRuntime();
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(modes).toEqual([{ modeId: 'yolo', sessionId: 'acp-session-1' }]);
+    expect(chunks.filter(chunk => chunk.type === 'error')).toEqual([]);
+    expect(chunks.some(chunk => chunk.type === 'text' && chunk.content.includes('the answer')))
+      .toBe(true);
+    // The session is then in a mode the toolbar does not show. Stricter than
+    // promised, which is the safe way to be wrong — and still wrong, which is
+    // what the record is for.
+    expect(logged).toContainEqual(expect.objectContaining({
+      event: 'execution.setMode.refused',
+      data: { modeId: 'yolo' },
+    }));
     execution.dispose();
     await host.dispose();
   });

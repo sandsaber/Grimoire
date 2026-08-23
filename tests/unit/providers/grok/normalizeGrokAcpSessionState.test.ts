@@ -8,7 +8,7 @@ describe('normalizeGrokAcpSessionModels', () => {
         { id: 'grok-fast', name: 'Grok Fast', description: 'Fast model' },
       ],
       currentModelId: 'grok-build',
-    } as never)).toEqual({
+    })).toEqual({
       availableModels: [
         { id: 'grok-build', name: 'Grok Build' },
         { description: 'Fast model', id: 'grok-fast', name: 'Grok Fast' },

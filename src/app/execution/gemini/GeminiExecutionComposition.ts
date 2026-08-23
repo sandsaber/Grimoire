@@ -170,9 +170,20 @@ export class GeminiExecution {
     const context: GeminiExecutionBackendContext = {
       clientFactory,
       requestResolver: this.requests,
-      dynamicApplier: new GeminiAcpDynamicConfigApplier({
-        resolve: dynamicRef => this.requests.resolveDynamic(dynamicRef),
-      }),
+      dynamicApplier: new GeminiAcpDynamicConfigApplier(
+        { resolve: dynamicRef => this.requests.resolveDynamic(dynamicRef) },
+        // A mode the agent would not take leaves the turn running under a
+        // different permission than the toolbar shows. Recorded rather than
+        // shown, because a turn that dies is worse and there is no surface for
+        // this yet — see the live-smoke entry for what a real refusal says.
+        ({ modeId, error }) => this.plugin.recordDebugLog({
+          error,
+          event: 'execution.setMode.refused',
+          level: 'warn',
+          scope: 'gemini',
+          data: { modeId },
+        }),
+      ),
       interactionBridge: this.interactions,
       resultSink: new GeminiProjectionResultSink(),
       reconciler: {
