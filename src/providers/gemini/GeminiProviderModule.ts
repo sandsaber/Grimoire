@@ -21,6 +21,10 @@ import {
   type GeminiExecutionBackendContext,
 } from './execution/GeminiExecutionBackend';
 import {
+  decodeGeminiModelId,
+  isGeminiModelSelectionId,
+} from './models';
+import {
   DEFAULT_GEMINI_PROVIDER_SETTINGS,
   type GeminiProviderSettings,
   normalizeGeminiModelAliases,
@@ -125,17 +129,21 @@ export type GeminiWorkspace = ProviderWorkspaceSlots;
 
 const geminiChatUi: ProviderChatUiContribution<GeminiProviderSettings> = {
   modelPresentation: {
-    // The visible list is what the session reported and the user curated, so
-    // ownership is a settings question. The chat's own ids are prefixed
-    // (`gemini:…`) but the settings hold the CLI's raw ones, which is what
-    // `models.ts` encodes and decodes between.
-    ownsModel: (modelId, settings) => normalizeGeminiVisibleModels(settings.visibleModels)
-      .includes(modelId)
-      || settings.discoveredModels.some(model => model.rawId === modelId)
-      || modelId in normalizeGeminiModelAliases(settings.modelAliases),
-    label: (modelId, settings) => normalizeGeminiModelAliases(settings.modelAliases)[modelId]
-      ?? settings.discoveredModels.find(model => model.rawId === modelId)?.label
-      ?? modelId,
+    // **By the prefix, which is what `GeminiChatUIConfig` actually does.** The
+    // OpenCode family owns a model by the user-curated list, and copying that
+    // here was wrong in a way nothing would have caught until M3: a chat model
+    // id is encoded (`gemini:gemini-2.5-pro`) while the settings hold the CLI's
+    // raw one, so a list lookup on the encoded id answers false for every model
+    // this provider has.
+    ownsModel: modelId => isGeminiModelSelectionId(modelId),
+    // Decoded first, for the same reason: the alias map and the discovered
+    // catalogue are both keyed by the raw id.
+    label: (modelId, settings) => {
+      const rawId = decodeGeminiModelId(modelId) ?? modelId;
+      return normalizeGeminiModelAliases(settings.modelAliases)[rawId]
+        ?? settings.discoveredModels.find(model => model.rawId === rawId)?.label
+        ?? rawId;
+    },
     contextWindow: () => undefined,
   },
   // Not an omission and not an oversight: `capabilities.ts` declares

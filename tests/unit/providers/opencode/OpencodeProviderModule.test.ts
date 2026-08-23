@@ -206,7 +206,12 @@ describe('OpenCode provider module', () => {
   });
 
   describe('model presentation', () => {
-    it('owns a model by the user-curated list rather than by a prefix', () => {
+    it('owns a model by the prefix, which is what the live config does', () => {
+      // This asserted the opposite until Gemini's module was checked against
+      // its own chat UI config and three siblings turned out to carry the same
+      // claim. A provider-qualified raw id does not make ownership a settings
+      // question: the chat never sees a raw id, it sees `opencode:<raw id>`, so a
+      // lookup in a list keyed by raw ids answers false for every model.
       const settings = {
         ...opencodeSettingsCodec.defaults(),
         visibleModels: ['anthropic/claude-sonnet'],
@@ -214,10 +219,15 @@ describe('OpenCode provider module', () => {
       };
       const presentation = features().chatUI.modelPresentation;
 
-      expect(presentation.ownsModel('anthropic/claude-sonnet', settings)).toBe(true);
-      expect(presentation.ownsModel('openai/gpt-5.5', settings)).toBe(true);
-      expect(presentation.label('openai/gpt-5.5', settings)).toBe('Fast');
-      expect(presentation.ownsModel('anthropic/claude-opus', settings)).toBe(false);
+      expect(presentation.ownsModel('opencode:anthropic/claude-sonnet', settings)).toBe(true);
+      // The synthetic id a vault with no catalogue yet still selects.
+      expect(presentation.ownsModel('opencode', settings)).toBe(true);
+      expect(presentation.ownsModel('anthropic/claude-sonnet', settings)).toBe(false);
+      // Another provider's, encoded the same way.
+      expect(presentation.ownsModel('gemini:gemini-2.5-pro', settings)).toBe(false);
+      // The label decodes first: the alias map is keyed by the raw id.
+      expect(presentation.label('opencode:openai/gpt-5.5', settings)).toBe('Fast');
+      expect(presentation.label('opencode:anthropic/claude-opus', settings)).toBe('anthropic/claude-opus');
     });
   });
 });

@@ -21,6 +21,10 @@ import {
   type MimocodeExecutionBackendContext,
 } from './execution/MimocodeExecutionBackend';
 import {
+  decodeMimocodeModelId,
+  isMimocodeModelSelectionId,
+} from './models';
+import {
   DEFAULT_MIMOCODE_PROVIDER_SETTINGS,
   type MimocodeProviderSettings,
   normalizeMimocodeModelAliases,
@@ -132,16 +136,22 @@ export type MimocodeWorkspace = ProviderWorkspaceSlots;
 
 const mimocodeChatUi: ProviderChatUiContribution<MimocodeProviderSettings> = {
   modelPresentation: {
-    // MiMoCode model ids are provider-qualified (`anthropic/claude-...`), and
-    // the visible list is user-curated, so ownership is a settings question
-    // rather than a prefix question.
-    ownsModel: (modelId, settings) => normalizeMimocodeVisibleModels(settings.visibleModels)
-      .includes(modelId)
-      || settings.discoveredModels.some(model => model.rawId === modelId)
-      || modelId in normalizeMimocodeModelAliases(settings.modelAliases),
-    label: (modelId, settings) => normalizeMimocodeModelAliases(settings.modelAliases)[modelId]
-      ?? settings.discoveredModels.find(model => model.rawId === modelId)?.label
-      ?? modelId,
+    // **By the prefix, which is what `MimocodeChatUIConfig` actually does.** This
+    // said the opposite until Gemini's module was checked against its own live
+    // config and three siblings turned out to carry the same claim: that a
+    // provider-qualified raw id (`anthropic/claude-...`) makes ownership a
+    // settings question. It does not. The chat never sees a raw id — it sees
+    // `mimocode:anthropic/claude-...`, which `models.ts` encodes — so a lookup in a
+    // list keyed by raw ids answers false for every model this provider has.
+    ownsModel: modelId => isMimocodeModelSelectionId(modelId),
+    // Decoded first, for the same reason: the alias map and the discovered
+    // catalogue are both keyed by the raw id.
+    label: (modelId, settings) => {
+      const rawId = decodeMimocodeModelId(modelId) ?? modelId;
+      return normalizeMimocodeModelAliases(settings.modelAliases)[rawId]
+        ?? settings.discoveredModels.find(model => model.rawId === rawId)?.label
+        ?? rawId;
+    },
     contextWindow: () => undefined,
   },
   reasoningControl: { kind: 'effort', tiers: ['low', 'medium', 'high'] },

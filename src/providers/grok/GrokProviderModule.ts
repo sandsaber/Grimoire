@@ -129,8 +129,10 @@ export type GrokWorkspace = ProviderWorkspaceSlots;
 const grokChatUi: ProviderChatUiContribution<GrokProviderSettings> = {
   modelPresentation: {
     // Grok model ids are Grimoire-encoded (`grok:<raw id>`), so ownership is a
-    // question the encoding answers — unlike OpenCode, where the visible list
-    // is the only thing that can.
+    // question the encoding answers. It is the answer for every provider that
+    // encodes one — this module had it right while three siblings claimed their
+    // visible list was the only thing that could, which their own chat UI
+    // configs contradicted.
     ownsModel: modelId => isGrokModelSelectionId(modelId),
     label: (modelId, settings) => {
       const rawId = decodeGrokModelId(modelId);

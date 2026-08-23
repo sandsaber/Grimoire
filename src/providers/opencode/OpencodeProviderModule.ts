@@ -21,6 +21,10 @@ import {
   type OpencodeExecutionBackendContext,
 } from './execution/OpencodeExecutionBackend';
 import {
+  decodeOpencodeModelId,
+  isOpencodeModelSelectionId,
+} from './models';
+import {
   DEFAULT_OPENCODE_PROVIDER_SETTINGS,
   normalizeOpencodeModelAliases,
   normalizeOpencodePreferredThinkingByModel,
@@ -120,16 +124,22 @@ export type OpencodeWorkspace = ProviderWorkspaceSlots;
 
 const opencodeChatUi: ProviderChatUiContribution<OpencodeProviderSettings> = {
   modelPresentation: {
-    // OpenCode model ids are provider-qualified (`anthropic/claude-...`), and
-    // the visible list is user-curated, so ownership is a settings question
-    // rather than a prefix question.
-    ownsModel: (modelId, settings) => normalizeOpencodeVisibleModels(settings.visibleModels)
-      .includes(modelId)
-      || settings.discoveredModels.some(model => model.rawId === modelId)
-      || modelId in normalizeOpencodeModelAliases(settings.modelAliases),
-    label: (modelId, settings) => normalizeOpencodeModelAliases(settings.modelAliases)[modelId]
-      ?? settings.discoveredModels.find(model => model.rawId === modelId)?.label
-      ?? modelId,
+    // **By the prefix, which is what `OpencodeChatUIConfig` actually does.** This
+    // said the opposite until Gemini's module was checked against its own live
+    // config and three siblings turned out to carry the same claim: that a
+    // provider-qualified raw id (`anthropic/claude-...`) makes ownership a
+    // settings question. It does not. The chat never sees a raw id — it sees
+    // `opencode:anthropic/claude-...`, which `models.ts` encodes — so a lookup in a
+    // list keyed by raw ids answers false for every model this provider has.
+    ownsModel: modelId => isOpencodeModelSelectionId(modelId),
+    // Decoded first, for the same reason: the alias map and the discovered
+    // catalogue are both keyed by the raw id.
+    label: (modelId, settings) => {
+      const rawId = decodeOpencodeModelId(modelId) ?? modelId;
+      return normalizeOpencodeModelAliases(settings.modelAliases)[rawId]
+        ?? settings.discoveredModels.find(model => model.rawId === rawId)?.label
+        ?? rawId;
+    },
     contextWindow: () => undefined,
   },
   reasoningControl: { kind: 'effort', tiers: ['low', 'medium', 'high'] },

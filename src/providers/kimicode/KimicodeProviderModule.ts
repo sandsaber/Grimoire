@@ -21,6 +21,10 @@ import {
   type KimicodeExecutionBackendContext,
 } from './execution/KimicodeExecutionBackend';
 import {
+  decodeKimicodeModelId,
+  isKimicodeModelSelectionId,
+} from './models';
+import {
   DEFAULT_KIMICODE_PROVIDER_SETTINGS,
   type KimicodeProviderSettings,
   normalizeKimicodeModelAliases,
@@ -138,16 +142,22 @@ export type KimicodeWorkspace = ProviderWorkspaceSlots;
 
 const kimicodeChatUi: ProviderChatUiContribution<KimicodeProviderSettings> = {
   modelPresentation: {
-    // Kimi Code model ids are provider-qualified (`anthropic/claude-...`), and
-    // the visible list is user-curated, so ownership is a settings question
-    // rather than a prefix question.
-    ownsModel: (modelId, settings) => normalizeKimicodeVisibleModels(settings.visibleModels)
-      .includes(modelId)
-      || settings.discoveredModels.some(model => model.rawId === modelId)
-      || modelId in normalizeKimicodeModelAliases(settings.modelAliases),
-    label: (modelId, settings) => normalizeKimicodeModelAliases(settings.modelAliases)[modelId]
-      ?? settings.discoveredModels.find(model => model.rawId === modelId)?.label
-      ?? modelId,
+    // **By the prefix, which is what `KimicodeChatUIConfig` actually does.** This
+    // said the opposite until Gemini's module was checked against its own live
+    // config and three siblings turned out to carry the same claim: that a
+    // provider-qualified raw id (`anthropic/claude-...`) makes ownership a
+    // settings question. It does not. The chat never sees a raw id — it sees
+    // `kimicode:anthropic/claude-...`, which `models.ts` encodes — so a lookup in a
+    // list keyed by raw ids answers false for every model this provider has.
+    ownsModel: modelId => isKimicodeModelSelectionId(modelId),
+    // Decoded first, for the same reason: the alias map and the discovered
+    // catalogue are both keyed by the raw id.
+    label: (modelId, settings) => {
+      const rawId = decodeKimicodeModelId(modelId) ?? modelId;
+      return normalizeKimicodeModelAliases(settings.modelAliases)[rawId]
+        ?? settings.discoveredModels.find(model => model.rawId === rawId)?.label
+        ?? rawId;
+    },
     contextWindow: () => undefined,
   },
   reasoningControl: { kind: 'effort', tiers: ['low', 'medium', 'high'] },

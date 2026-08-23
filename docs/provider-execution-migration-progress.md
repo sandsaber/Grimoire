@@ -6033,6 +6033,35 @@ notice repeating every turn, and the notice naming an id the user has never seen
 Gates: unit 507 suites / 7,905 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### Four modules described a model the way none of them behaves (this commit)
+
+Found while measuring Qwen against Gemini, which is the point of measuring: reading two providers side
+by side is what makes a claim visible as a claim.
+
+`GeminiProviderModule`'s `modelPresentation.ownsModel` asked whether a model id was in the vault's
+visible list. `GeminiChatUIConfig` — the live one, the one the module exists to replace — asks whether
+the id carries this provider's prefix. Three siblings said the same thing as the module and their own
+configs said the same thing as Gemini's, so **four modules out of seven disagreed with the code they
+describe**, all of them repeating one sentence: that a provider-qualified raw id
+(`anthropic/claude-...`) makes ownership a settings question rather than a prefix question.
+
+It does not, and the reason is one layer down: the chat never sees a raw id. It sees
+`opencode:anthropic/claude-...`, which `models.ts` encodes — so a lookup in a list keyed by raw ids
+answers **false for every model the provider has**. The label had the same bug from the same cause,
+reading an alias map keyed by raw ids with an encoded one.
+
+Dark today, because a module's `chatUI` has no consumer until M3. What it would have been is a
+provider whose model selector owns nothing, on the commit that wired it.
+
+Grok's module already had it right, and its comment named OpenCode as the counter-example it is not.
+The three are now what Grok's is, its comment says what is actually true, and each of the four has a
+break in both directions: ownership by list, and a label that does not decode.
+
+Eight breaks, eight caught.
+
+Gates: unit 507 suites / 7,906 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

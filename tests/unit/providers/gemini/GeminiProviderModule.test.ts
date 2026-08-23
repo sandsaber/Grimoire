@@ -250,7 +250,11 @@ describe('Gemini provider module', () => {
   });
 
   describe('model presentation', () => {
-    it('owns a model by the user-curated list rather than by a prefix', () => {
+    it('owns a model by the prefix, which is what the live config does', () => {
+      // Not the OpenCode family's rule, and copying theirs here was wrong in a
+      // way nothing would have caught until M3: a chat model id is encoded and
+      // the settings hold the CLI's raw one, so a list lookup on the encoded id
+      // answers false for every model this provider has.
       const settings = {
         ...geminiSettingsCodec.defaults(),
         visibleModels: ['gemini-2.5-pro'],
@@ -258,10 +262,27 @@ describe('Gemini provider module', () => {
       };
       const presentation = features().chatUI.modelPresentation;
 
-      expect(presentation.ownsModel('gemini-2.5-pro', settings)).toBe(true);
-      expect(presentation.ownsModel('gemini-3.5-flash', settings)).toBe(true);
-      expect(presentation.label('gemini-3.5-flash', settings)).toBe('Fast');
-      expect(presentation.ownsModel('gemini-1.0-ultra', settings)).toBe(false);
+      expect(presentation.ownsModel('gemini:gemini-2.5-pro', settings)).toBe(true);
+      // The synthetic id a vault with no catalogue yet still selects.
+      expect(presentation.ownsModel('gemini', settings)).toBe(true);
+      // Another provider's, encoded the same way — this is what the prefix is
+      // there to tell apart.
+      expect(presentation.ownsModel('qwen:qwen3-coder', settings)).toBe(false);
+      expect(presentation.ownsModel('gemini-2.5-pro', settings)).toBe(false);
+    });
+
+    it('labels an encoded model from the alias and the catalogue behind it', () => {
+      // Both are keyed by the raw id, so the label has to decode first.
+      const settings = {
+        ...geminiSettingsCodec.defaults(),
+        discoveredModels: [{ rawId: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' }],
+        modelAliases: { 'gemini-3.5-flash': 'Fast' },
+      };
+      const presentation = features().chatUI.modelPresentation;
+
+      expect(presentation.label('gemini:gemini-3.5-flash', settings)).toBe('Fast');
+      expect(presentation.label('gemini:gemini-2.5-pro', settings)).toBe('Gemini 2.5 Pro');
+      expect(presentation.label('gemini:gemini-1.0-ultra', settings)).toBe('gemini-1.0-ultra');
     });
   });
 
