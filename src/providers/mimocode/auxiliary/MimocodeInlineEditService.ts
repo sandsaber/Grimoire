@@ -1,13 +1,18 @@
+import { LazyAuxQueryRunner } from '../../../core/auxiliary/LazyAuxQueryRunner';
 import { QueryBackedInlineEditService } from '../../../core/auxiliary/QueryBackedInlineEditService';
 import type GrimoirePlugin from '../../../main';
-import { MimocodeAuxQueryRunner } from '../runtime/MimocodeAuxQueryRunner';
 
+/**
+ * Inline edits, on the execution kernel.
+ *
+ * One runner for the service, deliberately: `continueConversation` sends a
+ * second message expecting the first to still be there, and the auxiliary
+ * conversation is retained for exactly as long as this runner is not reset.
+ */
 export class MimocodeInlineEditService extends QueryBackedInlineEditService {
   constructor(plugin: GrimoirePlugin) {
-    super(new MimocodeAuxQueryRunner(plugin, {
-      agentProfile: 'readonly',
-      artifactPurpose: 'inline',
-      allowReadTextFile: true,
-    }));
+    super(new LazyAuxQueryRunner(
+      () => plugin.getMimocodeExecution().createAuxRunner('inline'),
+    ));
   }
 }

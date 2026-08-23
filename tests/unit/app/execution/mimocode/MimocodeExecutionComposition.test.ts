@@ -1,6 +1,6 @@
 import '@/providers';
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -103,7 +103,13 @@ describe('MiMoCode execution composition', () => {
     permissions: Array<Promise<AcpRequestPermissionResponse>>;
     configOptions: unknown[];
     loadRequests: Array<{ sessionId: string }>;
+    closes: string[];
+    permissionAnswers: AcpRequestPermissionResponse[];
+    askAnything: () => Promise<void> | undefined;
   } {
+    let askAnythingRef: (() => Promise<void>) | undefined;
+    const closes: string[] = [];
+    const permissionAnswers: AcpRequestPermissionResponse[] = [];
     const startupRefs: string[] = [];
     const prompts: unknown[] = [];
     const permissions: Array<Promise<AcpRequestPermissionResponse>> = [];
@@ -111,6 +117,14 @@ describe('MiMoCode execution composition', () => {
     const loadRequests: Array<{ sessionId: string }> = [];
     const factory: ManagedAcpClientFactory = {
       create: async (input: ManagedAcpClientFactoryInput) => {
+        const askAnything = async (): Promise<void> => {
+          permissionAnswers.push(await input.requestPermission({
+            sessionId: 'acp-session-1',
+            options: [{ optionId: 'once', kind: 'allow_once', name: 'Allow' }],
+            toolCall: { toolCallId: 'tool-9', title: 'write', rawInput: { path: 'note.md' } },
+          }));
+        };
+        askAnythingRef = askAnything;
         startupRefs.push(input.startupRef);
         const ask = (): void => {
           permissions.push(input.requestPermission({
@@ -245,12 +259,18 @@ describe('MiMoCode execution composition', () => {
             return () => { notify = undefined; };
           },
           onConnectionLost: () => () => undefined,
-          close: async () => 'confirmed' as const,
+          close: async () => {
+            closes.push(input.startupRef);
+            return 'confirmed' as const;
+          },
         };
         return client;
       },
     };
-    return { factory, startupRefs, prompts, permissions, configOptions, loadRequests };
+    return {
+      factory, startupRefs, prompts, permissions, configOptions, loadRequests, closes,
+      permissionAnswers, askAnything: () => askAnythingRef?.(),
+    };
   }
 
   async function createHarness(options: {
@@ -268,6 +288,9 @@ describe('MiMoCode execution composition', () => {
     permissions: Array<Promise<AcpRequestPermissionResponse>>;
     configOptions: unknown[];
     loadRequests: Array<{ sessionId: string }>;
+    closes: string[];
+    permissionAnswers: AcpRequestPermissionResponse[];
+    askAnything: () => Promise<void> | undefined;
     events: ExecutionEventEnvelope[];
   }> {
     const host = new ExecutionKernelHost({
@@ -279,7 +302,8 @@ describe('MiMoCode execution composition', () => {
     });
     const execution = new MimocodeExecution(options.plugin ?? createPlugin(), host.registry);
     const {
-      factory, startupRefs, prompts, permissions, configOptions, loadRequests,
+      factory, startupRefs, prompts, permissions, configOptions, loadRequests, closes,
+      permissionAnswers, askAnything,
     } = createFakeAcp(options);
     host.registerBackend(execution.createBackendRegistration(factory));
     await host.start();
@@ -291,7 +315,8 @@ describe('MiMoCode execution composition', () => {
     const events: ExecutionEventEnvelope[] = [];
     host.registry.observe(SESSION_ID, envelope => events.push(envelope));
     return {
-      execution, host, startupRefs, prompts, permissions, configOptions, loadRequests, events,
+      execution, host, startupRefs, prompts, permissions, configOptions, loadRequests, closes,
+      permissionAnswers, askAnything, events,
     };
   }
 
@@ -901,4 +926,191 @@ describe('MiMoCode execution composition', () => {
     execution.dispose();
     await host.dispose();
   });
+  describe('auxiliary work, on the kernel', () => {
+    /**
+     * The path the three auxiliary services now take, end to end over the same
+     * fake agent the chat turns run on — the store, the retained process, the
+     * seam, and the launch that is deliberately not the chat's.
+     */
+    it('answers a title on a process of its own, as the auxiliary agent', async () => {
+      const { execution, host, startupRefs, configOptions, prompts } = await createHarness();
+
+      const title = await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'The user asked about tomatoes.');
+
+      expect(title).toBe('the answer');
+      // Its own launch, and nothing else has launched: no chat turn ran, so a
+      // shared process would mean the auxiliary work had opened the
+      // conversation's own CLI to generate a title.
+      expect(startupRefs).toHaveLength(1);
+      // The agent whose permissions are what stop an unattended turn from
+      // writing to the vault. Set when the session opens, before the prompt.
+      expect(configOptions).toEqual([
+        expect.objectContaining({ configId: 'mode', value: 'grimoire-aux-passive' }),
+      ]);
+      expect(prompts).toHaveLength(1);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('writes an agent that cannot write, and gives inline edit one that can read', async () => {
+      const plugin = createPlugin();
+      const { execution, host } = await createHarness({ plugin });
+      const vault = plugin.app.vault.adapter.basePath as string;
+
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'the message');
+      await execution.createAuxRunner('inline').query({
+        systemPrompt: 'Edit the selection.',
+      }, 'make it shorter');
+
+      // **What actually stops an unattended turn**, and the reason the mode is
+      // set at all: MiMoCode has no per-request permission mode, so what a turn
+      // can do is the agent definition the artifacts wrote. Asserting only that
+      // the session was set to an agent id proves the name, not the permissions.
+      const agentOf = (purpose: string, id: string): Record<string, any> => JSON.parse(
+        readFileSync(join(vault, '.grimoire', 'mimocode', 'auxiliary', purpose, 'config.json'), 'utf8'),
+      ).agent[id];
+      expect(agentOf('title-gen', 'grimoire-aux-passive').permission).toEqual({
+        '*': 'deny',
+        external_directory: 'deny',
+      });
+      // An inline edit reads the note around what it is editing, and reads
+      // nothing that looks like a credential.
+      const inline = agentOf('inline', 'grimoire-aux-readonly').permission;
+      expect(inline).toMatchObject({ '*': 'deny', grep: 'allow' });
+      expect(inline.read).toMatchObject({ '*': 'allow', '*.env': 'deny' });
+      // Each purpose keeps its own artifacts, so a title's instructions cannot
+      // be the ones an edit runs under.
+      expect(existsSync(join(vault, '.grimoire', 'mimocode', 'auxiliary', 'inline', 'system.md')))
+        .toBe(true);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('sets the session to the agent this purpose runs as', async () => {
+      const { execution, host, configOptions } = await createHarness();
+
+      await execution.createAuxRunner('inline').query({
+        systemPrompt: 'Edit the selection.',
+      }, 'make it shorter');
+
+      expect(configOptions).toEqual([
+        expect.objectContaining({ configId: 'mode', value: 'grimoire-aux-readonly' }),
+      ]);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('launches mimocode from PATH when no CLI path is configured', async () => {
+      const plugin = createPlugin();
+      // Nothing resolved: no absolute path in settings, nothing found on PATH.
+      // Carried over from the runner this replaced, where it was its own case:
+      // the auxiliary launch builds its own environment and would otherwise be
+      // the one place the fallback was missing.
+      plugin.getResolvedProviderCliPath = () => null;
+      const { execution, host, startupRefs } = await createHarness({ plugin });
+
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'the message');
+
+      const launch = await execution.turnRequests.resolveLaunch(startupRefs[0]);
+      expect(launch.executable).toBe('mimocode');
+      expect(launch.arguments).toEqual(['acp']);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('asks nobody, because there is nobody to ask', async () => {
+      const { execution, host, permissionAnswers, askAnything } = await createHarness();
+
+      await execution.createAuxRunner('inline').query({
+        systemPrompt: 'Edit the selection.',
+      }, 'make it shorter');
+      await askAnything();
+
+      // An auxiliary turn has no surface to raise a prompt on: a modal that
+      // appeared over a note because a title was being generated behind it
+      // would be worse than the refusal.
+      expect(permissionAnswers).toEqual([{ outcome: { outcome: 'cancelled' } }]);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('keeps one runner\'s conversation and gives another its own', async () => {
+      const { execution, host, startupRefs } = await createHarness();
+      const first = execution.createAuxRunner('inline');
+
+      await first.query({ systemPrompt: 'Edit the selection.' }, 'make it shorter');
+      await first.query({ systemPrompt: 'Edit the selection.' }, 'shorter still');
+      await execution.createAuxRunner('inline').query({ systemPrompt: 'Edit the selection.' }, 'a different edit');
+
+      // Inline edit's second message has to reach the first one's session, and
+      // a second edit started elsewhere must not land in the middle of it.
+      expect(startupRefs).toHaveLength(2);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('ends the conversation on reset, and starts a new one after it', async () => {
+      const { execution, host, startupRefs, closes } = await createHarness();
+      const runner = execution.createAuxRunner('title-gen');
+
+      await runner.query({ systemPrompt: 'Name the conversation.' }, 'first');
+      runner.reset();
+      await new Promise(resolve => { setTimeout(resolve, 0); });
+      await runner.query({ systemPrompt: 'Name the conversation.' }, 'second');
+
+      // What the title service does after every title: the process that
+      // generated it is closed, and the next title launches its own.
+      expect(closes).toHaveLength(1);
+      expect(startupRefs).toHaveLength(2);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('applies the model the caller chose, decoding the id space it came in', async () => {
+      const { execution, host, configOptions } = await createHarness();
+
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+        model: 'mimocode:big-pickle-provider:big-pickle',
+      }, 'the message');
+
+      // The settings UI stores an encoded selection id and a caller elsewhere
+      // may pass a raw one. An id decoded from the wrong space is a model the
+      // account does not have, which the agent answers by refusing the option.
+      expect(configOptions).toEqual([
+        expect.objectContaining({ configId: 'mode' }),
+        expect.objectContaining({ configId: 'model', value: 'big-pickle-provider:big-pickle' }),
+      ]);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('closes the auxiliary processes when the composition goes away', async () => {
+      const { execution, host, closes } = await createHarness();
+      await execution.createAuxRunner('instructions').query({
+        systemPrompt: 'Refine the instructions.',
+      }, 'make this clearer');
+
+      // The composition alone, without its host: that is the order `main.ts`
+      // unloads in — every composition first, the kernel host after, and the
+      // host's disposal is not awaited. The backend closes these too; this is
+      // the one that runs first.
+      execution.dispose();
+
+      // A plugin unload with an idle auxiliary CLI still running is the leak
+      // the retained process would otherwise be.
+      for (let attempt = 0; attempt < 50 && closes.length === 0; attempt += 1) {
+        await new Promise(resolve => { setTimeout(resolve, 0); });
+      }
+      expect(closes).toHaveLength(1);
+      await host.dispose();
+    });
+  });
+
 });

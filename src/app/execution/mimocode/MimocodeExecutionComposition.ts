@@ -6,6 +6,7 @@ import {
   type MimocodeMetadataLaunch,
   MimocodeMetadataSession,
 } from '@/app/execution/mimocode/MimocodeMetadataSession';
+import type { AuxQueryRunner } from '@/core/auxiliary/AuxQueryRunner';
 import {
   executionSessionId,
   interactionId,
@@ -42,6 +43,7 @@ import type GrimoirePlugin from '@/main';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import { describeAcpSessionOpenFailure } from '@/providers/acp/execution/describeAcpSessionOpenFailure';
+import { ManagedAcpAuxiliaryQuery } from '@/providers/acp/execution/ManagedAcpAuxiliaryQuery';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createMimocodeModuleContext } from '@/providers/mimocode/app/MimocodeModuleContext';
@@ -50,12 +52,17 @@ import { MIMOCODE_PROVIDER_CAPABILITIES } from '@/providers/mimocode/capabilitie
 import type { MimocodeAcpDynamicConfig } from '@/providers/mimocode/execution/MimocodeAcpDynamicConfig';
 import { MimocodeAcpDynamicConfigApplier } from '@/providers/mimocode/execution/MimocodeAcpDynamicConfig';
 import { MimocodeAcpFileSystem } from '@/providers/mimocode/execution/MimocodeAcpFileSystem';
+import { createMimocodeAuxiliaryFileSystem } from '@/providers/mimocode/execution/MimocodeAuxiliaryFileSystem';
 import { MimocodeContentPresenter } from '@/providers/mimocode/execution/MimocodeContentPresenter';
 import {
   MimocodeExecutionBackend,
   type MimocodeExecutionBackendContext,
 } from '@/providers/mimocode/execution/MimocodeExecutionBackend';
 import {
+  auxiliaryRetentionKey,
+  type MimocodeAuxiliaryEnvironment,
+  type MimocodeAuxiliaryPurpose,
+  type MimocodeAuxiliaryRequest,
   MimocodeExecutionRequests,
   type MimocodeInvocationEnvironment,
 } from '@/providers/mimocode/execution/MimocodeExecutionRequests';
@@ -66,9 +73,18 @@ import { MimocodeSessionConfigState } from '@/providers/mimocode/execution/Mimoc
 import { loadMimocodeSessionCost } from '@/providers/mimocode/history/MimocodeUsageMetadataStore';
 import { mimocodeProviderModule } from '@/providers/mimocode/MimocodeProviderModule';
 import {
+  decodeMimocodeModelId,
+  isMimocodeModelSelectionId,
+} from '@/providers/mimocode/models';
+import {
   buildMimocodePromptBlocks,
   buildMimocodePromptText,
 } from '@/providers/mimocode/runtime/buildMimocodePrompt';
+import {
+  buildMimocodeAuxAgentConfig,
+  MIMOCODE_AUX_AGENT_IDS,
+  type MimocodeAuxAgentProfile,
+} from '@/providers/mimocode/runtime/MimocodeAuxiliaryAgents';
 import { prepareMimocodeLaunchArtifacts } from '@/providers/mimocode/runtime/MimocodeLaunchArtifacts';
 import { buildMimocodeRuntimeEnv } from '@/providers/mimocode/runtime/MimocodeRuntimeEnvironment';
 import type { MimocodeProviderSettings } from '@/providers/mimocode/settings';
@@ -76,10 +92,30 @@ import { getMimocodeState } from '@/providers/mimocode/types';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
+import { ManagedAcpAuxQueryRunner } from '../acp/ManagedAcpAuxQueryRunner';
 import { delayThroughWindow } from '../hostTimers';
 
 /** What a turn may answer with, before it is refused as too large. */
 const MAX_RESULT_BYTES = 256_000;
+
+/**
+ * What an auxiliary turn may answer with, which is much less.
+ *
+ * A title is a line and a refinement is a paragraph. The chat limit is for a
+ * turn that may legitimately produce a file's worth of text; an auxiliary answer
+ * that size is a model that misread its instructions, and reading 256 KB of it
+ * into a title field helps nobody.
+ */
+const AUXILIARY_RESULT_BYTE_LIMIT = 64_000;
+
+/**
+ * How long an auxiliary turn may run before it is abandoned.
+ *
+ * Shorter than a chat turn by an order of magnitude, and it has to be: nobody is
+ * watching it, and the thing waiting is a title that will not appear or a modal
+ * that will not answer.
+ */
+const AUXILIARY_TIMEOUT_MS = 60_000;
 
 /** Where a session opened only to answer a question keeps its state. */
 const METADATA_DATABASE = ':memory:';
@@ -113,6 +149,28 @@ export class MimocodeExecution {
     // one. Every resume then launches against the default database and the
     // session it was told to load is not in it.
     databasePath => this.environment(databasePath),
+    undefined,
+    request => this.auxiliaryEnvironment(request),
+  );
+
+  /**
+   * The auxiliary processes, one per runner that asked for one.
+   *
+   * Built here rather than per tab because auxiliary work belongs to no tab: a
+   * title is generated for a conversation nobody may be looking at, and an
+   * inline edit runs from a modal over a note. Disposed with the backend, which
+   * is what closes the processes it kept.
+   */
+  private readonly auxiliaryQueries = new ManagedAcpAuxiliaryQuery(
+    { resolve: requestRef => this.requests.resolveAuxiliary(requestRef) },
+    // Resolved per launch rather than captured: `createBackend` may be handed a
+    // fake factory by a test, and an auxiliary process launched behind it would
+    // be a real CLI nobody asked for.
+    { create: input => this.auxiliaryFactory().create(input) },
+    { setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      clearTimeout: handle => window.clearTimeout(handle as ReturnType<typeof setTimeout>) },
+    AUXILIARY_RESULT_BYTE_LIMIT,
+    AUXILIARY_TIMEOUT_MS,
   );
 
   /**
@@ -124,6 +182,8 @@ export class MimocodeExecution {
 
   private metadataSession: MimocodeMetadataSession | undefined;
   private clientFactory: ManagedAcpClientFactory | undefined;
+  private auxiliaryClientFactory: ManagedAcpClientFactory | undefined;
+  private injectedClientFactory: ManagedAcpClientFactory | undefined;
 
   /**
    * Which tab answers for a write on which ACP session.
@@ -165,12 +225,17 @@ export class MimocodeExecution {
    * protocol and process ownership: a test that has to launch MiMoCode to check
    * how a turn is composed is testing the wrong thing.
    */
-  createBackend(
-    clientFactory: ManagedAcpClientFactory = this.clientFactory ?? this.createClientFactory(),
-  ): MimocodeExecutionBackend {
-    this.clientFactory = clientFactory;
+  createBackend(clientFactory?: ManagedAcpClientFactory): MimocodeExecutionBackend {
+    // Injected once, and for both: a test that hands the backend a fake agent
+    // must not have an auxiliary turn launch a real one behind it.
+    if (clientFactory) {
+      this.injectedClientFactory = clientFactory;
+      this.auxiliaryClientFactory = clientFactory;
+    }
+    this.clientFactory = clientFactory ?? this.clientFactory ?? this.createClientFactory();
+
     const context: MimocodeExecutionBackendContext = {
-      clientFactory,
+      clientFactory: this.clientFactory,
       requestResolver: this.requests,
       dynamicApplier: new MimocodeAcpDynamicConfigApplier({
         resolve: dynamicRef => this.requests.resolveDynamic(dynamicRef),
@@ -187,16 +252,7 @@ export class MimocodeExecution {
         reconcile: async query => acpCancellationEvidence(query)
           ?? { kind: 'unknown', effectsPossible: true },
       },
-      auxiliaryQueries: {
-        execute: async () => {
-          // Titles, refinement and inline edits still run on
-          // `MimocodeAuxQueryRunner` until M5, and this composition has no
-          // reference space of its own for them. Refused rather than answered
-          // emptily: an auxiliary turn that silently returns nothing is the
-          // failure mode this migration exists to remove.
-          throw new Error('MiMoCode auxiliary execution is not wired to the kernel yet.');
-        },
-      },
+      auxiliaryQueries: this.auxiliaryQueries,
       scheduler: {
         setTimeout: (callback: () => void, delayMs: number) => window.setTimeout(callback, delayMs),
         clearTimeout: (handle: unknown) => window.clearTimeout(
@@ -543,6 +599,34 @@ export class MimocodeExecution {
     return this.metadataSession;
   }
 
+  /**
+   * An `AuxQueryRunner` for one auxiliary conversation, answered by the kernel.
+   *
+   * One per caller, and the caller decides what that means: the title service
+   * builds one per title and resets it when the title is done, while inline edit
+   * holds one for as long as the edit lasts. That is the unit a process is kept
+   * for, so it is the unit the conversation id is minted for.
+   */
+  createAuxRunner(purpose: MimocodeAuxiliaryPurpose): AuxQueryRunner {
+    const conversationId = opaqueId('ocaux');
+    return new ManagedAcpAuxQueryRunner({
+      reference: (config, prompt) => this.requests.referenceAuxiliary({
+        purpose,
+        conversationId,
+        systemPrompt: config.systemPrompt,
+        prompt,
+        ...(config.model ? { model: config.model } : {}),
+      }),
+      run: (requestRef, options) => (this.backend ?? this.createBackend())
+        .runAuxiliaryQuery(requestRef, options),
+      release: async () => {
+        await this.backend?.releaseAuxiliaryConversation(
+          auxiliaryRetentionKey(purpose, conversationId),
+        );
+      },
+    });
+  }
+
   /** Drops every reference held, and takes down whatever is on screen. */
   dispose(): void {
     // Taken down before the subscriptions are dropped: unsubscribing first
@@ -555,6 +639,10 @@ export class MimocodeExecution {
     }
     this.presenters.clear();
     this.requests.dispose();
+    // The backend closes these when it is disposed, and a composition disposed
+    // without one still has processes to close: an auxiliary turn needs no chat
+    // session and may have launched on its own.
+    this.settle(this.auxiliaryQueries.dispose());
   }
 
   /**
@@ -636,6 +724,44 @@ export class MimocodeExecution {
         level: 'warn',
         scope: 'mimocode',
       });
+    });
+  }
+
+  /**
+   * The factory an auxiliary process is launched through, and it is not the
+   * chat one.
+   *
+   * **What a chat turn may reach and an auxiliary turn may not.** The chat
+   * filesystem opts out of containment in full access — the user asked for it,
+   * and they are watching the turn that uses it. An auxiliary turn has nobody
+   * watching and no surface to ask on: a title being generated in the background
+   * must not read outside the vault because the *chat* was set to full access,
+   * and must not write at all. The legacy runner contained every auxiliary read
+   * for exactly this reason, and it declared no write.
+   */
+  private auxiliaryFactory(): ManagedAcpClientFactory {
+    this.auxiliaryClientFactory ??= this.injectedClientFactory ?? this.createAuxiliaryFactory();
+    return this.auxiliaryClientFactory;
+  }
+
+  private createAuxiliaryFactory(): ManagedAcpClientFactory {
+    const fileSystem = createMimocodeAuxiliaryFileSystem(
+      () => getVaultPath(this.plugin.app) ?? process.cwd(),
+    );
+    return new AcpManagedClientAdapterFactory({
+      clientInfo: {
+        name: 'grimoire-aux',
+        version: this.plugin.manifest?.version ?? '0.0.0',
+      },
+      delegate: {
+        fileSystem: {
+          readTextFile: request => fileSystem.readTextFile(request),
+          writeTextFile: request => fileSystem.writeTextFile(request),
+        },
+      },
+      processLauncher: new NodeManagedAcpProcessLauncher({
+        resolve: startupRef => this.requests.resolveLaunch(startupRef),
+      }),
     });
   }
 
@@ -760,6 +886,64 @@ export class MimocodeExecution {
    * from files, so a process spawned before they exist runs under the previous
    * turn's configuration.
    */
+  /**
+   * What an auxiliary `mimocode acp` is launched under.
+   *
+   * The chat environment's shape with three differences, and each is what makes
+   * an auxiliary turn auxiliary: its **own artifacts directory** per purpose, so
+   * a title's config cannot be the conversation's; its **own agent**, whose
+   * permissions are what stops an unattended turn from writing to the vault;
+   * and its **own system prompt**, which is the caller's rather than the
+   * vault's — a title is asked for by the prompt that asks for a title.
+   *
+   * No MCP servers and no database: an auxiliary turn has no conversation to
+   * resume and nothing to offer a tool.
+   */
+  private async auxiliaryEnvironment(
+    request: MimocodeAuxiliaryRequest,
+  ): Promise<MimocodeAuxiliaryEnvironment> {
+    const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
+      this.plugin.settings,
+      'mimocode',
+    );
+    const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
+    const executable = this.plugin.getResolvedProviderCliPath('mimocode') ?? 'mimocode';
+    const runtimeEnv = buildMimocodeRuntimeEnv(settings, executable);
+    const profile = AUXILIARY_AGENT_PROFILES[request.purpose];
+    const agentId = MIMOCODE_AUX_AGENT_IDS[profile];
+    const artifacts = await prepareMimocodeLaunchArtifacts({
+      artifactsSubdir: `mimocode/auxiliary/${request.purpose}`,
+      defaultAgentId: agentId,
+      managedAgents: [buildMimocodeAuxAgentConfig(profile)],
+      runtimeEnv,
+      systemPromptKey: request.systemPrompt,
+      systemPromptText: request.systemPrompt,
+      userName: this.plugin.settings.userName,
+      workspaceRoot: cwd,
+    });
+    const modelId = resolveMimocodeAuxiliaryModelId(request.model);
+    return {
+      executable,
+      cwd,
+      environment: definedEnvironment({
+        ...runtimeEnv,
+        MIMOCODE_CONFIG: artifacts.configPath,
+        MIMOCODE_CONFIG_CONTENT: artifacts.configContent,
+        PATH: getEnhancedPath(runtimeEnv.PATH, isAbsolute(executable) ? executable : undefined),
+      }),
+      // The legacy runner's launch key, unchanged: command, config, environment
+      // and the instructions the artifacts wrote.
+      launchKey: JSON.stringify({
+        artifactKey: artifacts.launchKey,
+        command: executable,
+        configPath: artifacts.configPath,
+        envText: getRuntimeEnvironmentText(this.plugin.settings, 'mimocode'),
+      }),
+      agentId,
+      ...(modelId ? { modelId } : {}),
+    };
+  }
+
   private async environment(databasePath?: string): Promise<MimocodeInvocationEnvironment> {
     const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
       this.plugin.settings,
@@ -829,6 +1013,38 @@ function notWiredHere(slot: string): Promise<never> {
   return Promise.reject(new Error(
     `MiMoCode MCP slot "${slot}" is served by the workspace registration, not by a chat tab.`,
   ));
+}
+
+/**
+ * Which agent each purpose runs as.
+ *
+ * An inline edit reads the note around what it is editing; a title and a
+ * refinement are given everything they need in the prompt. Copied from the
+ * three legacy services rather than decided again — this is their behaviour,
+ * moved.
+ */
+const AUXILIARY_AGENT_PROFILES: Readonly<Record<MimocodeAuxiliaryPurpose, MimocodeAuxAgentProfile>> = {
+  inline: 'readonly',
+  instructions: 'passive',
+  'title-gen': 'passive',
+};
+
+/**
+ * The raw model id behind whatever the caller passed.
+ *
+ * Callers hand over ids from two spaces: the encoded selection id the settings
+ * UI stores, and a raw provider id typed in or carried from elsewhere. Decoding
+ * only the first and passing the second through is what the legacy runner does,
+ * and an id decoded from the wrong space is a model the account does not have.
+ */
+function resolveMimocodeAuxiliaryModelId(model?: string): string | undefined {
+  const trimmed = model?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return isMimocodeModelSelectionId(trimmed)
+    ? decodeMimocodeModelId(trimmed) ?? undefined
+    : trimmed;
 }
 
 function definedEnvironment(

@@ -1,12 +1,12 @@
+import { LazyAuxQueryRunner } from '../../../core/auxiliary/LazyAuxQueryRunner';
 import { QueryBackedInstructionRefineService } from '../../../core/auxiliary/QueryBackedInstructionRefineService';
 import type GrimoirePlugin from '../../../main';
-import { MimocodeAuxQueryRunner } from '../runtime/MimocodeAuxQueryRunner';
 
+/** Instruction refinement, on the execution kernel. */
 export class MimocodeInstructionRefineService extends QueryBackedInstructionRefineService {
   constructor(plugin: GrimoirePlugin) {
-    super(new MimocodeAuxQueryRunner(plugin, {
-      agentProfile: 'passive',
-      artifactPurpose: 'instructions',
-    }));
+    super(new LazyAuxQueryRunner(
+      () => plugin.getMimocodeExecution().createAuxRunner('instructions'),
+    ));
   }
 }

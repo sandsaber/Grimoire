@@ -87,8 +87,15 @@ describe('provider execution topology', () => {
         // factory, which is what stops an auxiliary turn from reaching what the
         // chat's full-access filesystem may.
         expect(source).toContain(record.isolationEvidence);
-        expect(source).toMatch(/auxiliaryFactory|createAuxiliaryFactory/);
-        expect(source).toMatch(/createOpencodeAuxiliaryFileSystem|AuxiliaryFileSystem/);
+        // **The wiring, not the presence.** Read as a line rather than as two
+        // names in a file, because the failure this guards against is the
+        // auxiliary path being pointed at the chat factory while both methods
+        // still exist and both still read correctly on their own. The
+        // composition tests inject a factory, so neither real one runs there.
+        expect(source).toMatch(
+          /this\.auxiliaryClientFactory \?\?= this\.injectedClientFactory \?\? this\.createAuxiliaryFactory\(\)/,
+        );
+        expect(source).toMatch(/create\w+AuxiliaryFileSystem\(/);
       },
     );
 

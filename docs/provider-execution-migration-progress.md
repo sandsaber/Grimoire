@@ -6621,6 +6621,31 @@ the entire reason the session is retained.
 
 Gates: unit 517 suites / 8,060 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
 
+### MiMoCode's auxiliary flip, and the defect the mirror found (this commit)
+
+The same flip, on the provider that is not allowed to diverge from OpenCode. `MimocodeAuxQueryRunner`
+is deleted; the three services ask the kernel; the topology record says `kernel-isolated`.
+
+Done by normalized diff — `sed` both provider names to one token, then compare — which is what made it
+safe to do mechanically and is what found the reason to do it at all. **MiMoCode's auxiliary read had
+a defect OpenCode's had already fixed**: `request.limit ? … : lines.length`, where `limit: 0` asks for
+no lines and was answered with the whole file. The fix was never mirrored across. It is not mirrored
+now either — the file is gone, and the shared `AcpWorkspaceFileSystem` the kernel path uses reads
+absence rather than falsiness, so the flip carries the fix.
+
+The two compositions' auxiliary halves are byte-identical after normalizing the provider name, and so
+are their stores' auxiliary sections and all three test files. That is the property to keep: the next
+change to either belongs in both.
+
+Six breaks, one green — and it was the same green on OpenCode, which had not been broken this way.
+**Nothing proved the auxiliary path uses the auxiliary factory.** The policy has its own test and the
+permission refusal has one, but the composition tests inject a client factory, so neither real factory
+ever runs there: pointing the auxiliary path at the chat one changed no assertion in either provider.
+The topology gate reads the wiring line itself now. That is a source match rather than an exercise,
+and it is recorded as one below.
+
+Gates: unit 518 suites / 8,076 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6654,12 +6679,19 @@ consumer needs a conversation. Corrected, proven, still dark. What is left there
 and the runner adapter per provider, then the flip — and the stderr a failed auxiliary error carries
 today, which needs the client contract to grow.
 
-**The next M5 piece to pick up** is the same flip for the other four managed-ACP providers with real
-auxiliary work — Grok, Kimi Code, MiMoCode, and then Codex, which is a different transport. OpenCode's
-is the template and it is small: an auxiliary environment builder in the composition, three one-line
-services, a `kernel-isolated` topology record, and the runner deleted. Do them one at a time, and read
-each runner before deleting it — OpenCode's had a containment rule the kernel path did not, and only
-reading it side by side found that.
+**The next M5 piece to pick up** is the same flip for Kimi Code and Grok, then Codex, which is a
+different transport. OpenCode's and MiMoCode's are the template and it is small: an auxiliary
+environment builder in the composition, three one-line services, a `kernel-isolated` topology record,
+and the runner deleted. Kimi Code is a third fork of the same CLI, so the normalized diff carries most
+of it. Do them one at a time, and read each runner before deleting it — OpenCode's had a containment
+rule the kernel path did not, and MiMoCode's had a `limit: 0` defect OpenCode's had already fixed.
+
+**Owed on the auxiliary path:** nothing exercises the real auxiliary client factory. The composition
+tests inject one, so what proves an auxiliary turn is contained is the filesystem policy's own test
+plus a source match on the wiring line. A test that drives the real factory needs a fake process
+launcher rather than a fake factory — the launcher is built inside `createClientFactory`, so it is a
+seam that does not exist yet. Owner: whoever adds the auxiliary rows to a live smoke matrix, which is
+the other place this would be caught.
 
 **Claude's auxiliary path is different and should not be swept in with them**: `ClaudeAuxiliaryQuery`
 is cold by design, its inline edit is its own service rather than a `QueryBacked*` one, and nothing

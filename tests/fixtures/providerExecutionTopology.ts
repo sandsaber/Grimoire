@@ -279,14 +279,19 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     sessionBoundary: 'acp-session',
     resume: 'native',
     concurrency: 'one ACP session per conversation runtime',
-    auxiliary: 'isolated',
-    auxiliaryOwner: 'src/providers/mimocode/runtime/MimocodeAuxQueryRunner.ts',
+    // Auxiliary work on the kernel, like OpenCode's and for the same reason:
+    // these two do not diverge. The owner is the composition, which decides the
+    // launch — its own artifacts per purpose, its own agent, its own factory.
+    auxiliary: 'kernel-isolated',
+    auxiliaryOwner: 'src/app/execution/mimocode/MimocodeExecutionComposition.ts',
     sharedResources: MANAGED_ACP_SHARED_RESOURCES('mimocode'),
     capabilities: MIMOCODE_PROVIDER_CAPABILITIES,
     isolationEvidence: 'mimocode/auxiliary/',
     evidence: [
       'src/providers/mimocode/execution/MimocodeExecutionBackend.ts',
-      'src/providers/mimocode/runtime/MimocodeAuxQueryRunner.ts',
+      'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
+      'src/providers/mimocode/execution/MimocodeAuxiliaryFileSystem.ts',
+      'src/providers/mimocode/runtime/MimocodeAuxiliaryAgents.ts',
       'src/providers/mimocode/runtime/MimocodeLaunchArtifacts.ts',
     ],
   },

@@ -5,8 +5,39 @@ import { dirname, join } from 'node:path';
 import trace from '@test/fixtures/provider-traces/mimocode-execution.json';
 
 import { MimocodeAcpFileSystem } from '@/providers/mimocode/execution/MimocodeAcpFileSystem';
+import { createMimocodeAuxiliaryFileSystem } from '@/providers/mimocode/execution/MimocodeAuxiliaryFileSystem';
 
 describe('MimocodeAcpFileSystem', () => {
+  describe('what an auxiliary turn may reach', () => {
+    it('stays in the vault and writes nothing, whatever the chat is set to', async () => {
+      const root = await mkdtemp(join(tmpdir(), 'grimoire-mimocode-aux-fs-'));
+      const fileSystem = createMimocodeAuxiliaryFileSystem(() => root);
+      try {
+        await writeFile(join(root, 'note.md'), 'the note', 'utf8');
+        const outside = join(dirname(root), 'elsewhere.md');
+        await writeFile(outside, 'not the vault', 'utf8');
+
+        // Reading inside is the whole reason an inline edit has a filesystem.
+        await expect(fileSystem.readTextFile({ sessionId: 'aux', path: 'note.md' }))
+          .resolves.toEqual({ content: 'the note' });
+        // Outside is refused even though the *chat* may be in full access: an
+        // auxiliary turn is neither asked for nor watched, and the user who
+        // opted into unrestricted access opted in for the turn they can see.
+        await expect(fileSystem.readTextFile({ sessionId: 'aux', path: outside }))
+          .rejects.toThrow(/workspace/i);
+        // And it writes nothing at all, contained or not.
+        await expect(fileSystem.writeTextFile({
+          sessionId: 'aux',
+          path: 'note.md',
+          content: 'overwritten by a title generator',
+        })).rejects.toThrow();
+        await expect(readFile(join(root, 'note.md'), 'utf8')).resolves.toBe('the note');
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+  });
+
   it('contains reads and approved writes to the session workspace', async () => {
     const root = await mkdtemp(join(tmpdir(), 'grimoire-mimocode-fs-'));
     const approvals: string[] = [];
