@@ -23,8 +23,6 @@ const PROVIDER_ID = 'gemini' as const;
 export interface GeminiSessionConfigPorts {
   /** The whole settings object, which this both reads and seeds. */
   readonly settingsBag: () => Record<string, unknown>;
-  /** Persists what was seeded; only called when something actually changed. */
-  readonly saveSettings: () => Promise<void>;
 }
 
 /**
@@ -81,7 +79,17 @@ export class GeminiSessionConfigState {
     this.currentSessionModeId = null;
   }
 
-  /** The permission mode the vault is on, in Grimoire's vocabulary. */
+  /**
+   * This provider's own permission mode, not whichever one was projected last.
+   *
+   * `settings.permissionMode` is a shared field: the settings coordinator
+   * projects the active provider's value into it, so reading it directly
+   * answers for whoever was toggled most recently. That is how another
+   * provider's Auto-approve came to switch off *this* provider's workspace
+   * containment and skip its write approvals. The runtime asked the same
+   * question beside this one until the extraction was finished; a second
+   * implementation of the answer is how that defect comes back.
+   */
   permissionMode(): string {
     const snapshot = ProviderSettingsCoordinator
       .getProviderSettingsSnapshot(this.ports.settingsBag(), PROVIDER_ID);
@@ -125,6 +133,25 @@ export class GeminiSessionConfigState {
   }
 
   /**
+   * Takes on a mode the session says it switched to, and answers with the
+   * toolbar's word for it.
+   *
+   * The other door, and the only one that may move the user's selection: a
+   * `current_mode_update` is a switch somebody asked for — `/mode` typed into
+   * the composer, or the set this turn just applied — where `session/new`
+   * merely reports where the agent starts. Translated on the way into the
+   * vault, because `selectedMode` speaks Grimoire's three values and the
+   * agent's own `autoEdit` is one the toolbar cannot render; kept raw in
+   * `currentSessionModeId`, which is what the *session* is compared against.
+   */
+  adoptCurrentMode(currentModeId: string): 'normal' | 'full_access' | 'plan' {
+    this.currentSessionModeId = currentModeId;
+    const permissionMode = mapGeminiModeToGrimoire(currentModeId);
+    updateGeminiProviderSettings(this.ports.settingsBag(), { selectedMode: permissionMode });
+    return permissionMode;
+  }
+
+  /**
    * Keeps what a session reported about itself.
    *
    * The models and modes a tab's selectors are built from are answered once,
@@ -164,12 +191,16 @@ export class GeminiSessionConfigState {
     }
 
     if (modeState.currentModeId) {
-      // Translated on the way into the vault. `selectedMode` is what the toolbar
-      // reads back, and it speaks Grimoire's three values — the agent's own
-      // `autoEdit` is one it cannot render. Kept raw in `currentSessionModeId`,
-      // which is what the *session* is compared against.
+      // Recorded, not adopted. This is the mode the agent opens in — its own
+      // default, or whatever the session was left in — and it is what
+      // `applySelectedMode` compares against, so it is kept in the agent's
+      // vocabulary and nowhere else. Writing it into `selectedMode` would push
+      // it at the toolbar, which is the field `resolvePermissionMode` answers
+      // from and therefore what the *next turn* asks for: a session reporting
+      // `default` would talk a vault out of the Plan the user picked. Only a
+      // `current_mode_update` — an actual switch, which the user asked for —
+      // moves the toolbar.
       this.currentSessionModeId = modeState.currentModeId;
-      updates.selectedMode = mapGeminiModeToGrimoire(modeState.currentModeId);
     }
 
     if (Object.keys(updates).length === 0) {

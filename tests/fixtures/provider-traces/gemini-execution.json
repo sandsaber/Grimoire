@@ -14,7 +14,7 @@
     "executionSessionId": "es-gggggggggggggggggggggggggggggggg",
     "sessionInstanceId": "si-gggggggggggggggggggggggggggggggg",
     "runId": "run-gggggggggggggggggggggggggggggggg",
-    "nativeSessionId": "grok-session",
+    "nativeSessionId": "native-session",
     "nativeRunId": "prompt-1"
   },
   "cases": {

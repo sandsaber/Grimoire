@@ -5744,6 +5744,52 @@ Four breaks, four caught.
 
 Gates: unit 503 suites / 7,855 tests, typecheck, `eslint`, `build:release`.
 
+### The fifth review — the Gemini dark modules, and two the extraction broke (this commit)
+
+A read of the three commits the fourth review did not cover: nine provider-owned modules, a trace
+fixture, and the two extractions that changed live code inside `GeminiChatRuntime`. Six findings,
+recorded with a status column in [`docs/wave7-review-backlog.md`](wave7-review-backlog.md). Two are
+behavioural, and both were introduced by this wave rather than found in it.
+
+**A session that reports where it starts was talking the vault out of what the user picked.** The
+extracted state wrote `selectedMode` from the `currentModeId` in `session/new`'s answer. That field
+is not decoration: `GeminiChatUIConfig.resolvePermissionMode` answers from it, the settings
+coordinator projects that answer over the current value, and `resolveSelectedModeId` reads the
+projection — so the mode the *agent* opens in decided what the *next turn asks for*. A vault on Plan,
+opening a session that reports `default`, sent no `set_mode` at all: the wish and the session agreed,
+because the session had overwritten the wish. The break proves exactly that — with the old line back,
+`setMode` is called zero times.
+
+Two modules of this same wave already contradicted each other about it. `GeminiContentPresenter`
+documents `onSessionOpened` as deliberately separate from `onCurrentMode` — "pushing it at the
+toolbar would overwrite the Safe/Plan/Auto the user picked" — and its test asserts no mode is
+reported. The state that `onSessionOpened` feeds did the push one layer down, where both tests stayed
+green. Grok's equivalent records the raw id and writes no selection, which is now what this does;
+`adoptCurrentMode` is the one door that may move the toolbar, because a `current_mode_update` is a
+switch somebody asked for.
+
+**The other was a copy sold as a move.** `permissionMode()` and `fullAccess()` were extracted into
+the state and left in the runtime, where they are what gate workspace containment and write
+approvals. The comment above them is the record of this question being got wrong once already — an
+Auto-approve toggled on another provider switching off this one's containment. Two implementations of
+that answer is how it comes back. There is one now, and the test that caught the original failure
+runs through it: break the snapshot read and it goes red.
+
+The other four are small: a documented port nothing calls, two comments left pointing at deleted
+fields, `"grok-session"` in Gemini's own topology fixture, and a requests test half-built from
+another provider's values — a Claude model id, the `acp` subcommand this CLI does not take, and a
+database path it has no database for.
+
+Recorded rather than fixed: swapping the inline approval guard for the shared
+`normalizeApprovalInput` changed what a scalar `rawInput` becomes, `{}` to `{ value: … }`. It is what
+every other ACP provider does, so it converges — but a live behaviour change belongs in the commit
+that makes it.
+
+Two breaks, two caught, both landing on the assertion that matters rather than a neighbour.
+
+Gates: unit 503 suites / 7,855 tests, integration 145 (61 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

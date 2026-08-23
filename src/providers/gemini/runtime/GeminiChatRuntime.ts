@@ -1,8 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
-import type { PermissionMode } from '@/core/types';
 import {
   buildAcpSessionLoadFailureDebugEvent,
   isAcpMissingSessionError,
@@ -50,9 +48,6 @@ import {
 import { appendEditorContext } from '../../../utils/editor';
 import { getVaultPath } from '../../../utils/path';
 import { buildContextFromHistory, buildPromptWithHistoryContext } from '../../../utils/session';
-import type {
-  extractAcpSessionModelState,
-  extractAcpSessionModeState} from '../../acp';
 import {
   AcpClientConnection,
   type AcpContentBlock,
@@ -74,18 +69,10 @@ import { normalizeApprovalInput } from '../../acp/execution/AcpPermissionBridge'
 import { toAcpMcpServers } from '../../acp/mcp/toAcpMcpServers';
 import { geminiPlanUsageStore } from '../app/GeminiPlanUsageStore';
 import { GEMINI_PROVIDER_CAPABILITIES } from '../capabilities';
-import {
-  buildGeminiPermissionPresentation,
-} from '../execution/GeminiPermissionPresentation';
+import { buildGeminiPermissionPresentation } from '../execution/GeminiPermissionPresentation';
 import { GeminiSessionConfigState } from '../execution/GeminiSessionConfigState';
-import {
-  mapGeminiModeToGrimoire,
-  mapGrimoireModeToGemini,
-} from '../modes';
-import {
-  getGeminiProviderSettings,
-  updateGeminiProviderSettings,
-} from '../settings';
+import { mapGrimoireModeToGemini } from '../modes';
+import { getGeminiProviderSettings } from '../settings';
 import { buildGeminiRuntimeEnv } from './GeminiRuntimeEnvironment';
 
 interface ActiveTurn {
@@ -156,10 +143,7 @@ export class GeminiChatRuntime implements ChatRuntime {
    */
   private readonly sessionConfig = new GeminiSessionConfigState({
     settingsBag: () => this.plugin.settings,
-    saveSettings: async () => { await this.plugin.saveSettings?.(); },
   });
-
-  /** The mode the session is actually in, as the agent last reported it. */
 
   private permissionModeSyncCallback: ((sdkMode: string) => void) | null = null;
   private currentLaunchKey: string | null = null;
@@ -211,12 +195,6 @@ export class GeminiChatRuntime implements ChatRuntime {
     if (this.sessionId !== nextSessionId) {
       this.sessionInvalidated = false;
       this.sessionConfig.forgetSession();
-      // The mode goes with the model, and for the same reason: both are what
-      // *that* session was set to, and both are what `applySelectedMode` and
-      // `applySelectedModel` skip the call on. Kept across a session change,
-      // the next turn believes the new session is already in a mode nobody set
-      // it to — and runs it in the agent's default while the toolbar says Plan.
-
     }
     this.sessionId = nextSessionId;
   }
@@ -648,14 +626,7 @@ export class GeminiChatRuntime implements ChatRuntime {
     if (normalized.type === 'current_mode') {
       // The agent's own word for the mode it is in. Dropped, the toolbar kept
       // showing whatever was last picked even after the session moved.
-      //
-      // Kept in the agent's vocabulary where it is compared against the session
-      // — that is what `set_mode` is skipped on — and translated where it
-      // reaches the vault and the toolbar, which speak Grimoire's three values
-      // and cannot render `autoEdit` at all.
-      this.sessionConfig.markApplied({ modeId: normalized.currentModeId });
-      const permissionMode = mapGeminiModeToGrimoire(normalized.currentModeId);
-      updateGeminiProviderSettings(this.plugin.settings, { selectedMode: permissionMode });
+      const permissionMode = this.sessionConfig.adoptCurrentMode(normalized.currentModeId);
       void this.plugin.saveSettings?.();
       this.emitPermissionModeSync(permissionMode);
       return;
@@ -715,11 +686,9 @@ export class GeminiChatRuntime implements ChatRuntime {
     }
   }
 
-  private syncSessionDiscovery(params: {
-    configOptions?: Parameters<typeof extractAcpSessionModelState>[0]['configOptions'];
-    models?: Parameters<typeof extractAcpSessionModelState>[0]['models'];
-    modes?: Parameters<typeof extractAcpSessionModeState>[0]['modes'];
-  }): void {
+  private syncSessionDiscovery(
+    params: Parameters<GeminiSessionConfigState['syncSessionDiscovery']>[0],
+  ): void {
     if (this.sessionConfig.syncSessionDiscovery(params)) {
       void this.plugin.saveSettings?.();
     }
@@ -770,31 +739,11 @@ export class GeminiChatRuntime implements ChatRuntime {
     };
   }
 
-  /**
-   * This provider's own permission mode, not whichever one was projected last.
-   *
-   * `settings.permissionMode` is a shared field: the settings coordinator
-   * projects the active provider's value into it, so reading it directly
-   * answers for whoever was toggled most recently. That is how another
-   * provider's Auto-approve came to switch off *this* provider's workspace
-   * containment and skip its write approvals. Every flipped provider reads the
-   * per-provider snapshot; these two were the ones the change never reached.
-   */
-  private permissionMode(): PermissionMode {
-    return ProviderSettingsCoordinator
-      .getProviderSettingsSnapshot(this.plugin.settings, 'gemini')
-      .permissionMode;
-  }
-
-  private fullAccess(): boolean {
-    return this.permissionMode() === 'full_access';
-  }
-
   private async writeTextFile(request: AcpWriteTextFileRequest): Promise<Record<string, never>> {
     const resolvedPath = this.resolveSessionPath(request.sessionId, request.path);
     await approveAcpWriteTextFile({
       approvalCallback: this.approvalCallback,
-      fullAccess: this.fullAccess(),
+      fullAccess: this.sessionConfig.fullAccess(),
       providerLabel: 'Gemini',
       requestPath: request.path,
       resolvedPath,
@@ -811,7 +760,7 @@ export class GeminiChatRuntime implements ChatRuntime {
       ?? process.cwd();
     // Active (full-access) mode opts into unrestricted file access; safe and
     // plan modes confine ACP-delegated reads/writes to the session workspace.
-    const allowOutsideWorkspace = this.fullAccess();
+    const allowOutsideWorkspace = this.sessionConfig.fullAccess();
     return resolveWorkspacePath(cwd, rawPath, { allowOutsideWorkspace });
   }
 

@@ -46,7 +46,7 @@ describe('GeminiExecutionRequests', () => {
     const requestRef = store.reference({
       prompt,
       messageId: 'message-1',
-      dynamic: { modeId: 'plan', modelId: 'anthropic/claude-sonnet-4' },
+      dynamic: { modeId: 'plan', modelId: 'gemini-2.5-pro' },
     });
 
     const invocation = await store.resolve(requestRef);
@@ -71,7 +71,7 @@ describe('GeminiExecutionRequests', () => {
     });
     await expect(store.resolveDynamic(invocation.dynamicRef ?? '')).resolves.toEqual({
       modeId: 'plan',
-      modelId: 'anthropic/claude-sonnet-4',
+      modelId: 'gemini-2.5-pro',
     });
   });
 
@@ -112,13 +112,13 @@ describe('GeminiExecutionRequests', () => {
     // commands exist, which has no prompt behind it to resolve into one.
     const startupRef = store.referenceLaunch({
       executable: '/usr/local/bin/gemini',
-      arguments: ['acp'],
+      arguments: ['--acp'],
       cwd: '/vault',
       environment: {},
     });
 
     await expect(store.resolveLaunch(startupRef)).resolves.toEqual(expect.objectContaining({
-      arguments: ['acp'],
+      arguments: ['--acp'],
     }));
   });
 
@@ -146,7 +146,6 @@ describe('GeminiExecutionRequests', () => {
         environment: {},
         launchKey: 'launch-key-1',
         mcpServers: [],
-        databasePath: null,
       }),
       2,
     );
@@ -163,7 +162,7 @@ describe('GeminiExecutionRequests', () => {
     const requestRef = store.reference({ prompt });
     const startupRef = store.referenceLaunch({
       executable: '/usr/local/bin/gemini',
-      arguments: ['acp'],
+      arguments: ['--acp'],
       cwd: '/vault',
       environment: {},
     });

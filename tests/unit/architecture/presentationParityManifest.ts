@@ -753,10 +753,12 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // live with OpenCode's flip and are listed as wired.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
       // Wave 7's first half, built ahead of its own flip: Gemini CLI's backend
-      // descriptor and the provider-owned parts around it. Not listed beside
-      // them: `GeminiPermissionPresentation.ts`, which was moved out of the
-      // legacy runtime rather than written beside it, and `modes.ts`, which the
-      // runtime imports for the same fix.
+      // descriptor and the provider-owned parts around it. Three are not listed
+      // beside them, because the legacy runtime delegates to all three and they
+      // are in the production bundle already: `GeminiPermissionPresentation.ts`
+      // and `GeminiSessionConfigState.ts`, both moved out of that runtime rather
+      // than written next to it, and `modes.ts`, which it imports for the mode
+      // translation the fourth review asked for.
       'src/providers/gemini/execution/GeminiAcpDynamicConfig.ts',
       'src/providers/gemini/execution/GeminiAcpFileSystem.ts',
       'src/providers/gemini/execution/GeminiExecutionBackend.ts',

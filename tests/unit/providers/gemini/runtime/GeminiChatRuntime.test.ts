@@ -610,14 +610,15 @@ describe('GeminiChatRuntime', () => {
       expect(setMode).toHaveBeenCalledWith({ modeId, sessionId: 'session-1' });
     });
 
-    it('stores a mode the toolbar can render when a session first opens', async () => {
-      const plugin = createMockPlugin();
-      const runtime = new GeminiChatRuntime(plugin) as any;
+    it('lets a session report where it starts without moving what the user picked', async () => {
+      const { runtime, setMode, plugin } = createRuntimeWithSession('plan');
 
       // The other door into `selectedMode`, and the one that opens first:
-      // `session/new` reports the agent's own default rather than a switch, and
-      // the toolbar reads that field back. It happens on the first session a
-      // vault ever opens, not only when a mode changes.
+      // `session/new` answers with the mode the *agent* starts in, on the first
+      // session a vault ever opens and on every one after. That is not a switch
+      // anybody asked for, and `selectedMode` is the field the toolbar reads
+      // back — and, through `resolvePermissionMode`, the field the next turn's
+      // mode is resolved from. Adopting it talked a vault on Plan into Default.
       runtime.syncSessionDiscovery({
         modes: {
           availableModes: [
@@ -628,8 +629,14 @@ describe('GeminiChatRuntime', () => {
         },
       });
 
-      expect(getGeminiProviderSettings(plugin.settings).selectedMode).toBe('normal');
+      expect(getGeminiProviderSettings(plugin.settings).selectedMode).toBe('plan');
+      // Recorded all the same, in the agent's own vocabulary: it is what
+      // `applySelectedMode` skips a redundant round trip on.
       expect(runtime.sessionConfig.sessionModeId).toBe('default');
+
+      await runtime.applySelectedMode('session-1');
+
+      expect(setMode).toHaveBeenCalledWith({ modeId: 'plan', sessionId: 'session-1' });
     });
 
     it('shows the toolbar a value it can render when the agent reports its own', async () => {
