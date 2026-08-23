@@ -75,14 +75,14 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | Third review applied: kernel-in-production-at-first-flip owned (interim kernel host, storage docs, revert safety, unload), adapter bound to the lifecycle registry, capability-driven flip smoke, providerState parity gate, release-train rules, shared-resource inventory in M0a | Complete | `6df5658` |
 | UI verification layers documented (existing bundle-load/view-open smokes cited as gate layer 2), presentation-agnostic projection rule + stop condition, "After the migration" section (WorkGraph, UI evolution as renderer swap) | Complete | `b94a588` |
 | M0a — parity gate and adapter contract | Complete | `3273321` … `401a1b8`, plus post-review corrections in this commit |
-| M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | Complete for the four proof providers, plus Grok's wire recording taken at the start of wave 5; four remain | `7f8dfaa`, plus this commit |
+| M0b — golden traces (amortized; 4 topologies before freeze, rest at their flip) | **Complete** — all nine wire recordings taken. Three are `partial` because their accounts cannot open a session, and each says so in the file | `7f8dfaa`, plus this commit |
 | M1 — execution kernel, dark-launched | Complete | `dca2f84`, `cc6081e`, `ec1303f`, `86f0585`, `a689af8` |
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
-| M2-flips — nine production flips with legacy deletion | In progress — waves 1–4 (Antigravity, Codex, Claude, OpenCode) shipped; wave 1 certified, three matrices outstanding | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
+| M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — provider control plane | Not started | — |
 | M4 — revisioned persistence in production | Not started | — |
-| M5 — presentation evolution and seam deletion | Not started | — |
+| M5 — presentation evolution and seam deletion | In progress — the auxiliary checkpoint is live for OpenCode, MiMoCode and Kimi Code, with their runners deleted; Grok and Codex remain. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
