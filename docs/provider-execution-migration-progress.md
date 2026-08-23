@@ -6062,6 +6062,44 @@ Eight breaks, eight caught.
 Gates: unit 507 suites / 7,906 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### Wave 7 opens its second half: Qwen Code's module, dark (this commit)
+
+The last provider on the legacy path, and the derivation was measured before it was made.
+
+**Qwen derives from Gemini, and the measurement is the argument.** Both CLIs take `--acp` as a flag
+where the OpenCode family takes `acp` as a verb; both configure a session through dedicated
+`session/set_model` and `session/set_mode`; both name their modes `default`, `plan`, `yolo`.
+Normalized against each other the two runtimes differ in 706 lines out of 833 and 1,236 — but the
+method surfaces say what that difference *is*: Qwen's is a **strict superset** of Gemini's. Nothing
+Gemini has is missing; four things are added.
+
+- **Reasoning effort, applied as a prompt.** `applySelectedEffort` sends `/effort <level>` as a
+  `session/prompt` of its own before the turn's. Not a config option and not a dedicated method — a
+  slash command in the prompt channel, which no other provider on this transport uses, and which
+  costs a round trip the vendor charges for. Five levels, where the family has three;
+- **the session's own commands**, which this provider surfaces where Gemini drops them —
+  `supportsProviderCommands: true` and `runtimeCommandDiscovery: 'active-session-only'`. So the
+  module has the `runtimeCommands` slot Gemini's leaves out, and the context has a port for it: only
+  the tab holding the session knows what it announced;
+- **ask-user-question**, answered through the runtime's own permission handler;
+- **`reloadWorkspaceResources`**, a `ChatRuntime` member Gemini leaves absent.
+
+What it shares with Gemini is every absence: no native transcript, no launch artifacts, and a session
+binding that is an id and nothing else.
+
+The environment hash is read off the recorded handshake, which offers **one** auth method — *"Use
+OpenAI API key: Requires setting the `OPENAI_API_KEY` environment variable"*. `DASHSCOPE_API_KEY` is
+in the list because `registration.ts` anticipates it; the recording has never seen it offered, and
+the module says so.
+
+**Nothing here has been observed answering.** `qwen 0.21.15` refused `session/new` with
+"Authentication required" — the same position Kimi Code flipped from. The module's own test asserts
+that, so a reader meets the limitation before the claims.
+
+Eight breaks, eight caught, including the parity gate on this commit's first run.
+
+Gates: unit 508 suites / 7,927 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

@@ -770,6 +770,15 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // M5. The transport, the launcher and the client adapter beside it went
       // live with OpenCode's flip and are listed as wired.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
+      // Wave 7's second half, built ahead of its own flip: Qwen Code is the last
+      // provider on the legacy path. Derived from Gemini's, which was measured
+      // — both take `--acp` as a flag and configure a session through dedicated
+      // methods — and adds four things Gemini has nothing of: an effort applied
+      // as a `/effort` prompt, the session's own commands, ask-user-question,
+      // and `reloadWorkspaceResources`.
+      'src/providers/qwen/QwenProviderModule.ts',
+      'src/providers/qwen/app/QwenModuleContext.ts',
+      'src/providers/qwen/execution/QwenExecutionBackend.ts',
     ],
   },
 ];
