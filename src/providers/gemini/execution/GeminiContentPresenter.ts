@@ -13,6 +13,7 @@ import type {
   AcpUsage,
   AcpUsageUpdate,
 } from '@/providers/acp/types';
+import { mapGeminiModeToGrimoire } from '@/providers/gemini/modes';
 
 /**
  * What the ACP connection delivered, shared with every managed-ACP provider.
@@ -140,6 +141,9 @@ export class GeminiContentPresenter {
       this.promptFailure = content.message?.trim() || undefined;
       return [];
     }
+    if (content?.kind === 'mode-refused' && content.modeId) {
+      return [presentRefusedMode(content.modeId, content.detail)];
+    }
     if (content?.kind !== 'session-update' || !content.notification) {
       return [];
     }
@@ -252,3 +256,30 @@ export class GeminiContentPresenter {
     }];
   }
 }
+
+/**
+ * What a person is told when the session would not take the mode they picked.
+ *
+ * On the turn it happened to, because that is the turn that ran under the wrong
+ * one. Named in Grimoire's vocabulary rather than the agent's — the toolbar says
+ * Auto-approve and the user never typed `yolo` — with the agent's own reason
+ * behind it, which is the half that says what to do about it.
+ */
+function presentRefusedMode(modeId: string, detail?: string): StreamChunk {
+  const asked = PERMISSION_LABELS[mapGeminiModeToGrimoire(modeId)];
+  return {
+    type: 'notice',
+    level: 'warning',
+    content: detail
+      ? `Gemini did not switch to ${asked}: ${detail} This turn ran in the mode the session was `
+        + 'already in.'
+      : `Gemini did not switch to ${asked}. This turn ran in the mode the session was already in.`,
+  };
+}
+
+/** The toolbar's own words for its three values. */
+const PERMISSION_LABELS: Readonly<Record<'normal' | 'full_access' | 'plan', string>> = {
+  normal: 'Safe',
+  full_access: 'Auto-approve',
+  plan: 'Plan',
+};

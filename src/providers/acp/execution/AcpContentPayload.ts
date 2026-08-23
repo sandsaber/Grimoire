@@ -30,4 +30,18 @@ export type AcpContentPayload =
    * hands it back through `describeFailure`, so the tab still renders exactly
    * one error for one failure.
    */
-  | { readonly kind: 'prompt-failed'; readonly message: string };
+  | { readonly kind: 'prompt-failed'; readonly message: string }
+  /**
+   * A mode the session would not take, on the turn that asked for it.
+   *
+   * Not a failed turn: the turn runs, under the mode the session already has.
+   * What it is instead is the toolbar and the session disagreeing, which nobody
+   * would otherwise see — Gemini refuses `yolo` and `autoEdit` in a folder it
+   * has not been told to trust, so Auto-approve silently becomes Default.
+   */
+  | {
+    readonly kind: 'mode-refused';
+    readonly modeId: string;
+    /** What the agent said about why, where it said anything. */
+    readonly detail?: string;
+  };

@@ -76,8 +76,11 @@ Fixed in `GeminiAcpDynamicConfigApplier`: a refused mode leaves the turn running
 session already has, and the refusal is recorded through a port the composition logs. The refusals
 observed are all toward asking rather than away from it — the privileged modes are the ones an
 untrusted folder withholds — so the session is stricter than the toolbar promises rather than looser.
-That is the safe way to be wrong about a permission, and it is still wrong, which is what the record
-is for. A surface for it is owed.
+That is the safe way to be wrong about a permission, and it is still wrong — so the turn it happened
+to now carries a notice saying so, in the toolbar's own word for the mode and with the agent's reason
+behind it: *"Gemini did not switch to Auto-approve: Cannot enable privileged approval modes in an
+untrusted folder. This turn ran in the mode the session was already in."* Once per session rather than
+once per turn, because the folder is what the refusal is about and it does not change between turns.
 
 ### 2. The model list was read under the wrong name — shipped, fixed in this wave, three providers
 
@@ -134,9 +137,9 @@ release build in a vault and check, with quota:
 - the approval prompt names the tool and the path, and answering it releases the turn;
 - the model selector lists what row 17 discovered, and picking one changes the badge;
 - the permission toggle shows Safe/Plan/Auto-approve, and picking Auto-approve in an untrusted folder
-  now leaves the turn running — with the session in Default. **This is the one to look at hardest**:
-  finding 1 is fixed to the extent that the turn survives, and the toolbar still says something the
-  session is not.
+  leaves the turn running with a warning notice in it. **This is the one to look at hardest**: the
+  notice is what stands between the toolbar saying Auto-approve and the session being in Default, so
+  read it as a user would and check it is legible where it lands.
 
 ## Record
 

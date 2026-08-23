@@ -6006,6 +6006,33 @@ failure looks like an answer, and keeping it so none does.
 Gates: unit 507 suites / 7,905 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
 `build:release`.
 
+### The refused mode, said out loud (this commit)
+
+The last thing owed on the Gemini flip. A mode the agent will not take no longer kills the turn — that
+landed with the live smoke — but the turn then ran under a permission the toolbar did not show, and
+the only record of it was a debug log entry. A log nobody opens is not being told.
+
+The applier's input gains the turn's own content channel, which the run already had
+(`presentProviderContent`); the refusal goes out on it as a fifth `AcpContentPayload` kind, and
+Gemini's presenter renders a warning notice on the turn it happened to:
+
+> Gemini did not switch to Auto-approve: Cannot enable privileged approval modes in an untrusted
+> folder. This turn ran in the mode the session was already in.
+
+Three decisions in that sentence. It names the mode in **the toolbar's** vocabulary, because the user
+picked Auto-approve and never typed `yolo`. It carries the agent's own reason out of `data.details`,
+because `-32603 Internal error` names nothing anyone can act on while "untrusted folder" says exactly
+what to do. And it is emitted **once per session** rather than once per turn: the folder is what the
+refusal is about, it does not change between turns, and a notice on every one of them is noise a user
+learns to skip past. A session that later accepts a mode clears the mark, so a folder that becomes
+trusted is reported on again if it stops being.
+
+Five breaks, five caught — including the two that would have made it useless rather than wrong: the
+notice repeating every turn, and the notice naming an id the user has never seen.
+
+Gates: unit 507 suites / 7,905 tests, integration 145 (73 env-gated skips), typecheck, `eslint`,
+`build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

@@ -1,3 +1,4 @@
+import type { AcpContentPayload } from '@/providers/acp/execution/AcpContentPayload';
 import { mapGrimoireModeToGemini } from '@/providers/gemini/modes';
 
 import type { GeminiExecutionDynamicApplier } from './GeminiExecutionBackend';
@@ -39,6 +40,16 @@ export type GeminiModeRefusedReporter = (input: {
  * this provider, so there is nothing for a third call to carry.
  */
 export class GeminiAcpDynamicConfigApplier implements GeminiExecutionDynamicApplier {
+  /**
+   * The sessions already told about a refusal, so a turn is not the unit.
+   *
+   * The reason Gemini refuses is a property of the folder, not of the turn — it
+   * will refuse every turn of the session in the same way — so a notice per turn
+   * would be noise the user learns to skip past. Once per session is what makes
+   * it read as information.
+   */
+  private readonly reportedSessions = new Set<string>();
+
   constructor(
     private readonly resolver: GeminiAcpDynamicConfigResolver,
     private readonly onModeRefused?: GeminiModeRefusedReporter,
@@ -86,13 +97,50 @@ export class GeminiAcpDynamicConfigApplier implements GeminiExecutionDynamicAppl
   ): Promise<void> {
     try {
       await input.client.setMode({ modeId, sessionId: input.sessionId });
+      // A session that took it is one a later refusal is worth reporting on
+      // again — the folder can be trusted between turns.
+      this.reportedSessions.delete(input.sessionId);
     } catch (error) {
       if (input.signal.aborted) {
         throw error;
       }
       this.onModeRefused?.({ modeId, error });
+      if (this.reportedSessions.has(input.sessionId)) {
+        return;
+      }
+      this.reportedSessions.add(input.sessionId);
+      const detail = refusalDetail(error);
+      input.presentContent?.({
+        kind: 'mode-refused',
+        modeId,
+        ...(detail ? { detail } : {}),
+      } satisfies AcpContentPayload);
     }
   }
+}
+
+/**
+ * The sentence worth showing, out of the error the agent sent.
+ *
+ * `-32603 Internal error` names nothing a person can act on; this CLI puts the
+ * actionable half in `data.details` — "Cannot enable privileged approval modes
+ * in an untrusted folder", which says exactly what to do about it. Read
+ * defensively, because it is one observed shape rather than a contract.
+ */
+function refusalDetail(error: unknown): string | undefined {
+  const data = (error as { data?: unknown } | null)?.data;
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const details = (data as { details?: unknown }).details;
+    if (typeof details === 'string' && details.trim()) {
+      return details.trim();
+    }
+  }
+  const message = (error as { message?: unknown } | null)?.message;
+  // "Internal error" is the generic JSON-RPC text and says nothing; anything
+  // else the agent chose to write is worth more than nothing.
+  return typeof message === 'string' && message.trim() && message.trim() !== 'Internal error'
+    ? message.trim()
+    : undefined;
 }
 
 function throwIfAborted(signal: AbortSignal): void {

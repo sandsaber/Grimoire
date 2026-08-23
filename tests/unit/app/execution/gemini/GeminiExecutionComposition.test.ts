@@ -821,13 +821,28 @@ describe('Gemini execution composition', () => {
     expect(chunks.filter(chunk => chunk.type === 'error')).toEqual([]);
     expect(chunks.some(chunk => chunk.type === 'text' && chunk.content.includes('the answer')))
       .toBe(true);
-    // The session is then in a mode the toolbar does not show. Stricter than
-    // promised, which is the safe way to be wrong — and still wrong, which is
-    // what the record is for.
     expect(logged).toContainEqual(expect.objectContaining({
       event: 'execution.setMode.refused',
       data: { modeId: 'yolo' },
     }));
+
+    // The session is now in a mode the toolbar does not show. Stricter than
+    // promised, which is the safe way to be wrong — and still wrong, so the
+    // person is told on the turn it happened to, in the toolbar's own word for
+    // the mode and with the agent's reason behind it. A log entry nobody opens
+    // is not being told.
+    expect(chunks.filter(chunk => chunk.type === 'notice')).toEqual([{
+      type: 'notice',
+      level: 'warning',
+      content: 'Gemini did not switch to Auto-approve: Cannot enable privileged approval modes '
+        + 'in an untrusted folder. This turn ran in the mode the session was already in.',
+    }]);
+
+    // Once per session, not once per turn: the folder is what the agent is
+    // refusing over, and it does not change between turns — a notice on every
+    // one of them is noise a user learns to skip past.
+    const second = await drain(runtime.query(runtime.prepareTurn({ text: 'again' })));
+    expect(second.filter(chunk => chunk.type === 'notice')).toEqual([]);
     execution.dispose();
     await host.dispose();
   });

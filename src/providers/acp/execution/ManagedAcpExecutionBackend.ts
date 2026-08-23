@@ -99,6 +99,17 @@ export interface ManagedAcpExecutionDynamicApplier {
      * sent back to it. This is the one moment both are known.
      */
     readonly sessionModes?: AcpSessionModeState;
+    /**
+     * The turn's own content channel, for what configuring the session made the
+     * user's request untrue.
+     *
+     * Gemini is why it exists: it advertises four modes and refuses the
+     * privileged two in a folder it has not been told to trust, so a turn can
+     * run under a permission the toolbar does not show. The refusal is not a
+     * failed turn and must not be one — it is something the person has to be
+     * told, on the turn it happened to.
+     */
+    readonly presentContent?: (payload: unknown) => void;
   }): Promise<void>;
 }
 
@@ -546,6 +557,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
         sessionId: this.nativeSessionRef,
         dynamicRef: invocation.dynamicRef,
         signal: this.clientAbort?.signal ?? new AbortController().signal,
+        presentContent: payload => run.presentProviderContent(payload),
         ...(opened?.configOptions ? { sessionConfigOptions: opened.configOptions } : {}),
         ...(opened?.modes ? { sessionModes: opened.modes } : {}),
       }),
@@ -650,6 +662,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
           sessionId: this.nativeSessionRef!,
           dynamicRef: invocation.dynamicRef,
           signal: this.clientAbort!.signal,
+          presentContent: payload => run.presentProviderContent(payload),
           ...(reopened?.configOptions ? { sessionConfigOptions: reopened.configOptions } : {}),
           ...(reopened?.modes ? { sessionModes: reopened.modes } : {}),
         });
