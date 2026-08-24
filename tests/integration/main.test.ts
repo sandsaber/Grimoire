@@ -523,14 +523,19 @@ describe('GrimoirePlugin', () => {
         providerId: 'claude',
         sessionId: 'session-123',
       });
-      const saveMetadataSpy = jest.spyOn(plugin.storage.sessions, 'saveMetadata');
-      saveMetadataSpy.mockClear();
+      const updateSpy = jest.spyOn(plugin.storage.sessions, 'updateMetadata');
+      updateSpy.mockClear();
 
       await plugin.applyEnvironmentVariables('provider:claude', 'ANTHROPIC_MODEL=claude-sonnet-4-5');
 
       const updated = await plugin.getConversationById(conv.id);
       expect(updated?.sessionId).toBeNull();
-      expect(saveMetadataSpy).toHaveBeenCalled();
+      // Only what the invalidation cleared. Writing the whole conversation here
+      // would take a message appended in another window with it.
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ id: conv.id }),
+        ['sessionId', 'providerState'],
+      );
     });
 
     it('broadcasts ensureReady with force when env changes without model change', async () => {
@@ -820,6 +825,78 @@ describe('GrimoirePlugin', () => {
       const command = getRegisteredCommand('new-tab');
 
       expect(command.checkCallback(true)).toBe(false);
+    });
+  });
+
+  describe('what a conversation write actually writes', () => {
+    /**
+     * The seam neither half proves alone.
+     *
+     * `SessionStorage` composes two writers correctly and has its own tests for
+     * it; the plugin decides **what to tell it changed**. Reverting the plugin's
+     * half leaves both of those suites green — the whole conversation would go
+     * back to being written on every save, and only an assertion here would
+     * notice.
+     */
+    it('renames a conversation by writing the title and nothing else', async () => {
+      await plugin.onload();
+      const conv = await plugin.createConversation({ providerId: 'claude' });
+      const update = jest.spyOn(plugin.storage.sessions, 'updateMetadata');
+      const save = jest.spyOn(plugin.storage.sessions, 'saveMetadata');
+
+      await plugin.renameConversation(conv.id, 'About tomatoes');
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({ id: conv.id, title: 'About tomatoes' }),
+        ['title'],
+      );
+      // A rename that wrote the whole conversation put back whatever this
+      // window was holding — which mid-stream is the messages from before it.
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('updates a conversation by writing only the fields the caller set', async () => {
+      await plugin.onload();
+      const conv = await plugin.createConversation({ providerId: 'claude' });
+      const update = jest.spyOn(plugin.storage.sessions, 'updateMetadata');
+      const save = jest.spyOn(plugin.storage.sessions, 'saveMetadata');
+
+      await plugin.updateConversation(conv.id, { titleGenerationStatus: 'success' });
+
+      // The callers already speak in deltas — a status, a model, the stream's
+      // message list — and this is where that used to be thrown away.
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({ id: conv.id }),
+        ['titleGenerationStatus'],
+      );
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('carries every field an update did set, and nothing it did not', async () => {
+      await plugin.onload();
+      const conv = await plugin.createConversation({ providerId: 'claude' });
+      const update = jest.spyOn(plugin.storage.sessions, 'updateMetadata');
+
+      await plugin.updateConversation(conv.id, {
+        messages: [],
+        model: 'claude-sonnet-4-5',
+        // Immutable, and stripped before the write reaches storage.
+        providerId: 'codex',
+      });
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({ id: conv.id }),
+        ['model', 'messages'],
+      );
+    });
+
+    it('creates a conversation as a conversation the vault does not have', async () => {
+      await plugin.onload();
+      const create = jest.spyOn(plugin.storage.sessions, 'createMetadata');
+
+      const conv = await plugin.createConversation({ providerId: 'claude' });
+
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ id: conv.id }));
     });
   });
 
@@ -1204,7 +1281,8 @@ describe('GrimoirePlugin', () => {
         '.grimoire/sessions/conv-saved-1.meta.json.pending',
         '.grimoire/sessions/conv-saved-1.meta.json',
       );
-      const meta = JSON.parse(sessionWrite?.[1] as string);
+      // The conversation travels inside a record envelope now, in the same file.
+      const meta = JSON.parse(sessionWrite?.[1] as string).payload;
       expect(meta.sessionId).toBeNull();
     });
 

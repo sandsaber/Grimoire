@@ -73,7 +73,15 @@ function decodeConversationMetadata(payload: unknown): SessionMetadata {
   requireString(payload, 'title');
   requireFiniteNumber(payload, 'createdAt');
   requireFiniteNumber(payload, 'updatedAt');
-  return payload as unknown as SessionMetadata;
+  // **Exactly what the legacy write put in the file, and nothing else.**
+  // `toSessionMetadata` sets absent fields to `undefined` rather than omitting
+  // them, and the legacy `JSON.stringify` dropped those keys on the way out —
+  // so a payload that kept them is not what the vault has ever held, and the
+  // record store refuses it outright as not serializable. Round-tripping
+  // through JSON is that same drop, applied here rather than relied on later:
+  // it discards nothing a reader could have seen and preserves every field this
+  // build does not know about.
+  return JSON.parse(JSON.stringify(payload)) as SessionMetadata;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

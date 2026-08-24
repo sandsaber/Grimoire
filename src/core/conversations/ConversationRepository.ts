@@ -115,6 +115,32 @@ export class ConversationRepository {
     return record.revision;
   }
 
+  /**
+   * Applies the fields one writer changed onto whatever is on disk.
+   *
+   * **The operation every conversation save should have been.** A writer that
+   * carries a title, a status or a model applies exactly that, so a message
+   * appended in another window — or by the stream that is running right now —
+   * is still there afterwards. The legacy path wrote the whole conversation the
+   * writer happened to be holding, which is how a background title generator
+   * reverted a message the user had just sent.
+   *
+   * `create` is what the caller supplies for a conversation the vault does not
+   * have yet: a merge into nothing has nothing to merge into.
+   */
+  async merge(
+    conversationId: string,
+    fields: Partial<SessionMetadata>,
+    create: () => SessionMetadata,
+  ): Promise<number> {
+    const record = await this.records.merge(conversationId, current => (
+      current === null
+        ? create()
+        : { ...current, ...fields, id: conversationId }
+    ));
+    return record.revision;
+  }
+
   /** Deletes a conversation the caller has read, refusing a stale revision. */
   async remove(conversationId: string, expectedRevision: number): Promise<void> {
     await this.records.remove(conversationId, expectedRevision);

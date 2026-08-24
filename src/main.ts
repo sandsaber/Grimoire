@@ -30,6 +30,8 @@ import {
   clonePersistedMessages,
   collectAssistantResponseMetadata,
   collectVaultSearchContexts,
+  CONVERSATION_METADATA_FIELDS,
+  type ConversationMetadataField,
 } from './core/bootstrap/SessionStorage';
 import type { SharedAppStorage } from './core/bootstrap/storage';
 import { type DebugLogEvent, DebugLogService } from './core/debug/DebugLogService';
@@ -814,11 +816,15 @@ export default class GrimoirePlugin extends Plugin {
       await this.saveSettings();
     }
 
-    const conversationsToSave = new Set([...backfilledConversations, ...invalidatedConversations]);
-    for (const conv of conversationsToSave) {
-      await this.storage.sessions.saveMetadata(
-        this.storage.sessions.toSessionMetadata(conv)
-      );
+    // Two different repairs, and each writes only what it repaired: the backfill
+    // sets a timestamp, and an invalidation clears the session binding. A whole
+    // conversation written here would take a message appended in another window
+    // with it.
+    for (const conv of backfilledConversations) {
+      await this.storage.sessions.updateMetadata(conv, ['lastResponseAt']);
+    }
+    for (const conv of invalidatedConversations) {
+      await this.storage.sessions.updateMetadata(conv, SESSION_INVALIDATION_FIELDS);
     }
   }
 
@@ -926,9 +932,7 @@ export default class GrimoirePlugin extends Plugin {
 
     if (invalidatedConversations.length > 0) {
       for (const conv of invalidatedConversations) {
-        await this.storage.sessions.saveMetadata(
-          this.storage.sessions.toSessionMetadata(conv)
-        );
+        await this.storage.sessions.updateMetadata(conv, SESSION_INVALIDATION_FIELDS);
       }
     }
 
@@ -1127,7 +1131,7 @@ export default class GrimoirePlugin extends Plugin {
     };
 
     this.conversations.unshift(conversation);
-    await this.storage.sessions.saveMetadata(
+    await this.storage.sessions.createMetadata(
       this.storage.sessions.toSessionMetadata(conversation)
     );
 
@@ -1211,9 +1215,10 @@ export default class GrimoirePlugin extends Plugin {
     conversation.title = title.trim() || this.generateDefaultTitle();
     conversation.updatedAt = Date.now();
 
-    await this.storage.sessions.saveMetadata(
-      this.storage.sessions.toSessionMetadata(conversation)
-    );
+    // The title and nothing else. A rename that landed mid-stream used to write
+    // the whole conversation this window was holding, which put back the
+    // messages it had before the stream started.
+    await this.storage.sessions.updateMetadata(conversation, ['title']);
 
     for (const view of this.getAllViews()) {
       view.getTabManager()?.notifyConversationRenamed?.(id, conversation.title);
@@ -1231,8 +1236,12 @@ export default class GrimoirePlugin extends Plugin {
     conversation.vaultSearchContexts = collectVaultSearchContexts(conversation.messages);
     conversation.assistantResponseMetadata = collectAssistantResponseMetadata(conversation.messages);
 
-    await this.storage.sessions.saveMetadata(
-      this.storage.sessions.toSessionMetadata(conversation)
+    // **What this caller actually set**, not everything it happens to hold. The
+    // callers already speak in deltas — a status, a model, a message list — and
+    // this is where that was being thrown away.
+    await this.storage.sessions.updateMetadata(
+      conversation,
+      conversationMetadataFields(safeUpdates),
     );
 
     // Clear image data from memory after save (data is persisted by SDK).
@@ -1362,4 +1371,30 @@ export default class GrimoirePlugin extends Plugin {
     return sources.size > 0 ? sources.size : undefined;
   }
 
+}
+
+/**
+ * What an environment change clears when it invalidates a conversation.
+ *
+ * The reconcilers set exactly these two: the session is no longer resumable and
+ * the provider's own state described a session that is gone. Everything else
+ * the conversation holds is untouched, so nothing else is written.
+ */
+const SESSION_INVALIDATION_FIELDS: readonly ConversationMetadataField[] = [
+  'sessionId',
+  'providerState',
+];
+
+/**
+ * The metadata fields an update actually set.
+ *
+ * Callers already pass deltas — `{ titleGenerationStatus }`, `{ model }`, the
+ * stream's message list — and this is what keeps them deltas all the way to the
+ * file. A key that is not a metadata field, or one this build does not persist,
+ * is dropped rather than written.
+ */
+function conversationMetadataFields(
+  updates: Partial<Conversation>,
+): ConversationMetadataField[] {
+  return CONVERSATION_METADATA_FIELDS.filter(field => field in updates);
 }

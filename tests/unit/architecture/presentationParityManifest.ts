@@ -794,16 +794,12 @@ export const PARITY_SURFACES: ParitySurface[] = [
     ],
   },
   {
-    id: 'conversation-persistence-dark',
+    id: 'conversation-persistence',
     area: 'shell',
     description:
-      'Revisioned conversation persistence: a schema envelope, a revision, and the adoption step that reads the conversations every existing vault already holds.',
-    state: 'pending',
-    owner: 'M4 — reachable when the conversation save sites carry the revisions they read.',
+      'Revisioned conversation persistence: every conversation write goes through a record with a schema envelope and a revision, and a writer applies the fields it changed rather than the copy it was holding.',
+    state: 'wired',
     modules: [
-      // Built before it is routed, because what it changes is what a *stale*
-      // writer does, and that cannot be proven by the path that has no
-      // revisions. `SessionStorage` still writes what it always wrote.
       'src/core/conversations/ConversationRecord.ts',
       'src/core/conversations/ConversationRepository.ts',
     ],

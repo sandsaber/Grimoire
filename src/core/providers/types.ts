@@ -1,5 +1,6 @@
 import type GrimoirePlugin from '../../main';
 import type { CursorContext } from '../../utils/editor';
+import type { ConversationMetadataField } from '../bootstrap/SessionStorage';
 import type { SharedAppStorage } from '../bootstrap/storage';
 import type { McpServerManager } from '../mcp/McpServerManager';
 import type { ChatRuntime } from '../runtime/ChatRuntime';
@@ -102,6 +103,19 @@ export interface AppTabManagerState {
 /** Provider-neutral session metadata storage. */
 export interface AppSessionStorage {
   listMetadata(): Promise<SessionMetadata[]>;
+  /** Writes a conversation the vault does not have yet. */
+  createMetadata(meta: SessionMetadata): Promise<void>;
+  /**
+   * Applies the fields this writer changed, leaving the rest as it is on disk.
+   *
+   * Named fields rather than a whole conversation, because that is the whole of
+   * what makes two writers on one conversation compose instead of the later one
+   * reverting the earlier.
+   */
+  updateMetadata(
+    conv: Conversation,
+    changed: readonly ConversationMetadataField[],
+  ): Promise<void>;
   saveMetadata(meta: SessionMetadata): Promise<void>;
   deleteMetadata(id: string): Promise<void>;
   toSessionMetadata(conv: Conversation): SessionMetadata;

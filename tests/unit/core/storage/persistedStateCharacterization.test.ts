@@ -29,6 +29,19 @@ function readFixture(name: string): string {
   return readFileSync(resolve(process.cwd(), 'tests/fixtures/persisted-state', name), 'utf8');
 }
 
+/**
+ * The conversation inside the file, whatever the file is wrapped in.
+ *
+ * Since M4 a conversation is written as a versioned record: the same object,
+ * inside an envelope carrying its schema version and its revision. The
+ * compatibility promise is about the conversation, so that is what these
+ * comparisons read — and the envelope itself is asserted once, on its own.
+ */
+function payloadOf(adapter: { files: Map<string, string> }, path: string): unknown {
+  const stored = JSON.parse(adapter.files.get(path) as string) as Record<string, unknown>;
+  return stored.payload ?? stored;
+}
+
 describe('persisted state characterization', () => {
   describe('.grimoire/sessions/*.meta.json', () => {
     const raw = readFixture('session.meta.json');
@@ -90,7 +103,44 @@ describe('persisted state characterization', () => {
 
       // The reference is the parsed original: formatting may be re-emitted,
       // but no field may be lost, reordered into oblivion, or rewritten.
-      expect(JSON.parse(adapter.files.get(path) as string)).toEqual(parsed);
+      expect(payloadOf(adapter, path)).toEqual(parsed);
+    });
+
+    it('wraps the conversation in a record envelope, and keeps the file name', async () => {
+      const adapter = createDurableInMemoryVaultAdapter({ [path]: raw });
+      const storage = new SessionStorage(adapter, new VaultDurableStorage(adapter));
+
+      const loaded = await storage.loadMetadata(parsed.id);
+      await storage.saveMetadata(loaded as SessionMetadata);
+
+      // The layout M4 lands: the same path, the same file name, the same
+      // conversation — inside an envelope that says which schema wrote it and
+      // which revision this is, so a writer holding an older one is refused
+      // rather than applied.
+      const stored = JSON.parse(adapter.files.get(path) as string) as Record<string, unknown>;
+      expect(stored.schemaVersion).toBe(1);
+      expect(stored.recordId).toBe(parsed.id);
+      expect(typeof stored.revision).toBe('number');
+      expect(stored.payload).toEqual(parsed);
+      expect([...adapter.files.keys()]).toEqual([path]);
+    });
+
+    it('reads a conversation written before the envelope existed, and upgrades it in place', async () => {
+      const adapter = createDurableInMemoryVaultAdapter({ [path]: raw });
+      const storage = new SessionStorage(adapter, new VaultDurableStorage(adapter));
+
+      // Every vault in the field holds the bare object. Read as-is by a store
+      // that only understood envelopes it would be unreadable — for every
+      // conversation the user has, at once.
+      const before = await storage.loadMetadata(parsed.id);
+      expect(before).toEqual(parsed);
+      // Untouched until something legitimately writes it.
+      expect(adapter.files.get(path)).toBe(raw);
+
+      await storage.saveMetadata(before as SessionMetadata);
+
+      expect(payloadOf(adapter, path)).toEqual(parsed);
+      await expect(storage.loadMetadata(parsed.id)).resolves.toEqual(parsed);
     });
 
     it('keeps the fork source and the unknown provider field inside providerState', async () => {
@@ -100,7 +150,7 @@ describe('persisted state characterization', () => {
       const loaded = await storage.loadMetadata(parsed.id);
       await storage.saveMetadata(loaded as SessionMetadata);
 
-      const rewritten = JSON.parse(adapter.files.get(path) as string) as SessionMetadata;
+      const rewritten = payloadOf(adapter, path) as SessionMetadata;
       expect(rewritten.providerState).toEqual(parsed.providerState);
       expect(rewritten.providerState?.unknownProviderField).toEqual({
         writtenByANewerBuild: true,

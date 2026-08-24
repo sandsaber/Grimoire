@@ -107,7 +107,7 @@ The project requires Obsidian 1.13.0 or newer and uses the declarative settings 
 | Path | Owner |
 |------|-------|
 | `.grimoire/grimoire-settings.json` | Shared Grimoire app settings plus provider-specific configuration |
-| `.grimoire/sessions/*.meta.json` | Provider-neutral session metadata |
+| `.grimoire/sessions/*.meta.json` | Provider-neutral session metadata, written as a versioned record: `{ schemaVersion, recordId, revision, updatedAt, payload }`, where `payload` is the conversation. A file written before the envelope existed is read as revision 1 and rewritten in place at the next write, never renamed. A writer applies the fields it changed rather than the whole conversation it holds |
 | `.grimoire/logs/YYYY-MM-DD.jsonl` | Optional sanitized debug logs, written only when Advanced debug logging is enabled |
 | `.grimoire/control/**` | Grimoire-owned execution lifecycle control records: ownership, generations, state-machine positions, terminals, dispatch intents, and recovery evidence. Never a second provider transcript, and never prompts, secrets, or raw payloads. Written from the Antigravity flip onward, by the kernel the plugin constructs at load and shuts down at unload; retention, deletion, versioning, and redaction are decided in [`docs/provider-execution-persistence-decisions.md`](docs/provider-execution-persistence-decisions.md). These files are inert to the legacy runtime path, which is what makes reverting a shipped flip safe |
 | `.grimoire/mcp/<provider>.json` | Grimoire-owned MCP servers injected into ACP sessions for OpenCode, Grok Build, MiMoCode, Kimi Code, Qwen Code, and Gemini CLI |

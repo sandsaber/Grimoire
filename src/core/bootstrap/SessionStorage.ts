@@ -1,3 +1,4 @@
+import { ConversationRepository } from '../conversations/ConversationRepository';
 import type { DurableStorage } from '../persistence/DurableStorage';
 import { ProviderRegistry } from '../providers/ProviderRegistry';
 import { DEFAULT_CHAT_PROVIDER_ID } from '../providers/types';
@@ -282,6 +283,33 @@ function requireStorableId(id: string): string {
   return id;
 }
 
+/**
+ * A conversation field one writer changed, and therefore the only thing it may
+ * write.
+ *
+ * The whole point of naming them: a writer that carries a title writes a title.
+ * The legacy path wrote the whole conversation the writer happened to be
+ * holding, so a background title generator reverted whatever had been appended
+ * since it read.
+ */
+export const CONVERSATION_METADATA_FIELDS = [
+  'title',
+  'titleGenerationStatus',
+  'lastResponseAt',
+  'sessionId',
+  'model',
+  'providerState',
+  'messages',
+  'currentNote',
+  'externalContextPaths',
+  'enabledMcpServers',
+  'orchestratorMode',
+  'usage',
+  'resumeAtMessageId',
+] as const;
+
+export type ConversationMetadataField = typeof CONVERSATION_METADATA_FIELDS[number];
+
 export class SessionStorage {
   /**
    * @param durable the recoverable replacement a metadata write goes through.
@@ -291,10 +319,14 @@ export class SessionStorage {
    *   than built here so this module stays inside `src/core`, which is not
    *   where a vault-shaped implementation belongs.
    */
+  private readonly conversations: ConversationRepository;
+
   constructor(
     private adapter: VaultFileAdapter,
     private readonly durable: DurableStorage,
-  ) {}
+  ) {
+    this.conversations = new ConversationRepository({ storage: durable });
+  }
 
   getMetadataPath(id: string): string {
     return `${SESSIONS_PATH}/${requireStorableId(id)}.meta.json`;
@@ -304,28 +336,80 @@ export class SessionStorage {
     return `${LEGACY_SESSIONS_PATH}/${requireStorableId(id)}.meta.json`;
   }
 
+  /**
+   * Writes a conversation the vault does not have yet.
+   *
+   * A create over an id that already exists replaces it, which is what the
+   * legacy path did and is preserved here rather than changed inside a
+   * persistence milestone: a conversation may be created under a provider's own
+   * session id, and refusing that would break resuming into one. It is recorded
+   * as an open question, not endorsed.
+   */
+  async createMetadata(metadata: SessionMetadata): Promise<void> {
+    // The vault's own rule, kept ahead of the record store's: it is the
+    // stricter of the two, and it is the refusal every caller already handles.
+    requireStorableId(metadata.id);
+    await this.conversations.merge(metadata.id, metadata, () => metadata);
+    await this.deleteLegacyMetadataIfPresent(metadata.id);
+  }
+
+  /**
+   * Applies the fields this writer changed, leaving every other field as it is
+   * on disk.
+   *
+   * The operation the whole milestone is for. `changed` is what the caller
+   * actually set — not everything it happens to be holding — so two writers on
+   * one conversation compose instead of the later one reverting the earlier.
+   */
+  async updateMetadata(
+    conversation: Conversation,
+    changed: readonly ConversationMetadataField[],
+  ): Promise<void> {
+    requireStorableId(conversation.id);
+    await this.conversations.merge(
+      conversation.id,
+      projectConversationFields(conversation, changed),
+      () => this.toSessionMetadata(conversation),
+    );
+    await this.deleteLegacyMetadataIfPresent(conversation.id);
+  }
+
+  /**
+   * Writes a whole conversation over whatever is there.
+   *
+   * What is left of the legacy write, and it has one caller: relocating a
+   * `.claude/sessions` file into `.grimoire/sessions`, where the record being
+   * written *is* the whole of what was read a moment ago.
+   */
   async saveMetadata(metadata: SessionMetadata): Promise<void> {
-    const filePath = this.getMetadataPath(metadata.id);
-    const content = JSON.stringify(metadata, null, 2);
-    await this.durable.writeAtomic(filePath, content);
+    requireStorableId(metadata.id);
+    await this.conversations.merge(metadata.id, metadata, () => metadata);
     await this.deleteLegacyMetadataIfPresent(metadata.id);
   }
 
   async loadMetadata(id: string): Promise<SessionMetadata | null> {
     try {
-      const found = await this.readFirstPresent(id);
+      requireStorableId(id);
+      const record = await this.conversations.read(id);
+      if (record.kind === 'present') {
+        return isSupportedSessionMetadata(record.metadata) ? record.metadata : null;
+      }
+      // A record this build must not act on. Reported as "no conversation" for
+      // now, which is what the legacy reader answered for a file it could not
+      // parse — surfacing it is the typed-hydration half of this milestone.
+      if (record.kind === 'unreadable') {
+        return null;
+      }
+
+      const found = await this.readLegacyMetadata(id);
       if (!found) {
         return null;
       }
-      const metadata: unknown = JSON.parse(found.content);
+      const metadata: unknown = JSON.parse(found);
       if (!isSupportedSessionMetadata(metadata)) {
         return null;
       }
-
-      if (found.path !== this.getMetadataPath(id)) {
-        await this.saveMetadata(metadata);
-      }
-
+      await this.saveMetadata(metadata);
       return metadata;
     } catch {
       return null;
@@ -333,9 +417,10 @@ export class SessionStorage {
   }
 
   async deleteMetadata(id: string): Promise<void> {
-    // Through the durable store, so a half-finished write is not resurrected by
-    // the next read of a conversation the user just deleted.
-    await this.durable.remove(this.getMetadataPath(id));
+    requireStorableId(id);
+    // Whatever revision it reached: a user deleting a conversation is not racing
+    // themselves for a newer version of something they asked to be gone.
+    await this.conversations.removeIfPresent(id);
     await this.deleteLegacyMetadataIfPresent(id);
   }
 
@@ -394,11 +479,6 @@ export class SessionStorage {
   }
 
   toSessionMetadata(conversation: Conversation): SessionMetadata {
-    const providerState = ProviderRegistry
-      .getConversationHistoryService(conversation.providerId)
-      .buildPersistedProviderState?.(conversation)
-      ?? conversation.providerState;
-
     return {
       id: conversation.id,
       providerId: conversation.providerId,
@@ -409,7 +489,7 @@ export class SessionStorage {
       lastResponseAt: conversation.lastResponseAt,
       sessionId: conversation.sessionId,
       model: conversation.model,
-      providerState: providerState && Object.keys(providerState).length > 0 ? providerState : undefined,
+      providerState: buildPersistedProviderState(conversation),
       messages: cloneMessagesForMetadata(conversation.messages),
       currentNote: conversation.currentNote,
       externalContextPaths: conversation.externalContextPaths,
@@ -423,25 +503,14 @@ export class SessionStorage {
   }
 
   /**
-   * The current file if there is one, otherwise the legacy file.
+   * The `.claude/sessions` file, where one is still there.
    *
-   * Read rather than asked about: a write interrupted between the temporary
-   * file and the rename leaves the destination missing and the value
-   * recoverable, and only a read through the durable store puts it back. One
-   * read serves both the decision and the content.
+   * Read through the durable store rather than asked about: a write interrupted
+   * between the temporary file and the rename leaves the destination missing
+   * and the value recoverable, and only a read puts it back.
    */
-  private async readFirstPresent(
-    id: string,
-  ): Promise<{ readonly path: string; readonly content: string } | null> {
-    const filePath = this.getMetadataPath(id);
-    const current = await this.durable.read(filePath);
-    if (current !== null) {
-      return { path: filePath, content: current };
-    }
-
-    const legacyFilePath = this.getLegacyMetadataPath(id);
-    const legacy = await this.durable.read(legacyFilePath);
-    return legacy === null ? null : { path: legacyFilePath, content: legacy };
+  private async readLegacyMetadata(id: string): Promise<string | null> {
+    return this.durable.read(this.getLegacyMetadataPath(id));
   }
 
   private async deleteLegacyMetadataIfPresent(id: string): Promise<void> {
@@ -495,4 +564,52 @@ export class SessionStorage {
     const parts = filePath.split('/');
     return parts[parts.length - 1] ?? filePath;
   }
+}
+
+/**
+ * The metadata fields one writer changed, and nothing else.
+ *
+ * Each is projected the way `toSessionMetadata` projects it, because what is
+ * written has to be the same value either way — the difference is only how much
+ * of the conversation goes with it. The derived fields travel with the field
+ * they are derived from: the vault search contexts and the response metadata
+ * are read out of the messages, so they move when the messages do and stay put
+ * when they do not.
+ */
+function projectConversationFields(
+  conversation: Conversation,
+  changed: readonly ConversationMetadataField[],
+): Partial<SessionMetadata> {
+  const fields: Partial<SessionMetadata> = { updatedAt: conversation.updatedAt };
+  for (const field of new Set(changed)) {
+    switch (field) {
+      case 'messages':
+        fields.messages = cloneMessagesForMetadata(conversation.messages);
+        fields.vaultSearchContexts = collectVaultSearchContexts(conversation.messages);
+        fields.assistantResponseMetadata = collectAssistantResponseMetadata(conversation.messages);
+        break;
+      case 'providerState':
+        fields.providerState = buildPersistedProviderState(conversation);
+        break;
+      case 'orchestratorMode':
+        // The same narrowing `toSessionMetadata` does: `false` is the absence of
+        // the mode rather than a value worth writing.
+        fields.orchestratorMode = conversation.orchestratorMode === true ? true : undefined;
+        break;
+      default:
+        fields[field] = conversation[field] as never;
+        break;
+    }
+  }
+  return fields;
+}
+
+function buildPersistedProviderState(
+  conversation: Conversation,
+): Record<string, unknown> | undefined {
+  const providerState = ProviderRegistry
+    .getConversationHistoryService(conversation.providerId)
+    .buildPersistedProviderState?.(conversation)
+    ?? conversation.providerState;
+  return providerState && Object.keys(providerState).length > 0 ? providerState : undefined;
 }

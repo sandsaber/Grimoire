@@ -173,6 +173,49 @@ export class VersionedRepository<TPayload> {
     });
   }
 
+  /**
+   * Applies a change to whatever the record currently is.
+   *
+   * The difference from `mutate` is the absent expected revision, and it is the
+   * point rather than a convenience. `save` and `mutate` are for a caller that
+   * read a record, built a whole new one from it, and must be refused if the
+   * record moved underneath — the caller's copy is the record. **This is for a
+   * caller that carries a change rather than a copy**: a title, a status, a
+   * model. Applying that to the current record cannot lose what another writer
+   * put there, so there is nothing for a revision check to protect.
+   *
+   * The read and the write happen in the same queue slot, so no other write to
+   * this record can land between them.
+   */
+  merge(
+    recordId: string,
+    apply: (current: TPayload | null) => TPayload,
+  ): Promise<VersionedRecord<TPayload>> {
+    return this.enqueue(recordId, async () => {
+      const current = await this.readUnlocked(recordId);
+      if (current.kind === 'future') {
+        throw new RecordUnavailableError(
+          recordId,
+          `Record "${recordId}" uses future schema version ${current.schemaVersion}.`,
+        );
+      }
+      if (current.kind === 'corrupt') {
+        throw new RecordUnavailableError(
+          recordId,
+          `Record "${recordId}" is corrupt: ${current.error}`,
+        );
+      }
+      const revision = current.kind === 'absent' ? 0 : current.record.revision;
+      return this.writeRecord(
+        recordId,
+        apply(current.kind === 'absent' ? null : current.record.payload),
+        revision === 0 ? null : revision,
+        revision + 1,
+        current.kind === 'absent' ? null : current.raw,
+      );
+    });
+  }
+
   async remove(recordId: string, expectedRevision: number): Promise<void> {
     await this.enqueue(recordId, async () => {
       const current = await this.readUnlocked(recordId);

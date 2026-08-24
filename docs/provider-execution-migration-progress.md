@@ -81,7 +81,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — provider control plane | Not started | — |
-| M4 — revisioned persistence in production | In progress — the conversation record, its repository and the adoption step for existing vault data are built and proven, still dark. Routing the saves and typed history hydration remain | this commit |
+| M4 — revisioned persistence in production | In progress — **the conversation save path is routed**: every write goes through the record store, and a writer applies the fields it changed rather than the copy it holds. Typed history hydration remains | `4cf12a1`, this commit |
 | M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
 
@@ -6792,6 +6792,53 @@ routing lands, because nothing writes an enveloped record yet.
 
 Gates: unit 524 suites / 8,192 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
 
+### M4 routes the saves: a writer writes what it changed (this commit)
+
+**Live.** Every conversation write goes through the record store. The file is in the same place under
+the same name, with the conversation inside a versioned envelope, and the layout is documented in
+`AGENTS.md` and D5 as the plan requires.
+
+**The change that matters is not the envelope.** It is that `updateConversation`, `renameConversation`
+and the two reconciliation loops now say *what they changed* — a title, a status, a session binding,
+the stream's message list — and only that reaches the file. The callers were already passing deltas;
+`main.ts` was merging each one into a shared in-memory conversation and writing the whole thing back.
+So a background title generator holding the conversation as it was before the turn put those messages
+back, and an environment change clearing a session binding across every conversation wrote each one as
+it had been at load. Neither is hypothetical, and neither is visible in a single-window test — which
+is why this is the milestone the plan called load-bearing.
+
+**`merge` rather than a revision check, and the difference is the point.** `save` and `mutate` are for
+a caller whose copy *is* the record and must be refused if it moved underneath. A caller carrying a
+change rather than a copy cannot lose what another writer put there, so there is nothing for a
+revision check to protect — the read and the write share one queue slot, and the change lands on
+whatever is current.
+
+**Two findings from routing, neither looked for.**
+
+- **The record store rejected the conversation.** `toSessionMetadata` sets absent fields to
+  `undefined` rather than omitting them, and the legacy `JSON.stringify` dropped those keys on the way
+  out; the store's serializability check refuses them outright. So `decode` round-trips through JSON —
+  which *is* that same drop, applied where it can be read rather than relied on downstream. It
+  discards nothing a reader could have seen.
+- **A test double was reporting absence as `undefined`.** A bare `jest.fn()` resolves `undefined`,
+  which is neither a file nor the absence of one — the store read it back as `"undefined" is not valid
+  JSON` and refused the write as a damaged conversation. Fixed in the double rather than by loosening
+  the contract, which is `string | null`.
+
+**Three of eight breaks stayed green on the first pass, and all three were gaps.** Reverting
+`updateConversation` and `renameConversation` to whole-object writes changed nothing, because the
+tests drove `SessionStorage` directly — the storage composes two writers correctly whatever the plugin
+tells it, and the plugin's half is *what it tells it changed*. **A seam both sides stub is not
+covered**, again, and in the same shape as wave 1. The third was the delta filter: passing every field
+through instead of the ones the caller set was invisible for the same reason. All three go red now,
+pinned at the plugin.
+
+Deliberately not here: typed history hydration, which is the milestone's other bullet;
+`loadMetadata` still answers a record it cannot read as "no conversation", which is the silence those
+outcomes exist to replace. Recorded as an obligation rather than half-built.
+
+Gates: unit 525 suites / 8,202 tests, integration 5 / 149, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7448,6 +7495,16 @@ Open obligations, each with an owner:
   theirs, and Grok's flip keeps the fallback with a test that goes red without it. Owner: the three
   forks, in one commit of their own — their auxiliary halves are byte-identical and must stay that
   way;
+- **a conversation created over an id that already exists replaces it.** Preserved from the legacy
+  path rather than changed inside a persistence milestone: a conversation may be created under a
+  provider's own session id, so refusing the collision could break resuming into one, and adopting
+  the existing record would change what `createConversation` returns. What it does today is write an
+  empty conversation over one that has history. Owner: whoever owns conversation creation, with the
+  product answer for what resuming into an existing conversation should do;
+- **`loadMetadata` answers a record this build cannot read as "no conversation".** A future or corrupt
+  record now has a name — D5's read-only, migration-required state — and nothing surfaces it: the
+  conversation disappears from history exactly as it did before. Owner: M4's typed history hydration,
+  which is the same silence in the same place;
 - **awaiting an owner decision: redo.** Recorded as D9 in the persistence decisions. Re-running a
   request is free and needs no new state; undoing a rewind cannot be built on the control store,
   because D2 forbids a second copy of a provider transcript without exception, and the file backup

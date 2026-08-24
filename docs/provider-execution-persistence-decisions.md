@@ -89,6 +89,12 @@ Every record carries `schemaVersion`, starting at `1`.
 - A record with an **unknown future** version opens read-only and surfaces a migration-required
   state. The plugin never guesses, never discards, and never downgrades a record it does not
   understand.
+- A record with **no envelope at all** — data written before its store existed, which is every
+  conversation in every vault in the field — is adopted at read time as revision 1 through an
+  explicit step the store declares, and rewritten in place at the next legitimate write. Adoption
+  applies only where there is no envelope: a record that carries one and fails validation stays
+  corrupt, because resetting a damaged record to revision 1 is the overwrite the revision exists to
+  prevent.
 - Writes are atomic. Multi-record operations write an intent plus a recoverable completion marker,
   so a crash leaves either the old state or the new one, never a mixture.
 

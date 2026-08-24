@@ -27,6 +27,13 @@ describe('SessionStorage', () => {
       delete: jest.fn(),
       listFiles: jest.fn(),
     } as unknown as jest.Mocked<VaultFileAdapter>;
+    // Absence reported the way the real adapters report it. A bare `jest.fn()`
+    // resolves `undefined`, which is neither a file nor the absence of one —
+    // and a store that reads it back gets "undefined is not valid JSON", which
+    // reads as a damaged conversation rather than a missing one.
+    mockAdapter.read.mockRejectedValue(new Error('file not found'));
+    mockAdapter.exists.mockResolvedValue(false);
+    mockAdapter.listFiles.mockResolvedValue([]);
 
     storage = new SessionStorage(mockAdapter, createPassthroughDurableStorage(mockAdapter));
   });
@@ -63,8 +70,10 @@ describe('SessionStorage', () => {
         expect.any(String)
       );
 
+      // The conversation now travels inside a record envelope, in the same file
+      // under the same name. What is asserted is the conversation.
       const writtenContent = mockAdapter.write.mock.calls[0][1];
-      const parsed = JSON.parse(writtenContent);
+      const parsed = JSON.parse(writtenContent).payload;
 
       expect(parsed.id).toBe('session-456');
       expect(parsed.title).toBe('Test Session');
@@ -96,7 +105,7 @@ describe('SessionStorage', () => {
       await storage.saveMetadata(metadata);
 
       const writtenContent = mockAdapter.write.mock.calls[0][1];
-      const parsed = JSON.parse(writtenContent);
+      const parsed = JSON.parse(writtenContent).payload;
 
       expect(parsed.externalContextPaths).toEqual(['/path/to/external']);
       expect(parsed.enabledMcpServers).toEqual(['server1', 'server2']);
@@ -385,9 +394,36 @@ describe('SessionStorage', () => {
 
   describe('deleteMetadata', () => {
     it('deletes the meta.json file', async () => {
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        schemaVersion: 1,
+        recordId: 'session-del',
+        revision: 3,
+        updatedAt: 1,
+        payload: { id: 'session-del', title: 'Doomed', createdAt: 1, updatedAt: 1 },
+      }));
+
       await storage.deleteMetadata('session-del');
 
       expect(mockAdapter.delete).toHaveBeenCalledWith('.grimoire/sessions/session-del.meta.json');
+    });
+
+    it('deletes a conversation whatever revision it reached', async () => {
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        schemaVersion: 1,
+        recordId: 'session-del',
+        revision: 12,
+        updatedAt: 1,
+        payload: { id: 'session-del', title: 'Doomed', createdAt: 1, updatedAt: 1 },
+      }));
+
+      // A user deleting a conversation is not racing themselves for a newer
+      // version of something they asked to be gone.
+      await expect(storage.deleteMetadata('session-del')).resolves.toBeUndefined();
+      expect(mockAdapter.delete).toHaveBeenCalledWith('.grimoire/sessions/session-del.meta.json');
+    });
+
+    it('is quiet about a conversation that is not there', async () => {
+      await expect(storage.deleteMetadata('session-gone')).resolves.toBeUndefined();
     });
   });
 
