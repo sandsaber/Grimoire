@@ -60,8 +60,11 @@ export type AuxiliaryExecution =
    *
    * Distinguished because what proves the isolation is different: a dedicated
    * runner proves it by existing, while a composition that serves both paths
-   * proves it by launching auxiliary work through its own factory, into its own
-   * artifacts directory, with a filesystem policy the chat's cannot loosen.
+   * has to show the auxiliary launch being built separately — and **what that
+   * looks like is the provider's**, which is why the lines to look for are
+   * recorded per provider in `auxiliaryWiring` rather than assumed. The ACP
+   * providers isolate with their own client factory and filesystem policy;
+   * Codex has neither, and isolates on the thread it starts.
    */
   | 'kernel-isolated'
   /** Auxiliary services are registered but do nothing. */
@@ -102,6 +105,17 @@ export interface ProviderExecutionTopology {
    * isolation claim rather than pattern-matching around it.
    */
   isolationEvidence: string;
+  /**
+   * The lines that prove this provider's auxiliary launch is its own.
+   *
+   * Literal strings, read out of `auxiliaryOwner`. Required for a
+   * `kernel-isolated` provider, because there the same object serves both paths
+   * and "not the chat runtime" proves nothing. What they say differs by
+   * provider on purpose: an ACP composition is proven by the client factory it
+   * wires the auxiliary path to, and Codex by the parameters its auxiliary
+   * thread is started with.
+   */
+  auxiliaryWiring?: readonly string[];
   /** Modules the claims above were read from. */
   evidence: string[];
 }
@@ -182,18 +196,21 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     sessionBoundary: 'native-thread',
     resume: 'native',
     concurrency: 'one app-server process multiplexing threads and turns',
-    auxiliary: 'isolated',
-    auxiliaryOwner: 'src/providers/codex/runtime/CodexAuxQueryRunner.ts',
+    // Auxiliary work on the kernel, and the last provider to get there. Not
+    // built like the ACP compositions: there is no client factory to separate
+    // and no filesystem to contain, so the isolation is on the thread.
+    auxiliary: 'kernel-isolated',
+    auxiliaryOwner: 'src/app/execution/codex/CodexExecutionComposition.ts',
     sharedResources: [
       {
         resource: 'Codex app-server process',
         sharing: 'partitioned',
-        note: 'the auxiliary runner starts and owns its own app-server process and thread, documented at the class it lives on',
+        note: 'the auxiliary query launches a connection of its own per retained conversation; a chat daemon is never borrowed',
       },
       {
         resource: 'Codex session JSONL directory',
         sharing: 'partitioned',
-        note: 'auxiliary threads are separate threads; the chat thread id is never reused',
+        note: 'auxiliary threads are separate threads and are started with `persistExtendedHistory: false`, so they are not written where the chat path reads',
       },
       {
         resource: 'codex CLI binary and user configuration',
@@ -202,10 +219,18 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
       },
     ],
     capabilities: CODEX_PROVIDER_CAPABILITIES,
-    isolationEvidence: 'Manages its own process lifecycle',
+    isolationEvidence: 'approvalPolicy: \'never\'',
+    auxiliaryWiring: [
+      // What makes an unattended Codex turn safe, all three on `thread/start`:
+      // it cannot approve, it cannot write, and it is not recorded where the
+      // conversation's own transcript is read from.
+      "approvalPolicy: 'never'",
+      "sandbox: 'read-only'",
+      'persistExtendedHistory: false',
+    ],
     evidence: [
       'src/providers/codex/execution/CodexExecutionBackend.ts',
-      'src/providers/codex/runtime/CodexAuxQueryRunner.ts',
+      'src/providers/codex/execution/CodexAuxiliaryQuery.ts',
       'src/providers/codex/runtime/CodexAppServerProcess.ts',
     ],
   },
@@ -253,6 +278,14 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     ],
     capabilities: GROK_PROVIDER_CAPABILITIES,
     isolationEvidence: 'grok/auxiliary/',
+    auxiliaryWiring: [
+      // **The wiring, not the presence.** Read as a line rather than as two
+      // names in a file, because the failure this guards against is the
+      // auxiliary path being pointed at the chat factory while both methods
+      // still exist and both still read correctly on their own.
+      'this.auxiliaryClientFactory ??= this.injectedClientFactory ?? this.createAuxiliaryFactory()',
+      'AuxiliaryFileSystem(',
+    ],
     evidence: [
       'src/providers/grok/execution/GrokExecutionBackend.ts',
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
@@ -274,6 +307,14 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     sharedResources: MANAGED_ACP_SHARED_RESOURCES('kimicode'),
     capabilities: KIMICODE_PROVIDER_CAPABILITIES,
     isolationEvidence: 'kimicode/auxiliary/',
+    auxiliaryWiring: [
+      // **The wiring, not the presence.** Read as a line rather than as two
+      // names in a file, because the failure this guards against is the
+      // auxiliary path being pointed at the chat factory while both methods
+      // still exist and both still read correctly on their own.
+      'this.auxiliaryClientFactory ??= this.injectedClientFactory ?? this.createAuxiliaryFactory()',
+      'AuxiliaryFileSystem(',
+    ],
     evidence: [
       'src/providers/kimicode/execution/KimicodeExecutionBackend.ts',
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
@@ -296,6 +337,14 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     sharedResources: MANAGED_ACP_SHARED_RESOURCES('mimocode'),
     capabilities: MIMOCODE_PROVIDER_CAPABILITIES,
     isolationEvidence: 'mimocode/auxiliary/',
+    auxiliaryWiring: [
+      // **The wiring, not the presence.** Read as a line rather than as two
+      // names in a file, because the failure this guards against is the
+      // auxiliary path being pointed at the chat factory while both methods
+      // still exist and both still read correctly on their own.
+      'this.auxiliaryClientFactory ??= this.injectedClientFactory ?? this.createAuxiliaryFactory()',
+      'AuxiliaryFileSystem(',
+    ],
     evidence: [
       'src/providers/mimocode/execution/MimocodeExecutionBackend.ts',
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
@@ -320,6 +369,14 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     sharedResources: MANAGED_ACP_SHARED_RESOURCES('opencode'),
     capabilities: OPENCODE_PROVIDER_CAPABILITIES,
     isolationEvidence: 'opencode/auxiliary/',
+    auxiliaryWiring: [
+      // **The wiring, not the presence.** Read as a line rather than as two
+      // names in a file, because the failure this guards against is the
+      // auxiliary path being pointed at the chat factory while both methods
+      // still exist and both still read correctly on their own.
+      'this.auxiliaryClientFactory ??= this.injectedClientFactory ?? this.createAuxiliaryFactory()',
+      'AuxiliaryFileSystem(',
+    ],
     evidence: [
       'src/providers/opencode/execution/OpencodeExecutionBackend.ts',
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',

@@ -713,4 +713,305 @@ describe('Codex execution composition', () => {
     expect(dismissed).toBe(1);
     expect(execution.turnRequests.pendingCount).toBe(0);
   });
+  describe('auxiliary work, on the kernel', () => {
+    /**
+     * The path the three auxiliary services now take, end to end over the same
+     * fake daemon the chat turns run on — the store, the retained thread, the
+     * seam, and the launch that is deliberately not the chat's.
+     *
+     * Codex has no agent definition and no client-side filesystem, so every
+     * property asserted here is a **thread parameter**. That is the whole of
+     * what makes an unattended turn safe on this provider.
+     */
+    async function createAuxHarness(plugin: any = createPlugin()): Promise<{
+      execution: CodexExecution;
+      host: ExecutionKernelHost;
+      daemons: FakeConnection[];
+    }> {
+      const host = new ExecutionKernelHost({
+        storage: new TestDurableStorage(),
+        scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
+      });
+      const execution = new CodexExecution(plugin, host.registry);
+      const daemons: FakeConnection[] = [];
+      host.registerBackend(execution.createBackendRegistration({
+        create: () => {
+          const connection = new FakeConnection();
+          daemons.push(connection);
+          return connection as never;
+        },
+      }));
+      await host.start();
+      return { execution, host, daemons };
+    }
+
+    function threadStartOf(connection: FakeConnection): any {
+      return connection.calls.find(call => call.method === 'thread/start')?.params;
+    }
+
+    it('answers a title on a daemon of its own, with approvals off', async () => {
+      const { execution, host, daemons } = await createAuxHarness();
+
+      const title = await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'The user asked about tomatoes.');
+
+      expect(title).toBe('the answer');
+      // Its own daemon, and nothing else has launched: no chat turn ran, so a
+      // shared one would mean the auxiliary work had opened the conversation's
+      // own app-server to generate a title.
+      expect(daemons).toHaveLength(1);
+      expect(threadStartOf(daemons[0])).toEqual({
+        model: expect.any(String),
+        cwd: VAULT_CWD,
+        approvalPolicy: 'never',
+        sandbox: 'read-only',
+        baseInstructions: 'Name the conversation.',
+        experimentalRawEvents: true,
+        // Kept out of the transcript store the chat path reads back, which is
+        // this provider's version of "an auxiliary turn writes no history".
+        persistExtendedHistory: false,
+      });
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('stays read-only even when the chat is set to full access', async () => {
+      const plugin = createPlugin({ permissionMode: 'full_access' });
+      const { execution, host, daemons } = await createAuxHarness(plugin);
+
+      await execution.createAuxRunner('inline').query({
+        systemPrompt: 'Edit the selection.',
+      }, 'make it shorter');
+
+      // **The property every provider's auxiliary path has to hold, in this
+      // provider's own terms.** A chat turn in full access runs
+      // `danger-full-access` with approvals off, because the user asked for it
+      // and is watching. An auxiliary turn is neither asked for nor watched, so
+      // it is read-only whatever the chat is set to.
+      expect(threadStartOf(daemons[0])).toMatchObject({
+        approvalPolicy: 'never',
+        sandbox: 'read-only',
+      });
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('gives each purpose its own instructions and its own thread', async () => {
+      const { execution, host, daemons } = await createAuxHarness();
+
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'the message');
+      await execution.createAuxRunner('inline').query({
+        systemPrompt: 'Edit the selection.',
+      }, 'make it shorter');
+
+      // The instructions are a thread parameter for this provider rather than a
+      // file, and they are the caller's rather than the vault's: a title is
+      // asked for by the prompt that asks for a title.
+      expect(daemons).toHaveLength(2);
+      expect(threadStartOf(daemons[0]).baseInstructions).toBe('Name the conversation.');
+      expect(threadStartOf(daemons[1]).baseInstructions).toBe('Edit the selection.');
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('starts the auxiliary thread in the target the daemon was launched for', async () => {
+      const { execution, host, daemons } = await createAuxHarness();
+
+      await execution.createAuxRunner('instructions').query({
+        systemPrompt: 'Refine the instructions.',
+      }, 'make this clearer');
+
+      // Carried over from the runner this replaced, where it was its own case:
+      // the two targets Codex supports — this machine and a WSL distro —
+      // disagree about every path there is, and a thread started in the wrong
+      // one reads somewhere the user never pointed at.
+      expect(threadStartOf(daemons[0]).cwd).toBe(VAULT_CWD);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it("keeps one runner's conversation and gives another its own", async () => {
+      const { execution, host, daemons } = await createAuxHarness();
+      const first = execution.createAuxRunner('inline');
+
+      await first.query({ systemPrompt: 'Edit the selection.' }, 'make it shorter');
+      await first.query({ systemPrompt: 'Edit the selection.' }, 'shorter still');
+      await execution.createAuxRunner('inline')
+        .query({ systemPrompt: 'Edit the selection.' }, 'a different edit');
+
+      // Inline edit's second message has to reach the first one's thread, and a
+      // second edit started elsewhere must not land in the middle of it.
+      expect(daemons).toHaveLength(2);
+      expect(daemons[0].calls.filter(call => call.method === 'thread/start')).toHaveLength(1);
+      expect(daemons[0].calls.filter(call => call.method === 'turn/start')).toHaveLength(2);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('ends the conversation on reset, and starts a new one after it', async () => {
+      const { execution, host, daemons } = await createAuxHarness();
+      const runner = execution.createAuxRunner('title-gen');
+
+      await runner.query({ systemPrompt: 'Name the conversation.' }, 'first');
+      runner.reset();
+      await new Promise(resolve => { setTimeout(resolve, 0); });
+      await runner.query({ systemPrompt: 'Name the conversation.' }, 'second');
+
+      // What the title service does after every title: the daemon that generated
+      // it is closed, and the next title launches its own.
+      expect(daemons).toHaveLength(2);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('names the model the caller chose on both the thread and the turn', async () => {
+      const { execution, host, daemons } = await createAuxHarness();
+
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+        model: 'gpt-5.4-codex',
+      }, 'the message');
+
+      // The thread is started under whichever model this turn will run on, so a
+      // caller that named one is not answered by a thread built for another.
+      expect(threadStartOf(daemons[0]).model).toBe('gpt-5.4-codex');
+      const turnStart = daemons[0].calls.find(call => call.method === 'turn/start');
+      expect(turnStart?.params.model).toBe('gpt-5.4-codex');
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('falls back to the model the vault is set to when the caller names none', async () => {
+      const { execution, host, daemons } = await createAuxHarness();
+
+      await execution.createAuxRunner('instructions').query({
+        systemPrompt: 'Refine the instructions.',
+      }, 'make this clearer');
+
+      // Inline edit and instruction refinement pass no model unless the user set
+      // an override. `thread/start` requires one, so there is no "leave it to
+      // the daemon" here — what it must not be is another provider's.
+      const started = threadStartOf(daemons[0]);
+      expect(typeof started.model).toBe('string');
+      expect(started.model.length).toBeGreaterThan(0);
+      // Not repeated on the turn: the thread already runs on it.
+      const turnStart = daemons[0].calls.find(call => call.method === 'turn/start');
+      expect(turnStart?.params.model).toBeUndefined();
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('reports what the daemon said when an auxiliary turn fails', async () => {
+      const host = new ExecutionKernelHost({
+        storage: new TestDurableStorage(),
+        scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
+      });
+      const execution = new CodexExecution(createPlugin(), host.registry);
+      host.registerBackend(execution.createBackendRegistration({
+        create: () => {
+          const connection = new FakeConnection();
+          connection.failTurn = 'You have exhausted your daily quota on this model.';
+          return connection as never;
+        },
+      }));
+      await host.start();
+
+      // The alternative is the failure this migration exists to remove: an
+      // auxiliary turn that answers with nothing and a title that silently never
+      // appears.
+      await expect(execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'the message')).rejects.toThrow('exhausted your daily quota');
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('starts a new thread when the instructions change under the same runner', async () => {
+      const { execution, host, daemons } = await createAuxHarness();
+      const runner = execution.createAuxRunner('instructions');
+
+      await runner.query({ systemPrompt: 'Refine the instructions.' }, 'make this clearer');
+      await runner.query({ systemPrompt: 'Refine them, briefly.' }, 'and again');
+
+      // Codex takes its instructions on `thread/start` and a thread cannot be
+      // told new ones, so the launch key has to carry them — otherwise a system
+      // prompt edited in settings goes on being ignored for as long as the
+      // daemon lives, which is what the legacy runner did.
+      expect(daemons).toHaveLength(2);
+      expect(threadStartOf(daemons[1]).baseInstructions).toBe('Refine them, briefly.');
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('closes the auxiliary daemons when the backend is disposed', async () => {
+      const disposed: number[] = [];
+      const host = new ExecutionKernelHost({
+        storage: new TestDurableStorage(),
+        scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
+      });
+      const execution = new CodexExecution(createPlugin(), host.registry);
+      host.registerBackend(execution.createBackendRegistration({
+        create: () => {
+          const connection = new FakeConnection();
+          const index = disposed.length;
+          disposed.push(0);
+          connection.dispose = async () => { disposed[index] += 1; };
+          return connection as never;
+        },
+      }));
+      await host.start();
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'the message');
+
+      // The other half of the pair, and the one the composition's own disposal
+      // hides: `main.ts` takes the host down too, and a backend that shut down
+      // without closing its auxiliary port would leave an idle CLI behind
+      // whenever the composition was not disposed first.
+      await host.dispose();
+
+      expect(disposed.some(count => count > 0)).toBe(true);
+      execution.dispose();
+    });
+
+    it('closes the auxiliary daemons when the composition goes away', async () => {
+      const disposed: number[] = [];
+      const host = new ExecutionKernelHost({
+        storage: new TestDurableStorage(),
+        scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
+      });
+      const execution = new CodexExecution(createPlugin(), host.registry);
+      host.registerBackend(execution.createBackendRegistration({
+        create: () => {
+          const connection = new FakeConnection();
+          const index = disposed.length;
+          disposed.push(0);
+          connection.dispose = async () => { disposed[index] += 1; };
+          return connection as never;
+        },
+      }));
+      await host.start();
+      await execution.createAuxRunner('instructions').query({
+        systemPrompt: 'Refine the instructions.',
+      }, 'make this clearer');
+
+      // The composition alone, without its host: that is the order `main.ts`
+      // unloads in — every composition first, the kernel host after, and the
+      // host's disposal is not awaited. The backend closes these too; this is
+      // the one that runs first.
+      execution.dispose();
+
+      // A plugin unload with an idle auxiliary CLI still running is the leak the
+      // retained daemon would otherwise be.
+      for (let attempt = 0; attempt < 50 && disposed.every(count => count === 0); attempt += 1) {
+        await new Promise(resolve => { setTimeout(resolve, 0); });
+      }
+      expect(disposed.some(count => count > 0)).toBe(true);
+      await host.dispose();
+    });
+  });
+
 });

@@ -131,12 +131,37 @@ export interface CodexExecutionScheduler {
   clearTimeout(handle: unknown): void;
 }
 
+export interface CodexAuxiliaryQueryOptions {
+  /** The caller's own cancellation — a closed dialog, a superseded title. */
+  readonly signal?: AbortSignal;
+  /** The answer so far, for a caller that renders one as it arrives. */
+  readonly onText?: (accumulated: string) => void;
+}
+
+export interface CodexAuxiliaryPort {
+  execute(
+    requestRef: string,
+    signal: AbortSignal,
+    onText?: (accumulated: string) => void,
+  ): Promise<string>;
+  /**
+   * Ends one auxiliary conversation, keeping the others.
+   *
+   * `AuxQueryRunner.reset()`, from the other side. Optional because a provider
+   * whose auxiliary work is cold has nothing to end.
+   */
+  release?(retentionKey: string): Promise<void>;
+  /** Closes every auxiliary daemon this port kept. Called when the backend disposes. */
+  dispose?(): Promise<void>;
+}
+
 export interface CodexExecutionBackendContext {
   readonly connectionFactory: CodexExecutionConnectionFactory;
   readonly requestResolver: CodexExecutionRequestResolver;
   readonly resultSink: CodexExecutionResultSink;
   readonly interactionBridge: CodexInteractionBridge;
   readonly turnReconcilerFactory: CodexTurnReconcilerFactory;
+  readonly auxiliaryQueries: CodexAuxiliaryPort;
   readonly defaultResumeParams: Omit<ThreadResumeParams, 'threadId'>;
   readonly scheduler: CodexExecutionScheduler;
   readonly sessionInstanceIdFactory: () => SessionInstanceId;
@@ -183,6 +208,15 @@ ExecutionRecoveryPort {
   private servicesTask: Promise<CodexExecutionServices> | undefined;
   private activeServices: CodexExecutionServices | undefined;
   private readonly retiredConnectionTasks = new Set<Promise<void>>();
+  /**
+   * The auxiliary turns in flight, and the handles that end them.
+   *
+   * Held so a shutdown can stop them rather than close the daemons underneath
+   * them: an auxiliary turn owns no session here, so nothing else would notice
+   * it was still running.
+   */
+  private readonly auxiliaryControllers = new Set<AbortController>();
+  private readonly auxiliaryTasks = new Set<Promise<unknown>>();
   private disposing = false;
 
   constructor(private readonly context: CodexExecutionBackendContext) {
@@ -289,15 +323,65 @@ ExecutionRecoveryPort {
     }
   }
 
+  /**
+   * Runs one auxiliary turn, on the port's own daemon rather than a chat one.
+   *
+   * The caller's cancel and the backend's shutdown both end this turn, and the
+   * port is given one signal: a dialog the user closed must stop the work, not
+   * only stop waiting for it.
+   */
+  async runAuxiliaryQuery(
+    requestRef: string,
+    options?: CodexAuxiliaryQueryOptions,
+  ): Promise<string> {
+    if (this.disposing) {
+      throw new Error('Codex execution backend is disposing.');
+    }
+    const controller = new AbortController();
+    this.auxiliaryControllers.add(controller);
+    const forwardAbort = () => controller.abort(options?.signal?.reason);
+    options?.signal?.addEventListener('abort', forwardAbort, { once: true });
+    if (options?.signal?.aborted) forwardAbort();
+    const task = Promise.resolve().then(
+      () => this.context.auxiliaryQueries.execute(requestRef, controller.signal, options?.onText),
+    );
+    this.auxiliaryTasks.add(task);
+    try {
+      return await task;
+    } finally {
+      options?.signal?.removeEventListener('abort', forwardAbort);
+      this.auxiliaryControllers.delete(controller);
+      this.auxiliaryTasks.delete(task);
+    }
+  }
+
+  /**
+   * Ends one auxiliary conversation, which is what `AuxQueryRunner.reset()` is.
+   *
+   * Not a disposal: the other auxiliary conversations and every chat session on
+   * this backend keep running.
+   */
+  async releaseAuxiliaryConversation(retentionKey: string): Promise<void> {
+    await this.context.auxiliaryQueries.release?.(retentionKey);
+  }
+
   async dispose(): Promise<void> {
     if (this.disposing) {
       return;
     }
     this.disposing = true;
+    for (const controller of this.auxiliaryControllers) {
+      controller.abort(new Error('Codex execution backend disposed.'));
+    }
     await Promise.all([...this.sessions].map(session => session.dispose()));
     const services = await this.servicesTask?.catch(() => undefined);
     await services?.connection.dispose();
     await Promise.all([...this.retiredConnectionTasks]);
+    // After the turns, because a query still running holds the daemon it is
+    // running on: closing underneath it would be the shutdown racing its own
+    // work.
+    await Promise.allSettled([...this.auxiliaryTasks]);
+    await this.context.auxiliaryQueries.dispose?.();
     this.interactions.clear();
     this.interactionsByNativeRequest.clear();
   }

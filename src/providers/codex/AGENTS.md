@@ -21,7 +21,11 @@
 ## Provider-Owned Services
 
 - `CodexSkillListingService` uses a short-lived app-server process for `skills/list`; keep it independent from chat runtime lifecycle.
-- `CodexAuxQueryRunner` uses its own process, transport, and thread.
+- `CodexAuxiliaryQuery` runs auxiliary work — titles, refinement, inline edits — on its own
+  app-server process and its own thread, one per retained conversation. What makes a turn
+  auxiliary is on `thread/start`: `approvalPolicy: 'never'`, `sandbox: 'read-only'` whatever the
+  chat is set to, and `persistExtendedHistory: false`. The three services reach it through
+  `CodexExecution.createAuxRunner`; there is no provider-owned runner any more.
 - `CodexTaskResultInterpreter` is intentionally no-op because Grimoire's async Claude task system does not apply to Codex.
 - Image inputs are written to a temp directory, sent as local image paths, and cleaned up in `query()` finally blocks.
 

@@ -4,6 +4,7 @@ import {
   CodexActiveLaunchSpec,
   NodeCodexExecutionConnectionFactory,
 } from '@/app/execution/codex/NodeCodexExecutionConnectionFactory';
+import type { AuxQueryRunner } from '@/core/auxiliary/AuxQueryRunner';
 import {
   executionSessionId,
   interactionId,
@@ -34,6 +35,7 @@ import { createCodexModuleContext } from '@/providers/codex/app/CodexModuleConte
 import { codexPlanUsageStore } from '@/providers/codex/app/CodexPlanUsageStore';
 import { CODEX_PROVIDER_CAPABILITIES } from '@/providers/codex/capabilities';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
+import { CodexAuxiliaryQuery } from '@/providers/codex/execution/CodexAuxiliaryQuery';
 import { CodexContentPresenter } from '@/providers/codex/execution/CodexContentPresenter';
 import { readCodexConversationBinding } from '@/providers/codex/execution/CodexConversationBinding';
 import {
@@ -42,6 +44,10 @@ import {
   type CodexExecutionConnectionFactory,
 } from '@/providers/codex/execution/CodexExecutionBackend';
 import {
+  auxiliaryRetentionKey,
+  type CodexAuxiliaryEnvironment,
+  type CodexAuxiliaryPurpose,
+  type CodexAuxiliaryRequest,
   CodexExecutionRequests,
   type CodexInvocationEnvironment,
 } from '@/providers/codex/execution/CodexExecutionRequests';
@@ -62,6 +68,26 @@ import { DEFAULT_CODEX_PRIMARY_MODEL } from '@/providers/codex/types/models';
 import { getVaultPath } from '@/utils/path';
 
 import { delayThroughWindow } from '../hostTimers';
+import { KernelAuxQueryRunner } from '../KernelAuxQueryRunner';
+
+/**
+ * What an auxiliary turn may answer with, which is much less than a chat turn.
+ *
+ * A title is a line and a refinement is a paragraph. The chat limit is for a
+ * turn that may legitimately produce a file's worth of text; an auxiliary answer
+ * that size is a model that misread its instructions, and reading 64 KB of it
+ * into a title field helps nobody.
+ */
+const AUXILIARY_RESULT_BYTE_LIMIT = 64_000;
+
+/**
+ * How long an auxiliary turn may run before it is abandoned.
+ *
+ * Shorter than a chat turn by an order of magnitude, and it has to be: nobody is
+ * watching it, and the thing waiting is a title that will not appear or a modal
+ * that will not answer.
+ */
+const AUXILIARY_TIMEOUT_MS = 60_000;
 
 /**
  * Codex chat execution, assembled from the running plugin.
@@ -87,7 +113,34 @@ export class CodexExecution {
   private readonly requests = new CodexExecutionRequests(
     () => opaqueId('codexreq'),
     () => this.environment(),
+    undefined,
+    request => this.auxiliaryEnvironment(request),
   );
+
+  /**
+   * The auxiliary daemons, one per runner that asked for one.
+   *
+   * Built here rather than per tab because auxiliary work belongs to no tab: a
+   * title is generated for a conversation nobody may be looking at, and an
+   * inline edit runs from a modal over a note. Disposed with the backend, which
+   * is what closes the daemons it kept.
+   */
+  private readonly auxiliaryQueries = new CodexAuxiliaryQuery(
+    { resolve: requestRef => this.requests.resolveAuxiliary(requestRef) },
+    // Resolved per launch rather than captured: `createBackend` may be handed a
+    // fake connection factory by a test, and an auxiliary daemon launched behind
+    // it would be a real CLI nobody asked for.
+    { create: () => this.auxiliaryConnectionFactory().create() },
+    {
+      setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      clearTimeout: handle => window.clearTimeout(handle as ReturnType<typeof setTimeout>),
+    },
+    AUXILIARY_RESULT_BYTE_LIMIT,
+    AUXILIARY_TIMEOUT_MS,
+  );
+  private injectedConnectionFactory: CodexExecutionConnectionFactory | undefined;
+  private auxiliaryFactory: CodexExecutionConnectionFactory | undefined;
+  private backend: CodexExecutionBackend | undefined;
   private readonly presenters = new Set<CodexInteractionPresenter>();
   private workspaceSlots: ProviderWorkspaceSlots | undefined;
   private runtimeContext: ReturnType<typeof createCodexRuntimeContext> | undefined;
@@ -109,6 +162,9 @@ export class CodexExecution {
   createBackend(
     connectionFactory: CodexExecutionConnectionFactory = this.createConnectionFactory(),
   ): CodexExecutionBackend {
+    // Remembered for both: a test that hands the backend a fake daemon must not
+    // have an auxiliary turn launch a real one behind it.
+    this.injectedConnectionFactory ??= connectionFactory;
     const context: CodexExecutionBackendContext = {
       // Wrapped so every connection this composition builds also feeds the
       // plan-limit indicator: its reader and its subscription both lived in the
@@ -121,6 +177,7 @@ export class CodexExecution {
         },
       },
       requestResolver: this.requests,
+      auxiliaryQueries: this.auxiliaryQueries,
       resultSink: new CodexProjectionResultSink(),
       interactionBridge: this.interactions,
       turnReconcilerFactory: {
@@ -147,7 +204,36 @@ export class CodexExecution {
       sessionInstanceIdFactory: () => sessionInstanceId(opaqueId('si')),
       interactionIdFactory: () => interactionId(opaqueId('ix')),
     };
-    return new CodexExecutionBackend(context);
+    this.backend = new CodexExecutionBackend(context);
+    return this.backend;
+  }
+
+  /**
+   * An `AuxQueryRunner` for one auxiliary conversation, answered by the kernel.
+   *
+   * One per caller, and the caller decides what that means: the title service
+   * builds one per title and resets it when the title is done, while inline edit
+   * holds one for as long as the edit lasts. That is the unit a daemon and its
+   * thread are kept for, so it is the unit the conversation id is minted for.
+   */
+  createAuxRunner(purpose: CodexAuxiliaryPurpose): AuxQueryRunner {
+    const conversationId = opaqueId('codexaux');
+    return new KernelAuxQueryRunner({
+      reference: (config, prompt) => this.requests.referenceAuxiliary({
+        purpose,
+        conversationId,
+        systemPrompt: config.systemPrompt,
+        prompt,
+        ...(config.model ? { model: config.model } : {}),
+      }),
+      run: (requestRef, options) => (this.backend ?? this.createBackend())
+        .runAuxiliaryQuery(requestRef, options),
+      release: async () => {
+        await this.backend?.releaseAuxiliaryConversation(
+          auxiliaryRetentionKey(purpose, conversationId),
+        );
+      },
+    });
   }
 
   /**
@@ -386,10 +472,84 @@ export class CodexExecution {
     this.presenters.clear();
     this.requests.dispose();
     this.skills.invalidate();
+    // The backend closes these when it is disposed, and a composition disposed
+    // without one still has daemons to close: an auxiliary turn needs no chat
+    // session and may have launched on its own.
+    void this.auxiliaryQueries.dispose().catch(() => undefined);
   }
 
   private createConnectionFactory(): CodexExecutionConnectionFactory {
     return new NodeCodexExecutionConnectionFactory({ activeLaunchSpec: this.activeLaunchSpec });
+  }
+
+  /**
+   * The factory an auxiliary daemon is launched through.
+   *
+   * **The same one the chat uses, and for this provider that is the honest
+   * answer.** An ACP composition needs a second client factory because its
+   * containment is a filesystem delegate the client advertises; Codex's
+   * containment is on the thread — `approvalPolicy: 'never'` and
+   * `sandbox: 'read-only'`, set in `auxiliaryEnvironment` below — so what
+   * separates an auxiliary daemon from a chat one is not how it was launched but
+   * what it was asked to do. Every daemon this factory makes is its own process
+   * either way, which is the isolation that matters.
+   */
+  private auxiliaryConnectionFactory(): CodexExecutionConnectionFactory {
+    this.auxiliaryFactory ??= this.injectedConnectionFactory ?? this.createConnectionFactory();
+    return this.auxiliaryFactory;
+  }
+
+  /**
+   * What an auxiliary Codex thread is started with.
+   *
+   * The chat environment's shape with three differences, and each is what makes
+   * an auxiliary turn auxiliary: **approvals off and the sandbox read-only**, so
+   * an unattended turn cannot write to the vault or ask a question nobody is
+   * there to answer; **its own base instructions**, which are the caller's
+   * rather than the vault's — a title is asked for by the prompt that asks for a
+   * title; and **`persistExtendedHistory: false`**, which keeps auxiliary work
+   * out of the transcript store the chat path reads back.
+   */
+  private async auxiliaryEnvironment(
+    request: CodexAuxiliaryRequest,
+  ): Promise<CodexAuxiliaryEnvironment> {
+    const launchSpec = this.activeLaunchSpec.current();
+    const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
+      this.plugin.settings,
+      'codex',
+    );
+    const selected = typeof settings.model === 'string' && settings.model
+      ? settings.model
+      : DEFAULT_CODEX_PRIMARY_MODEL;
+    // The thread is started under whichever model this turn will run on, so a
+    // caller that named one is not answered by a thread built for another.
+    const model = request.model ?? selected;
+    return {
+      thread: {
+        model,
+        cwd: launchSpec.targetCwd ?? process.cwd(),
+        approvalPolicy: 'never',
+        sandbox: 'read-only',
+        baseInstructions: request.systemPrompt,
+        experimentalRawEvents: true,
+        persistExtendedHistory: false,
+      },
+      // Everything the daemon and its thread were started for. The base
+      // instructions are in here because Codex takes them on `thread/start` and
+      // a thread cannot be told new ones: changing them has to be a new thread,
+      // and the retained pair is a daemon and its thread together.
+      launchKey: JSON.stringify({
+        command: launchSpec.command,
+        args: launchSpec.args,
+        cwd: launchSpec.targetCwd ?? null,
+        model,
+        systemPrompt: request.systemPrompt,
+      }),
+      // Named on the turn only where the caller named one: a turn that repeats
+      // the thread's own model says nothing, and the legacy runner sent it only
+      // when it had been asked for.
+      ...(request.model ? { model: request.model } : {}),
+    };
   }
 
   /**

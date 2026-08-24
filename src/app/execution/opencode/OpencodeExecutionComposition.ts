@@ -92,8 +92,8 @@ import { getOpencodeState } from '@/providers/opencode/types';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
-import { ManagedAcpAuxQueryRunner } from '../acp/ManagedAcpAuxQueryRunner';
 import { delayThroughWindow } from '../hostTimers';
+import { KernelAuxQueryRunner } from '../KernelAuxQueryRunner';
 
 /** What a turn may answer with, before it is refused as too large. */
 const MAX_RESULT_BYTES = 256_000;
@@ -608,7 +608,7 @@ export class OpencodeExecution {
    */
   createAuxRunner(purpose: OpencodeAuxiliaryPurpose): AuxQueryRunner {
     const conversationId = opaqueId('ocaux');
-    return new ManagedAcpAuxQueryRunner({
+    return new KernelAuxQueryRunner({
       reference: (config, prompt) => this.requests.referenceAuxiliary({
         purpose,
         conversationId,

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { BoundConversation } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatMessage } from '../../../core/types';
 import { buildContextFromHistory } from '../../../utils/session';
@@ -14,6 +16,7 @@ import {
   findPreferredCodexSkillByName,
 } from '../skills/CodexSkillListingService';
 import { DEFAULT_CODEX_PRIMARY_MODEL } from '../types/models';
+import type { CodexAuxiliaryInvocation } from './CodexAuxiliaryQuery';
 import {
   type CodexConversationBinding,
   readCodexConversationBinding,
@@ -73,6 +76,58 @@ export interface CodexExecutionRequest {
   readonly scope?: string;
 }
 
+/**
+ * Which auxiliary conversation a turn belongs to.
+ *
+ * The legacy runner is one instance per service, each owning its own daemon and
+ * its own thread; the purpose is what keeps them apart here, and it is what a
+ * `reset()` ends.
+ */
+export type CodexAuxiliaryPurpose = 'inline' | 'instructions' | 'title-gen';
+
+/** What one auxiliary turn asks for, before it becomes an opaque reference. */
+export interface CodexAuxiliaryRequest {
+  readonly purpose: CodexAuxiliaryPurpose;
+  /**
+   * Which auxiliary conversation this turn belongs to — one per runner.
+   *
+   * The runner is the conversation, not the purpose, and the consumer is what
+   * says so: `QueryBackedTitleGenerationService` builds a **runner per title**
+   * and resets it when the title is done, while inline edit holds one for as
+   * long as the edit lasts. Keying retention by purpose alone would put two
+   * titles generated at once on one thread, and let either one's `reset()` close
+   * the daemon the other was using.
+   */
+  readonly conversationId: string;
+  /**
+   * The instructions the thread is started with.
+   *
+   * A thread parameter rather than a file for this provider, and it cannot be
+   * changed once the thread exists — which is why a changed prompt is part of
+   * the launch key rather than something the next turn carries.
+   */
+  readonly systemPrompt: string;
+  readonly prompt: string;
+  /** The model the caller asked for, where it named one. */
+  readonly model?: string;
+}
+
+/**
+ * Everything ambient an auxiliary Codex daemon and its thread run under.
+ *
+ * Built by the composition, which is the half that knows this provider: the
+ * launch spec's working directory, the model the vault is set to, and the
+ * parameters that make the thread auxiliary.
+ */
+export interface CodexAuxiliaryEnvironment {
+  /** What the thread is started with, including the policy that contains it. */
+  readonly thread: ThreadStartParams;
+  /** Everything the daemon and its thread were started for; a change relaunches. */
+  readonly launchKey: string;
+  /** The model to name on the turn, where the caller named one. */
+  readonly model?: string;
+}
+
 export interface CodexInvocationEnvironment {
   /** The provider-projected settings snapshot, read at dispatch. */
   readonly settings: Record<string, unknown>;
@@ -107,6 +162,7 @@ const REFUSAL_LIMIT = 8;
  */
 export class CodexExecutionRequests implements CodexExecutionRequestResolver {
   private readonly pending = new Map<string, CodexExecutionRequest>();
+  private readonly auxiliary = new Map<string, CodexAuxiliaryRequest>();
   /**
    * The scratch directories of turns already dispatched, per tab.
    *
@@ -134,7 +190,56 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
     private readonly nextReference: () => string,
     private readonly environment: () => Promise<CodexInvocationEnvironment>,
     private readonly limit: number = DEFAULT_LIMIT,
+    /**
+     * Absent until this provider's auxiliary work is routed through the kernel.
+     * Optional rather than throwing at construction, because the chat half of
+     * this store is live and the auxiliary half is not.
+     */
+    private readonly auxiliaryEnvironment?: (
+      request: CodexAuxiliaryRequest,
+    ) => Promise<CodexAuxiliaryEnvironment>,
   ) {}
+
+  /**
+   * Holds an auxiliary turn and returns the reference the backend will carry.
+   *
+   * The same reference space as a chat turn, deliberately: it is the same kernel
+   * carrying it, and a second space would be a second thing to keep bounded and
+   * a second place for a prompt to be retained.
+   */
+  referenceAuxiliary(request: CodexAuxiliaryRequest): string {
+    while (this.auxiliary.size >= this.limit) {
+      const oldest = this.auxiliary.keys().next();
+      if (oldest.done) {
+        break;
+      }
+      this.auxiliary.delete(oldest.value);
+    }
+    const reference = this.nextReference();
+    this.auxiliary.set(reference, request);
+    return reference;
+  }
+
+  async resolveAuxiliary(requestRef: string): Promise<CodexAuxiliaryInvocation> {
+    const request = this.auxiliary.get(requestRef);
+    if (!request) {
+      throw new Error('Unknown Codex auxiliary request reference.');
+    }
+    // Removed on resolve: holding a prompt after its turn dispatched is
+    // retention nobody asked for.
+    this.auxiliary.delete(requestRef);
+    if (!this.auxiliaryEnvironment) {
+      throw new Error('Codex auxiliary execution has no environment.');
+    }
+    const environment = await this.auxiliaryEnvironment(request);
+    return {
+      retentionKey: auxiliaryRetentionKey(request.purpose, request.conversationId),
+      restartFingerprint: fingerprint(environment.launchKey),
+      thread: environment.thread,
+      input: [{ type: 'text', text: request.prompt }],
+      ...(environment.model ? { model: environment.model } : {}),
+    };
+  }
 
   /** Holds a turn and returns the reference the kernel will carry. */
   reference(request: CodexExecutionRequest): string {
@@ -273,6 +378,7 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
     }
     this.liveBundles.clear();
     this.pending.clear();
+    this.auxiliary.clear();
   }
 
   /** Test and diagnostic view of how many turns are still waiting. */
@@ -414,4 +520,29 @@ async function resolveSkillInputs(
     // runtime sent the prompt without them, and the mention stays in the text.
     return [];
   }
+}
+
+/**
+ * What makes the query relaunch rather than reuse the daemon it has.
+ *
+ * Hashed rather than kept, for the reason the reference maps are bounded: the
+ * launch key carries the auxiliary system prompt, and a retained thread holding
+ * one for as long as the conversation lives is retention nobody asked for.
+ */
+function fingerprint(launchKey: string): string {
+  return createHash('sha256').update(launchKey).digest('hex');
+}
+
+/**
+ * The key one auxiliary conversation is retained under.
+ *
+ * Exported because the caller that ends a conversation has to name the same one
+ * the store minted: `AuxQueryRunner.reset()` knows which runner it is, and the
+ * runner is the conversation.
+ */
+export function auxiliaryRetentionKey(
+  purpose: CodexAuxiliaryPurpose,
+  conversationId: string,
+): string {
+  return `codex-auxiliary:${purpose}:${conversationId}`;
 }

@@ -52,6 +52,9 @@ function createDriver(
   }
   const backend = new CodexExecutionBackend({
     connectionFactory: { create: () => connection },
+    auxiliaryQueries: {
+      execute: async () => { throw new Error('no auxiliary work in this test'); },
+    },
     requestResolver: {
       resolve: () => requestResolution.promise,
       resolveSteer: async () => [],

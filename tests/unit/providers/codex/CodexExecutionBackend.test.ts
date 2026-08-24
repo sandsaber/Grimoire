@@ -1070,6 +1070,11 @@ function createFixture(options: FixtureOptions = {}) {
         return connections[Math.min(connectionIndex++, connections.length - 1)];
       },
     },
+    // Nothing here runs an auxiliary turn: this file is about the chat backend,
+    // and a port that answers would let one pass unnoticed.
+    auxiliaryQueries: {
+      execute: async () => { throw new Error('no auxiliary work in this test'); },
+    },
     requestResolver: {
       resolve: async requestRef => options.invocations?.[requestRef] ?? defaultInvocation,
       resolveSteer: async () => [{ type: 'text', text: 'Continue with the correction' }],

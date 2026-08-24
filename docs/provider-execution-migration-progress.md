@@ -6829,7 +6829,9 @@ were mirrored:
    subdirectory — a partitioning the forks do not have and the kernel path must keep — and the effort
    is passed as a process argument rather than set on the session.
 
-Codex is further still: a second app-server process and its own thread, not an ACP session at all.
+~~Codex is further still: a second app-server process and its own thread, not an ACP session at
+all.~~ **Flipped**, and it stayed true: its auxiliary work is a second app-server process and its
+own thread, and what contains it is the thread rather than a client or a directory.
 
 **Owed on the auxiliary path:** nothing exercises the real auxiliary client factory. The composition
 tests inject one, so what proves an auxiliary turn is contained is the filesystem policy's own test

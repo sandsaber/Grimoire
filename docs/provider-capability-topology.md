@@ -61,7 +61,7 @@ on top of the four every provider gets — new session, cancel, history, model s
 |---|---|---|
 | Antigravity | no-op | `auxiliary/AntigravityNoopServices.ts` |
 | Claude | isolated | `runtime/claudeColdStartQuery.ts` |
-| Codex | isolated | `runtime/CodexAuxQueryRunner.ts` |
+| Codex | kernel-isolated | `app/execution/codex/CodexExecutionComposition.ts` |
 | Gemini | no-op | `auxiliary/GeminiNoopServices.ts` |
 | Grok | kernel-isolated | `app/execution/grok/GrokExecutionComposition.ts` |
 | Kimi Code | kernel-isolated | `app/execution/kimicode/KimicodeExecutionComposition.ts` |
@@ -74,13 +74,18 @@ Their flips cannot produce auxiliary contention at all, which makes them the che
 flip on this axis.
 
 The six with real auxiliary execution each isolate it by construction, verified in code rather than
-assumed:
+assumed. Five of the six now run it on the execution kernel; **Claude is the only provider left with
+an auxiliary path of its own**, and it is cold by design rather than a runner that owns a process:
 
 - **Claude** runs auxiliary queries cold, with `persistSession: false`, so an auxiliary turn never
   writes a session the chat path reads;
-- **Codex** starts a second app-server process and its own thread for auxiliary work — the class
-  that does it says so in its own documentation comment, and owns its process, transport, and
-  thread id;
+- **Codex** is on the kernel, and is the one provider whose isolation is neither a directory nor a
+  client. It has no agent definition to deny a tool and no client-side filesystem to contain, so
+  everything that makes a turn auxiliary is on `thread/start`: `approvalPolicy: 'never'` so it cannot
+  approve anything, `sandbox: 'read-only'` so it cannot write — **whatever the chat is set to**,
+  including full access — and `persistExtendedHistory: false` so it is never written where the
+  conversation's own transcript is read from. Each retained auxiliary conversation is its own
+  app-server process and its own thread;
 - **OpenCode, MiMoCode and Kimi Code** run auxiliary work on the execution kernel and keep no runner.
   Each composition launches it through **its own client factory**, into
   `.grimoire/<provider>/auxiliary/<purpose>/` artifacts instead of the chat path's

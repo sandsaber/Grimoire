@@ -77,25 +77,25 @@ describe('provider execution topology', () => {
     );
 
     it.each(PROVIDER_EXECUTION_TOPOLOGY.filter(record => record.auxiliary === 'kernel-isolated'))(
-      '$providerId launches auxiliary work through its own factory and artifacts',
+      '$providerId builds its auxiliary launch separately from the chat one',
       record => {
         const source = readFileSync(resolve(process.cwd(), record.auxiliaryOwner), 'utf8');
 
         // The owner here serves both paths, so "not the chat runtime" proves
         // nothing — what proves the isolation is that the auxiliary launch is
-        // built separately: its own artifacts directory, and its own client
-        // factory, which is what stops an auxiliary turn from reaching what the
-        // chat's full-access filesystem may.
+        // built separately. **What that looks like is the provider's**, and the
+        // record says so: the ACP compositions are proven by the client factory
+        // the auxiliary path is wired to, and Codex — which has no such factory
+        // and no filesystem delegate — by the parameters its thread is started
+        // with. Asserting one shape for all of them would have made this vacuous
+        // for the first provider that did not share it.
         expect(source).toContain(record.isolationEvidence);
-        // **The wiring, not the presence.** Read as a line rather than as two
-        // names in a file, because the failure this guards against is the
-        // auxiliary path being pointed at the chat factory while both methods
-        // still exist and both still read correctly on their own. The
-        // composition tests inject a factory, so neither real one runs there.
-        expect(source).toMatch(
-          /this\.auxiliaryClientFactory \?\?= this\.injectedClientFactory \?\? this\.createAuxiliaryFactory\(\)/,
-        );
-        expect(source).toMatch(/create\w+AuxiliaryFileSystem\(/);
+        // Guards the guard: a record with no wiring would pass every assertion
+        // below by having none to fail.
+        expect(record.auxiliaryWiring?.length ?? 0).toBeGreaterThan(0);
+        for (const line of record.auxiliaryWiring ?? []) {
+          expect(source).toContain(line);
+        }
       },
     );
 

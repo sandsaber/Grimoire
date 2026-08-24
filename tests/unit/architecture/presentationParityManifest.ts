@@ -800,12 +800,14 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'Auxiliary execution — titles, refinement, inline edits — on the kernel rather than on a provider runner that owns its own process.',
     state: 'wired',
     modules: [
-      // Live for every managed-ACP provider with auxiliary work: the three forks
-      // of the OpenCode CLI and Grok, whose services ask the kernel and whose
-      // own runners are deleted. Codex's is a different transport and is its own
-      // commit rather than a sweep.
+      // Live for every provider with auxiliary work except Claude's, which is
+      // cold by design: the three forks of the OpenCode CLI, Grok, and Codex —
+      // whose services ask the kernel and whose own runners are deleted. The
+      // runner adapter is shared by all five and knows no protocol, which is
+      // what its name says.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
-      'src/app/execution/acp/ManagedAcpAuxQueryRunner.ts',
+      'src/providers/codex/execution/CodexAuxiliaryQuery.ts',
+      'src/app/execution/KernelAuxQueryRunner.ts',
       // Built when it is asked a question rather than when it is constructed,
       // which is the timing the provider runners had: a service is built when a
       // tab initializes, and what it reaches for is built at plugin load.

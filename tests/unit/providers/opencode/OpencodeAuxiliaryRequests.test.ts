@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { ManagedAcpAuxQueryRunner } from '@/app/execution/acp/ManagedAcpAuxQueryRunner';
+import { KernelAuxQueryRunner } from '@/app/execution/KernelAuxQueryRunner';
 import type { AuxQueryConfig } from '@/core/auxiliary/AuxQueryRunner';
 import {
   auxiliaryRetentionKey,
@@ -183,7 +183,7 @@ describe('OpenCode auxiliary requests', () => {
   describe('the runner the auxiliary services keep calling', () => {
     function createRunner(): {
       released: number;
-      runner: ManagedAcpAuxQueryRunner;
+      runner: KernelAuxQueryRunner;
       runs: Array<{ requestRef: string; signal?: AbortSignal; onText?: (text: string) => void }>;
       seen: Array<{ config: AuxQueryConfig; prompt: string }>;
     } {
@@ -194,7 +194,7 @@ describe('OpenCode auxiliary requests', () => {
       }> = [];
       const seen: Array<{ config: AuxQueryConfig; prompt: string }> = [];
       const state = { released: 0 };
-      const runner = new ManagedAcpAuxQueryRunner({
+      const runner = new KernelAuxQueryRunner({
         reference: (config, prompt) => {
           seen.push({ config, prompt });
           return `aux-ref-${seen.length}`;
@@ -246,7 +246,7 @@ describe('OpenCode auxiliary requests', () => {
     });
 
     it('does not fail the caller when the closing does', async () => {
-      const runner = new ManagedAcpAuxQueryRunner({
+      const runner = new KernelAuxQueryRunner({
         reference: () => 'aux-ref',
         run: async () => 'answer',
         release: async () => { throw new Error('the process would not confirm'); },
