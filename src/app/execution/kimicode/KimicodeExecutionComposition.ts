@@ -929,7 +929,7 @@ export class KimicodeExecution {
       userName: this.plugin.settings.userName,
       workspaceRoot: cwd,
     });
-    const modelId = resolveKimicodeAuxiliaryModelId(request.model);
+    const modelId = resolveKimicodeAuxiliaryModelId(settings, request.model);
     return {
       executable,
       cwd,
@@ -1038,21 +1038,33 @@ const AUXILIARY_AGENT_PROFILES: Readonly<Record<KimicodeAuxiliaryPurpose, Kimico
 };
 
 /**
- * The raw model id behind whatever the caller passed.
+ * The raw model id an auxiliary turn runs under.
  *
- * Callers hand over ids from two spaces: the encoded selection id the settings
- * UI stores, and a raw provider id typed in or carried from elsewhere. Decoding
- * only the first and passing the second through is what the legacy runner does,
- * and an id decoded from the wrong space is a model the account does not have.
+ * Two id spaces and two callers. A caller that names a model hands over either
+ * the encoded selection id the settings UI stores or a raw provider id carried
+ * from elsewhere; decoding only the first and passing the second through is what
+ * the legacy runner does, and an id decoded from the wrong space is a model the
+ * account does not have.
+ *
+ * A caller that names none — inline edit and instruction refinement, unless the
+ * user set an override — falls back to **the model the chat is set to**, which
+ * is the behaviour the legacy runner had and the reason this takes the settings.
+ * Without it an auxiliary turn silently runs on whatever the CLI defaults to,
+ * which is a different model and a different bill from the one the vault is
+ * configured for. A raw id in that setting is left alone: the legacy runner only
+ * ever applied a decoded selection here.
  */
-function resolveKimicodeAuxiliaryModelId(model?: string): string | undefined {
+function resolveKimicodeAuxiliaryModelId(
+  settings: Record<string, unknown>,
+  model?: string,
+): string | undefined {
   const trimmed = model?.trim();
-  if (!trimmed) {
-    return undefined;
+  if (trimmed) {
+    return isKimicodeModelSelectionId(trimmed) ? decodeKimicodeModelId(trimmed) ?? undefined : trimmed;
   }
-  return isKimicodeModelSelectionId(trimmed)
-    ? decodeKimicodeModelId(trimmed) ?? undefined
-    : trimmed;
+
+  const selected = typeof settings.model === 'string' ? settings.model : '';
+  return isKimicodeModelSelectionId(selected) ? decodeKimicodeModelId(selected) ?? undefined : undefined;
 }
 
 function definedEnvironment(

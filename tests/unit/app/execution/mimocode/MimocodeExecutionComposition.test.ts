@@ -1091,6 +1091,49 @@ describe('MiMoCode execution composition', () => {
       await host.dispose();
     });
 
+
+    it('falls back to the model the chat is set to when the caller names none', async () => {
+      const plugin = createPlugin();
+      plugin.settings.savedProviderModel = { mimocode: 'mimocode:big-pickle-provider/big-pickle' };
+      updateMimocodeProviderSettings(plugin.settings, {
+        discoveredModels: [{ label: 'Big Pickle', rawId: 'big-pickle-provider/big-pickle' }],
+        visibleModels: ['big-pickle-provider/big-pickle'],
+      });
+      const { execution, host, configOptions } = await createHarness({ plugin });
+
+      // Inline edit and instruction refinement pass no model unless the user set
+      // an override, and the runner this replaced applied the chat's selection to
+      // them. Without this an auxiliary turn silently runs on whatever the CLI
+      // defaults to, which is a different model and a different bill from the one
+      // the vault is configured for. The first flip of this checkpoint dropped it
+      // for three providers at once.
+      await execution.createAuxRunner('instructions').query({
+        systemPrompt: 'Refine the instructions.',
+      }, 'make this clearer');
+
+      expect(configOptions).toEqual([
+        expect.objectContaining({ configId: 'mode' }),
+        expect.objectContaining({ configId: 'model', value: 'big-pickle-provider/big-pickle' }),
+      ]);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('applies nothing when the vault has chosen no model of its own', async () => {
+      const { execution, host, configOptions } = await createHarness();
+
+      await execution.createAuxRunner('instructions').query({
+        systemPrompt: 'Refine the instructions.',
+      }, 'make this clearer');
+
+      // The default selection is this provider's synthetic id, which names no
+      // model at all. Sending it would ask the agent for a model that does not
+      // exist rather than leaving it on its own default.
+      expect(configOptions).toEqual([expect.objectContaining({ configId: 'mode' })]);
+      execution.dispose();
+      await host.dispose();
+    });
+
     it('closes the auxiliary processes when the composition goes away', async () => {
       const { execution, host, closes } = await createHarness();
       await execution.createAuxRunner('instructions').query({

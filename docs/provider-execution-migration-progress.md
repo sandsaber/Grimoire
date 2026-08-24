@@ -6732,6 +6732,20 @@ out of the vault.
 
 Gates: unit 521 suites / 8,122 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
 
+### The model the three fork flips dropped (this commit)
+
+The obligation Grok's flip recorded, closed in its own commit because it changes three providers'
+behaviour rather than tidying them. `resolveOpencodeAuxiliaryModelId` and its two twins now take the
+projected settings and fall back to **the model the chat is set to** when the caller names none —
+which inline edit and instruction refinement do, unless the user set an override. Until now those two
+ran on whatever the CLI defaults to.
+
+The three auxiliary halves are still byte-identical after normalizing the provider name: the same
+function, the same doc comment, the same call. Three breaks, three red, one per provider — and each
+test is the fallback rather than the decode, so removing the decode would not satisfy it.
+
+Gates: unit 521 suites / 8,128 tests, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6789,9 +6803,7 @@ happened*, a call that happened with an undefined argument passes it. Use `toHav
    load-bearing: *"M5's multiple views and durable agents are unsafe without revisioned saves already
    live underneath them."* Finishing M5's auxiliary checkpoint out of order was safe because it
    touches no persistence; the projections and durable agents are not.
-2. **The model fallback the three fork flips dropped** is small, isolated, and a live behaviour
-   difference rather than a cleanup — its own commit, listed in the obligations below.
-3. **Codex's auxiliary work** is a separate design question — a second app-server process and its own
+2. **Codex's auxiliary work** is a separate design question — a second app-server process and its own
    thread, not an ACP session — and is the last piece of this checkpoint.
 
 **One thing waiting on the owner rather than on code: D9, redo.** Re-running a request is free and
@@ -7378,7 +7390,9 @@ Open obligations, each with an owner:
   than by being thin. What is still owed is the *answer* traffic those three would show, which is an
   account rather than a recorder. The recorder that took them redacts: see the Grok entry for what the
   first capture contained;
-- **the three fork auxiliary flips dropped the chat's model.** Every legacy `*AuxQueryRunner` falls
+- ~~**the three fork auxiliary flips dropped the chat's model.**~~ **Closed in the commit below this
+  entry**, in the shape the entry asked for: one commit, the same change three times, the halves still
+  identical. The original entry follows: Every legacy `*AuxQueryRunner` falls
   back to the model the chat is set to when the caller names none, and inline edit and instruction
   refinement name none unless the user set an override; `OpencodeExecutionComposition`,
   `MimocodeExecutionComposition` and `KimicodeExecutionComposition` resolve only the caller's model,
