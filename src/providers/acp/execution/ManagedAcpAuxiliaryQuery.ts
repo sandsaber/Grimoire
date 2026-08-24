@@ -1,8 +1,24 @@
 import type { ResultCommitScheduler } from '@/core/execution/ResultCommit';
 
+import { mapAcpApprovalDecision } from '../acpApprovals';
 import type { AcpContentBlock, AcpSessionConfigId, AcpSessionConfigValueId } from '../types';
 import type { ManagedAcpClient, ManagedAcpClientFactory } from './ManagedAcpClient';
 import { ManagedAcpTerminationUnconfirmedError } from './ManagedAcpClient';
+
+/**
+ * How an auxiliary turn answers a permission request nobody is there to answer.
+ *
+ * `cancel` is ACP's "the turn was cancelled before the user responded", and it
+ * ends the turn — right for an agent that was launched unable to do the thing
+ * it is asking about, because a well-formed auxiliary agent never asks.
+ *
+ * `reject` selects the agent's own reject option, which is a **no it can report
+ * and work around**. That is what a provider needs when its auxiliary safety is
+ * the launch rather than an agent definition: Grok's inline profile launches in
+ * `ask` mode, so its agent asks about tools it is perfectly able to run, and an
+ * inline edit answered `cancelled` would be abandoned rather than told no.
+ */
+export type ManagedAcpAuxiliaryRefusal = 'cancel' | 'reject';
 
 /** One `session/set_config_option`, as an auxiliary turn asks for it. */
 export interface ManagedAcpAuxiliaryConfigOption {
@@ -48,6 +64,14 @@ export interface ManagedAcpAuxiliaryInvocation {
    * option is: the caller passes a model per query.
    */
   readonly modelId?: string;
+  /**
+   * How this turn refuses a permission request. Cancels when unset.
+   *
+   * A property of the launch rather than of the turn, and it travels here for
+   * the same reason the agent id does: the provider that built the launch is
+   * the only thing that knows whether the agent under it can ask at all.
+   */
+  readonly permissionRefusal?: ManagedAcpAuxiliaryRefusal;
 }
 
 export interface ManagedAcpAuxiliaryResolver {
@@ -191,8 +215,13 @@ export class ManagedAcpAuxiliaryQuery {
       // to ask on, and the permission policy it should be running under belongs
       // to the launch the `startupRef` names — that is where the legacy runners
       // put it, in the generated agent config, so a well-formed auxiliary agent
-      // never reaches this callback.
-      requestPermission: async () => ({ outcome: { outcome: 'cancelled' } }),
+      // never reaches this callback. What differs is how it is turned away,
+      // which the launch decides too.
+      requestPermission: async request => (
+        invocation.permissionRefusal === 'reject'
+          ? mapAcpApprovalDecision('deny', request.options)
+          : { outcome: { outcome: 'cancelled' } }
+      ),
     });
     let client: ManagedAcpClient;
     try {

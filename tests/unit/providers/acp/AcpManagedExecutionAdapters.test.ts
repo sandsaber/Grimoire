@@ -11,9 +11,13 @@ import {
   type ManagedAcpAuxiliaryInvocation,
   ManagedAcpAuxiliaryQuery,
 } from '@/providers/acp/execution/ManagedAcpAuxiliaryQuery';
-import type { ManagedAcpClient } from '@/providers/acp/execution/ManagedAcpClient';
+import type {
+  ManagedAcpClient,
+  ManagedAcpClientFactoryInput,
+} from '@/providers/acp/execution/ManagedAcpClient';
 import type {
   AcpPromptResponse,
+  AcpRequestPermissionResponse,
   AcpSessionNotification,
 } from '@/providers/acp/types';
 
@@ -128,8 +132,13 @@ describe('managed ACP execution adapters', () => {
     invocation: Partial<ManagedAcpAuxiliaryInvocation>
       | (() => Partial<ManagedAcpAuxiliaryInvocation>) = {},
     limits: { maxResultBytes?: number; timeoutMs?: number; scheduler?: TestScheduler } = {},
-  ): { launches: string[]; query: ManagedAcpAuxiliaryQuery } {
+  ): {
+    launches: string[];
+    query: ManagedAcpAuxiliaryQuery;
+    askAnything: () => Promise<AcpRequestPermissionResponse>;
+  } {
     const launches: string[] = [];
+    let requestPermission: ManagedAcpClientFactoryInput['requestPermission'] | undefined;
     const query = new ManagedAcpAuxiliaryQuery(
       {
         // Read per call, because the store will read the settings per call: a
@@ -147,6 +156,7 @@ describe('managed ACP execution adapters', () => {
       {
         create: async input => {
           launches.push(input.startupRef);
+          requestPermission = input.requestPermission;
           return typeof client === 'function' ? client(input.startupRef) : client;
         },
       },
@@ -154,7 +164,21 @@ describe('managed ACP execution adapters', () => {
       limits.maxResultBytes ?? 1024,
       limits.timeoutMs ?? 60_000,
     );
-    return { launches, query };
+    return {
+      launches,
+      query,
+      askAnything: async () => {
+        if (!requestPermission) throw new Error('Nothing has launched to ask.');
+        return requestPermission({
+          sessionId: 'aux-session',
+          options: [
+            { optionId: 'yes', kind: 'allow_once', name: 'Allow' },
+            { optionId: 'no', kind: 'reject_once', name: 'Deny' },
+          ],
+          toolCall: { toolCallId: 'tool-1', title: 'read', rawInput: { path: 'note.md' } },
+        });
+      },
+    };
   }
 
   /**
@@ -488,6 +512,39 @@ describe('managed ACP execution adapters', () => {
     await expect(execution).resolves.toBe('result');
     await expect(query.dispose()).rejects.toThrow('termination was not confirmed');
     expect(client.closeCalls).toBe(1);
+  });
+
+  it('cancels a permission request nobody is there to answer', async () => {
+    const client = new AuxiliaryClient();
+    const { query, askAnything } = auxiliaryQuery(client);
+
+    const turn = query.execute('aux-ref', new AbortController().signal);
+    await answer(client, 'aux-session', 'result');
+    await turn;
+
+    // The default, and right for an agent that was launched unable to do the
+    // thing it is asking about: a modal that appeared over a note because a
+    // title was being generated behind it would be worse than the refusal.
+    await expect(askAnything()).resolves.toEqual({ outcome: { outcome: 'cancelled' } });
+    await query.dispose();
+  });
+
+  it('selects the agent\'s own reject option when the launch asked for one', async () => {
+    const client = new AuxiliaryClient();
+    const { query, askAnything } = auxiliaryQuery(client, { permissionRefusal: 'reject' });
+
+    const turn = query.execute('aux-ref', new AbortController().signal);
+    await answer(client, 'aux-session', 'result');
+    await turn;
+
+    // For a provider whose auxiliary safety is the launch rather than an agent
+    // definition, the agent asks about tools it can actually run. A cancellation
+    // ends the turn; a reject is a no it can report and carry on from — which is
+    // the difference between an inline edit that is told no and one abandoned.
+    await expect(askAnything()).resolves.toEqual({
+      outcome: { optionId: 'no', outcome: 'selected' },
+    });
+    await query.dispose();
   });
 
   it('refuses to start an auxiliary turn after dispose', async () => {

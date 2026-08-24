@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import type { ManagedAcpAuxiliaryInvocation } from '@/providers/acp/execution/ManagedAcpAuxiliaryQuery';
 import type { ManagedAcpExecutionInvocation } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
 
 import type { ManagedAcpLaunchInvocation } from '../../../app/execution/acp/NodeManagedAcpProcessLauncher';
@@ -25,6 +26,71 @@ export interface GrokExecutionRequest {
 }
 
 
+
+/**
+ * Which auxiliary conversation a turn belongs to.
+ *
+ * The legacy runner is one instance per purpose, each with its own managed
+ * `GROK_HOME` and its own idle process; the purpose is what keeps them apart
+ * here, and it is what a `reset()` ends.
+ */
+export type GrokAuxiliaryPurpose = 'inline' | 'instructions' | 'title-gen';
+
+/** What one auxiliary turn asks for, before it becomes an opaque reference. */
+export interface GrokAuxiliaryRequest {
+  readonly purpose: GrokAuxiliaryPurpose;
+  /**
+   * Which auxiliary conversation this turn belongs to — one per runner.
+   *
+   * The runner is the conversation, not the purpose, and the consumer is what
+   * says so: `QueryBackedTitleGenerationService` builds a **runner per title**
+   * and resets it when the title is done, while inline edit holds one for as
+   * long as the edit lasts. Keying retention by purpose alone would put two
+   * titles generated at once in one session, and let either one's `reset()`
+   * close the process the other was using.
+   */
+  readonly conversationId: string;
+  /**
+   * The instructions the process is launched under.
+   *
+   * Not a per-turn field despite arriving on every call: Grok reads its system
+   * prompt from a file the artifacts write into the managed home, so changing it
+   * is a relaunch. It is part of the launch key for exactly that reason.
+   */
+  readonly systemPrompt: string;
+  readonly prompt: string;
+  /** The model the caller asked for, in whichever id space it had. */
+  readonly model?: string;
+}
+
+/**
+ * Everything ambient a launched auxiliary `grok agent … stdio` runs under.
+ *
+ * Built by the composition, which is the half that knows this provider: the
+ * managed home for this purpose, the command line its permission policy and
+ * reasoning effort ride on, and the raw model id behind whatever the caller
+ * passed.
+ */
+export interface GrokAuxiliaryEnvironment {
+  readonly executable: string;
+  /** What `grok agent … stdio` is spawned with, including this purpose's policy. */
+  readonly arguments: readonly string[];
+  readonly cwd: string;
+  readonly environment: Readonly<Record<string, string>>;
+  /** Everything the launch is keyed by; a change relaunches the process. */
+  readonly launchKey: string;
+  /** The raw model id to apply per turn, where one applies. */
+  readonly modelId?: string;
+  /**
+   * Whether this purpose is launched with a filesystem delegate at all.
+   *
+   * An inline edit reads the note around what it is editing; a title and a
+   * refinement are given everything they need in the prompt, and the legacy
+   * runner handed them no `readTextFile` — which the ACP handshake carries, so
+   * the agent is told there is nothing to read rather than refused per call.
+   */
+  readonly readsFiles: boolean;
+}
 
 /**
  * Everything ambient a launched `grok agent … stdio` runs under, read at
@@ -70,13 +136,31 @@ const DEFAULT_LIMIT = 64;
  */
 export class GrokExecutionRequests {
   private readonly pending = new Map<string, GrokExecutionRequest>();
+  private readonly auxiliary = new Map<string, GrokAuxiliaryRequest>();
   private readonly startups = new Map<string, ManagedAcpLaunchInvocation>();
+  /**
+   * Which auxiliary startups were launched to read, by the reference the client
+   * factory is handed.
+   *
+   * The factory is given a `startupRef` and nothing else, and for this provider
+   * the filesystem delegate differs per purpose. Absent means no: a launch this
+   * store has forgotten reads nothing, which is the safe half of the answer.
+   */
+  private readonly auxiliaryReads = new Map<string, boolean>();
   private readonly dynamics = new Map<string, GrokAcpDynamicConfig>();
 
   constructor(
     private readonly nextReference: () => string,
     private readonly environment: () => Promise<GrokInvocationEnvironment>,
     private readonly limit: number = DEFAULT_LIMIT,
+    /**
+     * Absent until this provider's auxiliary work is routed through the kernel.
+     * Optional rather than throwing at construction, because the chat half of
+     * this store is live and the auxiliary half is not.
+     */
+    private readonly auxiliaryEnvironment?: (
+      request: GrokAuxiliaryRequest,
+    ) => Promise<GrokAuxiliaryEnvironment>,
   ) {}
 
   /** Holds a turn and returns the reference the kernel will carry. */
@@ -155,10 +239,76 @@ export class GrokExecutionRequests {
     return dynamic;
   }
 
+  /**
+   * Holds an auxiliary turn and returns the reference the backend will carry.
+   *
+   * The same reference space as a chat turn, deliberately: it is the same
+   * kernel carrying it, and a second space would be a second thing to keep
+   * bounded and a second place for a prompt to be retained.
+   */
+  referenceAuxiliary(request: GrokAuxiliaryRequest): string {
+    evict(this.auxiliary, this.limit);
+    const reference = this.nextReference();
+    this.auxiliary.set(reference, request);
+    return reference;
+  }
+
+  async resolveAuxiliary(requestRef: string): Promise<ManagedAcpAuxiliaryInvocation> {
+    const request = this.auxiliary.get(requestRef);
+    if (!request) {
+      throw new Error('Unknown Grok auxiliary request reference.');
+    }
+    this.auxiliary.delete(requestRef);
+    if (!this.auxiliaryEnvironment) {
+      throw new Error('Grok auxiliary execution has no environment.');
+    }
+    const environment = await this.auxiliaryEnvironment(request);
+    evict(this.startups, this.limit);
+    evict(this.auxiliaryReads, this.limit);
+    const startupRef = this.nextReference();
+    this.startups.set(startupRef, {
+      executable: environment.executable,
+      // The policy is on the command line here too: an auxiliary turn's
+      // permission mode and reasoning effort are what the process was started
+      // with, which is why neither can be applied to the session afterwards.
+      arguments: [...environment.arguments],
+      cwd: environment.cwd,
+      environment: { ...environment.environment },
+    });
+    this.auxiliaryReads.set(startupRef, environment.readsFiles);
+    return {
+      startupRef,
+      cwd: environment.cwd,
+      prompt: [{ type: 'text', text: request.prompt }],
+      mcpServers: [],
+      // One retained process per conversation, relaunched when the launch it was
+      // started for is no longer the launch this turn asks for — a system prompt
+      // edited in settings, a CLI path changed, an effort level moved.
+      retentionKey: auxiliaryRetentionKey(request.purpose, request.conversationId),
+      restartFingerprint: fingerprint(environment.launchKey),
+      // **Told no, not cut off.** There is no agent definition to deny a tool
+      // here, so the reading profile launches in `ask` mode and its agent asks
+      // about tools it can run. A cancelled outcome would end the turn; the
+      // reject option is a refusal it can report and carry on from, which is
+      // what the legacy runner answered with.
+      permissionRefusal: 'reject',
+      // Grok has ACP's dedicated setter rather than a `model` config option, so
+      // the model travels as an id rather than as a configuration to apply.
+      ...(environment.modelId ? { modelId: environment.modelId } : {}),
+    };
+  }
+
+  /** Whether the auxiliary launch behind this startup was given a filesystem. */
+  auxiliaryReadsFiles(startupRef: string): boolean {
+    return this.auxiliaryReads.get(startupRef) ?? false;
+  }
+
   /** Drops everything held for turns that will never dispatch. */
   dispose(): void {
     this.pending.clear();
+    this.auxiliary.clear();
     this.startups.clear();
+    this.auxiliaryReads.clear();
     this.dynamics.clear();
   }
 
@@ -183,6 +333,20 @@ export class GrokExecutionRequests {
  */
 function fingerprint(launchKey: string): string {
   return createHash('sha256').update(launchKey).digest('hex');
+}
+
+/**
+ * The key one auxiliary conversation is retained under.
+ *
+ * Exported because the caller that ends a conversation has to name the same one
+ * the store minted: `AuxQueryRunner.reset()` knows which runner it is, and the
+ * runner is the conversation.
+ */
+export function auxiliaryRetentionKey(
+  purpose: GrokAuxiliaryPurpose,
+  conversationId: string,
+): string {
+  return `grok-auxiliary:${purpose}:${conversationId}`;
 }
 
 function evict(store: Map<string, unknown>, limit: number): void {

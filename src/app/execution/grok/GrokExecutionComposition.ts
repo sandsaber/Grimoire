@@ -6,6 +6,7 @@ import {
   type GrokMetadataLaunch,
   GrokMetadataSession,
 } from '@/app/execution/grok/GrokMetadataSession';
+import type { AuxQueryRunner } from '@/core/auxiliary/AuxQueryRunner';
 import {
   executionSessionId,
   interactionId,
@@ -45,6 +46,7 @@ import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellati
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import { AcpWorkspaceFileSystem } from '@/providers/acp/execution/AcpWorkspaceFileSystem';
 import { describeAcpSessionOpenFailure } from '@/providers/acp/execution/describeAcpSessionOpenFailure';
+import { ManagedAcpAuxiliaryQuery } from '@/providers/acp/execution/ManagedAcpAuxiliaryQuery';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
 import type { ManagedAcpExecutionBackendContext } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
@@ -59,9 +61,14 @@ import {
   type GrokAcpDynamicConfig,
   GrokAcpDynamicConfigApplier,
 } from '@/providers/grok/execution/GrokAcpDynamicConfig';
+import { createGrokAuxiliaryFileSystem } from '@/providers/grok/execution/GrokAuxiliaryFileSystem';
 import { GrokContentPresenter } from '@/providers/grok/execution/GrokContentPresenter';
 import { GrokExecutionBackend } from '@/providers/grok/execution/GrokExecutionBackend';
 import {
+  auxiliaryRetentionKey,
+  type GrokAuxiliaryEnvironment,
+  type GrokAuxiliaryPurpose,
+  type GrokAuxiliaryRequest,
   GrokExecutionRequests,
   type GrokInvocationEnvironment,
 } from '@/providers/grok/execution/GrokExecutionRequests';
@@ -77,12 +84,20 @@ import {
   loadGrokSessionContextUsage,
   loadGrokSessionCost,
 } from '@/providers/grok/history/GrokUsageMetadataStore';
+import {
+  decodeGrokModelId,
+  isGrokModelSelectionId,
+} from '@/providers/grok/models';
 import { resolveGrokPermissionModeForSettings } from '@/providers/grok/modes';
 import { buildGrokPromptBlocks, buildGrokPromptText } from '@/providers/grok/runtime/buildGrokPrompt';
 import { formatGrokAskUserQuestionResponse } from '@/providers/grok/runtime/formatGrokAskUserQuestionResponse';
 import { logGrokDebug } from '@/providers/grok/runtime/grokDebugLog';
 import { buildGrokAgentProcessArgs } from '@/providers/grok/runtime/GrokLaunchArgs';
-import { prepareGrokLaunchArtifacts } from '@/providers/grok/runtime/GrokLaunchArtifacts';
+import {
+  type GrokAuxiliaryProfile,
+  prepareGrokLaunchArtifacts,
+  resolveGrokAuxiliaryPermissionMode,
+} from '@/providers/grok/runtime/GrokLaunchArtifacts';
 import { applyGrokNativeModelCatalog, readGrokNativeModelCatalog } from '@/providers/grok/runtime/GrokModelsCache';
 import {
   buildManagedGrokProcessEnv,
@@ -101,10 +116,30 @@ import type { GrokProviderState } from '@/providers/grok/types';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
+import { ManagedAcpAuxQueryRunner } from '../acp/ManagedAcpAuxQueryRunner';
 import { delayThroughWindow } from '../hostTimers';
 
 /** What a turn may answer with, before it is refused as too large. */
 const MAX_RESULT_BYTES = 256_000;
+
+/**
+ * What an auxiliary turn may answer with, which is much less.
+ *
+ * A title is a line and a refinement is a paragraph. The chat limit is for a
+ * turn that may legitimately produce a file's worth of text; an auxiliary answer
+ * that size is a model that misread its instructions, and reading 256 KB of it
+ * into a title field helps nobody.
+ */
+const AUXILIARY_RESULT_BYTE_LIMIT = 64_000;
+
+/**
+ * How long an auxiliary turn may run before it is abandoned.
+ *
+ * Shorter than a chat turn by an order of magnitude, and it has to be: nobody is
+ * watching it, and the thing waiting is a title that will not appear or a modal
+ * that will not answer.
+ */
+const AUXILIARY_TIMEOUT_MS = 60_000;
 
 /**
  * What the account has spent, in Grok's own method name.
@@ -157,6 +192,28 @@ export class GrokExecution {
   private readonly requests = new GrokExecutionRequests(
     () => opaqueId('grokreq'),
     () => this.environment(),
+    undefined,
+    request => this.auxiliaryEnvironment(request),
+  );
+
+  /**
+   * The auxiliary processes, one per runner that asked for one.
+   *
+   * Built here rather than per tab because auxiliary work belongs to no tab: a
+   * title is generated for a conversation nobody may be looking at, and an
+   * inline edit runs from a modal over a note. Disposed with the backend, which
+   * is what closes the processes it kept.
+   */
+  private readonly auxiliaryQueries = new ManagedAcpAuxiliaryQuery(
+    { resolve: requestRef => this.requests.resolveAuxiliary(requestRef) },
+    // Resolved per launch rather than captured: `createBackend` may be handed a
+    // fake factory by a test, and an auxiliary process launched behind it would
+    // be a real CLI nobody asked for.
+    { create: input => this.auxiliaryFactory().create(input) },
+    { setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      clearTimeout: handle => window.clearTimeout(handle as ReturnType<typeof setTimeout>) },
+    AUXILIARY_RESULT_BYTE_LIMIT,
+    AUXILIARY_TIMEOUT_MS,
   );
 
   /**
@@ -192,6 +249,8 @@ export class GrokExecution {
 
   private metadataSession: GrokMetadataSession | undefined;
   private clientFactory: ManagedAcpClientFactory | undefined;
+  private auxiliaryClientFactory: ManagedAcpClientFactory | undefined;
+  private injectedClientFactory: ManagedAcpClientFactory | undefined;
 
   /** This composition's identity in the plan-usage store's reader table. */
   private readonly billingReaderOwner = {};
@@ -221,12 +280,17 @@ export class GrokExecution {
    * protocol and process ownership: a test that has to launch Grok to check how
    * a turn is composed is testing the wrong thing.
    */
-  createBackend(
-    clientFactory: ManagedAcpClientFactory = this.clientFactory ??= this.createClientFactory(),
-  ): GrokExecutionBackend {
-    this.clientFactory ??= clientFactory;
+  createBackend(clientFactory?: ManagedAcpClientFactory): GrokExecutionBackend {
+    // Injected once, and for both: a test that hands the backend a fake agent
+    // must not have an auxiliary turn launch a real one behind it.
+    if (clientFactory) {
+      this.injectedClientFactory = clientFactory;
+      this.auxiliaryClientFactory = clientFactory;
+    }
+    this.clientFactory = clientFactory ?? this.clientFactory ?? this.createClientFactory();
+
     const context: Omit<ManagedAcpExecutionBackendContext, 'descriptor'> = {
-      clientFactory,
+      clientFactory: this.clientFactory,
       requestResolver: this.requests,
       dynamicApplier: new GrokAcpDynamicConfigApplier({
         resolve: dynamicRef => this.requests.resolveDynamic(dynamicRef),
@@ -246,16 +310,7 @@ export class GrokExecution {
         reconcile: async query => acpCancellationEvidence(query)
           ?? { kind: 'unknown', effectsPossible: true },
       },
-      auxiliaryQueries: {
-        execute: async () => {
-          // Titles, refinement and inline edits still run on
-          // `GrokAuxQueryRunner` until M5, and this composition has no
-          // reference space of its own for them. Refused rather than answered
-          // emptily: an auxiliary turn that silently returns nothing is the
-          // failure mode this migration exists to remove.
-          throw new Error('Grok auxiliary execution is not wired to the kernel yet.');
-        },
-      },
+      auxiliaryQueries: this.auxiliaryQueries,
       scheduler: {
         setTimeout: (callback: () => void, delayMs: number) => window.setTimeout(callback, delayMs),
         clearTimeout: (handle: unknown) => window.clearTimeout(
@@ -668,6 +723,34 @@ export class GrokExecution {
     return this.metadataSession;
   }
 
+  /**
+   * An `AuxQueryRunner` for one auxiliary conversation, answered by the kernel.
+   *
+   * One per caller, and the caller decides what that means: the title service
+   * builds one per title and resets it when the title is done, while inline edit
+   * holds one for as long as the edit lasts. That is the unit a process is kept
+   * for, so it is the unit the conversation id is minted for.
+   */
+  createAuxRunner(purpose: GrokAuxiliaryPurpose): AuxQueryRunner {
+    const conversationId = opaqueId('grokaux');
+    return new ManagedAcpAuxQueryRunner({
+      reference: (config, prompt) => this.requests.referenceAuxiliary({
+        purpose,
+        conversationId,
+        systemPrompt: config.systemPrompt,
+        prompt,
+        ...(config.model ? { model: config.model } : {}),
+      }),
+      run: (requestRef, options) => (this.backend ?? this.createBackend())
+        .runAuxiliaryQuery(requestRef, options),
+      release: async () => {
+        await this.backend?.releaseAuxiliaryConversation(
+          auxiliaryRetentionKey(purpose, conversationId),
+        );
+      },
+    });
+  }
+
   /** Drops every reference held, and takes down whatever is on screen. */
   dispose(): void {
     // Taken down before the subscriptions are dropped: unsubscribing first
@@ -678,6 +761,10 @@ export class GrokExecution {
     this.presenters.clear();
     grokPlanUsageStore.setBillingReader(null, this.billingReaderOwner);
     this.requests.dispose();
+    // The backend closes these when it is disposed, and a composition disposed
+    // without one still has processes to close: an auxiliary turn needs no chat
+    // session and may have launched on its own.
+    this.settle(this.auxiliaryQueries.dispose());
   }
 
   /**
@@ -882,6 +969,83 @@ export class GrokExecution {
     return decision === 'allow' || decision === 'allow-always';
   }
 
+  /**
+   * The factory an auxiliary process is launched through, and it is not the
+   * chat one.
+   *
+   * **What a chat turn may reach and an auxiliary turn may not.** The chat
+   * filesystem opts out of containment in `always-approve` — the user asked for
+   * it, and they are watching the turn that uses it. An auxiliary turn has
+   * nobody watching and no surface to ask on: a title being generated in the
+   * background must not read outside the vault because the *chat* was set to
+   * auto-approve, and must not write at all. The legacy runner contained every
+   * auxiliary read for exactly this reason, and it declared no write.
+   */
+  private auxiliaryFactory(): ManagedAcpClientFactory {
+    this.auxiliaryClientFactory ??= this.injectedClientFactory ?? this.createAuxiliaryFactory();
+    return this.auxiliaryClientFactory;
+  }
+
+  /**
+   * Two auxiliary clients behind one factory, chosen by what the launch may read.
+   *
+   * The OpenCode forks can build one client for all three purposes because their
+   * agent definition is what denies a read. Grok has no such definition, so the
+   * only thing that can say "this purpose reads nothing" is the client — and it
+   * says it in the handshake, by being built without a filesystem delegate at
+   * all. That is what the legacy runner's `allowReadTextFile` did, and it is
+   * decided per launch, which is what the startup reference names.
+   */
+  private createAuxiliaryFactory(): ManagedAcpClientFactory {
+    const reading = this.buildAuxiliaryFactory(createGrokAuxiliaryFileSystem(
+      () => getVaultPath(this.plugin.app) ?? process.cwd(),
+    ));
+    const blind = this.buildAuxiliaryFactory(undefined);
+    return {
+      create: input => (
+        this.requests.auxiliaryReadsFiles(input.startupRef) ? reading : blind
+      ).create(input),
+    };
+  }
+
+  private buildAuxiliaryFactory(
+    fileSystem: AcpWorkspaceFileSystem | undefined,
+  ): ManagedAcpClientFactory {
+    return new AcpManagedClientAdapterFactory({
+      clientInfo: {
+        name: 'grimoire-aux',
+        version: this.plugin.manifest?.version ?? '0.0.0',
+      },
+      // The vendor envelope is the chat client's too: without it a turn's stop
+      // reason arrives on a method this client would drop, and an auxiliary
+      // prompt would never settle.
+      vendorSessionNotifications: {
+        methods: GROK_SESSION_NOTIFICATION_METHODS,
+        parse: (method, params) => parseGrokSessionNotification(method, params),
+        createDeduplicator: () => {
+          const mirror = new GrokSessionNotificationMirrorDeduplicator();
+          return (notification, source) => mirror.shouldProcess(
+            notification,
+            source as GrokSessionNotificationSource,
+          );
+        },
+      },
+      delegate: {
+        ...(fileSystem
+          ? {
+            fileSystem: {
+              readTextFile: request => fileSystem.readTextFile(request),
+              writeTextFile: request => fileSystem.writeTextFile(request),
+            },
+          }
+          : {}),
+      },
+      processLauncher: new NodeManagedAcpProcessLauncher({
+        resolve: startupRef => this.requests.resolveLaunch(startupRef),
+      }),
+    });
+  }
+
   private createClientFactory(): ManagedAcpClientFactory {
     const fileSystem = new AcpWorkspaceFileSystem({
       providerLabel: 'Grok Build',
@@ -989,6 +1153,68 @@ export class GrokExecution {
    * into a process started under the old ones, and the launch key is what makes
    * the backend restart instead.
    */
+  /**
+   * What an auxiliary `grok agent … stdio` is launched under.
+   *
+   * The chat environment's shape with three differences, and each is what makes
+   * an auxiliary turn auxiliary: its **own managed home** per purpose, so a
+   * title's config, system prompt and session store cannot be the
+   * conversation's; its **own permission mode**, which is what stops an
+   * unattended turn from writing to the vault, and which rides on the command
+   * line here rather than on the session; and its **own system prompt**, which
+   * is the caller's rather than the vault's — a title is asked for by the prompt
+   * that asks for a title.
+   *
+   * No MCP servers: an auxiliary turn has nothing to offer a tool.
+   */
+  private async auxiliaryEnvironment(
+    request: GrokAuxiliaryRequest,
+  ): Promise<GrokAuxiliaryEnvironment> {
+    const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
+      this.plugin.settings,
+      'grok',
+    );
+    const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
+    const executable = this.plugin.getResolvedProviderCliPath('grok') ?? 'grok';
+    const profile = AUXILIARY_PROFILES[request.purpose];
+    const permissionMode = resolveGrokAuxiliaryPermissionMode(profile);
+    const artifacts = await prepareGrokLaunchArtifacts({
+      artifactsSubdir: `grok/auxiliary/${request.purpose}`,
+      permissionMode,
+      systemPromptKey: request.systemPrompt,
+      systemPromptText: request.systemPrompt,
+      workspaceRoot: cwd,
+    });
+    const runtimeEnv = buildGrokRuntimeEnv(this.plugin.settings, executable, artifacts.grokHomePath);
+    // Read from the projected snapshot rather than off the settings bag: the
+    // bag's `effortLevel` belongs to whichever provider a tab last selected,
+    // and an auxiliary turn launched with another provider's effort is a
+    // process started for settings nobody chose. The legacy runner read the bag.
+    const reasoningEffort = typeof settings.effortLevel === 'string' ? settings.effortLevel : null;
+    const modelId = resolveGrokAuxiliaryModelId(settings, request.model);
+    return {
+      executable,
+      arguments: buildGrokAgentProcessArgs(reasoningEffort, permissionMode),
+      cwd,
+      environment: definedEnvironment({
+        ...runtimeEnv,
+        PATH: getEnhancedPath(runtimeEnv.PATH, isAbsolute(executable) ? executable : undefined),
+      }),
+      // The legacy runner's launch key, unchanged: command, environment, the
+      // managed home, the effort it was started with, and the artifacts' own key
+      // — which carries the system prompt and the permission mode with it.
+      launchKey: JSON.stringify({
+        artifactKey: artifacts.launchKey,
+        command: executable,
+        envText: getRuntimeEnvironmentText(this.plugin.settings, 'grok'),
+        grokHomePath: artifacts.grokHomePath,
+        reasoningEffort,
+      }),
+      readsFiles: profile === 'readonly',
+      ...(modelId ? { modelId } : {}),
+    };
+  }
+
   private async environment(): Promise<GrokInvocationEnvironment> {
     const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
       this.plugin.settings,
@@ -1034,6 +1260,49 @@ export class GrokExecution {
       mcpServers: ProviderWorkspaceRegistry.getMcpServerManager('grok')?.getServers() ?? [],
     };
   }
+}
+
+/**
+ * Which profile each purpose runs as.
+ *
+ * An inline edit reads the note around what it is editing; a title and a
+ * refinement are given everything they need in the prompt. Copied from the
+ * three legacy services rather than decided again — this is their behaviour,
+ * moved.
+ */
+const AUXILIARY_PROFILES: Readonly<Record<GrokAuxiliaryPurpose, GrokAuxiliaryProfile>> = {
+  inline: 'readonly',
+  instructions: 'passive',
+  'title-gen': 'passive',
+};
+
+/**
+ * The raw model id an auxiliary turn runs under.
+ *
+ * Two id spaces and two callers. A caller that names a model hands over either
+ * the encoded selection id the settings UI stores or a raw provider id carried
+ * from elsewhere; decoding only the first and passing the second through is what
+ * the legacy runner does, and an id decoded from the wrong space is a model the
+ * account does not have.
+ *
+ * A caller that names none — inline edit and instruction refinement, unless the
+ * user set an override — falls back to **the model the chat is set to**, which
+ * is the behaviour the legacy runner had and the reason this takes the settings.
+ * Without it an auxiliary turn silently runs on whatever the CLI defaults to.
+ * A raw id in that setting is left alone: the legacy runner only ever applied a
+ * decoded selection here.
+ */
+function resolveGrokAuxiliaryModelId(
+  settings: Record<string, unknown>,
+  model?: string,
+): string | undefined {
+  const trimmed = model?.trim();
+  if (trimmed) {
+    return isGrokModelSelectionId(trimmed) ? decodeGrokModelId(trimmed) ?? undefined : trimmed;
+  }
+
+  const selected = typeof settings.model === 'string' ? settings.model : '';
+  return isGrokModelSelectionId(selected) ? decodeGrokModelId(selected) ?? undefined : undefined;
 }
 
 /** The vendor's own code for a failure, where it names one. */

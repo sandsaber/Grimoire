@@ -1,6 +1,6 @@
 import '@/providers';
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -89,16 +89,21 @@ describe('Grok execution composition', () => {
     modes: AcpSetSessionModeRequest[];
     configOptions: unknown[];
     permissions: Array<Promise<AcpRequestPermissionResponse>>;
+    closes: string[];
+    askAnything: () => Promise<AcpRequestPermissionResponse>;
   } {
     const startupRefs: string[] = [];
     const prompts: unknown[] = [];
     const models: string[] = [];
     const modes: AcpSetSessionModeRequest[] = [];
     const configOptions: unknown[] = [];
+    const closes: string[] = [];
     const permissions: Array<Promise<AcpRequestPermissionResponse>> = [];
+    let lastPermissionRequest: ManagedAcpClientFactoryInput['requestPermission'] | undefined;
     const factory: ManagedAcpClientFactory = {
       create: async (input: ManagedAcpClientFactoryInput) => {
         startupRefs.push(input.startupRef);
+        lastPermissionRequest = input.requestPermission;
         const ask = (): void => {
           permissions.push(input.requestPermission({
             sessionId: 'grok-session',
@@ -210,12 +215,28 @@ describe('Grok execution composition', () => {
             return () => { notify = undefined; };
           },
           onConnectionLost: () => () => undefined,
-          close: async () => 'confirmed' as const,
+          close: async () => {
+            closes.push(input.startupRef);
+            return 'confirmed' as const;
+          },
         };
         return client;
       },
     };
-    return { factory, startupRefs, prompts, models, modes, configOptions, permissions };
+    return {
+      factory, startupRefs, prompts, models, modes, configOptions, permissions, closes,
+      askAnything: async () => {
+        if (!lastPermissionRequest) throw new Error('Nothing has launched to ask.');
+        return lastPermissionRequest({
+          sessionId: 'grok-session',
+          options: [
+            { optionId: 'yes', kind: 'allow_once', name: 'Allow' },
+            { optionId: 'no', kind: 'reject_once', name: 'Deny' },
+          ],
+          toolCall: { toolCallId: 'tool-9', title: 'read', kind: 'read', rawInput: { path: 'note.md' } },
+        });
+      },
+    };
   }
 
   async function createHarness(options: {
@@ -239,6 +260,8 @@ describe('Grok execution composition', () => {
     modes: AcpSetSessionModeRequest[];
     configOptions: unknown[];
     permissions: Array<Promise<AcpRequestPermissionResponse>>;
+    closes: string[];
+    askAnything: () => Promise<AcpRequestPermissionResponse>;
     events: ExecutionEventEnvelope[];
   }> {
     const host = new ExecutionKernelHost({
@@ -819,6 +842,265 @@ describe('Grok execution composition', () => {
     expect(launch.executable).toBe('grok');
     execution.dispose();
     await host.dispose();
+  });
+
+  describe('auxiliary work, on the kernel', () => {
+    /**
+     * The path the three auxiliary services now take, end to end over the same
+     * fake agent the chat turns run on — the store, the retained process, the
+     * seam, and the launch that is deliberately not the chat's.
+     *
+     * What is different from the three OpenCode forks is what is asserted here:
+     * there is no agent to set the session to, so every one of these properties
+     * is a property of the **command line and the managed home**.
+     */
+    it('answers a title on a process of its own, under its own policy', async () => {
+      const plugin = createPlugin();
+      const { execution, host, startupRefs, prompts, configOptions } = await createHarness({ plugin });
+
+      const title = await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'The user asked about tomatoes.');
+
+      expect(title).toBe('the answer');
+      // Its own launch, and nothing else has launched: no chat turn ran, so a
+      // shared process would mean the auxiliary work had opened the
+      // conversation's own CLI to generate a title.
+      expect(startupRefs).toHaveLength(1);
+      expect(prompts).toHaveLength(1);
+      // **Nothing is set on the session.** The forks send the agent id here;
+      // this provider has no agent, and a `mode` config option applied to an
+      // auxiliary session would be setting it to one of the vault's chat modes.
+      expect(configOptions).toHaveLength(0);
+      const launch = await execution.turnRequests.resolveLaunch(startupRefs[0]);
+      // What actually makes this turn safe is on the command line, which is why
+      // a change to it restarts the process rather than reconfiguring a session,
+      // and why nothing on the session had to say it.
+      expect(launch.arguments).toEqual(['agent', '--reasoning-effort', 'high', 'stdio']);
+      expect(launch.executable).toBe('/usr/local/bin/grok');
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('writes each purpose its own managed home, with its own permission mode', async () => {
+      const plugin = createPlugin();
+      const { execution, host } = await createHarness({ plugin });
+      const vault = plugin.app.vault.adapter.basePath as string;
+
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'the message');
+      await execution.createAuxRunner('inline').query({
+        systemPrompt: 'Edit the selection.',
+      }, 'make it shorter');
+
+      const homeOf = (purpose: string): string => join(
+        vault, '.grimoire', 'grok', 'auxiliary', purpose,
+      );
+      // The config the launched process reads its policy out of. Asserting the
+      // launch flag alone would prove the argument, not the mode the CLI ends up
+      // in — for this provider both are written, and they have to agree.
+      expect(readFileSync(join(homeOf('title-gen'), 'managed_config.toml'), 'utf8'))
+        .toContain('permission_mode = "plan"');
+      // An inline edit reads the note around what it is editing, so its turn is
+      // launched able to ask rather than unable to act.
+      expect(readFileSync(join(homeOf('inline'), 'managed_config.toml'), 'utf8'))
+        .toContain('permission_mode = "ask"');
+      // Each purpose keeps its own instructions, so a title's cannot be the ones
+      // an edit runs under — and its own `GROK_HOME`, so neither shares a
+      // session store with the other or with the chat.
+      expect(readFileSync(join(homeOf('inline'), 'system.md'), 'utf8'))
+        .toContain('Edit the selection.');
+      expect(existsSync(join(homeOf('title-gen'), 'system.md'))).toBe(true);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('launches the auxiliary process into its own GROK_HOME', async () => {
+      const plugin = createPlugin();
+      const { execution, host, startupRefs } = await createHarness({ plugin });
+      const vault = plugin.app.vault.adapter.basePath as string;
+
+      await execution.createAuxRunner('instructions').query({
+        systemPrompt: 'Refine the instructions.',
+      }, 'make this clearer');
+
+      const launch = await execution.turnRequests.resolveLaunch(startupRefs[0]);
+      // The home is what the process reads its config and system prompt from,
+      // and it is the partitioning this provider has that the forks do not: a
+      // shared home would put an auxiliary session in the conversation's store.
+      expect(launch.environment.GROK_HOME).toBe(
+        join(vault, '.grimoire', 'grok', 'auxiliary', 'instructions'),
+      );
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('gives the reading purpose a filesystem and the others none', async () => {
+      const { execution, host, startupRefs } = await createHarness();
+
+      await execution.createAuxRunner('inline').query({
+        systemPrompt: 'Edit the selection.',
+      }, 'make it shorter');
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'the message');
+
+      // **The forks decide this in an agent definition and Grok cannot.** With
+      // nothing to deny a read, the only thing that can say "this purpose reads
+      // nothing" is the client, and it says it in the handshake by being built
+      // without a delegate — which is chosen per launch, so the launch has to
+      // carry the answer.
+      expect(execution.turnRequests.auxiliaryReadsFiles(startupRefs[0])).toBe(true);
+      expect(execution.turnRequests.auxiliaryReadsFiles(startupRefs[1])).toBe(false);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('tells the agent no rather than cutting its turn off', async () => {
+      const { execution, host, askAnything } = await createHarness();
+
+      await execution.createAuxRunner('inline').query({
+        systemPrompt: 'Edit the selection.',
+      }, 'make it shorter');
+
+      // An auxiliary turn has no surface to raise a prompt on. But this one is
+      // launched in `ask` mode — it is *able* to run the tool it is asking
+      // about — so it is refused with the agent's own reject option, which it
+      // can report and work around. A cancellation would abandon the edit.
+      await expect(askAnything()).resolves.toEqual({
+        outcome: { optionId: 'no', outcome: 'selected' },
+      });
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('launches grok from PATH when no CLI path is configured', async () => {
+      const plugin = createPlugin();
+      // Nothing resolved: no absolute path in settings, nothing found on PATH.
+      // Carried over from the runner this replaced, where it was its own case:
+      // the auxiliary launch builds its own environment and would otherwise be
+      // the one place the fallback was missing.
+      plugin.getResolvedProviderCliPath = () => null;
+      const { execution, host, startupRefs } = await createHarness({ plugin });
+
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+      }, 'the message');
+
+      const launch = await execution.turnRequests.resolveLaunch(startupRefs[0]);
+      expect(launch.executable).toBe('grok');
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it("keeps one runner's conversation and gives another its own", async () => {
+      const { execution, host, startupRefs } = await createHarness();
+      const first = execution.createAuxRunner('inline');
+
+      await first.query({ systemPrompt: 'Edit the selection.' }, 'make it shorter');
+      await first.query({ systemPrompt: 'Edit the selection.' }, 'shorter still');
+      await execution.createAuxRunner('inline')
+        .query({ systemPrompt: 'Edit the selection.' }, 'a different edit');
+
+      // Inline edit's second message has to reach the first one's session, and
+      // a second edit started elsewhere must not land in the middle of it.
+      expect(startupRefs).toHaveLength(2);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('ends the conversation on reset, and starts a new one after it', async () => {
+      const { execution, host, startupRefs, closes } = await createHarness();
+      const runner = execution.createAuxRunner('title-gen');
+
+      await runner.query({ systemPrompt: 'Name the conversation.' }, 'first');
+      runner.reset();
+      await new Promise(resolve => { setTimeout(resolve, 0); });
+      await runner.query({ systemPrompt: 'Name the conversation.' }, 'second');
+
+      // What the title service does after every title: the process that
+      // generated it is closed, and the next title launches its own.
+      expect(closes).toHaveLength(1);
+      expect(startupRefs).toHaveLength(2);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('applies the model the caller chose, through the setter this agent has', async () => {
+      const { execution, host, models, configOptions } = await createHarness();
+
+      await execution.createAuxRunner('title-gen').query({
+        systemPrompt: 'Name the conversation.',
+        model: 'grok:openai/gpt-5.4',
+      }, 'the message');
+
+      // `session/set_model`, which is one of Grok's differences from the forks:
+      // they carry the model as a config option because that is what their agent
+      // answers, and applying it that way here would set a configuration this
+      // agent does not have.
+      expect(models).toEqual(['openai/gpt-5.4']);
+      expect(configOptions).toHaveLength(0);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('falls back to the model the chat is set to when the caller names none', async () => {
+      const plugin = createPlugin({
+        savedProviderModel: { grok: 'grok:openai/gpt-5.4' },
+        visibleModels: ['openai/gpt-5.4'],
+      });
+      const { execution, host, models } = await createHarness({ plugin });
+
+      // Inline edit and instruction refinement pass no model unless the user
+      // set an override, and the runner this replaced applied the chat's
+      // selection to them. Without this an auxiliary turn silently runs on
+      // whatever the CLI defaults to, which is a different model and a different
+      // bill from the one the vault is configured for.
+      await execution.createAuxRunner('instructions').query({
+        systemPrompt: 'Refine the instructions.',
+      }, 'make this clearer');
+
+      expect(models).toEqual(['openai/gpt-5.4']);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('applies nothing when the vault has chosen no model of its own', async () => {
+      const { execution, host, models } = await createHarness();
+
+      await execution.createAuxRunner('instructions').query({
+        systemPrompt: 'Refine the instructions.',
+      }, 'make this clearer');
+
+      // The default selection is this provider's synthetic id, which names no
+      // model at all. Sending it would ask the agent for a model that does not
+      // exist rather than leaving it on its own default.
+      expect(models).toHaveLength(0);
+      execution.dispose();
+      await host.dispose();
+    });
+
+    it('closes the auxiliary processes when the composition goes away', async () => {
+      const { execution, host, closes } = await createHarness();
+      await execution.createAuxRunner('instructions').query({
+        systemPrompt: 'Refine the instructions.',
+      }, 'make this clearer');
+
+      // The composition alone, without its host: that is the order `main.ts`
+      // unloads in — every composition first, the kernel host after, and the
+      // host's disposal is not awaited. The backend closes these too; this is
+      // the one that runs first.
+      execution.dispose();
+
+      // A plugin unload with an idle auxiliary CLI still running is the leak
+      // the retained process would otherwise be.
+      for (let attempt = 0; attempt < 50 && closes.length === 0; attempt += 1) {
+        await new Promise(resolve => { setTimeout(resolve, 0); });
+      }
+      expect(closes).toHaveLength(1);
+      await host.dispose();
+    });
   });
 
 });

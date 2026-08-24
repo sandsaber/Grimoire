@@ -238,8 +238,11 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     sessionBoundary: 'acp-session',
     resume: 'native',
     concurrency: 'one ACP session per conversation runtime, with provider extensions',
-    auxiliary: 'isolated',
-    auxiliaryOwner: 'src/providers/grok/runtime/GrokAuxQueryRunner.ts',
+    // Auxiliary work on the kernel, like the three OpenCode forks — but not
+    // built the way they are: there is no managed agent to run as here, so the
+    // launch carries the policy and the client carries what may be read.
+    auxiliary: 'kernel-isolated',
+    auxiliaryOwner: 'src/app/execution/grok/GrokExecutionComposition.ts',
     sharedResources: [
       ...MANAGED_ACP_SHARED_RESOURCES('grok'),
       {
@@ -252,7 +255,9 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     isolationEvidence: 'grok/auxiliary/',
     evidence: [
       'src/providers/grok/execution/GrokExecutionBackend.ts',
-      'src/providers/grok/runtime/GrokAuxQueryRunner.ts',
+      'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
+      'src/providers/grok/execution/GrokAuxiliaryFileSystem.ts',
+      'src/providers/grok/runtime/GrokLaunchArtifacts.ts',
       'src/providers/grok/runtime/GrokPaths.ts',
     ],
   },

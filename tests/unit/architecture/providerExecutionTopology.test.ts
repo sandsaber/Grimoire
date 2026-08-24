@@ -217,9 +217,19 @@ describe('provider execution topology', () => {
   });
 
   describe('managed-ACP artifact partitioning', () => {
+    // Both isolations, because the partitioning is the same claim either way:
+    // an auxiliary launch writes its artifacts somewhere the chat launch does
+    // not. Filtering to `isolated` alone emptied this table the moment the last
+    // managed-ACP runner was deleted, and an empty `.each` is not a passing
+    // guard — it is no guard.
     const managedAcpWithAuxiliary = PROVIDER_EXECUTION_TOPOLOGY.filter(
-      record => record.topology === 'managed-acp-subprocess' && record.auxiliary === 'isolated',
+      record => record.topology === 'managed-acp-subprocess'
+        && (record.auxiliary === 'isolated' || record.auxiliary === 'kernel-isolated'),
     );
+
+    it('has a provider to check', () => {
+      expect(managedAcpWithAuxiliary.length).toBeGreaterThan(0);
+    });
 
     it.each(managedAcpWithAuxiliary)(
       '$providerId writes auxiliary artifacts to a separate subdirectory',

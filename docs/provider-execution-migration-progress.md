@@ -6683,6 +6683,55 @@ with an undefined argument passes it.
 
 Gates: unit 519 suites / 8,095 tests, typecheck, `eslint`, `build:release`.
 
+### Grok's auxiliary flip — where the launch is the policy (this commit)
+
+`GrokAuxQueryRunner` is deleted, and **every managed-ACP provider now runs its auxiliary work on the
+kernel**. Codex is the only auxiliary runner left, and it is a second app-server process rather than
+an ACP session.
+
+The three differences this file recorded before the work started all held, and **two more only came
+out of reading the runner beside the forks'**. Both are consequences of the same fact — this provider
+has no agent definition, so everything the forks put in one has to live somewhere else:
+
+- **the refusal shape.** The forks answer a permission request `cancelled`, and the comment beside it
+  says why: a well-formed auxiliary agent never reaches that callback, because its own definition
+  denied the tool. Grok's reading profile launches in `ask` mode, so its agent asks about tools it is
+  perfectly able to run — and ACP's `cancelled` means the turn was cancelled, which ends it. The
+  legacy runner selected the agent's own **reject** option, which is a no it can report and work
+  around. `ManagedAcpAuxiliaryQuery` now carries a per-launch refusal; `cancel` stays the default, so
+  the three forks are unchanged;
+- **the filesystem is per purpose, and it is the client that says so.** The forks build one auxiliary
+  client for all three purposes and let the agent definition deny the read. Grok's title and
+  refinement purposes were launched with **no `readTextFile` delegate at all** — which the ACP
+  handshake carries, so the agent is told there is nothing to read rather than refused per call. The
+  auxiliary factory is one object that picks one of two clients by what the launch may read, keyed by
+  the startup reference, because that is the only thing a client factory is handed.
+
+**A regression the three fork flips shipped, found by reading Grok's runner next to theirs.** Every
+legacy runner falls back to **the model the chat is set to** when the caller names none — and inline
+edit and instruction refinement name none unless the user set an override. The fork compositions
+resolve only the caller's model, so those two now run on whatever the CLI defaults to: a different
+model and a different bill from the one the vault is configured for. Grok's flip keeps the fallback
+and pins it; the forks are recorded as an obligation rather than swept in here.
+
+**A cross-provider leak the legacy runner had and this does not.** It read `effortLevel` straight off
+the settings bag, which holds whichever provider a tab last selected — so an auxiliary Grok process
+could be started with Codex's reasoning effort. The kernel path reads Grok's projected snapshot, the
+same one the chat launch reads.
+
+**A gate that emptied itself at the flip.** The managed-ACP artifact-partitioning check filtered on
+`auxiliary === 'isolated'`, and Grok was the last provider in that state; deleting the runner left
+`it.each` with an empty table. Jest reports that as an error rather than as a pass, which is the only
+reason it was noticed at all — the check now covers both isolations and asserts it has a provider to
+check.
+
+Eight breaks, eight red: the refusal in the store and in the shared query, every launch reading, the
+model fallback removed, the auxiliary artifacts pointed at the chat home, the composition not closing
+its own processes, the auxiliary path pointed at the chat factory, and the auxiliary filesystem let
+out of the vault.
+
+Gates: unit 521 suites / 8,122 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -6710,13 +6759,17 @@ two now, and Antigravity is the only provider fully green on this machine.
 reader that matches nothing makes every assertion above it vacuous. Break the reader, not only the
 rule.
 
-**M5 has started, and its auxiliary checkpoint is three providers deep.** It began with the auxiliary
-query rather than the projections because that module was already dark and waiting — and reading it
-against `AuxQueryRunner` found it had been built **cold** when the consumer needs a conversation:
-inline edit's `continueConversation` is a second turn on the first turn's session. Corrected, then
-built end to end and flipped for **OpenCode, MiMoCode and Kimi Code**, whose three `*AuxQueryRunner`
-files are deleted. Their auxiliary halves are byte-identical after normalizing the provider name —
-compositions, stores, services and tests — and that is the property to keep.
+**M5 has started, and its auxiliary checkpoint has taken every managed-ACP provider.** It began with
+the auxiliary query rather than the projections because that module was already dark and waiting — and
+reading it against `AuxQueryRunner` found it had been built **cold** when the consumer needs a
+conversation: inline edit's `continueConversation` is a second turn on the first turn's session.
+Corrected, then built end to end and flipped for **OpenCode, MiMoCode, Kimi Code and Grok**, whose
+four `*AuxQueryRunner` files are deleted. The three forks' auxiliary halves are byte-identical after
+normalizing the provider name — compositions, stores, services and tests — and that is the property to
+keep. **Grok's is not, and was not meant to be**: it has no agent definition, so its permission mode
+rides on the command line, its reading purpose is the only one given a filesystem, and a permission
+request is refused with the agent's own reject option rather than a cancellation. **Codex is the last
+auxiliary runner**, and it is a second app-server process rather than an ACP session.
 
 **Two defects came out of reading each runner before deleting it**, neither found by looking for one.
 The kernel path would have let an unattended title read outside the vault whenever the *chat* was set
@@ -6731,24 +6784,26 @@ happened*, a call that happened with an undefined argument passes it. Use `toHav
 
 ### What to pick up tomorrow, in order
 
-1. **Grok's auxiliary flip** — the last managed-ACP runner, and small. Its prerequisites are below;
-   one of the three is already done.
-2. **Then stop before the projections and decide the order.** The plan puts **M3** (provider catalog)
-   and **M4** (revisioned persistence) before the rest of M5, and M4 is not merely earlier but
+1. **Stop before the projections and decide the order.** The plan puts **M3** (provider catalog) and
+   **M4** (revisioned persistence) before the rest of M5, and M4 is not merely earlier but
    load-bearing: *"M5's multiple views and durable agents are unsafe without revisioned saves already
    live underneath them."* Finishing M5's auxiliary checkpoint out of order was safe because it
    touches no persistence; the projections and durable agents are not.
+2. **The model fallback the three fork flips dropped** is small, isolated, and a live behaviour
+   difference rather than a cleanup — its own commit, listed in the obligations below.
 3. **Codex's auxiliary work** is a separate design question — a second app-server process and its own
-   thread, not an ACP session — and does not have to ride with Grok.
+   thread, not an ACP session — and is the last piece of this checkpoint.
 
 **One thing waiting on the owner rather than on code: D9, redo.** Re-running a request is free and
 needs no new state; undoing a rewind cannot be built on the control store, because D2 forbids a second
 copy of a provider transcript and the file backup is discarded after a successful rewind. Which of the
 two the product wants is the open question.
 
-**Grok is not a fork of the same CLI, and the diff against Kimi Code's was read before this was
-written.** Three differences, each of which changes the work — do not mirror it the way the three
-forks were mirrored:
+~~**Grok is not a fork of the same CLI, and the diff against Kimi Code's was read before this was
+written.**~~ **Flipped in the commit above**, and all three held — with two more that only came out
+of reading the runner: the refusal shape, and the filesystem being per purpose. The original entry
+follows. Three differences, each of which changes the work — do not mirror it the way the three forks
+were mirrored:
 
 1. **No managed agent and no config file.** Where the forks write an agent definition whose
    permissions deny writing, Grok passes a `permissionMode` to its launch artifacts —
@@ -6768,8 +6823,10 @@ Codex is further still: a second app-server process and its own thread, not an A
 tests inject one, so what proves an auxiliary turn is contained is the filesystem policy's own test
 plus a source match on the wiring line. A test that drives the real factory needs a fake process
 launcher rather than a fake factory — the launcher is built inside `createClientFactory`, so it is a
-seam that does not exist yet. Owner: whoever adds the auxiliary rows to a live smoke matrix, which is
-the other place this would be caught.
+seam that does not exist yet. **Grok added a second thing behind that seam**: which of two clients a
+launch gets, and therefore whether the agent is told it can read at all. The flag the choice is made
+from is asserted end to end; the choosing is not. Owner: whoever adds the auxiliary rows to a live
+smoke matrix, which is the other place this would be caught.
 
 **Claude's auxiliary path is different and should not be swept in with them**: `ClaudeAuxiliaryQuery`
 is cold by design, its inline edit is its own service rather than a `QueryBacked*` one, and nothing
@@ -7321,6 +7378,14 @@ Open obligations, each with an owner:
   than by being thin. What is still owed is the *answer* traffic those three would show, which is an
   account rather than a recorder. The recorder that took them redacts: see the Grok entry for what the
   first capture contained;
+- **the three fork auxiliary flips dropped the chat's model.** Every legacy `*AuxQueryRunner` falls
+  back to the model the chat is set to when the caller names none, and inline edit and instruction
+  refinement name none unless the user set an override; `OpencodeExecutionComposition`,
+  `MimocodeExecutionComposition` and `KimicodeExecutionComposition` resolve only the caller's model,
+  so those two purposes now run on whatever the CLI defaults to. Found by reading Grok's runner beside
+  theirs, and Grok's flip keeps the fallback with a test that goes red without it. Owner: the three
+  forks, in one commit of their own — their auxiliary halves are byte-identical and must stay that
+  way;
 - **awaiting an owner decision: redo.** Recorded as D9 in the persistence decisions. Re-running a
   request is free and needs no new state; undoing a rewind cannot be built on the control store,
   because D2 forbids a second copy of a provider transcript without exception, and the file backup

@@ -63,7 +63,7 @@ on top of the four every provider gets — new session, cancel, history, model s
 | Claude | isolated | `runtime/claudeColdStartQuery.ts` |
 | Codex | isolated | `runtime/CodexAuxQueryRunner.ts` |
 | Gemini | no-op | `auxiliary/GeminiNoopServices.ts` |
-| Grok | isolated | `runtime/GrokAuxQueryRunner.ts` |
+| Grok | kernel-isolated | `app/execution/grok/GrokExecutionComposition.ts` |
 | Kimi Code | kernel-isolated | `app/execution/kimicode/KimicodeExecutionComposition.ts` |
 | MiMoCode | kernel-isolated | `app/execution/mimocode/MimocodeExecutionComposition.ts` |
 | OpenCode | kernel-isolated | `app/execution/opencode/OpencodeExecutionComposition.ts` |
@@ -81,17 +81,22 @@ assumed:
 - **Codex** starts a second app-server process and its own thread for auxiliary work — the class
   that does it says so in its own documentation comment, and owns its process, transport, and
   thread id;
-- **Grok** gives its auxiliary runner its own
-  subprocess, transport, and session id, and write launch artifacts under
-  `.grimoire/<provider>/auxiliary/<purpose>/` instead of the chat path's `.grimoire/<provider>/`.
-  For Grok the managed `GROK_HOME` is derived from that subdirectory, so even the provider home is
-  partitioned;
-- **OpenCode, MiMoCode and Kimi Code** keep all of that and no longer keep a runner. Their auxiliary work runs on the
-  execution kernel: each composition launches it through **its own client factory**, into the same
-  `auxiliary/<purpose>/` artifacts, as an agent whose permissions deny writing. The client factory is
-  the part worth reading twice — a chat turn in full access opts out of workspace containment
-  because the user asked for it and is watching, and an auxiliary turn is neither, so it is contained
-  whatever the chat is set to and writes nothing at all.
+- **OpenCode, MiMoCode and Kimi Code** run auxiliary work on the execution kernel and keep no runner.
+  Each composition launches it through **its own client factory**, into
+  `.grimoire/<provider>/auxiliary/<purpose>/` artifacts instead of the chat path's
+  `.grimoire/<provider>/`, as an agent whose permissions deny writing. The client factory is the part
+  worth reading twice — a chat turn in full access opts out of workspace containment because the user
+  asked for it and is watching, and an auxiliary turn is neither, so it is contained whatever the
+  chat is set to and writes nothing at all;
+- **Grok** is on the kernel too, and keeps the same partitioning — the managed `GROK_HOME` is derived
+  from that auxiliary subdirectory, so even the provider home is separate. What is built differently
+  is everything the forks put in an agent definition, because Grok has none. The permission mode
+  rides on the command line (`ask` for the purpose that reads, `plan` for the two that do not), so a
+  change to it restarts the process rather than reconfiguring a session; and because there is no
+  agent to deny a read, the purposes that read nothing are launched with **no filesystem delegate at
+  all**, which the ACP handshake carries. A permission request that reaches the client anyway is
+  answered with the agent's own reject option rather than a cancellation, so an inline edit is told
+  no and carries on instead of being abandoned.
 
 ## Shared resources
 

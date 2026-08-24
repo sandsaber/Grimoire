@@ -800,10 +800,10 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'Auxiliary execution — titles, refinement, inline edits — on the kernel rather than on a provider runner that owns its own process.',
     state: 'wired',
     modules: [
-      // Live for the three forks of the OpenCode CLI, whose auxiliary services
-      // ask the kernel and whose own runners are deleted. Grok still has its
-      // own, and Codex's is a different transport; each is its own commit
-      // rather than a sweep.
+      // Live for every managed-ACP provider with auxiliary work: the three forks
+      // of the OpenCode CLI and Grok, whose services ask the kernel and whose
+      // own runners are deleted. Codex's is a different transport and is its own
+      // commit rather than a sweep.
       'src/providers/acp/execution/ManagedAcpAuxiliaryQuery.ts',
       'src/app/execution/acp/ManagedAcpAuxQueryRunner.ts',
       // Built when it is asked a question rather than when it is constructed,
@@ -819,6 +819,9 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/mimocode/execution/MimocodeAuxiliaryFileSystem.ts',
       'src/providers/kimicode/runtime/KimicodeAuxiliaryAgents.ts',
       'src/providers/kimicode/execution/KimicodeAuxiliaryFileSystem.ts',
+      // Grok has no agent to run as: its profile is a permission mode on the
+      // launch, which is why the mapping sits beside the artifacts that write it.
+      'src/providers/grok/execution/GrokAuxiliaryFileSystem.ts',
     ],
   },
 ];
