@@ -283,4 +283,148 @@ describe('VersionedRepository', () => {
     expect(storage.get(getVersionedRecordPath('records', 'canonical')))
       .not.toContain('ignored');
   });
+  describe('adopting records this store did not write', () => {
+    /**
+     * The step D5's schema migration cannot reach: a file with **no envelope at
+     * all** has no `schemaVersion` to migrate from. A store adopting data that
+     * predates it has to say how to read that, or every record in it reads
+     * `corrupt` at once — which under D5 opens the whole store read-only.
+     */
+    function createAdoptingRepository(
+      storage: TestDurableStorage,
+      adopt: (raw: unknown) => ExampleRecord | null = raw => (
+        typeof (raw as { count?: unknown })?.count === 'number'
+          ? { count: (raw as { count: number }).count }
+          : null
+      ),
+    ): VersionedRepository<ExampleRecord> {
+      return new VersionedRepository({
+        storage,
+        namespace: 'records',
+        schema,
+        now: () => 100,
+        adoptLegacyRecord: raw => adopt(raw),
+      });
+    }
+
+    it('reads a bare record as its first revision, without rewriting it', async () => {
+      const storage = new TestDurableStorage();
+      const bare = JSON.stringify({ count: 7 });
+      storage.seed(getVersionedRecordPath('records', 'legacy-bare'), bare);
+      const repository = createAdoptingRepository(storage);
+
+      const read = await repository.read('legacy-bare');
+
+      expect(read).toMatchObject({
+        kind: 'migrated',
+        fromSchemaVersion: 0,
+        record: { revision: 1, payload: { count: 7 } },
+      });
+      // Rewritten at the next legitimate write, not eagerly on startup.
+      expect(storage.get(getVersionedRecordPath('records', 'legacy-bare'))).toBe(bare);
+    });
+
+    it('upgrades the file in place at the next write', async () => {
+      const storage = new TestDurableStorage();
+      storage.seed(getVersionedRecordPath('records', 'legacy-bare'), JSON.stringify({ count: 7 }));
+      const repository = createAdoptingRepository(storage);
+
+      await repository.save('legacy-bare', { count: 8 }, 1);
+
+      const stored = JSON.parse(
+        storage.get(getVersionedRecordPath('records', 'legacy-bare')) as string,
+      );
+      expect(stored).toMatchObject({ schemaVersion: 2, revision: 2, payload: { count: 8 } });
+    });
+
+    it('never adopts a record this store wrote, however permissive the adopter', async () => {
+      const storage = new TestDurableStorage();
+      // Damaged: written by this store, and unreadable. A `revision` that is not
+      // a number is exactly what `validateEnvelope` exists to catch.
+      storage.seed(getVersionedRecordPath('records', 'damaged'), JSON.stringify({
+        schemaVersion: 2,
+        recordId: 'damaged',
+        revision: 'four',
+        updatedAt: 5,
+        payload: { count: 3 },
+      }));
+      // An adopter that accepts anything, which is the case the envelope check
+      // is there for: a permissive one would otherwise read a damaged record as
+      // legacy data and **silently reset a record with history behind it to
+      // revision 1**, which is the overwrite this whole store exists to stop.
+      const repository = createAdoptingRepository(storage, () => ({ count: 0 }));
+
+      await expect(repository.read('damaged')).resolves.toMatchObject({ kind: 'corrupt' });
+    });
+
+    it('leaves a file the adopter does not recognise corrupt', async () => {
+      const storage = new TestDurableStorage();
+      storage.seed(getVersionedRecordPath('records', 'foreign'), JSON.stringify({ other: true }));
+      const repository = createAdoptingRepository(storage);
+
+      await expect(repository.read('foreign')).resolves.toMatchObject({ kind: 'corrupt' });
+    });
+
+    it('does not adopt anything when the store did not ask to', async () => {
+      const storage = new TestDurableStorage();
+      storage.seed(getVersionedRecordPath('records', 'legacy-bare'), JSON.stringify({ count: 7 }));
+      const repository = new VersionedRepository({
+        storage,
+        namespace: 'records',
+        schema,
+        now: () => 100,
+      });
+
+      // The control store did not ask, and must keep reading exactly as before.
+      await expect(repository.read('legacy-bare')).resolves.toMatchObject({ kind: 'corrupt' });
+    });
+  });
+
+  describe('the name a record file is given', () => {
+    it('reads and lists under the suffix the store asked for', async () => {
+      const storage = new TestDurableStorage();
+      const repository = new VersionedRepository({
+        storage,
+        namespace: 'records',
+        schema,
+        now: () => 100,
+        fileSuffix: '.meta.json',
+      });
+
+      await repository.save('record-1', { count: 1 }, null);
+
+      // A store adopting files the vault already holds keeps their name, so the
+      // upgrade is a rewrite of each file rather than a rename of all of them.
+      expect(storage.get('records/record-1.meta.json')).not.toBeNull();
+      expect(storage.get(getVersionedRecordPath('records', 'record-1'))).toBeNull();
+      await expect(repository.listRecordIds()).resolves.toEqual(['record-1']);
+    });
+
+    it('does not read another store\'s files out of the same directory', async () => {
+      const storage = new TestDurableStorage();
+      storage.seed('records/other.json', JSON.stringify({ count: 1 }));
+      const repository = new VersionedRepository({
+        storage,
+        namespace: 'records',
+        schema,
+        now: () => 100,
+        fileSuffix: '.meta.json',
+      });
+
+      // A listing that matched on `.json` alone would invent a record named
+      // `other.` out of a file belonging to something else.
+      await expect(repository.listRecordIds()).resolves.toEqual([]);
+    });
+
+    it('refuses a suffix a record id could contain', () => {
+      // Without this, one record's path is readable as another's id, which is
+      // how a listing invents records that do not exist.
+      expect(() => new VersionedRepository({
+        storage: new TestDurableStorage(),
+        namespace: 'records',
+        schema,
+        fileSuffix: 'json',
+      })).toThrow(/file suffix/i);
+    });
+  });
 });

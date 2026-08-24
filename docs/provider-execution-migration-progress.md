@@ -81,8 +81,8 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — provider control plane | Not started | — |
-| M4 — revisioned persistence in production | Not started | — |
-| M5 — presentation evolution and seam deletion | In progress — the auxiliary checkpoint is live for OpenCode, MiMoCode and Kimi Code, with their runners deleted; Grok and Codex remain. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac` |
+| M4 — revisioned persistence in production | In progress — the conversation record, its repository and the adoption step for existing vault data are built and proven, still dark. Routing the saves and typed history hydration remain | this commit |
+| M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
@@ -6745,6 +6745,52 @@ function, the same doc comment, the same call. Three breaks, three red, one per 
 test is the fallback rather than the decode, so removing the decode would not satisfy it.
 
 Gates: unit 521 suites / 8,128 tests, typecheck, `eslint`, `build:release`.
+
+### M4 opens: the conversation record, and the vault that already exists (this commit)
+
+**Dark.** `SessionStorage` still writes what it always wrote; nothing is routed. What exists now is the
+half M4 cannot be built without: a conversation record with a schema envelope and a revision, a
+repository over it, and the step that makes the vaults already in the field readable.
+
+**The case M4 exists for, stated plainly.** A title generated in the background, a message appended in
+one window and a rename in another all read the conversation, change part of it, and write the whole
+of it back. On the legacy path the last one to finish wins and takes the others' changes with it,
+because `saveMetadata` is an atomic write of whatever the caller was holding. A save here names the
+revision it was built from, and a stale one is refused.
+
+**Adoption is the piece the plan's schema versioning cannot reach.** D5 migrates a record with a
+*known older* `schemaVersion`; every conversation in every existing vault has **no envelope at all**,
+so there is no version to migrate from. Read as-is it is `corrupt`, and D5 then opens the store
+read-only — for every conversation the user has, at once. So `VersionedRepository` gained an explicit
+adoption step: a file with no envelope is read as revision 1, and **not rewritten until something
+legitimately writes it**, which is the other half of what D5 asks. Guarded so it can only ever apply
+to a file this store did not write: a damaged record that *does* carry an envelope stays corrupt
+rather than being silently reset to revision 1, which would be the overwrite the whole store exists
+to stop.
+
+**The file keeps its name.** `<id>.meta.json` is what every vault holds, so the repository takes a file
+suffix rather than renaming every conversation a user has to `<id>.json`. The upgrade from bare object
+to enveloped record is then a compare-and-swap of that file's own contents. The listing matches on the
+full suffix, and a suffix a record id could contain is refused — otherwise one record's path is
+readable as another's id, which is how a listing invents records that do not exist.
+
+**`decode` validates and does not rewrite.** The control store's schema rebuilds its payload field by
+field, which is right for a record whose shape it owns. A conversation carries a provider's own state
+bag and whatever a later release adds, and D5 says a store never discards what it does not understand
+— so only the fields every reader depends on are checked, and the rest is passed through. Breaking
+that is one of the tests.
+
+**One break of nine stayed green, and it was a gap.** Removing the envelope guard on adoption changed
+nothing, because the conversation adopter *also* checks that the file names its own conversation. The
+guard belongs to the shared repository and so does its test: an adopter that accepts anything, against
+a damaged enveloped record. It goes red now.
+
+Still owed before this milestone can be called done, and deliberately not in this commit: routing the
+`main.ts` save sites through the repository with the revisions they read, the typed history hydration
+result at each call site, and the storage-layout documentation — which does not change until the
+routing lands, because nothing writes an enveloped record yet.
+
+Gates: unit 524 suites / 8,192 tests, integration 5 / 145, typecheck, `eslint`, `build:release`.
 
 ## Current blocker
 

@@ -10,12 +10,42 @@ const storageMutationQueues = new WeakMap<DurableStorage, Map<string, Promise<vo
 /** How many times a removal re-reads a record that changed under it. */
 const REMOVE_ATTEMPTS = 3;
 
+/** What a record file is named after its id, unless the store says otherwise. */
+const DEFAULT_FILE_SUFFIX = '.json';
+
 export interface VersionedRepositoryOptions<TPayload> {
   readonly storage: DurableStorage;
   readonly namespace: string;
   readonly schema: RecordSchema<TPayload>;
   readonly now?: () => number;
   readonly validatePayload?: (payload: TPayload) => void;
+  /**
+   * What a record file is named, after the record id. `.json` by default.
+   *
+   * A parameter because a store may be adopting files that already exist under
+   * a name the vault has been writing for releases — conversation metadata is
+   * `<id>.meta.json` — and renaming every one of them in every vault to gain a
+   * revision would be a migration with no benefit. Keeping the name lets the
+   * upgrade be a compare-and-swap of that file's own contents.
+   */
+  readonly fileSuffix?: string;
+  /**
+   * Reads a record this store did not write, as its first revision.
+   *
+   * The explicit, idempotent adoption step D5 asks for, at the one boundary a
+   * schema migration cannot reach: a file with **no envelope at all** has no
+   * `schemaVersion` to migrate from. Without this such a file reads `corrupt`,
+   * which under D5 opens the store read-only — so a store adopting existing
+   * vault data must say how to read it, or every record in it becomes
+   * unreadable at once.
+   *
+   * Given the parsed JSON, it returns the payload or `null` for "this is not
+   * something I recognise", which stays `corrupt`. The adopted record reads as
+   * `migrated` at revision 1, so the next legitimate write replaces the file
+   * with an enveloped one — at read time nothing is rewritten, which is the
+   * other half of what D5 requires.
+   */
+  readonly adoptLegacyRecord?: (raw: unknown, recordId: string) => TPayload | null;
 }
 
 export class RevisionConflictError extends Error {
@@ -44,6 +74,8 @@ export class VersionedRepository<TPayload> {
   private readonly schema: RecordSchema<TPayload>;
   private readonly now: () => number;
   private readonly validatePayload?: (payload: TPayload) => void;
+  private readonly fileSuffix: string;
+  private readonly adoptLegacyRecord?: (raw: unknown, recordId: string) => TPayload | null;
   private readonly mutationQueues: Map<string, Promise<void>>;
 
   constructor(options: VersionedRepositoryOptions<TPayload>) {
@@ -57,6 +89,11 @@ export class VersionedRepository<TPayload> {
     this.schema = options.schema;
     this.now = options.now ?? Date.now;
     this.validatePayload = options.validatePayload;
+    this.fileSuffix = options.fileSuffix ?? DEFAULT_FILE_SUFFIX;
+    validateFileSuffix(this.fileSuffix);
+    if (options.adoptLegacyRecord) {
+      this.adoptLegacyRecord = options.adoptLegacyRecord;
+    }
     const existingQueues = storageMutationQueues.get(options.storage);
     if (existingQueues) {
       this.mutationQueues = existingQueues;
@@ -74,10 +111,10 @@ export class VersionedRepository<TPayload> {
     const prefix = `${this.namespace}/`;
     const paths = await this.storage.list(this.namespace);
     return paths.flatMap(path => {
-      if (!path.startsWith(prefix) || !path.endsWith('.json')) {
+      if (!path.startsWith(prefix) || !path.endsWith(this.fileSuffix)) {
         return [];
       }
-      const encodedId = path.slice(prefix.length, -'.json'.length);
+      const encodedId = path.slice(prefix.length, -this.fileSuffix.length);
       if (!encodedId || encodedId.includes('/')) {
         return [];
       }
@@ -146,7 +183,7 @@ export class VersionedRepository<TPayload> {
         throw new RevisionConflictError(recordId, expectedRevision, actualRevision);
       }
       if (!await this.storage.compareAndSwap(
-        getVersionedRecordPath(this.namespace, recordId),
+        getVersionedRecordPath(this.namespace, recordId, this.fileSuffix),
         current.kind === 'current' || current.kind === 'migrated' ? current.raw : null,
         null,
       )) {
@@ -177,7 +214,7 @@ export class VersionedRepository<TPayload> {
           return;
         }
         if (await this.storage.compareAndSwap(
-          getVersionedRecordPath(this.namespace, recordId),
+          getVersionedRecordPath(this.namespace, recordId, this.fileSuffix),
           raw,
           null,
         )) {
@@ -243,7 +280,7 @@ export class VersionedRepository<TPayload> {
     assertJsonValue(envelope, '$', new Set<object>());
     const serialized = JSON.stringify(envelope);
     const written = await this.storage.compareAndSwap(
-      getVersionedRecordPath(this.namespace, recordId),
+      getVersionedRecordPath(this.namespace, recordId, this.fileSuffix),
       expectedRaw,
       serialized,
     );
@@ -270,7 +307,7 @@ export class VersionedRepository<TPayload> {
 
   private async readUnlocked(recordId: string): Promise<VersionedRecordReadResult<TPayload>> {
     requireRecordId(recordId);
-    const path = getVersionedRecordPath(this.namespace, recordId);
+    const path = getVersionedRecordPath(this.namespace, recordId, this.fileSuffix);
     const raw = await this.storage.read(path);
     if (raw === null) {
       return { kind: 'absent' };
@@ -278,6 +315,10 @@ export class VersionedRepository<TPayload> {
 
     try {
       const parsed = JSON.parse(raw) as Partial<VersionedRecord<unknown>>;
+      const adopted = this.adopt(parsed, recordId, raw);
+      if (adopted) {
+        return adopted;
+      }
       validateEnvelope(parsed, recordId);
       const schemaVersion = parsed.schemaVersion as number;
       if (schemaVersion > this.schema.currentVersion) {
@@ -318,8 +359,41 @@ export class VersionedRepository<TPayload> {
     }
   }
 
+  /**
+   * A file this store did not write, read as its first revision.
+   *
+   * Only where there is no envelope: a record that carries one and fails
+   * validation is a record this store wrote and cannot read, which is corrupt
+   * and must stay corrupt. Adoption is for data that predates the store.
+   */
+  private adopt(
+    parsed: unknown,
+    recordId: string,
+    raw: string,
+  ): VersionedRecordReadResult<TPayload> | null {
+    if (!this.adoptLegacyRecord || looksEnveloped(parsed)) {
+      return null;
+    }
+    const payload = this.adoptLegacyRecord(parsed, recordId);
+    if (payload === null) {
+      return null;
+    }
+    return {
+      kind: 'migrated',
+      fromSchemaVersion: 0,
+      record: {
+        schemaVersion: this.schema.currentVersion,
+        recordId,
+        revision: 1,
+        updatedAt: this.now(),
+        payload: this.schema.decode(payload),
+      },
+      raw,
+    };
+  }
+
   private enqueue<TResult>(recordId: string, task: () => Promise<TResult>): Promise<TResult> {
-    const queueKey = getVersionedRecordPath(this.namespace, recordId);
+    const queueKey = getVersionedRecordPath(this.namespace, recordId, this.fileSuffix);
     const previous = this.mutationQueues.get(queueKey) ?? Promise.resolve();
     const operation = previous.catch(() => undefined).then(task);
     const tail = operation.then(() => undefined, () => undefined);
@@ -332,10 +406,33 @@ export class VersionedRepository<TPayload> {
   }
 }
 
-export function getVersionedRecordPath(namespace: string, recordId: string): string {
+/**
+ * Whether this looks like something this store wrote.
+ *
+ * Deliberately weak: it asks only for the envelope's own marker fields, so a
+ * malformed record written by this store is still validated — and rejected —
+ * by `validateEnvelope` rather than being adopted as legacy data and silently
+ * reset to revision 1.
+ */
+function looksEnveloped(parsed: unknown): boolean {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return false;
+  }
+  const candidate = parsed as Record<string, unknown>;
+  return 'schemaVersion' in candidate
+    && 'revision' in candidate
+    && Object.prototype.hasOwnProperty.call(candidate, 'payload');
+}
+
+export function getVersionedRecordPath(
+  namespace: string,
+  recordId: string,
+  fileSuffix: string = DEFAULT_FILE_SUFFIX,
+): string {
   validateNamespace(namespace);
   requireRecordId(recordId);
-  return `${namespace}/${encodeURIComponent(recordId)}.json`;
+  validateFileSuffix(fileSuffix);
+  return `${namespace}/${encodeURIComponent(recordId)}${fileSuffix}`;
 }
 
 function validateEnvelope(
@@ -403,4 +500,12 @@ function assertJsonValue(value: unknown, path: string, ancestors: Set<object>): 
     }
   }
   ancestors.delete(value);
+}
+
+function validateFileSuffix(fileSuffix: string): void {
+  // A suffix a record id could contain would make one record's path readable as
+  // another's id, which is how a listing invents records that do not exist.
+  if (!/^\.[A-Za-z0-9.]{1,32}$/.test(fileSuffix)) {
+    throw new Error(`Invalid versioned record file suffix: ${fileSuffix}`);
+  }
 }
