@@ -394,6 +394,9 @@
       "messages": {
         "interrupted": "Interrompu",
         "interruptedHint": "· Que doit faire Grimoire à la place ?",
+        "historyUnavailable": "Les messages antérieurs de cette conversation ne sont plus disponibles : le fournisseur ne conserve plus la session dans laquelle ils étaient enregistrés.",
+        "historyPartial": "Une partie de cette conversation n'a pas pu être chargée ; certains messages antérieurs peuvent donc manquer.",
+        "historyUnreadable": "Les messages antérieurs de cette conversation n'ont pas pu être lus ; la suite peut donc être incomplète.",
         "conversationCompacted": "Conversation compactée",
         "completed": "Terminé",
         "duration": "* {flavor} pendant {duration}",

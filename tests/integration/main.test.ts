@@ -1,5 +1,6 @@
 import { addIcon, setTooltip } from 'obsidian';
 
+import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { TOOL_SUBAGENT } from '@/core/tools/toolNames';
 import { VIEW_TYPE_GRIMOIRE } from '@/core/types';
 import { setLocale } from '@/i18n/i18n';
@@ -897,6 +898,37 @@ describe('GrimoirePlugin', () => {
       const conv = await plugin.createConversation({ providerId: 'claude' });
 
       expect(create).toHaveBeenCalledWith(expect.objectContaining({ id: conv.id }));
+    });
+  });
+
+  describe('what happened when a conversation was opened', () => {
+    it('reports what the provider said about its history', async () => {
+      await plugin.onload();
+      const conv = await plugin.createConversation({ providerId: 'claude' });
+      const service = ProviderRegistry.getConversationHistoryService('claude');
+      const hydrate = jest.spyOn(service, 'hydrateConversationHistory')
+        .mockResolvedValue({ outcome: 'stale', reason: 'sessionsNotFound' });
+
+      await plugin.getConversationById(conv.id);
+
+      // The surface reads this to say why a transcript is short. Before it, the
+      // provider knew and nobody carried it, so an unloadable conversation
+      // looked exactly like an empty one.
+      expect(plugin.getHistoryHydration(conv.id)).toEqual({
+        outcome: 'stale',
+        reason: 'sessionsNotFound',
+      });
+      hydrate.mockRestore();
+    });
+
+    it('forgets what it found when the conversation is deleted', async () => {
+      await plugin.onload();
+      const conv = await plugin.createConversation({ providerId: 'claude' });
+      await plugin.getConversationById(conv.id);
+
+      await plugin.deleteConversation(conv.id);
+
+      expect(plugin.getHistoryHydration(conv.id)).toBeUndefined();
     });
   });
 

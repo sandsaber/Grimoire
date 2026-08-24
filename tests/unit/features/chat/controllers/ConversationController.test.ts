@@ -48,6 +48,7 @@ function createMockDeps(overrides: Partial<ConversationControllerDeps> = {}): Co
         updatedAt: Date.now(),
       }),
       getConversationById: jest.fn().mockResolvedValue(null),
+      getHistoryHydration: jest.fn().mockReturnValue(undefined),
       getConversationSync: jest.fn().mockReturnValue(null),
       getConversationList: jest.fn().mockReturnValue([]),
       findEmptyConversation: jest.fn().mockResolvedValue(null),
@@ -594,11 +595,36 @@ describe('ConversationController', () => {
 
       expect(deps.renderer.renderMessages).toHaveBeenCalledWith(
         expect.any(Array),
-        expect.any(Function)
+        expect.any(Function),
+        undefined,
       );
 
       const greetingFn = (deps.renderer.renderMessages as jest.Mock).mock.calls[0][1];
       expect(greetingFn().length).toBeGreaterThan(0);
+    });
+
+    it('tells the renderer what the provider found when the history was loaded', async () => {
+      deps.state.currentConversationId = 'conv-1';
+      (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
+        id: 'conv-1',
+        messages: [],
+        sessionId: 'session-gone',
+      });
+      (deps.plugin.getHistoryHydration as jest.Mock).mockReturnValue({
+        outcome: 'stale',
+        reason: 'sessionNotFound',
+      });
+
+      await controller.loadActive();
+
+      // Without this the renderer has nothing to say, and a conversation whose
+      // session the provider no longer has is drawn exactly like an empty one.
+      expect(deps.renderer.renderMessages).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(Function),
+        { outcome: 'stale', reason: 'sessionNotFound' },
+      );
+      expect(deps.plugin.getHistoryHydration).toHaveBeenCalledWith('conv-1');
     });
   });
 
@@ -648,7 +674,8 @@ describe('ConversationController', () => {
 
       expect(deps.renderer.renderMessages).toHaveBeenCalledWith(
         expect.any(Array),
-        expect.any(Function)
+        expect.any(Function),
+        undefined,
       );
 
       const greetingFn = (deps.renderer.renderMessages as jest.Mock).mock.calls[0][1];

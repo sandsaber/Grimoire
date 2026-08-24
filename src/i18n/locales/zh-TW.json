@@ -394,6 +394,9 @@
       "messages": {
         "interrupted": "已中斷",
         "interruptedHint": "· Grimoire 應改做什麼？",
+        "historyUnavailable": "此對話的早期訊息已無法使用——提供者已不再保留儲存它們的工作階段。",
+        "historyPartial": "此對話的一部分無法載入，因此可能缺少部分早期訊息。",
+        "historyUnreadable": "無法讀取此對話的早期訊息，因此後續內容可能不完整。",
         "conversationCompacted": "對話已壓縮",
         "completed": "已完成",
         "duration": "* {flavor}，持續 {duration}",

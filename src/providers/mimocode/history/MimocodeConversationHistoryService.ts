@@ -1,3 +1,4 @@
+import type { ProviderHistoryHydration } from '../../../core/providers/ProviderModule';
 import type { ProviderConversationHistoryService } from '../../../core/providers/types';
 import type { Conversation } from '../../../core/types';
 import { getMimocodeState, type MimocodeProviderState } from '../types';
@@ -9,11 +10,13 @@ export class MimocodeConversationHistoryService implements ProviderConversationH
   async hydrateConversationHistory(
     conversation: Conversation,
     _vaultPath: string | null,
-  ): Promise<void> {
+  ): Promise<ProviderHistoryHydration> {
     const sessionId = conversation.sessionId;
     if (!sessionId) {
+      // Never bound to a session, so there is no provider history to be
+      // missing: what the conversation shows is what its own metadata holds.
       this.hydratedKeys.delete(conversation.id);
-      return;
+      return { outcome: 'absent' };
     }
 
     const state = getMimocodeState(conversation.providerState);
@@ -22,17 +25,24 @@ export class MimocodeConversationHistoryService implements ProviderConversationH
       conversation.messages.length > 0
       && this.hydratedKeys.get(conversation.id) === hydrationKey
     ) {
-      return;
+      return { outcome: 'complete' };
     }
 
     const messages = await loadMimocodeSessionMessages(sessionId, state);
     if (messages.length === 0) {
       this.hydratedKeys.delete(conversation.id);
-      return;
+      // **The silence this outcome exists to replace.** The conversation names
+      // a session and the store has nothing under it: the session was deleted,
+      // the database moved, or it was written by a CLI this machine no longer
+      // has. Until now that was indistinguishable from an empty conversation.
+      return conversation.messages.length > 0
+        ? { outcome: 'stale', reason: 'sessionNotFound' }
+        : { outcome: 'absent' };
     }
 
     conversation.messages = messages;
     this.hydratedKeys.set(conversation.id, hydrationKey);
+    return { outcome: 'complete' };
   }
 
   async deleteConversationSession(

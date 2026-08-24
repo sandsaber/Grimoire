@@ -394,6 +394,9 @@
       "messages": {
         "interrupted": "Interrupted",
         "interruptedHint": "· What should Grimoire do instead?",
+        "historyUnavailable": "This conversation's earlier messages are no longer available — the provider no longer has the session they were saved in.",
+        "historyPartial": "Part of this conversation could not be loaded, so some earlier messages may be missing.",
+        "historyUnreadable": "This conversation's earlier messages could not be read, so what follows may be incomplete.",
         "conversationCompacted": "Conversation compacted",
         "completed": "Baked",
         "duration": "* {flavor} for {duration}",

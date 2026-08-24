@@ -557,7 +557,11 @@ export class ConversationController {
 
     const welcomeEl = renderer.renderMessages(
       state.messages,
-      () => this.getGreeting()
+      () => this.getGreeting(),
+      // What the provider found when this conversation's history was loaded. A
+      // transcript shorter than the conversation says so here rather than
+      // looking like a conversation that was always this short.
+      plugin.getHistoryHydration(conversation.id),
     );
     this.deps.setWelcomeEl(welcomeEl);
   }

@@ -394,6 +394,9 @@
       "messages": {
         "interrupted": "중단됨",
         "interruptedHint": "· 대신 Grimoire가 무엇을 해야 하나요?",
+        "historyUnavailable": "이 대화의 이전 메시지를 더 이상 사용할 수 없습니다. 메시지가 저장된 세션이 공급자에 남아 있지 않습니다.",
+        "historyPartial": "이 대화의 일부를 불러오지 못해 이전 메시지 일부가 누락되었을 수 있습니다.",
+        "historyUnreadable": "이 대화의 이전 메시지를 읽지 못해 이후 내용이 불완전할 수 있습니다.",
         "conversationCompacted": "대화 압축됨",
         "completed": "완료됨",
         "duration": "* {flavor} · {duration}",

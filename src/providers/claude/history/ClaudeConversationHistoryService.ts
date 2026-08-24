@@ -1,3 +1,4 @@
+import type { ProviderHistoryHydration } from '../../../core/providers/ProviderModule';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type { ProviderConversationHistoryService } from '../../../core/providers/types';
 import { isSubagentToolName, TOOL_TASK } from '../../../core/tools/toolNames';
@@ -375,9 +376,13 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
   async hydrateConversationHistory(
     conversation: Conversation,
     vaultPath: string | null,
-  ): Promise<void> {
-    if (!vaultPath || this.hydratedConversationIds.has(conversation.id)) {
-      return;
+  ): Promise<ProviderHistoryHydration> {
+    if (this.hydratedConversationIds.has(conversation.id)) {
+      return { outcome: 'complete' };
+    }
+    if (!vaultPath) {
+      // Nowhere to look. The conversation shows what its own metadata holds.
+      return { outcome: 'absent' };
     }
 
     const state = getClaudeState(conversation.providerState);
@@ -390,7 +395,7 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
         ].filter((id): id is string => !!id);
 
     if (allSessionIds.length === 0) {
-      return;
+      return { outcome: 'absent' };
     }
 
     const allSdkMessages: ChatMessage[] = [];
@@ -448,7 +453,10 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
     const allSessionsMissing = missingSessionCount === allSessionIds.length;
     const hasLoadErrors = errorCount > 0 && successCount === 0 && !allSessionsMissing;
     if (hasLoadErrors) {
-      return;
+      // Every session this conversation names failed to read, and none of them
+      // was simply absent. Nothing is merged, and the conversation is left
+      // showing whatever its metadata holds — which until now it did silently.
+      return { outcome: 'corrupt', reason: 'sessionsUnreadable' };
     }
 
     const filteredSdkMessages = allSdkMessages.filter(msg => !msg.isRebuiltContext);
@@ -470,6 +478,17 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
 
     conversation.messages = merged;
     this.hydratedConversationIds.add(conversation.id);
+
+    // The three counters this method already kept, finally said out loud. A
+    // conversation whose sessions the SDK no longer has is `stale`; one that
+    // lost some of a resumed chain is `partial`.
+    if (allSessionsMissing) {
+      return { outcome: 'stale', reason: 'sessionsNotFound' };
+    }
+    if (missingSessionCount > 0 || errorCount > 0) {
+      return { outcome: 'partial', reason: 'someSessionsUnavailable' };
+    }
+    return { outcome: 'complete' };
   }
 
   async deleteConversationSession(

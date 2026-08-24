@@ -394,6 +394,9 @@
       "messages": {
         "interrupted": "Interrumpido",
         "interruptedHint": "· ¿Qué debería hacer Grimoire en su lugar?",
+        "historyUnavailable": "Los mensajes anteriores de esta conversación ya no están disponibles: el proveedor ya no conserva la sesión en la que se guardaron.",
+        "historyPartial": "No se pudo cargar parte de esta conversación, por lo que pueden faltar algunos mensajes anteriores.",
+        "historyUnreadable": "No se pudieron leer los mensajes anteriores de esta conversación, por lo que lo que sigue puede estar incompleto.",
         "conversationCompacted": "Conversación compactada",
         "completed": "Listo",
         "duration": "* {flavor} durante {duration}",

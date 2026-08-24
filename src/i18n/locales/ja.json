@@ -394,6 +394,9 @@
       "messages": {
         "interrupted": "中断されました",
         "interruptedHint": "· 代わりにGrimoireに何をさせますか？",
+        "historyUnavailable": "この会話の以前のメッセージは利用できなくなりました。保存されていたセッションがプロバイダーに残っていません。",
+        "historyPartial": "この会話の一部を読み込めなかったため、以前のメッセージが欠けている可能性があります。",
+        "historyUnreadable": "この会話の以前のメッセージを読み取れなかったため、以降の内容は不完全な可能性があります。",
         "conversationCompacted": "会話を圧縮しました",
         "completed": "完了",
         "duration": "* {flavor}、{duration}",

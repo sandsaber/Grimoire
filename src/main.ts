@@ -40,6 +40,7 @@ import {
   getRuntimeEnvironmentText,
   setEnvironmentVariablesForScope,
 } from './core/providers/providerEnvironment';
+import type { ProviderHistoryHydration } from './core/providers/ProviderModule';
 import { ProviderRegistry } from './core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from './core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from './core/providers/ProviderWorkspaceRegistry';
@@ -103,6 +104,13 @@ export default class GrimoirePlugin extends Plugin {
   settings!: GrimoireSettings;
   storage!: SharedAppStorage;
   private conversations: Conversation[] = [];
+  /**
+   * What the last hydration of each conversation reported.
+   *
+   * In memory only: it describes what this session found on disk, and a session
+   * that starts again looks again.
+   */
+  private readonly historyHydration = new Map<string, ProviderHistoryHydration>();
   private executionKernelHost: ExecutionKernelHost | null = null;
   private antigravityExecution: AntigravityExecution | null = null;
   private codexExecution: CodexExecution | null = null;
@@ -1098,9 +1106,15 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   private async loadSdkMessagesForConversation(conversation: Conversation): Promise<void> {
-    await ProviderRegistry
+    const hydration = await ProviderRegistry
       .getConversationHistoryService(conversation.providerId)
       .hydrateConversationHistory(conversation, getVaultPath(this.app));
+    // Kept per conversation rather than returned, because the callers that open
+    // one — `switchConversation`, `getConversationById` — hand back the
+    // conversation itself and the surface asks separately. What it is for is a
+    // conversation whose transcript could not be loaded: without this it looks
+    // exactly like a conversation with nothing in it.
+    this.historyHydration.set(conversation.id, hydration);
     applyVaultSearchContextsToMessages(
       conversation.messages,
       conversation.vaultSearchContexts,
@@ -1159,6 +1173,7 @@ export default class GrimoirePlugin extends Plugin {
       .deleteConversationSession(conversation, getVaultPath(this.app));
 
     await this.storage.sessions.deleteMetadata(id);
+    this.historyHydration.delete(id);
 
     for (const view of this.getAllViews()) {
       const tabManager = view.getTabManager();
@@ -1255,6 +1270,16 @@ export default class GrimoirePlugin extends Plugin {
         }
       }
     }
+  }
+
+  /**
+   * What happened the last time this conversation's history was loaded.
+   *
+   * `undefined` before it has been opened. The surface reads this to say why a
+   * transcript is short or empty, which the provider knew and nobody carried.
+   */
+  getHistoryHydration(conversationId: string): ProviderHistoryHydration | undefined {
+    return this.historyHydration.get(conversationId);
   }
 
   async getConversationById(id: string): Promise<Conversation | null> {

@@ -19,6 +19,7 @@ import type {
 } from '../types';
 import type { ProviderId } from '../types/provider';
 import type { ProviderCommandCatalog } from './commands/ProviderCommandCatalog';
+import type { ProviderHistoryHydration } from './ProviderModule';
 
 export type { ProviderId } from '../types/provider';
 
@@ -500,10 +501,19 @@ export interface ProviderWorkspaceRegistration<
 }
 
 export interface ProviderConversationHistoryService {
+  /**
+   * Loads a conversation's transcript from the provider, and says what happened.
+   *
+   * The outcome is the point. Hydration used to answer nothing at all, so a
+   * conversation whose session the provider no longer has looked exactly like a
+   * conversation with nothing in it — the user opened it, saw an empty
+   * transcript, and had no way to tell the difference. `stale` is that case
+   * named.
+   */
   hydrateConversationHistory(
     conversation: Conversation,
     vaultPath: string | null,
-  ): Promise<void>;
+  ): Promise<ProviderHistoryHydration>;
   deleteConversationSession(
     conversation: Conversation,
     vaultPath: string | null,

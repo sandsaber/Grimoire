@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 
+import type { ProviderHistoryHydration } from '../../../core/providers/ProviderModule';
 import type { ProviderConversationHistoryService } from '../../../core/providers/types';
 import type { ChatMessage, Conversation } from '../../../core/types';
 import type { CodexProviderState } from '../types';
@@ -60,30 +61,34 @@ export class CodexConversationHistoryService implements ProviderConversationHist
   async hydrateConversationHistory(
     conversation: Conversation,
     _vaultPath: string | null,
-  ): Promise<void> {
+  ): Promise<ProviderHistoryHydration> {
     const state = getCodexState(conversation.providerState);
     const transcriptRootPath = state.transcriptRootPath
       ?? deriveCodexSessionsRootFromSessionPath(state.sessionFilePath);
 
     // Pending fork with existing in-memory messages: keep them as-is
     if (this.isPendingForkConversation(conversation) && conversation.messages.length > 0) {
-      return;
+      return { outcome: 'complete' };
     }
 
     // Pending fork without messages: hydrate from source transcript truncated at resumeAt
     if (this.isPendingForkConversation(conversation)) {
       const sourceSessionFile = this.resolveSourceSessionFile(state);
-      if (!sourceSessionFile) return;
+      if (!sourceSessionFile) {
+        // The transcript this fork was taken from is not on this machine.
+        return { outcome: 'stale', reason: 'forkSourceNotFound' };
+      }
 
       const turns = readSessionTurns(sourceSessionFile);
       const resumeAt = state.forkSource!.resumeAt;
       const truncated = this.truncateTurnsAtCheckpoint(turns, resumeAt);
       if (!truncated) {
         this.hydratedConversationPaths.delete(conversation.id);
-        return;
+        // The checkpoint this fork was taken at is no longer in the transcript.
+        return { outcome: 'stale', reason: 'forkCheckpointNotFound' };
       }
       conversation.messages = truncated.flatMap(t => t.messages);
-      return;
+      return { outcome: 'complete' };
     }
 
     // Established fork: source prefix + fork-only turns
@@ -103,7 +108,7 @@ export class CodexConversationHistoryService implements ProviderConversationHist
         const sourcePrefix = this.truncateTurnsAtCheckpoint(sourceTurns, resumeAt);
         if (!sourcePrefix) {
           this.hydratedConversationPaths.delete(conversation.id);
-          return;
+          return { outcome: 'stale', reason: 'forkCheckpointNotFound' };
         }
         const sourceTurnIds = new Set(sourceTurns.map(t => t.turnId).filter(Boolean));
         const forkOnlyTurns = forkTurns.filter(t => !t.turnId || !sourceTurnIds.has(t.turnId));
@@ -115,12 +120,14 @@ export class CodexConversationHistoryService implements ProviderConversationHist
 
         if (messages.length === 0) {
           this.hydratedConversationPaths.delete(conversation.id);
-          return;
+          return conversation.messages.length > 0
+            ? { outcome: 'stale', reason: 'sessionNotFound' }
+            : { outcome: 'absent' };
         }
 
         conversation.messages = messages;
         this.hydratedConversationPaths.set(conversation.id, `fork::${state.threadId}`);
-        return;
+        return { outcome: 'complete' };
       }
     }
 
@@ -136,7 +143,11 @@ export class CodexConversationHistoryService implements ProviderConversationHist
 
     if (!sessionFilePath) {
       this.hydratedConversationPaths.delete(conversation.id);
-      return;
+      // A conversation that names a thread with no transcript beside it: the
+      // session was deleted, or it belongs to a machine this vault syncs from.
+      return conversation.messages.length > 0 && threadId
+        ? { outcome: 'stale', reason: 'sessionNotFound' }
+        : { outcome: 'absent' };
     }
 
     const hydrationKey = `${threadId ?? ''}::${sessionFilePath}`;
@@ -144,7 +155,7 @@ export class CodexConversationHistoryService implements ProviderConversationHist
       conversation.messages.length > 0
       && this.hydratedConversationPaths.get(conversation.id) === hydrationKey
     ) {
-      return;
+      return { outcome: 'complete' };
     }
 
     if (sessionFilePath !== state.sessionFilePath) {
@@ -165,11 +176,16 @@ export class CodexConversationHistoryService implements ProviderConversationHist
     const sdkMessages = parseCodexSessionFile(sessionFilePath);
     if (sdkMessages.length === 0) {
       this.hydratedConversationPaths.delete(conversation.id);
-      return;
+      // **The silence this outcome exists to replace.** The transcript file is
+      // there and holds nothing this build can read back as a turn.
+      return conversation.messages.length > 0
+        ? { outcome: 'stale', reason: 'transcriptEmpty' }
+        : { outcome: 'absent' };
     }
 
     conversation.messages = mergeStoredAndHydratedMessages(conversation.messages, sdkMessages);
     this.hydratedConversationPaths.set(conversation.id, hydrationKey);
+    return { outcome: 'complete' };
   }
 
   async deleteConversationSession(

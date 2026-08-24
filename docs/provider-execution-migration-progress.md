@@ -81,7 +81,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — provider control plane | Not started | — |
-| M4 — revisioned persistence in production | In progress — **the conversation save path is routed**: every write goes through the record store, and a writer applies the fields it changed rather than the copy it holds. Typed history hydration remains | `4cf12a1`, this commit |
+| M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
 
@@ -6839,6 +6839,42 @@ outcomes exist to replace. Recorded as an obligation rather than half-built.
 
 Gates: unit 525 suites / 8,202 tests, integration 5 / 149, typecheck, `eslint`, `build:release`.
 
+### M4 closes: hydration says what happened, and the conversation shows it (this commit)
+
+The milestone's second bullet, and the silence M0a characterized: `hydrateConversationHistory`
+answered `void`, so **a conversation whose session the provider no longer has looked exactly like a
+conversation with nothing in it**. The user opened it, saw an empty transcript, and had no way to tell
+the difference.
+
+All nine providers answer `ProviderHistoryHydration` now, and the mapping is not uniform because the
+providers are not. Claude already counted `missingSessionCount`, `errorCount` and `successCount` and
+threw all three away — every session unreadable is `corrupt`, all of them missing is `stale`, some of
+them is `partial`. Codex has four ways to lose a fork's source and each of them is `stale` with its
+own reason. The three no-transcript providers answer `absent`, which is the distinction the surface
+acts on: **a conversation that never had a provider-side history is not one that lost it**, and an
+empty new chat must not be captioned.
+
+**The row is in the conversation, above the first message, where the missing turns would have been.**
+A toast was the cheaper option and the wrong one: a conversation reopened tomorrow is missing exactly
+as much as it is today, so what says so has to be part of it. Three of the six outcomes are shown and
+three are not — `complete` loaded, `absent` had nothing to lose, `recovered` closed the gap.
+
+**Three of six breaks stayed green, and two were gaps rather than gates.** Removing the controller's
+pass-through typechecks, because the parameter is optional — nothing tested the controller. And a
+fork calling a missing session `complete` was invisible, because no test drove the branch where the
+store is asked and answers with nothing. Both are pinned now, the second across all four ACP providers
+at once so the three forks cannot drift.
+
+**A failure I introduced and did not see for three commands.** The controller change made two existing
+tests throw — the plugin double had no `getHistoryHydration` — and I ran `lint`, `build:release` and
+a *filtered* test pattern before the full suite. The break-test that found it was looking for
+something else. Filtered runs are for iterating; the full suite is what says the tree is green.
+
+Copy landed in all ten locales rather than English with nine fallbacks, because the coverage gate
+requires it and because a fallback is the same invisibility this row exists to remove.
+
+Gates: unit 527 suites / 8,240 tests, integration 5 / 151, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7503,8 +7539,10 @@ Open obligations, each with an owner:
   product answer for what resuming into an existing conversation should do;
 - **`loadMetadata` answers a record this build cannot read as "no conversation".** A future or corrupt
   record now has a name — D5's read-only, migration-required state — and nothing surfaces it: the
-  conversation disappears from history exactly as it did before. Owner: M4's typed history hydration,
-  which is the same silence in the same place;
+  conversation disappears from the history list exactly as it did before. **Not closed by the typed
+  hydration commit**, and the reason is worth stating: a hydration outcome is shown *inside* a
+  conversation, and a conversation whose metadata cannot be read never reaches the list to be opened.
+  It needs a surface of its own. Owner: whoever builds the history list's own empty and error states;
 - **awaiting an owner decision: redo.** Recorded as D9 in the persistence decisions. Re-running a
   request is free and needs no new state; undoing a rewind cannot be built on the control store,
   because D2 forbids a second copy of a provider transcript without exception, and the file backup

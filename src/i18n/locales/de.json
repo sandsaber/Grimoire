@@ -394,6 +394,9 @@
       "messages": {
         "interrupted": "Unterbrochen",
         "interruptedHint": "· Was soll Grimoire stattdessen tun?",
+        "historyUnavailable": "Die früheren Nachrichten dieser Unterhaltung sind nicht mehr verfügbar – der Anbieter hat die Sitzung, in der sie gespeichert waren, nicht mehr.",
+        "historyPartial": "Ein Teil dieser Unterhaltung konnte nicht geladen werden, daher fehlen möglicherweise frühere Nachrichten.",
+        "historyUnreadable": "Die früheren Nachrichten dieser Unterhaltung konnten nicht gelesen werden, daher ist das Folgende möglicherweise unvollständig.",
         "conversationCompacted": "Unterhaltung komprimiert",
         "completed": "Fertig",
         "duration": "* {flavor} für {duration}",

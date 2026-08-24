@@ -151,6 +151,58 @@ describe('MessageRenderer', () => {
     expect(welcomeEl.hasClass('grimoire-welcome')).toBe(true);
   });
 
+  describe('the row that says why a transcript is short', () => {
+    /**
+     * A conversation whose history could not be loaded used to look exactly
+     * like a conversation with nothing in it. The provider knew the difference
+     * and nobody carried it; this is where it is finally said.
+     */
+    function noticesFor(hydration?: any): string[] {
+      const { renderer, messagesEl } = createRenderer();
+      jest.spyOn(renderer, 'renderStoredMessage').mockImplementation(() => {});
+      renderer.renderMessages([], () => 'Hello', hydration);
+      return (messagesEl.children as any[])
+        .filter(child => child.hasClass?.('grimoire-history-notice'))
+        .map(child => child.children[0]?.textContent as string);
+    }
+
+    it('says a conversation whose session the provider no longer has', () => {
+      const notices = noticesFor({ outcome: 'stale', reason: 'sessionNotFound' });
+
+      expect(notices).toHaveLength(1);
+      expect(notices[0]).toContain('no longer available');
+    });
+
+    it('says a conversation that loaded only part of its history', () => {
+      const notices = noticesFor({ outcome: 'partial', reason: 'someSessionsUnavailable' });
+
+      expect(notices).toHaveLength(1);
+      expect(notices[0]).toContain('Part of this conversation');
+    });
+
+    it('says a conversation whose transcript could not be read', () => {
+      const notices = noticesFor({ outcome: 'corrupt', reason: 'sessionsUnreadable' });
+
+      expect(notices).toHaveLength(1);
+      expect(notices[0]).toContain('could not be read');
+    });
+
+    it('says nothing about a conversation that loaded', () => {
+      expect(noticesFor({ outcome: 'complete' })).toHaveLength(0);
+    });
+
+    it('says nothing about a new chat', () => {
+      // `absent` is a conversation that never had a provider-side history to
+      // lose. Captioning an empty new chat would be worse than the silence.
+      expect(noticesFor({ outcome: 'absent' })).toHaveLength(0);
+      expect(noticesFor(undefined)).toHaveLength(0);
+    });
+
+    it('says nothing about a gap that was closed', () => {
+      expect(noticesFor({ outcome: 'recovered', reason: 'rebuilt' })).toHaveLength(0);
+    });
+  });
+
   // ============================================
   // renderStoredMessage
   // ============================================

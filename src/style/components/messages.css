@@ -266,6 +266,29 @@
   color: var(--text-muted);
 }
 
+/*
+ * Why a transcript is shorter than the conversation it belongs to.
+ *
+ * Sits above the first message, where the turns that could not be loaded would
+ * have been. Quiet rather than alarming: nothing has gone wrong right now — the
+ * user is simply looking at less than was said, and until this row existed they
+ * had no way to tell.
+ */
+.grimoire-history-notice {
+  display: flex;
+  justify-content: center;
+  padding: var(--size-4-2) var(--size-4-3);
+  margin-bottom: var(--size-4-2);
+}
+
+.grimoire-history-notice-text {
+  max-width: 60ch;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+  text-wrap: pretty;
+}
+
 .grimoire-text-block {
   --grimoire-text-block-inline-end-buffer: 44px;
   position: relative;
