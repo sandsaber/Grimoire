@@ -6882,6 +6882,56 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
+### Where the session of 2026-08-24 ended
+
+**M5's auxiliary checkpoint is closed and M4 is complete.** Six commits: Grok's and Codex's auxiliary
+flips, the model fallback the earlier fork flips had dropped, and M4's three checkpoints.
+
+**No provider owns an auxiliary runner any more.** Claude's auxiliary path is the only one outside the
+kernel and is meant to be — cold by design, its own service rather than a `QueryBacked*` one. The
+runner adapter turned out to know no protocol, only its name did: it is
+`src/app/execution/KernelAuxQueryRunner.ts` now and five providers share it.
+
+**Neither of the last two providers was a fork of the pattern, and both said so before the work
+started.** Grok has no agent definition, so its permission mode rides on the command line, only its
+reading purpose is given a filesystem, and a permission request is refused with the agent's own reject
+option rather than a cancellation — a cancellation ends the turn, which would abandon an inline edit
+instead of telling it no. Codex has neither an agent definition nor a client-side filesystem: every
+property that makes a turn auxiliary is on `thread/start`.
+
+**M4 landed in three checkpoints and the middle one is the load-bearing one.** A writer now writes
+*what it changed* rather than the copy it is holding, which is what stops a background title generator
+from putting back the messages a stream had just appended. The record store's adoption step is what
+lets it read the vaults already in the field: every conversation out there has no envelope at all, and
+D5's schema migration cannot reach a record with no version to migrate from.
+
+**What this session got wrong, twice, in the same shape.** A break-test reverted with
+`git checkout -- <file>` on uncommitted work destroyed a whole change rather than the injected defect,
+and had to be redone from scratch. And a real break survived `lint`, `build:release` and a *filtered*
+test run for three commands before the full suite caught it. Both are now habits rather than
+recollections: back up to a scratch file before breaking, and run the whole project before calling
+anything done.
+
+**Nine breaks stayed green across the session, and every one was a gap rather than a passing gate.**
+The recurring cause is the same one wave 1 recorded: a test that drives one half of a seam cannot see
+the other half being reverted. Assume a green break is a missing test until proven otherwise.
+
+#### What to pick up next, in order
+
+1. **M3 — the provider catalog.** The plan's next milestone and now unblocked: replace the split
+   registries, move the four legacy prompt encoders — `ProviderModule` still has no `prepareTurn` slot,
+   and the adapter routes it through a host port meanwhile — and close the three `src/core/**` modules
+   that import the plugin type, enumerated in `executionCompositionBoundaries.test.ts`.
+2. **Then the rest of M5**: the projections, durable agents, and the seam deletion. Safe to start now
+   in the order the plan gives, because the revisioned saves M5 was said to be unsafe without are live.
+3. **Two obligations from M4**, either of which is a small commit of its own: creating a conversation
+   over an id that already exists still replaces it, and the history list has no error state for a
+   record this build cannot read.
+
+**Still waiting on the owner rather than on code: D9, redo**, unchanged. And certification remains
+account-bound rather than code-bound — Gemini one turn per replenishment, MiMoCode, Kimi Code and Qwen
+not certifiable on this machine.
+
 ### Where the seventh session of 2026-08-23 ended
 
 **Every provider executes through the kernel, every one has a live harness, and every one has a
@@ -6925,7 +6975,7 @@ and nobody had mirrored — the flip carries it away by deleting the file.
 `expect([undefined]).toEqual([])` **passes**. Anywhere a test asserts `toEqual([])` to mean *nothing
 happened*, a call that happened with an undefined argument passes it. Use `toHaveLength(0)`.
 
-### What to pick up tomorrow, in order
+#### What that session left to pick up (all done)
 
 1. **Stop before the projections and decide the order.** The plan puts **M3** (provider catalog) and
    **M4** (revisioned persistence) before the rest of M5, and M4 is not merely earlier but
