@@ -7125,10 +7125,10 @@ Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`)
 
 ### Where the session of 2026-08-25 ended
 
-**M3 is open and seven of its rows have moved.** `ProviderCatalog` is the one validated inventory of
+**M3 is open and eight of its rows have moved.** `ProviderCatalog` is the one validated inventory of
 the nine modules, and `ProviderWorkspaceManager` owns both halves of the workspace lifecycle.
-Registration rows 1, 2, 3, 4, 6 and 7 and app-level row 3 are gone from their old homes; the two
-registries hold what is left.
+Registration rows 1, 2, 3, 4, 6 and 7 and app-level rows 2 and 3 are gone from their old homes; the
+two registries hold what is left.
 
 **Every checkpoint this session found something live, and none of it was found by reading the code
 that changed — it was found by the gate that had to hold the change.**
@@ -7157,24 +7157,50 @@ have switched Gemini's session commands on as a side effect, because `chatSurfac
 `supportsProviderCommands` answer different questions. Recorded as a checked divergence, decided in
 the next commit by giving the descriptor a third command field, then moved.
 
+#### Four target homes the inventory named are wrong, and reading them is why
+
+Written down here because each was found by reading the destination before moving, and each would
+have been an afternoon spent building the wrong seam:
+
+- **Row 14, `historyService`, does not belong in `features(context)`.** The module's `history` port
+  is deliberately *runtime-scoped*: every provider's context answers `null` for a conversation id
+  that is not the tab's own, and Codex's factory says so in a comment — a lookup across the
+  workspace "would answer for a conversation this runtime does not serve". The legacy
+  `historyService` is workspace-global, and its four consumers ask about any conversation. The two
+  are different contracts wearing one name. Its real home is a **workspace slot**, served by the
+  manager, like commands and models;
+- **row 8, `chatUIConfig`, cannot move as `ProviderChatUiContribution` stands.** The legacy
+  interface has twenty-odd members — reasoning options, service-tier and mode toggles, permission
+  mapping, model metadata discovery taking the plugin — against three in the module contribution.
+  Expanding the contribution to match would give `ProviderModule.ts` plugin and UI vocabulary, which
+  its own boundary gate forbids. This row needs a decision about where provider *presentation*
+  lives, not a move;
+- **row 5's slot has no provider filling it.** No module declares `context`, so preloaded context
+  files exist only on the registration today;
+- **app-level row 1, `workspaceCapabilities`, is not `capabilities.workspace`.** The legacy record
+  is five resource kinds each carrying `{ inventory, manager, runtimeCommandDiscovery }`; the
+  descriptor's map is one `CapabilitySupport` per key over a different key set. The richer one
+  cannot be projected from the coarser one.
+
+What *is* still true: `chatUI` is a module-level constant in all nine modules and never reads the
+context, and rows 15 and 16 use the context only for plugin-owned services rather than for the bound
+conversation. So `features(context)` is really two contracts — static provider declarations and
+runtime-scoped ports — and splitting it is the move that unblocks the rest.
+
 #### What to pick up next, in order
 
-1. **The feature resolver, and the design question in it.** Registration rows 5, 8, 14 and 15 all
-   live in `ProviderModule.features(context)`, and the context is built per provider at app level —
-   eight providers have a `create<Provider>ModuleContext(plugin, boundConversation)`, Antigravity
-   needs none. A catalog-level `features(providerId)` implies **one unbound context per provider**,
-   which is fine for history, task results and context files but not for anything reading the bound
-   conversation. Decide where the resolver is assembled — `main.ts`, a new
-   `src/app/execution/ProviderFeatureSource.ts`, or the per-provider execution compositions that
-   already build these contexts — before moving any of the four rows. Row 15
-   (`taskResultInterpreter`, two call sites) is the cheapest one to prove the seam with.
+1. **Split `ProviderFeatureContributions`.** Static declarations (`chatUI`, `context`, `taskResults`,
+   `nativeAgents`) belong on the module itself, with no factory; the runtime-scoped ports
+   (`history`, `rewind`) stay behind `features(context)` and are reached through the adapter that
+   already builds them. That removes the resolver question rather than answering it, and it is what
+   the nine modules already do in practice.
 2. **Row 9, `settingsReconciler`.** Unblocked but not small: `ProviderSettingsCoordinator` projects,
    clones and merges the settings record per provider, and the codec's `reconcile` works on decoded
    provider settings. Re-expressing that is a settings-behaviour risk, so it wants a fresh session
    and its own characterization tests.
-3. **The ten workspace rows and app-level rows 1 and 2**, then delete both registries. Laziness in
-   `ProviderWorkspaceManager` lands with these, since it is the synchronous consumers that force
-   eager initialization today.
+3. **The ten workspace rows, plus row 14 and app-level row 1**, then delete both registries.
+   Laziness in `ProviderWorkspaceManager` lands with these, since it is the synchronous consumers
+   that force eager initialization today.
 4. **Then the rest of M5**: projections, durable agents, seam deletion.
 5. **Two obligations from M4**, each a small commit: creating a conversation over an id that already
    exists still replaces it, and the history list has no error state for a record this build cannot
