@@ -13,7 +13,6 @@ export const opencodeProviderRegistration: ProviderRegistration = {
   createInstructionRefineService: (plugin) => new OpencodeInstructionRefineService(plugin),
   createRuntime: ({ plugin }) => plugin.getOpencodeExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new OpencodeTitleGenerationService(plugin),
-  environmentKeyPatterns: [/^OPENCODE_/i],
   historyService: new OpencodeConversationHistoryService(),
   settingsReconciler: opencodeSettingsReconciler,
   taskResultInterpreter: new OpencodeTaskResultInterpreter(),

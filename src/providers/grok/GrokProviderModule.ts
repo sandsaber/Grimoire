@@ -267,6 +267,8 @@ export const grokSettingsCodec: ProviderSettingsCodec<GrokProviderSettings> = {
     'cliPathsByHost',
   ],
 
+  environmentKeyPrefixes: ['GROK_', 'XAI_'],
+
   reconcile(settings): ProviderSettingsReconcileResult<GrokProviderSettings> {
     const environmentHash = computeEnvironmentHash(settings.environmentVariables);
     const normalized = decodeSettings(this.encode({ ...settings, environmentHash }));

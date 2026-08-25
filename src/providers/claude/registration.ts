@@ -8,7 +8,6 @@ import { ClaudeTaskResultInterpreter } from './runtime/ClaudeTaskResultInterpret
 import { claudeChatUIConfig } from './ui/ClaudeChatUIConfig';
 
 export const claudeProviderRegistration: ProviderRegistration = {
-  environmentKeyPatterns: [/^ANTHROPIC_/i, /^CLAUDE_/i],
   chatUIConfig: claudeChatUIConfig,
   settingsReconciler: claudeSettingsReconciler,
   createRuntime: ({ plugin }) => plugin.getClaudeExecution().createRuntime(),

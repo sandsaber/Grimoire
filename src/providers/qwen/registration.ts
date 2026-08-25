@@ -15,7 +15,6 @@ export const qwenProviderRegistration: ProviderRegistration = {
   createInstructionRefineService: () => new QwenInstructionRefineService(),
   createRuntime: ({ plugin }) => plugin.getQwenExecution().createRuntime(),
   createTitleGenerationService: () => new QwenTitleGenerationService(),
-  environmentKeyPatterns: [/^QWEN_/i, /^DASHSCOPE_/i, /^WEB_SEARCH_/i],
   historyService: new QwenConversationHistoryService(),
   settingsReconciler: qwenSettingsReconciler,
   taskResultInterpreter: new QwenTaskResultInterpreter(),

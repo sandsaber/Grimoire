@@ -281,6 +281,8 @@ export const mimocodeSettingsCodec: ProviderSettingsCodec<MimocodeProviderSettin
     'cliPathsByHost',
   ],
 
+  environmentKeyPrefixes: ['MIMOCODE_'],
+
   reconcile(settings): ProviderSettingsReconcileResult<MimocodeProviderSettings> {
     const environmentHash = computeEnvironmentHash(settings.environmentVariables);
     const normalized = decodeSettings(this.encode({ ...settings, environmentHash }));

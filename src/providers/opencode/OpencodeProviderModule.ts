@@ -269,6 +269,8 @@ export const opencodeSettingsCodec: ProviderSettingsCodec<OpencodeProviderSettin
     'cliPathsByHost',
   ],
 
+  environmentKeyPrefixes: ['OPENCODE_'],
+
   reconcile(settings): ProviderSettingsReconcileResult<OpencodeProviderSettings> {
     const environmentHash = computeEnvironmentHash(settings.environmentVariables);
     const normalized = decodeSettings(this.encode({ ...settings, environmentHash }));

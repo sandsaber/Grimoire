@@ -273,6 +273,8 @@ export const qwenSettingsCodec: ProviderSettingsCodec<QwenProviderSettings> = {
     'cliPathsByHost',
   ],
 
+  environmentKeyPrefixes: ['QWEN_', 'DASHSCOPE_', 'WEB_SEARCH_'],
+
   reconcile(settings): ProviderSettingsReconcileResult<QwenProviderSettings> {
     const environmentHash = computeEnvironmentHash(settings.environmentVariables);
     const normalized = decodeSettings(this.encode({ ...settings, environmentHash }));

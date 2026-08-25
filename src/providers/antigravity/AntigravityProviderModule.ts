@@ -205,6 +205,8 @@ export const antigravitySettingsCodec: ProviderSettingsCodec<AntigravityProvider
   // invalidates the next run rather than a live session.
   runtimeInputKeys: ['environmentVariables', 'environmentHash', 'cliPath', 'cliPathsByHost'],
 
+  environmentKeyPrefixes: ['ANTIGRAVITY_', 'GOOGLE_', 'GEMINI_', 'VERTEX_'],
+
   reconcile(settings): ProviderSettingsReconcileResult<AntigravityProviderSettings> {
     const normalized = decodeSettings(this.encode(settings));
     return {

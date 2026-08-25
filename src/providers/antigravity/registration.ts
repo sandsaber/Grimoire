@@ -18,7 +18,6 @@ export const antigravityProviderRegistration: ProviderRegistration = {
   // other registration stay exactly as they were. Codex followed in wave 2.
   createRuntime: ({ plugin }) => plugin.getAntigravityExecution().createRuntime(),
   createTitleGenerationService: () => new AntigravityTitleGenerationService(),
-  environmentKeyPatterns: [/^ANTIGRAVITY_/i, /^GOOGLE_/i, /^GEMINI_/i, /^VERTEX_/i],
   historyService: new AntigravityConversationHistoryService(),
   settingsReconciler: antigravitySettingsReconciler,
   taskResultInterpreter: new AntigravityTaskResultInterpreter(),

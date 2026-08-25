@@ -13,7 +13,6 @@ export const mimocodeProviderRegistration: ProviderRegistration = {
   createInstructionRefineService: (plugin) => new MimocodeInstructionRefineService(plugin),
   createRuntime: ({ plugin }) => plugin.getMimocodeExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new MimocodeTitleGenerationService(plugin),
-  environmentKeyPatterns: [/^MIMOCODE_/i],
   historyService: new MimocodeConversationHistoryService(),
   settingsReconciler: mimocodeSettingsReconciler,
   taskResultInterpreter: new MimocodeTaskResultInterpreter(),

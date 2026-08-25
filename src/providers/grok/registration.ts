@@ -16,7 +16,6 @@ export const grokProviderRegistration: ProviderRegistration = {
   createInstructionRefineService: (plugin) => new GrokInstructionRefineService(plugin),
   createRuntime: ({ plugin }) => plugin.getGrokExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new GrokTitleGenerationService(plugin),
-  environmentKeyPatterns: [/^GROK_/i, /^XAI_/i],
   historyService: new GrokConversationHistoryService(),
   getPreloadedContextFiles: () => [
     `${GRIMOIRE_STORAGE_PATH}/${GROK_ARTIFACTS_SUBDIR}/system.md`,

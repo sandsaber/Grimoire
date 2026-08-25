@@ -9,7 +9,6 @@ import { codexSubagentLifecycleAdapter } from './normalization/codexSubagentNorm
 import { codexChatUIConfig } from './ui/CodexChatUIConfig';
 
 export const codexProviderRegistration: ProviderRegistration = {
-  environmentKeyPatterns: [/^OPENAI_/i, /^CODEX_/i],
   chatUIConfig: codexChatUIConfig,
   settingsReconciler: codexSettingsReconciler,
   // The second provider flip: chat execution runs through the kernel. Only this

@@ -13,7 +13,6 @@ export const kimicodeProviderRegistration: ProviderRegistration = {
   createInstructionRefineService: (plugin) => new KimicodeInstructionRefineService(plugin),
   createRuntime: ({ plugin }) => plugin.getKimicodeExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new KimicodeTitleGenerationService(plugin),
-  environmentKeyPatterns: [/^KIMICODE_/i],
   historyService: new KimicodeConversationHistoryService(),
   settingsReconciler: kimicodeSettingsReconciler,
   taskResultInterpreter: new KimicodeTaskResultInterpreter(),

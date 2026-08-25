@@ -36,6 +36,7 @@ function testModule(
     isEnabled: (value: TestSettings) => value.enabled,
     withEnabled: (value: TestSettings, enabled: boolean) => ({ ...value, enabled }),
     runtimeInputKeys: ['label'],
+    environmentKeyPrefixes: [`${providerId.toUpperCase()}_`],
     reconcile: (value: TestSettings) => ({
       settings: value,
       changed: false,
@@ -353,6 +354,40 @@ describe('ProviderCatalog', () => {
       catalog.setEnabled(settings, 'one', false);
 
       expect(settings.providerConfigs).toEqual({ one: { enabled: false } });
+    });
+  });
+
+  describe('environment key ownership', () => {
+    it('matches a prefix without caring about case', () => {
+      const catalog = new ProviderCatalog([testModule('one')]);
+
+      expect(catalog.environmentKeyOwner('ONE_API_KEY')).toBe('one');
+      expect(catalog.environmentKeyOwner('one_api_key')).toBe('one');
+      expect(catalog.environmentKeyOwner('  ONE_API_KEY  ')).toBe('one');
+    });
+
+    it('owns nothing it was not given a prefix for', () => {
+      const catalog = new ProviderCatalog([testModule('one')]);
+
+      expect(catalog.environmentKeyOwner('PATH')).toBeNull();
+      expect(catalog.environmentKeyOwner('')).toBeNull();
+      // A prefix, not a substring: a key that merely contains the provider's
+      // name belongs to nobody.
+      expect(catalog.environmentKeyOwner('MY_ONE_KEY')).toBeNull();
+    });
+
+    it('gives a shared prefix to whichever provider is presented first', () => {
+      const shared = (providerId: string, order: number): CatalogProviderModule => {
+        const module = testModule(providerId);
+        return {
+          ...module,
+          manifest: { id: providerId, displayName: providerId, order },
+          settings: { ...module.settings, environmentKeyPrefixes: ['VENDOR_'] },
+        };
+      };
+      const catalog = new ProviderCatalog([shared('later', 20), shared('earlier', 10)]);
+
+      expect(catalog.environmentKeyOwner('VENDOR_TOKEN')).toBe('earlier');
     });
   });
 

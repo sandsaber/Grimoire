@@ -287,6 +287,8 @@ export const kimicodeSettingsCodec: ProviderSettingsCodec<KimicodeProviderSettin
     'cliPathsByHost',
   ],
 
+  environmentKeyPrefixes: ['KIMICODE_'],
+
   reconcile(settings): ProviderSettingsReconcileResult<KimicodeProviderSettings> {
     const environmentHash = computeEnvironmentHash(settings.environmentVariables);
     const normalized = decodeSettings(this.encode({ ...settings, environmentHash }));

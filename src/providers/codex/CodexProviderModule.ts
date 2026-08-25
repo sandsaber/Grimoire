@@ -271,6 +271,8 @@ export const codexSettingsCodec: ProviderSettingsCodec<CodexProviderSettings> = 
     'wslDistroOverridesByHost',
   ],
 
+  environmentKeyPrefixes: ['OPENAI_', 'CODEX_'],
+
   reconcile(settings): ProviderSettingsReconcileResult<CodexProviderSettings> {
     // The saved hash and the environment text that produces it both live in the
     // settings, so the comparison the legacy reconciler makes is available here

@@ -28,7 +28,7 @@ that is produced by `initialize(context)` and needs a live plugin. A provider th
 optional workspace member is caught only by the parity gate, and only if its module leaves the
 bundle.
 
-## `ProviderRegistration` fields (11) — [types.ts:56](../src/core/providers/types.ts)
+## `ProviderRegistration` fields (10) — [types.ts:56](../src/core/providers/types.ts)
 
 Rows that have already moved are not deleted; they are listed under
 [Moved to the provider catalog](#moved-to-the-provider-catalog-5) with where they live now. Row
@@ -38,7 +38,6 @@ plan and this file both refer to rows by number.
 | # | Field | What it carries | Consumed by today | Target home | Moves at |
 |---|---|---|---|---|---|
 | 5 | `getPreloadedContextFiles?` | provider-preloaded context file names | chat context surfaces | context capability port | M3 |
-| 7 | `environmentKeyPatterns?` | env keys that invalidate runtime | settings environment handling | `ProviderSettingsCodec` runtime-input declaration | M3 |
 | 8 | `chatUIConfig` | provider chat UI configuration | chat feature rendering | UI-config feature contribution | M3 |
 | 9 | `settingsReconciler` | settings/model normalization on load and env change | settings load, environment change | `ProviderSettingsCodec` | M3 |
 | 10 | `createRuntime` | chat execution (`ChatRuntime`) | `TabManager` / `Tab` | `ExecutionBackendFactory` behind the presentation adapter | **M2 — this is the flip** |
@@ -75,7 +74,7 @@ fields of either service interface.
 | 1 | `workspaceCapabilities` | `ProviderWorkspaceRegistration.workspaceCapabilities` ([types.ts:484](../src/core/providers/types.ts)) | `ProviderWorkspaceRegistry.getCapabilities()`, settings gating | workspace part of `ProviderCapabilityDescriptor` in the module | M3 |
 | 2 | default provider configs | `getBuiltInProviderDefaultConfigs()` in [defaultProviderConfigs.ts](../src/providers/defaultProviderConfigs.ts), a third source beside the two registries | [defaultSettings.ts](../src/app/settings/defaultSettings.ts) | `ProviderSettingsCodec` defaults, published through the catalog | M3 |
 
-## Moved to their target homes (6)
+## Moved to their target homes (7)
 
 Rows that have reached the home the tables above name for them. They stay recorded here for the
 same reason those tables exist: a contribution that simply disappears from an inventory is
@@ -89,6 +88,7 @@ each table's total still adds up.
 | 3 | `isEnabled` | registration | `ProviderSettingsCodec.isEnabled` | `ProviderCatalog.isEnabled()` / `enabledIds()` | M3 |
 | 4 | `setEnabled` | registration | `ProviderSettingsCodec.withEnabled` | `ProviderCatalog.setEnabled()` | M3 |
 | 6 | `capabilities` | registration | `ProviderCapabilityDescriptor` | `ProviderCatalog.capabilities()`, projected by `toLegacyCapabilities` | M3 |
+| 7 | `environmentKeyPatterns` | registration | `ProviderSettingsCodec.environmentKeyPrefixes` | `ProviderCatalog.environmentKeyOwner()` | M3 |
 | 3 | workspace initialize/dispose lifecycle | app-level | `ProviderWorkspaceContribution`, both halves required | `ProviderWorkspaceManager`, owned by the plugin instance | M3 |
 
 Both moved together, and had to: ordering with the names still on the registration would have left
@@ -114,6 +114,14 @@ the provider that caused it, leaves that provider retryable, and releases everyt
 Initialization is still eager and there is no generation fence: laziness belongs with the move of
 workspace consumers onto the module slots, since every consumer reads its service synchronously
 today, and a fence belongs with the first settings transition that recycles a workspace.
+
+Row 7 arrived at a different home than this table predicted. It named
+`ProviderSettingsCodec`'s runtime-input declaration, but `runtimeInputKeys` are *settings* field
+names and these are *environment variable* names — two questions that happen to sit next to each
+other. It is `environmentKeyPrefixes` now, and prefixes rather than regular expressions: all nine
+registrations wrote `/^PREFIX_/i` and nothing needed more, while a contract taking an arbitrary
+expression has the core run provider-supplied code over every key a user types into their
+environment settings.
 
 ## Rules
 

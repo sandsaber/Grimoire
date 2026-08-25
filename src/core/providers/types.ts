@@ -64,7 +64,6 @@ export interface CreateChatRuntimeOptions {
  */
 export interface ProviderRegistration {
   getPreloadedContextFiles?: () => string[];
-  environmentKeyPatterns?: RegExp[];
   chatUIConfig: ProviderChatUIConfig;
   settingsReconciler: ProviderSettingsReconciler;
   createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => ChatRuntime;

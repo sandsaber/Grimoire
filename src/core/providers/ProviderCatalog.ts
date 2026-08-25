@@ -113,6 +113,31 @@ export class ProviderCatalog {
     return projected;
   }
 
+  /**
+   * The provider that owns an environment variable name, if any.
+   *
+   * First match in presentation order, which is the rule the registry had and
+   * the reason the order matters: Antigravity and Gemini CLI both claim
+   * `GOOGLE_`, `GEMINI_` and `VERTEX_`, and Antigravity sorts first, so those
+   * keys are scoped to Antigravity. Preserved rather than corrected here —
+   * which provider should own a shared vendor prefix is a product question.
+   */
+  environmentKeyOwner(key: string): ProviderId | null {
+    const normalized = key.trim().toUpperCase();
+    if (!normalized) {
+      return null;
+    }
+    for (const module of this.modules) {
+      const owns = module.settings.environmentKeyPrefixes.some(
+        prefix => normalized.startsWith(prefix.toUpperCase()),
+      );
+      if (owns) {
+        return module.manifest.id;
+      }
+    }
+    return null;
+  }
+
   /** Inventory row 3. */
   isEnabled(settings: Record<string, unknown>, providerId: string): boolean {
     const module = this.require(providerId);

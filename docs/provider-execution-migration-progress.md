@@ -80,7 +80,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
-| M3 — provider control plane | In progress — the catalog owns provider identity, ordering, enablement and capability gating, and a workspace manager owns both halves of the workspace lifecycle. Five of the sixteen registration rows and one of the three app-level rows have moved | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, this commit |
+| M3 — provider control plane | In progress — the catalog owns provider identity, ordering, enablement and capability gating, and a workspace manager owns both halves of the workspace lifecycle. Six of the sixteen registration rows and one of the three app-level rows have moved | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
@@ -7073,6 +7073,26 @@ loads and unloads the real plugin; and bypassing the manager in `main.ts` fails 
 that were not written for it.
 
 Gates: unit 525 suites / 8,269 tests, integration 5 / 153, typecheck, `eslint`, `build:release`.
+
+### Environment keys were nine regular expressions saying the same thing (this commit)
+
+Inventory row 7, at a different home than the table predicted. It named `ProviderSettingsCodec`'s
+runtime-input declaration, but `runtimeInputKeys` are *settings* field names and these are
+*environment variable* names — two questions that happened to sit next to each other in the first
+reading. The codec declares `environmentKeyPrefixes` now, and `ProviderCatalog.environmentKeyOwner`
+answers who owns a key.
+
+**Prefixes rather than regular expressions.** All nine registrations wrote `/^PREFIX_/i` and nothing
+ever needed more, while a contract that accepts an arbitrary expression is a contract where the core
+runs provider-supplied code over every key a user types into their environment settings.
+
+**One behaviour is now pinned that was previously an accident of ordering.** Antigravity and Gemini
+CLI both claim `GOOGLE_`, `GEMINI_` and `VERTEX_`, first match in presentation order wins, and
+Antigravity is presented first — so every Google key scopes to Antigravity. That was true before and
+is unchanged; what is new is a test that says so, because reordering the two providers would
+silently rescope every such key a user has already typed.
+
+Gates: unit 525 suites / 8,287 tests, integration 5 / 153, typecheck, `eslint`, `build:release`.
 
 ## Current blocker
 

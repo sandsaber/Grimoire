@@ -15,7 +15,6 @@ export const geminiProviderRegistration: ProviderRegistration = {
   createInstructionRefineService: () => new GeminiInstructionRefineService(),
   createRuntime: ({ plugin }) => plugin.getGeminiExecution().createRuntime(),
   createTitleGenerationService: () => new GeminiTitleGenerationService(),
-  environmentKeyPatterns: [/^GEMINI_/i, /^GOOGLE_/i, /^VERTEX_/i],
   historyService: new GeminiConversationHistoryService(),
   settingsReconciler: geminiSettingsReconciler,
   taskResultInterpreter: new GeminiTaskResultInterpreter(),

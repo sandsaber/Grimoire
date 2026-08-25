@@ -275,6 +275,8 @@ export const claudeSettingsCodec: ProviderSettingsCodec<ClaudeProviderSettings> 
     'loadUserSettings',
   ],
 
+  environmentKeyPrefixes: ['ANTHROPIC_', 'CLAUDE_'],
+
   reconcile(settings): ProviderSettingsReconcileResult<ClaudeProviderSettings> {
     // Claude folds the project settings hash into its environment hash when it
     // respects project settings, so a changed `.claude/settings.json` is an

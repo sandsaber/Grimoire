@@ -290,6 +290,8 @@ export const geminiSettingsCodec: ProviderSettingsCodec<GeminiProviderSettings> 
     'cliPathsByHost',
   ],
 
+  environmentKeyPrefixes: ['GEMINI_', 'GOOGLE_', 'VERTEX_'],
+
   reconcile(settings): ProviderSettingsReconcileResult<GeminiProviderSettings> {
     const environmentHash = computeEnvironmentHash(settings.environmentVariables);
     const normalized = decodeSettings(this.encode({ ...settings, environmentHash }));

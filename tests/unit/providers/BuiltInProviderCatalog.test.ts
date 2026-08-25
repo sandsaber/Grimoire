@@ -81,6 +81,39 @@ describe('built-in provider catalog', () => {
     });
   });
 
+  describe('environment key ownership', () => {
+    it.each([
+      ['ANTHROPIC_API_KEY', 'claude'],
+      ['CLAUDE_CODE_PATH', 'claude'],
+      ['OPENAI_MODEL', 'codex'],
+      ['CODEX_HOME', 'codex'],
+      ['OPENCODE_PORT', 'opencode'],
+      ['XAI_API_KEY', 'grok'],
+      ['MIMOCODE_TOKEN', 'mimocode'],
+      ['KIMICODE_TOKEN', 'kimicode'],
+      ['ANTIGRAVITY_CLI', 'antigravity'],
+      ['DASHSCOPE_API_KEY', 'qwen'],
+      ['WEB_SEARCH_ENDPOINT', 'qwen'],
+    ])('scopes %s to %s', (key, providerId) => {
+      expect(builtInProviderCatalog.environmentKeyOwner(key)).toBe(providerId);
+    });
+
+    it.each(['GOOGLE_API_KEY', 'GEMINI_API_KEY', 'VERTEX_PROJECT'])(
+      'gives %s to Antigravity, which is presented before Gemini CLI',
+      key => {
+        // Both providers claim all three prefixes, and first-in-order wins.
+        // Pinned rather than left implicit: reordering the two would silently
+        // rescope every Google key a user has typed into their settings.
+        expect(builtInProviderCatalog.environmentKeyOwner(key)).toBe('antigravity');
+      },
+    );
+
+    it('leaves a shared key to nobody', () => {
+      expect(builtInProviderCatalog.environmentKeyOwner('PATH')).toBeNull();
+      expect(builtInProviderCatalog.environmentKeyOwner('HTTPS_PROXY')).toBeNull();
+    });
+  });
+
   it('names each provider as the product names it', () => {
     expect(builtInProviderCatalog.list().map(module => module.manifest.displayName)).toEqual([
       'Claude',

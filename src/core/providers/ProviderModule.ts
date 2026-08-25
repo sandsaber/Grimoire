@@ -76,11 +76,25 @@ export interface ProviderSettingsCodec<TSettings extends object = Record<string,
   withEnabled(settings: TSettings, enabled: boolean): TSettings;
 
   /**
-   * Environment keys whose change invalidates a backend generation.
-   * Inventory row 7, declared as data rather than as a regex the core applies
-   * blindly.
+   * Settings fields whose change invalidates a backend generation.
+   *
+   * Declared as data rather than as a predicate the core calls blindly. Note
+   * that these are *settings* field names; the environment variable names a
+   * provider owns are `environmentKeyPrefixes`, which is a different question
+   * and was mapped onto this slot by mistake in the first inventory.
    */
   readonly runtimeInputKeys: readonly string[];
+
+  /**
+   * Environment variable name prefixes this provider owns. Inventory row 7.
+   *
+   * Prefixes rather than the regular expressions this replaces: every one of
+   * the nine was `/^PREFIX_/i` written nine different times, and a contract
+   * that accepts an arbitrary expression is a contract where the core runs
+   * provider-supplied code over every key a user types into their environment
+   * settings. Matching is case-insensitive, on the whole prefix.
+   */
+  readonly environmentKeyPrefixes: readonly string[];
 
   /**
    * Normalization on load and on environment change. Inventory row 9.
