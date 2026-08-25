@@ -517,8 +517,33 @@ export interface ProviderCapabilityDescriptor {
   };
   readonly security: { readonly enforcement: SecurityEnforcement };
   /** Workspace-side capability gating. App-level inventory row 1. */
-  readonly workspace: Readonly<Record<string, CapabilitySupport>>;
+  readonly workspace: ProviderWorkspaceCapabilityMap;
 }
+
+/**
+ * The workspace surfaces a provider can claim.
+ *
+ * This is the one capability field whose keys are data rather than
+ * declarations, and a free-form record made every one of them unverifiable: a
+ * typo — `model`, `cliResolutions` — reads as "unsupported", and the settings
+ * tab silently loses a section with nothing failing. Naming the keys turns that
+ * into a compile error, which is why the catalog does not re-check them at
+ * runtime; a compile-time union needs no runtime guard.
+ */
+export type ProviderWorkspaceCapabilityKey =
+  | 'skills'
+  | 'commands'
+  | 'agents'
+  | 'mcp'
+  | 'cliResolution'
+  | 'models'
+  | 'usage'
+  | 'environment';
+
+/** Absent means unsupported here too, so a provider declares only what it has. */
+export type ProviderWorkspaceCapabilityMap = Readonly<
+  Partial<Record<ProviderWorkspaceCapabilityKey, CapabilitySupport>>
+>;
 
 // ---------------------------------------------------------------------------
 // The module

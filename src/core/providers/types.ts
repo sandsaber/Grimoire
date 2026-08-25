@@ -55,9 +55,14 @@ export interface CreateChatRuntimeOptions {
  * Provider-owned workspace services (CLI resolution, commands, agents,
  * MCP, settings tabs) live behind `src/providers/<id>/app/`.
  */
+/**
+ * What a provider still registers outside the catalog.
+ *
+ * Shrinking rather than growing: identity and ordering moved to
+ * `ProviderManifest` at M3 and are no longer declared here, so the two
+ * inventories cannot disagree about a provider's name or its place in a list.
+ */
 export interface ProviderRegistration {
-  displayName: string;
-  blankTabOrder: number;
   isEnabled: (settings: Record<string, unknown>) => boolean;
   setEnabled: (settings: Record<string, unknown>, enabled: boolean) => void;
   getPreloadedContextFiles?: () => string[];

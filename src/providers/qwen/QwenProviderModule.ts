@@ -295,7 +295,7 @@ QwenProviderSettings
   manifest: {
     id: 'qwen',
     displayName: 'Qwen Code',
-    order: 80,
+    order: 90,
   },
 
   settings: qwenSettingsCodec,

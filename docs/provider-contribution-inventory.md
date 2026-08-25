@@ -28,12 +28,15 @@ that is produced by `initialize(context)` and needs a live plugin. A provider th
 optional workspace member is caught only by the parity gate, and only if its module leaves the
 bundle.
 
-## `ProviderRegistration` fields (16) — [types.ts:56](../src/core/providers/types.ts)
+## `ProviderRegistration` fields (14) — [types.ts:56](../src/core/providers/types.ts)
+
+Rows that have already moved are not deleted; they are listed under
+[Moved to the provider catalog](#moved-to-the-provider-catalog-2) with where they live now. Row
+numbers are stable: a moved row leaves a gap rather than renumbering the rows below it, because the
+plan and this file both refer to rows by number.
 
 | # | Field | What it carries | Consumed by today | Target home | Moves at |
 |---|---|---|---|---|---|
-| 1 | `displayName` | provider identity label | settings UI, tab labels, pickers | `ProviderManifest` | M3 |
-| 2 | `blankTabOrder` | deterministic provider ordering | blank tab, settings ordering | `ProviderManifest` | M3 |
 | 3 | `isEnabled` | enablement predicate over settings | view, settings, tab creation | `ProviderSettingsCodec` | M3 |
 | 4 | `setEnabled` | enablement writer | settings toggles | `ProviderSettingsCodec` | M3 |
 | 5 | `getPreloadedContextFiles?` | provider-preloaded context file names | chat context surfaces | context capability port | M3 |
@@ -75,6 +78,22 @@ fields of either service interface.
 | 1 | `workspaceCapabilities` | `ProviderWorkspaceRegistration.workspaceCapabilities` ([types.ts:484](../src/core/providers/types.ts)) | `ProviderWorkspaceRegistry.getCapabilities()`, settings gating | workspace part of `ProviderCapabilityDescriptor` in the module | M3 |
 | 2 | default provider configs | `getBuiltInProviderDefaultConfigs()` in [defaultProviderConfigs.ts](../src/providers/defaultProviderConfigs.ts), a third source beside the two registries | [defaultSettings.ts](../src/app/settings/defaultSettings.ts) | `ProviderSettingsCodec` defaults, published through the catalog | M3 |
 | 3 | workspace initialize/dispose lifecycle | `ProviderWorkspaceRegistry.initializeAll()` at plugin load; **no dispose contract exists today** | `main.ts` startup | lazy, failure-isolated init plus asynchronous dispose in the workspace manager — both halves land together; "init without dispose" is the v1 defect repeating | M3 |
+
+## Moved to the provider catalog (2)
+
+Rows that have left `ProviderRegistration` for a `ProviderModule` slot. They stay recorded here for
+the same reason the tables above exist: a contribution that simply disappears from the inventory is
+indistinguishable from one that was dropped.
+
+| # | Field | What it carried | Now declared by | Read through | Moved at |
+|---|---|---|---|---|---|
+| 1 | `displayName` | provider identity label | `ProviderManifest.displayName` | `ProviderCatalog.displayName()` / `displayNameOrId()` | M3 |
+| 2 | `blankTabOrder` | deterministic provider ordering | `ProviderManifest.order` | `ProviderCatalog.ids()`, which sorts by it | M3 |
+
+Both moved together, and had to: ordering with the names still on the registration would have left
+two inventories able to disagree about the same provider — which they already did. Three modules
+reached M3 declaring the `manifest.order` of the provider they were forked from, and nothing
+compared the two, because nothing could. The catalog now refuses a duplicate order outright.
 
 ## Rules
 

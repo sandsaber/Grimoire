@@ -1,5 +1,6 @@
 import '@/providers';
 
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import type { Conversation } from '@/core/types';
 import type { ProviderId } from '@/core/types/provider';
@@ -16,7 +17,7 @@ import type { ProviderId } from '@/core/types/provider';
 describe('history hydration outcomes', () => {
   const OUTCOMES = ['absent', 'complete', 'partial', 'stale', 'corrupt', 'recovered'];
 
-  const providerIds = ProviderRegistry.getRegisteredProviderIds();
+  const providerIds = providerCatalog().ids();
 
   it('has providers to check', () => {
     // Guards the guard: an empty registry would make every case below vacuous.

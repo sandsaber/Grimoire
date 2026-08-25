@@ -52,11 +52,11 @@ describe('Kimi Code provider module', () => {
     );
   }
 
-  it('declares its identity and ordering from the registration it replaces', () => {
+  it('declares its identity and ordering', () => {
     expect(kimicodeProviderModule.manifest).toEqual({
       id: 'kimicode',
       displayName: 'Kimi Code',
-      order: 30,
+      order: 60,
     });
   });
 

@@ -1,3 +1,5 @@
+import '@/providers';
+
 import { OpencodeMetadataSession } from '@/app/execution/opencode/OpencodeMetadataSession';
 import type {
   ManagedAcpClient,

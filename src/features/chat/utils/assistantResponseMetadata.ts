@@ -1,3 +1,4 @@
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import type { ProviderId } from '../../../core/providers/types';
 import type { AssistantResponseMetadata } from '../../../core/types';
@@ -16,7 +17,7 @@ const CHAT_PROVIDER_LABELS: Record<string, string> = {
 };
 
 export function getAssistantResponseProviderLabel(providerId: ProviderId): string {
-  return CHAT_PROVIDER_LABELS[providerId] ?? ProviderRegistry.getProviderDisplayName(providerId);
+  return CHAT_PROVIDER_LABELS[providerId] ?? providerCatalog().displayName(providerId);
 }
 
 function normalizeDisplayString(value: unknown): string | undefined {

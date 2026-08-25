@@ -13,14 +13,12 @@ import { getGrokProviderSettings, updateGrokProviderSettings } from './settings'
 import { grokChatUIConfig } from './ui/GrokChatUIConfig';
 
 export const grokProviderRegistration: ProviderRegistration = {
-  blankTabOrder: 40,
   capabilities: GROK_PROVIDER_CAPABILITIES,
   chatUIConfig: grokChatUIConfig,
   createInlineEditService: (plugin) => new GrokInlineEditService(plugin),
   createInstructionRefineService: (plugin) => new GrokInstructionRefineService(plugin),
   createRuntime: ({ plugin }) => plugin.getGrokExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new GrokTitleGenerationService(plugin),
-  displayName: 'Grok Build',
   environmentKeyPatterns: [/^GROK_/i, /^XAI_/i],
   historyService: new GrokConversationHistoryService(),
   isEnabled: (settings) => getGrokProviderSettings(settings).enabled,

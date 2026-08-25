@@ -54,11 +54,11 @@ describe('Qwen provider module', () => {
     );
   }
 
-  it('declares its identity and ordering from the registration it replaces', () => {
+  it('declares its identity and ordering', () => {
     expect(qwenProviderModule.manifest).toEqual({
       id: 'qwen',
       displayName: 'Qwen Code',
-      order: 80,
+      order: 90,
     });
   });
 

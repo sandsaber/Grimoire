@@ -10,8 +10,6 @@ import { getClaudeProviderSettings, updateClaudeProviderSettings } from './setti
 import { claudeChatUIConfig } from './ui/ClaudeChatUIConfig';
 
 export const claudeProviderRegistration: ProviderRegistration = {
-  displayName: 'Claude',
-  blankTabOrder: 10,
   isEnabled: (settings) => getClaudeProviderSettings(settings).enabled,
   setEnabled: (settings, enabled) => { updateClaudeProviderSettings(settings, { enabled }); },
   capabilities: CLAUDE_PROVIDER_CAPABILITIES,

@@ -1,5 +1,6 @@
 import type GrimoirePlugin from '../../main';
 import type { ChatRuntime } from '../runtime/ChatRuntime';
+import { providerCatalog } from './ProviderCatalog';
 import {
   type CreateChatRuntimeOptions,
   DEFAULT_CHAT_PROVIDER_ID,
@@ -23,6 +24,11 @@ import {
  * Bootstrap concerns (default settings, shared storage, CLI resolution,
  * workspace command/agent services) are composed explicitly in `main.ts`
  * through `src/core/bootstrap/` and `src/providers/<id>/app/`.
+ *
+ * Which providers exist, what they are called, and what order they appear in
+ * are no longer questions this class answers: the catalog owns them, and a
+ * registration for a provider the catalog does not hold is refused rather than
+ * kept as a second inventory.
  */
 export class ProviderRegistry {
   private static registrations: Partial<Record<ProviderId, ProviderRegistration>> = {};
@@ -31,6 +37,9 @@ export class ProviderRegistry {
     providerId: ProviderId,
     registration: ProviderRegistration,
   ): void {
+    if (!providerCatalog().get(providerId)) {
+      throw new Error(`Provider "${providerId}" is not in the catalog.`);
+    }
     this.registrations[providerId] = registration;
   }
 
@@ -110,36 +119,9 @@ export class ProviderRegistry {
     return this.getProviderRegistration(providerId).settingsReconciler;
   }
 
-  static getRegisteredProviderIds(): ProviderId[] {
-    return Object.keys(this.registrations)
-      .sort((left, right) => this.compareProviderTabOrder(left, right));
-  }
-
-  static isRegisteredProviderId(value: unknown): value is ProviderId {
-    return typeof value === 'string' && this.registrations[value] !== undefined;
-  }
-
   static getEnabledProviderIds(settings: Record<string, unknown>): ProviderId[] {
-    return this.getRegisteredProviderIds()
+    return [...providerCatalog().ids()]
       .filter(providerId => this.getProviderRegistration(providerId).isEnabled(settings));
-  }
-
-  private static compareProviderTabOrder(left: ProviderId, right: ProviderId): number {
-    const orderDiff = this.getProviderRegistration(left).blankTabOrder
-      - this.getProviderRegistration(right).blankTabOrder;
-    if (orderDiff !== 0) {
-      return orderDiff;
-    }
-
-    return left.localeCompare(right);
-  }
-
-  static getProviderDisplayName(providerId: ProviderId): string {
-    return this.getProviderRegistration(providerId).displayName;
-  }
-
-  static getProviderDisplayNameOrId(providerId: string): string {
-    return this.registrations[providerId]?.displayName ?? providerId;
   }
 
   static getPreloadedContextFiles(providerId: ProviderId): string[] {
@@ -155,25 +137,18 @@ export class ProviderRegistry {
   }
 
   static resolveSettingsProviderId(settings: Record<string, unknown>): ProviderId {
+    const catalog = providerCatalog();
     const current = settings.settingsProvider;
     if (typeof current === 'string') {
       const currentProvider = current;
-      if (
-        this.getRegisteredProviderIds().includes(currentProvider)
-        && this.isEnabled(currentProvider, settings)
-      ) {
+      if (catalog.has(currentProvider) && this.isEnabled(currentProvider, settings)) {
         return currentProvider;
       }
     }
 
     const enabledProviderIds = this.getEnabledProviderIds(settings);
     if (enabledProviderIds.length === 0) {
-      return (
-        typeof current === 'string'
-        && this.getRegisteredProviderIds().includes(current)
-      )
-        ? current
-        : DEFAULT_CHAT_PROVIDER_ID;
+      return catalog.has(current) ? current : DEFAULT_CHAT_PROVIDER_ID;
     }
 
     if (this.isEnabled(DEFAULT_CHAT_PROVIDER_ID, settings)) {
@@ -193,7 +168,7 @@ export class ProviderRegistry {
   ): ProviderId {
     const providerIds = options.onlyEnabledProviders
       ? this.getEnabledProviderIds(settings)
-      : this.getRegisteredProviderIds();
+      : providerCatalog().ids();
     const fallbackProviderId = (
       options.fallbackProviderId
       && (!options.onlyEnabledProviders || this.isEnabled(options.fallbackProviderId, settings))
@@ -220,7 +195,7 @@ export class ProviderRegistry {
 
   static getCustomModelIds(envVars: Record<string, string>): Set<string> {
     const ids = new Set<string>();
-    for (const providerId of this.getRegisteredProviderIds()) {
+    for (const providerId of providerCatalog().ids()) {
       for (const modelId of this.getChatUIConfig(providerId).getCustomModelIds(envVars)) {
         ids.add(modelId);
       }

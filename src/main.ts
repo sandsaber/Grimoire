@@ -35,6 +35,7 @@ import {
 } from './core/bootstrap/SessionStorage';
 import type { SharedAppStorage } from './core/bootstrap/storage';
 import { type DebugLogEvent, DebugLogService } from './core/debug/DebugLogService';
+import { providerCatalog } from './core/providers/ProviderCatalog';
 import {
   getEnvironmentVariablesForScope as getScopedEnvironmentVariables,
   getRuntimeEnvironmentText,
@@ -136,7 +137,7 @@ export default class GrimoirePlugin extends Plugin {
       await ProviderWorkspaceRegistry.initializeAll(this);
       await this.writeDebugLog({
         data: {
-          providerCount: ProviderRegistry.getRegisteredProviderIds().length,
+          providerCount: providerCatalog().ids().length,
         },
         event: 'loaded',
         level: 'info',
@@ -1051,7 +1052,9 @@ export default class GrimoirePlugin extends Plugin {
     return cliResolver.resolveFromSettings(this.settings);
   }
 
-  private reconcileModelWithEnvironment(providerIds: ProviderId[] = ProviderRegistry.getRegisteredProviderIds()): {
+  private reconcileModelWithEnvironment(
+    providerIds: readonly ProviderId[] = providerCatalog().ids(),
+  ): {
     changed: boolean;
     invalidatedConversations: Conversation[];
   } {
@@ -1063,7 +1066,7 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   private getAffectedEnvironmentProviders(scopes: EnvironmentScope[]): ProviderId[] {
-    const registeredProviderIds = new Set(ProviderRegistry.getRegisteredProviderIds());
+    const registeredProviderIds = new Set(providerCatalog().ids());
     const affectedProviderIds = new Set<ProviderId>();
 
     for (const scope of scopes) {
@@ -1358,7 +1361,7 @@ export default class GrimoirePlugin extends Plugin {
   private getConversationModelLabel(conversation: Conversation): string | undefined {
     const model = conversation.usage?.model?.trim();
     if (!model) {
-      return ProviderRegistry.getProviderDisplayName(conversation.providerId);
+      return providerCatalog().displayName(conversation.providerId);
     }
 
     const uiConfig = ProviderRegistry.getChatUIConfig(conversation.providerId);

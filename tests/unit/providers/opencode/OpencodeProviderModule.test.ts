@@ -52,7 +52,7 @@ describe('OpenCode provider module', () => {
     );
   }
 
-  it('declares its identity and ordering from the registration it replaces', () => {
+  it('declares its identity and ordering', () => {
     expect(opencodeProviderModule.manifest).toEqual({
       id: 'opencode',
       displayName: 'OpenCode',

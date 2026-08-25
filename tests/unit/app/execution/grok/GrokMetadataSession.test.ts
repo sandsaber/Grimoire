@@ -1,3 +1,5 @@
+import '@/providers';
+
 import { GrokMetadataSession } from '@/app/execution/grok/GrokMetadataSession';
 import type {
   ManagedAcpClient,

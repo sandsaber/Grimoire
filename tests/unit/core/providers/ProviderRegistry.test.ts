@@ -4,6 +4,7 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 
 import { CodexExecution } from '@/app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import type {
@@ -129,20 +130,6 @@ describe('ProviderRegistry', () => {
     expect(caps.reasoningControl).toBe('effort');
   });
 
-  it('lists registered provider ids in settings tab order', () => {
-    expect(ProviderRegistry.getRegisteredProviderIds()).toEqual([
-      'claude',
-      'codex',
-      'opencode',
-      'grok',
-      'mimocode',
-      'kimicode',
-      'antigravity',
-      'gemini',
-      'qwen',
-    ]);
-  });
-
   it('filters enabled provider ids using registration metadata', () => {
     expect(ProviderRegistry.getEnabledProviderIds({
       providerConfigs: {
@@ -183,23 +170,18 @@ describe('ProviderRegistry', () => {
     ]);
   });
 
-  it('returns the display name from provider registration metadata', () => {
-    expect(ProviderRegistry.getProviderDisplayName('claude')).toBe('Claude');
-    expect(ProviderRegistry.getProviderDisplayName('codex')).toBe('Codex');
-  });
-
-  it('validates opaque provider ids and preserves unknown display labels', () => {
-    expect(ProviderRegistry.isRegisteredProviderId('grok')).toBe(true);
-    expect(ProviderRegistry.isRegisteredProviderId('unknown')).toBe(false);
-    expect(ProviderRegistry.isRegisteredProviderId(null)).toBe(false);
-    expect(ProviderRegistry.getProviderDisplayNameOrId('mimocode')).toBe('MiMoCode');
-    expect(ProviderRegistry.getProviderDisplayNameOrId('future-provider')).toBe('future-provider');
+  it('refuses a registration for a provider the catalog does not hold', () => {
+    // The registry is no longer an inventory. A registration for an id the
+    // catalog never heard of used to create a tenth provider that appeared in
+    // nothing and answered for nothing.
+    expect(() => ProviderRegistry.register('ghost', {} as never))
+      .toThrow('Provider "ghost" is not in the catalog.');
   });
 
   it('routes enablement updates through every provider registration', () => {
     const settings: Record<string, unknown> = {};
 
-    for (const providerId of ProviderRegistry.getRegisteredProviderIds()) {
+    for (const providerId of providerCatalog().ids()) {
       ProviderRegistry.setEnabled(providerId, settings, true);
       expect(ProviderRegistry.isEnabled(providerId, settings)).toBe(true);
       ProviderRegistry.setEnabled(providerId, settings, false);

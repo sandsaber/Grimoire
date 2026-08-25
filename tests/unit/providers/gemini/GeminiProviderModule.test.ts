@@ -51,7 +51,7 @@ describe('Gemini provider module', () => {
     );
   }
 
-  it('declares its identity and ordering from the registration it replaces', () => {
+  it('declares its identity and ordering', () => {
     expect(geminiProviderModule.manifest).toEqual({
       id: 'gemini',
       // Google replaced this CLI with Antigravity; the adapter is current.

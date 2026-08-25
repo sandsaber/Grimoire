@@ -1,5 +1,6 @@
 import '@/providers';
 
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { geminiWorkspaceRegistration } from '@/providers/gemini/app/GeminiWorkspaceServices';
 import { getGeminiProviderSettings, updateGeminiProviderSettings } from '@/providers/gemini/settings';
@@ -10,8 +11,8 @@ describe('Gemini provider registration', () => {
   });
 
   it('registers Gemini as an opt-in provider', () => {
-    expect(ProviderRegistry.getRegisteredProviderIds()).toContain('gemini');
-    expect(ProviderRegistry.getProviderDisplayName('gemini')).toBe('Gemini CLI (Legacy)');
+    expect(providerCatalog().ids()).toContain('gemini');
+    expect(providerCatalog().displayName('gemini')).toBe('Gemini CLI (Legacy)');
     expect(ProviderRegistry.isEnabled('gemini', {})).toBe(false);
 
     const settings: Record<string, unknown> = {};

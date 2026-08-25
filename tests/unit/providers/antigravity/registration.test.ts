@@ -4,6 +4,7 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 
 import { AntigravityExecution } from '@/app/execution/antigravity/AntigravityExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { antigravityWorkspaceRegistration } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
@@ -23,8 +24,8 @@ describe('Antigravity provider registration', () => {
   });
 
   it('registers Antigravity as an opt-in provider', () => {
-    expect(ProviderRegistry.getRegisteredProviderIds()).toContain('antigravity');
-    expect(ProviderRegistry.getProviderDisplayName('antigravity')).toBe('Antigravity');
+    expect(providerCatalog().ids()).toContain('antigravity');
+    expect(providerCatalog().displayName('antigravity')).toBe('Antigravity');
     expect(ProviderRegistry.isEnabled('antigravity', {})).toBe(false);
 
     const settings: Record<string, unknown> = {};

@@ -12,6 +12,7 @@ import {
 import { tokenizeSearchText } from '../../../core/context/text';
 import type { ProjectWorkspace } from '../../../core/context/types';
 import type { VaultSearchService } from '../../../core/context/VaultSearchService';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import {
   DEFAULT_CHAT_PROVIDER_ID,
@@ -598,7 +599,7 @@ export class InputController {
       const providerId = this.getActiveProviderId();
       const errorMsg = normalizeProviderError(
         rawErrorMessage,
-        ProviderRegistry.getProviderDisplayName(providerId),
+        providerCatalog().displayName(providerId),
       ).message;
       await streamController.appendText(
         `\n\n**${t('chat.ui.messages.errorLabel')}:** ${errorMsg}`,
@@ -1072,7 +1073,7 @@ export class InputController {
 
     if (requestedProviderId) {
       if (
-        !ProviderRegistry.getRegisteredProviderIds().includes(requestedProviderId)
+        !providerCatalog().ids().includes(requestedProviderId)
         || !ProviderRegistry.isEnabled(requestedProviderId, settings)
       ) {
         throw new ProjectWorkspaceRoutingError(
@@ -1089,7 +1090,7 @@ export class InputController {
       });
       if (requestedProviderId && modelProviderId !== targetProviderId) {
         throw new ProjectWorkspaceRoutingError(
-          `Project workspace model "${requestedModel}" belongs to ${ProviderRegistry.getProviderDisplayName(modelProviderId)}, not ${ProviderRegistry.getProviderDisplayName(targetProviderId)}.`,
+          `Project workspace model "${requestedModel}" belongs to ${providerCatalog().displayName(modelProviderId)}, not ${providerCatalog().displayName(targetProviderId)}.`,
         );
       }
       targetProviderId = requestedProviderId ?? modelProviderId;
@@ -1109,13 +1110,13 @@ export class InputController {
             return requestedModel ? { model: requestedModel } : undefined;
           }
           throw new ProjectWorkspaceRoutingError(
-            `Project workspace uses ${ProviderRegistry.getProviderDisplayName(targetProviderId)}, but this session is bound to ${ProviderRegistry.getProviderDisplayName(activeProviderId)}. Start a new session or choose a matching workspace provider.`,
+            `Project workspace uses ${providerCatalog().displayName(targetProviderId)}, but this session is bound to ${providerCatalog().displayName(activeProviderId)}. Start a new session or choose a matching workspace provider.`,
           );
         });
       }
 
       throw new ProjectWorkspaceRoutingError(
-        `Project workspace uses ${ProviderRegistry.getProviderDisplayName(targetProviderId)}, but this session is bound to ${ProviderRegistry.getProviderDisplayName(activeProviderId)}. Start a new session or choose a matching workspace provider.`,
+        `Project workspace uses ${providerCatalog().displayName(targetProviderId)}, but this session is bound to ${providerCatalog().displayName(activeProviderId)}. Start a new session or choose a matching workspace provider.`,
       );
     }
 

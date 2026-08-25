@@ -1,4 +1,5 @@
 import { parseEnvironmentVariables } from '../../utils/env';
+import { providerCatalog } from './ProviderCatalog';
 import { getProviderConfig, setProviderConfig } from './providerConfig';
 import { ProviderRegistry } from './ProviderRegistry';
 import type { ProviderId } from './types';
@@ -50,7 +51,7 @@ function classifyEnvironmentKey(key: string): EnvironmentKeyOwnership {
     return { type: 'shared-known' };
   }
 
-  for (const providerId of ProviderRegistry.getRegisteredProviderIds()) {
+  for (const providerId of providerCatalog().ids()) {
     const patterns = ProviderRegistry.getEnvironmentKeyPatterns(providerId);
     if (patterns.some((pattern) => pattern.test(normalized))) {
       return { type: 'provider', providerId };

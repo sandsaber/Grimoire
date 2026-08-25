@@ -1,5 +1,6 @@
 import { Notice, setIcon, TFile } from 'obsidian';
 
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import type { ProviderId } from '../../../core/providers/types';
 import { t } from '../../../i18n/i18n';
@@ -90,7 +91,7 @@ export function syncContextSummary(tab: TabData, plugin: GrimoirePlugin): void {
 
   const providerId = getTabProviderId(tab, plugin);
   const settings = getTabSettingsSnapshot(tab, plugin);
-  const providerName = ProviderRegistry.getProviderDisplayName(providerId);
+  const providerName = providerCatalog().displayName(providerId);
   const reasoningLabel = getReasoningLabel(settings);
   const currentPath = tab.ui.fileContextManager?.getCurrentNotePath() ?? '';
 

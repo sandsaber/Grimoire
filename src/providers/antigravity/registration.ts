@@ -12,7 +12,6 @@ import { getAntigravityProviderSettings, updateAntigravityProviderSettings } fro
 import { antigravityChatUIConfig } from './ui/AntigravityChatUIConfig';
 
 export const antigravityProviderRegistration: ProviderRegistration = {
-  blankTabOrder: 70,
   capabilities: ANTIGRAVITY_PROVIDER_CAPABILITIES,
   chatUIConfig: antigravityChatUIConfig,
   createInlineEditService: () => new AntigravityInlineEditService(),
@@ -22,7 +21,6 @@ export const antigravityProviderRegistration: ProviderRegistration = {
   // other registration stay exactly as they were. Codex followed in wave 2.
   createRuntime: ({ plugin }) => plugin.getAntigravityExecution().createRuntime(),
   createTitleGenerationService: () => new AntigravityTitleGenerationService(),
-  displayName: 'Antigravity',
   environmentKeyPatterns: [/^ANTIGRAVITY_/i, /^GOOGLE_/i, /^GEMINI_/i, /^VERTEX_/i],
   historyService: new AntigravityConversationHistoryService(),
   isEnabled: (settings) => getAntigravityProviderSettings(settings).enabled,

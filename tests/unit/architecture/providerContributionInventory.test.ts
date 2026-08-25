@@ -100,13 +100,29 @@ describe('provider contribution inventory', () => {
   describe('ProviderRegistration table', () => {
     const documented = readInventoryRows('## `ProviderRegistration` fields');
     const declared = readInterfaceMembers(TYPES_PATH, 'ProviderRegistration');
+    const moved = readInventoryRows('## Moved to the provider catalog');
 
     it('documents exactly the declared fields', () => {
       expect([...documented].sort()).toEqual([...declared].sort());
     });
 
     it('claims the count the heading advertises', () => {
-      expect(documented).toHaveLength(16);
+      expect(documented).toHaveLength(14);
+    });
+
+    it('accounts for every field the registration ever declared', () => {
+      // A row that moves leaves the table above and appears in the moved one.
+      // Without this the inventory shrinks silently, which is the same failure
+      // as a contribution disappearing — the thing this file exists to catch.
+      expect(documented.length + moved.length).toBe(16);
+    });
+
+    it('does not leave a moved row in both tables', () => {
+      expect(moved.filter(field => documented.includes(field))).toEqual([]);
+    });
+
+    it('records where each moved row went', () => {
+      expect(moved).toEqual(['displayName', 'blankTabOrder']);
     });
 
     it.each(Object.entries(REGISTRATIONS))(

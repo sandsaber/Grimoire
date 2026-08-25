@@ -1,5 +1,6 @@
 import type { Conversation } from '../types';
 import { coercePermissionMode } from '../types/settings';
+import { providerCatalog } from './ProviderCatalog';
 import { ProviderRegistry } from './ProviderRegistry';
 import type { ProviderChatUIConfig, ProviderId } from './types';
 
@@ -127,7 +128,7 @@ export class ProviderSettingsCoordinator {
       return false;
     }
 
-    const isValid = ProviderRegistry.getRegisteredProviderIds().some((providerId) =>
+    const isValid = providerCatalog().ids().some((providerId) =>
       ProviderRegistry.getChatUIConfig(providerId)
         .getModelOptions(settings)
         .some((option) => option.value === currentModel)
@@ -237,7 +238,7 @@ export class ProviderSettingsCoordinator {
     const currentBudget = typeof settings.thinkingBudget === 'string' ? settings.thinkingBudget : undefined;
     const modelOptions = uiConfig.getModelOptions(settings);
     const isDefaultModelOfAnotherProvider = currentModel.length > 0
-      && ProviderRegistry.getRegisteredProviderIds()
+      && providerCatalog().ids()
         .filter(id => id !== providerId)
         .some(id => ProviderRegistry.getChatUIConfig(id).isDefaultModel(currentModel));
     const canReuseCurrentModel = currentModel.length > 0
@@ -338,14 +339,14 @@ export class ProviderSettingsCoordinator {
     return this.reconcileProviders(
       settings,
       conversations,
-      ProviderRegistry.getRegisteredProviderIds(),
+      providerCatalog().ids(),
     );
   }
 
   static reconcileProviders(
     settings: Record<string, unknown>,
     conversations: Conversation[],
-    providerIds: ProviderId[],
+    providerIds: readonly ProviderId[],
   ): SettingsReconciliationResult {
     let anyChanged = false;
     const allInvalidated: Conversation[] = [];
@@ -388,7 +389,7 @@ export class ProviderSettingsCoordinator {
     let anyChanged = false;
     const settingsProvider = getSettingsProviderId(settings);
 
-    for (const providerId of ProviderRegistry.getRegisteredProviderIds()) {
+    for (const providerId of providerCatalog().ids()) {
       const reconciler = ProviderRegistry.getSettingsReconciler(providerId);
       const targetSettings = providerId === settingsProvider
         ? settings

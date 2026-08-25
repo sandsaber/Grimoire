@@ -2,6 +2,7 @@ import { Menu, Notice, setIcon, setTooltip } from 'obsidian';
 
 import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
 
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import type { ProviderId, TitleGenerationService } from '../../../core/providers/types';
 import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
@@ -959,7 +960,7 @@ export class ConversationController {
     // The product default, not one provider's colour picked out of the list: a
     // conversation whose provider is not registered was showing Claude's dot,
     // which reads as a claim about which provider it belongs to.
-    const resolvedProviderId = providerId && ProviderRegistry.isRegisteredProviderId(providerId)
+    const resolvedProviderId = providerId && providerCatalog().has(providerId)
       ? providerId
       : DEFAULT_CHAT_PROVIDER_ID;
     return `var(--grimoire-provider-${resolvedProviderId})`;

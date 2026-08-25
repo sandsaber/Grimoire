@@ -1,4 +1,4 @@
-import { ProviderRegistry } from '../../../../core/providers/ProviderRegistry';
+import { providerCatalog } from '../../../../core/providers/ProviderCatalog';
 import { TOOL_BASH, TOOL_READ } from '../../../../core/tools/toolNames';
 import type { ChatMessage, ProviderId, ToolCallInfo } from '../../../../core/types';
 import { t } from '../../../../i18n/i18n';
@@ -133,7 +133,7 @@ function getFileName(path: string): string {
 }
 
 function getProviderLabel(providerId: ProviderId): string {
-  return ProviderRegistry.getProviderDisplayNameOrId(providerId);
+  return providerCatalog().displayNameOrId(providerId);
 }
 
 export class RuntimeContextActivityView {

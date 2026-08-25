@@ -40,7 +40,7 @@ describe('Codex provider module', () => {
     return codexProviderModule.features(createContext());
   }
 
-  it('declares its identity and ordering from the registration it replaces', () => {
+  it('declares its identity and ordering', () => {
     expect(codexProviderModule.manifest).toEqual({
       id: 'codex',
       displayName: 'Codex',

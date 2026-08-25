@@ -308,7 +308,7 @@ KimicodeProviderSettings
   manifest: {
     id: 'kimicode',
     displayName: 'Kimi Code',
-    order: 30,
+    order: 60,
   },
 
   settings: kimicodeSettingsCodec,

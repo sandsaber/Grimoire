@@ -1,7 +1,9 @@
+import { installProviderCatalog } from '../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '../core/providers/ProviderWorkspaceRegistry';
 import { antigravityWorkspaceRegistration } from './antigravity/app/AntigravityWorkspaceServices';
 import { antigravityProviderRegistration } from './antigravity/registration';
+import { builtInProviderCatalog } from './BuiltInProviderCatalog';
 import { claudeWorkspaceRegistration } from './claude/app/ClaudeWorkspaceServices';
 import { claudeProviderRegistration } from './claude/registration';
 import { codexWorkspaceRegistration } from './codex/app/CodexWorkspaceServices';
@@ -26,6 +28,7 @@ export function registerBuiltInProviders(): void {
     return;
   }
 
+  installProviderCatalog(builtInProviderCatalog);
   ProviderRegistry.register('claude', claudeProviderRegistration);
   ProviderRegistry.register('codex', codexProviderRegistration);
   ProviderRegistry.register('opencode', opencodeProviderRegistration);

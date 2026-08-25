@@ -10,14 +10,12 @@ import { getKimicodeProviderSettings, updateKimicodeProviderSettings } from './s
 import { kimicodeChatUIConfig } from './ui/KimicodeChatUIConfig';
 
 export const kimicodeProviderRegistration: ProviderRegistration = {
-  blankTabOrder: 60,
   capabilities: KIMICODE_PROVIDER_CAPABILITIES,
   chatUIConfig: kimicodeChatUIConfig,
   createInlineEditService: (plugin) => new KimicodeInlineEditService(plugin),
   createInstructionRefineService: (plugin) => new KimicodeInstructionRefineService(plugin),
   createRuntime: ({ plugin }) => plugin.getKimicodeExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new KimicodeTitleGenerationService(plugin),
-  displayName: 'Kimi Code',
   environmentKeyPatterns: [/^KIMICODE_/i],
   historyService: new KimicodeConversationHistoryService(),
   isEnabled: (settings) => getKimicodeProviderSettings(settings).enabled,

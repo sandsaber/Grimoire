@@ -31,8 +31,8 @@ OpenCode and MiMoCode intentionally mirror each other closely; when changing lau
 
 - Keep `src/core/` provider-neutral. Shared chat/runtime/settings contracts belong there only when at least two providers need the behavior.
 - Keep provider-specific protocol, storage, CLI resolution, history parsing, model discovery, settings UI, and launch artifacts inside `src/providers/<provider>/`.
-- Register provider runtime and auxiliary services through `ProviderRegistry`.
-- Register provider workspace services through `ProviderWorkspaceRegistry`.
+- Declare every built-in provider once, in `src/providers/BuiltInProviderCatalog.ts`. The catalog owns provider identity, display name, ordering, and the inventory itself; it validates the modules at construction and refuses a duplicate id, order, or execution backend.
+- Register provider runtime and auxiliary services through `ProviderRegistry`, and provider workspace services through `ProviderWorkspaceRegistry`. Both hold only the contributions that have not moved to the catalog yet, and both are deleted when the last one moves.
 - Feature code must consume provider-neutral contracts. Do not read provider-specific `Conversation.providerState` fields directly from `src/features/`.
 - Preserve provider-native behavior first. Prefer adapting official CLI/runtime semantics over reimplementing provider features inside Grimoire.
 - Use `.grimoire/` for Grimoire-owned vault data. Do not add legacy storage migration behavior unless a migration milestone explicitly asks for it.

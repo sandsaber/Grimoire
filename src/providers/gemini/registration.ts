@@ -12,14 +12,12 @@ import { getGeminiProviderSettings, updateGeminiProviderSettings } from './setti
 import { geminiChatUIConfig } from './ui/GeminiChatUIConfig';
 
 export const geminiProviderRegistration: ProviderRegistration = {
-  blankTabOrder: 80,
   capabilities: GEMINI_PROVIDER_CAPABILITIES,
   chatUIConfig: geminiChatUIConfig,
   createInlineEditService: () => new GeminiInlineEditService(),
   createInstructionRefineService: () => new GeminiInstructionRefineService(),
   createRuntime: ({ plugin }) => plugin.getGeminiExecution().createRuntime(),
   createTitleGenerationService: () => new GeminiTitleGenerationService(),
-  displayName: 'Gemini CLI (Legacy)',
   environmentKeyPatterns: [/^GEMINI_/i, /^GOOGLE_/i, /^VERTEX_/i],
   historyService: new GeminiConversationHistoryService(),
   isEnabled: (settings) => getGeminiProviderSettings(settings).enabled,

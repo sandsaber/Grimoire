@@ -10,14 +10,12 @@ import { getMimocodeProviderSettings, updateMimocodeProviderSettings } from './s
 import { mimocodeChatUIConfig } from './ui/MimocodeChatUIConfig';
 
 export const mimocodeProviderRegistration: ProviderRegistration = {
-  blankTabOrder: 50,
   capabilities: MIMOCODE_PROVIDER_CAPABILITIES,
   chatUIConfig: mimocodeChatUIConfig,
   createInlineEditService: (plugin) => new MimocodeInlineEditService(plugin),
   createInstructionRefineService: (plugin) => new MimocodeInstructionRefineService(plugin),
   createRuntime: ({ plugin }) => plugin.getMimocodeExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new MimocodeTitleGenerationService(plugin),
-  displayName: 'MiMoCode',
   environmentKeyPatterns: [/^MIMOCODE_/i],
   historyService: new MimocodeConversationHistoryService(),
   isEnabled: (settings) => getMimocodeProviderSettings(settings).enabled,

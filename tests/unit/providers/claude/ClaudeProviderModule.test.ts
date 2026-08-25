@@ -53,7 +53,7 @@ describe('Claude provider module', () => {
     );
   }
 
-  it('declares its identity and ordering from the registration it replaces', () => {
+  it('declares its identity and ordering', () => {
     expect(claudeProviderModule.manifest).toEqual({
       id: 'claude',
       displayName: 'Claude',

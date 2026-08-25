@@ -5,6 +5,7 @@ import { Notice } from 'obsidian';
 
 import { readBundledChangelog } from '@/app/changelog/source';
 import { DEFAULT_GRIMOIRE_SETTINGS } from '@/app/settings/defaultSettings';
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { GrimoireSettingTab } from '@/features/settings/GrimoireSettings';
@@ -269,7 +270,7 @@ describe('GrimoireSettingTab settings hub', () => {
 
       (tab as any).renderProvidersHub(
         container,
-        ProviderRegistry.getRegisteredProviderIds(),
+        providerCatalog().ids(),
         createMockEl('div'),
       );
 
@@ -367,7 +368,7 @@ describe('GrimoireSettingTab settings hub', () => {
     const providerHint = settingEl.querySelector('.grimoire-settings-provider-hint');
     expect(providerHint?.textContent).toBe('Select a provider card to view its settings below.');
     expect(providerGrid).not.toBeNull();
-    expect(ProviderRegistry.getRegisteredProviderIds()).toEqual([
+    expect(providerCatalog().ids()).toEqual([
       'claude',
       'codex',
       'opencode',
@@ -387,7 +388,7 @@ describe('GrimoireSettingTab settings hub', () => {
 
     (tab as any).renderProvidersHub(
       container,
-      ProviderRegistry.getRegisteredProviderIds(),
+      providerCatalog().ids(),
       createMockEl('div'),
     );
 
@@ -430,7 +431,7 @@ describe('GrimoireSettingTab settings hub', () => {
     const tab = new GrimoireSettingTab(createSettingsApp(), plugin);
     const container = createMockEl('div');
 
-    (tab as any).renderWorkspaceHub(container, ProviderRegistry.getRegisteredProviderIds());
+    (tab as any).renderWorkspaceHub(container, providerCatalog().ids());
 
     const navigation = container.children[0];
     const sectionLabels = Array.from(
@@ -473,7 +474,7 @@ describe('GrimoireSettingTab settings hub', () => {
 
   it('uses explicit provider capabilities for every Advanced manager', () => {
     const tab = new GrimoireSettingTab(createSettingsApp(), createSettingsPlugin());
-    const providerIds = ProviderRegistry.getRegisteredProviderIds();
+    const providerIds = providerCatalog().ids();
 
     expect((tab as any).getWorkspaceManagerProviders(providerIds, 'skills')).toEqual([
       'claude',
@@ -680,7 +681,7 @@ describe('GrimoireSettingTab settings hub', () => {
       readonly: false,
       status: 'available',
       deleteResource: jest.fn().mockResolvedValue(undefined),
-    }], '', ProviderRegistry.getRegisteredProviderIds(), resourceArea);
+    }], '', providerCatalog().ids(), resourceArea);
 
     expect(container.children[0].children.map((cell: any) => cell.textContent)).toEqual([
       'Name',

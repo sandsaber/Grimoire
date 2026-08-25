@@ -1,5 +1,6 @@
 import { TFile } from 'obsidian';
 
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import {
@@ -508,7 +509,7 @@ export class StreamController {
 
     return normalizeProviderError(
       message,
-      ProviderRegistry.getProviderDisplayName(providerId),
+      providerCatalog().displayName(providerId),
     ).message;
   }
 
@@ -1828,7 +1829,7 @@ export class StreamController {
       }));
     }
     statusEl.createSpan({
-      text: `${ProviderRegistry.getProviderDisplayName(providerId)} · ${t('chat.ui.progress.stillWorking')}`,
+      text: `${providerCatalog().displayName(providerId)} · ${t('chat.ui.progress.stillWorking')}`,
     });
     const elapsedEl = statusEl.createSpan({ cls: 'grimoire-silent-turn-status-elapsed' });
     const updateElapsed = () => {

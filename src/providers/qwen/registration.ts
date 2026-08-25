@@ -12,14 +12,12 @@ import { getQwenProviderSettings, updateQwenProviderSettings } from './settings'
 import { qwenChatUIConfig } from './ui/QwenChatUIConfig';
 
 export const qwenProviderRegistration: ProviderRegistration = {
-  blankTabOrder: 80,
   capabilities: QWEN_PROVIDER_CAPABILITIES,
   chatUIConfig: qwenChatUIConfig,
   createInlineEditService: () => new QwenInlineEditService(),
   createInstructionRefineService: () => new QwenInstructionRefineService(),
   createRuntime: ({ plugin }) => plugin.getQwenExecution().createRuntime(),
   createTitleGenerationService: () => new QwenTitleGenerationService(),
-  displayName: 'Qwen Code',
   environmentKeyPatterns: [/^QWEN_/i, /^DASHSCOPE_/i, /^WEB_SEARCH_/i],
   historyService: new QwenConversationHistoryService(),
   isEnabled: (settings) => getQwenProviderSettings(settings).enabled,

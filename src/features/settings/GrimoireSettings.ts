@@ -18,6 +18,7 @@ import {
   normalizeHiddenCommandList,
 } from '../../core/providers/commands/hiddenCommands';
 import type { ProviderCommandEntry } from '../../core/providers/commands/ProviderCommandEntry';
+import { providerCatalog } from '../../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../core/providers/ProviderWorkspaceRegistry';
@@ -465,7 +466,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
 
     setLocale(this.plugin.settings.locale as Locale);
 
-    const providerIds = this.orderProviderIds(ProviderRegistry.getRegisteredProviderIds());
+    const providerIds = this.orderProviderIds(providerCatalog().ids());
     const tabIds: SettingsTabId[] = ['general', 'providers', 'workspace', 'about'];
     if (!tabIds.includes(this.activeTab)) {
       this.activeTab = 'general';
@@ -611,7 +612,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
     return t(`settings.hub.${key}` as TranslationKey);
   }
 
-  private orderProviderIds(providerIds: ProviderId[]): ProviderId[] {
+  private orderProviderIds(providerIds: readonly ProviderId[]): ProviderId[] {
     const preferredOrder = [
       'claude',
       'codex',
@@ -644,7 +645,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
       return this.getHubText('geminiLegacy');
     }
     return PROVIDER_SETTING_COPY[providerId]?.name
-      ?? ProviderRegistry.getProviderDisplayName(providerId);
+      ?? providerCatalog().displayName(providerId);
   }
 
   private getProviderStatusText(providerId: ProviderId): string {
@@ -1970,7 +1971,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
 
           const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
           const seenValues = new Set<string>();
-          for (const providerId of ProviderRegistry.getRegisteredProviderIds()) {
+          for (const providerId of providerCatalog().ids()) {
             const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
             for (const model of uiConfig.getModelOptions(settingsBag)) {
               if (!seenValues.has(model.value)) {
@@ -2289,7 +2290,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
     const uniqueModelIds = new Set<string>();
     const providerIds = providerId
       ? [providerId]
-      : ProviderRegistry.getRegisteredProviderIds();
+      : providerCatalog().ids();
 
     for (const targetProviderId of providerIds) {
       const envVars = parseEnvironmentVariables(

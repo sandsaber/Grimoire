@@ -80,7 +80,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
-| M3 — provider control plane | Not started | — |
+| M3 — provider control plane | In progress — the catalog exists, validates the nine modules, and owns provider identity and ordering; the two registries hold what has not moved yet | this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
@@ -6874,6 +6874,46 @@ Copy landed in all ten locales rather than English with nine fallbacks, because 
 requires it and because a fallback is the same invisibility this row exists to remove.
 
 Gates: unit 527 suites / 8,240 tests, integration 5 / 151, typecheck, `eslint`, `build:release`.
+
+### M3 opens: one validated inventory, and the drift it found on arrival (this commit)
+
+`ProviderCatalog` holds the nine `ProviderModule`s, validates them at construction, and is installed
+where the modules live so core reaches it without importing a provider. **What it validates is what
+types cannot**: that a module's settings, workspace, auxiliary, capability and execution
+contributions all claim the same provider; that no two modules share an id, an order, or an execution
+backend; and that a settings codec survives a round trip of its own defaults. Capability enums are
+deliberately not re-checked — they are compile-time unions over compile-time constants, and a runtime
+guard there is ceremony. The one capability field that *was* unverifiable, `capabilities.workspace`,
+is a named key union now, so a typo is a compile error instead of a silently missing settings section.
+
+**The first thing the validator did was fail.** Three modules — MiMoCode, Kimi Code and Qwen —
+declared the `manifest.order` of the provider they were forked from. Nothing had noticed, because
+nothing compared the manifests to the registrations that actually ordered the product, and the three
+tests that claimed to do so had the number copied into the assertion: `declares its identity and
+ordering *from the registration it replaces*`, asserting `order: 30`. A test that names a source it
+never reads is the recurring shape on this branch. The catalog refuses a duplicate order outright,
+which is why the fix could not be forgotten.
+
+**Rows 1 and 2 moved, and they had to move together.** `displayName` and `blankTabOrder` are gone
+from `ProviderRegistration`; the manifest declares them and `ProviderCatalog` publishes them. Moving
+one without the other would have left the two inventories able to disagree about the same provider,
+which is precisely the state that produced the wrong orders. `ProviderRegistry` is no longer an
+inventory at all: it answers about registrations it holds, asks the catalog which providers exist,
+and **refuses a registration for an id the catalog does not hold** — a tenth provider used to be one
+`register` call away from existing in nothing and answering for nothing.
+
+The inventory document keeps the moved rows rather than deleting them, in a table of their own with
+where they live now, and the fitness test asserts the two tables still add up to the sixteen fields
+the registration ever declared. A row that vanishes from an inventory is indistinguishable from a
+contribution that was dropped.
+
+**Three breaks, three real gates.** Restoring Kimi Code's duplicate order fails the plugin at import
+across dozens of suites with the two provider names in the message; renaming Claude in its manifest
+fails four suites including the chat status line that shows the name; deleting a moved row from the
+inventory fails the accounting test. None stayed green, which is the first time this session's
+break-tests found no gap.
+
+Gates: unit 529 suites / 8,274 tests, integration 5 / 151, typecheck, `eslint`, `build:release`.
 
 ## Current blocker
 

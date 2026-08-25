@@ -1,5 +1,6 @@
 import { ConversationRepository } from '../conversations/ConversationRepository';
 import type { DurableStorage } from '../persistence/DurableStorage';
+import { providerCatalog } from '../providers/ProviderCatalog';
 import { ProviderRegistry } from '../providers/ProviderRegistry';
 import { DEFAULT_CHAT_PROVIDER_ID } from '../providers/types';
 import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
@@ -86,7 +87,7 @@ function isSupportedSessionMetadata(value: unknown): value is SessionMetadata {
   }
 
   const providerId = (value as { providerId?: unknown }).providerId;
-  return providerId === undefined || ProviderRegistry.isRegisteredProviderId(providerId);
+  return providerId === undefined || providerCatalog().has(providerId);
 }
 
 function getMessagePreview(messages: ChatMessage[] | undefined): string {

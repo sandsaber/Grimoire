@@ -2,6 +2,7 @@ export { isRecord } from '../../../utils/records';
 import { getHiddenProviderCommandSet } from '../../../core/providers/commands/hiddenCommands';
 import type { ProviderCommandDropdownConfig } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
@@ -101,7 +102,7 @@ export function getBlankTabModelOptions(
   return ProviderRegistry.getEnabledProviderIds(settings).flatMap((providerId) => {
     const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
     const providerIcon = uiConfig.getProviderIcon?.() ?? undefined;
-    const group = ProviderRegistry.getProviderDisplayName(providerId);
+    const group = providerCatalog().displayName(providerId);
 
     return uiConfig.getModelOptions(settings)
       .map(model => ({

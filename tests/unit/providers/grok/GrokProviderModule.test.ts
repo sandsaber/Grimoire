@@ -6,7 +6,6 @@ import {
   grokSettingsCodec,
   type GrokWorkspaceContext,
 } from '@/providers/grok/GrokProviderModule';
-import { grokProviderRegistration } from '@/providers/grok/registration';
 
 /**
  * The fifth module, and the first that had nothing new to prove.
@@ -56,11 +55,11 @@ describe('Grok provider module', () => {
     );
   }
 
-  it('declares its identity and ordering from the registration it replaces', () => {
+  it('declares its identity and ordering', () => {
     expect(grokProviderModule.manifest).toEqual({
       id: 'grok',
-      displayName: grokProviderRegistration.displayName,
-      order: grokProviderRegistration.blankTabOrder,
+      displayName: 'Grok Build',
+      order: 40,
     });
   });
 

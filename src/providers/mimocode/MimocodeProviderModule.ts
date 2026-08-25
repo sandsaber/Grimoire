@@ -302,7 +302,7 @@ MimocodeProviderSettings
   manifest: {
     id: 'mimocode',
     displayName: 'MiMoCode',
-    order: 30,
+    order: 50,
   },
 
   settings: mimocodeSettingsCodec,

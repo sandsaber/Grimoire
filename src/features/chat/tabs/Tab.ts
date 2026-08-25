@@ -11,6 +11,7 @@ import type { ProviderCommandDropdownConfig } from '../../../core/providers/comm
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
 import { getOpaqueProviderState } from '../../../core/providers/getOpaqueProviderState';
 import { getEnabledProviderForModel, getProviderForModel } from '../../../core/providers/modelRouting';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
@@ -1452,7 +1453,7 @@ export function initializeTabControllers(
           tab.providerId = derivedProvider;
         }
         if (!ProviderRegistry.isEnabled(tab.providerId, plugin.settings)) {
-          throw new Error(`${ProviderRegistry.getProviderDisplayName(tab.providerId)} is disabled. Enable it in Grimoire settings first.`);
+          throw new Error(`${providerCatalog().displayName(tab.providerId)} is disabled. Enable it in Grimoire settings first.`);
         }
 
         await initializeTabService(tab, plugin);

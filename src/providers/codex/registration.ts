@@ -11,8 +11,6 @@ import { getCodexProviderSettings, updateCodexProviderSettings } from './setting
 import { codexChatUIConfig } from './ui/CodexChatUIConfig';
 
 export const codexProviderRegistration: ProviderRegistration = {
-  displayName: 'Codex',
-  blankTabOrder: 20,
   isEnabled: (settings) => getCodexProviderSettings(settings).enabled,
   setEnabled: (settings, enabled) => { updateCodexProviderSettings(settings, { enabled }); },
   capabilities: CODEX_PROVIDER_CAPABILITIES,

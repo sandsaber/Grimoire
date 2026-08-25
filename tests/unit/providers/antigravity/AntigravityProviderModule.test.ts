@@ -12,7 +12,7 @@ import {
  * failed exactly there.
  */
 describe('Antigravity provider module', () => {
-  it('declares its identity and ordering from the registration it replaces', () => {
+  it('declares its identity and ordering', () => {
     expect(antigravityProviderModule.manifest).toEqual({
       id: 'antigravity',
       displayName: 'Antigravity',

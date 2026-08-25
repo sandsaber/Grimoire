@@ -1,5 +1,6 @@
 import '@/providers';
 
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { qwenWorkspaceRegistration } from '@/providers/qwen/app/QwenWorkspaceServices';
 import { getQwenProviderSettings, updateQwenProviderSettings } from '@/providers/qwen/settings';
@@ -10,8 +11,8 @@ describe('Qwen provider registration', () => {
   });
 
   it('registers Qwen as an opt-in provider', () => {
-    expect(ProviderRegistry.getRegisteredProviderIds()).toContain('qwen');
-    expect(ProviderRegistry.getProviderDisplayName('qwen')).toBe('Qwen Code');
+    expect(providerCatalog().ids()).toContain('qwen');
+    expect(providerCatalog().displayName('qwen')).toBe('Qwen Code');
     expect(ProviderRegistry.isEnabled('qwen', {})).toBe(false);
 
     const settings: Record<string, unknown> = {};

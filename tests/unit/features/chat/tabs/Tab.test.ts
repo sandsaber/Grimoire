@@ -6,6 +6,7 @@ import { Notice, Platform, setIcon } from 'obsidian';
 import os from 'os';
 import path from 'path';
 
+import { ProviderCatalog } from '@/core/providers/ProviderCatalog';
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { ChatState } from '@/features/chat/state/ChatState';
@@ -3966,7 +3967,7 @@ describe('Tab - Blank Tab Model Selector', () => {
       { value: 'sonnet', label: 'Sonnet' },
     ];
     jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['claude']);
-    jest.spyOn(ProviderRegistry, 'getProviderDisplayName').mockImplementation((providerId) => (
+    jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'claude' ? 'Claude' : 'Codex'
     ));
     jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
@@ -3988,7 +3989,7 @@ describe('Tab - Blank Tab Model Selector', () => {
     ];
 
     jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['codex', 'claude']);
-    jest.spyOn(ProviderRegistry, 'getProviderDisplayName').mockImplementation((providerId) => (
+    jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'codex' ? 'Codex' : 'Claude'
     ));
     jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
@@ -4018,7 +4019,7 @@ describe('Tab - Cross-Provider Model Rejection', () => {
     jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['codex', 'claude']);
-    jest.spyOn(ProviderRegistry, 'getProviderDisplayName').mockImplementation((providerId) => (
+    jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'codex' ? 'Codex' : 'Claude'
     ));
     jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
@@ -5039,7 +5040,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
     const antigravityModels = [{ value: 'antigravity', label: 'Antigravity' }];
     const claudeModels = [{ value: 'haiku', label: 'Haiku' }];
     jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['antigravity', 'claude']);
-    jest.spyOn(ProviderRegistry, 'getProviderDisplayName').mockImplementation((providerId) => (
+    jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'antigravity' ? 'Antigravity' : 'Claude'
     ));
     jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({

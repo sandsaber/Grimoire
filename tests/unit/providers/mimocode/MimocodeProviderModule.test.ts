@@ -52,11 +52,11 @@ describe('MiMoCode provider module', () => {
     );
   }
 
-  it('declares its identity and ordering from the registration it replaces', () => {
+  it('declares its identity and ordering', () => {
     expect(mimocodeProviderModule.manifest).toEqual({
       id: 'mimocode',
       displayName: 'MiMoCode',
-      order: 30,
+      order: 50,
     });
   });
 
