@@ -1,6 +1,8 @@
 import trace from '@test/fixtures/provider-traces/kimicode-execution.json';
+import {
+  KIMICODE_PROVIDER_CAPABILITIES,
+} from '@test/fixtures/providerCapabilityBaseline';
 
-import { KIMICODE_PROVIDER_CAPABILITIES } from '@/providers/kimicode/capabilities';
 import {
   kimicodeProviderModule,
   kimicodeSettingsCodec,

@@ -1,7 +1,9 @@
 import trace from '@test/fixtures/provider-traces/gemini-execution.json';
+import {
+  GEMINI_PROVIDER_CAPABILITIES,
+} from '@test/fixtures/providerCapabilityBaseline';
 
 import { createGeminiModuleContext } from '@/providers/gemini/app/GeminiModuleContext';
-import { GEMINI_PROVIDER_CAPABILITIES } from '@/providers/gemini/capabilities';
 import {
   geminiProviderModule,
   geminiSettingsCodec,

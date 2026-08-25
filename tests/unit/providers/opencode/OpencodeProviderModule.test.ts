@@ -1,6 +1,8 @@
 import trace from '@test/fixtures/provider-traces/opencode-execution.json';
+import {
+  OPENCODE_PROVIDER_CAPABILITIES,
+} from '@test/fixtures/providerCapabilityBaseline';
 
-import { OPENCODE_PROVIDER_CAPABILITIES } from '@/providers/opencode/capabilities';
 import {
   opencodeProviderModule,
   opencodeSettingsCodec,

@@ -28,17 +28,16 @@ that is produced by `initialize(context)` and needs a live plugin. A provider th
 optional workspace member is caught only by the parity gate, and only if its module leaves the
 bundle.
 
-## `ProviderRegistration` fields (12) — [types.ts:56](../src/core/providers/types.ts)
+## `ProviderRegistration` fields (11) — [types.ts:56](../src/core/providers/types.ts)
 
 Rows that have already moved are not deleted; they are listed under
-[Moved to the provider catalog](#moved-to-the-provider-catalog-4) with where they live now. Row
+[Moved to the provider catalog](#moved-to-the-provider-catalog-5) with where they live now. Row
 numbers are stable: a moved row leaves a gap rather than renumbering the rows below it, because the
 plan and this file both refer to rows by number.
 
 | # | Field | What it carries | Consumed by today | Target home | Moves at |
 |---|---|---|---|---|---|
 | 5 | `getPreloadedContextFiles?` | provider-preloaded context file names | chat context surfaces | context capability port | M3 |
-| 6 | `capabilities` | static feature flags | chat UI gating, controllers | `ProviderCapabilityDescriptor` | M2 (adapter reads descriptor); UI gating M3 |
 | 7 | `environmentKeyPatterns?` | env keys that invalidate runtime | settings environment handling | `ProviderSettingsCodec` runtime-input declaration | M3 |
 | 8 | `chatUIConfig` | provider chat UI configuration | chat feature rendering | UI-config feature contribution | M3 |
 | 9 | `settingsReconciler` | settings/model normalization on load and env change | settings load, environment change | `ProviderSettingsCodec` | M3 |
@@ -77,7 +76,7 @@ fields of either service interface.
 | 2 | default provider configs | `getBuiltInProviderDefaultConfigs()` in [defaultProviderConfigs.ts](../src/providers/defaultProviderConfigs.ts), a third source beside the two registries | [defaultSettings.ts](../src/app/settings/defaultSettings.ts) | `ProviderSettingsCodec` defaults, published through the catalog | M3 |
 | 3 | workspace initialize/dispose lifecycle | `ProviderWorkspaceRegistry.initializeAll()` at plugin load; **no dispose contract exists today** | `main.ts` startup | lazy, failure-isolated init plus asynchronous dispose in the workspace manager — both halves land together; "init without dispose" is the v1 defect repeating | M3 |
 
-## Moved to the provider catalog (4)
+## Moved to the provider catalog (5)
 
 Rows that have left `ProviderRegistration` for a `ProviderModule` slot. They stay recorded here for
 the same reason the tables above exist: a contribution that simply disappears from the inventory is
@@ -89,6 +88,7 @@ indistinguishable from one that was dropped.
 | 2 | `blankTabOrder` | deterministic provider ordering | `ProviderManifest.order` | `ProviderCatalog.ids()`, which sorts by it | M3 |
 | 3 | `isEnabled` | enablement predicate over settings | `ProviderSettingsCodec.isEnabled` | `ProviderCatalog.isEnabled()` / `enabledIds()` | M3 |
 | 4 | `setEnabled` | enablement writer | `ProviderSettingsCodec.withEnabled` | `ProviderCatalog.setEnabled()` | M3 |
+| 6 | `capabilities` | static feature flags | `ProviderCapabilityDescriptor` | `ProviderCatalog.capabilities()`, projected by `toLegacyCapabilities` | M3 |
 
 Both moved together, and had to: ordering with the names still on the registration would have left
 two inventories able to disagree about the same provider — which they already did. Three modules
@@ -99,6 +99,12 @@ Rows 3 and 4 followed. Enablement is read and written through the provider's own
 the write applies only the keys enablement changed: the legacy writer re-encoded the whole provider
 config on every toggle, so switching a provider off also rewrote its CLI path and its model lists
 through whatever normalizers those fields happened to have.
+
+Row 6 followed once the descriptor could answer both command questions. The nine
+`src/providers/<id>/capabilities.ts` files are deleted; the record the UI reads is projected from
+the descriptor, and the values those files held live on as
+`tests/fixtures/providerCapabilityBaseline.ts`, which the parity test compares field for field. A
+projection is only trustworthy against something it cannot also change.
 
 ## Rules
 

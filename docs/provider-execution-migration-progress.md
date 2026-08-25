@@ -80,7 +80,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
-| M3 — provider control plane | In progress — the catalog exists, validates the nine modules, and owns provider identity, ordering and enablement. Capability gating (row 6) is unblocked: the projection now reads a command field per question | `0dd3580`, `928a3c9`, this commit |
+| M3 — provider control plane | In progress — the catalog exists, validates the nine modules, and owns provider identity, ordering, enablement and capability gating. Five of the sixteen registration rows have moved | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
@@ -7009,6 +7009,35 @@ was about to turn Gemini's on at row 6.
 One divergence is left in the parity table, Grok's rewind, and it is the declared one.
 
 Gates: unit 529 suites / 8,302 tests, integration 5 / 151, typecheck, `eslint`, `build:release`.
+
+### Row 6 moves, and nine capability files are deleted (this commit)
+
+Capability gating reads the module descriptor now. `ProviderCatalog.capabilities()` projects it into
+the record the chat feature has always consumed, `ProviderRegistration.capabilities` is gone, and
+the nine `src/providers/<id>/capabilities.ts` files with it — the first deletion of a whole legacy
+contribution family on this branch.
+
+**What replaces the thing being deleted is the interesting part.** A projection checked against a
+descriptor is a projection checked against itself, so the nine records were copied verbatim into
+`tests/fixtures/providerCapabilityBaseline.ts` before their sources were removed. The parity test
+compares every field of every provider against it; editing a value there is declaring a product
+change, and the fixture says so at the top. Five per-provider `capabilities.test.ts` files went with
+the sources — they asserted the same values field by field for five providers, which the baseline
+now does for nine.
+
+Grok's rewind is the one declared divergence left, and moving the gating is what finishes it: a tab
+with a live service already had no rewind button, a tab without one read the legacy record and had
+one. Both read the descriptor now.
+
+The parity manifest's capability surface names what reads the declarations rather than the
+declarations themselves, because a module belongs to exactly one surface and the nine modules are
+claimed by `provider-chat-execution`.
+
+**Two breaks, both real.** Changing a value in the baseline fails the parity test and the module's
+own agreement test; changing a value in a descriptor fails four suites, including the built-in
+command test that gates the fork command — a UI surface, not a mirror.
+
+Gates: unit 524 suites / 8,257 tests, integration 5 / 151, typecheck, `eslint`, `build:release`.
 
 ## Current blocker
 

@@ -1,6 +1,8 @@
 import trace from '@test/fixtures/provider-traces/grok-execution.json';
+import {
+  GROK_PROVIDER_CAPABILITIES,
+} from '@test/fixtures/providerCapabilityBaseline';
 
-import { GROK_PROVIDER_CAPABILITIES } from '@/providers/grok/capabilities';
 import {
   grokProviderModule,
   grokSettingsCodec,

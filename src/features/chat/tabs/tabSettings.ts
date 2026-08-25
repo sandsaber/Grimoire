@@ -289,7 +289,7 @@ export function getTabCapabilities(
     return tab.service.getCapabilities();
   }
 
-  return ProviderRegistry.getCapabilities(providerId);
+  return providerCatalog().capabilities(providerId);
 }
 
 export function getTabChatUIConfig(

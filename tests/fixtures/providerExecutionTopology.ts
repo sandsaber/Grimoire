@@ -1,3 +1,15 @@
+import {
+  ANTIGRAVITY_PROVIDER_CAPABILITIES,
+  CLAUDE_PROVIDER_CAPABILITIES,
+  CODEX_PROVIDER_CAPABILITIES,
+  GEMINI_PROVIDER_CAPABILITIES,
+  GROK_PROVIDER_CAPABILITIES,
+  KIMICODE_PROVIDER_CAPABILITIES,
+  MIMOCODE_PROVIDER_CAPABILITIES,
+  OPENCODE_PROVIDER_CAPABILITIES,
+  QWEN_PROVIDER_CAPABILITIES,
+} from '@test/fixtures/providerCapabilityBaseline';
+
 /**
  * Per-provider execution topology and shared-resource inventory.
  *
@@ -16,17 +28,7 @@
  * rather than a fixture for topology and a separate hunt through each
  * provider's own capabilities module.
  */
-
 import type { ProviderCapabilities } from '@/core/providers/types';
-import { ANTIGRAVITY_PROVIDER_CAPABILITIES } from '@/providers/antigravity/capabilities';
-import { CLAUDE_PROVIDER_CAPABILITIES } from '@/providers/claude/capabilities';
-import { CODEX_PROVIDER_CAPABILITIES } from '@/providers/codex/capabilities';
-import { GEMINI_PROVIDER_CAPABILITIES } from '@/providers/gemini/capabilities';
-import { GROK_PROVIDER_CAPABILITIES } from '@/providers/grok/capabilities';
-import { KIMICODE_PROVIDER_CAPABILITIES } from '@/providers/kimicode/capabilities';
-import { MIMOCODE_PROVIDER_CAPABILITIES } from '@/providers/mimocode/capabilities';
-import { OPENCODE_PROVIDER_CAPABILITIES } from '@/providers/opencode/capabilities';
-import { QWEN_PROVIDER_CAPABILITIES } from '@/providers/qwen/capabilities';
 
 export type ProcessTopology =
   /** One short-lived process per run, no reusable session. */
@@ -95,9 +97,9 @@ export interface ProviderExecutionTopology {
    */
   sharedResources: SharedResource[];
   /**
-   * The provider's own capability declaration, re-exported so the M2 smoke
-   * matrix has one record to read. `capabilities.ts` stays canonical: this is a
-   * reference, never a copy.
+   * The record the UI reads, re-exported so the M2 smoke matrix has one place
+   * to read it. The module's `ProviderCapabilityDescriptor` is the declaration;
+   * this points at the M3 baseline the projection is checked against.
    */
   capabilities: Readonly<ProviderCapabilities>;
   /**
@@ -159,7 +161,6 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     evidence: [
       'src/providers/antigravity/execution/AntigravityExecutionBackend.ts',
       'src/providers/antigravity/auxiliary/AntigravityNoopServices.ts',
-      'src/providers/antigravity/capabilities.ts',
     ],
   },
   {
@@ -254,7 +255,6 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     evidence: [
       'src/providers/gemini/execution/GeminiExecutionBackend.ts',
       'src/providers/gemini/auxiliary/GeminiNoopServices.ts',
-      'src/providers/gemini/capabilities.ts',
     ],
   },
   {
@@ -405,7 +405,6 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     evidence: [
       'src/providers/qwen/execution/QwenExecutionBackend.ts',
       'src/providers/qwen/auxiliary/QwenNoopServices.ts',
-      'src/providers/qwen/capabilities.ts',
     ],
   },
 ];

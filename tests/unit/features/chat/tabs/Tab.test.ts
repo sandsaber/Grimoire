@@ -975,7 +975,7 @@ describe('Tab - Service Initialization', () => {
 
     it('should initialize toolbar config for the tab provider', () => {
       const getChatUIConfigSpy = jest.spyOn(ProviderRegistry, 'getChatUIConfig');
-      const getCapabilitiesSpy = jest.spyOn(ProviderRegistry, 'getCapabilities');
+      const getCapabilitiesSpy = jest.spyOn(ProviderCatalog.prototype, 'capabilities');
       jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
       jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
       jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
@@ -2981,7 +2981,7 @@ describe('Tab - UI Callback Wiring', () => {
     });
 
     it('should update context meter for Codex tabs on usage change', () => {
-      const getCapabilitiesSpy = jest.spyOn(ProviderRegistry, 'getCapabilities');
+      const getCapabilitiesSpy = jest.spyOn(ProviderCatalog.prototype, 'capabilities');
       getCapabilitiesSpy.mockReturnValue({
         providerId: 'codex',
         supportsPersistentRuntime: true,

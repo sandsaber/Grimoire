@@ -4,7 +4,6 @@ import { GrokInlineEditService } from './auxiliary/GrokInlineEditService';
 import { GrokInstructionRefineService } from './auxiliary/GrokInstructionRefineService';
 import { GrokTaskResultInterpreter } from './auxiliary/GrokTaskResultInterpreter';
 import { GrokTitleGenerationService } from './auxiliary/GrokTitleGenerationService';
-import { GROK_PROVIDER_CAPABILITIES } from './capabilities';
 import { grokSettingsReconciler } from './env/GrokSettingsReconciler';
 import { GrokConversationHistoryService } from './history/GrokConversationHistoryService';
 import { grokSubagentLifecycleAdapter } from './normalization/grokSubagentNormalization';
@@ -12,7 +11,6 @@ import { GROK_ARTIFACTS_SUBDIR } from './runtime/GrokPaths';
 import { grokChatUIConfig } from './ui/GrokChatUIConfig';
 
 export const grokProviderRegistration: ProviderRegistration = {
-  capabilities: GROK_PROVIDER_CAPABILITIES,
   chatUIConfig: grokChatUIConfig,
   createInlineEditService: (plugin) => new GrokInlineEditService(plugin),
   createInstructionRefineService: (plugin) => new GrokInstructionRefineService(plugin),

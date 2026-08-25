@@ -1,6 +1,7 @@
 import { Notice } from 'obsidian';
 
 import { getOpaqueProviderState } from '../../../core/providers/getOpaqueProviderState';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
@@ -1021,7 +1022,7 @@ export class TabManager implements TabManagerInterface {
     }
 
     const providerId = getTabProviderId(targetTab, this.plugin);
-    const staticCapabilities = ProviderRegistry.getCapabilities(providerId);
+    const staticCapabilities = providerCatalog().capabilities(providerId);
     if (!staticCapabilities.supportsProviderCommands) {
       return [];
     }
@@ -1163,7 +1164,7 @@ export class TabManager implements TabManagerInterface {
       tab.ui.modelSelector?.updateDisplay();
       tab.ui.modelSelector?.renderOptions();
     }
-    if (ProviderRegistry.getCapabilities(providerId).supportsProviderCommands) {
+    if (providerCatalog().capabilities(providerId).supportsProviderCommands) {
       await this.getSdkCommands(tab.id);
     }
   }

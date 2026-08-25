@@ -1,6 +1,8 @@
 import trace from '@test/fixtures/provider-traces/claude-execution.json';
+import {
+  CLAUDE_PROVIDER_CAPABILITIES,
+} from '@test/fixtures/providerCapabilityBaseline';
 
-import { CLAUDE_PROVIDER_CAPABILITIES } from '@/providers/claude/capabilities';
 import {
   claudeProviderModule,
   claudeSettingsCodec,

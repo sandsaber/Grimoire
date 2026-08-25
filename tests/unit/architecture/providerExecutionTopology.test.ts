@@ -155,7 +155,7 @@ describe('provider execution topology', () => {
     );
 
     it('points the smoke matrix at one capability record', () => {
-      expect(document).toContain('capabilities.ts');
+      expect(document).toContain('tests/fixtures/providerCapabilityBaseline.ts');
       expect(PROVIDER_EXECUTION_TOPOLOGY.every(record => record.capabilities !== undefined)).toBe(
         true,
       );

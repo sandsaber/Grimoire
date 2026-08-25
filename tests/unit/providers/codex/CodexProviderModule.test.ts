@@ -1,4 +1,7 @@
-import { CODEX_PROVIDER_CAPABILITIES } from '@/providers/codex/capabilities';
+import {
+  CODEX_PROVIDER_CAPABILITIES,
+} from '@test/fixtures/providerCapabilityBaseline';
+
 import {
   codexProviderModule,
   codexSettingsCodec,

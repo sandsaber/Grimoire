@@ -1,8 +1,10 @@
 import trace from '@test/fixtures/provider-traces/qwen-execution.json';
 import wire from '@test/fixtures/provider-traces/wire/qwen-wire.json';
+import {
+  QWEN_PROVIDER_CAPABILITIES,
+} from '@test/fixtures/providerCapabilityBaseline';
 
 import { createQwenModuleContext } from '@/providers/qwen/app/QwenModuleContext';
-import { QWEN_PROVIDER_CAPABILITIES } from '@/providers/qwen/capabilities';
 import {
   qwenProviderModule,
   qwenSettingsCodec,

@@ -19,7 +19,7 @@ describe('Qwen provider registration', () => {
     updateQwenProviderSettings(settings, { enabled: true });
 
     expect(providerCatalog().isEnabled(settings, 'qwen')).toBe(true);
-    expect(ProviderRegistry.getCapabilities('qwen')?.reasoningControl).toBe('effort');
+    expect(providerCatalog().capabilities('qwen')?.reasoningControl).toBe('effort');
   });
 
   it('creates a Qwen runtime through the composition the plugin owns', () => {

@@ -5,6 +5,17 @@ import antigravityTrace from '@test/fixtures/provider-traces/antigravity-executi
 import claudeTrace from '@test/fixtures/provider-traces/claude-execution.json';
 import codexTrace from '@test/fixtures/provider-traces/codex-execution.json';
 import opencodeTrace from '@test/fixtures/provider-traces/opencode-execution.json';
+import {
+  ANTIGRAVITY_PROVIDER_CAPABILITIES,
+  CLAUDE_PROVIDER_CAPABILITIES,
+  CODEX_PROVIDER_CAPABILITIES,
+  GEMINI_PROVIDER_CAPABILITIES,
+  GROK_PROVIDER_CAPABILITIES,
+  KIMICODE_PROVIDER_CAPABILITIES,
+  MIMOCODE_PROVIDER_CAPABILITIES,
+  OPENCODE_PROVIDER_CAPABILITIES,
+  QWEN_PROVIDER_CAPABILITIES,
+} from '@test/fixtures/providerCapabilityBaseline';
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { executionBackendId } from '@/core/execution/ExecutionBackendDescriptor';
@@ -51,23 +62,14 @@ import type {
 } from '@/core/runtime/types';
 import type { StreamChunk } from '@/core/types/chat';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
-import { ANTIGRAVITY_PROVIDER_CAPABILITIES } from '@/providers/antigravity/capabilities';
-import { CLAUDE_PROVIDER_CAPABILITIES } from '@/providers/claude/capabilities';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
-import { CODEX_PROVIDER_CAPABILITIES } from '@/providers/codex/capabilities';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
 import type { CodexProviderSettings } from '@/providers/codex/settings';
-import { GEMINI_PROVIDER_CAPABILITIES } from '@/providers/gemini/capabilities';
 import { geminiProviderModule } from '@/providers/gemini/GeminiProviderModule';
-import { GROK_PROVIDER_CAPABILITIES } from '@/providers/grok/capabilities';
 import { grokProviderModule } from '@/providers/grok/GrokProviderModule';
-import { KIMICODE_PROVIDER_CAPABILITIES } from '@/providers/kimicode/capabilities';
 import { kimicodeProviderModule } from '@/providers/kimicode/KimicodeProviderModule';
-import { MIMOCODE_PROVIDER_CAPABILITIES } from '@/providers/mimocode/capabilities';
 import { mimocodeProviderModule } from '@/providers/mimocode/MimocodeProviderModule';
-import { OPENCODE_PROVIDER_CAPABILITIES } from '@/providers/opencode/capabilities';
 import { opencodeProviderModule } from '@/providers/opencode/OpencodeProviderModule';
-import { QWEN_PROVIDER_CAPABILITIES } from '@/providers/qwen/capabilities';
 import { qwenProviderModule } from '@/providers/qwen/QwenProviderModule';
 
 /**

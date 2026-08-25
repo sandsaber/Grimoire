@@ -72,12 +72,17 @@ jest.mock('@/core/providers/ProviderRegistry', () => ({
     getConversationHistoryService: () => ({
       buildForkProviderState: mockBuildForkProviderState,
     }),
-    getCapabilities: (...args: any[]) => mockGetCapabilities(...args),
     resolveProviderForModel: (model: string) => (
       model.startsWith('opencode:') ? 'opencode'
         : model.startsWith('gpt-') || /^o\d/.test(model) ? 'codex' : 'claude'
     ),
   },
+}));
+
+jest.mock('@/core/providers/ProviderCatalog', () => ({
+  providerCatalog: () => ({
+    capabilities: (...args: any[]) => mockGetCapabilities(...args),
+  }),
 }));
 
 jest.mock('@/core/providers/ProviderWorkspaceRegistry', () => ({

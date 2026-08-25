@@ -435,15 +435,13 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'Static capability flags that gate plan mode, rewind, fork, images, MCP, and provider commands in the UI.',
     state: 'wired',
     modules: [
-      'src/providers/antigravity/capabilities.ts',
-      'src/providers/claude/capabilities.ts',
-      'src/providers/codex/capabilities.ts',
-      'src/providers/gemini/capabilities.ts',
-      'src/providers/grok/capabilities.ts',
-      'src/providers/kimicode/capabilities.ts',
-      'src/providers/mimocode/capabilities.ts',
-      'src/providers/opencode/capabilities.ts',
-      'src/providers/qwen/capabilities.ts',
+      // Nine per-provider records until M3, one projection from the catalog
+      // after it. The declarations themselves live on each module's capability
+      // descriptor, and those modules are claimed by `provider-chat-execution`;
+      // a module belongs to exactly one surface, so this one names what reads
+      // them.
+      'src/core/providers/ProviderCatalog.ts',
+      'src/core/providers/legacyCapabilities.ts',
     ],
   },
   {

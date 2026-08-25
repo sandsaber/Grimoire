@@ -66,7 +66,7 @@ function resolveEffortMetadata(
   model: string,
   settings: Record<string, unknown>,
 ): Pick<AssistantResponseMetadata, 'effort' | 'effortLabel'> {
-  const capabilities = ProviderRegistry.getCapabilities(providerId);
+  const capabilities = providerCatalog().capabilities(providerId);
   if (capabilities.reasoningControl !== 'effort') {
     return {};
   }

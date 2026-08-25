@@ -107,7 +107,7 @@ describe('provider contribution inventory', () => {
     });
 
     it('claims the count the heading advertises', () => {
-      expect(documented).toHaveLength(12);
+      expect(documented).toHaveLength(11);
     });
 
     it('accounts for every field the registration ever declared', () => {
@@ -122,7 +122,13 @@ describe('provider contribution inventory', () => {
     });
 
     it('records where each moved row went', () => {
-      expect(moved).toEqual(['displayName', 'blankTabOrder', 'isEnabled', 'setEnabled']);
+      expect(moved).toEqual([
+        'displayName',
+        'blankTabOrder',
+        'isEnabled',
+        'setEnabled',
+        'capabilities',
+      ]);
     });
 
     it.each(Object.entries(REGISTRATIONS))(
@@ -187,9 +193,13 @@ describe('provider contribution inventory', () => {
       { contribution: 'mcpServerManager', surfaceId: 'settings-mcp-management' },
     ];
 
+    // The moved table counts: a contribution that reached its target home is
+    // still a contribution with a surface, and its manifest entry has to keep
+    // saying so.
     const documented = [
       ...readInventoryRows('## `ProviderRegistration` fields'),
       ...readInventoryRows('## `ProviderWorkspaceServices` members'),
+      ...readInventoryRows('## Moved to the provider catalog'),
     ];
 
     it.each(CONTRIBUTION_SURFACES)(

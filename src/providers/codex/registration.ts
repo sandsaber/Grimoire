@@ -3,14 +3,12 @@ import { CodexInlineEditService } from './auxiliary/CodexInlineEditService';
 import { CodexInstructionRefineService } from './auxiliary/CodexInstructionRefineService';
 import { CodexTaskResultInterpreter } from './auxiliary/CodexTaskResultInterpreter';
 import { CodexTitleGenerationService } from './auxiliary/CodexTitleGenerationService';
-import { CODEX_PROVIDER_CAPABILITIES } from './capabilities';
 import { codexSettingsReconciler } from './env/CodexSettingsReconciler';
 import { CodexConversationHistoryService } from './history/CodexConversationHistoryService';
 import { codexSubagentLifecycleAdapter } from './normalization/codexSubagentNormalization';
 import { codexChatUIConfig } from './ui/CodexChatUIConfig';
 
 export const codexProviderRegistration: ProviderRegistration = {
-  capabilities: CODEX_PROVIDER_CAPABILITIES,
   environmentKeyPatterns: [/^OPENAI_/i, /^CODEX_/i],
   chatUIConfig: codexChatUIConfig,
   settingsReconciler: codexSettingsReconciler,

@@ -13,6 +13,9 @@ import type {
   TitleGenerationResult,
   TitleGenerationService,
 } from '@/core/providers/types';
+import {
+  DEFAULT_CHAT_PROVIDER_ID,
+} from '@/core/providers/types';
 import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { DEFAULT_CODEX_PRIMARY_MODEL } from '@/providers/codex/types/models';
 
@@ -55,7 +58,7 @@ describe('ProviderRegistry', () => {
   });
 
   it('returns capabilities for the default provider', () => {
-    const caps = ProviderRegistry.getCapabilities();
+    const caps = providerCatalog().capabilities(DEFAULT_CHAT_PROVIDER_ID);
     expect(caps.providerId).toBe('codex');
     expect(caps).toHaveProperty('supportsPlanMode');
     expect(caps).toHaveProperty('supportsFork');
@@ -82,7 +85,7 @@ describe('ProviderRegistry', () => {
   });
 
   it('throws when an unknown provider is requested', () => {
-    expect(() => ProviderRegistry.getCapabilities(
+    expect(() => ProviderRegistry.getChatUIConfig(
       'nonexistent' as any,
     )).toThrow('Provider "nonexistent" is not registered.');
   });
@@ -101,7 +104,7 @@ describe('ProviderRegistry', () => {
   });
 
   it('returns Codex capabilities', () => {
-    const caps = ProviderRegistry.getCapabilities('codex');
+    const caps = providerCatalog().capabilities('codex');
     expect(caps.providerId).toBe('codex');
     expect(caps.supportsPlanMode).toBe(true);
     expect(caps.supportsFork).toBe(true);
@@ -111,7 +114,7 @@ describe('ProviderRegistry', () => {
   });
 
   it('returns OpenCode capabilities', () => {
-    const caps = ProviderRegistry.getCapabilities('opencode');
+    const caps = providerCatalog().capabilities('opencode');
     expect(caps.providerId).toBe('opencode');
     expect(caps.supportsProviderCommands).toBe(true);
     expect(caps.supportsInstructionMode).toBe(true);
@@ -119,7 +122,7 @@ describe('ProviderRegistry', () => {
   });
 
   it('returns Qwen Code ACP capabilities without unsupported controls', () => {
-    const caps = ProviderRegistry.getCapabilities('qwen');
+    const caps = providerCatalog().capabilities('qwen');
     expect(caps.providerId).toBe('qwen');
     expect(caps.supportsPersistentRuntime).toBe(true);
     expect(caps.supportsProviderCommands).toBe(true);

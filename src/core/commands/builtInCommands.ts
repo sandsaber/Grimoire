@@ -5,7 +5,7 @@
  * These are handled separately from user-defined slash commands.
  */
 
-import { ProviderRegistry } from '../providers/ProviderRegistry';
+import { providerCatalog } from '../providers/ProviderCatalog';
 import type { ProviderCapabilities, ProviderId } from '../providers/types';
 
 export type BuiltInCommandAction = 'clear' | 'add-dir' | 'resume' | 'fork' | 'image';
@@ -86,7 +86,7 @@ function resolveCapabilities(
   }
 
   try {
-    return ProviderRegistry.getCapabilities(context);
+    return providerCatalog().capabilities(context);
   } catch {
     return null;
   }

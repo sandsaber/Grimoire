@@ -1,6 +1,8 @@
 import trace from '@test/fixtures/provider-traces/mimocode-execution.json';
+import {
+  MIMOCODE_PROVIDER_CAPABILITIES,
+} from '@test/fixtures/providerCapabilityBaseline';
 
-import { MIMOCODE_PROVIDER_CAPABILITIES } from '@/providers/mimocode/capabilities';
 import {
   mimocodeProviderModule,
   mimocodeSettingsCodec,

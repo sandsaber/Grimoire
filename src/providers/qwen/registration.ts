@@ -5,13 +5,11 @@ import {
   QwenTaskResultInterpreter,
   QwenTitleGenerationService,
 } from './auxiliary/QwenNoopServices';
-import { QWEN_PROVIDER_CAPABILITIES } from './capabilities';
 import { qwenSettingsReconciler } from './env/QwenSettingsReconciler';
 import { QwenConversationHistoryService } from './history/QwenConversationHistoryService';
 import { qwenChatUIConfig } from './ui/QwenChatUIConfig';
 
 export const qwenProviderRegistration: ProviderRegistration = {
-  capabilities: QWEN_PROVIDER_CAPABILITIES,
   chatUIConfig: qwenChatUIConfig,
   createInlineEditService: () => new QwenInlineEditService(),
   createInstructionRefineService: () => new QwenInstructionRefineService(),

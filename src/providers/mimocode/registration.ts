@@ -3,13 +3,11 @@ import { MimocodeInlineEditService } from './auxiliary/MimocodeInlineEditService
 import { MimocodeInstructionRefineService } from './auxiliary/MimocodeInstructionRefineService';
 import { MimocodeTaskResultInterpreter } from './auxiliary/MimocodeTaskResultInterpreter';
 import { MimocodeTitleGenerationService } from './auxiliary/MimocodeTitleGenerationService';
-import { MIMOCODE_PROVIDER_CAPABILITIES } from './capabilities';
 import { mimocodeSettingsReconciler } from './env/MimocodeSettingsReconciler';
 import { MimocodeConversationHistoryService } from './history/MimocodeConversationHistoryService';
 import { mimocodeChatUIConfig } from './ui/MimocodeChatUIConfig';
 
 export const mimocodeProviderRegistration: ProviderRegistration = {
-  capabilities: MIMOCODE_PROVIDER_CAPABILITIES,
   chatUIConfig: mimocodeChatUIConfig,
   createInlineEditService: (plugin) => new MimocodeInlineEditService(plugin),
   createInstructionRefineService: (plugin) => new MimocodeInstructionRefineService(plugin),

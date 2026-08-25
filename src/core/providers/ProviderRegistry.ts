@@ -6,7 +6,6 @@ import {
   DEFAULT_CHAT_PROVIDER_ID,
   type InlineEditService,
   type InstructionRefineService,
-  type ProviderCapabilities,
   type ProviderChatUIConfig,
   type ProviderConversationHistoryService,
   type ProviderId,
@@ -101,10 +100,6 @@ export class ProviderRegistry {
     providerId: ProviderId = DEFAULT_CHAT_PROVIDER_ID,
   ): ProviderSubagentLifecycleAdapter | null {
     return this.getProviderRegistration(providerId).subagentLifecycleAdapter ?? null;
-  }
-
-  static getCapabilities(providerId: ProviderId = DEFAULT_CHAT_PROVIDER_ID): ProviderCapabilities {
-    return this.getProviderRegistration(providerId).capabilities;
   }
 
   static getEnvironmentKeyPatterns(providerId: ProviderId): RegExp[] {

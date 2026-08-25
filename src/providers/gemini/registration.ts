@@ -5,13 +5,11 @@ import {
   GeminiTaskResultInterpreter,
   GeminiTitleGenerationService,
 } from './auxiliary/GeminiNoopServices';
-import { GEMINI_PROVIDER_CAPABILITIES } from './capabilities';
 import { geminiSettingsReconciler } from './env/GeminiSettingsReconciler';
 import { GeminiConversationHistoryService } from './history/GeminiConversationHistoryService';
 import { geminiChatUIConfig } from './ui/GeminiChatUIConfig';
 
 export const geminiProviderRegistration: ProviderRegistration = {
-  capabilities: GEMINI_PROVIDER_CAPABILITIES,
   chatUIConfig: geminiChatUIConfig,
   createInlineEditService: () => new GeminiInlineEditService(),
   createInstructionRefineService: () => new GeminiInstructionRefineService(),

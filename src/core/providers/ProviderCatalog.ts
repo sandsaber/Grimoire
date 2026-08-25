@@ -1,7 +1,9 @@
 import { isRecord } from '../../utils/records';
 import type { ProviderId } from '../types/provider';
+import { toLegacyCapabilities } from './legacyCapabilities';
 import { getProviderConfig, setProviderConfig } from './providerConfig';
 import type { ProviderModule } from './ProviderModule';
+import type { ProviderCapabilities } from './types';
 
 /**
  * A provider module with its three type parameters widened.
@@ -40,6 +42,7 @@ export type CatalogProviderModule = ProviderModule<unknown, unknown, object>;
 export class ProviderCatalog {
   private readonly modules: readonly CatalogProviderModule[];
   private readonly byId: ReadonlyMap<ProviderId, CatalogProviderModule>;
+  private readonly legacyCapabilities = new Map<string, Readonly<ProviderCapabilities>>();
 
   constructor(modules: readonly CatalogProviderModule[]) {
     validateModules(modules);
@@ -90,6 +93,24 @@ export class ProviderCatalog {
    */
   displayNameOrId(value: string): string {
     return this.get(value)?.manifest.displayName ?? value;
+  }
+
+  /**
+   * Inventory row 6, in the shape the chat feature reads.
+   *
+   * Projected from the module's descriptor rather than stored beside it: two
+   * declarations of the same capability is how Gemini ended up with a command
+   * surface its live record denied. Memoized because the projection freezes a
+   * new object each call and the UI asks per render.
+   */
+  capabilities(providerId: string): Readonly<ProviderCapabilities> {
+    const cached = this.legacyCapabilities.get(providerId);
+    if (cached) {
+      return cached;
+    }
+    const projected = toLegacyCapabilities(this.require(providerId).capabilities);
+    this.legacyCapabilities.set(providerId, projected);
+    return projected;
   }
 
   /** Inventory row 3. */

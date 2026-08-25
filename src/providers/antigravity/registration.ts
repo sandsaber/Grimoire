@@ -5,13 +5,11 @@ import {
   AntigravityTaskResultInterpreter,
   AntigravityTitleGenerationService,
 } from './auxiliary/AntigravityNoopServices';
-import { ANTIGRAVITY_PROVIDER_CAPABILITIES } from './capabilities';
 import { antigravitySettingsReconciler } from './env/AntigravitySettingsReconciler';
 import { AntigravityConversationHistoryService } from './history/AntigravityConversationHistoryService';
 import { antigravityChatUIConfig } from './ui/AntigravityChatUIConfig';
 
 export const antigravityProviderRegistration: ProviderRegistration = {
-  capabilities: ANTIGRAVITY_PROVIDER_CAPABILITIES,
   chatUIConfig: antigravityChatUIConfig,
   createInlineEditService: () => new AntigravityInlineEditService(),
   createInstructionRefineService: () => new AntigravityInstructionRefineService(),

@@ -44,11 +44,16 @@ parity.
 
 The M2 flip smoke matrix must exercise "every capability the provider declares", which needs one
 place to read them. That place is the fixture: each record's `capabilities` field re-exports the
-provider's own `capabilities.ts` declaration.
+record the UI reads.
 
-`src/providers/<provider>/capabilities.ts` stays canonical — the fixture holds a reference, never a
-copy, so the two cannot disagree. Nothing is duplicated into this document either, for the same
-reason: a capability table rendered by hand is a table that drifts.
+Until M3 that record was `src/providers/<provider>/capabilities.ts`, and the fixture held a
+reference to it. Those nine files are gone: each module's `ProviderCapabilityDescriptor` is the
+declaration now, `ProviderCatalog.capabilities()` projects it into the record the UI consumes, and
+`tests/fixtures/providerCapabilityBaseline.ts` holds what that record contained on the day the
+gating moved. The baseline is a deliberate copy — a projection can only be checked against
+something it cannot also change — and the parity test compares every field of every provider
+against it. Nothing is duplicated into this document, for the older reason: a capability table
+rendered by hand is a table that drifts.
 
 Practically, that means a flip's smoke matrix is derived, not written: read the provider's record,
 take the declared flags (`supportsPlanMode`, `supportsRewind`, `supportsFork`, `supportsTurnSteer`,

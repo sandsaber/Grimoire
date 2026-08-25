@@ -259,7 +259,7 @@ export class InputController {
       return agentService.getCapabilities();
     }
 
-    return ProviderRegistry.getCapabilities(providerId);
+    return providerCatalog().capabilities(providerId);
   }
 
   private isResumeSessionAtStillNeeded(resumeUuid: string, previousMessages: ChatMessage[]): boolean {
