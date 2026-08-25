@@ -7255,6 +7255,31 @@ assertion is at the product level: the old conversation still has its title.
 
 Gates: unit 525 suites / 8,304 tests, integration 5 / 154, typecheck, `eslint`, `build:release`.
 
+### M4 shipped a defect on this branch: every conversation came back empty (this commit)
+
+Found while reading the second M4 obligation, and much worse than the obligation. `listMetadata()`
+— the reader that fills the conversation list at startup — parsed each file with `JSON.parse` and
+handed the result on. Since M4 the file holds a versioned envelope, so what it handed on was
+`{ schemaVersion, recordId, revision, updatedAt, payload }`.
+
+**That object passed the shape guard.** `isSupportedSessionMetadata` rejects only an unknown
+`providerId`, and an envelope has none. So every conversation written since M4 came back from the
+listing with **no id, no title, no messages, and the default provider** — the whole history, silently
+replaced by placeholder rows, on the next plugin load.
+
+The listing reads through the record store now, which is what unwraps the envelope, adopts a bare
+legacy file, and refuses one this build must not act on. The legacy directory is still parsed
+directly, because those files are exactly what the envelope replaced.
+
+**Nothing caught it, and the reason is worth keeping.** Three M4 checkpoints, an integration suite
+that watched every write, and a unit suite of eight thousand tests — and not one of them read a
+conversation *back* through the file listing. Every assertion about persistence was made against the
+writer or against the store's own API. The test added here reloads the plugin into a vault that
+remembers and asks for the conversation by id; breaking the listing back to file parsing fails it
+and leaves all 8,304 unit tests green.
+
+Gates: unit 525 suites / 8,304 tests, integration 5 / 155, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

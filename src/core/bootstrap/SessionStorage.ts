@@ -433,12 +433,37 @@ export class SessionStorage {
     await this.deleteLegacyMetadataIfPresent(id);
   }
 
+  /**
+   * Every conversation the vault holds.
+   *
+   * Read through the record store, not by parsing the files: since M4 a
+   * conversation is stored inside a versioned envelope, and a reader that
+   * `JSON.parse`s the file gets `{ schemaVersion, recordId, revision,
+   * updatedAt, payload }` instead of the conversation. That object passed the
+   * shape guard — which only rejects an unknown `providerId`, and an envelope
+   * has none — so **every conversation written since M4 came back from this
+   * list with no id, no title and no messages**. Nothing caught it because
+   * nothing read a conversation back through the listing.
+   *
+   * The legacy directory is still parsed directly, because those files are what
+   * the envelope replaced and they are adopted on read.
+   */
   async listMetadata(): Promise<SessionMetadata[]> {
     const metas: SessionMetadata[] = [];
+    const seen = new Set<string>();
 
-    const files = await this.listUniqueMetadataFiles();
+    for (const conversationId of await this.conversations.listIds()) {
+      const record = await this.conversations.read(conversationId);
+      seen.add(`${conversationId}.meta.json`);
+      if (record.kind === 'present' && isSupportedSessionMetadata(record.metadata)) {
+        metas.push(record.metadata);
+      }
+    }
 
-    for (const filePath of files) {
+    for (const filePath of await this.listMetadataFiles(LEGACY_SESSIONS_PATH)) {
+      if (seen.has(this.getFileName(filePath))) {
+        continue;
+      }
       try {
         const content = await this.durable.read(filePath);
         if (content === null) {
@@ -449,10 +474,7 @@ export class SessionStorage {
           continue;
         }
         metas.push(raw);
-
-        if (filePath.startsWith(`${LEGACY_SESSIONS_PATH}/`)) {
-          await this.saveMetadata(raw);
-        }
+        await this.saveMetadata(raw);
       } catch {
         // Skip files that fail to load.
       }
@@ -527,25 +549,6 @@ export class SessionStorage {
     if (await this.adapter.exists(legacyFilePath)) {
       await this.adapter.delete(legacyFilePath);
     }
-  }
-
-  private async listUniqueMetadataFiles(): Promise<string[]> {
-    const preferredFiles = await this.listMetadataFiles(SESSIONS_PATH);
-    const fallbackFiles = await this.listMetadataFiles(LEGACY_SESSIONS_PATH);
-    const filesByName = new Map<string, string>();
-
-    for (const filePath of preferredFiles) {
-      filesByName.set(this.getFileName(filePath), filePath);
-    }
-
-    for (const filePath of fallbackFiles) {
-      const fileName = this.getFileName(filePath);
-      if (!filesByName.has(fileName)) {
-        filesByName.set(fileName, filePath);
-      }
-    }
-
-    return Array.from(filesByName.values());
   }
 
   /**

@@ -267,7 +267,11 @@ describe('GrimoirePlugin', () => {
      */
     function useRememberingVault(): Map<string, string> {
       const files = new Map<string, string>();
-      mockApp.vault.adapter.exists.mockImplementation(async (path: string) => files.has(path));
+      // Folders exist when something is stored under them, which is what the
+      // recursive listing checks before it descends.
+      mockApp.vault.adapter.exists.mockImplementation(async (path: string) => (
+        files.has(path) || [...files.keys()].some(stored => stored.startsWith(`${path}/`))
+      ));
       mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
         const stored = files.get(path);
         if (stored === undefined) {
@@ -281,6 +285,10 @@ describe('GrimoirePlugin', () => {
       mockApp.vault.adapter.remove.mockImplementation(async (path: string) => {
         files.delete(path);
       });
+      mockApp.vault.adapter.list.mockImplementation(async (folder: string) => ({
+        files: [...files.keys()].filter(path => path.startsWith(`${folder}/`)),
+        folders: [],
+      }));
       mockApp.vault.adapter.rename.mockImplementation(async (from: string, to: string) => {
         const stored = files.get(from);
         if (stored !== undefined) {
@@ -290,6 +298,29 @@ describe('GrimoirePlugin', () => {
       });
       return files;
     }
+
+    it('comes back from the vault after a reload, with what was written to it', async () => {
+      // The assertion nothing had: a conversation read back through the file
+      // listing. Since M4 the file holds a versioned envelope, and a reader
+      // that parses it directly gets `{ schemaVersion, recordId, revision,
+      // updatedAt, payload }` — which passed the shape guard, so every
+      // conversation came back with no id, no title and no messages.
+      useRememberingVault();
+      await plugin.onload();
+      const created = await plugin.createConversation({ providerId: 'claude' });
+      await plugin.renameConversation(created.id, 'Tomatoes');
+
+      const reloaded = new GrimoirePlugin(mockApp, mockManifest);
+      await reloaded.onload();
+
+      const conversation = await reloaded.getConversationById(created.id);
+      expect(conversation).toMatchObject({
+        id: created.id,
+        providerId: 'claude',
+        title: 'Tomatoes',
+      });
+      reloaded.onunload();
+    });
 
     it('does not create over a conversation the vault already holds', async () => {
       useRememberingVault();
