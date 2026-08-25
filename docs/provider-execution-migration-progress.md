@@ -7434,10 +7434,16 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 **M3 is closed.** Everything below is M5 or later.
 
-1. **The chat projections** — M5's centre, and now the thing everything else waits on. The
-   thirteen provider rows handed over from M3 are re-implementations of UI-shaped consumers, and
-   those consumers are what the projection work rewrites; doing the rows first means rewriting each
-   consumer twice.
+1. **The chat execution coordinator** — M5's centre, and the projection's first consumer. The
+   projection itself has landed and is dark; what is missing is the thing that feeds it (turn
+   acceptance, dispatch, persistence barriers, queued-input release) and the renderer that maps it
+   onto the existing DOM. `StreamController` is 2,100 lines of incremental append and
+   `InputController` 2,150; the move is from *chunks appended as they arrive* to *a state the
+   renderer diffs*, which is the actual work and cannot be done a chunk at a time. The first
+   attempt's `ChatExecutionCoordinator` (908 lines) and `ChatProjectionAttachment` (109) are the
+   material; both are on `codex/provider-architecture-research` at `8cab81b4`.
+   The thirteen provider rows handed over from M3 are re-implementations of the same UI-shaped
+   consumers, so doing them first means rewriting each consumer twice.
 2. **The workspace context assembly comes *after* those consumers, not before.** It looked like the
    next step until reading the rows: every provider's `workspace.initialize(context)` needs a
    context built from the plugin, eight have a `create<Provider>ModuleContext`, and the machinery is
