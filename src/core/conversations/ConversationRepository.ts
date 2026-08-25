@@ -141,6 +141,29 @@ export class ConversationRepository {
     return record.revision;
   }
 
+  /**
+   * Writes a conversation the vault does not have yet, and refuses one it does.
+   *
+   * `merge` would have applied the new conversation's fields over the stored
+   * one, which for a freshly built conversation means its empty message list,
+   * its default title and its new timestamps land on top of a real chat. A
+   * conversation is created from a provider session id when a tab first has
+   * something to save, and a session id that already names a conversation is
+   * exactly the case that must not overwrite it.
+   *
+   * The check is inside the same queue slot as the write, so two creations of
+   * the same id cannot both find it absent.
+   */
+  async create(metadata: SessionMetadata): Promise<number> {
+    const record = await this.records.merge(metadata.id, current => {
+      if (current !== null) {
+        throw new ConversationAlreadyExistsError(metadata.id);
+      }
+      return metadata;
+    });
+    return record.revision;
+  }
+
   /** Deletes a conversation the caller has read, refusing a stale revision. */
   async remove(conversationId: string, expectedRevision: number): Promise<void> {
     await this.records.remove(conversationId, expectedRevision);
@@ -159,6 +182,14 @@ export class ConversationRepository {
   /** Every conversation id this store holds a file for. */
   listIds(): Promise<string[]> {
     return this.records.listRecordIds();
+  }
+}
+
+/** Raised when a conversation is created over an id the vault already holds. */
+export class ConversationAlreadyExistsError extends Error {
+  constructor(readonly conversationId: string) {
+    super(`Conversation "${conversationId}" already exists.`);
+    this.name = 'ConversationAlreadyExistsError';
   }
 }
 

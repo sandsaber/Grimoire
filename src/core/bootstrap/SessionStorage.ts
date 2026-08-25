@@ -346,11 +346,19 @@ export class SessionStorage {
    * session id, and refusing that would break resuming into one. It is recorded
    * as an open question, not endorsed.
    */
+  /**
+   * Writes a conversation the vault does not have yet.
+   *
+   * Refuses an id the vault already holds rather than merging into it: this
+   * used to apply a freshly built conversation's empty message list, default
+   * title and new timestamps on top of a real chat whenever a provider session
+   * id already named one.
+   */
   async createMetadata(metadata: SessionMetadata): Promise<void> {
     // The vault's own rule, kept ahead of the record store's: it is the
     // stricter of the two, and it is the refusal every caller already handles.
     requireStorableId(metadata.id);
-    await this.conversations.merge(metadata.id, metadata, () => metadata);
+    await this.conversations.create(metadata);
     await this.deleteLegacyMetadataIfPresent(metadata.id);
   }
 

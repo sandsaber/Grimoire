@@ -7232,6 +7232,29 @@ at M3 were corrected to the milestone that will actually do the work.
 
 Gates: unit 525 suites / 8,301 tests, integration 5 / 153, typecheck, `eslint`, `build:release`.
 
+### Creating a conversation stopped overwriting one (this commit)
+
+The first of M4's two recorded obligations. A conversation created from a live provider session is
+keyed by that session id, which is how its transcript is found again — and when the vault already
+held a conversation under that id, the new one was written straight over it: empty message list,
+default title, fresh timestamps. `createMetadata` merged, and a merge from a freshly built
+conversation is an overwrite of everything a real chat had.
+
+`ConversationRepository.create` refuses an id the store already holds, inside the same queue slot as
+the write, so two creations of one id cannot both find it absent. The plugin catches the refusal and
+creates under a fresh id instead, keeping the session in the conversation's `sessionId` field so
+resume still works and the existing conversation is left alone. A refusal and a retry rather than a
+lookup first, for the same reason: a check-then-write loses the race with another window.
+
+The in-memory list is appended to after the write now, so an id the store refused never reaches it.
+
+**The integration test needed a vault that remembers.** The shared adapter mock answers
+`exists: false` and `read: ''`, which is fine for tests that only watch calls and makes every stored
+conversation invisible to one that needs a collision. Fifteen lines of in-memory adapter, and the
+assertion is at the product level: the old conversation still has its title.
+
+Gates: unit 525 suites / 8,304 tests, integration 5 / 154, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7341,9 +7364,9 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
    `{ inventory, manager, runtimeCommandDiscovery }`, and the descriptor's `workspace` map is one
    `CapabilitySupport` per key over a different key set.
 6. **Then the rest of M5**: projections, durable agents, seam deletion.
-7. **Two obligations from M4**, each a small commit: creating a conversation over an id that already
-   exists still replaces it, and the history list has no error state for a record this build cannot
-   read.
+7. **One obligation left from M4**: the history list has no error state for a record this build
+   cannot read — `loadMetadata` answers `null` for a corrupt or future-schema conversation, so it
+   silently disappears from the list. Creating over an existing id no longer replaces it.
 
 **Still waiting on the owner rather than on code: D9, redo.** Certification remains account-bound —
 Gemini one turn per replenishment, MiMoCode, Kimi Code and Qwen not certifiable on this machine.

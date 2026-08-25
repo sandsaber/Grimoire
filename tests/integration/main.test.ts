@@ -256,6 +256,60 @@ describe('GrimoirePlugin', () => {
 
   });
 
+  describe('creating a conversation', () => {
+    /**
+     * A vault that remembers what was written to it.
+     *
+     * The shared mock adapter answers `exists: false` and `read: ''`, which is
+     * fine for tests that only watch calls but makes every stored conversation
+     * invisible — and a collision with a conversation the vault holds is
+     * exactly what this group is about.
+     */
+    function useRememberingVault(): Map<string, string> {
+      const files = new Map<string, string>();
+      mockApp.vault.adapter.exists.mockImplementation(async (path: string) => files.has(path));
+      mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
+        const stored = files.get(path);
+        if (stored === undefined) {
+          throw new Error(`File not found: ${path}`);
+        }
+        return stored;
+      });
+      mockApp.vault.adapter.write.mockImplementation(async (path: string, content: string) => {
+        files.set(path, content);
+      });
+      mockApp.vault.adapter.remove.mockImplementation(async (path: string) => {
+        files.delete(path);
+      });
+      mockApp.vault.adapter.rename.mockImplementation(async (from: string, to: string) => {
+        const stored = files.get(from);
+        if (stored !== undefined) {
+          files.set(to, stored);
+          files.delete(from);
+        }
+      });
+      return files;
+    }
+
+    it('does not create over a conversation the vault already holds', async () => {
+      useRememberingVault();
+      // A conversation is keyed by the provider session id it was created
+      // from. When that id already names a chat, the new one used to be
+      // written straight over it: empty message list, default title, fresh
+      // timestamps.
+      await plugin.onload();
+      const existing = await plugin.createConversation({ sessionId: 'session-1' });
+      await plugin.updateConversation(existing.id, { title: 'Tomatoes' });
+
+      const created = await plugin.createConversation({ sessionId: 'session-1' });
+
+      expect(created.id).not.toBe(existing.id);
+      // The session is still recorded, so resuming the provider still works.
+      expect(created.sessionId).toBe('session-1');
+      expect((await plugin.getConversationById(existing.id))?.title).toBe('Tomatoes');
+    });
+  });
+
   describe('provider workspaces', () => {
     it('loads every other provider when one workspace initializer throws', async () => {
       // Startup used to await each provider's initializer in one loop with no

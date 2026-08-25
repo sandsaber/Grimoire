@@ -34,6 +34,7 @@ import {
   type ConversationMetadataField,
 } from './core/bootstrap/SessionStorage';
 import type { SharedAppStorage } from './core/bootstrap/storage';
+import { ConversationAlreadyExistsError } from './core/conversations/ConversationRepository';
 import { type DebugLogEvent, DebugLogService } from './core/debug/DebugLogService';
 import { providerCatalog } from './core/providers/ProviderCatalog';
 import {
@@ -1182,9 +1183,8 @@ export default class GrimoirePlugin extends Plugin {
   }): Promise<Conversation> {
     const providerId = options?.providerId ?? DEFAULT_CHAT_PROVIDER_ID;
     const sessionId = options?.sessionId;
-    const conversationId = sessionId ?? this.generateConversationId();
-    const conversation: Conversation = {
-      id: conversationId,
+    const build = (id: string): Conversation => ({
+      id,
       providerId,
       title: this.generateDefaultTitle(),
       createdAt: Date.now(),
@@ -1192,12 +1192,38 @@ export default class GrimoirePlugin extends Plugin {
       sessionId: sessionId ?? null,
       model: options?.model,
       messages: [],
-    };
+    });
 
+    // A conversation created from a live session is keyed by that session id,
+    // which is how its transcript is found again. When the vault already holds
+    // one under that id, the new chat takes an id of its own and keeps the
+    // session in its `sessionId` field, so resume still works and the existing
+    // conversation is left alone. Written as a refusal and a retry rather than
+    // a lookup first: the store serializes per id, and a check-then-write can
+    // lose the race with another window.
+    let conversation = build(sessionId ?? this.generateConversationId());
+    try {
+      await this.storage.sessions.createMetadata(
+        this.storage.sessions.toSessionMetadata(conversation)
+      );
+    } catch (error) {
+      if (!(error instanceof ConversationAlreadyExistsError)) {
+        throw error;
+      }
+      this.recordDebugLog({
+        data: { conversationId: conversation.id },
+        event: 'conversation.create.collision',
+        level: 'warn',
+        scope: 'plugin',
+      });
+      conversation = build(this.generateConversationId());
+      await this.storage.sessions.createMetadata(
+        this.storage.sessions.toSessionMetadata(conversation)
+      );
+    }
+
+    // After the write, so a refused id never reaches the in-memory list.
     this.conversations.unshift(conversation);
-    await this.storage.sessions.createMetadata(
-      this.storage.sessions.toSessionMetadata(conversation)
-    );
 
     return conversation;
   }

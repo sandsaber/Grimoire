@@ -192,6 +192,47 @@ describe('conversation repository', () => {
     });
   });
 
+  describe('creating', () => {
+    it('writes a conversation the vault does not have', async () => {
+      const { repository } = createRepository();
+
+      await expect(repository.create(metadata())).resolves.toBe(1);
+      await expect(repository.read('conv-1')).resolves.toMatchObject({
+        kind: 'present',
+        revision: 1,
+      });
+    });
+
+    it('refuses an id the vault already holds, and leaves it untouched', async () => {
+      // A conversation is created from a provider session id when a tab first
+      // has something to save. Merging instead would apply the new
+      // conversation's empty message list, default title and fresh timestamps
+      // over a real chat.
+      const { repository } = createRepository();
+      await repository.create(metadata({ title: 'Tomatoes' }));
+
+      await expect(repository.create(metadata({ title: 'Replacement' })))
+        .rejects.toThrow('Conversation "conv-1" already exists.');
+
+      await expect(repository.read('conv-1')).resolves.toMatchObject({
+        kind: 'present',
+        metadata: expect.objectContaining({ title: 'Tomatoes' }),
+        revision: 1,
+      });
+    });
+
+    it('refuses a conversation adopted from a bare legacy file', async () => {
+      // The vault in the field: an existing conversation has no envelope, so a
+      // creation over it must be refused on what the file says, not on whether
+      // this store wrote it.
+      const { repository, storage } = createRepository();
+      storage.seed(CONVERSATION_PATH, JSON.stringify(metadata({ title: 'Tomatoes' })));
+
+      await expect(repository.create(metadata({ title: 'Replacement' })))
+        .rejects.toThrow('already exists');
+    });
+  });
+
   describe('records this build must not act on', () => {
     it('reports a record from a newer release rather than guessing at it', async () => {
       const { repository, storage } = createRepository();
