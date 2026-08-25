@@ -138,7 +138,7 @@ describe('provider contribution inventory', () => {
     });
 
     it('claims the count the heading advertises', () => {
-      expect(documented).toHaveLength(10);
+      expect(documented).toHaveLength(9);
     });
 
     it('accounts for every field the registration ever declared', () => {
@@ -158,6 +158,7 @@ describe('provider contribution inventory', () => {
         'blankTabOrder',
         'isEnabled',
         'setEnabled',
+        'getPreloadedContextFiles',
         'capabilities',
         'environmentKeyPatterns',
       ]);
@@ -173,7 +174,7 @@ describe('provider contribution inventory', () => {
     );
 
     it.each(Object.entries(REGISTRATIONS))('%s supplies every required field', (_providerId, registration) => {
-      const optional = ['getPreloadedContextFiles', 'subagentLifecycleAdapter'];
+      const optional = ['subagentLifecycleAdapter'];
       const missing = documented.filter(
         field => !optional.includes(field) && !(field in registration),
       );

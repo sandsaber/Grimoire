@@ -1,4 +1,3 @@
-import { GRIMOIRE_STORAGE_PATH } from '../../core/bootstrap/StoragePaths';
 import type { ProviderRegistration } from '../../core/providers/types';
 import { GrokInlineEditService } from './auxiliary/GrokInlineEditService';
 import { GrokInstructionRefineService } from './auxiliary/GrokInstructionRefineService';
@@ -7,7 +6,6 @@ import { GrokTitleGenerationService } from './auxiliary/GrokTitleGenerationServi
 import { grokSettingsReconciler } from './env/GrokSettingsReconciler';
 import { GrokConversationHistoryService } from './history/GrokConversationHistoryService';
 import { grokSubagentLifecycleAdapter } from './normalization/grokSubagentNormalization';
-import { GROK_ARTIFACTS_SUBDIR } from './runtime/GrokPaths';
 import { grokChatUIConfig } from './ui/GrokChatUIConfig';
 
 export const grokProviderRegistration: ProviderRegistration = {
@@ -17,9 +15,6 @@ export const grokProviderRegistration: ProviderRegistration = {
   createRuntime: ({ plugin }) => plugin.getGrokExecution().createRuntime(),
   createTitleGenerationService: (plugin) => new GrokTitleGenerationService(plugin),
   historyService: new GrokConversationHistoryService(),
-  getPreloadedContextFiles: () => [
-    `${GRIMOIRE_STORAGE_PATH}/${GROK_ARTIFACTS_SUBDIR}/system.md`,
-  ],
   settingsReconciler: grokSettingsReconciler,
   subagentLifecycleAdapter: grokSubagentLifecycleAdapter,
   taskResultInterpreter: new GrokTaskResultInterpreter(),

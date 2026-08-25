@@ -110,10 +110,6 @@ export class ProviderRegistry {
     return this.getProviderRegistration(providerId).settingsReconciler;
   }
 
-  static getPreloadedContextFiles(providerId: ProviderId): string[] {
-    return this.getProviderRegistration(providerId).getPreloadedContextFiles?.() ?? [];
-  }
-
   static resolveSettingsProviderId(settings: Record<string, unknown>): ProviderId {
     const catalog = providerCatalog();
     const current = settings.settingsProvider;

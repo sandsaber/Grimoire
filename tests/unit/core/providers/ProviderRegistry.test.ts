@@ -192,13 +192,6 @@ describe('ProviderRegistry', () => {
     }
   });
 
-  it('exposes provider-owned preloaded context files without feature hardcoding', () => {
-    expect(ProviderRegistry.getPreloadedContextFiles('grok')).toEqual([
-      '.grimoire/grok/system.md',
-    ]);
-    expect(ProviderRegistry.getPreloadedContextFiles('claude')).toEqual([]);
-  });
-
   it('routes auto title generation to the active settings provider', async () => {
     const providerCalls: ProviderId[] = [];
     const originalCreate = ProviderRegistry.createTitleGenerationService.bind(ProviderRegistry);

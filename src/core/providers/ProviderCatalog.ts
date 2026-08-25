@@ -155,6 +155,23 @@ export class ProviderCatalog {
     ]));
   }
 
+  /**
+   * What a provider declares about itself. Inventory rows 5, 8, 15 and 16.
+   *
+   * Reachable without a plugin, which is the whole reason `declarations` was
+   * split out of the runtime-port factory: a question about a provider's own
+   * name for a tool, or the files it preloads, should not need a running
+   * conversation to answer.
+   */
+  declarations(providerId: string): CatalogProviderModule['declarations'] {
+    return this.require(providerId).declarations;
+  }
+
+  /** Inventory row 5. */
+  preloadedContextFiles(providerId: string): readonly string[] {
+    return this.declarations(providerId).context?.preloadedFileNames() ?? [];
+  }
+
   /** Inventory row 3. */
   isEnabled(settings: Record<string, unknown>, providerId: string): boolean {
     const module = this.require(providerId);

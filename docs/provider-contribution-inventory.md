@@ -28,7 +28,7 @@ that is produced by `initialize(context)` and needs a live plugin. A provider th
 optional workspace member is caught only by the parity gate, and only if its module leaves the
 bundle.
 
-## `ProviderRegistration` fields (10) — [types.ts:56](../src/core/providers/types.ts)
+## `ProviderRegistration` fields (9) — [types.ts:56](../src/core/providers/types.ts)
 
 Rows that have already moved are not deleted; they are listed under
 [Moved to the provider catalog](#moved-to-the-provider-catalog-5) with where they live now. Row
@@ -37,7 +37,6 @@ plan and this file both refer to rows by number.
 
 | # | Field | What it carries | Consumed by today | Target home | Moves at |
 |---|---|---|---|---|---|
-| 5 | `getPreloadedContextFiles?` | provider-preloaded context file names | chat context surfaces | context capability port | M3 |
 | 8 | `chatUIConfig` | provider chat UI configuration | chat feature rendering | UI-config feature contribution | M3 |
 | 9 | `settingsReconciler` | settings/model normalization on load and env change | settings load, environment change | `ProviderSettingsCodec` | M3 |
 | 10 | `createRuntime` | chat execution (`ChatRuntime`) | `TabManager` / `Tab` | `ExecutionBackendFactory` behind the presentation adapter | **M2 — this is the flip** |
@@ -73,7 +72,7 @@ fields of either service interface.
 |---|---|---|---|---|---|
 | 1 | `workspaceCapabilities` | `ProviderWorkspaceRegistration.workspaceCapabilities` ([types.ts:484](../src/core/providers/types.ts)) | `ProviderWorkspaceRegistry.getCapabilities()`, settings gating | workspace part of `ProviderCapabilityDescriptor` in the module | M3 |
 
-## Moved to their target homes (8)
+## Moved to their target homes (9)
 
 Rows that have reached the home the tables above name for them. They stay recorded here for the
 same reason those tables exist: a contribution that simply disappears from an inventory is
@@ -86,6 +85,7 @@ each table's total still adds up.
 | 2 | `blankTabOrder` | registration | `ProviderManifest.order` | `ProviderCatalog.ids()`, which sorts by it | M3 |
 | 3 | `isEnabled` | registration | `ProviderSettingsCodec.isEnabled` | `ProviderCatalog.isEnabled()` / `enabledIds()` | M3 |
 | 4 | `setEnabled` | registration | `ProviderSettingsCodec.withEnabled` | `ProviderCatalog.setEnabled()` | M3 |
+| 5 | `getPreloadedContextFiles` | registration | `ProviderDeclarations.context` | `ProviderCatalog.preloadedContextFiles()` | M3 |
 | 6 | `capabilities` | registration | `ProviderCapabilityDescriptor` | `ProviderCatalog.capabilities()`, projected by `toLegacyCapabilities` | M3 |
 | 7 | `environmentKeyPatterns` | registration | `ProviderSettingsCodec.environmentKeyPrefixes` | `ProviderCatalog.environmentKeyOwner()` | M3 |
 | 2 | default provider configs | app-level | `ProviderSettingsCodec.defaults()` | `ProviderCatalog.defaultConfigs()` | M3 |
@@ -129,6 +129,11 @@ list on every load — so the shipped settings file gains one key with the value
 as. The nine `DEFAULT_<PROVIDER>_PROVIDER_SETTINGS` constants are no longer a source;
 `getBuiltInProviderDefaultConfigs()` derives from the catalog, and the keys it ships are pinned in a
 test rather than left to be re-derived from the codecs it is checking.
+
+Row 5 followed the split that made `declarations` reachable without a plugin. Only Grok declares it —
+it has no agent definition, so its system prompt is a vault file passed on the command line — and the
+catalog answers an empty list for the other eight, which is where the knowledge belongs: the chat
+context surface used to ask a registry that answered for a provider it named nowhere.
 
 ## Rules
 

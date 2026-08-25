@@ -15,6 +15,7 @@ import type {
 import type { ManagedAcpExecutionBackendContext } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
 import { parseEnvironmentVariables } from '@/utils/env';
 
+import { GRIMOIRE_STORAGE_PATH } from '../../core/bootstrap/StoragePaths';
 import { isRecord } from '../../utils/records';
 import {
   GROK_EXECUTION_DESCRIPTOR,
@@ -25,6 +26,7 @@ import {
   isGrokModelSelectionId,
   normalizeGrokThinkingOptionsByModel,
 } from './models';
+import { GROK_ARTIFACTS_SUBDIR } from './runtime/GrokPaths';
 import {
   DEFAULT_GROK_PROVIDER_SETTINGS,
   type GrokProviderSettings,
@@ -350,6 +352,14 @@ GrokProviderSettings
   declarations: {
     providerId: 'grok',
     chatUI: grokChatUi,
+    // The only provider that preloads a file of its own: Grok has no agent
+    // definition, so its system prompt is written to the vault and passed on
+    // the command line, and the chat context surface shows what went in.
+    context: {
+      preloadedFileNames: () => [
+        `${GRIMOIRE_STORAGE_PATH}/${GROK_ARTIFACTS_SUBDIR}/system.md`,
+      ],
+    },
   },
 
   runtimePorts: context => ({

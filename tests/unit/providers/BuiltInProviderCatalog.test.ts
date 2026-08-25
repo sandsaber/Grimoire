@@ -114,6 +114,20 @@ describe('built-in provider catalog', () => {
     });
   });
 
+  it('preloads a context file for the one provider that writes one', () => {
+    // Grok has no agent definition, so its system prompt is a vault file passed
+    // on the command line, and the chat context surface shows what went in.
+    // Every other provider preloads nothing, which is what the empty list says
+    // rather than a feature-layer special case naming Grok.
+    const preloading = builtInProviderCatalog.ids()
+      .filter(providerId => builtInProviderCatalog.preloadedContextFiles(providerId).length > 0);
+
+    expect(preloading).toEqual(['grok']);
+    expect(builtInProviderCatalog.preloadedContextFiles('grok'))
+      .toEqual(['.grimoire/grok/system.md']);
+    expect(builtInProviderCatalog.preloadedContextFiles('claude')).toEqual([]);
+  });
+
   it('names each provider as the product names it', () => {
     expect(builtInProviderCatalog.list().map(module => module.manifest.displayName)).toEqual([
       'Claude',

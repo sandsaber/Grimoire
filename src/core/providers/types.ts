@@ -63,7 +63,6 @@ export interface CreateChatRuntimeOptions {
  * inventories cannot disagree about a provider's name or its place in a list.
  */
 export interface ProviderRegistration {
-  getPreloadedContextFiles?: () => string[];
   chatUIConfig: ProviderChatUIConfig;
   settingsReconciler: ProviderSettingsReconciler;
   createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => ChatRuntime;

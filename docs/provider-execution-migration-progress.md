@@ -80,7 +80,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
-| M3 — provider control plane | In progress — the catalog owns provider identity, ordering, enablement and capability gating, and a workspace manager owns both halves of the workspace lifecycle. Six of the sixteen registration rows and two of the three app-level rows have moved | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, this commit |
+| M3 — provider control plane | In progress — the catalog owns provider identity, ordering, enablement and capability gating, and a workspace manager owns both halves of the workspace lifecycle. Seven of the sixteen registration rows and two of the three app-level rows have moved | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
@@ -7140,6 +7140,19 @@ fails when the title stops being read from the payload.
 
 The adapter's `TSettings` type parameter went with the split: the runtime ports are not generic, so
 nine `RuntimeAdapter` subclasses were passing a type argument nothing used.
+
+Gates: unit 525 suites / 8,301 tests, integration 5 / 153, typecheck, `eslint`, `build:release`.
+
+### The first row the split unblocked (this commit)
+
+Row 5, `getPreloadedContextFiles`, moved the moment `declarations` became reachable without a
+plugin. Only Grok declares it — it has no agent definition, so its system prompt is a vault file
+passed on the command line, and the chat context surface shows what went in. The catalog answers an
+empty list for the other eight.
+
+Small, and worth the entry for what the test says: the assertion is *which* providers preload
+something, not that Grok does. A test naming only Grok would still pass if a second provider quietly
+started preloading a file.
 
 Gates: unit 525 suites / 8,301 tests, integration 5 / 153, typecheck, `eslint`, `build:release`.
 

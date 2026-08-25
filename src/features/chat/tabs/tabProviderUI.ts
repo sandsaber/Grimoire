@@ -150,7 +150,7 @@ export function refreshRuntimeContextUI(tab: TabData, plugin: GrimoirePlugin): v
 
 export function recordProviderLaunchArtifacts(tab: TabData, plugin: GrimoirePlugin): void {
   const providerId = getTabProviderId(tab, plugin);
-  for (const path of ProviderRegistry.getPreloadedContextFiles(providerId)) {
+  for (const path of providerCatalog().preloadedContextFiles(providerId)) {
     tab.ui.runtimeContextActivity?.recordPreloadedFile(providerId, path);
   }
 }
