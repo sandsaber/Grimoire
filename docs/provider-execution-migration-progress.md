@@ -80,7 +80,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
-| M3 — provider control plane | In progress — the catalog owns provider identity, ordering, enablement and capability gating, and a workspace manager owns both halves of the workspace lifecycle. Six of the sixteen registration rows and one of the three app-level rows have moved | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, this commit |
+| M3 — provider control plane | In progress — the catalog owns provider identity, ordering, enablement and capability gating, and a workspace manager owns both halves of the workspace lifecycle. Six of the sixteen registration rows and two of the three app-level rows have moved | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
@@ -7093,6 +7093,28 @@ is unchanged; what is new is a test that says so, because reordering the two pro
 silently rescope every such key a user has already typed.
 
 Gates: unit 525 suites / 8,287 tests, integration 5 / 153, typecheck, `eslint`, `build:release`.
+
+### The third source of provider defaults, and what it had already lost (this commit)
+
+App-level inventory row 2. `getBuiltInProviderDefaultConfigs()` was a hand-maintained map of nine
+`DEFAULT_<PROVIDER>_PROVIDER_SETTINGS` constants standing beside the two registries — a third place
+for a provider's defaults to be declared, which is a third place for them to drift. Each provider's
+settings codec is the one declaration now, and the function derives from the catalog.
+
+**Compared before replacing, and eight of nine agreed exactly.** Antigravity's hand-maintained
+default omitted `discoveredModels`; its codec encodes an empty list, and its own reader normalized
+the missing key back to an empty list on every load. So the shipped settings file gains one key
+whose value it was already read as — stated rather than discovered later.
+
+**Nothing was watching the shipped settings shape**, which is how that omission survived. The keys
+each provider seeds are written out in a test now, rather than derived from the codecs the test is
+checking, alongside the fact that a fresh vault enables exactly one provider. Adding a key to a
+codec's `encode` fails it, which is the point: that is a change to the file every user's vault gets.
+
+The freshness the old function had is kept and stated: a caller seeding settings will mutate them,
+so every call returns new objects.
+
+Gates: unit 525 suites / 8,298 tests, integration 5 / 153, typecheck, `eslint`, `build:release`.
 
 ## Current blocker
 

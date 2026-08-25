@@ -255,7 +255,7 @@ describe('provider contribution inventory', () => {
     it('accounts for the three contributions that live outside both service objects', () => {
       const moved = readMovedRows().filter(row => row.from === 'app-level');
 
-      expect(documented).toHaveLength(2);
+      expect(documented).toHaveLength(1);
       expect(documented.length + moved.length).toBe(3);
     });
 
@@ -265,10 +265,19 @@ describe('provider contribution inventory', () => {
       );
     });
 
-    it('anchors the third source of provider defaults', () => {
+    it('has no third source of provider defaults left to anchor', () => {
+      // The row said a hand-maintained map stood beside the two registries.
+      // It derives from the catalog now, so what is checkable is that it still
+      // covers every provider and no longer names a per-provider constant.
+      const source = readFileSync(
+        resolve(process.cwd(), 'src/providers/defaultProviderConfigs.ts'),
+        'utf8',
+      );
+
       expect(Object.keys(getBuiltInProviderDefaultConfigs())).toEqual(
         expect.arrayContaining(Object.keys(REGISTRATIONS)),
       );
+      expect(source).not.toMatch(/DEFAULT_\w+_PROVIDER_SETTINGS/);
     });
 
     it('has both halves of the workspace lifecycle, where the moved row says', () => {

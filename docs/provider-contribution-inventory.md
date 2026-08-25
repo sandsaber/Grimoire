@@ -64,7 +64,7 @@ plan and this file both refer to rows by number.
 | 10 | `settingsTabRenderer?` | provider settings tab | `GrimoireSettings` | settings presentation slot | M3 |
 | 11 | `refreshAgentMentions?` | mention refresh hook | workspace refresh | agent-mention port | M3 |
 
-## Registration- and app-level contributions (2) — outside both service objects
+## Registration- and app-level contributions (1) — outside both service objects
 
 These carried no slot in the v1 module and are the easiest to lose again, because they are not
 fields of either service interface.
@@ -72,9 +72,8 @@ fields of either service interface.
 | # | Contribution | Where it lives today | Consumed by today | Target home | Moves at |
 |---|---|---|---|---|---|
 | 1 | `workspaceCapabilities` | `ProviderWorkspaceRegistration.workspaceCapabilities` ([types.ts:484](../src/core/providers/types.ts)) | `ProviderWorkspaceRegistry.getCapabilities()`, settings gating | workspace part of `ProviderCapabilityDescriptor` in the module | M3 |
-| 2 | default provider configs | `getBuiltInProviderDefaultConfigs()` in [defaultProviderConfigs.ts](../src/providers/defaultProviderConfigs.ts), a third source beside the two registries | [defaultSettings.ts](../src/app/settings/defaultSettings.ts) | `ProviderSettingsCodec` defaults, published through the catalog | M3 |
 
-## Moved to their target homes (7)
+## Moved to their target homes (8)
 
 Rows that have reached the home the tables above name for them. They stay recorded here for the
 same reason those tables exist: a contribution that simply disappears from an inventory is
@@ -89,6 +88,7 @@ each table's total still adds up.
 | 4 | `setEnabled` | registration | `ProviderSettingsCodec.withEnabled` | `ProviderCatalog.setEnabled()` | M3 |
 | 6 | `capabilities` | registration | `ProviderCapabilityDescriptor` | `ProviderCatalog.capabilities()`, projected by `toLegacyCapabilities` | M3 |
 | 7 | `environmentKeyPatterns` | registration | `ProviderSettingsCodec.environmentKeyPrefixes` | `ProviderCatalog.environmentKeyOwner()` | M3 |
+| 2 | default provider configs | app-level | `ProviderSettingsCodec.defaults()` | `ProviderCatalog.defaultConfigs()` | M3 |
 | 3 | workspace initialize/dispose lifecycle | app-level | `ProviderWorkspaceContribution`, both halves required | `ProviderWorkspaceManager`, owned by the plugin instance | M3 |
 
 Both moved together, and had to: ordering with the names still on the registration would have left
@@ -122,6 +122,13 @@ other. It is `environmentKeyPrefixes` now, and prefixes rather than regular expr
 registrations wrote `/^PREFIX_/i` and nothing needed more, while a contract taking an arbitrary
 expression has the core run provider-supplied code over every key a user types into their
 environment settings.
+
+App-level row 2 went next, and the two sources agreed for eight providers of nine. Antigravity's
+hand-maintained default omitted `discoveredModels`, which its own reader normalized back to an empty
+list on every load — so the shipped settings file gains one key with the value it was already read
+as. The nine `DEFAULT_<PROVIDER>_PROVIDER_SETTINGS` constants are no longer a source;
+`getBuiltInProviderDefaultConfigs()` derives from the catalog, and the keys it ships are pinned in a
+test rather than left to be re-derived from the codecs it is checking.
 
 ## Rules
 

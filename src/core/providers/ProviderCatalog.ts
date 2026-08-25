@@ -138,6 +138,23 @@ export class ProviderCatalog {
     return null;
   }
 
+  /**
+   * Every provider's defaults, encoded as they are stored. App-level row 2.
+   *
+   * A fresh object per provider on every call, because the caller owns the
+   * settings it is seeding and will mutate them. The third source this
+   * replaces — a hand-maintained map beside the two registries — agreed with
+   * the codecs for eight providers of nine; Antigravity's omitted
+   * `discoveredModels`, which its reader normalized back to an empty list on
+   * every load.
+   */
+  defaultConfigs(): Record<ProviderId, Record<string, unknown>> {
+    return Object.fromEntries(this.modules.map(module => [
+      module.manifest.id,
+      module.settings.encode(module.settings.defaults()),
+    ]));
+  }
+
   /** Inventory row 3. */
   isEnabled(settings: Record<string, unknown>, providerId: string): boolean {
     const module = this.require(providerId);
