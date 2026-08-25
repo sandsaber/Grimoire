@@ -80,7 +80,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
-| M3 — provider control plane | In progress — the catalog exists, validates the nine modules, and owns provider identity, ordering, enablement and capability gating. Five of the sixteen registration rows have moved | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, this commit |
+| M3 — provider control plane | In progress — the catalog owns provider identity, ordering, enablement and capability gating, and a workspace manager owns both halves of the workspace lifecycle. Five of the sixteen registration rows and one of the three app-level rows have moved | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
@@ -7038,6 +7038,41 @@ own agreement test; changing a value in a descriptor fails four suites, includin
 command test that gates the fork command — a UI surface, not a mirror.
 
 Gates: unit 524 suites / 8,257 tests, integration 5 / 151, typecheck, `eslint`, `build:release`.
+
+### One provider could take down every provider's workspace (this commit)
+
+App-level inventory row 3, and the row understated it. `ProviderWorkspaceRegistry.initializeAll()`
+was a `for` loop that awaited each provider's initializer in turn, with no `try`, publishing into a
+static map, with no teardown at all. Three consequences, all reachable:
+
+- **one provider took down every provider.** An initializer that threw propagated out of the loop
+  and out of `onload`'s try, so every provider *after it in the iteration order* was never built —
+  no command catalog, no model list, no CLI resolution, no settings tab. Which providers those were
+  depended on object key order;
+- **a failure was permanent** until the next plugin load, because nothing could ask again;
+- **nothing was released at unload**, and the static map outlived the instance that filled it, so
+  the next load read the previous load's services until its own initializer overwrote them.
+
+`ProviderWorkspaceManager` owns the lifecycle now, one instance per plugin load. Initialization is
+concurrent and isolated, a failure is recorded through a port and stays retryable, and `disposeAll`
+is the half that never existed — including for a workspace that finishes *after* teardown started,
+which is released rather than published.
+
+**Two absences are deliberate and stated in the class.** Initialization is still eager: every
+consumer reads its service synchronously, so laziness arrives with the move of those consumers onto
+the module slots, not before. And there is no generation fence, because nothing recycles a workspace
+yet — a mechanism with no producer is the dark machinery this migration is unwinding.
+
+The registry keeps its synchronous accessors and loses its lifecycle: it builds one provider's
+services on request and publishes what the manager gives it. Its comment describes the loop it used
+to have rather than naming it, because the fitness test reads this file for that name.
+
+**Four breaks, four red.** A sequential unguarded startup fails the isolation test; a teardown that
+releases nothing fails three; removing `disposeAll` from `onunload` fails the integration test that
+loads and unloads the real plugin; and bypassing the manager in `main.ts` fails four, including two
+that were not written for it.
+
+Gates: unit 525 suites / 8,269 tests, integration 5 / 153, typecheck, `eslint`, `build:release`.
 
 ## Current blocker
 

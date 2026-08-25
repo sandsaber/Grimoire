@@ -65,7 +65,7 @@ plan and this file both refer to rows by number.
 | 10 | `settingsTabRenderer?` | provider settings tab | `GrimoireSettings` | settings presentation slot | M3 |
 | 11 | `refreshAgentMentions?` | mention refresh hook | workspace refresh | agent-mention port | M3 |
 
-## Registration- and app-level contributions (3) — outside both service objects
+## Registration- and app-level contributions (2) — outside both service objects
 
 These carried no slot in the v1 module and are the easiest to lose again, because they are not
 fields of either service interface.
@@ -74,21 +74,22 @@ fields of either service interface.
 |---|---|---|---|---|---|
 | 1 | `workspaceCapabilities` | `ProviderWorkspaceRegistration.workspaceCapabilities` ([types.ts:484](../src/core/providers/types.ts)) | `ProviderWorkspaceRegistry.getCapabilities()`, settings gating | workspace part of `ProviderCapabilityDescriptor` in the module | M3 |
 | 2 | default provider configs | `getBuiltInProviderDefaultConfigs()` in [defaultProviderConfigs.ts](../src/providers/defaultProviderConfigs.ts), a third source beside the two registries | [defaultSettings.ts](../src/app/settings/defaultSettings.ts) | `ProviderSettingsCodec` defaults, published through the catalog | M3 |
-| 3 | workspace initialize/dispose lifecycle | `ProviderWorkspaceRegistry.initializeAll()` at plugin load; **no dispose contract exists today** | `main.ts` startup | lazy, failure-isolated init plus asynchronous dispose in the workspace manager — both halves land together; "init without dispose" is the v1 defect repeating | M3 |
 
-## Moved to the provider catalog (5)
+## Moved to their target homes (6)
 
-Rows that have left `ProviderRegistration` for a `ProviderModule` slot. They stay recorded here for
-the same reason the tables above exist: a contribution that simply disappears from the inventory is
-indistinguishable from one that was dropped.
+Rows that have reached the home the tables above name for them. They stay recorded here for the
+same reason those tables exist: a contribution that simply disappears from an inventory is
+indistinguishable from one that was dropped. The `From` column says which table the row left, so
+each table's total still adds up.
 
-| # | Field | What it carried | Now declared by | Read through | Moved at |
+| # | Contribution | From | Now declared by | Read through | Moved at |
 |---|---|---|---|---|---|
-| 1 | `displayName` | provider identity label | `ProviderManifest.displayName` | `ProviderCatalog.displayName()` / `displayNameOrId()` | M3 |
-| 2 | `blankTabOrder` | deterministic provider ordering | `ProviderManifest.order` | `ProviderCatalog.ids()`, which sorts by it | M3 |
-| 3 | `isEnabled` | enablement predicate over settings | `ProviderSettingsCodec.isEnabled` | `ProviderCatalog.isEnabled()` / `enabledIds()` | M3 |
-| 4 | `setEnabled` | enablement writer | `ProviderSettingsCodec.withEnabled` | `ProviderCatalog.setEnabled()` | M3 |
-| 6 | `capabilities` | static feature flags | `ProviderCapabilityDescriptor` | `ProviderCatalog.capabilities()`, projected by `toLegacyCapabilities` | M3 |
+| 1 | `displayName` | registration | `ProviderManifest.displayName` | `ProviderCatalog.displayName()` / `displayNameOrId()` | M3 |
+| 2 | `blankTabOrder` | registration | `ProviderManifest.order` | `ProviderCatalog.ids()`, which sorts by it | M3 |
+| 3 | `isEnabled` | registration | `ProviderSettingsCodec.isEnabled` | `ProviderCatalog.isEnabled()` / `enabledIds()` | M3 |
+| 4 | `setEnabled` | registration | `ProviderSettingsCodec.withEnabled` | `ProviderCatalog.setEnabled()` | M3 |
+| 6 | `capabilities` | registration | `ProviderCapabilityDescriptor` | `ProviderCatalog.capabilities()`, projected by `toLegacyCapabilities` | M3 |
+| 3 | workspace initialize/dispose lifecycle | app-level | `ProviderWorkspaceContribution`, both halves required | `ProviderWorkspaceManager`, owned by the plugin instance | M3 |
 
 Both moved together, and had to: ordering with the names still on the registration would have left
 two inventories able to disagree about the same provider — which they already did. Three modules
@@ -105,6 +106,14 @@ Row 6 followed once the descriptor could answer both command questions. The nine
 the descriptor, and the values those files held live on as
 `tests/fixtures/providerCapabilityBaseline.ts`, which the parity test compares field for field. A
 projection is only trustworthy against something it cannot also change.
+
+The app-level lifecycle row moved with the workspace manager. `initializeAll()` was a loop that
+awaited each provider in turn with no `try`, published into a static map that outlived the plugin
+instance, and had no teardown at all; the manager initializes concurrently, isolates a failure to
+the provider that caused it, leaves that provider retryable, and releases everything at unload.
+Initialization is still eager and there is no generation fence: laziness belongs with the move of
+workspace consumers onto the module slots, since every consumer reads its service synchronously
+today, and a fence belongs with the first settings transition that recycles a workspace.
 
 ## Rules
 

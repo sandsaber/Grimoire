@@ -37,6 +37,35 @@ import { PARITY_SURFACES } from './presentationParityManifest';
  */
 
 const INVENTORY_PATH = 'docs/provider-contribution-inventory.md';
+
+/** The moved table's rows as `{ contribution, from }`, so each total still adds up. */
+function readMovedRows(): Array<{ contribution: string; from: string }> {
+  const document = readFileSync(resolve(process.cwd(), INVENTORY_PATH), 'utf8');
+  const lines = document.split('\n');
+  const start = lines.findIndex(line => line.startsWith('## Moved to their target homes'));
+
+  if (start === -1) {
+    throw new Error(`Moved table was not found in ${INVENTORY_PATH}`);
+  }
+
+  const rows: Array<{ contribution: string; from: string }> = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.startsWith('#')) {
+      break;
+    }
+    if (!line.startsWith('|')) {
+      continue;
+    }
+    const cells = line.split('|').map(cell => cell.trim());
+    const contribution = cells[2]?.replace(/`/g, '').replace(/\?$/, '');
+    if (!contribution || contribution === 'Contribution' || contribution.startsWith('---')) {
+      continue;
+    }
+    rows.push({ contribution, from: cells[3] ?? '' });
+  }
+
+  return rows;
+}
 const TYPES_PATH = 'src/core/providers/types.ts';
 
 const WORKSPACE_REGISTRATIONS = {
@@ -100,7 +129,9 @@ describe('provider contribution inventory', () => {
   describe('ProviderRegistration table', () => {
     const documented = readInventoryRows('## `ProviderRegistration` fields');
     const declared = readInterfaceMembers(TYPES_PATH, 'ProviderRegistration');
-    const moved = readInventoryRows('## Moved to the provider catalog');
+    const moved = readMovedRows()
+      .filter(row => row.from === 'registration')
+      .map(row => row.contribution);
 
     it('documents exactly the declared fields', () => {
       expect([...documented].sort()).toEqual([...declared].sort());
@@ -199,7 +230,7 @@ describe('provider contribution inventory', () => {
     const documented = [
       ...readInventoryRows('## `ProviderRegistration` fields'),
       ...readInventoryRows('## `ProviderWorkspaceServices` members'),
-      ...readInventoryRows('## Moved to the provider catalog'),
+      ...readMovedRows().map(row => row.contribution),
     ];
 
     it.each(CONTRIBUTION_SURFACES)(
@@ -220,8 +251,11 @@ describe('provider contribution inventory', () => {
   describe('registration- and app-level contributions', () => {
     const documented = readInventoryRows('## Registration- and app-level contributions');
 
-    it('records the three contributions that live outside both service objects', () => {
-      expect(documented).toHaveLength(3);
+    it('accounts for the three contributions that live outside both service objects', () => {
+      const moved = readMovedRows().filter(row => row.from === 'app-level');
+
+      expect(documented).toHaveLength(2);
+      expect(documented.length + moved.length).toBe(3);
     });
 
     it('anchors workspaceCapabilities on the workspace registration', () => {
@@ -236,17 +270,22 @@ describe('provider contribution inventory', () => {
       );
     });
 
-    it('still has no workspace dispose contract, as the inventory row states', () => {
-      // The row says init exists and dispose does not, and that shipping one
-      // without the other is the v1 defect repeating. When dispose lands, this
-      // fails and the row must move with it.
+    it('has both halves of the workspace lifecycle, where the moved row says', () => {
+      // The row used to say init existed and dispose did not, and that shipping
+      // one without the other is the v1 defect repeating. Both halves are on
+      // the manager now, and the registry owns no lifecycle at all.
+      const manager = readFileSync(
+        resolve(process.cwd(), 'src/core/providers/ProviderWorkspaceManager.ts'),
+        'utf8',
+      );
       const registry = readFileSync(
         resolve(process.cwd(), 'src/core/providers/ProviderWorkspaceRegistry.ts'),
         'utf8',
       );
 
-      expect(registry).toContain('static async initializeAll');
-      expect(registry).not.toContain('disposeAll');
+      expect(manager).toContain('async initializeAll');
+      expect(manager).toContain('async disposeAll');
+      expect(registry).not.toContain('initializeAll');
     });
   });
 });

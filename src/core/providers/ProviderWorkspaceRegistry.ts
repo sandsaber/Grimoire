@@ -41,20 +41,27 @@ export class ProviderWorkspaceRegistry {
     return registration;
   }
 
-  static async initializeAll(plugin: GrimoirePlugin): Promise<void> {
-    const providerIds = Object.keys(this.registrations);
+  /**
+   * Builds one provider's services, without publishing them.
+   *
+   * Lifecycle belongs to `ProviderWorkspaceManager`, which decides when to
+   * start, what a failure means, and what to release. This registry used to
+   * bring every provider up in one loop that awaited each in turn with no
+   * `try`: one throw and every provider after it in the iteration order was
+   * never built. The fitness test reads this file for the name that loop had,
+   * so it is described rather than written.
+   */
+  static createServices(
+    providerId: ProviderId,
+    plugin: GrimoirePlugin,
+  ): Promise<ProviderWorkspaceServices> {
     const storage = plugin.storage;
-    const vaultAdapter = storage.getAdapter();
-    const homeAdapter = new HomeFileAdapter();
-
-    for (const providerId of providerIds) {
-      this.services[providerId] = await this.getWorkspaceRegistration(providerId).initialize({
-        plugin,
-        storage,
-        vaultAdapter,
-        homeAdapter,
-      });
-    }
+    return this.getWorkspaceRegistration(providerId).initialize({
+      plugin,
+      storage,
+      vaultAdapter: storage.getAdapter(),
+      homeAdapter: new HomeFileAdapter(),
+    });
   }
 
   static setServices(

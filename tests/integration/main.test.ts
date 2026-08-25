@@ -1,6 +1,8 @@
 import { addIcon, setTooltip } from 'obsidian';
 
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
+import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { TOOL_SUBAGENT } from '@/core/tools/toolNames';
 import { VIEW_TYPE_GRIMOIRE } from '@/core/types';
 import { setLocale } from '@/i18n/i18n';
@@ -252,6 +254,47 @@ describe('GrimoirePlugin', () => {
       expect(getRegisteredCommand('switch-to-tab-3').name).toBe('Перейти на вкладку 3');
     });
 
+  });
+
+  describe('provider workspaces', () => {
+    it('loads every other provider when one workspace initializer throws', async () => {
+      // Startup used to await each provider's initializer in one loop with no
+      // `try`, so a single throw cost every provider after it in the iteration
+      // order its command catalog, model list, CLI resolution and settings tab
+      // — and which ones those were depended on object key order.
+      const real = ProviderWorkspaceRegistry.createServices.bind(ProviderWorkspaceRegistry);
+      jest.spyOn(ProviderWorkspaceRegistry, 'createServices')
+        .mockImplementation(async (providerId, host) => {
+          if (providerId === 'claude') {
+            throw new Error('no Claude CLI on this machine');
+          }
+          return real(providerId, host);
+        });
+
+      await plugin.onload();
+
+      const withoutServices = providerCatalog().ids()
+        .filter(providerId => ProviderWorkspaceRegistry.getServices(providerId) === null);
+
+      expect(withoutServices).toEqual(['claude']);
+    });
+
+    it('withdraws every workspace at unload', async () => {
+      // The services map is static and used to outlive the plugin instance that
+      // filled it, so the next load read the previous load's services until its
+      // own initializer overwrote them.
+      await plugin.onload();
+      expect(ProviderWorkspaceRegistry.getServices('codex')).not.toBeNull();
+
+      plugin.onunload();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const stillPublished = providerCatalog().ids()
+        .filter(providerId => ProviderWorkspaceRegistry.getServices(providerId) !== null);
+
+      expect(stillPublished).toEqual([]);
+    });
   });
 
   describe('onunload', () => {

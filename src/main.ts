@@ -44,8 +44,9 @@ import {
 import type { ProviderHistoryHydration } from './core/providers/ProviderModule';
 import { ProviderRegistry } from './core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from './core/providers/ProviderSettingsCoordinator';
+import { ProviderWorkspaceManager } from './core/providers/ProviderWorkspaceManager';
 import { ProviderWorkspaceRegistry } from './core/providers/ProviderWorkspaceRegistry';
-import type { ProviderId } from './core/providers/types';
+import type { ProviderId, ProviderWorkspaceServices } from './core/providers/types';
 import type { AppTabManagerState } from './core/providers/types';
 import { DEFAULT_CHAT_PROVIDER_ID } from './core/providers/types';
 import { HomeFileAdapter } from './core/storage/HomeFileAdapter';
@@ -129,12 +130,13 @@ export default class GrimoirePlugin extends Plugin {
   private pendingWhatsNewVersion = '';
   private ribbonIconEl: HTMLElement | null = null;
   private readonly shellCommands = new Map<string, Command>();
+  private providerWorkspaces: ProviderWorkspaceManager<ProviderWorkspaceServices> | null = null;
 
   async onload() {
     try {
       await this.loadSettings();
       await this.startExecutionKernel();
-      await ProviderWorkspaceRegistry.initializeAll(this);
+      await this.startProviderWorkspaces();
       await this.writeDebugLog({
         data: {
           providerCount: providerCatalog().ids().length,
@@ -371,6 +373,11 @@ export default class GrimoirePlugin extends Plugin {
     // Before the kernel, because it takes down whatever prompt is on screen and
     // releases the scratch directories a turn was holding; the kernel's own
     // shutdown then cancels what is still running.
+    // Before the compositions, because a workspace holds vault-facing services
+    // a composition may still be reading from. Not awaited, for the same reason
+    // the kernel's shutdown is not: `onunload` returns void.
+    void this.providerWorkspaces?.disposeAll();
+    this.providerWorkspaces = null;
     this.codexExecution?.dispose();
     this.claudeExecution?.dispose();
     this.opencodeExecution?.dispose();
@@ -486,6 +493,46 @@ export default class GrimoirePlugin extends Plugin {
    * failed start surfaces as refused turns for those two rather than a vault
    * without Grimoire in it.
    */
+  /**
+   * Brings every provider's workspace services up, isolated from each other.
+   *
+   * Startup awaits this and cannot be taken down by it: a provider whose
+   * initializer throws is recorded and left retryable, and the others are
+   * unaffected. The loop this replaces awaited each provider in turn with no
+   * `try`, so one failure silently cost every provider after it in the
+   * iteration order its command catalog, model list, CLI resolution and
+   * settings tab.
+   */
+  private async startProviderWorkspaces(): Promise<void> {
+    if (this.unloading) {
+      return;
+    }
+    const manager = new ProviderWorkspaceManager<ProviderWorkspaceServices>({
+      contribution: providerId => ({
+        initialize: () => ProviderWorkspaceRegistry.createServices(providerId, this),
+        // Legacy workspace services hold no process, watcher or timer — the
+        // half is declared because a provider that grows one needs somewhere to
+        // release it, and because init without dispose is what the first
+        // attempt shipped.
+        dispose: async () => {},
+      }),
+      publish: (providerId, services) => {
+        ProviderWorkspaceRegistry.setServices(providerId, services ?? undefined);
+      },
+      reportFailure: ({ providerId, phase, error }) => {
+        this.recordDebugLog({
+          data: { phase, providerId },
+          error,
+          event: 'provider.workspace.failed',
+          level: 'warn',
+          scope: 'plugin',
+        });
+      },
+    });
+    this.providerWorkspaces = manager;
+    await manager.initializeAll(providerCatalog().ids());
+  }
+
   private async startExecutionKernel(): Promise<void> {
     if (this.unloading) {
       // Unload won the race with settings loading. A host built now would open
