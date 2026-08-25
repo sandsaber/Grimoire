@@ -7402,41 +7402,43 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 **M3 is closed.** Everything below is M5 or later.
 
-1. **The workspace context assembly, now an M5 step.** The ten workspace rows
-   move onto module `ProviderWorkspaceSlots` served by `ProviderWorkspaceManager`, and every
-   provider's `workspace.initialize(context)` needs a context built from the plugin. Eight have a
-   `create<Provider>ModuleContext(plugin, boundConversation)`; Antigravity needs none; Codex is the
-   only provider initializing module slots today, in its own composition. Decide where the nine
-   factories are assembled — `main.ts` or an app-level module beside the manager — then take the
-   rows one at a time, each with its consumers, so no eager initialization exists without a reader.
-   `cliResolution` looked like the cheapest first row — all nine declare it — until reading it
-   showed the module port is async while every launch path calls the legacy resolver synchronously,
-   and that the plan already puts its execution side at M2 and only its settings-side display later.
-   Pick a row by reading its consumer first; that is what this session's last four rows taught.
-2. **Rows 15 and 16 need `SubagentManager` before they can move.** The split made
+1. **The chat projections** — M5's centre, and now the thing everything else waits on. The
+   thirteen provider rows handed over from M3 are re-implementations of UI-shaped consumers, and
+   those consumers are what the projection work rewrites; doing the rows first means rewriting each
+   consumer twice.
+2. **The workspace context assembly comes *after* those consumers, not before.** It looked like the
+   next step until reading the rows: every provider's `workspace.initialize(context)` needs a
+   context built from the plugin, eight have a `create<Provider>ModuleContext`, and the machinery is
+   straightforward — but no workspace row can move onto it until its consumer is reworked, so
+   building it first would be a mechanism with no reader. `cliResolution` looked like the cheapest
+   first row until reading it showed the module port is async while every launch path calls the
+   legacy resolver synchronously. Pick a row by reading its consumer first; that is what this
+   session taught five times over.
+3. **Rows 15 and 16 need `SubagentManager` before they can move.** The split made
    `declarations.taskResults` and `declarations.nativeAgents` reachable, but the legacy
    `ProviderTaskResultInterpreter` the feature layer consumes is five low-level methods
    (`hasAsyncLaunchMarker`, `extractAgentId`, `extractStructuredResult`, `resolveTerminalStatus`,
    `extractTagValue`) against the module port's single `interpret`. `SubagentManager` reads the
    low-level ones directly, so this is an M5-shaped rework, not a row move.
-3. **Row 8, `chatUIConfig`, is probably an M5 row, not an M3 one.** The legacy interface is twenty-odd
+4. **Row 8, `chatUIConfig`, is an M5 row.** The legacy interface is twenty-odd
    UI members — reasoning options, service-tier and mode toggles, permission mapping, model metadata
    discovery taking the plugin — and `ProviderModule.ts` may not acquire plugin or UI vocabulary. The
    plan's own M5 calls the renderer a thin replaceable layer; this row belongs to that step. Worth an
    explicit decision and an inventory correction rather than an attempt.
-4. **Row 9, `settingsReconciler`.** Unblocked but not small: `ProviderSettingsCoordinator` projects,
+5. **Row 9, `settingsReconciler`.** Unblocked but not small: `ProviderSettingsCoordinator` projects,
    clones and merges the settings record per provider, and the codec's `reconcile` works on decoded
    provider settings. Re-expressing that is a settings-behaviour risk, so it wants a fresh session
    and its own characterization tests.
-5. **Row 14 and app-level row 1**, then delete both registries. Laziness in
+6. **Row 14 and app-level row 1**, then delete both registries. Laziness in
    `ProviderWorkspaceManager` lands with these, since it is the synchronous consumers that force
    eager initialization today. App-level row 1 is a shape mismatch of its own: the legacy
    `ProviderWorkspaceCapabilities` is five resource kinds each carrying
    `{ inventory, manager, runtimeCommandDiscovery }`, and the descriptor's `workspace` map is one
    `CapabilitySupport` per key over a different key set.
-6. **Then the rest of M5**: projections, durable agents, seam deletion.
-7. **M4's obligations are closed.** Creating over an existing id no longer replaces it, and the
-   history list shows a row for a record this build cannot read.
+7. **The rest of M5**: durable agents, `ApplicationRuntime` as the composition root, seam deletion.
+   Auxiliary work and bang-bash are done.
+8. **M4's obligations are closed**, and one of them found a defect M4 had shipped on this branch:
+   the conversation list was reading the versioned envelope as if it were the conversation.
 
 **Still waiting on the owner rather than on code: D9, redo.** Certification remains account-bound —
 Gemini one turn per replenishment, MiMoCode, Kimi Code and Qwen not certifiable on this machine.
