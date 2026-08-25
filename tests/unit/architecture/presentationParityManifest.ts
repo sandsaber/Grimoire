@@ -257,7 +257,9 @@ export const PARITY_SURFACES: ParitySurface[] = [
     state: 'wired',
     modules: [
       'src/features/chat/ui/BangBashModeManager.ts',
-      'src/features/chat/services/BangBashService.ts',
+      // The feature's own child process until M5. It runs on the kernel now,
+      // which is what makes the command someone's responsibility at unload.
+      'src/app/execution/local/LocalShellExecution.ts',
     ],
   },
   {

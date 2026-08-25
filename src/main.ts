@@ -18,6 +18,10 @@ import { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
 import { GeminiExecution } from './app/execution/gemini/GeminiExecutionComposition';
 import { GrokExecution } from './app/execution/grok/GrokExecutionComposition';
 import { KimicodeExecution } from './app/execution/kimicode/KimicodeExecutionComposition';
+import {
+  type LocalShellCommandOutcome,
+  LocalShellExecution,
+} from './app/execution/local/LocalShellExecution';
 import { MimocodeExecution } from './app/execution/mimocode/MimocodeExecutionComposition';
 import { OpencodeExecution } from './app/execution/opencode/OpencodeExecutionComposition';
 import { QwenExecution } from './app/execution/qwen/QwenExecutionComposition';
@@ -37,6 +41,7 @@ import {
 import type { SharedAppStorage } from './core/bootstrap/storage';
 import { ConversationAlreadyExistsError } from './core/conversations/ConversationRepository';
 import { type DebugLogEvent, DebugLogService } from './core/debug/DebugLogService';
+import type { LocalShellInvocation } from './core/execution/local/LocalShellBackend';
 import { providerCatalog } from './core/providers/ProviderCatalog';
 import {
   getEnvironmentVariablesForScope as getScopedEnvironmentVariables,
@@ -133,6 +138,7 @@ export default class GrimoirePlugin extends Plugin {
   private ribbonIconEl: HTMLElement | null = null;
   private readonly shellCommands = new Map<string, Command>();
   private providerWorkspaces: ProviderWorkspaceManager<ProviderWorkspaceServices> | null = null;
+  private localShellExecution: LocalShellExecution | null = null;
   /**
    * Conversations the vault holds and this build cannot read.
    *
@@ -388,6 +394,8 @@ export default class GrimoirePlugin extends Plugin {
     // the kernel's shutdown is not: `onunload` returns void.
     void this.providerWorkspaces?.disposeAll();
     this.providerWorkspaces = null;
+    void this.localShellExecution?.dispose();
+    this.localShellExecution = null;
     this.codexExecution?.dispose();
     this.claudeExecution?.dispose();
     this.opencodeExecution?.dispose();
@@ -560,6 +568,11 @@ export default class GrimoirePlugin extends Plugin {
         });
       },
     });
+    // The application's own shell, registered like any provider backend: a
+    // bang-bash command is a run the kernel owns, so shutdown cancels it
+    // instead of leaving a process behind the plugin that started it.
+    this.localShellExecution = new LocalShellExecution(host.registry);
+    host.registerBackend({ backend: this.localShellExecution.createBackend() });
     this.antigravityExecution = new AntigravityExecution(this, host.registry);
     host.registerBackend({ backend: this.antigravityExecution.createBackend() });
     this.codexExecution = new CodexExecution(this, host.registry);
@@ -1099,6 +1112,21 @@ export default class GrimoirePlugin extends Plugin {
       this.settings,
       scope,
     );
+  }
+
+  /**
+   * Runs one shell command on the kernel.
+   *
+   * The bang-bash surface's only way to reach a process. It used to hold its
+   * own `child_process` handle inside the chat feature, which meant a command
+   * still running at unload had nobody to stop it.
+   */
+  async runShellCommand(invocation: LocalShellInvocation): Promise<LocalShellCommandOutcome> {
+    const shell = this.localShellExecution;
+    if (!shell) {
+      throw new Error('Shell execution is not available.');
+    }
+    return shell.run(invocation);
   }
 
   getResolvedProviderCliPath(providerId: ProviderId): string | null {

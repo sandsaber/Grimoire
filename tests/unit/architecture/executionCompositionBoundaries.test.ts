@@ -76,10 +76,14 @@ const LEGACY_CORE_PLUGIN_IMPORTS = [
  */
 
 /**
- * Pre-existing direct process launch from a feature. Bang-bash mode is a
- * product surface today; its execution moves to the local-shell backend at M5.
+ * Direct process launches still permitted under `src/features/`.
+ *
+ * Empty since M5 moved bang-bash mode onto the local-shell backend, which was
+ * the only entry. Kept as a list rather than deleted so a new one has to be
+ * added deliberately, and asserted empty so the exemption cannot come back
+ * quietly.
  */
-const LEGACY_FEATURE_PROCESS_LAUNCH = ['src/features/chat/services/BangBashService.ts'];
+const LEGACY_FEATURE_PROCESS_LAUNCH: string[] = [];
 
 function read(module: string): string {
   return readFileSync(resolve(process.cwd(), module), 'utf8');
@@ -243,6 +247,13 @@ describe('execution composition boundaries', () => {
       const stale = LEGACY_CORE_PLUGIN_IMPORTS.filter(module => !importsPlugin(read(module)));
 
       expect(stale).toEqual([]);
+    });
+
+    it('permits no direct process launch under src/features at all', () => {
+      // Bang-bash mode was the last one. A feature that spawns its own child
+      // process owns a lifetime nothing else can end: unloading the plugin
+      // left the command running.
+      expect(LEGACY_FEATURE_PROCESS_LAUNCH).toEqual([]);
     });
 
     it('adds no new direct process launch under src/features', () => {

@@ -82,7 +82,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
-| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched, and M3 handed over thirteen provider rows plus registry deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
+| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Bang-bash mode runs on the kernel and the local-shell backend is live. Projections, durable agents and the seam deletion are untouched, and M3 handed over thirteen provider rows plus registry deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
@@ -7295,6 +7295,34 @@ guard against something that cannot be opened.
 
 The same silence typed hydration removed from the transcript, removed from the list. Copy landed in
 all ten locales, because a fallback is that silence again in another language.
+
+Gates: unit 525 suites / 8,306 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
+### Bang-bash mode stops owning a process the plugin cannot end (this commit)
+
+An M5 item, and the one that closes the composition-boundary gate's last feature exemption. Bang-bash
+mode spawned its own child through `child_process` from inside the chat feature: a 30-second
+`exec` with a 1MB buffer, owned by nothing. Unloading the plugin left it running.
+
+It is a run on the kernel now, through `LocalShellBackend` — which was built at M1, tested, and had
+never had a consumer. **The first internal-service backend in production**: the association is
+`{ kind: 'internal', service: 'shell' }` rather than a provider, which is the case the kernel's
+identity model was designed for and had never exercised. One session per plugin load, owned by the
+application rather than by a conversation, because a shell command does not belong to a chat and
+closing the tab that typed it should not make the process someone else's problem.
+
+**Output does not travel as events.** The backend reports lifecycle through the event stream and
+hands raw bytes to an output observer, so the composition buffers per run and decodes with a
+*streaming* decoder — a pipe splits wherever it likes, and decoding each chunk alone turns one
+multi-byte character into two replacement characters. That break stayed green until a test wrote an
+arrow as `[0xe2]` then `[0x86, 0x92]`.
+
+**One field is gone and it is worth saying so.** `BangBashResult.exitCode` was a number the status
+panel stored and never rendered; a terminal event reports a kind and a reason, not an exit status.
+Rather than invent one, the outcome says `failed` and carries a message only for the failures whose
+reason is not already on stdout — a timeout, an output limit, a process that could not start. A
+non-zero exit explains itself in the command's own output, and a Grimoire sentence there would sit
+in front of the shell's.
 
 Gates: unit 525 suites / 8,306 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 

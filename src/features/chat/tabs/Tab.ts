@@ -48,7 +48,6 @@ import { StreamController } from '../controllers/StreamController';
 import { MessageRenderer } from '../rendering/MessageRenderer';
 import { cleanupThinkingBlock } from '../rendering/ThinkingBlockRenderer';
 import { findRewindContext } from '../rewind';
-import { BangBashService } from '../services/BangBashService';
 import { SubagentManager } from '../services/SubagentManager';
 import { ChatState } from '../state/ChatState';
 import { BangBashModeManager as BangBashModeManagerClass } from '../ui/BangBashModeManager';
@@ -479,7 +478,6 @@ function initializeInstructionAndTodo(tab: TabData, plugin: GrimoirePlugin): voi
     const vaultPath = getVaultPath(plugin.app);
     if (vaultPath) {
       const enhancedPath = getEnhancedPath();
-      const bashService = new BangBashService(vaultPath, enhancedPath);
 
       tab.ui.bangBashModeManager = new BangBashModeManagerClass(
         dom.inputEl,
@@ -491,10 +489,20 @@ function initializeInstructionAndTodo(tab: TabData, plugin: GrimoirePlugin): voi
             const id = `bash-${Date.now()}`;
             statusPanel.addBashOutput({ id, command, status: 'running', output: '' });
 
-            const result = await bashService.execute(command);
-            const output = [result.stdout, result.stderr, result.error].filter(Boolean).join('\n').trim();
-            const status = result.exitCode === 0 ? 'completed' : 'error';
-            statusPanel.updateBashOutput(id, { status, output, exitCode: result.exitCode });
+            // Through the kernel rather than a child process of this feature:
+            // the run is owned by the application, so unloading the plugin
+            // takes the command down with it.
+            const result = await plugin.runShellCommand({
+              command,
+              cwd: vaultPath,
+              environment: { ...process.env as Record<string, string>, PATH: enhancedPath },
+            });
+            const output = [result.stdout, result.stderr, result.error]
+              .filter(Boolean).join('\n').trim();
+            statusPanel.updateBashOutput(id, {
+              status: result.failed ? 'error' : 'completed',
+              output,
+            });
           },
           getInputWrapper: () => dom.inputWrapper,
         }
