@@ -6,7 +6,6 @@ import { Notice } from 'obsidian';
 import { readBundledChangelog } from '@/app/changelog/source';
 import { DEFAULT_GRIMOIRE_SETTINGS } from '@/app/settings/defaultSettings';
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { GrimoireSettingTab } from '@/features/settings/GrimoireSettings';
 import { setLocale, t } from '@/i18n/i18n';
@@ -293,7 +292,7 @@ describe('GrimoireSettingTab settings hub', () => {
     await (tab as any).updateProviderEnabled('qwen', true);
 
     expect(refreshModels).toHaveBeenCalledTimes(1);
-    expect(ProviderRegistry.isEnabled('qwen', plugin.settings)).toBe(false);
+    expect(providerCatalog().isEnabled(plugin.settings, 'qwen')).toBe(false);
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
     expect(Notice).toHaveBeenCalledWith('Could not load provider models.');
   });

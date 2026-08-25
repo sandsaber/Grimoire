@@ -26,11 +26,11 @@ describe('Antigravity provider registration', () => {
   it('registers Antigravity as an opt-in provider', () => {
     expect(providerCatalog().ids()).toContain('antigravity');
     expect(providerCatalog().displayName('antigravity')).toBe('Antigravity');
-    expect(ProviderRegistry.isEnabled('antigravity', {})).toBe(false);
+    expect(providerCatalog().isEnabled({}, 'antigravity')).toBe(false);
 
     const settings: Record<string, unknown> = {};
     updateAntigravityProviderSettings(settings, { enabled: true });
-    expect(ProviderRegistry.isEnabled('antigravity', settings)).toBe(true);
+    expect(providerCatalog().isEnabled(settings, 'antigravity')).toBe(true);
   });
 
   it('creates a kernel-backed Antigravity runtime through the provider registry', () => {

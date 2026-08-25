@@ -119,21 +119,8 @@ export class ProviderRegistry {
     return this.getProviderRegistration(providerId).settingsReconciler;
   }
 
-  static getEnabledProviderIds(settings: Record<string, unknown>): ProviderId[] {
-    return [...providerCatalog().ids()]
-      .filter(providerId => this.getProviderRegistration(providerId).isEnabled(settings));
-  }
-
   static getPreloadedContextFiles(providerId: ProviderId): string[] {
     return this.getProviderRegistration(providerId).getPreloadedContextFiles?.() ?? [];
-  }
-
-  static isEnabled(providerId: ProviderId, settings: Record<string, unknown>): boolean {
-    return this.getProviderRegistration(providerId).isEnabled(settings);
-  }
-
-  static setEnabled(providerId: ProviderId, settings: Record<string, unknown>, enabled: boolean): void {
-    this.getProviderRegistration(providerId).setEnabled(settings, enabled);
   }
 
   static resolveSettingsProviderId(settings: Record<string, unknown>): ProviderId {
@@ -141,17 +128,17 @@ export class ProviderRegistry {
     const current = settings.settingsProvider;
     if (typeof current === 'string') {
       const currentProvider = current;
-      if (catalog.has(currentProvider) && this.isEnabled(currentProvider, settings)) {
+      if (catalog.has(currentProvider) && catalog.isEnabled(settings, currentProvider)) {
         return currentProvider;
       }
     }
 
-    const enabledProviderIds = this.getEnabledProviderIds(settings);
+    const enabledProviderIds = catalog.enabledIds(settings);
     if (enabledProviderIds.length === 0) {
       return catalog.has(current) ? current : DEFAULT_CHAT_PROVIDER_ID;
     }
 
-    if (this.isEnabled(DEFAULT_CHAT_PROVIDER_ID, settings)) {
+    if (catalog.isEnabled(settings, DEFAULT_CHAT_PROVIDER_ID)) {
       return DEFAULT_CHAT_PROVIDER_ID;
     }
 
@@ -166,12 +153,16 @@ export class ProviderRegistry {
       fallbackProviderId?: ProviderId;
     } = {},
   ): ProviderId {
+    const catalog = providerCatalog();
     const providerIds = options.onlyEnabledProviders
-      ? this.getEnabledProviderIds(settings)
-      : providerCatalog().ids();
+      ? catalog.enabledIds(settings)
+      : catalog.ids();
     const fallbackProviderId = (
       options.fallbackProviderId
-      && (!options.onlyEnabledProviders || this.isEnabled(options.fallbackProviderId, settings))
+      && (
+        !options.onlyEnabledProviders
+        || catalog.isEnabled(settings, options.fallbackProviderId)
+      )
     )
       ? options.fallbackProviderId
       : (options.onlyEnabledProviders

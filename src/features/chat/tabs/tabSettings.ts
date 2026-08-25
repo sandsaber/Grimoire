@@ -99,7 +99,7 @@ export type ContextEngineRelevantSettings = GrimoireSettings & {
 export function getBlankTabModelOptions(
   settings: Record<string, unknown>,
 ): ProviderUIOption[] {
-  return ProviderRegistry.getEnabledProviderIds(settings).flatMap((providerId) => {
+  return providerCatalog().enabledIds(settings).flatMap((providerId) => {
     const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
     const providerIcon = uiConfig.getProviderIcon?.() ?? undefined;
     const group = providerCatalog().displayName(providerId);
@@ -250,7 +250,7 @@ export function resolveBlankTabModel(
     return settings.model as string;
   }
 
-  const targetProviderId = ProviderRegistry.isEnabled(providerId, settings)
+  const targetProviderId = providerCatalog().isEnabled(settings, providerId)
     ? providerId
     : ProviderRegistry.resolveSettingsProviderId(settings);
   const snapshot = ProviderSettingsCoordinator.getProviderSettingsSnapshot(settings, targetProviderId);

@@ -13,12 +13,12 @@ describe('Gemini provider registration', () => {
   it('registers Gemini as an opt-in provider', () => {
     expect(providerCatalog().ids()).toContain('gemini');
     expect(providerCatalog().displayName('gemini')).toBe('Gemini CLI (Legacy)');
-    expect(ProviderRegistry.isEnabled('gemini', {})).toBe(false);
+    expect(providerCatalog().isEnabled({}, 'gemini')).toBe(false);
 
     const settings: Record<string, unknown> = {};
     updateGeminiProviderSettings(settings, { enabled: true });
 
-    expect(ProviderRegistry.isEnabled('gemini', settings)).toBe(true);
+    expect(providerCatalog().isEnabled(settings, 'gemini')).toBe(true);
   });
 
   it('creates a Gemini runtime through the composition the plugin owns', () => {

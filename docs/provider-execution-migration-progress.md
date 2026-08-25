@@ -80,7 +80,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
-| M3 — provider control plane | In progress — the catalog exists, validates the nine modules, and owns provider identity and ordering; the two registries hold what has not moved yet | this commit |
+| M3 — provider control plane | In progress — the catalog exists, validates the nine modules, and owns provider identity, ordering and enablement; the two registries hold what has not moved yet | `0dd3580`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
@@ -6914,6 +6914,36 @@ inventory fails the accounting test. None stayed green, which is the first time 
 break-tests found no gap.
 
 Gates: unit 529 suites / 8,274 tests, integration 5 / 151, typecheck, `eslint`, `build:release`.
+
+### Enablement moves, and the writer stops rewriting what it did not change (this commit)
+
+Inventory rows 3 and 4. `isEnabled` and `setEnabled` are gone from `ProviderRegistration`; the
+catalog reads and writes enablement through each provider's own settings codec, from the same
+`providerConfigs` entry the legacy accessors used.
+
+**The write is the part worth reading.** Every provider's legacy `setEnabled` called
+`update<Provider>ProviderSettings(settings, { enabled })`, which re-encoded the *whole* config
+through that provider's normalizers before storing it — so switching a provider off also rewrote its
+CLI path, its visible models, its aliases, and anything else a normalizer touched on the way past.
+The catalog encodes the settings before and after `withEnabled` and stores only the keys that
+differ, which for all nine is exactly `enabled`. Same rule M4 put on conversation writes, arriving
+here for the same reason: a writer that stores the copy it is holding overwrites decisions it never
+made.
+
+The test that proves it is generic rather than nine hand-written ones: each provider's stored config
+gets a string field in a form its own encoder would normalize away, plus a key the codec does not
+model at all, and after the toggle both must survive untouched. Breaking the delta into a
+whole-config write fails it for eight of the nine — the ninth, Qwen, has nothing its encoder
+reshapes, which is itself worth knowing.
+
+**A guess corrected by the suite**: a fresh vault does not have every provider disabled, it has
+Codex enabled, because the default chat provider ships enabled. Pinned as product copy now rather
+than left to be re-derived.
+
+`ProviderRegistry` no longer answers which providers are enabled either; `resolveSettingsProviderId`
+and `resolveProviderForModel` ask the catalog. Four of the sixteen registration fields have moved.
+
+Gates: unit 529 suites / 8,291 tests, integration 5 / 151, typecheck, `eslint`, `build:release`.
 
 ## Current blocker
 

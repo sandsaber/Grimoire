@@ -63,8 +63,6 @@ export interface CreateChatRuntimeOptions {
  * inventories cannot disagree about a provider's name or its place in a list.
  */
 export interface ProviderRegistration {
-  isEnabled: (settings: Record<string, unknown>) => boolean;
-  setEnabled: (settings: Record<string, unknown>, enabled: boolean) => void;
   getPreloadedContextFiles?: () => string[];
   capabilities: ProviderCapabilities;
   environmentKeyPatterns?: RegExp[];

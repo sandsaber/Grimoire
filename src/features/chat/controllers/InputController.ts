@@ -1074,7 +1074,7 @@ export class InputController {
     if (requestedProviderId) {
       if (
         !providerCatalog().ids().includes(requestedProviderId)
-        || !ProviderRegistry.isEnabled(requestedProviderId, settings)
+        || !providerCatalog().isEnabled(settings, requestedProviderId)
       ) {
         throw new ProjectWorkspaceRoutingError(
           `Project workspace provider "${requestedProviderId}" is not enabled.`,

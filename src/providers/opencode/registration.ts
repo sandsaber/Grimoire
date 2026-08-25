@@ -6,7 +6,6 @@ import { OpencodeTitleGenerationService } from './auxiliary/OpencodeTitleGenerat
 import { OPENCODE_PROVIDER_CAPABILITIES } from './capabilities';
 import { opencodeSettingsReconciler } from './env/OpencodeSettingsReconciler';
 import { OpencodeConversationHistoryService } from './history/OpencodeConversationHistoryService';
-import { getOpencodeProviderSettings, updateOpencodeProviderSettings } from './settings';
 import { opencodeChatUIConfig } from './ui/OpencodeChatUIConfig';
 
 export const opencodeProviderRegistration: ProviderRegistration = {
@@ -18,8 +17,6 @@ export const opencodeProviderRegistration: ProviderRegistration = {
   createTitleGenerationService: (plugin) => new OpencodeTitleGenerationService(plugin),
   environmentKeyPatterns: [/^OPENCODE_/i],
   historyService: new OpencodeConversationHistoryService(),
-  isEnabled: (settings) => getOpencodeProviderSettings(settings).enabled,
-  setEnabled: (settings, enabled) => { updateOpencodeProviderSettings(settings, { enabled }); },
   settingsReconciler: opencodeSettingsReconciler,
   taskResultInterpreter: new OpencodeTaskResultInterpreter(),
 };

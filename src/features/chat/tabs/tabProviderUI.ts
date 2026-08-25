@@ -1,4 +1,5 @@
 import { getEnabledProviderForModel } from '../../../core/providers/modelRouting';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
@@ -375,7 +376,7 @@ export function onProviderAvailabilityChanged(tab: TabData, plugin: GrimoirePlug
   if (tab.lifecycleState !== 'blank') return;
 
   const settingsSnapshot = plugin.settings as unknown as Record<string, unknown>;
-  const enabledProviderIds = ProviderRegistry.getEnabledProviderIds(settingsSnapshot);
+  const enabledProviderIds = providerCatalog().enabledIds(settingsSnapshot);
   if (enabledProviderIds.length === 0) {
     cleanupTabRuntime(tab);
     tab.ui.modelSelector?.updateDisplay();

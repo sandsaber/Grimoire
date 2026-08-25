@@ -476,7 +476,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
       this.activeProviderId = providerIds.includes(configuredProvider)
         ? configuredProvider
         : (providerIds.find((providerId) => (
-            ProviderRegistry.isEnabled(providerId, this.plugin.settings)
+            providerCatalog().isEnabled(this.plugin.settings, providerId)
           )) ?? providerIds[0] ?? null);
     }
 
@@ -663,7 +663,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
   ): void {
     const grid = container.createDiv({ cls: 'grimoire-settings-provider-grid' });
     for (const providerId of providerIds) {
-      const enabled = ProviderRegistry.isEnabled(providerId, this.plugin.settings);
+      const enabled = providerCatalog().isEnabled(this.plugin.settings, providerId);
       const card = grid.createDiv({
         attr: {
           'aria-pressed': String(providerId === this.activeProviderId),
@@ -2215,7 +2215,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
   }
 
   private setProviderEnabled(providerId: ProviderId, enabled: boolean): void {
-    ProviderRegistry.setEnabled(providerId, this.plugin.settings, enabled);
+    providerCatalog().setEnabled(this.plugin.settings, providerId, enabled);
   }
 
   private async refreshProviderModelCatalog(providerId: ProviderId): Promise<void> {

@@ -6,12 +6,9 @@ import { CLAUDE_PROVIDER_CAPABILITIES } from './capabilities';
 import { claudeSettingsReconciler } from './env/ClaudeSettingsReconciler';
 import { ClaudeConversationHistoryService } from './history/ClaudeConversationHistoryService';
 import { ClaudeTaskResultInterpreter } from './runtime/ClaudeTaskResultInterpreter';
-import { getClaudeProviderSettings, updateClaudeProviderSettings } from './settings';
 import { claudeChatUIConfig } from './ui/ClaudeChatUIConfig';
 
 export const claudeProviderRegistration: ProviderRegistration = {
-  isEnabled: (settings) => getClaudeProviderSettings(settings).enabled,
-  setEnabled: (settings, enabled) => { updateClaudeProviderSettings(settings, { enabled }); },
   capabilities: CLAUDE_PROVIDER_CAPABILITIES,
   environmentKeyPatterns: [/^ANTHROPIC_/i, /^CLAUDE_/i],
   chatUIConfig: claudeChatUIConfig,

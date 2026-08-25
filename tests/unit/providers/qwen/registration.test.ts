@@ -13,12 +13,12 @@ describe('Qwen provider registration', () => {
   it('registers Qwen as an opt-in provider', () => {
     expect(providerCatalog().ids()).toContain('qwen');
     expect(providerCatalog().displayName('qwen')).toBe('Qwen Code');
-    expect(ProviderRegistry.isEnabled('qwen', {})).toBe(false);
+    expect(providerCatalog().isEnabled({}, 'qwen')).toBe(false);
 
     const settings: Record<string, unknown> = {};
     updateQwenProviderSettings(settings, { enabled: true });
 
-    expect(ProviderRegistry.isEnabled('qwen', settings)).toBe(true);
+    expect(providerCatalog().isEnabled(settings, 'qwen')).toBe(true);
     expect(ProviderRegistry.getCapabilities('qwen')?.reasoningControl).toBe('effort');
   });
 

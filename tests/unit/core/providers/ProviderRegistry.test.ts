@@ -131,25 +131,25 @@ describe('ProviderRegistry', () => {
   });
 
   it('filters enabled provider ids using registration metadata', () => {
-    expect(ProviderRegistry.getEnabledProviderIds({
+    expect(providerCatalog().enabledIds({
       providerConfigs: {
         claude: { enabled: false },
         codex: { enabled: false },
       },
     })).toEqual([]);
-    expect(ProviderRegistry.getEnabledProviderIds({
+    expect(providerCatalog().enabledIds({
       providerConfigs: {
         claude: { enabled: true },
         codex: { enabled: false },
       },
     })).toEqual(['claude']);
-    expect(ProviderRegistry.getEnabledProviderIds({
+    expect(providerCatalog().enabledIds({
       providerConfigs: {
         claude: { enabled: true },
         codex: { enabled: true },
       },
     })).toEqual(['claude', 'codex']);
-    expect(ProviderRegistry.getEnabledProviderIds({
+    expect(providerCatalog().enabledIds({
       providerConfigs: {
         claude: { enabled: true },
         codex: { enabled: true },
@@ -182,10 +182,10 @@ describe('ProviderRegistry', () => {
     const settings: Record<string, unknown> = {};
 
     for (const providerId of providerCatalog().ids()) {
-      ProviderRegistry.setEnabled(providerId, settings, true);
-      expect(ProviderRegistry.isEnabled(providerId, settings)).toBe(true);
-      ProviderRegistry.setEnabled(providerId, settings, false);
-      expect(ProviderRegistry.isEnabled(providerId, settings)).toBe(false);
+      providerCatalog().setEnabled(settings, providerId, true);
+      expect(providerCatalog().isEnabled(settings, providerId)).toBe(true);
+      providerCatalog().setEnabled(settings, providerId, false);
+      expect(providerCatalog().isEnabled(settings, providerId)).toBe(false);
     }
   });
 

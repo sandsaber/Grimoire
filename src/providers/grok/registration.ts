@@ -9,7 +9,6 @@ import { grokSettingsReconciler } from './env/GrokSettingsReconciler';
 import { GrokConversationHistoryService } from './history/GrokConversationHistoryService';
 import { grokSubagentLifecycleAdapter } from './normalization/grokSubagentNormalization';
 import { GROK_ARTIFACTS_SUBDIR } from './runtime/GrokPaths';
-import { getGrokProviderSettings, updateGrokProviderSettings } from './settings';
 import { grokChatUIConfig } from './ui/GrokChatUIConfig';
 
 export const grokProviderRegistration: ProviderRegistration = {
@@ -21,8 +20,6 @@ export const grokProviderRegistration: ProviderRegistration = {
   createTitleGenerationService: (plugin) => new GrokTitleGenerationService(plugin),
   environmentKeyPatterns: [/^GROK_/i, /^XAI_/i],
   historyService: new GrokConversationHistoryService(),
-  isEnabled: (settings) => getGrokProviderSettings(settings).enabled,
-  setEnabled: (settings, enabled) => { updateGrokProviderSettings(settings, { enabled }); },
   getPreloadedContextFiles: () => [
     `${GRIMOIRE_STORAGE_PATH}/${GROK_ARTIFACTS_SUBDIR}/system.md`,
   ],

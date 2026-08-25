@@ -513,8 +513,11 @@ function isBangBashEnabledForProvider(
   return ProviderRegistry.getChatUIConfig(providerId).isBangBashEnabled?.(settings) ?? false;
 }
 
-function getModelCatalogProviderIds(_tab: TabData, plugin: GrimoirePlugin): ProviderId[] {
-  return ProviderRegistry.getEnabledProviderIds(plugin.settings);
+function getModelCatalogProviderIds(
+  _tab: TabData,
+  plugin: GrimoirePlugin,
+): readonly ProviderId[] {
+  return providerCatalog().enabledIds(plugin.settings);
 }
 
 async function refreshTabModelOptions(tab: TabData, plugin: GrimoirePlugin): Promise<void> {
@@ -1452,7 +1455,7 @@ export function initializeTabControllers(
           );
           tab.providerId = derivedProvider;
         }
-        if (!ProviderRegistry.isEnabled(tab.providerId, plugin.settings)) {
+        if (!providerCatalog().isEnabled(plugin.settings, tab.providerId)) {
           throw new Error(`${providerCatalog().displayName(tab.providerId)} is disabled. Enable it in Grimoire settings first.`);
         }
 

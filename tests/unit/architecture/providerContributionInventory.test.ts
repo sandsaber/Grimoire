@@ -107,7 +107,7 @@ describe('provider contribution inventory', () => {
     });
 
     it('claims the count the heading advertises', () => {
-      expect(documented).toHaveLength(14);
+      expect(documented).toHaveLength(12);
     });
 
     it('accounts for every field the registration ever declared', () => {
@@ -122,7 +122,7 @@ describe('provider contribution inventory', () => {
     });
 
     it('records where each moved row went', () => {
-      expect(moved).toEqual(['displayName', 'blankTabOrder']);
+      expect(moved).toEqual(['displayName', 'blankTabOrder', 'isEnabled', 'setEnabled']);
     });
 
     it.each(Object.entries(REGISTRATIONS))(

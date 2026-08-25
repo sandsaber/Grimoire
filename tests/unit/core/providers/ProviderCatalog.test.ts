@@ -19,12 +19,20 @@ function testModule(
     providerId,
     schemaVersion: 1,
     defaults: (): TestSettings => ({ enabled: true, label: providerId }),
-    decode: (input: unknown) => ({
-      ok: true as const,
-      value: input as TestSettings,
-      preservedUnknown: {},
-    }),
-    encode: (value: TestSettings) => ({ ...value }),
+    decode: (input: unknown) => {
+      const record = (typeof input === 'object' && input !== null)
+        ? input as Record<string, unknown>
+        : {};
+      const value: TestSettings = {
+        enabled: typeof record.enabled === 'boolean' ? record.enabled : true,
+        label: typeof record.label === 'string' ? record.label : providerId,
+      };
+      return record.broken === true
+        ? { ok: false as const, fallback: value, issues: ['broken'], preservedUnknown: {} }
+        : { ok: true as const, value, preservedUnknown: {} };
+    },
+    // Encoding normalizes, which is what makes a whole-config write visible.
+    encode: (value: TestSettings) => ({ ...value, label: value.label.trim().toLowerCase() }),
     isEnabled: (value: TestSettings) => value.enabled,
     withEnabled: (value: TestSettings, enabled: boolean) => ({ ...value, enabled }),
     runtimeInputKeys: ['label'],
@@ -278,6 +286,73 @@ describe('ProviderCatalog', () => {
 
       expect(() => new ProviderCatalog([moduleWith('one', patch)]))
         .toThrow('enablement does not round-trip');
+    });
+  });
+
+  describe('enablement', () => {
+    const catalog = new ProviderCatalog([testModule('one')]);
+
+    it('reads enablement through the provider own codec', () => {
+      expect(catalog.isEnabled({ providerConfigs: { one: { enabled: false } } }, 'one'))
+        .toBe(false);
+      expect(catalog.isEnabled({ providerConfigs: { one: { enabled: true } } }, 'one'))
+        .toBe(true);
+    });
+
+    it('falls back to what the provider would have loaded when the config is unreadable', () => {
+      // Refusing to answer would take the provider out of the picker, which is
+      // a worse answer than the one it would load with.
+      expect(catalog.isEnabled({ providerConfigs: { one: { broken: true } } }, 'one')).toBe(true);
+    });
+
+    it('answers for a provider with no stored config at all', () => {
+      expect(catalog.isEnabled({}, 'one')).toBe(true);
+    });
+
+    it('lists the enabled providers in presentation order', () => {
+      const two = new ProviderCatalog([
+        testModule('one'),
+        testModule('two', { manifest: { id: 'two', displayName: 'Two', order: 5 } }),
+      ]);
+      const settings = {
+        providerConfigs: { one: { enabled: true }, two: { enabled: true } },
+      };
+
+      expect(two.enabledIds(settings)).toEqual(['two', 'one']);
+      expect(two.enabledIds({ providerConfigs: { one: { enabled: false }, two: {} } }))
+        .toEqual(['two']);
+    });
+
+    it('writes only the keys enablement changed', () => {
+      // The legacy writer re-encoded the whole config on every toggle. Here the
+      // untouched key is stored in a form the codec would normalize away, so a
+      // whole-config write is visible instead of merely suspected.
+      const settings: Record<string, unknown> = {
+        providerConfigs: { one: { enabled: true, label: '  Kept As Typed  ', extra: 7 } },
+      };
+
+      catalog.setEnabled(settings, 'one', false);
+
+      expect(settings.providerConfigs).toEqual({
+        one: { enabled: false, label: '  Kept As Typed  ', extra: 7 },
+      });
+    });
+
+    it('writes nothing when the provider is already in the requested state', () => {
+      const configs = { one: { enabled: true, label: '  Kept As Typed  ' } };
+      const settings: Record<string, unknown> = { providerConfigs: configs };
+
+      catalog.setEnabled(settings, 'one', true);
+
+      expect(settings.providerConfigs).toBe(configs);
+    });
+
+    it('creates the config when a provider has never been configured', () => {
+      const settings: Record<string, unknown> = {};
+
+      catalog.setEnabled(settings, 'one', false);
+
+      expect(settings.providerConfigs).toEqual({ one: { enabled: false } });
     });
   });
 

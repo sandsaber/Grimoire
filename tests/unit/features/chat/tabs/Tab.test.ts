@@ -3966,7 +3966,7 @@ describe('Tab - Blank Tab Model Selector', () => {
       { value: 'haiku', label: 'Haiku' },
       { value: 'sonnet', label: 'Sonnet' },
     ];
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['claude']);
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['claude']);
     jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'claude' ? 'Claude' : 'Codex'
     ));
@@ -3988,7 +3988,7 @@ describe('Tab - Blank Tab Model Selector', () => {
       { value: DEFAULT_CODEX_PRIMARY_MODEL, label: DEFAULT_CODEX_PRIMARY_MODEL_LABEL },
     ];
 
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['codex', 'claude']);
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['codex', 'claude']);
     jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'codex' ? 'Codex' : 'Claude'
     ));
@@ -4005,7 +4005,7 @@ describe('Tab - Blank Tab Model Selector', () => {
   });
 
   it('returns no models when every provider is disabled', () => {
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue([]);
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue([]);
     jest.spyOn(ProviderRegistry, 'getChatUIConfig');
 
     expect(getBlankTabModelOptions({})).toEqual([]);
@@ -4018,7 +4018,7 @@ describe('Tab - Cross-Provider Model Rejection', () => {
     jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['codex', 'claude']);
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['codex', 'claude']);
     jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'codex' ? 'Codex' : 'Claude'
     ));
@@ -4548,7 +4548,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('refreshes all enabled provider model catalogs for a blank tab', async () => {
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['claude', 'codex']);
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['claude', 'codex']);
     const claudeCatalog = { refreshModels: jest.fn().mockResolvedValue(false) };
     const codexCatalog = { refreshModels: jest.fn().mockResolvedValue(true) };
     const plugin = createMockPlugin();
@@ -4576,7 +4576,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('refreshes all enabled provider model catalogs for a bound tab', async () => {
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['claude', 'codex']);
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['claude', 'codex']);
     const claudeCatalog = { refreshModels: jest.fn().mockResolvedValue(true) };
     const codexCatalog = { refreshModels: jest.fn().mockResolvedValue(true) };
     const plugin = createMockPlugin();
@@ -5039,7 +5039,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   it('keeps blank-tab model options mixed after selecting Antigravity', async () => {
     const antigravityModels = [{ value: 'antigravity', label: 'Antigravity' }];
     const claudeModels = [{ value: 'haiku', label: 'Haiku' }];
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['antigravity', 'claude']);
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['antigravity', 'claude']);
     jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'antigravity' ? 'Antigravity' : 'Claude'
     ));

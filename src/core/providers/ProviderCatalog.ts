@@ -1,4 +1,6 @@
+import { isRecord } from '../../utils/records';
 import type { ProviderId } from '../types/provider';
+import { getProviderConfig, setProviderConfig } from './providerConfig';
 import type { ProviderModule } from './ProviderModule';
 
 /**
@@ -89,6 +91,77 @@ export class ProviderCatalog {
   displayNameOrId(value: string): string {
     return this.get(value)?.manifest.displayName ?? value;
   }
+
+  /** Inventory row 3. */
+  isEnabled(settings: Record<string, unknown>, providerId: string): boolean {
+    const module = this.require(providerId);
+    return module.settings.isEnabled(this.decodeConfig(module, settings));
+  }
+
+  /** The enabled providers, in presentation order. */
+  enabledIds(settings: Record<string, unknown>): readonly ProviderId[] {
+    return Object.freeze(
+      this.modules
+        .filter(module => module.settings.isEnabled(this.decodeConfig(module, settings)))
+        .map(module => module.manifest.id),
+    );
+  }
+
+  /**
+   * Inventory row 4.
+   *
+   * Writes back only the keys enablement actually changed. The legacy writer
+   * re-encoded the whole provider config on every toggle, so switching a
+   * provider off also rewrote its CLI path, its model list, and whatever else
+   * its normalizers touched on the way past. That is the same rule M4 put on
+   * conversation writes: a writer applies what it changed, not the copy it
+   * happens to be holding.
+   */
+  setEnabled(settings: Record<string, unknown>, providerId: string, enabled: boolean): void {
+    const module = this.require(providerId);
+    const config = getProviderConfig(settings, providerId);
+    const current = this.decodeConfig(module, settings);
+    if (module.settings.isEnabled(current) === enabled) {
+      return;
+    }
+    const before = module.settings.encode(current);
+    const after = module.settings.encode(module.settings.withEnabled(current, enabled));
+    const patch = Object.fromEntries(
+      Object.entries(after).filter(([key, value]) => !sameEncodedValue(before[key], value)),
+    );
+    setProviderConfig(settings, providerId, { ...config, ...patch });
+  }
+
+  /**
+   * A provider's settings as its own codec reads them.
+   *
+   * An unreadable config still answers: the fallback is what the provider would
+   * have loaded anyway, and refusing to say whether a provider is enabled would
+   * take it out of the picker instead of showing it as it is.
+   */
+  private decodeConfig(module: CatalogProviderModule, settings: Record<string, unknown>): object {
+    const decoded = module.settings.decode(getProviderConfig(settings, module.manifest.id));
+    return decoded.ok ? decoded.value : decoded.fallback;
+  }
+}
+
+/** Structural comparison over encoded settings, which are JSON values. */
+function sameEncodedValue(left: unknown, right: unknown): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left)
+      && Array.isArray(right)
+      && left.length === right.length
+      && left.every((item, index) => sameEncodedValue(item, right[index]));
+  }
+  if (!isRecord(left) || !isRecord(right)) {
+    return false;
+  }
+  const keys = Object.keys(left);
+  return keys.length === Object.keys(right).length
+    && keys.every(key => key in right && sameEncodedValue(left[key], right[key]));
 }
 
 let installedCatalog: ProviderCatalog | null = null;
