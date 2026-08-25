@@ -486,14 +486,6 @@ describe('execution adapter over the registry', () => {
       // no service yet still reads the record. Moving the gating finishes the
       // removal.
       grok: { supportsRewind: false },
-      // Not declared, and not a defect in either statement: `chatSurface` says
-      // what Grimoire puts in the chat input, and Gemini's vault
-      // `.gemini/commands/**` reach a dropdown; the live
-      // `supportsProviderCommands` gates loading the *provider session's*
-      // commands, which Gemini drops. One boolean, two questions. Moving the
-      // gating would switch Gemini's session commands on as a side effect, so
-      // the projection has to stop conflating them first.
-      gemini: { supportsProviderCommands: true },
     };
 
     it.each(modules)('$manifest.id projects to its live record field for field', module => {

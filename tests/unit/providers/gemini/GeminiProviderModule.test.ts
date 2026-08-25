@@ -101,17 +101,17 @@ describe('Gemini provider module', () => {
     });
 
     it('finds commands in the vault while refusing the ones the session announces', () => {
-      // The one place the descriptor and the live boolean deliberately
-      // disagree, and the family's assertion — `discovery !== 'unsupported'`
-      // equals `supportsProviderCommands` — is what would hide it.
-      // `supportsProviderCommands` gates the *session's* commands, which this
-      // provider drops: the recording captures an `available_commands_update`
-      // carrying twenty and no surface asks for one. What Grimoire does list is
-      // `.gemini/commands/**/*.toml`, which is a static vault catalogue.
+      // The provider that made the descriptor grow a third command field. The
+      // recording captures an `available_commands_update` carrying twenty
+      // session commands and no surface asks for one, while
+      // `.gemini/commands/**/*.toml` is a static vault catalogue that does
+      // reach the input. Two answers, so two fields — one boolean could only
+      // have been wrong about one of them.
       expect(GEMINI_PROVIDER_CAPABILITIES.supportsProviderCommands).toBe(false);
       expect(capabilities.commands).toEqual({
         discovery: 'static',
         chatSurface: 'grimoire',
+        sessionCommands: 'unsupported',
       });
     });
 

@@ -183,12 +183,12 @@ const geminiCapabilities: ProviderCapabilityDescriptor = {
     // These two statements do not project onto one boolean, which is what M3
     // found: `chatSurface` says what Grimoire puts in the chat input, while the
     // live `supportsProviderCommands` gates loading the *provider's session*
-    // commands. For every other provider the two agree; for Gemini they do not,
-    // so the UI gating cannot move onto this descriptor until the projection
-    // stops conflating them. The divergence is recorded in the capability
-    // parity test rather than papered over here.
+    // commands. For every other provider the two agree; Gemini is why the
+    // descriptor grew `sessionCommands` instead of choosing which of the two to
+    // be wrong about.
     discovery: 'static',
     chatSurface: 'grimoire',
+    sessionCommands: 'unsupported',
   },
   mcp: {
     // Grimoire owns `.grimoire/mcp/gemini.json` and injects those servers into

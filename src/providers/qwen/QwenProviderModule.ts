@@ -177,6 +177,7 @@ const qwenCapabilities: ProviderCapabilityDescriptor = {
     // `runtimeCommandDiscovery: 'active-session-only'`.
     discovery: 'active-session',
     chatSurface: 'grimoire',
+    sessionCommands: 'native',
   },
   mcp: {
     ownership: 'grimoire',

@@ -471,7 +471,7 @@ export interface ProviderCapabilityDescriptor {
   readonly commands: {
     readonly discovery: ProviderCommandDiscovery;
     /**
-     * Whether Grimoire surfaces those commands in the chat input.
+     * Whether Grimoire surfaces commands in the chat input for this provider.
      *
      * Split from `discovery` for the same reason `mcp` is three fields: what a
      * provider *can* do and what the UI *asks for* are different statements,
@@ -481,6 +481,17 @@ export interface ProviderCapabilityDescriptor {
      * Codex flip, silently.
      */
     readonly chatSurface: CapabilitySupport;
+    /**
+     * Whether Grimoire loads the commands the provider's own session announces.
+     *
+     * A third field because Gemini answers the two questions differently: its
+     * vault `.gemini/commands/**` reach the input dropdown, while the twenty
+     * commands its ACP session announces are dropped. One field could say
+     * either, and whichever it said would be wrong about the other — which is
+     * what blocked the capability gating from moving onto this descriptor until
+     * the two were separated.
+     */
+    readonly sessionCommands: CapabilitySupport;
   };
   readonly mcp: {
     readonly ownership: CapabilitySupport;

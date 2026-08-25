@@ -158,7 +158,11 @@ const claudeCapabilities: ProviderCapabilityDescriptor = {
   // Both kinds are real for Claude: `.claude/commands/**` is a static
   // inventory, and the SDK reports more once a session exists. The record names
   // the one the UI must wait for.
-  commands: { discovery: 'active-session', chatSurface: 'grimoire' },
+  commands: {
+    discovery: 'active-session',
+    chatSurface: 'grimoire',
+    sessionCommands: 'native',
+  },
   mcp: {
     // The only provider where Grimoire owns the server list, writes it, and
     // starts and stops the servers.

@@ -164,7 +164,11 @@ const grokCapabilities: ProviderCapabilityDescriptor = {
     transcriptHydration: 'native',
   },
   history: { ownership: 'provider-native' },
-  commands: { discovery: 'active-session', chatSurface: 'grimoire' },
+  commands: {
+    discovery: 'active-session',
+    chatSurface: 'grimoire',
+    sessionCommands: 'native',
+  },
   mcp: {
     ownership: 'grimoire',
     sessionConfiguration: 'grimoire',

@@ -158,6 +158,7 @@ const codexCapabilities: ProviderCapabilityDescriptor = {
     // Codex can list its skills; the chat input does not ask. Stated as a fact
     // rather than left as a contradiction between two records.
     chatSurface: 'unsupported',
+    sessionCommands: 'unsupported',
   },
   mcp: {
     // Codex configures MCP itself. Grimoire neither stores nor injects servers

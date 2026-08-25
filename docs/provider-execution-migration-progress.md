@@ -80,7 +80,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
-| M3 — provider control plane | In progress — the catalog exists, validates the nine modules, and owns provider identity, ordering and enablement. Capability gating (row 6) is blocked on one projection that conflates two questions, recorded in the parity test | `0dd3580`, `928a3c9`, this commit |
+| M3 — provider control plane | In progress — the catalog exists, validates the nine modules, and owns provider identity, ordering and enablement. Capability gating (row 6) is unblocked: the projection now reads a command field per question | `0dd3580`, `928a3c9`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
@@ -6986,6 +6986,27 @@ either, which is exactly why nothing noticed. Renamed to the product's word.
 `toLegacyCapabilities` moved out of the adapter into `src/core/providers/legacyCapabilities.ts`,
 where the catalog can reach it without importing a 1,900-line runtime module, and the adapter's
 `reasoningControl` host port is gone along with the nine compositions that supplied it.
+
+Gates: unit 529 suites / 8,302 tests, integration 5 / 151, typecheck, `eslint`, `build:release`.
+
+### The command capability was one field answering two questions (this commit)
+
+The thing that blocked row 6 in the previous commit, decided rather than deferred. The descriptor
+now has three command fields instead of two: `discovery` (what the provider can list),
+`chatSurface` (what Grimoire puts in the chat input), and **`sessionCommands`** (whether Grimoire
+loads the commands the provider's own session announces).
+
+Gemini is why. Its vault `.gemini/commands/**` reach the input dropdown while the twenty commands
+its ACP session announces are dropped, and a single boolean could only have been wrong about one of
+the two. Every other provider answers both the same way, which is why eight of nine never showed the
+seam.
+
+The legacy `supportsProviderCommands` maps from `sessionCommands` now, which is the only one of the
+three it has ever gated — `getSdkCommands` returns before it reaches a catalog when the boolean is
+false. Mapping from `discovery` would have turned Codex's on at its flip; mapping from `chatSurface`
+was about to turn Gemini's on at row 6.
+
+One divergence is left in the parity table, Grok's rewind, and it is the declared one.
 
 Gates: unit 529 suites / 8,302 tests, integration 5 / 151, typecheck, `eslint`, `build:release`.
 

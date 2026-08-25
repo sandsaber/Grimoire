@@ -24,10 +24,12 @@ export function toLegacyCapabilities(
     supportsPlanMode: supported(descriptor.interactions.planMode),
     supportsRewind: supported(descriptor.conversation.rewind),
     supportsFork: supported(descriptor.conversation.fork),
-    // From the chat surface, not from discovery: Codex can list its commands
-    // and the chat input does not ask, and mapping from discovery would turn
-    // that on at its flip without anyone deciding to.
-    supportsProviderCommands: supported(descriptor.commands.chatSurface),
+    // From `sessionCommands`, which is the only one of the three command fields
+    // this boolean has ever gated: `getSdkCommands` returns before it reaches a
+    // catalog when this is false. Mapping from `discovery` would have turned
+    // Codex's on at its flip; mapping from `chatSurface` would have turned
+    // Gemini's session commands on here.
+    supportsProviderCommands: supported(descriptor.commands.sessionCommands),
     supportsImageAttachments: supported(descriptor.input.imageAttachments),
     supportsInstructionMode: supported(descriptor.input.instructionMode),
     // The boolean the UI reads gates the per-run server selector and nothing
