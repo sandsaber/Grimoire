@@ -7165,9 +7165,10 @@ Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`)
 
 ### Where the session of 2026-08-25 ended
 
-**M3 is open and eight of its rows have moved.** `ProviderCatalog` is the one validated inventory of
+**M3 is open and nine of its rows have moved.** `ProviderCatalog` is the one validated inventory of
 the nine modules, and `ProviderWorkspaceManager` owns both halves of the workspace lifecycle.
-Registration rows 1, 2, 3, 4, 6 and 7 and app-level rows 2 and 3 are gone from their old homes; the
+Registration rows 1, 2, 3, 4, 5, 6 and 7 and app-level rows 2 and 3 are gone from their old homes,
+and `features(context)` has been split into what a provider declares and what a runtime binds; the
 two registries hold what is left.
 
 **Every checkpoint this session found something live, and none of it was found by reading the code
@@ -7229,21 +7230,37 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 #### What to pick up next, in order
 
-1. **Rows 15 and 16 need `SubagentManager` before they can move.** The split made
+1. **The workspace context assembly — the last structural decision in M3.** The ten workspace rows
+   move onto module `ProviderWorkspaceSlots` served by `ProviderWorkspaceManager`, and every
+   provider's `workspace.initialize(context)` needs a context built from the plugin. Eight have a
+   `create<Provider>ModuleContext(plugin, boundConversation)`; Antigravity needs none; Codex is the
+   only provider initializing module slots today, in its own composition. Decide where the nine
+   factories are assembled — `main.ts` or an app-level module beside the manager — then take the
+   rows one at a time, each with its consumers, so no eager initialization exists without a reader.
+   `cliResolution` is the cheapest first row: all nine already declare it.
+2. **Rows 15 and 16 need `SubagentManager` before they can move.** The split made
    `declarations.taskResults` and `declarations.nativeAgents` reachable, but the legacy
    `ProviderTaskResultInterpreter` the feature layer consumes is five low-level methods
    (`hasAsyncLaunchMarker`, `extractAgentId`, `extractStructuredResult`, `resolveTerminalStatus`,
    `extractTagValue`) against the module port's single `interpret`. `SubagentManager` reads the
    low-level ones directly, so this is an M5-shaped rework, not a row move.
-2. **Row 9, `settingsReconciler`.** Unblocked but not small: `ProviderSettingsCoordinator` projects,
+3. **Row 8, `chatUIConfig`, is probably an M5 row, not an M3 one.** The legacy interface is twenty-odd
+   UI members — reasoning options, service-tier and mode toggles, permission mapping, model metadata
+   discovery taking the plugin — and `ProviderModule.ts` may not acquire plugin or UI vocabulary. The
+   plan's own M5 calls the renderer a thin replaceable layer; this row belongs to that step. Worth an
+   explicit decision and an inventory correction rather than an attempt.
+4. **Row 9, `settingsReconciler`.** Unblocked but not small: `ProviderSettingsCoordinator` projects,
    clones and merges the settings record per provider, and the codec's `reconcile` works on decoded
    provider settings. Re-expressing that is a settings-behaviour risk, so it wants a fresh session
    and its own characterization tests.
-3. **The ten workspace rows, plus row 14 and app-level row 1**, then delete both registries.
-   Laziness in `ProviderWorkspaceManager` lands with these, since it is the synchronous consumers
-   that force eager initialization today.
-4. **Then the rest of M5**: projections, durable agents, seam deletion.
-5. **Two obligations from M4**, each a small commit: creating a conversation over an id that already
+5. **Row 14 and app-level row 1**, then delete both registries. Laziness in
+   `ProviderWorkspaceManager` lands with these, since it is the synchronous consumers that force
+   eager initialization today. App-level row 1 is a shape mismatch of its own: the legacy
+   `ProviderWorkspaceCapabilities` is five resource kinds each carrying
+   `{ inventory, manager, runtimeCommandDiscovery }`, and the descriptor's `workspace` map is one
+   `CapabilitySupport` per key over a different key set.
+6. **Then the rest of M5**: projections, durable agents, seam deletion.
+7. **Two obligations from M4**, each a small commit: creating a conversation over an id that already
    exists still replaces it, and the history list has no error state for a record this build cannot
    read.
 
