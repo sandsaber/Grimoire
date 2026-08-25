@@ -7326,6 +7326,38 @@ in front of the shell's.
 
 Gates: unit 525 suites / 8,306 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### M5's chat projection, dark, and the rule that keeps it that way (this commit)
+
+The reducer the chat surface will consume instead of the adapter's chunk stream: what a conversation
+looks like, derived from what the kernel recorded — messages, turns, interactions, queued commands,
+persistence state. Harvested from the first attempt's Phase 7 as material and rebuilt against this
+branch's contracts, with its test.
+
+Dark on purpose and listed as pending in the parity manifest, the way M1's kernel and M4's record
+store were: its first consumer is the chat execution coordinator, and building the coordinator is
+the next step. What is *not* deferred is the rule.
+
+**The stop condition is a gate now, not a sentence.** The plan says projections carry no DOM types,
+CSS class names, element structure or layout vocabulary, because that is what makes a later UI
+redesign a renderer swap instead of another architecture event. Two rules hold it: the projection is
+on the composition-boundary gate's strict list, which already forbids DOM globals, `obsidian`,
+providers and process launches — and a second rule reads the file for the markers that arrive as
+*field names* rather than as imports, which no import check can see. `readonly cssClass: string`
+passes every import rule ever written.
+
+**One thing the harvest had was left out.** The v1 projection also folded in a durable
+`ExecutionRunRecord`, so a run recovered at startup could reach the surface without replaying its
+events. `RunProjection` here has no reducer for one, and adding it now would be a slot with no
+producer. It arrives with its consumer, and the reason is written where the event would have gone.
+
+**A sharp edge found by porting.** The reducer's switch had no default, and `noImplicitReturns` is
+off in this repository — so a kind added to the union without a case would fall out and return
+`undefined`, erasing the whole conversation with nothing to catch it. Two of the ported tests hit
+exactly that. It ends in a `never` assignment, which makes the omission a compile error, plus a
+return that makes a malformed event a no-op rather than a blank chat.
+
+Gates: unit 526 suites / 8,314 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

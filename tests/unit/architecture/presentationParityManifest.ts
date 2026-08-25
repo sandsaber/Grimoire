@@ -778,6 +778,16 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: ['src/core/execution/RunProjection.ts'],
   },
   {
+    id: 'chat-execution-projection',
+    area: 'chat',
+    description:
+      'The chat projection reducer: what a conversation looks like, derived from what the kernel recorded — messages, turns, interactions, queued commands and persistence state.',
+    state: 'pending',
+    owner:
+      'M5 — the chat execution coordinator is its first consumer. The chat surface still folds the adapter\'s chunk stream into the DOM as it arrives, which is the consumption this replaces.',
+    modules: ['src/features/chat/projections/ChatProjection.ts'],
+  },
+  {
     id: 'execution-platform-dark',
     area: 'shell',
     description:

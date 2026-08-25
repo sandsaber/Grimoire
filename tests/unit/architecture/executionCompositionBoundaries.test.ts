@@ -46,6 +46,11 @@ const STRICT_MODULES = [
   'src/core/persistence/VersionedRecord.ts',
   'src/core/persistence/VersionedRepository.ts',
   'src/core/runtime/execution/ExecutionChatRuntimeAdapter.ts',
+  // Under `src/features/` and held to the same rule as core: a projection that
+  // learns a DOM type, an element structure or a CSS class is the plan's stop
+  // condition, and it is what would make a UI redesign another architecture
+  // event instead of a renderer swap.
+  'src/features/chat/projections/ChatProjection.ts',
 ];
 
 /**
@@ -284,6 +289,55 @@ describe('execution composition boundaries', () => {
       // The match is over the whole file, comments included — so a strict
       // module explains the rule without writing the word it forbids.
       expect(source).not.toMatch(/\bHTMLElement\b|\bdocument\b|\bwindow\./);
+    });
+  });
+
+  describe('projections stay presentation-agnostic', () => {
+    /**
+     * The plan's stop condition, as a rule rather than a sentence.
+     *
+     * A projection that names a CSS class, an element or a layout is a
+     * projection a UI redesign has to rewrite, which is what makes the redesign
+     * another architecture event instead of a renderer swap. The strict-module
+     * rule above already forbids DOM globals and `obsidian`; these are the
+     * markers that arrive as *field names* instead, which no import check sees.
+     */
+    const PROJECTION_MODULES = ['src/features/chat/projections/ChatProjection.ts'];
+    const PRESENTATION_VOCABULARY = [
+      /\bcssClass\b/,
+      /\bclassName\b/,
+      /\bgrimoire-[a-z-]+\b/,
+      /\binnerHTML\b/,
+      /\bstyle\b\s*[:?]/,
+      /\belement\b\s*[:?]/,
+      /\bcontainer\b\s*[:?]/,
+    ];
+
+    it.each(PROJECTION_MODULES)('%s names no presentation vocabulary', module => {
+      const source = read(module);
+      const found = PRESENTATION_VOCABULARY.filter(pattern => pattern.test(source));
+
+      expect(found).toEqual([]);
+    });
+
+    it('recognises the vocabulary it forbids', () => {
+      // Guards the guard: a rule over field names is easy to write in a form
+      // that matches nothing at all.
+      const samples = [
+        'readonly cssClass: string;',
+        'readonly className: string;',
+        "const cls = 'grimoire-history-item';",
+        'node.innerHTML = text;',
+        'readonly style: string;',
+        'readonly element?: unknown;',
+        'readonly container: unknown;',
+      ];
+
+      for (const sample of samples) {
+        expect(PRESENTATION_VOCABULARY.some(pattern => pattern.test(sample))).toBe(true);
+      }
+      expect(PRESENTATION_VOCABULARY.some(pattern => pattern.test('readonly title: string;')))
+        .toBe(false);
     });
   });
 
