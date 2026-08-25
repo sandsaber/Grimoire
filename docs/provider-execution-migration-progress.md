@@ -7280,6 +7280,24 @@ and leaves all 8,304 unit tests green.
 
 Gates: unit 525 suites / 8,304 tests, integration 5 / 155, typecheck, `eslint`, `build:release`.
 
+### The history list stops hiding what it cannot read (this commit)
+
+M4's second obligation, and the last one. A conversation whose record this build must not act on — a
+damaged file, or one written by a newer release — was skipped by the listing. The file stayed on
+disk and the chat simply vanished from the history, indistinguishable from one the user deleted.
+
+`listConversations()` reports them beside the readable ones, and the history dropdown renders them
+as their own block above the list: no title to search, no timestamp to group by, nothing to open,
+and a sentence saying which of the two it is. They are answered separately from
+`getConversationList()` on purpose — folding a conversation with no title, no messages and no
+provider into that list would make every consumer of it, tab titles and search and delete-all,
+guard against something that cannot be opened.
+
+The same silence typed hydration removed from the transcript, removed from the list. Copy landed in
+all ten locales, because a fallback is that silence again in another language.
+
+Gates: unit 525 suites / 8,306 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7389,9 +7407,8 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
    `{ inventory, manager, runtimeCommandDiscovery }`, and the descriptor's `workspace` map is one
    `CapabilitySupport` per key over a different key set.
 6. **Then the rest of M5**: projections, durable agents, seam deletion.
-7. **One obligation left from M4**: the history list has no error state for a record this build
-   cannot read — `loadMetadata` answers `null` for a corrupt or future-schema conversation, so it
-   silently disappears from the list. Creating over an existing id no longer replaces it.
+7. **M4's obligations are closed.** Creating over an existing id no longer replaces it, and the
+   history list shows a row for a record this build cannot read.
 
 **Still waiting on the owner rather than on code: D9, redo.** Certification remains account-bound —
 Gemini one turn per replenishment, MiMoCode, Kimi Code and Qwen not certifiable on this machine.

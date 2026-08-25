@@ -322,6 +322,35 @@ describe('GrimoirePlugin', () => {
       reloaded.onunload();
     });
 
+    it('reports a conversation the vault holds and this build cannot read', async () => {
+      // The alternative was silence: a damaged record was skipped by the
+      // listing, so the file stayed on disk and the chat simply vanished —
+      // indistinguishable from one the user deleted.
+      const files = useRememberingVault();
+      files.set('.grimoire/sessions/conv-broken.meta.json', '{"schemaVersion":1,');
+      files.set(
+        '.grimoire/sessions/conv-future.meta.json',
+        JSON.stringify({
+          schemaVersion: 99,
+          recordId: 'conv-future',
+          revision: 1,
+          updatedAt: 1,
+          payload: { id: 'conv-future', title: 'Later', createdAt: 1, updatedAt: 1 },
+        }),
+      );
+
+      await plugin.onload();
+
+      expect([...plugin.getUnreadableConversations()].sort(
+        (left, right) => left.id.localeCompare(right.id),
+      )).toEqual([
+        { id: 'conv-broken', reason: 'corrupt' },
+        { id: 'conv-future', reason: 'future' },
+      ]);
+      // And neither becomes a placeholder row in the conversation list.
+      expect(plugin.getConversationList()).toEqual([]);
+    });
+
     it('does not create over a conversation the vault already holds', async () => {
       useRememberingVault();
       // A conversation is keyed by the provider session id it was created

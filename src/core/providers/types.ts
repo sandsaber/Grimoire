@@ -1,5 +1,6 @@
 import type GrimoirePlugin from '../../main';
 import type { CursorContext } from '../../utils/editor';
+import type { ConversationListing } from '../bootstrap/SessionStorage';
 import type { ConversationMetadataField } from '../bootstrap/SessionStorage';
 import type { SharedAppStorage } from '../bootstrap/storage';
 import type { McpServerManager } from '../mcp/McpServerManager';
@@ -104,6 +105,8 @@ export interface AppTabManagerState {
 /** Provider-neutral session metadata storage. */
 export interface AppSessionStorage {
   listMetadata(): Promise<SessionMetadata[]>;
+  /** The same listing, plus the conversations this build cannot read. */
+  listConversations(): Promise<ConversationListing>;
   /** Writes a conversation the vault does not have yet. */
   createMetadata(meta: SessionMetadata): Promise<void>;
   /**

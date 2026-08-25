@@ -680,6 +680,7 @@ export class ConversationController {
         autocomplete: 'off',
       },
     });
+    this.renderUnreadableConversations(container);
     const list = container.createDiv({ cls: 'grimoire-history-list' });
 
     const renderList = (rawQuery = ''): void => {
@@ -734,6 +735,40 @@ export class ConversationController {
     }
 
     options.onClose?.();
+  }
+
+  /**
+   * The conversations the vault holds and this build cannot read.
+   *
+   * Their own block, above the list and outside the search: they have no
+   * title to match, no timestamp to group by, and nothing to open. Shown at
+   * all because the file is still there — a conversation that simply vanishes
+   * from the list is indistinguishable from one the user deleted, which is the
+   * silence typed hydration removed from the transcript and this removes from
+   * the list.
+   */
+  private renderUnreadableConversations(container: HTMLElement): void {
+    const unreadable = this.deps.plugin.getUnreadableConversations?.() ?? [];
+    if (unreadable.length === 0) {
+      return;
+    }
+
+    const block = container.createDiv({ cls: 'grimoire-history-unreadable' });
+    for (const entry of unreadable) {
+      const item = block.createDiv({ cls: 'grimoire-history-unreadable-item' });
+      item.setAttribute('data-conversation-id', entry.id);
+      const title = item.createDiv({
+        cls: 'grimoire-history-unreadable-title',
+        text: t('chat.ui.history.unreadableTitle'),
+      });
+      title.setAttribute('title', entry.id);
+      item.createDiv({
+        cls: 'grimoire-history-unreadable-reason',
+        text: entry.reason === 'future'
+          ? t('chat.ui.history.unreadableFuture')
+          : t('chat.ui.history.unreadableCorrupt'),
+      });
+    }
   }
 
   private renderHistoryConversationRow(

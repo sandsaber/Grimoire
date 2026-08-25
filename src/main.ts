@@ -24,6 +24,7 @@ import { QwenExecution } from './app/execution/qwen/QwenExecutionComposition';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
 import { VaultDurableStorage } from './app/storage/VaultDurableStorage';
+import type { UnreadableConversation } from './core/bootstrap/SessionStorage';
 import {
   applyAssistantResponseMetadataToMessages,
   applyVaultSearchContextsToMessages,
@@ -132,6 +133,14 @@ export default class GrimoirePlugin extends Plugin {
   private ribbonIconEl: HTMLElement | null = null;
   private readonly shellCommands = new Map<string, Command>();
   private providerWorkspaces: ProviderWorkspaceManager<ProviderWorkspaceServices> | null = null;
+  /**
+   * Conversations the vault holds and this build cannot read.
+   *
+   * Kept beside the list rather than folded into it: they have no title, no
+   * messages and no provider, and every conversation operation would have to
+   * guard against that. The history surface renders them as their own row.
+   */
+  private unreadableConversations: readonly UnreadableConversation[] = [];
 
   async onload() {
     try {
@@ -831,8 +840,9 @@ export default class GrimoirePlugin extends Plugin {
     );
     const didNormalizeModelVariants = this.normalizeModelVariantSettings();
 
-    const allMetadata = await this.storage.sessions.listMetadata();
-    this.conversations = allMetadata.map(meta => {
+    const listing = await this.storage.sessions.listConversations();
+    this.unreadableConversations = listing.unreadable;
+    this.conversations = listing.metadata.map(meta => {
       const resumeSessionId = meta.sessionId !== undefined ? meta.sessionId : meta.id;
 
       return {
@@ -1374,6 +1384,18 @@ export default class GrimoirePlugin extends Plugin {
 
   findEmptyConversation(): Conversation | null {
     return this.conversations.find(c => c.messages.length === 0) || null;
+  }
+
+  /**
+   * Conversations the vault holds and this build cannot read.
+   *
+   * Answered separately from `getConversationList`, because they have no title,
+   * no messages and no provider: folding them into that list would make every
+   * consumer of it — tab titles, search, delete-all — guard against a
+   * conversation that cannot be opened.
+   */
+  getUnreadableConversations(): readonly UnreadableConversation[] {
+    return this.unreadableConversations;
   }
 
   getConversationList(): ConversationMeta[] {

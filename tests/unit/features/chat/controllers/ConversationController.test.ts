@@ -724,6 +724,37 @@ describe('ConversationController', () => {
         expect(getHistoryItems(dropdown).length).toBe(2);
       });
 
+      it('shows a row for a conversation the vault holds and this build cannot read', () => {
+        // Skipping it made the file indistinguishable from a chat the user
+        // deleted. Its own block, above the list: no title to search, no
+        // timestamp to group by, nothing to open.
+        (deps.plugin.getConversationList as jest.Mock).mockReturnValue([]);
+        (deps.plugin as any).getUnreadableConversations = () => [
+          { id: 'conv-future', reason: 'future' },
+          { id: 'conv-broken', reason: 'corrupt' },
+        ];
+
+        controller.updateHistoryDropdown();
+
+        const block = dropdown.querySelector('.grimoire-history-unreadable');
+        expect(block).toBeTruthy();
+        expect(block.children.length).toBe(2);
+        const reasons = block.children.map((child: any) => (
+          child.querySelector('.grimoire-history-unreadable-reason')?.textContent
+        ));
+        expect(reasons[0]).toContain('newer version');
+        expect(reasons[1]).toContain('damaged');
+      });
+
+      it('shows no such row when every conversation is readable', () => {
+        (deps.plugin.getConversationList as jest.Mock).mockReturnValue([]);
+        (deps.plugin as any).getUnreadableConversations = () => [];
+
+        controller.updateHistoryDropdown();
+
+        expect(dropdown.querySelector('.grimoire-history-unreadable')).toBeFalsy();
+      });
+
       it('should show "No conversations" when list is empty', () => {
         (deps.plugin.getConversationList as jest.Mock).mockReturnValue([]);
 

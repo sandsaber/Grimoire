@@ -178,6 +178,32 @@
   text-align: center;
 }
 
+.grimoire-history-unreadable {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+}
+
+.grimoire-history-unreadable-item {
+  padding: 8px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-secondary);
+}
+
+.grimoire-history-unreadable-title {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.grimoire-history-unreadable-reason {
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
 .grimoire-history-item {
   position: relative;
   display: grid;

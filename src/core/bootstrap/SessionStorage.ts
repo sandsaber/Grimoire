@@ -81,6 +81,17 @@ export function clonePersistedMessages(
   return cloneMessagesForMetadata(messages) ?? [];
 }
 
+/** A conversation the vault holds and this build must not act on. */
+export interface UnreadableConversation {
+  readonly id: string;
+  readonly reason: 'corrupt' | 'future';
+}
+
+export interface ConversationListing {
+  readonly metadata: SessionMetadata[];
+  readonly unreadable: UnreadableConversation[];
+}
+
 function isSupportedSessionMetadata(value: unknown): value is SessionMetadata {
   if (!value || typeof value !== 'object') {
     return false;
@@ -449,7 +460,19 @@ export class SessionStorage {
    * the envelope replaced and they are adopted on read.
    */
   async listMetadata(): Promise<SessionMetadata[]> {
+    return (await this.listConversations()).metadata;
+  }
+
+  /**
+   * Every conversation the vault holds, including the ones it cannot read.
+   *
+   * A record this build must not act on is reported rather than skipped: the
+   * file is still there, and a conversation that simply disappears from the
+   * list is indistinguishable from one the user deleted.
+   */
+  async listConversations(): Promise<ConversationListing> {
     const metas: SessionMetadata[] = [];
+    const unreadable: UnreadableConversation[] = [];
     const seen = new Set<string>();
 
     for (const conversationId of await this.conversations.listIds()) {
@@ -457,6 +480,8 @@ export class SessionStorage {
       seen.add(`${conversationId}.meta.json`);
       if (record.kind === 'present' && isSupportedSessionMetadata(record.metadata)) {
         metas.push(record.metadata);
+      } else if (record.kind === 'unreadable') {
+        unreadable.push({ id: conversationId, reason: record.reason });
       }
     }
 
@@ -480,7 +505,7 @@ export class SessionStorage {
       }
     }
 
-    return metas;
+    return { metadata: metas, unreadable };
   }
 
   async listAllConversations(): Promise<ConversationMeta[]> {
