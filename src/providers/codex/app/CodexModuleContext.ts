@@ -8,7 +8,6 @@ import type { CodexWorkspaceContext } from '../CodexProviderModule';
 import { readCodexConversationBinding } from '../execution/CodexConversationBinding';
 import { CodexConversationHistoryService } from '../history/CodexConversationHistoryService';
 import { getCodexModelOptions } from '../modelOptions';
-import { codexSubagentLifecycleAdapter } from '../normalization/codexSubagentNormalization';
 import { codexPlanUsageStore } from './CodexPlanUsageStore';
 import { maybeGetCodexWorkspaceServices } from './CodexWorkspaceServices';
 
@@ -113,12 +112,6 @@ export function createCodexModuleContext(
       return bound?.kind === 'thread' ? bound.threadId : null;
     },
     isPendingFork: conversationId => bindingFor(conversation, conversationId)?.kind === 'fork',
-    recognizesSubagentTool: toolName => (
-      codexSubagentLifecycleAdapter.isSpawnTool(toolName)
-      || codexSubagentLifecycleAdapter.isWaitTool(toolName)
-      || codexSubagentLifecycleAdapter.isCloseTool(toolName)
-    ),
-    parseSubagentDisplay: () => null,
     dispose: async () => {
       // Nothing is created here: every service reached above is owned by the
       // workspace registration, which disposes them itself.

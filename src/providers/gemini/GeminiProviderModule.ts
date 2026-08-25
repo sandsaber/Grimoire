@@ -375,9 +375,13 @@ GeminiProviderSettings
 
   capabilities: geminiCapabilities,
 
-  features: context => ({
+  declarations: {
     providerId: 'gemini',
     chatUI: geminiChatUi,
+  },
+
+  runtimePorts: context => ({
+    providerId: 'gemini',
     history: {
       hydrate: conversationId => context.hydrateConversation(conversationId),
       deleteSession: conversationId => context.deleteConversationSession(conversationId),

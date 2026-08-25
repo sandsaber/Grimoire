@@ -45,8 +45,8 @@ describe('Qwen provider module', () => {
     };
   }
 
-  function features(): ReturnType<typeof qwenProviderModule.features> {
-    return qwenProviderModule.features(createContext());
+  function features(): ReturnType<typeof qwenProviderModule.runtimePorts> {
+    return qwenProviderModule.runtimePorts(createContext());
   }
 
   function workspaceSlots(): ReturnType<typeof qwenProviderModule.workspace.initialize> {
@@ -236,7 +236,7 @@ describe('Qwen provider module', () => {
         visibleModels: ['qwen3-coder-plus'],
         modelAliases: { 'qwen3-max': 'Max' },
       };
-      const presentation = features().chatUI.modelPresentation;
+      const presentation = qwenProviderModule.declarations.chatUI.modelPresentation;
 
       expect(presentation.ownsModel('qwen:qwen3-coder-plus', settings)).toBe(true);
       expect(presentation.ownsModel('qwen', settings)).toBe(true);

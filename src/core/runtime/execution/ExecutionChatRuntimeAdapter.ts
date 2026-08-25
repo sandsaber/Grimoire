@@ -17,7 +17,7 @@ import type { ExecutionLifecycleRegistry } from '../../execution/ExecutionLifecy
 import { toLegacyCapabilities } from '../../providers/legacyCapabilities';
 import type {
   ProviderCapabilityDescriptor,
-  ProviderFeatureContributions,
+  ProviderRuntimePorts,
   ProviderWorkspaceSlots,
 } from '../../providers/ProviderModule';
 import type { ProviderCapabilities } from '../../providers/types';
@@ -610,7 +610,7 @@ export interface ExecutionChatRuntimeHostPorts {
  * the UI can test for is a capability, while one that always fails is a
  * capability the UI cannot tell from a defect.
  */
-export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<string, unknown>> {
+export class ExecutionChatRuntimeAdapter {
   private readonly session: ExecutionAdapterSession;
   private readonly readyListeners = new Set<(ready: boolean) => void>();
   private executionSessionId: ExecutionSessionId | null = null;
@@ -637,7 +637,7 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   constructor(
     private readonly context: ExecutionChatRuntimeAdapterContext,
     private readonly ports: ExecutionChatRuntimeHostPorts,
-    private readonly features: ProviderFeatureContributions<TSettings>,
+    private readonly features: ProviderRuntimePorts,
     private readonly workspace?: ProviderWorkspaceSlots,
   ) {
     this.session = new ExecutionAdapterSession(context.capabilities);

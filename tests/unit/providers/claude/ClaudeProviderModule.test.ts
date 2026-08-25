@@ -38,14 +38,12 @@ describe('Claude provider module', () => {
       resolveSessionId: () => 'claude-session',
       isPendingFork: () => false,
       rewind: async () => ({ outcome: 'rewound' as const, filesChanged: ['note.md'] }),
-      interpretTaskResult: () => ({ title: 'Reviewer', isError: false }),
-      parseSubagentDisplay: () => ({ agentId: 'sub-1', label: 'Reviewer' }),
       dispose: async () => undefined,
     };
   }
 
-  function features(): ReturnType<typeof claudeProviderModule.features> {
-    return claudeProviderModule.features(createContext());
+  function features(): ReturnType<typeof claudeProviderModule.runtimePorts> {
+    return claudeProviderModule.runtimePorts(createContext());
   }
 
   function workspaceSlots(): ReturnType<typeof claudeProviderModule.workspace.initialize> {
@@ -145,14 +143,20 @@ describe('Claude provider module', () => {
     });
 
     it('interprets a subagent result only for the tools that launch one', () => {
-      const taskResults = features().taskResults;
+      // Reads a real payload through the real interpreter, which is what the
+      // M3 split made possible: this used to run against a stub the module
+      // context supplied, so the assertion proved the stub rather than Claude.
+      const taskResults = claudeProviderModule.declarations.taskResults;
+      const payload = { agent_id: 'reviewer' };
 
-      expect(taskResults?.interpret('Agent', {})).toEqual({
-        title: 'Reviewer',
+      expect(taskResults?.interpret('Agent', payload)).toEqual({
+        title: 'reviewer',
         isError: false,
       });
-      expect(taskResults?.interpret('Task', {})).not.toBeNull();
-      expect(taskResults?.interpret('Read', {})).toBeNull();
+      expect(taskResults?.interpret('Task', payload)).not.toBeNull();
+      // A payload naming no agent is still a task result, just an unnamed one.
+      expect(taskResults?.interpret('Task', {})).toEqual({ title: 'Task', isError: false });
+      expect(taskResults?.interpret('Read', payload)).toBeNull();
     });
   });
 
@@ -162,7 +166,7 @@ describe('Claude provider module', () => {
     });
 
     it('preloads no context files of its own', () => {
-      expect(features().context).toBeUndefined();
+      expect(claudeProviderModule.declarations.context).toBeUndefined();
     });
   });
 
@@ -239,7 +243,7 @@ describe('Claude provider module', () => {
           maxInputTokens: 500_000,
         }],
       };
-      const presentation = features().chatUI.modelPresentation;
+      const presentation = claudeProviderModule.declarations.chatUI.modelPresentation;
 
       expect(presentation.ownsModel('claude-custom', settings)).toBe(true);
       expect(presentation.contextWindow('claude-custom', settings)).toBe(500_000);

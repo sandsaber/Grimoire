@@ -363,9 +363,13 @@ MimocodeProviderSettings
 
   capabilities: mimocodeCapabilities,
 
-  features: context => ({
+  declarations: {
     providerId: 'mimocode',
     chatUI: mimocodeChatUi,
+  },
+
+  runtimePorts: context => ({
+    providerId: 'mimocode',
     history: {
       hydrate: conversationId => context.hydrateConversation(conversationId),
       deleteSession: conversationId => context.deleteConversationSession(conversationId),

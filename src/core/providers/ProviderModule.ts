@@ -252,7 +252,20 @@ export interface ProviderSettingsPresentationPort<THost = unknown> {
 // Feature contributions — inventory rows 5, 8, 14, 15, 16
 // ---------------------------------------------------------------------------
 
-export interface ProviderFeatureContributions<TSettings extends object = Record<string, unknown>> {
+/**
+ * What a provider declares about itself, independent of any running session.
+ *
+ * Split from the runtime ports at M3, because the single `features(context)`
+ * factory was two contracts wearing one name. Every one of these is a
+ * module-level constant in all nine providers and reads nothing from a context;
+ * the ports that genuinely need one are `ProviderRuntimePorts`, and the
+ * presentation adapter — the only consumer of that factory — asks for exactly
+ * those two and nothing here.
+ *
+ * Keeping them behind a factory made them unreachable without a plugin, which
+ * is what stopped the UI-facing rows from moving off the legacy registration.
+ */
+export interface ProviderDeclarations<TSettings extends object = Record<string, unknown>> {
   readonly providerId: ProviderId;
   /** Provider-preloaded context file names. Inventory row 5. */
   readonly context?: ProviderContextPort;
@@ -261,6 +274,24 @@ export interface ProviderFeatureContributions<TSettings extends object = Record<
    * named members so a migrated config cannot quietly lose the model picker.
    */
   readonly chatUI: ProviderChatUiContribution<TSettings>;
+  /** Provider task and tool result interpretation. Inventory row 15. */
+  readonly taskResults?: ProviderTaskResultPort;
+  /** Subagent tool-name recognition and display parsing. Inventory row 16. */
+  readonly nativeAgents?: ProviderNativeAgentPort;
+}
+
+/**
+ * The ports that only mean something for a running conversation.
+ *
+ * Both are answered against the conversation the context is bound to, and both
+ * answer `null`, `absent` or nothing at all for any other — deliberately: a
+ * lookup across the workspace would answer for a conversation this runtime does
+ * not serve. That is why they cannot be reached from a catalog, and why the
+ * workspace-global history service the feature layer uses is a different
+ * contract with the same subject.
+ */
+export interface ProviderRuntimePorts {
+  readonly providerId: ProviderId;
   /** Hydration, fork state, session resolution, deletion. Inventory row 14. */
   readonly history?: ProviderHistoryPort;
   /**
@@ -273,10 +304,6 @@ export interface ProviderFeatureContributions<TSettings extends object = Record<
    * the host to perform it. Only Claude declares it today.
    */
   readonly rewind?: ProviderRewindPort;
-  /** Provider task and tool result interpretation. Inventory row 15. */
-  readonly taskResults?: ProviderTaskResultPort;
-  /** Subagent tool-name recognition and display parsing. Inventory row 16. */
-  readonly nativeAgents?: ProviderNativeAgentPort;
 }
 
 export interface ProviderContextPort {
@@ -610,6 +637,8 @@ export interface ProviderModule<
   readonly execution: ExecutionBackendFactory<TExecutionContext>;
   readonly auxiliary: ProviderAuxiliaryContributions<TExecutionContext>;
   readonly capabilities: ProviderCapabilityDescriptor;
+  /** What the provider declares about itself, reachable without a plugin. */
+  readonly declarations: ProviderDeclarations<TSettings>;
   /**
    * A factory over the same context the workspace initializes from.
    *
@@ -620,6 +649,10 @@ export interface ProviderModule<
    * real history services that would have been dropped at their flip — the
    * exact loss this migration exists to prevent. Synchronous on purpose: these
    * are ports, and constructing a port must not do work.
+   *
+   * It carried the static declarations too until M3, which made them
+   * unreachable without a plugin and kept every UI-facing row on the legacy
+   * registration. They are `declarations` now.
    */
-  features(context: TWorkspaceContext): ProviderFeatureContributions<TSettings>;
+  runtimePorts(context: TWorkspaceContext): ProviderRuntimePorts;
 }

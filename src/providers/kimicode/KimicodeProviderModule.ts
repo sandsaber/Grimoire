@@ -369,9 +369,13 @@ KimicodeProviderSettings
 
   capabilities: kimicodeCapabilities,
 
-  features: context => ({
+  declarations: {
     providerId: 'kimicode',
     chatUI: kimicodeChatUi,
+  },
+
+  runtimePorts: context => ({
+    providerId: 'kimicode',
     history: {
       hydrate: conversationId => context.hydrateConversation(conversationId),
       deleteSession: conversationId => context.deleteConversationSession(conversationId),

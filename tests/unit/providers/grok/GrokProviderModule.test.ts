@@ -46,8 +46,8 @@ describe('Grok provider module', () => {
     };
   }
 
-  function features(): ReturnType<typeof grokProviderModule.features> {
-    return grokProviderModule.features(createContext());
+  function features(): ReturnType<typeof grokProviderModule.runtimePorts> {
+    return grokProviderModule.runtimePorts(createContext());
   }
 
   function workspaceSlots(): ReturnType<typeof grokProviderModule.workspace.initialize> {
@@ -251,7 +251,7 @@ describe('Grok provider module', () => {
         modelAliases: { 'grok-4.6': 'Fast' },
         visibleModels: ['grok-4.6'],
       };
-      const presentation = features().chatUI.modelPresentation;
+      const presentation = grokProviderModule.declarations.chatUI.modelPresentation;
 
       // Unlike OpenCode, a Grok selection carries its provider in the id, so a
       // model the vault has never discovered is still Grok's to label.

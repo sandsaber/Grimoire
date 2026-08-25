@@ -351,9 +351,13 @@ OpencodeProviderSettings
 
   capabilities: opencodeCapabilities,
 
-  features: context => ({
+  declarations: {
     providerId: 'opencode',
     chatUI: opencodeChatUi,
+  },
+
+  runtimePorts: context => ({
+    providerId: 'opencode',
     history: {
       hydrate: conversationId => context.hydrateConversation(conversationId),
       deleteSession: conversationId => context.deleteConversationSession(conversationId),

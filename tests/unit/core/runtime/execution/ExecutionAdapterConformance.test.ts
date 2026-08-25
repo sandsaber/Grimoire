@@ -64,7 +64,6 @@ import type { StreamChunk } from '@/core/types/chat';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
-import type { CodexProviderSettings } from '@/providers/codex/settings';
 import { geminiProviderModule } from '@/providers/gemini/GeminiProviderModule';
 import { grokProviderModule } from '@/providers/grok/GrokProviderModule';
 import { kimicodeProviderModule } from '@/providers/kimicode/KimicodeProviderModule';
@@ -568,7 +567,7 @@ describe('the assembled ChatRuntime adapter', () => {
   function createAdapter(
     harness: Harness,
     ports: Partial<ExecutionChatRuntimeHostPorts> = {},
-  ): ExecutionChatRuntimeAdapter<CodexProviderSettings> {
+  ): ExecutionChatRuntimeAdapter {
     return new ExecutionChatRuntimeAdapter(
       harness.context,
       {
@@ -592,7 +591,7 @@ describe('the assembled ChatRuntime adapter', () => {
         delay: immediately,
         ...ports,
       },
-      codexProviderModule.features({
+      codexProviderModule.runtimePorts({
         listSkills: async () => [],
         listAgentMentions: async () => [],
         refreshAgentMentions: async () => undefined,
@@ -606,8 +605,6 @@ describe('the assembled ChatRuntime adapter', () => {
         deleteConversationSession: async () => undefined,
         resolveSessionId: () => 'thread-1',
         isPendingFork: () => false,
-        recognizesSubagentTool: () => false,
-        parseSubagentDisplay: () => null,
         dispose: async () => undefined,
       }),
     );
@@ -946,7 +943,7 @@ describe('the assembled ChatRuntime adapter', () => {
         currentSessionId: () => null,
         delay: immediately,
       },
-      codexProviderModule.features({
+      codexProviderModule.runtimePorts({
         listSkills: async () => [],
         listAgentMentions: async () => [],
         refreshAgentMentions: async () => undefined,
@@ -960,8 +957,6 @@ describe('the assembled ChatRuntime adapter', () => {
         deleteConversationSession: async () => undefined,
         resolveSessionId: () => 'thread-1',
         isPendingFork: () => false,
-        recognizesSubagentTool: () => false,
-        parseSubagentDisplay: () => null,
         dispose: async () => undefined,
       }),
     ).steer).toBeUndefined();
@@ -979,7 +974,7 @@ describe('the assembled ChatRuntime adapter', () => {
         currentSessionId: () => null,
         delay: immediately,
       },
-      antigravityProviderModule.features({
+      antigravityProviderModule.runtimePorts({
         resolveCliPath: async () => null,
         listModels: async () => [],
         refreshModels: async () => [],
@@ -1326,7 +1321,7 @@ describe('concurrent readiness', () => {
         currentSessionId: () => null,
         delay: immediately,
       },
-      antigravityProviderModule.features({
+      antigravityProviderModule.runtimePorts({
         resolveCliPath: async () => null,
         listModels: async () => [],
         refreshModels: async () => [],

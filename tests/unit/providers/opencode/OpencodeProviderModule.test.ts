@@ -43,8 +43,8 @@ describe('OpenCode provider module', () => {
     };
   }
 
-  function features(): ReturnType<typeof opencodeProviderModule.features> {
-    return opencodeProviderModule.features(createContext());
+  function features(): ReturnType<typeof opencodeProviderModule.runtimePorts> {
+    return opencodeProviderModule.runtimePorts(createContext());
   }
 
   function workspaceSlots(): ReturnType<typeof opencodeProviderModule.workspace.initialize> {
@@ -219,7 +219,7 @@ describe('OpenCode provider module', () => {
         visibleModels: ['anthropic/claude-sonnet'],
         modelAliases: { 'openai/gpt-5.5': 'Fast' },
       };
-      const presentation = features().chatUI.modelPresentation;
+      const presentation = opencodeProviderModule.declarations.chatUI.modelPresentation;
 
       expect(presentation.ownsModel('opencode:anthropic/claude-sonnet', settings)).toBe(true);
       // The synthetic id a vault with no catalogue yet still selects.

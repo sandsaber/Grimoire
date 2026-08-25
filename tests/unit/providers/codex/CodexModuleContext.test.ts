@@ -80,11 +80,10 @@ describe('Codex module context', () => {
     await expect(context.deleteConversationSession('conv-1')).resolves.toBeUndefined();
   });
 
-  it('recognizes the tools Codex drives its own agents with', () => {
-    const context = contextFor(null);
-
-    expect(context.recognizesSubagentTool('spawn_agent')).toBe(true);
-    expect(context.recognizesSubagentTool('wait')).toBe(true);
-    expect(context.recognizesSubagentTool('Bash')).toBe(false);
+  it('no longer carries subagent recognition, which needs no plugin', () => {
+    // Moved to `codexProviderModule.declarations.nativeAgents` at M3, where its
+    // own test lives: reaching a plugin to answer a question about a tool name
+    // is what kept that row on the legacy registration.
+    expect(contextFor(null)).not.toHaveProperty('recognizesSubagentTool');
   });
 });

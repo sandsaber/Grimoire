@@ -17,7 +17,7 @@ import type {
 } from '@/core/execution/ExecutionLifecycleRegistry';
 import { getRuntimeEnvironmentText } from '@/core/providers/providerEnvironment';
 import type {
-  ProviderFeatureContributions,
+  ProviderRuntimePorts,
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
@@ -67,7 +67,6 @@ import {
   buildGeminiPromptText,
 } from '@/providers/gemini/runtime/buildGeminiPrompt';
 import { buildGeminiRuntimeEnv } from '@/providers/gemini/runtime/GeminiRuntimeEnvironment';
-import type { GeminiProviderSettings } from '@/providers/gemini/settings';
 import { getVaultPath } from '@/utils/path';
 
 import { delayThroughWindow } from '../hostTimers';
@@ -413,7 +412,7 @@ export class GeminiExecution {
     // Built here, not passed in: the module's history contribution answers about
     // *this tab's* conversation, so the context has to close over the same one
     // the ports above sync.
-    const contributions = geminiProviderModule.features(
+    const contributions = geminiProviderModule.runtimePorts(
       createGeminiModuleContext(boundConversation),
     );
 
@@ -726,11 +725,11 @@ function opaqueId(prefix: string): string {
  * A tab closing is when the prompts it raised and the turns it queued stop being
  * anyone's; waiting for its next turn is waiting for one that never comes.
  */
-class GeminiRuntimeAdapter extends ExecutionChatRuntimeAdapter<GeminiProviderSettings> {
+class GeminiRuntimeAdapter extends ExecutionChatRuntimeAdapter {
   constructor(
     context: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[0],
     ports: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[1],
-    features: ProviderFeatureContributions<GeminiProviderSettings>,
+    features: ProviderRuntimePorts,
     workspace: ProviderWorkspaceSlots,
     private readonly releaseTab: () => void,
   ) {

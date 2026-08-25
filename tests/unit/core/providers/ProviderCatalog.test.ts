@@ -61,7 +61,19 @@ function testModule(
     },
     auxiliary: { providerId },
     capabilities: { providerId } as CatalogProviderModule['capabilities'],
-    features: () => ({ providerId }) as ReturnType<CatalogProviderModule['features']>,
+    declarations: {
+      providerId,
+      chatUI: {
+        modelPresentation: {
+          ownsModel: () => false,
+          label: (modelId: string) => modelId,
+          contextWindow: () => undefined,
+        },
+        permissionToggles: [],
+        icon: providerId,
+      },
+    },
+    runtimePorts: () => ({ providerId }),
     ...overrides,
   };
 }
@@ -227,11 +239,20 @@ describe('ProviderCatalog', () => {
         .toThrow('workspace.dispose must be a function');
     });
 
-    it('requires a features factory rather than a features object', () => {
+    it('requires a runtime-port factory rather than an object', () => {
       // A plain object cannot carry a port that needs vault-facing services,
       // which is how a real history service is dropped at a flip.
-      expect(() => new ProviderCatalog([moduleWith('one', { features: {} })]))
-        .toThrow('module.features must be a function');
+      expect(() => new ProviderCatalog([moduleWith('one', { runtimePorts: {} })]))
+        .toThrow('module.runtimePorts must be a function');
+    });
+
+    it('requires the declarations to name the same provider and declare a chat UI', () => {
+      expect(() => new ProviderCatalog([
+        moduleWith('one', { declarations: { providerId: 'other' } }),
+      ])).toThrow('has a declarations contribution claiming "other"');
+      expect(() => new ProviderCatalog([
+        moduleWith('one', { declarations: { providerId: 'one' } }),
+      ])).toThrow('declares no chat UI contribution');
     });
 
     it('rejects settings runtime input keys that are not strings', () => {

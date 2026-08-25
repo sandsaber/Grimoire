@@ -5,7 +5,6 @@ import { getVaultPath } from '../../../utils/path';
 import type { ClaudeWorkspaceContext } from '../ClaudeProviderModule';
 import type { ClaudeRewindResult } from '../execution/ClaudeExecutionBackend';
 import { ClaudeConversationHistoryService } from '../history/ClaudeConversationHistoryService';
-import { ClaudeTaskResultInterpreter } from '../runtime/ClaudeTaskResultInterpreter';
 import { claudePlanUsageStore } from './ClaudePlanUsageStore';
 
 /**
@@ -34,7 +33,7 @@ export interface ClaudeModuleContextPorts {
 /**
  * The module's context over the running plugin, for the runtime's features.
  *
- * Everything the adapter reads through `claudeProviderModule.features(...)` is
+ * Everything the adapter reads through `claudeProviderModule.runtimePorts(...)` is
  * wired here from services that already exist. The workspace slots are not:
  * Claude's workspace is still registered the legacy way through
  * `ClaudeWorkspaceServices`, and its flip is a separate checkpoint — so they
@@ -47,7 +46,6 @@ export function createClaudeModuleContext(
   ports: ClaudeModuleContextPorts,
 ): ClaudeWorkspaceContext {
   const history = new ClaudeConversationHistoryService();
-  const interpreter = new ClaudeTaskResultInterpreter();
 
   return {
     hydrateConversation: async conversationId => {
@@ -98,21 +96,6 @@ export function createClaudeModuleContext(
     // Assembled from what the interpreter can actually read off a subagent's
     // result, rather than invented: the agent it belongs to, the structured
     // text it carried, and whether the SDK ended it as an error.
-    interpretTaskResult: payload => {
-      const detail = interpreter.extractStructuredResult(payload);
-      return {
-        title: interpreter.extractAgentId(payload) ?? 'Task',
-        ...(detail ? { detail } : {}),
-        isError: interpreter.resolveTerminalStatus(payload, 'completed') === 'error',
-      };
-    },
-    parseSubagentDisplay: payload => {
-      const agentId = interpreter.extractAgentId(payload);
-      // No id is no agent to display, which is different from an agent with no
-      // name: answering with a placeholder would put a card on screen for
-      // something that never ran.
-      return agentId ? { agentId, label: agentId } : null;
-    },
     readPlanUsage: async () => {
       const usage = claudePlanUsageStore.getCachedUsage({
         plugin,

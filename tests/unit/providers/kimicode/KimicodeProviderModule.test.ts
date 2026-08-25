@@ -43,8 +43,8 @@ describe('Kimi Code provider module', () => {
     };
   }
 
-  function features(): ReturnType<typeof kimicodeProviderModule.features> {
-    return kimicodeProviderModule.features(createContext());
+  function features(): ReturnType<typeof kimicodeProviderModule.runtimePorts> {
+    return kimicodeProviderModule.runtimePorts(createContext());
   }
 
   function workspaceSlots(): ReturnType<typeof kimicodeProviderModule.workspace.initialize> {
@@ -227,7 +227,7 @@ describe('Kimi Code provider module', () => {
         visibleModels: ['anthropic/claude-sonnet'],
         modelAliases: { 'openai/gpt-5.5': 'Fast' },
       };
-      const presentation = features().chatUI.modelPresentation;
+      const presentation = kimicodeProviderModule.declarations.chatUI.modelPresentation;
 
       expect(presentation.ownsModel('kimicode:anthropic/claude-sonnet', settings)).toBe(true);
       // The synthetic id a vault with no catalogue yet still selects.

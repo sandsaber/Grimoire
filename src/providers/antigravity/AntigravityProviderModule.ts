@@ -273,12 +273,15 @@ AntigravityProviderSettings
 
   capabilities: antigravityCapabilities,
 
-  // No history, rewind, task results, or native agents: print mode keeps no
-  // transcript Grimoire could hydrate and spawns no subagents.
-  features: () => ({
+  // No task results or native agents: print mode spawns no subagents.
+  declarations: {
     providerId: 'antigravity',
     chatUI: antigravityChatUi,
-  }),
+  },
+
+  // No history and no rewind: print mode keeps no transcript Grimoire could
+  // hydrate, and there is nothing to rewind to.
+  runtimePorts: () => ({ providerId: 'antigravity' }),
 };
 
 function createDefaultSettings(): AntigravityProviderSettings {

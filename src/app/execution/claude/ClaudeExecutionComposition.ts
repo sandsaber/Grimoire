@@ -12,7 +12,7 @@ import type {
   BackendLifecycleRegistration,
   ExecutionLifecycleRegistry,
 } from '@/core/execution/ExecutionLifecycleRegistry';
-import type { ProviderFeatureContributions } from '@/core/providers/ProviderModule';
+import type { ProviderRuntimePorts } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
 import {
@@ -52,7 +52,6 @@ import { createStopSubagentHook } from '@/providers/claude/hooks/SubagentHooks';
 import { encodeClaudeTurn } from '@/providers/claude/prompt/ClaudeTurnEncoder';
 import { QueryOptionsBuilder } from '@/providers/claude/runtime/ClaudeQueryOptionsBuilder';
 import { createClaudeRewindBackup } from '@/providers/claude/runtime/ClaudeRewindService';
-import type { ClaudeProviderSettings } from '@/providers/claude/settings';
 import { getClaudeState } from '@/providers/claude/types/providerState';
 import { getEnhancedPath,parseEnvironmentVariables } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
@@ -343,7 +342,7 @@ export class ClaudeExecution {
     // Built here, not passed in: the module's history contribution answers
     // about *this tab's* conversation, so the context has to close over the
     // same one the ports above sync.
-    const contributions = claudeProviderModule.features(createClaudeModuleContext(
+    const contributions = claudeProviderModule.runtimePorts(createClaudeModuleContext(
       this.plugin,
       boundConversation,
       {
@@ -507,11 +506,11 @@ function opaqueId(prefix: string): string {
  * when a prompt this tab raised stops being anyone's: leaving it open locks the
  * composer of a view that no longer exists.
  */
-class ClaudeRuntimeAdapter extends ExecutionChatRuntimeAdapter<ClaudeProviderSettings> {
+class ClaudeRuntimeAdapter extends ExecutionChatRuntimeAdapter {
   constructor(
     context: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[0],
     ports: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[1],
-    features: ProviderFeatureContributions<ClaudeProviderSettings>,
+    features: ProviderRuntimePorts,
     private readonly releaseTab: () => void,
   ) {
     super(context, ports, features);

@@ -16,7 +16,7 @@ import type {
   ExecutionLifecycleRegistry,
 } from '@/core/execution/ExecutionLifecycleRegistry';
 import { buildSystemPrompt } from '@/core/prompt/mainAgent';
-import type { ProviderFeatureContributions, ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
+import type { ProviderRuntimePorts, ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
 import {
@@ -61,7 +61,6 @@ import { encodeCodexTurn } from '@/providers/codex/prompt/encodeCodexTurn';
 import { resolveCodexAppServerLaunchSpec } from '@/providers/codex/runtime/codexAppServerSupport';
 import type { CodexExecutionConnection } from '@/providers/codex/runtime/CodexExecutionConnection';
 import { createCodexRuntimeContext } from '@/providers/codex/runtime/CodexRuntimeContext';
-import type { CodexProviderSettings } from '@/providers/codex/settings';
 import { CodexSkillListingService } from '@/providers/codex/skills/CodexSkillListingService';
 import { DEFAULT_CODEX_PRIMARY_MODEL } from '@/providers/codex/types/models';
 import { getVaultPath } from '@/utils/path';
@@ -262,7 +261,7 @@ export class CodexExecution {
    * property of *this* tab, read when the turn is dispatched.
    */
   createRuntime(
-    features?: ProviderFeatureContributions<CodexProviderSettings>,
+    features?: ProviderRuntimePorts,
     workspace?: ProviderWorkspaceSlots,
   ): ChatRuntime {
     let conversation: BoundConversation | null = null;
@@ -368,7 +367,7 @@ export class CodexExecution {
     // *this tab's* conversation, so the context has to close over the same one
     // the ports above sync.
     const contributions = features
-      ?? codexProviderModule.features(createCodexModuleContext(this.plugin, boundConversation));
+      ?? codexProviderModule.runtimePorts(createCodexModuleContext(this.plugin, boundConversation));
 
     adapter = new CodexRuntimeAdapter(
       {
@@ -639,11 +638,11 @@ export class CodexExecution {
  * capability, it is this composition noticing that the scratch directories and
  * the prompt belonging to that tab are now nobody's.
  */
-class CodexRuntimeAdapter extends ExecutionChatRuntimeAdapter<CodexProviderSettings> {
+class CodexRuntimeAdapter extends ExecutionChatRuntimeAdapter {
   constructor(
     context: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[0],
     ports: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[1],
-    features: ProviderFeatureContributions<CodexProviderSettings>,
+    features: ProviderRuntimePorts,
     workspace: ProviderWorkspaceSlots | undefined,
     private readonly releaseTab: () => void,
   ) {

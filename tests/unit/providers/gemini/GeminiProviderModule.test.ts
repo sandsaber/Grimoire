@@ -42,8 +42,8 @@ describe('Gemini provider module', () => {
     };
   }
 
-  function features(): ReturnType<typeof geminiProviderModule.features> {
-    return geminiProviderModule.features(createContext());
+  function features(): ReturnType<typeof geminiProviderModule.runtimePorts> {
+    return geminiProviderModule.runtimePorts(createContext());
   }
 
   function workspaceSlots(): ReturnType<typeof geminiProviderModule.workspace.initialize> {
@@ -261,7 +261,7 @@ describe('Gemini provider module', () => {
         visibleModels: ['gemini-2.5-pro'],
         modelAliases: { 'gemini-3.5-flash': 'Fast' },
       };
-      const presentation = features().chatUI.modelPresentation;
+      const presentation = geminiProviderModule.declarations.chatUI.modelPresentation;
 
       expect(presentation.ownsModel('gemini:gemini-2.5-pro', settings)).toBe(true);
       // The synthetic id a vault with no catalogue yet still selects.
@@ -279,7 +279,7 @@ describe('Gemini provider module', () => {
         discoveredModels: [{ rawId: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' }],
         modelAliases: { 'gemini-3.5-flash': 'Fast' },
       };
-      const presentation = features().chatUI.modelPresentation;
+      const presentation = geminiProviderModule.declarations.chatUI.modelPresentation;
 
       expect(presentation.label('gemini:gemini-3.5-flash', settings)).toBe('Fast');
       expect(presentation.label('gemini:gemini-2.5-pro', settings)).toBe('Gemini 2.5 Pro');

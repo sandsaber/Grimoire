@@ -347,9 +347,13 @@ GrokProviderSettings
 
   capabilities: grokCapabilities,
 
-  features: context => ({
+  declarations: {
     providerId: 'grok',
     chatUI: grokChatUi,
+  },
+
+  runtimePorts: context => ({
+    providerId: 'grok',
     history: {
       hydrate: conversationId => context.hydrateConversation(conversationId),
       deleteSession: conversationId => context.deleteConversationSession(conversationId),

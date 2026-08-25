@@ -53,19 +53,19 @@ describe('Antigravity provider module', () => {
       expect(antigravityProviderModule.capabilities.security.enforcement).toBe('grimoire');
     });
 
-    it('omits feature ports it has nothing to put in', () => {
-      const features = antigravityProviderModule.features({
+    it('omits the ports it has nothing to put in', () => {
+      const ports = antigravityProviderModule.runtimePorts({
         resolveCliPath: async () => null,
         listModels: async () => [],
         refreshModels: async () => [],
       });
 
-      expect(features.history).toBeUndefined();
-      expect(features.rewind).toBeUndefined();
-      expect(features.taskResults).toBeUndefined();
-      expect(features.nativeAgents).toBeUndefined();
+      expect(ports.history).toBeUndefined();
+      expect(ports.rewind).toBeUndefined();
+      expect(antigravityProviderModule.declarations.taskResults).toBeUndefined();
+      expect(antigravityProviderModule.declarations.nativeAgents).toBeUndefined();
       // chatUI is not optional: every provider renders somewhere.
-      expect(features.chatUI.icon).toBe('antigravity');
+      expect(antigravityProviderModule.declarations.chatUI.icon).toBe('antigravity');
     });
   });
 

@@ -21,7 +21,7 @@ import { computeSystemPromptKey } from '@/core/prompt/mainAgent';
 import { getRuntimeEnvironmentText } from '@/core/providers/providerEnvironment';
 import type {
   ProviderCommandDescriptor,
-  ProviderFeatureContributions,
+  ProviderRuntimePorts,
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
@@ -110,7 +110,6 @@ import {
   type GrokSessionNotificationSource,
   parseGrokSessionNotification,
 } from '@/providers/grok/runtime/GrokSessionNotifications';
-import type { GrokProviderSettings } from '@/providers/grok/settings';
 import type { GrokProviderState } from '@/providers/grok/types';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
@@ -634,7 +633,7 @@ export class GrokExecution {
     // Built here, not passed in: the module's history contribution answers
     // about *this tab's* conversation, so the context has to close over the
     // same one the ports above sync.
-    const contributions = grokProviderModule.features(
+    const contributions = grokProviderModule.runtimePorts(
       createGrokModuleContext(this.plugin, boundConversation, {
         sessionPaths: () => ({
           ...(sessionDirPath ? { sessionDirPath } : {}),
@@ -1344,11 +1343,11 @@ function notWiredHere(slot: string): Promise<never> {
  * A tab closing is when the prompts it raised and the turns it queued stop
  * being anyone's; waiting for its next turn is waiting for one that never comes.
  */
-class GrokRuntimeAdapter extends ExecutionChatRuntimeAdapter<GrokProviderSettings> {
+class GrokRuntimeAdapter extends ExecutionChatRuntimeAdapter {
   constructor(
     context: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[0],
     ports: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[1],
-    features: ProviderFeatureContributions<GrokProviderSettings>,
+    features: ProviderRuntimePorts,
     workspace: ProviderWorkspaceSlots,
     private readonly releaseTab: () => void,
   ) {

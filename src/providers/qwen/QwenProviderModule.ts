@@ -355,9 +355,13 @@ QwenProviderSettings
 
   capabilities: qwenCapabilities,
 
-  features: context => ({
+  declarations: {
     providerId: 'qwen',
     chatUI: qwenChatUi,
+  },
+
+  runtimePorts: context => ({
+    providerId: 'qwen',
     history: {
       hydrate: conversationId => context.hydrateConversation(conversationId),
       deleteSession: conversationId => context.deleteConversationSession(conversationId),

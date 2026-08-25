@@ -303,7 +303,12 @@ function validateModules(modules: readonly CatalogProviderModule[]): void {
     requireMethod(providerId, 'workspace', workspace, 'initialize');
     requireMethod(providerId, 'workspace', workspace, 'dispose');
     requireMethod(providerId, 'execution', execution, 'create');
-    requireMethod(providerId, 'module', module, 'features');
+    requireMethod(providerId, 'module', module, 'runtimePorts');
+    const declarations = requirePresent(module, 'declarations');
+    requireIdentity(providerId, 'declarations', declarations.providerId);
+    if (!declarations.chatUI) {
+      throw new Error(`Provider "${providerId}" declares no chat UI contribution.`);
+    }
     validateSettingsCodec(providerId, settings);
 
     const association = execution.descriptor?.association;

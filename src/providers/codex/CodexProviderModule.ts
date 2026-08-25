@@ -5,7 +5,6 @@ import type {
   ProviderHistoryHydration,
   ProviderModelDescriptor,
   ProviderModule,
-  ProviderNativeAgentDisplay,
   ProviderSettingsCodec,
   ProviderSettingsReconcileResult,
   ProviderUsageSnapshot,
@@ -20,6 +19,7 @@ import {
   type CodexExecutionBackendContext,
 } from './execution/CodexExecutionBackend';
 import { normalizeCodexDiscoveredModels } from './modelDiscoveryState';
+import { codexSubagentLifecycleAdapter } from './normalization/codexSubagentNormalization';
 import {
   type CodexInstallationMethod,
   type CodexProviderSettings,
@@ -104,8 +104,6 @@ export interface CodexWorkspaceContext {
   deleteConversationSession(conversationId: string): Promise<void>;
   resolveSessionId(conversationId: string): string | null;
   isPendingFork(conversationId: string): boolean;
-  recognizesSubagentTool(toolName: string): boolean;
-  parseSubagentDisplay(payload: unknown): ProviderNativeAgentDisplay | null;
   /** Releases the skill storage, agent mention provider, and usage store. */
   dispose(): Promise<void>;
 }
@@ -352,9 +350,26 @@ CodexProviderSettings
 
   capabilities: codexCapabilities,
 
-  features: context => ({
+  declarations: {
     providerId: 'codex',
     chatUI: codexChatUi,
+    // Read straight off the normalization adapter. It used to arrive through
+    // the module context, which needed a plugin for something that needs
+    // nothing — and that indirection is what kept this row on the legacy
+    // registration.
+    nativeAgents: {
+      recognizesToolName: toolName => (
+        codexSubagentLifecycleAdapter.isSpawnTool(toolName)
+        || codexSubagentLifecycleAdapter.isWaitTool(toolName)
+        || codexSubagentLifecycleAdapter.isCloseTool(toolName)
+      ),
+      // Codex names no agent in its tool payloads, so there is no card to draw.
+      parseDisplay: () => null,
+    },
+  },
+
+  runtimePorts: context => ({
+    providerId: 'codex',
     history: {
       hydrate: conversationId => context.hydrateConversation(conversationId),
       deleteSession: conversationId => context.deleteConversationSession(conversationId),
@@ -363,10 +378,6 @@ CodexProviderSettings
       buildSessionPatch: input => ({
         sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
       }),
-    },
-    nativeAgents: {
-      recognizesToolName: toolName => context.recognizesSubagentTool(toolName),
-      parseDisplay: payload => context.parseSubagentDisplay(payload),
     },
   }),
 };

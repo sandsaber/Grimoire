@@ -21,7 +21,7 @@ import { computeSystemPromptKey } from '@/core/prompt/mainAgent';
 import { getRuntimeEnvironmentText } from '@/core/providers/providerEnvironment';
 import type {
   ProviderCommandDescriptor,
-  ProviderFeatureContributions,
+  ProviderRuntimePorts,
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
@@ -86,7 +86,6 @@ import {
 } from '@/providers/mimocode/runtime/MimocodeAuxiliaryAgents';
 import { prepareMimocodeLaunchArtifacts } from '@/providers/mimocode/runtime/MimocodeLaunchArtifacts';
 import { buildMimocodeRuntimeEnv } from '@/providers/mimocode/runtime/MimocodeRuntimeEnvironment';
-import type { MimocodeProviderSettings } from '@/providers/mimocode/settings';
 import { getMimocodeState } from '@/providers/mimocode/types';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
@@ -512,7 +511,7 @@ export class MimocodeExecution {
     // Built here, not passed in: the module's history contribution answers
     // about *this tab's* conversation, so the context has to close over the
     // same one the ports above sync.
-    const contributions = mimocodeProviderModule.features(
+    const contributions = mimocodeProviderModule.runtimePorts(
       createMimocodeModuleContext(this.plugin, boundConversation, {
         databasePath: () => databasePath,
       }),
@@ -1079,11 +1078,11 @@ function opaqueId(prefix: string): string {
  * being anyone's; waiting for its next turn is waiting for one that never
  * comes.
  */
-class MimocodeRuntimeAdapter extends ExecutionChatRuntimeAdapter<MimocodeProviderSettings> {
+class MimocodeRuntimeAdapter extends ExecutionChatRuntimeAdapter {
   constructor(
     context: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[0],
     ports: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[1],
-    features: ProviderFeatureContributions<MimocodeProviderSettings>,
+    features: ProviderRuntimePorts,
     workspace: ProviderWorkspaceSlots,
     private readonly releaseTab: () => void,
   ) {

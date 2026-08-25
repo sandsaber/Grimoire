@@ -43,8 +43,8 @@ describe('MiMoCode provider module', () => {
     };
   }
 
-  function features(): ReturnType<typeof mimocodeProviderModule.features> {
-    return mimocodeProviderModule.features(createContext());
+  function features(): ReturnType<typeof mimocodeProviderModule.runtimePorts> {
+    return mimocodeProviderModule.runtimePorts(createContext());
   }
 
   function workspaceSlots(): ReturnType<typeof mimocodeProviderModule.workspace.initialize> {
@@ -227,7 +227,7 @@ describe('MiMoCode provider module', () => {
         visibleModels: ['anthropic/claude-sonnet'],
         modelAliases: { 'openai/gpt-5.5': 'Fast' },
       };
-      const presentation = features().chatUI.modelPresentation;
+      const presentation = mimocodeProviderModule.declarations.chatUI.modelPresentation;
 
       expect(presentation.ownsModel('mimocode:anthropic/claude-sonnet', settings)).toBe(true);
       // The synthetic id a vault with no catalogue yet still selects.

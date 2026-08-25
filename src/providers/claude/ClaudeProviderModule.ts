@@ -7,12 +7,10 @@ import type {
   ProviderMcpServer,
   ProviderModelDescriptor,
   ProviderModule,
-  ProviderNativeAgentDisplay,
   ProviderRewindOutcome,
   ProviderRewindRequest,
   ProviderSettingsCodec,
   ProviderSettingsReconcileResult,
-  ProviderTaskResultSummary,
   ProviderUsageSnapshot,
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
@@ -25,6 +23,7 @@ import {
   ClaudeExecutionBackend,
   type ClaudeExecutionBackendContext,
 } from './execution/ClaudeExecutionBackend';
+import { ClaudeTaskResultInterpreter } from './runtime/ClaudeTaskResultInterpreter';
 import {
   type ClaudeCodeProjectSettingsSnapshot,
   type ClaudeDiscoveredModel,
@@ -106,8 +105,6 @@ export interface ClaudeWorkspaceContext {
   resolveSessionId(conversationId: string): string | null;
   isPendingFork(conversationId: string): boolean;
   rewind(input: ProviderRewindRequest): Promise<ProviderRewindOutcome>;
-  interpretTaskResult(payload: unknown): ProviderTaskResultSummary | null;
-  parseSubagentDisplay(payload: unknown): ProviderNativeAgentDisplay | null;
   dispose(): Promise<void>;
 }
 
@@ -141,6 +138,15 @@ const claudeChatUi: ProviderChatUiContribution<ClaudeProviderSettings> = {
   ],
   icon: 'claude',
 };
+
+/**
+ * Reads a Claude tool payload for the two rows that describe it.
+ *
+ * Module level, and stateless: it used to be constructed inside the module
+ * context, which meant reaching a plugin for something that needs none — and
+ * that indirection is what kept both rows on the legacy registration.
+ */
+const taskResultInterpreter = new ClaudeTaskResultInterpreter();
 
 const claudeCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'claude',
@@ -357,9 +363,36 @@ ClaudeProviderSettings
 
   capabilities: claudeCapabilities,
 
-  features: context => ({
+  declarations: {
     providerId: 'claude',
     chatUI: claudeChatUi,
+    taskResults: {
+      interpret: (toolName, payload) => {
+        if (!CLAUDE_SUBAGENT_TOOL_NAMES.includes(toolName)) {
+          return null;
+        }
+        const detail = taskResultInterpreter.extractStructuredResult(payload);
+        return {
+          title: taskResultInterpreter.extractAgentId(payload) ?? 'Task',
+          ...(detail ? { detail } : {}),
+          isError: taskResultInterpreter.resolveTerminalStatus(payload, 'completed') === 'error',
+        };
+      },
+    },
+    nativeAgents: {
+      recognizesToolName: toolName => CLAUDE_SUBAGENT_TOOL_NAMES.includes(toolName),
+      parseDisplay: payload => {
+        const agentId = taskResultInterpreter.extractAgentId(payload);
+        // No id is no agent to display, which is different from an agent with
+        // no name: answering with a placeholder would put a card on screen for
+        // something that never ran.
+        return agentId ? { agentId, label: agentId } : null;
+      },
+    },
+  },
+
+  runtimePorts: context => ({
+    providerId: 'claude',
     history: {
       hydrate: conversationId => context.hydrateConversation(conversationId),
       deleteSession: conversationId => context.deleteConversationSession(conversationId),
@@ -370,17 +403,6 @@ ClaudeProviderSettings
       }),
     },
     rewind: { rewind: input => context.rewind(input) },
-    taskResults: {
-      interpret: (toolName, payload) => (
-        CLAUDE_SUBAGENT_TOOL_NAMES.includes(toolName)
-          ? context.interpretTaskResult(payload)
-          : null
-      ),
-    },
-    nativeAgents: {
-      recognizesToolName: toolName => CLAUDE_SUBAGENT_TOOL_NAMES.includes(toolName),
-      parseDisplay: payload => context.parseSubagentDisplay(payload),
-    },
   }),
 };
 

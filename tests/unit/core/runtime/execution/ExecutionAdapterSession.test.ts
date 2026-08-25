@@ -348,15 +348,7 @@ function createBareAdapter(
       currentSessionId: () => null,
       delay: immediately,
     },
-    { providerId: capabilities.providerId, chatUI: {
-      modelPresentation: {
-        ownsModel: () => false,
-        label: modelId => modelId,
-        contextWindow: () => undefined,
-      },
-      permissionToggles: [],
-      icon: 'test',
-    } },
+    { providerId: capabilities.providerId },
     workspace,
   );
 }

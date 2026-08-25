@@ -33,15 +33,36 @@ describe('Codex provider module', () => {
       deleteConversationSession: async () => undefined,
       resolveSessionId: () => 'thread-1',
       isPendingFork: () => false,
-      recognizesSubagentTool: toolName => toolName === 'Agent',
-      parseSubagentDisplay: () => ({ agentId: 'sub-1', label: 'Reviewer' }),
       dispose: async () => undefined,
     };
   }
 
-  function features(): ReturnType<typeof codexProviderModule.features> {
-    return codexProviderModule.features(createContext());
+  function runtimePorts(): ReturnType<typeof codexProviderModule.runtimePorts> {
+    return codexProviderModule.runtimePorts(createContext());
   }
+
+  it('recognizes the tools Codex drives its own agents with', () => {
+    // Read off the normalization adapter rather than through a module context,
+    // which is what the M3 split made possible: a question about a tool name
+    // needs no plugin.
+    const nativeAgents = codexProviderModule.declarations.nativeAgents;
+
+    expect(nativeAgents?.recognizesToolName('spawn_agent')).toBe(true);
+    expect(nativeAgents?.recognizesToolName('wait')).toBe(true);
+    expect(nativeAgents?.recognizesToolName('Bash')).toBe(false);
+    // Codex names no agent in its tool payloads.
+    expect(nativeAgents?.parseDisplay({ agent_id: 'sub-1' })).toBeNull();
+  });
+
+  it('answers about a conversation only through the context it was bound to', () => {
+    // The split at M3 left exactly two ports behind the factory, and this is
+    // why they are behind one: they answer for the runtime's own conversation
+    // and nothing else.
+    const ports = runtimePorts();
+
+    expect(ports.history?.resolveSessionId('any')).toBe('thread-1');
+    expect(ports.rewind).toBeUndefined();
+  });
 
   it('declares its identity and ordering', () => {
     expect(codexProviderModule.manifest).toEqual({
@@ -123,7 +144,7 @@ describe('Codex provider module', () => {
     it('omits the deliberately no-op task result interpreter', () => {
       // Present-but-empty is the one shape the contract forbids: the UI cannot
       // tell it apart from a working port.
-      expect(features().taskResults).toBeUndefined();
+      expect(codexProviderModule.declarations.taskResults).toBeUndefined();
     });
 
     it('omits runtime command discovery, which Codex does through a separate process', async () => {
@@ -262,7 +283,7 @@ describe('Codex provider module', () => {
         ...codexSettingsCodec.defaults(),
         customModels: 'internal-review-model\nsecond-model',
       };
-      const presentation = features().chatUI.modelPresentation;
+      const presentation = codexProviderModule.declarations.chatUI.modelPresentation;
 
       expect(presentation.ownsModel('internal-review-model', settings)).toBe(true);
       expect(presentation.ownsModel('gpt-5.5', settings)).toBe(true);
@@ -271,7 +292,7 @@ describe('Codex provider module', () => {
 
     it('gives no context window to a model it does not own', () => {
       const settings = codexSettingsCodec.defaults();
-      const presentation = features().chatUI.modelPresentation;
+      const presentation = codexProviderModule.declarations.chatUI.modelPresentation;
 
       expect(presentation.contextWindow('gpt-5.5', settings)).toBe(200_000);
       expect(presentation.contextWindow('claude-opus-5', settings)).toBeUndefined();

@@ -19,7 +19,7 @@ import type {
 import { getRuntimeEnvironmentText } from '@/core/providers/providerEnvironment';
 import type {
   ProviderCommandDescriptor,
-  ProviderFeatureContributions,
+  ProviderRuntimePorts,
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
@@ -84,7 +84,6 @@ import {
   buildQwenPromptText,
 } from '@/providers/qwen/runtime/buildQwenPrompt';
 import { buildQwenRuntimeEnv } from '@/providers/qwen/runtime/QwenRuntimeEnvironment';
-import type { QwenProviderSettings } from '@/providers/qwen/settings';
 import { getVaultPath } from '@/utils/path';
 
 import { delayThroughWindow } from '../hostTimers';
@@ -530,7 +529,7 @@ export class QwenExecution {
     // Built here, not passed in: the module's history contribution answers about
     // *this tab's* conversation, so the context has to close over the same one
     // the ports above sync.
-    const contributions = qwenProviderModule.features(
+    const contributions = qwenProviderModule.runtimePorts(
       createQwenModuleContext(boundConversation, { sessionCommands: () => sessionCommands }),
     );
 
@@ -877,11 +876,11 @@ function opaqueId(prefix: string): string {
  * A tab closing is when the prompts it raised and the turns it queued stop being
  * anyone's; waiting for its next turn is waiting for one that never comes.
  */
-class QwenRuntimeAdapter extends ExecutionChatRuntimeAdapter<QwenProviderSettings> {
+class QwenRuntimeAdapter extends ExecutionChatRuntimeAdapter {
   constructor(
     context: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[0],
     ports: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[1],
-    features: ProviderFeatureContributions<QwenProviderSettings>,
+    features: ProviderRuntimePorts,
     workspace: ProviderWorkspaceSlots,
     private readonly releaseTab: () => void,
   ) {

@@ -7116,6 +7116,33 @@ so every call returns new objects.
 
 Gates: unit 525 suites / 8,298 tests, integration 5 / 153, typecheck, `eslint`, `build:release`.
 
+### `features(context)` was two contracts wearing one name (this commit)
+
+The split the previous entry named as the next move. `ProviderModule` has `declarations` — what a
+provider says about itself, reachable without a plugin — and `runtimePorts(context)`, which keeps
+the two ports that only mean something for a running conversation.
+
+**The consumer had already voted.** `ExecutionChatRuntimeAdapter` is the only thing that has ever
+consumed that factory, and it reads exactly two members from it: `history` and `rewind`. `chatUI` is
+a module-level constant in all nine providers and reads nothing from a context. Keeping the two
+groups together is what made every UI-facing row unreachable without a plugin, and so unable to
+leave the legacy registration.
+
+**Two providers were reaching a plugin to answer questions that need none.** Claude's task-result
+summary and subagent display went through the module context to a `ClaudeTaskResultInterpreter` the
+context constructed with no arguments; Codex's subagent recognition went through the context to
+`codexSubagentLifecycleAdapter`, a module-level constant the context file already imported. Both are
+read directly now, and both context members are deleted.
+
+**One test was proving a stub.** Claude's task-result test asserted `title: 'Reviewer'` — the value
+its own fake context returned. It runs against the real interpreter and a real payload now, and
+fails when the title stops being read from the payload.
+
+The adapter's `TSettings` type parameter went with the split: the runtime ports are not generic, so
+nine `RuntimeAdapter` subclasses were passing a type argument nothing used.
+
+Gates: unit 525 suites / 8,301 tests, integration 5 / 153, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7189,11 +7216,12 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 #### What to pick up next, in order
 
-1. **Split `ProviderFeatureContributions`.** Static declarations (`chatUI`, `context`, `taskResults`,
-   `nativeAgents`) belong on the module itself, with no factory; the runtime-scoped ports
-   (`history`, `rewind`) stay behind `features(context)` and are reached through the adapter that
-   already builds them. That removes the resolver question rather than answering it, and it is what
-   the nine modules already do in practice.
+1. **Rows 15 and 16 need `SubagentManager` before they can move.** The split made
+   `declarations.taskResults` and `declarations.nativeAgents` reachable, but the legacy
+   `ProviderTaskResultInterpreter` the feature layer consumes is five low-level methods
+   (`hasAsyncLaunchMarker`, `extractAgentId`, `extractStructuredResult`, `resolveTerminalStatus`,
+   `extractTagValue`) against the module port's single `interpret`. `SubagentManager` reads the
+   low-level ones directly, so this is an M5-shaped rework, not a row move.
 2. **Row 9, `settingsReconciler`.** Unblocked but not small: `ProviderSettingsCoordinator` projects,
    clones and merges the settings record per provider, and the codec's `reconcile` works on decoded
    provider settings. Re-expressing that is a settings-behaviour risk, so it wants a fresh session
