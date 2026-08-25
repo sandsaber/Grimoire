@@ -832,35 +832,55 @@ Exit gate:
 
 Checkpoints: one per topology proof, one for the adapter, one per flip.
 
-### M3 — Provider control plane behind the existing UI
+### M3 — One validated provider inventory, and an owner for provider workspaces
 
-Objective: one validated catalog replaces the split registries without changing any settings or
-workspace surface.
+Objective: a single validated catalog owns what a provider *declares*, and provider workspaces get a
+lifecycle owner — without changing any settings or workspace surface.
+
+**Scope revised during execution.** The original objective was "one validated catalog replaces the
+split registries", moving every contribution row. Reading the fourteen rows that remained after nine
+had moved found thirteen shape mismatches, all with the same cause: the `ProviderModule` contract
+was written as a *better* contract, not as a destination for the legacy one. `commandCatalog`
+answers `getDropdownConfig()` and `listDropdownEntries()` against a slot offering `list()`;
+`chatUIConfig` has twenty-odd UI members against three; `settingsTabRenderer` takes a context
+carrying `HTMLElement` against a deliberately opaque host; `historyService` is workspace-global
+against a runtime-bound port. Moving them is not a move — it is re-implementing UI-shaped consumers,
+which is the work M5 already owns, on the same consumers, at the same layer. Widening the module
+ports to match instead would put plugin, DOM and settings-bag vocabulary into `ProviderModule.ts`,
+which the composition-boundary gate forbids and which is a stated stop condition. So those rows, and
+the registries they keep alive, move to M5. The evidence table is in
+[`provider-execution-migration-progress.md`](provider-execution-migration-progress.md).
 
 Work:
 
-- harvest the catalog, settings presentation codecs, canonical versioned SHA-256 fingerprints, lazy
-  workspace manager, and settings transaction coordinator (v1 Phase 8);
-- move registry consumers to the catalog one contribution row at a time — defaults and ordering,
-  enablement, settings tabs, model routing, command catalogs, agent mentions, MCP managers, CLI
-  resolvers, usage providers, and every remaining M3-tagged row of
-  [`provider-contribution-inventory.md`](provider-contribution-inventory.md) — all three of its
-  tables, including `workspaceCapabilities`, the separate default-config source, and the workspace
-  initialize/dispose lifecycle; the table is the authority, not any prose count. This is the
-  dependency class whose silent loss broke the first attempt; the inventory and parity manifest
-  track each row explicitly;
-- make provider workspaces lazy, failure-isolated, generation-fenced, retryable, and asynchronously
-  disposable; one provider failure cannot block startup or another provider;
-- delete `ProviderRegistry`, `ProviderWorkspaceRegistry`, and the separately maintained default
-  inventories when their last consumer has moved.
+- build the immutable, validated provider catalog and register all nine modules in it (harvested
+  from v1 Phase 8 as material, not as a copy: the v1 contract is the one harvest ban 1 excludes);
+- move the contribution rows that are genuinely *declarations* — provider identity and ordering,
+  enablement, capability gating, environment-key ownership, the shipped default configs, and
+  preloaded context files — so that no second inventory declares any of them;
+- split `ProviderModule.features(context)` into what a provider declares, reachable without a
+  plugin, and the ports that only mean something for a running conversation;
+- give provider workspaces a lifecycle owner: concurrent, failure-isolated initialization, a
+  recorded and retryable failure, and asynchronous disposal at unload. One provider failure cannot
+  block startup or another provider.
 
 Exit gate:
 
-- exactly one catalog contains all nine modules and the registries are deleted;
-- settings search, settings tabs, model selection, and workspace behavior are unchanged;
-- startup performs no blocking initialization for unused providers;
-- settings transitions drain, persist, recycle, and recover idempotently; accepted side-effecting
-  runs are never relabelled invalidated.
+- exactly one catalog holds all nine modules, validated at construction, and it rejects a duplicate
+  id, order or execution backend;
+- provider identity, ordering, enablement, capability gating, environment-key ownership, shipped
+  defaults and preloaded context files come from it, and no second source declares them;
+- provider workspace initialization is isolated per provider, retryable, and disposed at unload;
+- settings search, settings tabs, model selection, and workspace behavior are unchanged, with one
+  declared exception: a Grok tab with no live service no longer shows a rewind button, which
+  finishes the removal Grok's own flip declared and which a tab *with* a live service already had.
+
+Moved to M5 with their consumers: the remaining registration and workspace rows, deletion of
+`ProviderRegistry` and `ProviderWorkspaceRegistry`, lazy workspace initialization (every consumer
+reads its service synchronously today), the generation fence, and the settings transaction
+coordinator with row 9's reconciler. The last two have no producer yet — nothing recycles a
+workspace — and building a mechanism before its producer is the dark machinery this migration is
+unwinding.
 
 Checkpoint: `refactor: unify provider control plane`
 
@@ -913,6 +933,15 @@ Work:
   durable-ownership UI (work cards, reattachment) — never before;
 - auxiliary work (title, refine, inline edit, command/model probes, warm-up) moves to isolated
   auxiliary owners; auxiliary results cannot mutate the visible conversation session;
+- **the provider rows M3 handed over**, each with the consumer that reads it, because each is a
+  re-implementation rather than a move: `chatUIConfig`, `settingsTabRenderer`, `commandCatalog`,
+  `agentMentionProvider`, `runtimeCommandLoader`, `modelCatalog`, `usageProvider`, the MCP pair,
+  `historyService`, `taskResultInterpreter`, `subagentLifecycleAdapter`, `workspaceCapabilities`,
+  and `settingsReconciler` with the settings transaction coordinator. Workspace initialization
+  becomes lazy in the same step, since it is those synchronous consumers that force it to be eager,
+  and the generation fence lands with the first transition that recycles a workspace. When the last
+  consumer has moved, `ProviderRegistry` and `ProviderWorkspaceRegistry` are deleted and the three
+  `src/core/**` modules that import the plugin type close with them;
 - `BangBashService` routes through `LocalShellBackend`; tab close detaches its projection and
   application shutdown owns cleanup;
 - `ApplicationRuntime` becomes the composition root in `main.ts` by absorbing the interim kernel

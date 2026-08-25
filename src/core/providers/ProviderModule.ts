@@ -242,7 +242,8 @@ export interface ProviderMcpServer {
  *
  * Typed as an opaque host handle so this contract acquires no DOM vocabulary —
  * a projection or contract that learns element structure is a plan stop
- * condition. The host supplies the real surface at M3.
+ * condition. The host supplies the real surface at M5, with the settings tab
+ * rework this slot is waiting on.
  */
 export interface ProviderSettingsPresentationPort<THost = unknown> {
   render(host: THost): void;

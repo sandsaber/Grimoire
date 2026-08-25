@@ -408,8 +408,8 @@ export default class GrimoirePlugin extends Plugin {
    * Antigravity's chat execution, held here for the duration of one load.
    *
    * A provider name on the plugin surface is not where this belongs, and it
-   * does not stay: M3's provider catalog owns runtime construction and takes
-   * this with it. Until then the registration needs one object per load — the
+   * does not stay: `ApplicationRuntime` becomes the composition root at M5 and
+   * takes this with it. Until then the registration needs one object per load — the
    * request store the backend and every tab runtime must share — and this is
    * the only place with that lifetime.
    */

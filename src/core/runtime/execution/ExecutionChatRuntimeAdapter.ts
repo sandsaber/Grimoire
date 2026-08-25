@@ -490,8 +490,9 @@ export function dispatchCancellation(
  * since the proofs began. It is routed through the host rather than invented
  * here, because prompt encoding is real provider behaviour that lives in the
  * legacy runtimes today: giving it a slot means moving four encoders, which is
- * M3 work, not a line in this file. Recorded so the slot is added deliberately
- * rather than discovered missing again at the flip.
+ * M5 work — it is a provider contribution whose consumers are the legacy
+ * controllers M5 rewrites — not a line in this file. Recorded so the slot is
+ * added deliberately rather than discovered missing again at the flip.
  */
 export interface ExecutionChatRuntimeHostPorts {
   prepareTurn(request: ChatTurnRequest): PreparedChatTurn;
@@ -527,7 +528,7 @@ export interface ExecutionChatRuntimeHostPorts {
    * once, at the point where it decides whether `steer` exists at all.
    */
   readonly encodeSteerRef?: (turn: PreparedChatTurn) => string;
-  /** Provider-native session id, read from the session snapshot at M3. */
+  /** Provider-native session id, read from the session snapshot at M5. */
   currentSessionId(): string | null;
   /**
    * The conversation this runtime is now bound to, as the caller supplied it.

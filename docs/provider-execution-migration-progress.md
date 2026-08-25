@@ -80,9 +80,9 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
-| M3 — provider control plane | In progress — the catalog owns provider identity, ordering, enablement and capability gating, and a workspace manager owns both halves of the workspace lifecycle. Seven of the sixteen registration rows and two of the three app-level rows have moved | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, this commit |
+| M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
-| M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
+| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched, and M3 handed over thirteen provider rows plus registry deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
@@ -7200,6 +7200,38 @@ recorded here as a proposal, not applied to
 
 Gates: unchanged; this commit is documentation.
 
+### M3 closes at a revised scope, and the plan says why (this commit)
+
+The re-sequencing the previous entry proposed, decided by the owner: **M3 ends at the catalog and
+the workspace lifecycle owner.** The thirteen rows that turned out to be re-implementations rather
+than moves go to M5, with the consumers that read them, and so do registry deletion, lazy workspace
+initialization, the generation fence, and the settings transaction coordinator with row 9's
+reconciler.
+
+What M3 delivered, and what its exit gate now says:
+
+- one validated catalog holding all nine modules, rejecting a duplicate id, order or execution
+  backend at construction;
+- provider identity, ordering, enablement, capability gating, environment-key ownership, the shipped
+  default configs, and preloaded context files come from it, with no second source declaring any of
+  them;
+- `ProviderModule.features(context)` split into what a provider declares and what a runtime binds,
+  which is what made the declaration rows reachable without a plugin;
+- provider workspaces have a lifecycle owner: concurrent isolated initialization, a recorded and
+  retryable failure, and asynchronous disposal at unload.
+
+**One product behaviour changed, and it was declared before this milestone.** A Grok tab with no live
+service no longer shows a rewind button. A tab *with* a live service already had none since Grok's
+flip, because the runtime answered `canRewind: false` for every input; the legacy record said
+otherwise, and moving the gating onto the descriptor is what made the two agree. The exit gate names
+it rather than claiming nothing moved.
+
+`provider-execution-migration-plan.md` and `provider-contribution-inventory.md` carry the revision;
+the three `src/core/**` plugin-import exemptions now name M5, and three stale in-code notes pointing
+at M3 were corrected to the milestone that will actually do the work.
+
+Gates: unit 525 suites / 8,301 tests, integration 5 / 153, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7209,7 +7241,7 @@ Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`)
 
 ### Where the session of 2026-08-25 ended
 
-**M3 is open and nine of its rows have moved.** `ProviderCatalog` is the one validated inventory of
+**M3 is complete, at a scope the owner revised mid-session.** `ProviderCatalog` is the one validated inventory of
 the nine modules, and `ProviderWorkspaceManager` owns both halves of the workspace lifecycle.
 Registration rows 1, 2, 3, 4, 5, 6 and 7 and app-level rows 2 and 3 are gone from their old homes,
 and `features(context)` has been split into what a provider declares and what a runtime binds; the
@@ -7274,14 +7306,19 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 #### What to pick up next, in order
 
-1. **The workspace context assembly — the last structural decision in M3.** The ten workspace rows
+**M3 is closed.** Everything below is M5 or later.
+
+1. **The workspace context assembly, now an M5 step.** The ten workspace rows
    move onto module `ProviderWorkspaceSlots` served by `ProviderWorkspaceManager`, and every
    provider's `workspace.initialize(context)` needs a context built from the plugin. Eight have a
    `create<Provider>ModuleContext(plugin, boundConversation)`; Antigravity needs none; Codex is the
    only provider initializing module slots today, in its own composition. Decide where the nine
    factories are assembled — `main.ts` or an app-level module beside the manager — then take the
    rows one at a time, each with its consumers, so no eager initialization exists without a reader.
-   `cliResolution` is the cheapest first row: all nine already declare it.
+   `cliResolution` looked like the cheapest first row — all nine declare it — until reading it
+   showed the module port is async while every launch path calls the legacy resolver synchronously,
+   and that the plan already puts its execution side at M2 and only its settings-side display later.
+   Pick a row by reading its consumer first; that is what this session's last four rows taught.
 2. **Rows 15 and 16 need `SubagentManager` before they can move.** The split made
    `declarations.taskResults` and `declarations.nativeAgents` reachable, but the legacy
    `ProviderTaskResultInterpreter` the feature layer consumes is five low-level methods

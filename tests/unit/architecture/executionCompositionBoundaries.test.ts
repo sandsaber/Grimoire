@@ -49,9 +49,13 @@ const STRICT_MODULES = [
 ];
 
 /**
- * Pre-existing violations of `src/core/**` → plugin. Each is removed when the
- * provider catalog replaces the split registries at M3; until then the list may
- * shrink but never grow.
+ * Pre-existing violations of `src/core/**` → plugin.
+ *
+ * Each closes when its file is deleted, which happens when the last consumer of
+ * the two registries has moved. That was M3's exit gate until reading the rows
+ * showed them to be re-implementations of UI-shaped consumers rather than
+ * moves; they belong to M5 now, with the consumers they serve. Until then the
+ * list may shrink but never grow.
  */
 const LEGACY_CORE_PLUGIN_IMPORTS = [
   'src/core/providers/ProviderRegistry.ts',

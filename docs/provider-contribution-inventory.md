@@ -37,31 +37,31 @@ plan and this file both refer to rows by number.
 
 | # | Field | What it carries | Consumed by today | Target home | Moves at |
 |---|---|---|---|---|---|
-| 8 | `chatUIConfig` | provider chat UI configuration | chat feature rendering | UI-config feature contribution | M3 |
-| 9 | `settingsReconciler` | settings/model normalization on load and env change | settings load, environment change | `ProviderSettingsCodec` | M3 |
+| 8 | `chatUIConfig` | provider chat UI configuration | chat feature rendering | UI-config feature contribution | M5 |
+| 9 | `settingsReconciler` | settings/model normalization on load and env change | settings load, environment change | `ProviderSettingsCodec` | M5 |
 | 10 | `createRuntime` | chat execution (`ChatRuntime`) | `TabManager` / `Tab` | `ExecutionBackendFactory` behind the presentation adapter | **M2 — this is the flip** |
 | 11 | `createTitleGenerationService` | auxiliary provider execution | title generation | auxiliary owner over an isolated execution session | M5 (legacy path allowed until then) |
 | 12 | `createInstructionRefineService` | auxiliary provider execution | instruction refine | auxiliary owner | M5 |
 | 13 | `createInlineEditService` | auxiliary provider execution | inline edit modal | auxiliary owner | M5 |
-| 14 | `historyService` | hydration, fork state, session resolution, deletion | conversation controllers, history UI | history capability port | M3 |
-| 15 | `taskResultInterpreter` | provider task/tool result interpretation | chat rendering | result-interpretation port | M3 |
+| 14 | `historyService` | hydration, fork state, session resolution, deletion | conversation controllers, history UI | history capability port | M5 |
+| 15 | `taskResultInterpreter` | provider task/tool result interpretation | chat rendering | result-interpretation port | M5 |
 | 16 | `subagentLifecycleAdapter?` | subagent tool-name recognition and display parsing | `SubagentManager` | native-agent observation port | M5 |
 
 ## `ProviderWorkspaceServices` members (11) — [types.ts:436](../src/core/providers/types.ts)
 
 | # | Member | What it carries | Consumed by today | Target home | Moves at |
 |---|---|---|---|---|---|
-| 1 | `commandCatalog?` | static slash-command inventory | command discovery, mention UI | commands capability port | M3 |
-| 2 | `agentMentionProvider?` | agent mention inventory | mention UI | agent-mention port | M3 |
-| 3 | `cliResolver?` | CLI binary resolution | launch paths, settings diagnostics | module CLI-resolution slot; the execution side moves with the M2 flip through the backend's own launch composition (exact mechanism is an M2-proofs design decision), the settings-side display at M3 | M2/M3 |
-| 4 | `modelCatalog?` | model discovery and listing | settings, model picker | model-routing port | M3 |
-| 5 | `usageProvider?` | plan/usage indicators | status UI | usage port | M3 |
-| 6 | `runtimeCommandLoader?` | active-session command discovery | chat UI | commands capability port | M3 |
+| 1 | `commandCatalog?` | static slash-command inventory | command discovery, mention UI | commands capability port | M5 |
+| 2 | `agentMentionProvider?` | agent mention inventory | mention UI | agent-mention port | M5 |
+| 3 | `cliResolver?` | CLI binary resolution | launch paths, settings diagnostics | module CLI-resolution slot; the execution side moves with the M2 flip through the backend's own launch composition (exact mechanism is an M2-proofs design decision), the settings-side display at M3 | M2 execution side; M5 settings side |
+| 4 | `modelCatalog?` | model discovery and listing | settings, model picker | model-routing port | M5 |
+| 5 | `usageProvider?` | plan/usage indicators | status UI | usage port | M5 |
+| 6 | `runtimeCommandLoader?` | active-session command discovery | chat UI | commands capability port | M5 |
 | 7 | `tabWarmupPolicy?` | provider warmup policy | `TabManager` | replaced by lifecycle residency policy | M5 |
-| 8 | `mcpStorage?` | Grimoire-owned MCP config storage | MCP UI, session injection | MCP port | M3 |
-| 9 | `mcpServerManager?` | MCP server lifecycle | MCP UI, sessions | MCP port | M3 |
-| 10 | `settingsTabRenderer?` | provider settings tab | `GrimoireSettings` | settings presentation slot | M3 |
-| 11 | `refreshAgentMentions?` | mention refresh hook | workspace refresh | agent-mention port | M3 |
+| 8 | `mcpStorage?` | Grimoire-owned MCP config storage | MCP UI, session injection | MCP port | M5 |
+| 9 | `mcpServerManager?` | MCP server lifecycle | MCP UI, sessions | MCP port | M5 |
+| 10 | `settingsTabRenderer?` | provider settings tab | `GrimoireSettings` | settings presentation slot | M5 |
+| 11 | `refreshAgentMentions?` | mention refresh hook | workspace refresh | agent-mention port | M5 |
 
 ## Registration- and app-level contributions (1) — outside both service objects
 
@@ -70,7 +70,7 @@ fields of either service interface.
 
 | # | Contribution | Where it lives today | Consumed by today | Target home | Moves at |
 |---|---|---|---|---|---|
-| 1 | `workspaceCapabilities` | `ProviderWorkspaceRegistration.workspaceCapabilities` ([types.ts:484](../src/core/providers/types.ts)) | `ProviderWorkspaceRegistry.getCapabilities()`, settings gating | workspace part of `ProviderCapabilityDescriptor` in the module | M3 |
+| 1 | `workspaceCapabilities` | `ProviderWorkspaceRegistration.workspaceCapabilities` ([types.ts:484](../src/core/providers/types.ts)) | `ProviderWorkspaceRegistry.getCapabilities()`, settings gating | workspace part of `ProviderCapabilityDescriptor` in the module | M5 |
 
 ## Moved to their target homes (9)
 
@@ -134,6 +134,18 @@ Row 5 followed the split that made `declarations` reachable without a plugin. On
 it has no agent definition, so its system prompt is a vault file passed on the command line — and the
 catalog answers an empty list for the other eight, which is where the knowledge belongs: the chat
 context surface used to ask a registry that answered for a provider it named nowhere.
+
+### Where the remaining rows go
+
+Every row still in the two tables above moves at **M5**, with the consumer that reads it. M3 was
+revised during execution: reading these rows against their target slots found thirteen shape
+mismatches with one cause — the `ProviderModule` contract was written as a better contract, not as a
+destination for the legacy one. `commandCatalog` answers `getDropdownConfig()` and
+`listDropdownEntries()` against a slot offering `list()`; `chatUIConfig` has twenty-odd UI members
+against three; `settingsTabRenderer` takes a context carrying `HTMLElement` against a deliberately
+opaque host; `historyService` is workspace-global against a runtime-bound port. Each is a
+re-implementation of a UI-shaped consumer, which is what M5 does anyway, to the same consumers, at
+the same layer. The evidence table is in the progress log.
 
 ## Rules
 
