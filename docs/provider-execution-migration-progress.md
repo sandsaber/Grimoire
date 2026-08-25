@@ -7156,6 +7156,50 @@ started preloading a file.
 
 Gates: unit 525 suites / 8,301 tests, integration 5 / 153, typecheck, `eslint`, `build:release`.
 
+### Every row still on the registries is a rework, not a move (this commit)
+
+Nine rows have moved, and each of the last four arrived somewhere the inventory did not predict.
+That stopped looking like coincidence, so the remaining fourteen were read against their target
+slots before touching any of them. **Thirteen of the fourteen are shape mismatches**, and the reason
+is the same in every case: the `ProviderModule` contract was designed as a *better* contract, not as
+a destination for the legacy one.
+
+| Row | What the feature layer consumes | What the module slot offers |
+|---|---|---|
+| 3, `cliResolver` | `resolveFromSettings(settings): string \| null`, synchronous, called from every launch path | `resolve(): Promise<{ executable, source, diagnostics? }>` |
+| 1, `commandCatalog` | `getDropdownConfig()`, `listDropdownEntries({ includeBuiltIns })`, and more | `list(): Promise<ProviderCommandDescriptor[]>` |
+| 2, `agentMentionProvider` | `searchAgents(query)` | `list()` / `refresh()` |
+| 4, `modelCatalog` | `refreshModels({ plugin, settings }): Promise<boolean>` | `list()` / `refresh(): Promise<ProviderModelDescriptor[]>` |
+| 5, `usageProvider` | `getCachedUsage(context)` plus `refreshUsage(context)`, both taking the plugin | `read(): Promise<ProviderUsageSnapshot \| null>` |
+| 10, `settingsTabRenderer` | a context carrying `HTMLElement`, section builders and command settings | `render(host: THost)`, host deliberately opaque |
+| 8, `chatUIConfig` | twenty-odd members: reasoning options, service tiers, mode selectors, permission mapping, model metadata discovery taking the plugin | three: model presentation, permission toggles, icon |
+| 14, `historyService` | workspace-global, asked about any conversation | runtime-bound, answers `null` for any conversation but the tab's own |
+| 15, `taskResultInterpreter` | five low-level readers `SubagentManager` calls directly | one `interpret(toolName, payload)` |
+| app-level 1, `workspaceCapabilities` | five resource kinds, each `{ inventory, manager, runtimeCommandDiscovery }` | one `CapabilitySupport` per key, different key set |
+
+Only `mcpStorage`/`mcpServerManager` and `runtimeCommandLoader` were not read closely enough to
+classify, and `tabWarmupPolicy` is already an M5 row.
+
+**This is a milestone-scope finding, not an implementation detail.** M3 as written says "move
+registry consumers to the catalog one contribution row at a time", and for the rows that were
+genuinely declarations — identity, ordering, enablement, capabilities, environment ownership,
+defaults, preloaded files — that is exactly what happened, nine times. What is left is not a set of
+moves. It is re-implementing UI-shaped consumers against better contracts, and the two ways to avoid
+that both cost more than they save: widening the module ports to match the legacy interfaces would
+put plugin, DOM and settings-bag vocabulary into `ProviderModule.ts`, which its own boundary gate
+forbids and which is the stop condition the plan states for projections; and leaving the rows where
+they are means the registries survive.
+
+M5 already owns that rework: it rebuilds the chat surface against projections and calls the renderer
+"a thin replaceable layer". The rows above are the same work, on the same consumers, at the same
+layer. **Recommended: close M3 at the catalog and the workspace lifecycle owner, and move the
+remaining rows into M5 with the consumers they belong to** — including the "delete both registries"
+exit gate, which cannot be met before its consumers are rewritten. This is a plan change and it is
+recorded here as a proposal, not applied to
+[`provider-execution-migration-plan.md`](provider-execution-migration-plan.md).
+
+Gates: unchanged; this commit is documentation.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
