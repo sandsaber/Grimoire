@@ -33,7 +33,6 @@ import type { ChatMessage } from '@/core/types';
 import type GrimoirePlugin from '@/main';
 import { createCodexModuleContext } from '@/providers/codex/app/CodexModuleContext';
 import { codexPlanUsageStore } from '@/providers/codex/app/CodexPlanUsageStore';
-import { CODEX_PROVIDER_CAPABILITIES } from '@/providers/codex/capabilities';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
 import { CodexAuxiliaryQuery } from '@/providers/codex/execution/CodexAuxiliaryQuery';
 import { CodexContentPresenter } from '@/providers/codex/execution/CodexContentPresenter';
@@ -308,7 +307,6 @@ export class CodexExecution {
         conversation: boundConversation,
         scope,
       }),
-      reasoningControl: CODEX_PROVIDER_CAPABILITIES.reasoningControl,
       // The thread this conversation is bound to, which is what the legacy
       // runtime reported and what the history patch writes back.
       currentSessionId: () => {

@@ -149,7 +149,6 @@ const geminiChatUi: ProviderChatUiContribution<GeminiProviderSettings> = {
   // Not an omission and not an oversight: `capabilities.ts` declares
   // `reasoningControl: 'none'`, and the recorded session offers no config
   // option a level could be carried in.
-  reasoningControl: { kind: 'none' },
   permissionToggles: [
     { id: 'normal', label: 'Safe' },
     { id: 'plan', label: 'Plan' },
@@ -180,6 +179,14 @@ const geminiCapabilities: ProviderCapabilityDescriptor = {
     // recording captures `available_commands_update` carrying twenty of them —
     // and Grimoire drops every one, because `supportsProviderCommands: false`
     // and the workspace registration declares `runtimeCommandDiscovery: 'none'`.
+    //
+    // These two statements do not project onto one boolean, which is what M3
+    // found: `chatSurface` says what Grimoire puts in the chat input, while the
+    // live `supportsProviderCommands` gates loading the *provider's session*
+    // commands. For every other provider the two agree; for Gemini they do not,
+    // so the UI gating cannot move onto this descriptor until the projection
+    // stops conflating them. The divergence is recorded in the capability
+    // parity test rather than papered over here.
     discovery: 'static',
     chatSurface: 'grimoire',
   },
@@ -225,6 +232,7 @@ const geminiCapabilities: ProviderCapabilityDescriptor = {
     compaction: 'native',
   },
   security: { enforcement: 'native' },
+  reasoningControl: { kind: 'none' },
   workspace: {
     commands: 'grimoire',
     agents: 'grimoire',

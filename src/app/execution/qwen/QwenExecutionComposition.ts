@@ -50,7 +50,6 @@ import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import type { AcpUsageUpdate } from '@/providers/acp/types';
 import { createQwenModuleContext } from '@/providers/qwen/app/QwenModuleContext';
 import { qwenPlanUsageStore } from '@/providers/qwen/app/QwenPlanUsageStore';
-import { QWEN_PROVIDER_CAPABILITIES } from '@/providers/qwen/capabilities';
 import type { QwenAcpDynamicConfig } from '@/providers/qwen/execution/QwenAcpDynamicConfig';
 import { QwenAcpDynamicConfigApplier } from '@/providers/qwen/execution/QwenAcpDynamicConfig';
 import { QwenAcpFileSystem } from '@/providers/qwen/execution/QwenAcpFileSystem';
@@ -448,7 +447,6 @@ export class QwenExecution {
           ...(dynamic ? { dynamic } : {}),
         });
       },
-      reasoningControl: QWEN_PROVIDER_CAPABILITIES.reasoningControl,
       /**
        * The ACP session this conversation is actually on.
        *

@@ -103,7 +103,6 @@ const antigravityChatUi: ProviderChatUiContribution<AntigravityProviderSettings>
       ?? modelId.replace(/^antigravity:/, ''),
     contextWindow: () => undefined,
   },
-  reasoningControl: { kind: 'none' },
   permissionToggles: [],
   icon: 'antigravity',
 };
@@ -155,6 +154,7 @@ const antigravityCapabilities: ProviderCapabilityDescriptor = {
   // Grimoire enforces the process boundary because the CLI exposes no approval
   // surface; that is why Safe mode stays fail-closed for this provider.
   security: { enforcement: 'grimoire' },
+  reasoningControl: { kind: 'none' },
   workspace: { cliResolution: 'native', models: 'native' },
 };
 

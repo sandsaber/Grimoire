@@ -56,7 +56,6 @@ import type {
 } from '@/providers/acp/types';
 import { createGrokModuleContext } from '@/providers/grok/app/GrokModuleContext';
 import { grokPlanUsageStore } from '@/providers/grok/app/GrokPlanUsageStore';
-import { GROK_PROVIDER_CAPABILITIES } from '@/providers/grok/capabilities';
 import {
   type GrokAcpDynamicConfig,
   GrokAcpDynamicConfigApplier,
@@ -556,7 +555,6 @@ export class GrokExecution {
           ...(dynamic ? { dynamic } : {}),
         });
       },
-      reasoningControl: GROK_PROVIDER_CAPABILITIES.reasoningControl,
       /**
        * The ACP session this conversation is actually on.
        *

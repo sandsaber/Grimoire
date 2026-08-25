@@ -26,7 +26,6 @@ import type GrimoirePlugin from '@/main';
 import { createClaudeModuleContext } from '@/providers/claude/app/ClaudeModuleContext';
 import { claudePlanUsageStore } from '@/providers/claude/app/ClaudePlanUsageStore';
 import { getClaudeWorkspaceServices } from '@/providers/claude/app/ClaudeWorkspaceServices';
-import { CLAUDE_PROVIDER_CAPABILITIES } from '@/providers/claude/capabilities';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
 import { ClaudeAuxiliaryQuery } from '@/providers/claude/execution/ClaudeAuxiliaryQuery';
 import { ClaudeContentPresenter } from '@/providers/claude/execution/ClaudeContentPresenter';
@@ -310,7 +309,6 @@ export class ClaudeExecution {
         },
         });
       },
-      reasoningControl: CLAUDE_PROVIDER_CAPABILITIES.reasoningControl,
       // The session this conversation is on, which the kernel records and a
       // resume asks for. The presenter's copy comes first because a new
       // conversation learns its session mid-turn, and the record is written

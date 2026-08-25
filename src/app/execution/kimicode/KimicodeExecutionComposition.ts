@@ -48,7 +48,6 @@ import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedA
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createKimicodeModuleContext } from '@/providers/kimicode/app/KimicodeModuleContext';
 import { kimicodePlanUsageStore } from '@/providers/kimicode/app/KimicodePlanUsageStore';
-import { KIMICODE_PROVIDER_CAPABILITIES } from '@/providers/kimicode/capabilities';
 import type { KimicodeAcpDynamicConfig } from '@/providers/kimicode/execution/KimicodeAcpDynamicConfig';
 import { KimicodeAcpDynamicConfigApplier } from '@/providers/kimicode/execution/KimicodeAcpDynamicConfig';
 import { KimicodeAcpFileSystem } from '@/providers/kimicode/execution/KimicodeAcpFileSystem';
@@ -419,7 +418,6 @@ export class KimicodeExecution {
           onLaunchResolved: resolved => { databasePath = resolved; },
         });
       },
-      reasoningControl: KIMICODE_PROVIDER_CAPABILITIES.reasoningControl,
       /**
        * The ACP session this conversation is actually on.
        *

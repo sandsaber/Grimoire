@@ -32,6 +32,8 @@ import {
   type ExecutionLifecycleScheduler,
 } from '@/core/execution/ExecutionLifecycleRegistry';
 import { DeterministicFakeBackend } from '@/core/execution/testing/DeterministicFakeBackend';
+import { toLegacyCapabilities } from '@/core/providers/legacyCapabilities';
+import type { ProviderCapabilities } from '@/core/providers/types';
 import {
   classifyForPresentation,
   dispatchCancellation,
@@ -41,7 +43,6 @@ import {
   type ExecutionChatRuntimeHostPorts,
   ExecutionRunStream,
   startExecutionRun,
-  toLegacyCapabilities,
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { AutoTurnResult } from '@/core/runtime/types';
 import type {
@@ -56,8 +57,18 @@ import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
 import { CODEX_PROVIDER_CAPABILITIES } from '@/providers/codex/capabilities';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
 import type { CodexProviderSettings } from '@/providers/codex/settings';
+import { GEMINI_PROVIDER_CAPABILITIES } from '@/providers/gemini/capabilities';
+import { geminiProviderModule } from '@/providers/gemini/GeminiProviderModule';
+import { GROK_PROVIDER_CAPABILITIES } from '@/providers/grok/capabilities';
+import { grokProviderModule } from '@/providers/grok/GrokProviderModule';
+import { KIMICODE_PROVIDER_CAPABILITIES } from '@/providers/kimicode/capabilities';
+import { kimicodeProviderModule } from '@/providers/kimicode/KimicodeProviderModule';
+import { MIMOCODE_PROVIDER_CAPABILITIES } from '@/providers/mimocode/capabilities';
+import { mimocodeProviderModule } from '@/providers/mimocode/MimocodeProviderModule';
 import { OPENCODE_PROVIDER_CAPABILITIES } from '@/providers/opencode/capabilities';
 import { opencodeProviderModule } from '@/providers/opencode/OpencodeProviderModule';
+import { QWEN_PROVIDER_CAPABILITIES } from '@/providers/qwen/capabilities';
+import { qwenProviderModule } from '@/providers/qwen/QwenProviderModule';
 
 /**
  * The adapter as a client of the registry, over the real lifecycle.
@@ -430,12 +441,21 @@ describe('execution adapter over the registry', () => {
     }]);
   });
 
-  describe('capability projection over the four proof topologies', () => {
+  describe('capability projection over every shipped provider', () => {
+    // All nine, not the four proof topologies. The four-provider version was
+    // written when only four modules existed, and it stayed that way after the
+    // other five landed — so five providers' UI gating could have drifted from
+    // the record the UI actually reads with nothing to say so.
     const modules = [
       antigravityProviderModule,
       codexProviderModule,
       claudeProviderModule,
       opencodeProviderModule,
+      geminiProviderModule,
+      grokProviderModule,
+      kimicodeProviderModule,
+      mimocodeProviderModule,
+      qwenProviderModule,
     ];
 
     const liveRecords = {
@@ -443,7 +463,38 @@ describe('execution adapter over the registry', () => {
       codex: CODEX_PROVIDER_CAPABILITIES,
       claude: CLAUDE_PROVIDER_CAPABILITIES,
       opencode: OPENCODE_PROVIDER_CAPABILITIES,
+      gemini: GEMINI_PROVIDER_CAPABILITIES,
+      grok: GROK_PROVIDER_CAPABILITIES,
+      kimicode: KIMICODE_PROVIDER_CAPABILITIES,
+      mimocode: MIMOCODE_PROVIDER_CAPABILITIES,
+      qwen: QWEN_PROVIDER_CAPABILITIES,
     } as const;
+
+    /**
+     * Where a module's descriptor deliberately differs from the live record,
+     * and what the difference means the day the UI gating moves onto it.
+     *
+     * Two entries, both found by widening this test from four providers to
+     * nine. An empty table would be the goal; an unexplained failure is the
+     * thing this replaces.
+     */
+    const DECLARED_DIVERGENCES: Record<string, Partial<ProviderCapabilities>> = {
+      // Declared at Grok's flip: the legacy record says Grok can rewind, while
+      // its runtime answered `canRewind: false` for every input, so every
+      // assistant message carried a rewind button whose menu could only fail.
+      // A live tab already reads the descriptor and has no button; a tab with
+      // no service yet still reads the record. Moving the gating finishes the
+      // removal.
+      grok: { supportsRewind: false },
+      // Not declared, and not a defect in either statement: `chatSurface` says
+      // what Grimoire puts in the chat input, and Gemini's vault
+      // `.gemini/commands/**` reach a dropdown; the live
+      // `supportsProviderCommands` gates loading the *provider session's*
+      // commands, which Gemini drops. One boolean, two questions. Moving the
+      // gating would switch Gemini's session commands on as a side effect, so
+      // the projection has to stop conflating them first.
+      gemini: { supportsProviderCommands: true },
+    };
 
     it.each(modules)('$manifest.id projects to its live record field for field', module => {
       // Every field, not a chosen few. The three-field version of this passed
@@ -451,13 +502,32 @@ describe('execution adapter over the registry', () => {
       // Codex against a live `false` — a UI change nobody had decided, which is
       // exactly what the preservation boundary forbids and what a partial
       // comparison cannot catch.
-      const live = liveRecords[module.manifest.id as keyof typeof liveRecords];
+      const providerId = module.manifest.id;
+      const live = liveRecords[providerId as keyof typeof liveRecords];
 
-      expect(toLegacyCapabilities(module.capabilities, live.reasoningControl)).toEqual(live);
+      expect(toLegacyCapabilities(module.capabilities))
+        .toEqual({ ...live, ...DECLARED_DIVERGENCES[providerId] });
+    });
+
+    it('declares a divergence only for a provider that has one', () => {
+      // Keeps the table from outliving its reason: an entry that no longer
+      // differs is an exemption nobody removed.
+      const stale = Object.entries(DECLARED_DIVERGENCES).filter(([providerId, difference]) => {
+        const module = modules.find(entry => entry.manifest.id === providerId);
+        const live = liveRecords[providerId as keyof typeof liveRecords];
+        const projected = toLegacyCapabilities(module!.capabilities) as ProviderCapabilities;
+        return Object.entries(difference).every(([field, value]) => (
+          projected[field as keyof ProviderCapabilities] === live[
+            field as keyof ProviderCapabilities
+          ] || value === live[field as keyof ProviderCapabilities]
+        ));
+      });
+
+      expect(stale).toEqual([]);
     });
 
     it.each(modules)('projects $manifest.id onto the record the UI reads', module => {
-      const legacy = toLegacyCapabilities(module.capabilities, 'effort');
+      const legacy = toLegacyCapabilities(module.capabilities);
 
       expect(legacy.providerId).toBe(module.manifest.id);
       expect(legacy.supportsRewind)
@@ -472,7 +542,7 @@ describe('execution adapter over the registry', () => {
       const withPrefix = modules
         .map(module => ({
           id: module.manifest.id,
-          prefix: toLegacyCapabilities(module.capabilities, 'effort').planPathPrefix,
+          prefix: toLegacyCapabilities(module.capabilities).planPathPrefix,
         }))
         .filter(entry => entry.prefix !== undefined);
 
@@ -524,7 +594,6 @@ describe('the assembled ChatRuntime adapter', () => {
           }
           return item.result ? [{ type: 'tool_result', id: 'call-1', content: item.result }] : [];
         },
-        reasoningControl: 'effort',
         currentSessionId: () => 'native-session',
         delay: immediately,
         ...ports,
@@ -880,7 +949,6 @@ describe('the assembled ChatRuntime adapter', () => {
           mcpMentions: new Set<string>(),
         }),
         encodeRequestRef: () => 'encoded',
-        reasoningControl: 'effort',
         currentSessionId: () => null,
         delay: immediately,
       },
@@ -914,7 +982,6 @@ describe('the assembled ChatRuntime adapter', () => {
           mcpMentions: new Set<string>(),
         }),
         encodeRequestRef: () => 'encoded',
-        reasoningControl: 'effort',
         currentSessionId: () => null,
         delay: immediately,
       },
@@ -1262,7 +1329,6 @@ describe('concurrent readiness', () => {
           mcpMentions: new Set<string>(),
         }),
         encodeRequestRef: () => 'encoded',
-        reasoningControl: 'effort',
         currentSessionId: () => null,
         delay: immediately,
       },

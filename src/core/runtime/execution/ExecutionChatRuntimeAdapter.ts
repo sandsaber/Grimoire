@@ -14,8 +14,8 @@ import type {
   RunId,
 } from '../../execution/ExecutionIds';
 import type { ExecutionLifecycleRegistry } from '../../execution/ExecutionLifecycleRegistry';
+import { toLegacyCapabilities } from '../../providers/legacyCapabilities';
 import type {
-  CapabilitySupport,
   ProviderCapabilityDescriptor,
   ProviderFeatureContributions,
   ProviderWorkspaceSlots,
@@ -319,42 +319,6 @@ export class ExecutionRunStream {
   }
 }
 
-/**
- * Projects the descriptor onto the capability record the UI reads today.
- *
- * Exists only until M3 moves the gating onto the descriptor. Every field is
- * derived from something the descriptor states, so a missing answer is a
- * missing descriptor field rather than an invented default.
- */
-export function toLegacyCapabilities(
-  descriptor: ProviderCapabilityDescriptor,
-  reasoningControl: ProviderCapabilities['reasoningControl'],
-): Readonly<ProviderCapabilities> {
-  const supported = (support: CapabilitySupport): boolean => support !== 'unsupported';
-  return Object.freeze({
-    providerId: descriptor.providerId,
-    supportsPersistentRuntime: descriptor.process.topology !== 'process-per-run',
-    supportsNativeHistory: descriptor.history.ownership === 'provider-native',
-    supportsPlanMode: supported(descriptor.interactions.planMode),
-    supportsRewind: supported(descriptor.conversation.rewind),
-    supportsFork: supported(descriptor.conversation.fork),
-    // From the chat surface, not from discovery: Codex can list its commands
-    // and the chat input does not ask, and mapping from discovery would turn
-    // that on at its flip without anyone deciding to.
-    supportsProviderCommands: supported(descriptor.commands.chatSurface),
-    supportsImageAttachments: supported(descriptor.input.imageAttachments),
-    supportsInstructionMode: supported(descriptor.input.instructionMode),
-    // The boolean the UI reads gates the per-run server selector and nothing
-    // else, which is why it maps from that field rather than from ownership —
-    // OpenCode owns Grimoire-managed MCP and still has no selector.
-    supportsMcpTools: supported(descriptor.mcp.perRunSelection),
-    supportsTurnSteer: supported(descriptor.conversation.steering),
-    reasoningControl,
-    ...(descriptor.interactions.planArtifactPrefix
-      ? { planPathPrefix: descriptor.interactions.planArtifactPrefix }
-      : {}),
-  });
-}
 
 /**
  * What each failure reason means, in a sentence a user can act on.
@@ -563,7 +527,6 @@ export interface ExecutionChatRuntimeHostPorts {
    * once, at the point where it decides whether `steer` exists at all.
    */
   readonly encodeSteerRef?: (turn: PreparedChatTurn) => string;
-  readonly reasoningControl: ProviderCapabilities['reasoningControl'];
   /** Provider-native session id, read from the session snapshot at M3. */
   currentSessionId(): string | null;
   /**
@@ -685,7 +648,7 @@ export class ExecutionChatRuntimeAdapter<TSettings extends object = Record<strin
   }
 
   getCapabilities(): Readonly<ProviderCapabilities> {
-    return toLegacyCapabilities(this.context.capabilities, this.ports.reasoningControl);
+    return toLegacyCapabilities(this.context.capabilities);
   }
 
   prepareTurn(request: ChatTurnRequest): PreparedChatTurn {

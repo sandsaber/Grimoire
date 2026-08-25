@@ -148,7 +148,6 @@ const qwenChatUi: ProviderChatUiContribution<QwenProviderSettings> = {
   // Five levels where the OpenCode family has three, and the mechanism behind
   // them is this provider's own: a `/effort <level>` prompt rather than a config
   // option or a dedicated method.
-  reasoningControl: { kind: 'effort', tiers: [...QWEN_EFFORT_LEVELS] },
   permissionToggles: [
     { id: 'normal', label: 'Safe' },
     { id: 'plan', label: 'Plan' },
@@ -215,6 +214,7 @@ const qwenCapabilities: ProviderCapabilityDescriptor = {
     compaction: 'native',
   },
   security: { enforcement: 'native' },
+  reasoningControl: { kind: 'effort', tiers: [...QWEN_EFFORT_LEVELS] },
   workspace: {
     commands: 'grimoire',
     agents: 'grimoire',

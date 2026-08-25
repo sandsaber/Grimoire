@@ -129,8 +129,7 @@ describe('Gemini provider module', () => {
     });
 
     it('offers no reasoning control, because the session carries nowhere to put one', () => {
-      expect(GEMINI_PROVIDER_CAPABILITIES.reasoningControl).toBe('none');
-      expect(features().chatUI.reasoningControl).toEqual({ kind: 'none' });
+      expect(geminiProviderModule.capabilities.reasoningControl).toEqual({ kind: 'none' });
     });
   });
 

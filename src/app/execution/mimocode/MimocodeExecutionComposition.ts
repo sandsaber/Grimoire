@@ -48,7 +48,6 @@ import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedA
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createMimocodeModuleContext } from '@/providers/mimocode/app/MimocodeModuleContext';
 import { mimocodePlanUsageStore } from '@/providers/mimocode/app/MimocodePlanUsageStore';
-import { MIMOCODE_PROVIDER_CAPABILITIES } from '@/providers/mimocode/capabilities';
 import type { MimocodeAcpDynamicConfig } from '@/providers/mimocode/execution/MimocodeAcpDynamicConfig';
 import { MimocodeAcpDynamicConfigApplier } from '@/providers/mimocode/execution/MimocodeAcpDynamicConfig';
 import { MimocodeAcpFileSystem } from '@/providers/mimocode/execution/MimocodeAcpFileSystem';
@@ -413,7 +412,6 @@ export class MimocodeExecution {
           onLaunchResolved: resolved => { databasePath = resolved; },
         });
       },
-      reasoningControl: MIMOCODE_PROVIDER_CAPABILITIES.reasoningControl,
       /**
        * The ACP session this conversation is actually on.
        *

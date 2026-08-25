@@ -160,7 +160,6 @@ const kimicodeChatUi: ProviderChatUiContribution<KimicodeProviderSettings> = {
     },
     contextWindow: () => undefined,
   },
-  reasoningControl: { kind: 'effort', tiers: ['low', 'medium', 'high'] },
   permissionToggles: [
     { id: 'normal', label: 'Safe' },
     { id: 'plan', label: 'Plan' },
@@ -222,6 +221,7 @@ const kimicodeCapabilities: ProviderCapabilityDescriptor = {
     compaction: 'native',
   },
   security: { enforcement: 'native' },
+  reasoningControl: { kind: 'effort', tiers: ['low', 'medium', 'high'] },
   workspace: {
     commands: 'grimoire',
     agents: 'grimoire',

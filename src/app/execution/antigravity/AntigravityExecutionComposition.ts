@@ -20,7 +20,6 @@ import type { ChatMessage } from '@/core/types';
 import { t } from '@/i18n/i18n';
 import type GrimoirePlugin from '@/main';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
-import { ANTIGRAVITY_PROVIDER_CAPABILITIES } from '@/providers/antigravity/capabilities';
 import {
   AntigravityExecutionBackend,
   type AntigravityExecutionBackendContext,
@@ -133,7 +132,6 @@ export class AntigravityExecution {
       encodeRequestRef: (turn, history?: ChatMessage[], options?: ChatRuntimeQueryOptions) => (
         this.requests.reference(buildAntigravityRequest(plugin, turn, history, options))
       ),
-      reasoningControl: ANTIGRAVITY_PROVIDER_CAPABILITIES.reasoningControl,
       // Print mode has no provider-native session, which is what the legacy
       // runtime reported too — it returned null and wrote `sessionId: null`.
       currentSessionId: () => null,

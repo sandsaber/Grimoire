@@ -145,7 +145,6 @@ const grokChatUi: ProviderChatUiContribution<GrokProviderSettings> = {
     },
     contextWindow: () => DEFAULT_CONTEXT_WINDOW,
   },
-  reasoningControl: { kind: 'effort', tiers: ['low', 'medium', 'high'] },
   permissionToggles: [
     { id: 'normal', label: 'Safe' },
     { id: 'plan', label: 'Plan' },
@@ -202,6 +201,7 @@ const grokCapabilities: ProviderCapabilityDescriptor = {
     compaction: 'native',
   },
   security: { enforcement: 'native' },
+  reasoningControl: { kind: 'effort', tiers: ['low', 'medium', 'high'] },
   workspace: {
     commands: 'grimoire',
     agents: 'grimoire',

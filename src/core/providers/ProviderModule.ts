@@ -271,7 +271,6 @@ export interface ProviderContextPort {
 
 export interface ProviderChatUiContribution<TSettings extends object = Record<string, unknown>> {
   readonly modelPresentation: ProviderModelPresentation<TSettings>;
-  readonly reasoningControl: ProviderReasoningControl;
   readonly permissionToggles: readonly ProviderPermissionToggle[];
   readonly icon: string;
 }
@@ -290,10 +289,18 @@ export interface ProviderModelPresentation<TSettings extends object = Record<str
   contextWindow(modelId: string, settings: TSettings): number | undefined;
 }
 
+/**
+ * The third kind is `token-budget` because that is the product's word for it.
+ *
+ * This union said `toggle` until M3 — a word invented while writing the
+ * contract, for a control the legacy capability record had already named. No
+ * provider declares either one today, which is exactly why it went unnoticed:
+ * a vocabulary nothing uses is a vocabulary nothing checks.
+ */
 export type ProviderReasoningControl =
   | { readonly kind: 'none' }
   | { readonly kind: 'effort'; readonly tiers: readonly string[] }
-  | { readonly kind: 'toggle' };
+  | { readonly kind: 'token-budget' };
 
 export interface ProviderPermissionToggle {
   readonly id: string;
@@ -516,6 +523,15 @@ export interface ProviderCapabilityDescriptor {
     readonly compaction: CapabilitySupport;
   };
   readonly security: { readonly enforcement: SecurityEnforcement };
+  /**
+   * Whether the provider takes a reasoning instruction, and in what vocabulary.
+   *
+   * A capability rather than a chat-UI detail, and it sat in both until M3: the
+   * legacy capability record and the module's chat-UI contribution each carried
+   * it, with only the legacy one live. One statement, one home — the picker is
+   * what presentation does with it.
+   */
+  readonly reasoningControl: ProviderReasoningControl;
   /** Workspace-side capability gating. App-level inventory row 1. */
   readonly workspace: ProviderWorkspaceCapabilityMap;
 }

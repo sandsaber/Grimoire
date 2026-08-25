@@ -43,7 +43,6 @@ import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedA
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createGeminiModuleContext } from '@/providers/gemini/app/GeminiModuleContext';
 import { geminiPlanUsageStore } from '@/providers/gemini/app/GeminiPlanUsageStore';
-import { GEMINI_PROVIDER_CAPABILITIES } from '@/providers/gemini/capabilities';
 import type { GeminiAcpDynamicConfig } from '@/providers/gemini/execution/GeminiAcpDynamicConfig';
 import { GeminiAcpDynamicConfigApplier } from '@/providers/gemini/execution/GeminiAcpDynamicConfig';
 import { GeminiAcpFileSystem } from '@/providers/gemini/execution/GeminiAcpFileSystem';
@@ -336,7 +335,6 @@ export class GeminiExecution {
           ...(dynamic ? { dynamic } : {}),
         });
       },
-      reasoningControl: GEMINI_PROVIDER_CAPABILITIES.reasoningControl,
       /**
        * The ACP session this conversation is actually on.
        *

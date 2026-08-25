@@ -80,7 +80,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-proofs — four topology proofs, dark | Complete — Antigravity, Codex, Claude, OpenCode | `e1ab910`, `2e46a87`, `5a5acad`, `4d844e0`, `bff6132`, `1a931c5` |
 | M2-adapter — presentation seam, proven without a flip | Complete | `4f206d1`, `6133097`, `48a61a4`, `e7e754c`, `f69daaa`, `7e2c5cc`, `47b1fe5`, plus review fixes `f0c6114`, `1ead161` |
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
-| M3 — provider control plane | In progress — the catalog exists, validates the nine modules, and owns provider identity, ordering and enablement; the two registries hold what has not moved yet | `0dd3580`, this commit |
+| M3 — provider control plane | In progress — the catalog exists, validates the nine modules, and owns provider identity, ordering and enablement. Capability gating (row 6) is blocked on one projection that conflates two questions, recorded in the parity test | `0dd3580`, `928a3c9`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution and seam deletion | In progress — **the auxiliary checkpoint is complete**: every provider runs auxiliary work on the kernel except Claude's, which is cold by design, and all five runners are deleted. Projections, durable agents and the seam deletion are untouched | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
@@ -6944,6 +6944,50 @@ than left to be re-derived.
 and `resolveProviderForModel` ask the catalog. Four of the sixteen registration fields have moved.
 
 Gates: unit 529 suites / 8,291 tests, integration 5 / 151, typecheck, `eslint`, `build:release`.
+
+### The capability gate was measuring four providers, and both extra findings were real (this commit)
+
+Row 6 was next, and reading the gate that would have to hold it stopped the move. The projection
+parity test — the one that proves the descriptor still produces the record the UI reads — compared
+**four** providers. It was written when four modules existed and stayed that way after the other
+five landed, so five providers' UI gating could have drifted with nothing to say so. Widened to all
+nine, it failed twice.
+
+**Grok, declared.** Its module says `rewind: 'unsupported'` while the live record says the provider
+can rewind — the divergence Grok's flip wrote down: the legacy runtime answered `canRewind: false`
+for every input, so every assistant message carried a button whose menu could only fail. A tab with
+a live service already reads the descriptor and has no button; a tab without one still reads the
+record. Moving the gating finishes the removal.
+
+**Gemini, not declared, and not a defect in either statement.** Its module says
+`commands.chatSurface: 'grimoire'` and the live record says `supportsProviderCommands: false`, and
+both are true of different questions. `chatSurface` says what Grimoire puts in the chat input, and
+Gemini's vault `.gemini/commands/**` do reach a dropdown; `supportsProviderCommands` gates loading
+the *provider session's* commands, which Gemini drops. One boolean, two questions — and moving the
+gating onto the descriptor would switch Gemini's session commands on as a side effect nobody decided.
+**So row 6 does not move in this commit.** The projection has to stop conflating the two first, and
+that is a design decision, not a mechanical move.
+
+Both are recorded as a checked table beside the assertion rather than as a failing test or a silent
+skip, with a second test that fails when an entry stops being a real divergence — an exemption list
+that cannot outlive its reason.
+
+**What did move is the field the projection could not check.** `reasoningControl` was declared
+twice — in the legacy capability record and in each module's chat-UI contribution — with only the
+legacy one live, and the projection took it as an *argument* from the caller, so the one field it
+copied was the one field it never verified. It is a capability now, on the descriptor, and the
+projection derives it like everything else. All nine agreed, which is luck rather than design: the
+duplicate had no gate.
+
+The contract's third reasoning kind was `toggle`, a word invented while writing it, next to a
+product vocabulary that has said `token-budget` since before the migration. No provider declares
+either, which is exactly why nothing noticed. Renamed to the product's word.
+
+`toLegacyCapabilities` moved out of the adapter into `src/core/providers/legacyCapabilities.ts`,
+where the catalog can reach it without importing a 1,900-line runtime module, and the adapter's
+`reasoningControl` host port is gone along with the nine compositions that supplied it.
+
+Gates: unit 529 suites / 8,302 tests, integration 5 / 151, typecheck, `eslint`, `build:release`.
 
 ## Current blocker
 

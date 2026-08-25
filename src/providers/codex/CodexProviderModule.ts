@@ -129,7 +129,6 @@ const codexChatUi: ProviderChatUiContribution<CodexProviderSettings> = {
         : undefined
     ),
   },
-  reasoningControl: { kind: 'effort', tiers: [...CODEX_EFFORT_TIERS] },
   permissionToggles: [
     { id: 'normal', label: 'Safe' },
     { id: 'plan', label: 'Plan' },
@@ -199,6 +198,7 @@ const codexCapabilities: ProviderCapabilityDescriptor = {
   // The CLI enforces its own approval and sandbox policy; Grimoire owns the
   // process boundary around it.
   security: { enforcement: 'native' },
+  reasoningControl: { kind: 'effort', tiers: [...CODEX_EFFORT_TIERS] },
   workspace: {
     skills: 'grimoire',
     agents: 'grimoire',

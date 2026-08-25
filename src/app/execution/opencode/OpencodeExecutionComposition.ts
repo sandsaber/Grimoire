@@ -48,7 +48,6 @@ import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedA
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createOpencodeModuleContext } from '@/providers/opencode/app/OpencodeModuleContext';
 import { opencodePlanUsageStore } from '@/providers/opencode/app/OpencodePlanUsageStore';
-import { OPENCODE_PROVIDER_CAPABILITIES } from '@/providers/opencode/capabilities';
 import type { OpencodeAcpDynamicConfig } from '@/providers/opencode/execution/OpencodeAcpDynamicConfig';
 import { OpencodeAcpDynamicConfigApplier } from '@/providers/opencode/execution/OpencodeAcpDynamicConfig';
 import { OpencodeAcpFileSystem } from '@/providers/opencode/execution/OpencodeAcpFileSystem';
@@ -412,7 +411,6 @@ export class OpencodeExecution {
           onLaunchResolved: resolved => { databasePath = resolved; },
         });
       },
-      reasoningControl: OPENCODE_PROVIDER_CAPABILITIES.reasoningControl,
       /**
        * The ACP session this conversation is actually on.
        *

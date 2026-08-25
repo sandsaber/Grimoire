@@ -115,8 +115,7 @@ describe('Qwen provider module', () => {
     });
 
     it('offers five reasoning levels, not the three its cousins do', () => {
-      expect(QWEN_PROVIDER_CAPABILITIES.reasoningControl).toBe('effort');
-      expect(features().chatUI.reasoningControl).toEqual({
+      expect(qwenProviderModule.capabilities.reasoningControl).toEqual({
         kind: 'effort',
         tiers: ['low', 'medium', 'high', 'xhigh', 'max'],
       });
