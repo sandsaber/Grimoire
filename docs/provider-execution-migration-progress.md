@@ -7101,6 +7101,66 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
+### Where the session of 2026-08-25 ended
+
+**M3 is open and seven of its rows have moved.** `ProviderCatalog` is the one validated inventory of
+the nine modules, and `ProviderWorkspaceManager` owns both halves of the workspace lifecycle.
+Registration rows 1, 2, 3, 4, 6 and 7 and app-level row 3 are gone from their old homes; the two
+registries hold what is left.
+
+**Every checkpoint this session found something live, and none of it was found by reading the code
+that changed — it was found by the gate that had to hold the change.**
+
+- three modules carried the `manifest.order` of the provider they were forked from, and the three
+  tests titled *"declares its identity and ordering from the registration it replaces"* had the
+  number copied into the assertion instead of reading the registration;
+- switching a provider off re-encoded its whole config through that provider's normalizers, so a
+  toggle rewrote the CLI path and the model lists on the way past;
+- the capability parity test compared four providers of nine. Widened, it failed twice: Grok's
+  declared rewind divergence, and a Gemini command capability where one boolean was answering two
+  different questions;
+- provider workspace startup was a loop with no `try`, so one initializer throwing cost every
+  provider *after it in the iteration order* its command catalog, model list, CLI resolution and
+  settings tab — and the order came from object keys. Nothing was released at unload, and the static
+  services map outlived the instance that filled it;
+- nine registrations each wrote `/^PREFIX_/i` for their environment keys, which is a contract that
+  runs provider-supplied expressions over every key a user types.
+
+**The recurring shape is one to keep**: a gate that measures a subset reads exactly like a gate that
+measures everything. Four of the five above were found by widening a gate's *scope*, not by
+tightening its rule.
+
+**One row was deliberately not moved and then unblocked in its own commit.** Capability gating would
+have switched Gemini's session commands on as a side effect, because `chatSurface` and
+`supportsProviderCommands` answer different questions. Recorded as a checked divergence, decided in
+the next commit by giving the descriptor a third command field, then moved.
+
+#### What to pick up next, in order
+
+1. **The feature resolver, and the design question in it.** Registration rows 5, 8, 14 and 15 all
+   live in `ProviderModule.features(context)`, and the context is built per provider at app level —
+   eight providers have a `create<Provider>ModuleContext(plugin, boundConversation)`, Antigravity
+   needs none. A catalog-level `features(providerId)` implies **one unbound context per provider**,
+   which is fine for history, task results and context files but not for anything reading the bound
+   conversation. Decide where the resolver is assembled — `main.ts`, a new
+   `src/app/execution/ProviderFeatureSource.ts`, or the per-provider execution compositions that
+   already build these contexts — before moving any of the four rows. Row 15
+   (`taskResultInterpreter`, two call sites) is the cheapest one to prove the seam with.
+2. **Row 9, `settingsReconciler`.** Unblocked but not small: `ProviderSettingsCoordinator` projects,
+   clones and merges the settings record per provider, and the codec's `reconcile` works on decoded
+   provider settings. Re-expressing that is a settings-behaviour risk, so it wants a fresh session
+   and its own characterization tests.
+3. **The ten workspace rows and app-level rows 1 and 2**, then delete both registries. Laziness in
+   `ProviderWorkspaceManager` lands with these, since it is the synchronous consumers that force
+   eager initialization today.
+4. **Then the rest of M5**: projections, durable agents, seam deletion.
+5. **Two obligations from M4**, each a small commit: creating a conversation over an id that already
+   exists still replaces it, and the history list has no error state for a record this build cannot
+   read.
+
+**Still waiting on the owner rather than on code: D9, redo.** Certification remains account-bound —
+Gemini one turn per replenishment, MiMoCode, Kimi Code and Qwen not certifiable on this machine.
+
 ### Where the session of 2026-08-24 ended
 
 **M5's auxiliary checkpoint is closed and M4 is complete.** Six commits: Grok's and Codex's auxiliary
@@ -7135,7 +7195,7 @@ anything done.
 The recurring cause is the same one wave 1 recorded: a test that drives one half of a seam cannot see
 the other half being reverted. Assume a green break is a missing test until proven otherwise.
 
-#### What to pick up next, in order
+#### What that session left to pick up (M3 started, the rest still open)
 
 1. **M3 — the provider catalog.** The plan's next milestone and now unblocked: replace the split
    registries, move the four legacy prompt encoders — `ProviderModule` still has no `prepareTurn` slot,
