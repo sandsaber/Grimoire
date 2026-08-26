@@ -82,7 +82,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
-| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete** and **the chat path is built but not turned on**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design, and all five runners are deleted; bang-bash runs on the local-shell backend. The chat projection, its coordinator, startup adoption, the renderer, the render target, the attachment, the composition and the conversation port all exist, are composed end to end in one test, and are **dark**: no tab constructs any of it, and the parity gate keeps them out of the bundle until the flip. Still untouched: the flip itself, durable agents, tab-close ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as composition root, and the seam deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
+| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete** and **the chat path is built, reviewed, and switched off**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design, and all five runners are deleted; bang-bash runs on the local-shell backend. The chat projection, its coordinator, startup adoption, the renderer, the render target, the attachment, the composition, the tab handle and the conversation port all exist, are composed end to end in one test, are **in the bundle**, and are **switched off** by an empty `projectionChatProviders`: adding one provider to that list is that provider's flip, certified by `docs/chat-projection-flip-smoke-matrix.md`, which has never run. Still untouched: the flip itself, durable agents, tab-close ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as composition root, and the seam deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
@@ -8355,58 +8355,17 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
    the flip carried across from `InputController` that no gate here can check; the plan gap that used
    to head that list is closed, so what row 1 now tests is the providers' response ids rather than
    the wiring.
-2. ~~**The flip, which the parity gate has shown to be one commit.**~~ **Done, and the entries below
-   record how.** Every piece exists, is dark, and
-   is composed end to end — projection, live content, coordinator, adoption, renderer, target,
-   attachment, composition, tab handle, conversation port. Wiring the composition root ahead of the
-   flip was tried and refused: *a surface listed as pending must not be in the shipped bundle*, which
-   is right, and it means the composition root, the tab wiring and the manifest state change are the
-   same commit. Its contents, in the order they were built:
-   - ~~`main.ts` constructs `ChatExecutionComposition` beside the kernel host~~ — **done**, with
-     eight surfaces moved to `wired` and the switch (`projectionChatProviders.ts`) empty;
-   - a tab constructs a `ChatTabExecution` with its own `ChatSurfaceBinding` (its `ChatState`, its
-     `MessageRenderer`, its `StreamController`, its provider's content presenter and failure
-     wording), and `turnEncoder: () => tab.service?.turnEncoder ?? null`;
-   - `InputController`'s send path calls `tab.execution.send(request, userMessage)` instead of
-     `agentService.query`, and its cancel path calls `cancel()`;
-   - `TabManager` opens the attachment when a tab binds a conversation and detaches it on close;
-   - the four chat manifest entries move off `pending`, which is what makes the bundle rule pass.
-   Everything the pieces know about each other is already tested; what this commit adds is the call
-   sites, and what it needs is the thing no gate here can give it — a live provider. Three of the four things that had to be settled first are settled, each in its own
-   checkpoint above; one is left, and it is the one only the flip itself can answer:
-   - ~~**the id of the bubble and the id of the stored message differ**~~ and ~~**who creates the
-     assistant message**~~ — **both closed in the entry above**: a turn names its answer at
-     `turn-started`, the target draws under that id and the barrier stores under it. What is left of
-     the second is only that `InputController` also creates one today, and stops at the flip;
-   - ~~**usage's write path.**~~ **Closed in the entry above**: the target reports what the
-     controller kept and the barrier persists it, leaving the last turn's usage alone when a turn
-     reports none;
-   - **which interaction trigger survives**, per the note on the port: the provider's presenter has
-     the dialog on screen already, and the projection wants to show it from state so a reopened tab
-     shows the question;
-   - ~~**and a fifth, found while assembling the composition rather than while flipping.**~~
-     **Named and typed in the entry above**, and reduced to what is left of it: `ChatTurnEncoder` is
-     what a tab must be handed, and it can only come from the provider's execution composition —
-     which builds it per tab, capturing that tab's conversation binding and scope. So the last step
-     is for each composition to expose the encoder it already builds, instead of only handing it to
-     an adapter. Nine files, one line of intent each, and provider-owned: read each provider's
-     nested `AGENTS.md` first. The original entry follows:
-     `submitTurn` takes a `requestRef` — the provider's own reference to the prompt — and only the
-     provider can produce one. `InputController` gets it from `agentService.prepareTurn(request)`,
-     which is a method on the *presentation adapter*, routed to a host port because
-     `ProviderModule` has no slot for it (a standing obligation above, owner M3, "when the four
-     legacy prompt encoders move"). So a tab that submits through the coordinator and still asks the
-     adapter for its request ref keeps the adapter alive through the flip that was supposed to
-     remove it. Either the obligation closes first, or the flip carries `prepareTurn` on the surface
-     binding and closes it on the way — but it cannot be left unnoticed, because the flip compiles
-     either way.
-   This is the flip, so it is a smoke matrix rather than a gate, and per the standing rule it is
-   certified against a live provider before the next thing lands.
-2. **`InputController` and `StreamController` stop owning the turn.** The other half of the same
-   flip: 2,100 lines of incremental append and 2,150 of turn acceptance come out, and every
-   provider's chat behaviour is downstream of them. Worth doing in the order the dark path was
-   built — a tab renders from the projection while the legacy path still owns acceptance, then
-   acceptance moves — rather than as one commit, so a red is attributable.
+2. **The flip is built and switched off, and reviewed.** Composition root, tab binding, tab
+   lifetime, the send and cancel branches and the manifest surfaces all landed. An outside review of
+   it found seven things and every one is resolved — five fixed, one already repaired a commit
+   earlier, one reclassified as a limit of what a `ResultRef` can resolve back to — plus an eighth
+   the fixes uncovered. The entries above are the record; what is left of it is item 1.
+
+3. **`InputController` and `StreamController` stop owning the turn.** Only after a provider has been
+   certified on the projection path: 2,100 lines of incremental append and 2,150 of turn acceptance
+   come out, and every provider's chat behaviour is downstream of them. The branch in
+   `InputController` is what makes this incremental — it goes when the last provider joins the list,
+   not before.
    The thirteen provider rows handed over from M3 are re-implementations of the same UI-shaped
    consumers, so doing them first means rewriting each consumer twice.
 3. ~~**An observation channel for control records.**~~ **Closed in the entry above**, and closed
