@@ -164,6 +164,72 @@ describe('chat execution coordinator', () => {
     ]);
   });
 
+  it('persists what the turn cost, because nothing else carries it', async () => {
+    // Token counts reach the surface as provider content and reach nothing
+    // else: the kernel carries none. The conversation's own usage — which every
+    // context meter reads — would otherwise be lost with the surface that saw
+    // it.
+    const harness = await createHarness();
+    const ticket = await harness.coordinator.submitTurn(turnCommand());
+    const started = await ticket.started;
+    harness.coordinator.recordTurnUsage(started.runId, {
+      ...usageOf(100),
+      model: 'a-model',
+    });
+    harness.backend.emit(started.runId, {
+      kind: 'output-delta',
+      channel: 'assistant',
+      text: 'Yes.',
+    });
+    harness.backend.emit(started.runId, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    });
+    await ticket.completion;
+
+    const stored = await harness.conversations.read(CONVERSATION_ID);
+    expect(stored.kind === 'present' ? stored.metadata.usage : null).toEqual({
+      ...usageOf(100),
+      model: 'a-model',
+    });
+    harness.coordinator.dispose();
+  });
+
+  it('leaves the last turn\'s usage alone when this one reported none', async () => {
+    // A provider that says nothing about tokens must not erase what the last
+    // turn established, which is what writing `null` through would do.
+    const harness = await createHarness();
+    const first = await harness.coordinator.submitTurn(turnCommand());
+    const firstStarted = await first.started;
+    harness.coordinator.recordTurnUsage(firstStarted.runId, usageOf(5));
+    harness.backend.emit(firstStarted.runId, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    });
+    await first.completion;
+
+    const second = await harness.coordinator.submitTurn(turnCommand({
+      commandId: 'cmd-2',
+      requestRef: 'req-2',
+      userMessage: userMessage('msg-user-2', 'And again?'),
+    }));
+    const secondStarted = await second.started;
+    harness.coordinator.recordTurnUsage(secondStarted.runId, null);
+    harness.backend.emit(secondStarted.runId, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    });
+    await second.completion;
+
+    const stored = await harness.conversations.read(CONVERSATION_ID);
+    expect(stored.kind === 'present' ? stored.metadata.usage : null)
+      .toEqual(usageOf(5));
+    harness.coordinator.dispose();
+  });
+
   it('queues the next turn and releases it once the first is durable', async () => {
     const harness = await createHarness();
     const first = await harness.coordinator.submitTurn(turnCommand());
@@ -732,3 +798,11 @@ function eagerLifecycle(): ChatExecutionLifecyclePort & {
   };
 }
 
+function usageOf(inputTokens: number) {
+  return {
+    inputTokens,
+    contextWindow: 200_000,
+    contextTokens: inputTokens,
+    percentage: 0,
+  };
+}

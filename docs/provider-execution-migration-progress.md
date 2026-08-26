@@ -7801,6 +7801,33 @@ instead, and goes red from either end — a barrier that mints its own id, or a 
 
 Gates: unit 531 suites / 8,388 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### What a turn cost travels back, because nothing else carries it (this commit)
+
+The third of the flip's four questions. Token counts reach the surface as *content* — no part of the
+kernel carries them, and the only thing that knows them is the provider payload they arrive in — so
+`conversation.usage`, which the legacy save wrote and every context meter reads, would have been lost
+with the surface that saw it. The target reports it and the barrier persists it: a call rather than a
+projection field, because a field would have to be fed from the target anyway and then read from
+there again.
+
+**What is reported is what the controller kept, not what the chunk carried.** `StreamController`
+already drops a usage report from another session and an aggregate that counts a subagent's tokens as
+the parent's; a second copy of those rules in the target is a second copy that can disagree, so the
+target reads back what the controller was left holding.
+
+**A turn that reports nothing leaves the last turn's usage alone.** Writing the absence through would
+erase what the previous turn established, which is what a provider that simply says nothing about
+tokens would have caused on every turn.
+
+**Two harness defects this found, both of the same shape.** The composition harness's conversation
+mapping silently dropped `usage` in both directions — and a mapping that drops a field a turn writes
+reads exactly like a turn that does not write it, which is what the first red said. And the edit that
+fixed it validated its last change before writing any of them, so an assertion failure discarded the
+two that had already succeeded: the same lesson as the `git checkout` one, in a different tool. One
+change per write.
+
+Gates: unit 531 suites / 8,392 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7885,10 +7912,9 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
      assistant message**~~ — **both closed in the entry above**: a turn names its answer at
      `turn-started`, the target draws under that id and the barrier stores under it. What is left of
      the second is only that `InputController` also creates one today, and stops at the flip;
-   - **usage's write path.** The meter is fed from content the target is handed, and the barrier
-     persists messages and `lastResponseAt` but not `conversation.usage`, which the legacy save
-     wrote. A target that learns usage has to get it back to the coordinator — a command on the
-     coordinator, not a field on the projection;
+   - ~~**usage's write path.**~~ **Closed in the entry above**: the target reports what the
+     controller kept and the barrier persists it, leaving the last turn's usage alone when a turn
+     reports none;
    - **which interaction trigger survives**, per the note on the port: the provider's presenter has
      the dialog on screen already, and the projection wants to show it from state so a reopened tab
      shows the question.

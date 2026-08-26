@@ -2,7 +2,12 @@ import type { RunState, RunTerminal } from '../../../core/execution/ExecutionCon
 import type { RunId } from '../../../core/execution/ExecutionIds';
 import type { ReconciledOutcomeProjection } from '../../../core/execution/RunProjection';
 import type { ProviderHistoryHydration } from '../../../core/providers/ProviderModule';
-import type { AssistantTextPhase, ChatContentItem, ChatMessage } from '../../../core/types';
+import type {
+  AssistantTextPhase,
+  ChatContentItem,
+  ChatMessage,
+  UsageInfo,
+} from '../../../core/types';
 import type { ProviderId } from '../../../core/types/provider';
 import type { ChatLiveItem, InteractionProjection } from '../projections/ChatProjection';
 import type {
@@ -79,6 +84,7 @@ export interface ChatMessageOperations {
 /** The streaming cursor the two above share. */
 export interface ChatStreamingCursor {
   messages: ChatMessage[];
+  usage: UsageInfo | null;
   currentContentEl: HTMLElement | null;
   currentTextEl: HTMLElement | null;
   currentTextContent: string;
@@ -103,6 +109,21 @@ export interface ChatSurfaceRenderTargetDeps {
   createAssistantMessage(messageId: string, runId: RunId): ChatMessage;
   /** The provider's wording for a terminal, where it has one. */
   describeTerminal(terminal: RunTerminal): string;
+  /**
+   * Reports the turn's token usage to whoever persists the conversation.
+   *
+   * Usage arrives as *content* — nothing in the kernel carries token counts,
+   * and the only thing that knows them is the provider payload. So it lands
+   * here first and has to travel back, which is why this is a call rather than
+   * a field on the projection: a projection field would have to be fed from
+   * here anyway, and then read from here again.
+   *
+   * The value reported is the one the controller kept, not the one the chunk
+   * carried: a usage report from another session, or an aggregate that counts a
+   * subagent's tokens as the parent's, is filtered there already, and a second
+   * copy of those rules here is a second copy that can disagree.
+   */
+  recordTurnUsage(runId: RunId, usage: UsageInfo | null): void;
   getGreeting(): string;
   getProviderId(): ProviderId;
   updateQueueIndicator(): void;
@@ -182,11 +203,18 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
       case 'reasoning-text':
         void this.deps.stream.appendThinking(item.text);
         return;
-      case 'provider-content':
-        for (const content of this.deps.presentProviderContent(item.payload)) {
-          void this.deps.stream.handleStreamChunk(content, message);
+      case 'provider-content': {
+        const presented = this.deps.presentProviderContent(item.payload);
+        const handled = presented.map(content => (
+          this.deps.stream.handleStreamChunk(content, message)
+        ));
+        if (presented.some(content => content.type === 'usage')) {
+          void Promise.all(handled).then(() => {
+            this.deps.recordTurnUsage(runId, this.deps.state.usage);
+          });
         }
         return;
+      }
       default: {
         const unhandled: never = item;
         void unhandled;

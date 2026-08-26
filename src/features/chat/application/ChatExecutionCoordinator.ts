@@ -36,7 +36,7 @@ import type {
   ExecutionReconciliationObserver,
   LifecycleLease,
 } from '../../../core/execution/ExecutionLifecycleRegistry';
-import type { ChatMessage, Conversation } from '../../../core/types';
+import type { ChatMessage, Conversation, UsageInfo } from '../../../core/types';
 import {
   type ChatProjection,
   type ChatProjectionEvent,
@@ -229,6 +229,8 @@ interface ActiveTurn {
    * a fast turn were silently gone.
    */
   readonly buffered: ExecutionEventEnvelope[];
+  /** The turn's token usage, as the surface last reported it. */
+  usage?: UsageInfo | null;
   finalization?: Promise<void>;
   finalized: boolean;
 }
@@ -352,6 +354,24 @@ export class ChatExecutionCoordinator {
     const entry = record ? this.entryForRun(record.runId) : undefined;
     if (record && entry) {
       this.apply(entry, { kind: 'interaction-record', record });
+    }
+  }
+
+  /**
+   * Records what a turn cost, for the barrier to persist with it.
+   *
+   * Token counts reach the surface as provider content and reach nothing else:
+   * the kernel carries none, so the conversation's own usage — which the legacy
+   * save wrote and every context meter reads — would otherwise be lost the
+   * moment the surface that saw it went away. A run this coordinator is not
+   * running is ignored rather than refused; a stale report from a turn that has
+   * ended is not worth an error.
+   */
+  recordTurnUsage(targetRunId: RunId, usage: UsageInfo | null): void {
+    const entry = this.entryForRun(targetRunId);
+    const active = entry?.active;
+    if (active?.runId === targetRunId) {
+      active.usage = usage;
     }
   }
 
@@ -824,7 +844,7 @@ export class ChatExecutionCoordinator {
       );
       const saved = await this.conversations.apply(
         active.conversationId,
-        current => completeConversation(current, assistantMessage, completedAt),
+        current => completeConversation(current, assistantMessage, active.usage, completedAt),
       );
       active.finalized = true;
       this.apply(entry, {
@@ -926,6 +946,7 @@ function appendUserMessage(
 function completeConversation(
   conversation: Conversation,
   assistantMessage: ChatMessage | undefined,
+  usage: UsageInfo | null | undefined,
   completedAt: number,
 ): Conversation {
   const alreadyPresent = assistantMessage
@@ -935,6 +956,9 @@ function completeConversation(
     messages: assistantMessage && !alreadyPresent
       ? [...conversation.messages, assistantMessage]
       : conversation.messages,
+    // Absent rather than null when the turn reported none: a turn whose
+    // provider says nothing about tokens must not erase what the last one did.
+    ...(usage ? { usage } : {}),
     lastResponseAt: Math.max(conversation.lastResponseAt ?? 0, completedAt),
     updatedAt: Math.max(conversation.updatedAt, completedAt),
   };

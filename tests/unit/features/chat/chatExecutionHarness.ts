@@ -55,7 +55,9 @@ export function opaque(prefix: string, ordinal: number): string {
  * session binding are all optional, because a vault in the field holds files
  * this build did not write. The projection this coordinator feeds is the chat
  * surface's shape, so the port is where the two meet. Only the fields a turn
- * touches are carried here; the plugin does the whole of it today.
+ * touches are carried here — and `usage` is one of them, which a first version
+ * of this left out: a mapping that drops a field a turn writes reads exactly
+ * like a turn that does not write it. The plugin does the whole of it today.
  */
 function toConversation(metadata: SessionMetadata): Conversation {
   return {
@@ -68,6 +70,7 @@ function toConversation(metadata: SessionMetadata): Conversation {
       ? { lastResponseAt: metadata.lastResponseAt }
       : {}),
     sessionId: metadata.sessionId ?? null,
+    ...(metadata.usage ? { usage: metadata.usage } : {}),
     messages: metadata.messages ? [...metadata.messages] : [],
   };
 }
@@ -83,6 +86,7 @@ function toMetadata(conversation: Conversation): SessionMetadata {
       ? { lastResponseAt: conversation.lastResponseAt }
       : {}),
     sessionId: conversation.sessionId,
+    ...(conversation.usage ? { usage: conversation.usage } : {}),
     messages: [...conversation.messages],
   };
 }

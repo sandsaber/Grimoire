@@ -41,6 +41,7 @@ function harness() {
   messageEl.querySelector = jest.fn().mockReturnValue(contentEl);
   const state: ChatStreamingCursor = {
     messages: [],
+    usage: null,
     currentContentEl: null,
     currentTextEl: null,
     currentTextContent: '',
@@ -98,6 +99,9 @@ function harness() {
       timestamp: 1,
     }),
     describeTerminal: terminal => `ended: ${terminal.reason}`,
+    recordTurnUsage: (forRunId, usage) => {
+      calls.push({ method: 'recordTurnUsage', args: [forRunId, usage] });
+    },
     getGreeting: () => 'Hello',
     getProviderId: () => 'claude',
     updateQueueIndicator: () => {
@@ -212,6 +216,43 @@ describe('chat surface render target', () => {
     expect(chat.calls.filter(call => call.method === 'handleStreamChunk').map(call => (
       (call.args[0] as { type: string }).type
     ))).toEqual(['tool_use', 'tool_result']);
+  });
+
+  it('reports the usage the controller kept, not the one the chunk carried', async () => {
+    // The controller filters a report from another session and an aggregate
+    // that counts a subagent's tokens as the parent's. A second copy of those
+    // rules here is a second copy that can disagree, so what is reported is
+    // what the controller was left holding.
+    const chat = harness();
+    beginTurn(chat.target);
+    chat.clear();
+    chat.setPresented([
+      { type: 'text', content: 'Answer.' },
+      { type: 'usage', usage: usageOf(10) },
+    ]);
+    chat.state.usage = { ...usageOf(10), model: 'kept-by-the-controller' };
+
+    chat.target.openTurnBlock(RUN_ID, 0, { kind: 'provider-content', payload: {} });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(chat.calls.filter(call => call.method === 'recordTurnUsage')).toEqual([{
+      method: 'recordTurnUsage',
+      args: [RUN_ID, { ...usageOf(10), model: 'kept-by-the-controller' }],
+    }]);
+  });
+
+  it('reports nothing for provider content that carried no usage', async () => {
+    const chat = harness();
+    beginTurn(chat.target);
+    chat.clear();
+    chat.setPresented([{ type: 'tool_use', id: 'tool-1', name: 'Read', input: {} }]);
+
+    chat.target.openTurnBlock(RUN_ID, 0, { kind: 'provider-content', payload: {} });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(chat.methods()).not.toContain('recordTurnUsage');
   });
 
   it('ends a failed turn the way the adapter ends one, and stops both indicators', () => {
@@ -351,3 +392,12 @@ describe('chat surface render target', () => {
     expect(chat.state.messages).toEqual([expect.objectContaining({ id: 'msg-1' })]);
   });
 });
+
+function usageOf(inputTokens: number) {
+  return {
+    inputTokens,
+    contextWindow: 200_000,
+    contextTokens: inputTokens,
+    percentage: 0,
+  };
+}

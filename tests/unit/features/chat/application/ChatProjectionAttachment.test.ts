@@ -50,6 +50,7 @@ function surface() {
   messageEl.querySelector = jest.fn().mockReturnValue(createMockEl());
   const state: ChatStreamingCursor = {
     messages: [],
+    usage: null,
     currentContentEl: null,
     currentTextEl: null,
     currentTextContent: '',
@@ -99,6 +100,9 @@ function surface() {
       timestamp: 1,
     }),
     describeTerminal: (value: RunTerminal) => `ended: ${value.reason}`,
+    recordTurnUsage: (forRunId, usage) => {
+      calls.push({ method: 'recordTurnUsage', args: [forRunId, usage] });
+    },
     getGreeting: () => 'Hello',
     getProviderId: () => 'claude',
     updateQueueIndicator: () => undefined,
