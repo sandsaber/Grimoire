@@ -494,7 +494,28 @@ export function dispatchCancellation(
  * controllers M5 rewrites — not a line in this file. Recorded so the slot is
  * added deliberately rather than discovered missing again at the flip.
  */
-export interface ExecutionChatRuntimeHostPorts {
+/**
+ * What it takes to turn a person's message into a turn the kernel can dispatch.
+ *
+ * Three provider-owned steps, named together because a caller needs all three
+ * and each is easy to leave out: what the prompt becomes, the opaque reference
+ * the backend resolves it by, and whether an answer is required of it. They are
+ * a port of their own rather than three members of the adapter's, because the
+ * adapter is not the only thing that has to send a turn — M5's chat path
+ * submits through the coordinator, and a surface that still asks an adapter for
+ * its request ref keeps the adapter alive through the flip meant to remove it.
+ */
+export interface ChatTurnEncoder {
+  prepareTurn(request: ChatTurnRequest): PreparedChatTurn;
+  encodeRequestRef(
+    turn: PreparedChatTurn,
+    history?: ChatMessage[],
+    options?: ChatRuntimeQueryOptions,
+  ): string;
+  resultExpectation?(turn: PreparedChatTurn): 'required' | 'optional' | 'none';
+}
+
+export interface ExecutionChatRuntimeHostPorts extends ChatTurnEncoder {
   prepareTurn(request: ChatTurnRequest): PreparedChatTurn;
   /**
    * Encodes a prepared turn into the opaque reference the backend resolves.

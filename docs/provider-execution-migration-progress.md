@@ -7880,6 +7880,42 @@ from becoming an unowned one — the second time it has done that in two checkpo
 
 Gates: unit 533 suites / 8,402 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### Sending a message, in the provider's own terms (this commit)
+
+The fifth prerequisite, closed as far as it can be without touching nine provider compositions.
+Reading it out turned out to be the work: a request ref is not one provider step but **three**, and
+the composition now performs all of them where they can be tested.
+
+`ChatTurnEncoder` names them — what the prompt becomes, the opaque reference the backend resolves it
+by, and whether an answer is required of the turn. `ExecutionChatRuntimeHostPorts` extends it, so
+nothing moved and nothing was re-declared; what changed is that a caller which is not the adapter can
+now ask for exactly those three. A surface that still asks an *adapter* for its request ref keeps the
+adapter alive through the flip meant to remove it, and it compiles either way — which is why this is
+a type rather than a note.
+
+**Four behaviours of the send path, each found by reading it rather than by writing this**, and each
+with a test:
+
+- **the history excludes the turn being sent.** The legacy path passes `messages.slice(0, -2)` —
+  everything but the user message and the assistant placeholder it just added — so the reference is
+  encoded from the conversation as it stands, before the coordinator appends anything. Encoding after
+  would send the provider the turn it is being asked to answer;
+- **what is persisted is what the provider composed**, not what was typed: `persistedContent` is the
+  prompt that will actually be sent, and the original input stays on `displayContent`;
+- **a compacting turn keeps no note**, because a note belongs to a message and a compaction is not
+  one;
+- **a compacting turn expects no result**, and that rule is the *adapter's* rather than any
+  provider's — `isCompact` is a property of any prepared turn. Without it a compaction that did
+  exactly what was asked ends as a failure for producing no answer.
+
+**A break that proved nothing, and what it took to notice.** The first attempt at breaking the
+history rule swapped two calls that both happen before the submit, so the history was identical and
+the test stayed green — a green break that says nothing about the rule. The defect that had to be
+injected is the one the rule forbids: appending the message being sent to the history it is encoded
+against.
+
+Gates: unit 533 suites / 8,406 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7971,7 +8007,13 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
    - **which interaction trigger survives**, per the note on the port: the provider's presenter has
      the dialog on screen already, and the projection wants to show it from state so a reopened tab
      shows the question;
-   - **and a fifth, found while assembling the composition rather than while flipping.**
+   - ~~**and a fifth, found while assembling the composition rather than while flipping.**~~
+     **Named and typed in the entry above**, and reduced to what is left of it: `ChatTurnEncoder` is
+     what a tab must be handed, and it can only come from the provider's execution composition —
+     which builds it per tab, capturing that tab's conversation binding and scope. So the last step
+     is for each composition to expose the encoder it already builds, instead of only handing it to
+     an adapter. Nine files, one line of intent each, and provider-owned: read each provider's
+     nested `AGENTS.md` first. The original entry follows:
      `submitTurn` takes a `requestRef` — the provider's own reference to the prompt — and only the
      provider can produce one. `InputController` gets it from `agentService.prepareTurn(request)`,
      which is a method on the *presentation adapter*, routed to a host port because

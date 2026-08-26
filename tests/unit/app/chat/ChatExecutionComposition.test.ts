@@ -12,6 +12,8 @@ import { ExecutionControlTransactionCoordinator } from '@/core/execution/Executi
 import { sessionInstanceId } from '@/core/execution/ExecutionIds';
 import { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
 import { DeterministicFakeBackend } from '@/core/execution/testing/DeterministicFakeBackend';
+import type { ChatTurnEncoder } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type { ChatTurnRequest } from '@/core/runtime/types';
 import type { ChatContentItem, ChatMessage } from '@/core/types';
 import type {
   ChatMessageOperations,
@@ -166,7 +168,167 @@ async function createComposition() {
   };
 }
 
+function encoder(overrides: Partial<ChatTurnEncoder> = {}): ChatTurnEncoder {
+  const encoded: {
+    history: readonly ChatMessage[];
+    options: unknown;
+  }[] = [];
+  const base: ChatTurnEncoder = {
+    prepareTurn: request => ({
+      isCompact: false,
+      mcpMentions: new Set<string>(),
+      persistedContent: `composed: ${request.text}`,
+      prompt: `composed: ${request.text}`,
+      request,
+    }),
+    encodeRequestRef: (_turn, history, options) => {
+      encoded.push({ history: history ?? [], options });
+      return `req-${encoded.length}`;
+    },
+    ...overrides,
+  };
+  return Object.assign(base, { encoded });
+}
+
+function turnRequest(text: string): ChatTurnRequest {
+  return { text };
+}
+
 describe('chat execution composition', () => {
+  describe('sending a message', () => {
+    it('persists what the provider composed and shows what was typed', async () => {
+      const app = await createComposition();
+      const drawn = surface();
+      const attachment = app.composition.bindSurface(drawn.binding);
+      await attachment.open(CONVERSATION_ID, app.composition.coordinator);
+      const turns = encoder();
+
+      const ticket = await app.composition.submitTurn({
+        commandId: 'cmd-1',
+        conversationId: CONVERSATION_ID,
+        backendId: executionBackendId('internal-deterministic-fake'),
+        encoder: turns,
+        request: turnRequest('are tomatoes a fruit?'),
+        userMessage: {
+          id: 'msg-user-1',
+          role: 'user',
+          content: 'are tomatoes a fruit?',
+          displayContent: 'are tomatoes a fruit?',
+          timestamp: 1,
+        },
+      });
+      const started = await ticket.started;
+      app.backend.emit(started.runId, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+      await ticket.completion;
+
+      const stored = await app.repository.read(CONVERSATION_ID);
+      const userMessage = stored.kind === 'present' ? stored.metadata.messages?.[0] : undefined;
+      // What the provider will actually send is what the conversation keeps;
+      // the original input stays where the surface renders it.
+      expect(userMessage?.content).toBe('composed: are tomatoes a fruit?');
+      expect(userMessage?.displayContent).toBe('are tomatoes a fruit?');
+      app.composition.dispose();
+    });
+
+    it('encodes the reference from the conversation before this turn joins it', async () => {
+      // The legacy path passes everything but the message it just added and the
+      // placeholder beside it. Encoding after the coordinator appends would send
+      // the provider the turn it is being asked to answer.
+      const app = await createComposition();
+      const turns = encoder();
+      const first = await app.composition.submitTurn({
+        commandId: 'cmd-1',
+        conversationId: CONVERSATION_ID,
+        backendId: executionBackendId('internal-deterministic-fake'),
+        encoder: turns,
+        request: turnRequest('first'),
+        userMessage: { id: 'msg-user-1', role: 'user', content: 'first', timestamp: 1 },
+      });
+      const firstStarted = await first.started;
+      app.backend.emit(firstStarted.runId, {
+        kind: 'output-delta',
+        channel: 'assistant',
+        text: 'Answer.',
+      });
+      app.backend.emit(firstStarted.runId, {
+        kind: 'terminal',
+        terminal: 'succeeded',
+        reason: 'completed',
+      });
+      await first.completion;
+
+      const second = await app.composition.submitTurn({
+        commandId: 'cmd-2',
+        conversationId: CONVERSATION_ID,
+        backendId: executionBackendId('internal-deterministic-fake'),
+        encoder: turns,
+        request: turnRequest('second'),
+        userMessage: { id: 'msg-user-2', role: 'user', content: 'second', timestamp: 2 },
+      });
+      await second.started;
+
+      const encoded = (turns as ChatTurnEncoder & { encoded: { history: ChatMessage[] }[] }).encoded;
+      expect(encoded[0]?.history.map(message => message.id)).toEqual([]);
+      expect(encoded[1]?.history.map(message => message.id)).toEqual(['msg-user-1', 'assistant-' + firstStarted.runId]);
+      app.composition.dispose();
+    });
+
+    it('expects no answer of a compacting turn, and keeps no note on it', async () => {
+      // `isCompact` is a property of any prepared turn, and the rule is the
+      // adapter's rather than any provider's: without it a compaction that did
+      // exactly what was asked ends as a failure for producing no answer.
+      const app = await createComposition();
+      const turns = encoder({
+        prepareTurn: request => ({
+          isCompact: true,
+          mcpMentions: new Set<string>(),
+          persistedContent: '/compact',
+          prompt: '/compact',
+          request: { ...request, currentNotePath: 'Note.md' },
+        }),
+      });
+
+      const ticket = await app.composition.submitTurn({
+        commandId: 'cmd-1',
+        conversationId: CONVERSATION_ID,
+        backendId: executionBackendId('internal-deterministic-fake'),
+        encoder: turns,
+        request: turnRequest('/compact'),
+        userMessage: { id: 'msg-user-1', role: 'user', content: '/compact', timestamp: 1 },
+      });
+      const started = await ticket.started;
+      app.backend.emit(started.runId, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+      const completed = await ticket.completion;
+
+      expect(completed.terminal.kind).toBe('succeeded');
+      const projected = app.composition.coordinator.getProjection(CONVERSATION_ID);
+      expect(projected?.turns[0]?.run.resultExpectation).toBe('none');
+      const stored = await app.repository.read(CONVERSATION_ID);
+      expect(stored.kind === 'present' ? stored.metadata.messages?.[0]?.currentNote : 'unset')
+        .toBeUndefined();
+      app.composition.dispose();
+    });
+
+    it('takes the provider\'s answer about what a turn expects', async () => {
+      const app = await createComposition();
+      const turns = encoder({ resultExpectation: () => 'optional' });
+
+      const ticket = await app.composition.submitTurn({
+        commandId: 'cmd-1',
+        conversationId: CONVERSATION_ID,
+        backendId: executionBackendId('internal-deterministic-fake'),
+        encoder: turns,
+        request: turnRequest('plan this'),
+        userMessage: { id: 'msg-user-1', role: 'user', content: 'plan this', timestamp: 1 },
+      });
+      await ticket.started;
+
+      expect(app.composition.coordinator.getProjection(CONVERSATION_ID)?.turns[0]?.run
+        .resultExpectation).toBe('optional');
+      app.composition.dispose();
+    });
+  });
+
   it('runs a turn from a bound surface and leaves it in the vault', async () => {
     const app = await createComposition();
     const drawn = surface();
