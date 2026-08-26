@@ -588,6 +588,7 @@ export class InputController {
         const completed = await submitted.ticket.completion;
         didEnqueueToSdk = completed.terminal.kind !== 'invalidated';
         wasInterrupted = completed.terminal.kind === 'cancelled';
+        planCompleted = completed.planCompleted === true;
         // The messages the projection drew and the barrier stored are the ones
         // everything after a turn writes to: the native identities a rewind
         // addresses, the completion time, the duration footer. Written to the

@@ -344,6 +344,74 @@ describe('chat execution coordinator', () => {
     ]);
   });
 
+  it('reports a turn that answered a plan decision', async () => {
+    // The surface asks a plan turn what to do with its plan once it ends, and
+    // has to know that a plan is what ended. Read from the turn's own
+    // interactions rather than watched for, so it is still true for a turn
+    // whose surface went away while the question was open.
+    const harness = await createHarness();
+    const ticket = await harness.coordinator.submitTurn(turnCommand());
+    const started = await ticket.started;
+    const planInteractionId = interactionId(`ix-${'b'.repeat(32)}`);
+    harness.backend.emit(started.runId, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: planInteractionId,
+        runId: started.runId,
+        kind: 'plan-decision',
+        presentationRef: 'plan-exit',
+        responseIds: ['plan-approve', 'plan-revise'],
+      },
+    });
+    await harness.registry.waitForIdle();
+    await harness.coordinator.resolveInteraction({
+      interactionId: planInteractionId,
+      responseId: 'plan-approve',
+      resolvedAt: 1_100,
+    });
+    harness.backend.emit(started.runId, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    });
+    const completed = await ticket.completion;
+
+    expect(completed.planCompleted).toBe(true);
+    harness.coordinator.dispose();
+  });
+
+  it('reports no plan for a turn that answered something else', async () => {
+    const harness = await createHarness();
+    const ticket = await harness.coordinator.submitTurn(turnCommand());
+    const started = await ticket.started;
+    const approvalId = interactionId(`ix-${'c'.repeat(32)}`);
+    harness.backend.emit(started.runId, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: approvalId,
+        runId: started.runId,
+        kind: 'approval',
+        presentationRef: 'approval-write',
+        responseIds: ['allow', 'deny'],
+      },
+    });
+    await harness.registry.waitForIdle();
+    await harness.coordinator.resolveInteraction({
+      interactionId: approvalId,
+      responseId: 'allow',
+      resolvedAt: 1_100,
+    });
+    harness.backend.emit(started.runId, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    });
+    const completed = await ticket.completion;
+
+    expect(completed.planCompleted).toBeUndefined();
+    harness.coordinator.dispose();
+  });
+
   it('shows what was later established about a turn that could not say', async () => {
     // The one durable record with no other way out. A run that ended
     // indeterminate is rendered as "could not establish whether this run

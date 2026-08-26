@@ -160,6 +160,16 @@ export interface CompletedChatTurn extends StartedChatTurn {
   readonly terminal: RunTerminal;
   readonly result?: MaterializedChatResult;
   readonly assistantMessageId?: string;
+  /**
+   * Whether a plan decision was answered during this turn.
+   *
+   * The surface asks a plan turn what to do with its plan once the turn ends,
+   * and it has to know that a plan is what ended. Derived from the turn's own
+   * interactions rather than watched for, which is the difference between this
+   * and the legacy path: the resolutions are on the projection, so the answer
+   * survives the surface that was watching going away mid-turn.
+   */
+  readonly planCompleted?: boolean;
 }
 
 export interface ChatTurnTicket {
@@ -864,6 +874,7 @@ export class ChatExecutionCoordinator {
         terminal,
         ...(materialized ? { result: materialized } : {}),
         ...(assistantMessage ? { assistantMessageId: assistantMessage.id } : {}),
+        ...(answeredAPlan(entry.projection, activeRunId) ? { planCompleted: true } : {}),
       });
       this.startNext(entry);
     } catch (error) {
@@ -1017,6 +1028,23 @@ function persistenceErrorCode(error: unknown): string {
   return error instanceof Error && error.name === 'RevisionConflictError'
     ? 'conversation-revision-conflict'
     : 'conversation-persistence-failed';
+}
+
+/**
+ * Whether this run answered a plan decision.
+ *
+ * The same reading the presentation adapter does — a response id that names a
+ * plan — kept identical rather than improved, because the ids are the
+ * providers' and a stricter rule here would silently stop raising the approval
+ * for one of them. Read from the projection, so it is still true for a turn
+ * whose surface went away while the question was open.
+ */
+function answeredAPlan(projection: ChatProjection, targetRunId: RunId): boolean {
+  return projection.interactions.some(interaction => (
+    interaction.runId === targetRunId
+    && interaction.status === 'resolved'
+    && interaction.selectedResponseId?.includes('plan') === true
+  ));
 }
 
 function findTurn(

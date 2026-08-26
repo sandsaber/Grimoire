@@ -8148,6 +8148,24 @@ matrix without one looks exactly like a matrix that passed. It is listed there n
 
 Gates: unit 535 suites / 8,429 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The plan gap closed, from the turn's own interactions (this commit)
+
+The one row of the flip's matrix that was written as *expected to fail*. A plan turn asks the surface
+what to do with its plan once the turn ends, and the surface has to know that a plan is what ended —
+which came from the runtime's turn metadata, watched for as the resolution went past, and had no
+equivalent on this path.
+
+It does not need watching. The resolutions are on the projection, so the answer is a question asked
+of the finished turn: did any interaction of this run resolve with a response id that names a plan.
+The reading is the presentation adapter's, kept identical rather than improved, because the ids
+belong to the providers and a stricter rule here would silently stop raising the approval for one of
+them.
+
+Derived rather than observed also means it survives what the observed version could not: a turn whose
+surface went away while the question was open still answers, because the record did not go with it.
+
+Gates: unit 535 suites / 8,431 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -8227,11 +8245,10 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 1. **Certify the flip, one provider at a time.** The code is done: every branch is written, every
    piece is in the bundle, and `src/app/chat/projectionChatProviders.ts` is empty, so no tab takes
    the path. Adding one provider to that list is that provider's flip, and
-   `docs/chat-projection-flip-smoke-matrix.md` is what certifies it. **Row 1 is a known gap and is
-   expected to fail**: `planCompleted` came from the runtime's turn metadata and has no projection
-   equivalent, so a plan turn raises no approval — close that before putting a plan-capable provider
-   on the list. Rows 2 to 4 are the couplings the flip carried across from `InputController` that no
-   gate here can check.
+   `docs/chat-projection-flip-smoke-matrix.md` is what certifies it. Rows 1 to 4 are the couplings
+   the flip carried across from `InputController` that no gate here can check; the plan gap that used
+   to head that list is closed, so what row 1 now tests is the providers' response ids rather than
+   the wiring.
 2. ~~**The flip, which the parity gate has shown to be one commit.**~~ **Done, and the entries below
    record how.** Every piece exists, is dark, and
    is composed end to end — projection, live content, coordinator, adoption, renderer, target,
