@@ -848,6 +848,16 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: ['src/app/chat/ChatExecutionComposition.ts'],
   },
   {
+    id: 'chat-tab-execution',
+    area: 'chat',
+    description:
+      'One tab\'s end of the chat execution path: its attachment, the conversation it is showing, the provider identity its turns go out under, and the conversation a blank tab creates on its first send.',
+    state: 'pending',
+    owner:
+      'M5 — the object the flip hands a tab. Nothing constructs one; InputController still drives the adapter\'s generator and ConversationController still creates the conversation lazily on save.',
+    modules: ['src/app/chat/ChatTabExecution.ts'],
+  },
+  {
     id: 'execution-platform-dark',
     area: 'shell',
     description:

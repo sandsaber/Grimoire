@@ -7927,6 +7927,28 @@ compositions and not the tab.
 
 Gates: unit 533 suites / 8,407 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### One tab's end of the path, which is the object the flip hands a tab (this commit)
+
+`ChatTabExecution` holds the three things that must *not* be shared: a tab's attachment, the
+conversation it is showing, and the provider identity its turns go out under. The composition owns
+everything that must be identical for every tab; this owns the rest, and between them a call site
+has one object to hold.
+
+**A blank tab has no conversation and a turn needs one.** The legacy path creates it lazily — the
+first user message triggers it, from inside title generation — and so does this, for the same reason
+and slightly earlier: the durable record has to exist before the run does, or a crash mid-turn leaves
+a run belonging to a conversation nobody can open. Once, however many turns follow.
+
+**A tab with no runtime is refused rather than defaulted.** Without the provider's own encoding there
+is no reference a backend can resolve, and a turn dispatched with a guessed one fails inside the
+provider with nothing to explain it. Nothing is created for a turn that never went out.
+
+**Closing a tab ends the view of the work, not the work.** The composition test detaches mid-turn and
+watches the run finish and reach the vault with nobody drawing it — which is the same guarantee
+adoption gives from the other side, seen from the tab's end.
+
+Gates: unit 534 suites / 8,412 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
