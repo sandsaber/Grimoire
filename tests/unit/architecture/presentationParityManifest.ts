@@ -798,6 +798,16 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: ['src/features/chat/application/ChatExecutionCoordinator.ts'],
   },
   {
+    id: 'chat-projection-renderer',
+    area: 'chat',
+    description:
+      'The diff between two chat projections, expressed as the calls a surface makes to draw them: blocks opened, text extended, turns begun and ended, interactions shown and taken away.',
+    state: 'pending',
+    owner:
+      'M5 — no target implements the port yet. The chat column is still drawn by StreamController folding the adapter\'s chunks into the DOM as they arrive; a target over MessageRenderer is what replaces that.',
+    modules: ['src/features/chat/rendering/ChatProjectionRenderer.ts'],
+  },
+  {
     id: 'execution-platform-dark',
     area: 'shell',
     description:

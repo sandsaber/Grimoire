@@ -7518,6 +7518,59 @@ for an earlier break and not for this one. Back up before every break, and resto
 
 Gates: unit 527 suites / 8,348 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The renderer: what changed, as the calls a surface makes (this commit)
+
+The plan's "thin replaceable layer that maps projections onto the current DOM", with the DOM behind
+a port. What is in the module is the part that is the same whatever the surface is made of —
+deciding what changed — and what is behind `ChatRenderTarget` is the part specific to this
+application's chat column. That split is what makes a later redesign a new target rather than a new
+architecture, and the renderer is on the same boundary gate as the projection and the coordinator
+because of it.
+
+**Its vocabulary was read out of the consumer, not designed.** `StreamController` opens a text block
+on the first append, appends into it, and finalizes it when the next kind of content arrives —
+`flushPendingTools`, `finalizeCurrentTextBlock`, `finalizeCurrentThinkingBlock` are all that one
+decision, made by watching the chunk type change. The port says it once, with the block index: a new
+index opens a block and the target finalizes whatever it had. That is the same decision taken where
+the ordering is already known instead of re-derived from the content.
+
+**A projection is a state and a chat column is an incremental thing**, which is the whole reason this
+is a class with a previous value rather than a `replace(model)` call. Redrawing a conversation on
+every token would lose scroll position, selection and every rendered code block. The first attempt's
+renderer did replace wholesale and never had to face it, because it had no live content to replace
+with — which is the second time that attempt's shape turned out to be a consequence of something it
+was missing rather than a design to copy.
+
+**The diff is cheap because the reducer is written the way it is.** An untouched turn is the same
+object and an untouched message list is the same array, so a render during a stream compares a
+handful of references and touches one block. The composition test is what holds that: a two-delta
+answer through the real kernel produces one `openTurnBlock`, one `extendTurnText`, one `endTurn` —
+no redraw, and no `appendMessage` at all.
+
+**One decision is asked before anything is drawn.** Whether every difference is something to *add* —
+same conversation, transcript extended rather than rewritten, turns in place, each turn's content
+grown the way a projection grows. If any of that fails the view is redrawn from nothing. Asking once
+up front is what stops the pass from discovering halfway through that a change had no increment and
+leaving the column half updated; the first draft threw from inside the walk and would have done
+exactly that, with no catch anywhere.
+
+**The rule the previous entry predicted, now enforced.** A turn drawn live has its answer on screen
+block by block, and the message the barrier then writes holds the same words: the renderer skips a
+message whose id is a rendered turn's `assistantMessageId`, and shows every other message that
+arrives. Breaking that rule fails two tests, one of them the end-to-end one.
+
+The composition harness moved to `tests/unit/features/chat/chatExecutionHarness.ts` so the renderer's
+suite and the coordinator's share one composition. Two copies of "the real kernel, the real store, a
+fake provider" is two definitions of composed, and the value of composing is gone the moment they
+disagree.
+
+Still dark: nothing constructs a renderer, no target implements the port, and the release bundle does
+not contain it. What is left for the chat step is the target itself — an adapter over
+`MessageRenderer` and the block helpers `StreamController` already owns — and the provider-content
+half of it, where `ProviderContentPresenter` turns an opaque payload into something to draw.
+
+Gates: unit 528 suites / 8,360 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7594,25 +7647,25 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 **M3 is closed.** Everything below is M5 or later.
 
-1. **The chat renderer.** The projection, its coordinator and its live content have all landed and
-   are dark; what is missing is the thing that maps a projection onto the existing chat DOM. The
-   contract question is answered — a turn carries its live items — so what is left is the mapping and
-   one thing it needs that core cannot supply: a `provider-content` payload is opaque, and turning
-   one into something a surface renders is the provider's own job. `ProviderContentPresenter` on the
-   adapter is how the flipped providers answer that today, and it is a port with nine real
-   implementations rather than a slot to invent. `StreamController` is 2,100 lines of incremental
-   append and `InputController` 2,150; the move is from chunks appended as they arrive to a state the
-   renderer diffs, which is the actual work and cannot be done a chunk at a time. The first attempt's
-   `ChatProjectionAttachment` (109 lines) and `ChatProjectionRenderer` (114) are the material, on
-   `codex/provider-architecture-research` at `8cab81b4` — its renderer rendered no running turn at
-   all, so it is material for the DOM mapping and not for the streaming half. Two contracts the
-   renderer will have to state rather than assume: a completed turn's answer lives in the durable
-   message, reachable from the turn by `assistantMessageId`, and the live items stay beside it, so a
-   renderer that draws both draws the answer twice; and a turn exists only for a run this session
-   started, while `messages` is the whole transcript.
+1. **The render target** — the last dark piece of the chat step, and the first one that is allowed to
+   touch a DOM. `ChatRenderTarget` has twelve methods and every one of them is something
+   `StreamController` and `MessageRenderer` already do; the work is an adapter over what exists, not
+   new rendering. Two parts of it are not mechanical. **Provider content**: the payload is opaque and
+   only the provider's own code knows what one of its items looks like, so the target needs
+   `ProviderContentPresenter` — a port with nine real implementations, reached today through the
+   presentation adapter, and the thing to check first is what a presenter needs that a target can
+   supply. **The two indicators**: the thinking indicator and the turn-silence timer are driven from
+   `setTurnState` here, and `StreamController` starts and stops them from six places, so read those
+   six before deciding which of them the state covers. After the target, the step that turns this on
+   is `ChatProjectionAttachment` (the first attempt's, 109 lines, at `8cab81b4`): subscribe a tab to
+   a coordinator, hand projections to a renderer, detach on close.
+2. **`InputController` and `StreamController` stop owning the turn**, once a target exists. That is
+   the flip, and it is the one that needs a smoke matrix rather than a gate: 2,100 lines of
+   incremental append and 2,150 of turn acceptance come out, and every provider's chat behaviour is
+   downstream of them.
    The thirteen provider rows handed over from M3 are re-implementations of the same UI-shaped
    consumers, so doing them first means rewriting each consumer twice.
-2. **An observation channel for control records**, now owed to one thing rather than three. Startup
+3. **An observation channel for control records**, now owed to one thing rather than three. Startup
    adoption turned out to need queries rather than notifications and has landed; what is left is
    reconciliation — an indeterminate run's reconciled verdict is appended to the control store with
    nothing published for it, so the projection's `reconciliation-record` and
@@ -7621,7 +7674,7 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
    the choice between widening `observe` and adding a second channel is worth making deliberately
    rather than by copying. Worth asking first whether a reconciliation should simply be published as
    a synthesized envelope, the way a registry-stated terminal now is.
-3. **The workspace context assembly comes *after* those consumers, not before.** It looked like the
+4. **The workspace context assembly comes *after* those consumers, not before.** It looked like the
    next step until reading the rows: every provider's `workspace.initialize(context)` needs a
    context built from the plugin, eight have a `create<Provider>ModuleContext`, and the machinery is
    straightforward — but no workspace row can move onto it until its consumer is reworked, so
@@ -7629,30 +7682,30 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
    first row until reading it showed the module port is async while every launch path calls the
    legacy resolver synchronously. Pick a row by reading its consumer first; that is what this
    session taught five times over.
-4. **Rows 15 and 16 need `SubagentManager` before they can move.** The split made
+5. **Rows 15 and 16 need `SubagentManager` before they can move.** The split made
    `declarations.taskResults` and `declarations.nativeAgents` reachable, but the legacy
    `ProviderTaskResultInterpreter` the feature layer consumes is five low-level methods
    (`hasAsyncLaunchMarker`, `extractAgentId`, `extractStructuredResult`, `resolveTerminalStatus`,
    `extractTagValue`) against the module port's single `interpret`. `SubagentManager` reads the
    low-level ones directly, so this is an M5-shaped rework, not a row move.
-5. **Row 8, `chatUIConfig`, is an M5 row.** The legacy interface is twenty-odd
+6. **Row 8, `chatUIConfig`, is an M5 row.** The legacy interface is twenty-odd
    UI members — reasoning options, service-tier and mode toggles, permission mapping, model metadata
    discovery taking the plugin — and `ProviderModule.ts` may not acquire plugin or UI vocabulary. The
    plan's own M5 calls the renderer a thin replaceable layer; this row belongs to that step. Worth an
    explicit decision and an inventory correction rather than an attempt.
-6. **Row 9, `settingsReconciler`.** Unblocked but not small: `ProviderSettingsCoordinator` projects,
+7. **Row 9, `settingsReconciler`.** Unblocked but not small: `ProviderSettingsCoordinator` projects,
    clones and merges the settings record per provider, and the codec's `reconcile` works on decoded
    provider settings. Re-expressing that is a settings-behaviour risk, so it wants a fresh session
    and its own characterization tests.
-7. **Row 14 and app-level row 1**, then delete both registries. Laziness in
+8. **Row 14 and app-level row 1**, then delete both registries. Laziness in
    `ProviderWorkspaceManager` lands with these, since it is the synchronous consumers that force
    eager initialization today. App-level row 1 is a shape mismatch of its own: the legacy
    `ProviderWorkspaceCapabilities` is five resource kinds each carrying
    `{ inventory, manager, runtimeCommandDiscovery }`, and the descriptor's `workspace` map is one
    `CapabilitySupport` per key over a different key set.
-8. **The rest of M5**: durable agents, `ApplicationRuntime` as the composition root, seam deletion.
+9. **The rest of M5**: durable agents, `ApplicationRuntime` as the composition root, seam deletion.
    Auxiliary work and bang-bash are done.
-9. **M4's obligations are closed**, and one of them found a defect M4 had shipped on this branch:
+10. **M4's obligations are closed**, and one of them found a defect M4 had shipped on this branch:
    the conversation list was reading the versioned envelope as if it were the conversation.
 
 **Still waiting on the owner rather than on code: D9, redo.** Certification remains account-bound —

@@ -310,6 +310,10 @@ describe('execution composition boundaries', () => {
     const PROJECTION_MODULES = [
       'src/features/chat/projections/ChatProjection.ts',
       'src/features/chat/application/ChatExecutionCoordinator.ts',
+      // The renderer decides *what changed*; the target it calls is where a DOM
+      // is allowed to exist. A renderer that names one itself is a renderer a
+      // redesign has to rewrite, which is the same stop condition one layer out.
+      'src/features/chat/rendering/ChatProjectionRenderer.ts',
     ];
     const PRESENTATION_VOCABULARY = [
       /\bcssClass\b/,
