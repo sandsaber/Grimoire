@@ -844,9 +844,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
     area: 'chat',
     description:
       'One tab\'s end of the chat execution path: its attachment, the conversation it is showing, the provider identity its turns go out under, and the conversation a blank tab creates on its first send.',
-    state: 'pending',
-    owner:
-      'M5 — the object the flip hands a tab. Nothing constructs one; InputController still drives the adapter\'s generator and ConversationController still creates the conversation lazily on save.',
+    state: 'wired',
+    // Built for every tab whose provider is on the projection path, and detached when the tab closes. That list is empty, so every tab still runs on the presentation adapter — the surface is in the bundle, the behaviour is not switched on.
     modules: [
       'src/app/chat/ChatTabExecution.ts',
       // The switch, beside the thing it switches, and the factory that asks it.

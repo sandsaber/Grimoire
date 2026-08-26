@@ -272,6 +272,8 @@ export function createTab(options: TabCreateOptions): TabData {
     },
     dom,
     renderer: null,
+    // Built after the controllers are, because a tab's binding reads them.
+    execution: null,
     orchestratorMode: conversation?.orchestratorMode === true
       || (!isBound && options.orchestratorMode === true),
   };
@@ -1697,6 +1699,12 @@ export function deactivateTab(tab: TabData): void {
  */
 export async function destroyTab(tab: TabData): Promise<void> {
   tab.lifecycleState = 'closing';
+
+  // First, and before anything cancels: this ends the *view* of the work. What
+  // happens to a run still going is the kernel's to decide, and a tab that
+  // stopped drawing is not a tab that stopped the turn.
+  tab.execution?.detach();
+  tab.execution = null;
 
   // Invalidate any in-flight stream so sendMessage finally-blocks skip
   // DOM/save work against a torn-down tab (mirrors createNew({ force })).

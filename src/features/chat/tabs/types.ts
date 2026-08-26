@@ -1,5 +1,6 @@
 import type { Component, WorkspaceLeaf } from 'obsidian';
 
+import type { ChatTabExecution } from '../../../app/chat/ChatTabExecution';
 import type { RelevantNotesService } from '../../../core/context/RelevantNotesService';
 import type { VaultSearchService } from '../../../core/context/VaultSearchService';
 import type { VaultTextIndex } from '../../../core/context/VaultTextIndex';
@@ -264,6 +265,16 @@ export interface TabData {
 
   /** Per-tab renderer. */
   renderer: MessageRenderer | null;
+
+  /**
+   * This tab's end of the projection execution path.
+   *
+   * `null` for every provider not on that path, which is every provider until
+   * one is added to `projectionChatProviders`. A tab that has one submits its
+   * turns through the coordinator and draws them from the projection; a tab
+   * that does not runs on the presentation adapter exactly as before.
+   */
+  execution: ChatTabExecution | null;
 
   /** Whether this tab should ask the provider to produce parallel-worker plans. */
   orchestratorMode: boolean;

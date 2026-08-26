@@ -8069,6 +8069,29 @@ rather than guessed at.
 
 Gates: unit 535 suites / 8,421 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### A tab's projection lifetime: built, bound, detached (this commit)
+
+The three points where a tab and its projection meet, wired.
+
+**Built after the controllers**, because the binding reads the tab's renderer and its stream
+controller. `null` unless the tab's provider is on the projection path, which is what keeps the flip
+to one provider at a time.
+
+**Bound when the tab learns its conversation**, which is the same callback that already syncs
+`tab.conversationId` — including the lazily created one. Opening on a conversation detaches the
+previous one first, and that is what stops the old conversation's turn being drawn into the new one's
+column.
+
+**Detached first when the tab closes**, before anything cancels: this ends the *view* of the work,
+and what happens to a run still going is the kernel's to decide. A tab that stopped drawing is not a
+tab that stopped the turn — which is the guarantee adoption gives from the other side, now reachable
+from the surface that relies on it.
+
+`chat-tab-execution` moves to `wired` with them. The list is still empty, so every tab still runs on
+the presentation adapter: the surface is in the bundle and the behaviour is not switched on.
+
+Gates: unit 535 suites / 8,421 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
