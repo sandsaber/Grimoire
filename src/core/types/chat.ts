@@ -218,9 +218,25 @@ export interface SessionMetadata {
  * Providers may keep provider-native turn metadata internally and expose it via
  * runtime methods instead of encoding it as stream-control chunks.
  */
-export type StreamChunk =
-  | { type: 'user_message_start'; content: string; itemId?: string }
-  | { type: 'assistant_message_start'; itemId?: string; phase?: AssistantTextPhase }
+export type StreamChunk = ChatContentItem | ChatTurnLifecycleChunk;
+
+/**
+ * What a provider is *saying*, as a surface draws it.
+ *
+ * The content half of `StreamChunk`, named because M5 needs it to have a name:
+ * the structural deletion gate searches for `StreamChunk`, and the plan says a
+ * neutral content type that still needs streamed rendering "receives a new
+ * projection-specific name" rather than being retained under ambiguous
+ * ownership. The shape is unchanged — it is what the chat column already draws,
+ * produced by provider normalizers proven against real transcripts — so this is
+ * a split and a rename, not a redesign.
+ *
+ * `usage` is here rather than in the lifecycle half, which is worth stating
+ * because it looks like a fact about the run: no part of the kernel carries
+ * token counts, and the only thing that knows them is the provider payload this
+ * arrives in. It is content because that is where it comes from.
+ */
+export type ChatContentItem =
   | { type: 'text'; content: string; phase?: AssistantTextPhase }
   | { type: 'thinking'; content: string }
   | {
@@ -231,13 +247,10 @@ export type StreamChunk =
     items?: ProgressItem[];
     append?: boolean;
   }
-  | { type: 'status'; content: string }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; id: string; content: string; isError?: boolean; toolUseResult?: SDKToolUseResult }
   | { type: 'tool_output'; id: string; content: string }
-  | { type: 'error'; content: string }
   | { type: 'notice'; content: string; level?: 'info' | 'warning' }
-  | { type: 'done' }
   | {
     type: 'usage';
     usage: UsageInfo;
@@ -249,6 +262,22 @@ export type StreamChunk =
   | { type: 'async_subagent_result'; agentId: string; status: 'completed' | 'error'; result?: string }
   | { type: 'subagent_tool_use'; subagentId: string; id: string; name: string; input: Record<string, unknown> }
   | { type: 'subagent_tool_result'; subagentId: string; id: string; content: string; isError?: boolean; toolUseResult?: SDKToolUseResult };
+
+/**
+ * The turn's shape, as the legacy stream had to signal it inline.
+ *
+ * Every one of these is something the execution projection now states as a
+ * fact: a turn starts because a run started, it ends because the run reached a
+ * terminal, a failure is that terminal's reason, and the thinking indicator
+ * follows the run's state. They are the variants the M5 seam deletion removes,
+ * which is why they are named apart from the content that stays.
+ */
+export type ChatTurnLifecycleChunk =
+  | { type: 'user_message_start'; content: string; itemId?: string }
+  | { type: 'assistant_message_start'; itemId?: string; phase?: AssistantTextPhase }
+  | { type: 'status'; content: string }
+  | { type: 'error'; content: string }
+  | { type: 'done' };
 
 /**
  * Context window usage information.

@@ -2,7 +2,9 @@
 export {
   type AssistantResponseMetadata,
   type AssistantTextPhase,
+  type ChatContentItem,
   type ChatMessage,
+  type ChatTurnLifecycleChunk,
   type ContentBlock,
   type Conversation,
   type ConversationMeta,

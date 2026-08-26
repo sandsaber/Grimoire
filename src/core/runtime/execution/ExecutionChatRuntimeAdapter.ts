@@ -1259,6 +1259,23 @@ export class ExecutionChatRuntimeAdapter {
 }
 
 /** Turns one provider content item into the chunks a surface renders. */
+/**
+ * One provider content item, turned into what a surface draws.
+ *
+ * Typed as the whole `StreamChunk` union rather than `ChatContentItem`, and the
+ * type checker is what established the reason: every flipped provider's
+ * presenter also carries **turn framing** — `user_message_start` and
+ * `assistant_message_start` — which `InputController` consumes to split a
+ * steered turn into separate messages. That framing is lifecycle and the
+ * projection states it, but the surface that reads it is still the legacy one.
+ * Narrowing this port to content is part of the flip that deletes that reader,
+ * not a step that can precede it.
+ *
+ * What a presenter already must not return is `done` or `error`: the kernel's
+ * terminal ends the turn and describes the failure, and a second opinion from
+ * the content channel renders the same ending twice. Each presenter filters
+ * those itself, which is where a narrowed type would have caught it for free.
+ */
 export type ProviderContentPresenter = (payload: unknown) => readonly StreamChunk[];
 
 /**

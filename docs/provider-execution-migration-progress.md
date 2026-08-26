@@ -7628,6 +7628,46 @@ each would have been discovered halfway through writing it:
 
 Gates: unit 528 suites / 8,362 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The content vocabulary has a name, and the type checker said where the line is (this commit)
+
+The first of the render target's three prerequisites, done as far as it goes today and stopped where
+the evidence said to stop.
+
+`StreamChunk` is now `ChatContentItem | ChatTurnLifecycleChunk`. The content half is what a provider
+is *saying* — text, thinking, tool calls and their results, progress, notices, subagent traffic,
+compaction boundaries, usage — produced by normalizers proven against real transcripts and unchanged
+in shape. The lifecycle half is the five variants the execution projection now states as facts:
+`user_message_start` and `assistant_message_start` are a turn's boundaries, `status` is the thinking
+indicator's text, `error` is the terminal's reason, `done` is the terminal itself. That is the split
+M5's seam deletion acts on, and naming it is what the plan asks for: a content type that still needs
+streamed rendering gets a projection-specific name rather than being retained under ambiguous
+ownership.
+
+**Then the port was narrowed to the content half, and the type checker refused — which is the finding.**
+All eight flipped providers' presenters failed to assign, and not over `done` or `error`, which each
+of them already filters: over **turn framing**. `user_message_start` and `assistant_message_start`
+travel the content channel today and `InputController` reads them to split a *steered* turn into
+separate messages. So the port cannot become content-only before the reader that needs framing is
+gone, and that reader is what the flip deletes. The narrowing is part of the flip rather than a step
+before it, and the comment on the port now says so instead of leaving the next attempt to rediscover
+it by compiling.
+
+**`usage` sits on the content side, which is the answer to the question the previous entry left open.**
+It looks like a fact about the run and is not: no part of the kernel carries token counts, and the
+only thing that knows them is the provider payload it arrives in. So the context-window meter is fed
+from content the target is handed, not from a projection field — and what is still owed is the write
+path, since the barrier persists messages and `lastResponseAt` and the legacy save wrote
+`conversation.usage` too.
+
+The classification is pinned by a gate rather than by this paragraph, because a variant drifting to
+the wrong side is a variant the deletion either takes with it or leaves behind, and neither is visible
+by reading the union. The same gate holds the framing readers at exactly one file — a second one
+appearing mid-flip is two opinions about where a turn begins, in the period when the projection is
+becoming the answer. Its parser is guarded too: the first version terminated the union at the first
+`;` and reported three variants of thirteen, and both rules passed on that empty-ish set.
+
+Gates: unit 529 suites / 8,366 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7704,21 +7744,21 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 **M3 is closed.** Everything below is M5 or later.
 
-1. **The content vocabulary split, then the render target.** In that order, and the entry above says
-   why: the target may not consume `StreamChunk`, so the content half needs its own projection-specific
-   name and owner first. `StreamChunk = <content> | <lifecycle>` in `src/core/types/chat.ts`, the
-   lifecycle half being what the projection replaced; the eight provider content presenters and the
-   routers behind them are the producers, and the split has to be made where their filtering already
-   is. Do it *with* the target rather than before it — a rename nothing consumes is churn, and the
-   target is what proves the split is in the right place. Then the target itself: thirteen methods,
-   every one of them something `StreamController` and `MessageRenderer` already do. Two parts are not
-   mechanical. **Usage**: the projection has none and the context meter is a baseline surface — decide
-   whether a turn's usage belongs on the projection or is read from the content the target is already
-   handed. **The two indicators**: the thinking indicator and the turn-silence timer are driven from
-   `setTurnState` here, and `StreamController` starts and stops them from six places, so read those
-   six before deciding which the state covers. After the target, the step that turns this on is
-   `ChatProjectionAttachment` (the first attempt's, 109 lines, at `8cab81b4`): subscribe a tab to a
-   coordinator, hand projections to a renderer, detach on close.
+1. **The render target.** The content vocabulary is split and named, and the two questions that were
+   open around it are answered: a presenter stays typed as `StreamChunk` until the flip, because
+   `InputController` still reads turn framing off that channel, and `usage` is content, so the meter
+   is fed from what the target is handed rather than from a projection field. The target is thirteen
+   methods and every one of them is something `StreamController` and `MessageRenderer` already do; it
+   is the first piece allowed to touch a DOM, so it belongs in `src/features/chat/rendering/` beside
+   the renderer, and it may consume `ChatContentItem` from the provider presenter it resolves.
+   Two parts are not mechanical. **The two indicators**: the thinking indicator and the turn-silence
+   timer are driven from `setTurnState`, and `StreamController` starts and stops them from six
+   places, so read those six before deciding which the state covers. **Usage's write path**: the
+   barrier persists messages and `lastResponseAt`, and the legacy save wrote `conversation.usage`
+   too — a target that learns usage from content has to get it back to the coordinator, which is a
+   command on the coordinator rather than a field on the projection. After the target, the step that
+   turns this on is `ChatProjectionAttachment` (the first attempt's, 109 lines, at `8cab81b4`):
+   subscribe a tab to a coordinator, hand projections to a renderer, detach on close.
 2. **`InputController` and `StreamController` stop owning the turn**, once a target exists. That is
    the flip, and it is the one that needs a smoke matrix rather than a gate: 2,100 lines of
    incremental append and 2,150 of turn acceptance come out, and every provider's chat behaviour is
