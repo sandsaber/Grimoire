@@ -772,9 +772,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
     area: 'shell',
     description:
       'The run projection reducer: what happened to a run, derived from its accepted events.',
-    state: 'pending',
-    owner:
-      'M5 — chat rendering moves from generator consumption to projection consumption, which is this reducer\'s first production consumer. The first flip did not light it up: the adapter renders the event stream directly.',
+    state: 'wired',
+    // In the bundle since the chat coordinator was constructed at load: a chat turn's state is a run projection, so the reducer ships with it.
     modules: ['src/core/execution/RunProjection.ts'],
   },
   {
@@ -782,9 +781,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
     area: 'chat',
     description:
       'The chat projection reducer: what a conversation looks like, derived from what the kernel recorded — messages, turns, interactions, queued commands and persistence state.',
-    state: 'pending',
-    owner:
-      'M5 — the chat execution coordinator is its first consumer. The chat surface still folds the adapter\'s chunk stream into the DOM as it arrives, which is the consumption this replaces.',
+    state: 'wired',
+    // Constructed with the coordinator at plugin load. No tab binds a surface to one yet: the providers on the projection path are listed in projectionChatProviders.ts, which is empty.
     modules: ['src/features/chat/projections/ChatProjection.ts'],
   },
   {
@@ -792,9 +790,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
     area: 'chat',
     description:
       'Turn acceptance, dispatch, the persistence barrier and queued-input release for a chat conversation, feeding the chat projection from what the kernel publishes.',
-    state: 'pending',
-    owner:
-      'M5 — nothing constructs one yet. Its own first consumer is the renderer that maps a projection onto the existing chat DOM; until that lands, InputController and StreamController still own turn acceptance and completion.',
+    state: 'wired',
+    // Constructed at plugin load, one per application. No tab submits through it yet.
     modules: ['src/features/chat/application/ChatExecutionCoordinator.ts'],
   },
   {
@@ -802,9 +799,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
     area: 'chat',
     description:
       'The diff between two chat projections, expressed as the calls a surface makes to draw them: blocks opened, text extended, turns begun and ended, interactions shown and taken away.',
-    state: 'pending',
-    owner:
-      'M5 — no target implements the port yet. The chat column is still drawn by StreamController folding the adapter\'s chunks into the DOM as they arrive; a target over MessageRenderer is what replaces that.',
+    state: 'wired',
+    // Built by the composition for every surface it binds. No tab binds one yet.
     modules: ['src/features/chat/rendering/ChatProjectionRenderer.ts'],
   },
   {
@@ -812,9 +808,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
     area: 'chat',
     description:
       'The renderer\'s port over the machinery that already draws the chat column: turn bubbles, streamed blocks, provider content, the two indicators, and the endings a terminal produces.',
-    state: 'pending',
-    owner:
-      'M5 — nothing constructs one. It is the last dark piece before the flip: what turns it on is the attachment that binds a tab to a coordinator, which is where InputController and StreamController stop owning the turn.',
+    state: 'wired',
+    // Built by the composition for every surface it binds. No tab binds one yet.
     modules: ['src/features/chat/rendering/ChatSurfaceRenderTarget.ts'],
   },
   {
@@ -822,9 +817,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
     area: 'chat',
     description:
       'One tab\'s subscription to one conversation\'s projection: opened before it loads so a tab can close mid-load, and released when the tab closes or moves to another conversation.',
-    state: 'pending',
-    owner:
-      'M5 — nothing constructs one. It is what the flip wires into a tab, and the flip is where InputController and StreamController stop owning the turn.',
+    state: 'wired',
+    // Built by the composition for every surface it binds. No tab opens one yet.
     modules: ['src/features/chat/application/ChatProjectionAttachment.ts'],
   },
   {
@@ -832,9 +826,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
     area: 'chat',
     description:
       'Where a turn\'s persistence barrier meets the vault: the record store\'s revisioned read and slot-scoped change, projected into the conversation a chat surface reads.',
-    state: 'pending',
-    owner:
-      'M5 — nothing constructs one. It is what the flip hands the coordinator; the legacy path still writes conversations through SessionStorage.updateMetadata from ConversationController.',
+    state: 'wired',
+    // Constructed at plugin load, over the plugin's own record store.
     modules: ['src/app/chat/StoredChatConversations.ts'],
   },
   {
@@ -842,9 +835,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
     area: 'chat',
     description:
       'The chat execution path assembled: one coordinator beside the kernel, a binding per surface, and the identities and the usage route that must be the same for every surface.',
-    state: 'pending',
-    owner:
-      'M5 — nothing constructs one. This is what the flip calls from a tab, and until it does, InputController drives the adapter\'s chunk stream instead.',
+    state: 'wired',
+    // Constructed at plugin load and disposed before the kernel at unload.
     modules: ['src/app/chat/ChatExecutionComposition.ts'],
   },
   {
@@ -855,7 +847,12 @@ export const PARITY_SURFACES: ParitySurface[] = [
     state: 'pending',
     owner:
       'M5 — the object the flip hands a tab. Nothing constructs one; InputController still drives the adapter\'s generator and ConversationController still creates the conversation lazily on save.',
-    modules: ['src/app/chat/ChatTabExecution.ts'],
+    modules: [
+      'src/app/chat/ChatTabExecution.ts',
+      // The switch, beside the thing it switches: both are unreachable until a
+      // tab asks whether its provider is on the projection path.
+      'src/app/chat/projectionChatProviders.ts',
+    ],
   },
   {
     id: 'execution-platform-dark',

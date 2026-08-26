@@ -11,6 +11,8 @@ import { shouldShowWhatsNew } from './app/changelog/display';
 import { parseChangelogRelease } from './app/changelog/parser';
 import { readBundledChangelog } from './app/changelog/source';
 import type { ChangelogRelease } from './app/changelog/types';
+import { ChatExecutionComposition } from './app/chat/ChatExecutionComposition';
+import { StoredChatConversations } from './app/chat/StoredChatConversations';
 import { AntigravityExecution } from './app/execution/antigravity/AntigravityExecutionComposition';
 import { ClaudeExecution } from './app/execution/claude/ClaudeExecutionComposition';
 import { CodexExecution } from './app/execution/codex/CodexExecutionComposition';
@@ -120,6 +122,7 @@ export default class GrimoirePlugin extends Plugin {
    */
   private readonly historyHydration = new Map<string, ProviderHistoryHydration>();
   private executionKernelHost: ExecutionKernelHost | null = null;
+  private chatExecution: ChatExecutionComposition | null = null;
   private antigravityExecution: AntigravityExecution | null = null;
   private codexExecution: CodexExecution | null = null;
   private claudeExecution: ClaudeExecution | null = null;
@@ -403,8 +406,27 @@ export default class GrimoirePlugin extends Plugin {
     this.kimicodeExecution?.dispose();
     this.geminiExecution?.dispose();
     this.qwenExecution?.dispose();
+    // Before the kernel's own shutdown: this detaches the surfaces watching runs,
+    // and the kernel is what then decides what happens to the runs themselves.
+    this.chatExecution?.dispose();
+    this.chatExecution = null;
     void this.executionKernelHost?.dispose();
     void this.persistOpenTabStates();
+  }
+
+  /**
+   * The chat execution path this plugin instance owns.
+   *
+   * One per load, for the reason the kernel is: a reload replaces it rather
+   * than sharing one with the instance it replaced. One for every tab, because
+   * a conversation's projection belongs to the conversation and two tabs open
+   * on one chat must see one turn rather than two.
+   */
+  getChatExecution(): ChatExecutionComposition {
+    if (!this.chatExecution) {
+      throw new Error('Chat execution is not available before plugin load.');
+    }
+    return this.chatExecution;
   }
 
   /**
@@ -622,6 +644,18 @@ export default class GrimoirePlugin extends Plugin {
     // stream it refuses to draw in the conversation.
     host.registerBackend(this.qwenExecution.createBackendRegistration());
     this.executionKernelHost = host;
+    // The chat execution path, assembled beside the kernel it runs on. The
+    // store it writes through is the plugin's own, because the queue that
+    // serializes writes to a conversation is held on that instance and a second
+    // one would not serialize against it.
+    this.chatExecution = new ChatExecutionComposition({
+      lifecycle: host.registry,
+      conversations: new StoredChatConversations({
+        repository: this.storage.sessions.records,
+        projection: this.storage.sessions,
+        defaultProviderId: DEFAULT_CHAT_PROVIDER_ID,
+      }),
+    });
     try {
       await host.start();
     } catch (error) {

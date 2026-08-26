@@ -8005,6 +8005,32 @@ vault holds what was sent.
 
 Gates: unit 534 suites / 8,414 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The flip, part one: the path is in the bundle (this commit)
+
+The owner asked for the flip knowing it cannot be certified here, which is the standing override
+recorded at wave 6 — said once and then recorded. This is its first half, and it is the half a gate
+can hold.
+
+`main.ts` assembles the chat execution path beside the kernel: one composition per load, over the
+plugin's **own** record store, disposed *before* the kernel at unload — this detaches the surfaces
+watching runs, and the kernel is what then decides what happens to the runs themselves. Eight
+manifest surfaces move from `pending` to `wired`, which is what the parity gate was refusing before:
+a pending surface must not be in the bundle, and now they are in it on purpose.
+
+**Nothing changes for a user.** `projectionChatProviders.ts` is the switch and it is **empty**: no
+tab takes the projection path, so every chat still runs on the presentation adapter exactly as
+before. A list rather than a boolean, because the chat surface is provider-neutral while the risk is
+not — a provider's content presenter, interaction presenter and failure wording are its own, and the
+branch's rule is one provider per checkpoint, proven before the pattern is repeated. Adding a
+provider to that list is that provider's flip.
+
+Two things the gate found rather than the reading. `RunProjection` became a shipped module the moment
+the coordinator was constructed — a chat turn's state *is* a run projection — and its surface had to
+move with it. And the switch itself is unreachable until a tab asks it a question, so it is attributed
+to the tab-execution surface that is still pending, beside the thing it switches.
+
+Gates: unit 534 suites / 8,416 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
