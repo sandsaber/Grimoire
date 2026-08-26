@@ -1378,6 +1378,9 @@ export function initializeTabControllers(
   tab.controllers.inputController = new InputController({
     plugin,
     state,
+    // Read late: the binding is built after the controllers are, and a tab
+    // whose provider is not on the projection path never has one.
+    getProjectionExecution: () => tab.execution,
     renderer: tab.renderer,
     streamController: tab.controllers.streamController,
     selectionController: tab.controllers.selectionController,

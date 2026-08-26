@@ -8092,6 +8092,36 @@ the presentation adapter: the surface is in the bundle and the behaviour is not 
 
 Gates: unit 535 suites / 8,421 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The flip's last branch: a turn goes to the kernel and comes back as a projection (this commit)
+
+`InputController` has the branch now, and it is three `if (projection)` and nothing else — a provider
+not on the path runs the generator loop byte for byte as before, which is what makes this a
+per-provider flip rather than a rewrite.
+
+- **neither message is drawn here.** The question arrives from the projection once the coordinator
+  has made it durable, and the answer as a turn the target opens. Drawing either here would draw it
+  twice, and the question *before it was recorded*, which is the one thing the barrier exists to
+  stop being possible;
+- **the send awaits the turn finishing**, not the generator ending. `submitted.ticket.completion` is
+  the turn's end, and the whole `finally` block below is written against a turn that ended — the
+  duration footer, the plan approval, the save, the queued-input release all still apply;
+- **cancel asks the kernel.** The run is the kernel's, so the stop goes there and the turn ends when
+  the provider says it did, or when recovery establishes that it cannot say. Cancelling the runtime
+  as well would be a second opinion about a run this tab no longer drives.
+
+**What is carried across, and what is not, is worth naming for whoever adds the first provider to the
+list.** Carried: `didEnqueueToSdk` from the terminal not being `invalidated`, `wasInterrupted` from
+it being `cancelled`, the persisted question copied back onto the message the surface holds.
+**Unverified against a running app**, because nothing here can be: whether the `finally` block's
+second finalization of an already-finalized turn is the no-op its guards suggest; whether the save
+that writes `state.messages` over what the barrier already wrote is the identity it should be;
+whether title generation still fires when the first message reaches `state.messages` from the
+projection rather than before the send; and `planCompleted`, which came from the runtime's turn
+metadata and has no projection equivalent yet — a plan turn on this path will not raise the approval.
+Those four are the smoke matrix's first four rows.
+
+Gates: unit 535 suites / 8,425 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

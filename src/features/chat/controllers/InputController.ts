@@ -1,5 +1,6 @@
 import { Notice, setIcon } from 'obsidian';
 
+import type { ChatTabExecution } from '../../../app/chat/ChatTabExecution';
 import {
   type BuiltInCommand,
   detectBuiltInCommand,
@@ -112,6 +113,14 @@ export interface InputControllerDeps {
   resetInputHeight: () => void;
   getAuxiliaryModel?: () => string | null;
   getAgentService?: () => ChatRuntime | null;
+  /**
+   * This tab's end of the projection execution path, where it has one.
+   *
+   * Read late and absent for every provider not on that path, which is what
+   * makes the branch below a per-provider flip rather than a rewrite: a tab
+   * without one runs the generator loop exactly as it always has.
+   */
+  getProjectionExecution?: () => ChatTabExecution | null;
   getSubagentManager: () => SubagentManager;
   /** Tab-level provider fallback for blank tabs (derived from draft model). */
   getTabProviderId?: () => ProviderId;
@@ -479,16 +488,26 @@ export class InputController {
       images: imagesForMessage,
       vaultSearchContext: turnRequest.vaultSearchContext,
     };
-    state.addMessage(userMsg);
+    const projection = this.deps.getProjectionExecution?.() ?? null;
+    if (!projection) {
+      state.addMessage(userMsg);
+      renderer.addMessage(userMsg);
+    }
     state.hasPendingConversationSave = true;
-    renderer.addMessage(userMsg);
 
     await this.triggerTitleGeneration();
 
     const assistantMsg = this.createAssistantMessage(queryOptions);
-    state.addMessage(assistantMsg);
-    this.activeStreamingAssistantMessage = assistantMsg;
-    this.activateStreamingAssistantMessage(assistantMsg);
+    if (!projection) {
+      // On the projection path both messages arrive from the projection: the
+      // question when the coordinator has made it durable, and the answer as a
+      // turn the target opens. Adding them here would draw each of them twice —
+      // and the question would be drawn before it was recorded, which is the
+      // one thing the barrier exists to stop being possible.
+      state.addMessage(assistantMsg);
+      this.activeStreamingAssistantMessage = assistantMsg;
+      this.activateStreamingAssistantMessage(assistantMsg);
+    }
     this.pendingProviderUserMessages = [{
       displayContent,
       images: imagesForMessage,
@@ -554,6 +573,20 @@ export class InputController {
     streamController.startTurnSilenceIndicator(this.getActiveProviderId());
 
     try {
+      if (projection) {
+        // The turn goes to the kernel and comes back as a projection: the
+        // coordinator makes the question durable, dispatches the run, and the
+        // attachment draws every part of it. What is awaited here is the turn
+        // being *finished*, which is what the block below this one is written
+        // against — everything it does after a turn ends still applies.
+        const submitted = await projection.send(turnRequest, userMsg, { queryOptions });
+        userMsg.content = submitted.userMessage.content;
+        userMsg.currentNote = submitted.userMessage.currentNote;
+        const completed = await submitted.ticket.completion;
+        didEnqueueToSdk = completed.terminal.kind !== 'invalidated';
+        wasInterrupted = completed.terminal.kind === 'cancelled';
+        return;
+      }
       const preparedTurn = agentService.prepareTurn(turnRequest);
       userMsg.content = preparedTurn.persistedContent;
       userMsg.currentNote = preparedTurn.isCompact
@@ -1577,7 +1610,16 @@ export class InputController {
     state.cancelRequested = true;
     // Restore queued message to input instead of discarding
     this.restorePendingMessagesToInput();
-    this.getAgentService()?.cancel();
+    const projection = this.deps.getProjectionExecution?.() ?? null;
+    if (projection) {
+      // The kernel owns the run, so the stop request goes to it and the turn
+      // ends when the provider says it did — or when recovery establishes that
+      // it cannot say. Cancelling the runtime here as well would be a second
+      // opinion about a run this tab no longer drives.
+      void projection.cancel();
+    } else {
+      this.getAgentService()?.cancel();
+    }
     streamController.hideThinkingIndicator();
     streamController.stopTurnSilenceIndicator();
   }

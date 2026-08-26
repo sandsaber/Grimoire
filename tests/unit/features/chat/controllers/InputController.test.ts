@@ -18,6 +18,7 @@ import { Notice } from 'obsidian';
 import * as os from 'os';
 import * as path from 'path';
 
+import type { ChatMessage } from '@/core/types';
 import { InputController, type InputControllerDeps } from '@/features/chat/controllers/InputController';
 import { ResumeSessionDropdown } from '@/shared/components/ResumeSessionDropdown';
 
@@ -34,6 +35,96 @@ beforeAll(() => {
 
 const mockNotice = Notice as jest.Mock;
 
+
+describe('InputController on the projection path', () => {
+  /**
+   * The branch a provider takes once it is on the projection path.
+   *
+   * Everything in it is `if (projection)`, so a provider that is not on the
+   * path runs the generator loop exactly as it always has — which is every
+   * provider today, and which is what makes this a per-provider flip rather
+   * than a rewrite.
+   */
+  let deps: InputControllerDeps;
+
+  function projectionOf(overrides: Record<string, unknown> = {}) {
+    return {
+      send: jest.fn().mockResolvedValue({
+        ticket: {
+          started: Promise.resolve({}),
+          completion: Promise.resolve({ terminal: { kind: 'succeeded', reason: 'completed' } }),
+        },
+        userMessage: { content: 'what the provider composed', currentNote: 'Note.md' },
+      }),
+      cancel: jest.fn().mockResolvedValue(undefined),
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    deps = createMockDeps();
+  });
+
+  it('sends through the coordinator and never opens the generator', async () => {
+    const projection = projectionOf();
+    deps.getProjectionExecution = () => projection as never;
+    const inputEl = deps.getInputEl();
+    inputEl.value = 'are tomatoes a fruit?';
+    const controller = new InputController(deps);
+
+    await controller.sendMessage();
+
+    expect(projection.send).toHaveBeenCalledTimes(1);
+    // The generator is the thing this path replaces. One call to it is the
+    // whole turn running twice.
+    expect(deps.getAgentService?.()?.query).not.toHaveBeenCalled();
+  });
+
+  it('draws neither message itself, because the projection draws both', async () => {
+    // The question arrives from the projection once the coordinator has made it
+    // durable, and the answer as a turn the target opens. Drawing either here
+    // would draw it twice — and the question before it was recorded, which is
+    // the one thing the barrier exists to stop being possible.
+    const projection = projectionOf();
+    deps.getProjectionExecution = () => projection as never;
+    deps.getInputEl().value = 'are tomatoes a fruit?';
+    const controller = new InputController(deps);
+
+    await controller.sendMessage();
+
+    expect(deps.renderer.addMessage).not.toHaveBeenCalled();
+  });
+
+  it('takes what the provider composed onto the message it is holding', async () => {
+    const projection = projectionOf();
+    deps.getProjectionExecution = () => projection as never;
+    deps.getInputEl().value = 'are tomatoes a fruit?';
+    const controller = new InputController(deps);
+
+    await controller.sendMessage();
+
+    const [, userMessage] = (projection.send).mock.calls[0] as [unknown, ChatMessage];
+    expect(userMessage.displayContent).toBe('are tomatoes a fruit?');
+    // The surface keeps its own copy in step with what was sent, the way the
+    // legacy path overwrites it after preparing the turn.
+    expect(userMessage.content).toBe('what the provider composed');
+  });
+
+  it('asks the kernel to stop, and does not also cancel the runtime', async () => {
+    const projection = projectionOf();
+    deps.getProjectionExecution = () => projection as never;
+    deps.state.isStreaming = true;
+    const controller = new InputController(deps);
+
+    controller.cancelStreaming();
+
+    // The kernel owns the run. Cancelling the runtime as well is a second
+    // opinion about a run this tab no longer drives.
+    expect(projection.cancel).toHaveBeenCalledTimes(1);
+    expect(deps.getAgentService?.()?.cancel).not.toHaveBeenCalled();
+  });
+});
 
 describe('InputController - Message Queue', () => {
   let controller: InputController;
