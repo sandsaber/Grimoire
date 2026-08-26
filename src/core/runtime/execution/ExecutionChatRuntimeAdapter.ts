@@ -230,9 +230,9 @@ export class ExecutionRunStream {
    */
   private describe(reason: RunTerminalReason): string {
     try {
-      return this.describeProviderFailure?.(reason) ?? describeFailure(reason);
+      return this.describeProviderFailure?.(reason) ?? describeRunFailure(reason);
     } catch {
-      return describeFailure(reason);
+      return describeRunFailure(reason);
     }
   }
 
@@ -359,7 +359,14 @@ function scopedRunId(envelope: ExecutionEventEnvelope): string | null {
   return envelope.scope.kind === 'session' ? null : String(envelope.scope.runId);
 }
 
-function describeFailure(reason: RunTerminalReason): string {
+/**
+ * The neutral sentence for a classified failure.
+ *
+ * Exported because a surface on the projection path renders the same ending
+ * this adapter does, and a second wording for the same terminal is two products
+ * describing one failure.
+ */
+export function describeRunFailure(reason: RunTerminalReason): string {
   return FAILURE_MESSAGES[reason];
 }
 
@@ -515,7 +522,33 @@ export interface ChatTurnEncoder {
   resultExpectation?(turn: PreparedChatTurn): 'required' | 'optional' | 'none';
 }
 
-export interface ExecutionChatRuntimeHostPorts extends ChatTurnEncoder {
+/**
+ * What a chat surface needs from the provider in order to draw its turns.
+ *
+ * The two things core carries without reading: one item of provider content,
+ * and the provider's own wording for a classified failure. Named together for
+ * the reason `ChatTurnEncoder` is — the presentation adapter is not the only
+ * thing that draws a turn, and a surface that reaches into an adapter for these
+ * keeps the adapter alive through the flip meant to remove it.
+ */
+export interface ChatSurfacePorts {
+  /**
+   * Turns one provider content item into what the surface draws.
+   *
+   * Absent for a provider whose turn is text and reasoning; present for one
+   * whose surface shows tool calls, their results, plan updates, or a
+   * compaction boundary — none of which core models, and all of which the
+   * provider's own normalization already produces.
+   */
+  readonly presentProviderContent?: ProviderContentPresenter;
+  /**
+   * Provider wording for a classified failure. Absent, or `undefined` for a
+   * given reason, leaves the neutral sentence in place.
+   */
+  readonly describeFailure?: FailurePresenter;
+}
+
+export interface ExecutionChatRuntimeHostPorts extends ChatTurnEncoder, ChatSurfacePorts {
   prepareTurn(request: ChatTurnRequest): PreparedChatTurn;
   /**
    * Encodes a prepared turn into the opaque reference the backend resolves.
@@ -561,15 +594,6 @@ export interface ExecutionChatRuntimeHostPorts extends ChatTurnEncoder {
    */
   syncConversation?(conversation: BoundConversation | null): void;
   /**
-   * Renders one provider content item into the chunks the surface reads.
-   *
-   * Absent for a provider whose turn is text and reasoning; present for one
-   * whose surface shows tool calls, their results, plan updates, or a
-   * compaction boundary — none of which core models, and all of which the
-   * provider's own normalization already produces.
-   */
-  readonly presentProviderContent?: ProviderContentPresenter;
-  /**
    * What this turn is expected to produce, where that is not an answer.
    *
    * For the provider-specific cases only: a compaction is handled here, because
@@ -589,11 +613,6 @@ export interface ExecutionChatRuntimeHostPorts extends ChatTurnEncoder {
   consumeProviderTurnMetadata?(): ChatTurnMetadata;
   /** Reports a cleanup that could not complete; never rethrown to the caller. */
   reportCleanupFailure?(error: unknown): void;
-  /**
-   * Provider wording for a classified failure. Absent, or `undefined` for a
-   * given reason, leaves the neutral sentence in place.
-   */
-  readonly describeFailure?: FailurePresenter;
   now?(): number;
   /**
    * Waits, without core owning a timer.
@@ -688,6 +707,17 @@ export class ExecutionChatRuntimeAdapter {
    * accessor goes with the rest of the adapter.
    */
   get turnEncoder(): ChatTurnEncoder {
+    return this.ports;
+  }
+
+  /**
+   * What a surface needs from this provider to draw the turns it sends.
+   *
+   * A handle on the same terms as `turnEncoder`, and it leaves with the adapter
+   * for the same reason: the composition that built these ports is where they
+   * belong once a surface asks for them directly.
+   */
+  get surfacePorts(): ChatSurfacePorts {
     return this.ports;
   }
 

@@ -8031,6 +8031,22 @@ to the tab-execution surface that is still pending, beside the thing it switches
 
 Gates: unit 534 suites / 8,416 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The two provider ports a surface draws with (this commit)
+
+The last thing the tab wiring needed and did not have. A surface on the projection path draws the
+same turns the presentation adapter draws, and it must reach into the adapter for none of it:
+`ChatSurfacePorts` names the two things that are the provider's — one item of provider content turned
+into what a surface shows, and the provider's own wording for a classified failure — and the adapter
+hands them out on the same terms as `ChatTurnEncoder`, as a handle that leaves with it.
+
+The neutral failure sentence is exported rather than repeated, because a second wording for one
+terminal is two products describing one failure.
+
+Two duplicate declarations came out with it: both members were declared inline on the host ports and
+again in the new type, which the compiler accepted and a reader would not have.
+
+Gates: unit 534 suites / 8,417 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

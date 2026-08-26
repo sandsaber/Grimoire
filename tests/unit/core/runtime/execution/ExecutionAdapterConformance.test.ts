@@ -47,6 +47,7 @@ import { toLegacyCapabilities } from '@/core/providers/legacyCapabilities';
 import type { ProviderCapabilities } from '@/core/providers/types';
 import {
   classifyForPresentation,
+  describeRunFailure,
   dispatchCancellation,
   ExecutionAdapterSession,
   ExecutionChatRuntimeAdapter,
@@ -563,6 +564,26 @@ describe('the assembled ChatRuntime adapter', () => {
   function readRef(ref: string | undefined): string | undefined {
     return ref === undefined ? undefined : refPayloads.get(ref);
   }
+
+  it('hands out what a surface needs from the provider, from the same ports', async () => {
+    // A surface on the projection path draws the same turns this adapter does,
+    // and reaches into it for neither: the content presenter and the failure
+    // wording are the provider's, and a second copy of either is two products
+    // describing one turn.
+    const harness = await createHarness();
+    const adapter = createAdapter(harness, {
+      presentProviderContent: () => [{ type: 'text', content: 'from the provider' }],
+      describeFailure: () => 'the provider\'s own words',
+    });
+
+    expect(adapter.surfacePorts.presentProviderContent?.({})).toEqual([
+      { type: 'text', content: 'from the provider' },
+    ]);
+    expect(adapter.surfacePorts.describeFailure?.('provider-failure'))
+      .toBe('the provider\'s own words');
+    // And the neutral sentence is one sentence, exported rather than repeated.
+    expect(describeRunFailure('provider-failure')).toEqual(expect.any(String));
+  });
 
   it('hands out the turn encoder it was built with, not a copy of it', async () => {
     // M5's chat path submits through the coordinator and still needs the three
