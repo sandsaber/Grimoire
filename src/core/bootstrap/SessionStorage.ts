@@ -13,6 +13,7 @@ import type {
   PersistedVaultSearchContext,
   SessionMetadata,
 } from '../types';
+import type { ProviderId } from '../types/provider';
 import { LEGACY_SESSIONS_PATH, SESSIONS_PATH } from './StoragePaths';
 
 export {
@@ -532,6 +533,45 @@ export class SessionStorage {
     return metas.sort((a, b) =>
       (b.lastResponseAt ?? b.createdAt) - (a.lastResponseAt ?? a.createdAt)
     );
+  }
+
+  /**
+   * The stored record as the chat surface reads it.
+   *
+   * The inverse of `toSessionMetadata`, and a method rather than a copy at each
+   * call site: the plugin does this to every conversation it loads and the
+   * execution path does it to the one a turn is running on, and the two
+   * disagreeing means a conversation means one thing to a tab and another to
+   * the turn inside it. `defaultProviderId` is the caller's, because a stored
+   * conversation may predate the field and only the application knows which
+   * provider a chat with no provider belongs to.
+   */
+  toConversation(metadata: SessionMetadata, defaultProviderId: ProviderId): Conversation {
+    return {
+      id: metadata.id,
+      providerId: metadata.providerId ?? defaultProviderId,
+      title: metadata.title,
+      createdAt: metadata.createdAt,
+      updatedAt: metadata.updatedAt,
+      lastResponseAt: metadata.lastResponseAt,
+      // A conversation with no explicit binding resumes under its own id, which
+      // is how every conversation written before the field existed still
+      // resumes. `undefined` and `null` are different answers here: the second
+      // is a binding that was deliberately cleared.
+      sessionId: metadata.sessionId !== undefined ? metadata.sessionId : metadata.id,
+      model: metadata.model,
+      providerState: metadata.providerState,
+      messages: clonePersistedMessages(metadata.messages),
+      currentNote: metadata.currentNote,
+      externalContextPaths: metadata.externalContextPaths,
+      enabledMcpServers: metadata.enabledMcpServers,
+      orchestratorMode: metadata.orchestratorMode,
+      usage: metadata.usage,
+      titleGenerationStatus: metadata.titleGenerationStatus,
+      resumeAtMessageId: metadata.resumeAtMessageId,
+      vaultSearchContexts: metadata.vaultSearchContexts,
+      assistantResponseMetadata: metadata.assistantResponseMetadata,
+    };
   }
 
   toSessionMetadata(conversation: Conversation): SessionMetadata {

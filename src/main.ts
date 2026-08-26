@@ -32,7 +32,6 @@ import type { UnreadableConversation } from './core/bootstrap/SessionStorage';
 import {
   applyAssistantResponseMetadataToMessages,
   applyVaultSearchContextsToMessages,
-  clonePersistedMessages,
   collectAssistantResponseMetadata,
   collectVaultSearchContexts,
   CONVERSATION_METADATA_FIELDS,
@@ -855,31 +854,12 @@ export default class GrimoirePlugin extends Plugin {
 
     const listing = await this.storage.sessions.listConversations();
     this.unreadableConversations = listing.unreadable;
-    this.conversations = listing.metadata.map(meta => {
-      const resumeSessionId = meta.sessionId !== undefined ? meta.sessionId : meta.id;
-
-      return {
-        id: meta.id,
-        providerId: meta.providerId ?? DEFAULT_CHAT_PROVIDER_ID,
-        title: meta.title,
-        createdAt: meta.createdAt,
-        updatedAt: meta.updatedAt,
-        lastResponseAt: meta.lastResponseAt,
-        sessionId: resumeSessionId,
-        model: meta.model,
-        providerState: meta.providerState,
-        messages: clonePersistedMessages(meta.messages),
-        currentNote: meta.currentNote,
-        externalContextPaths: meta.externalContextPaths,
-        enabledMcpServers: meta.enabledMcpServers,
-        orchestratorMode: meta.orchestratorMode,
-        usage: meta.usage,
-        titleGenerationStatus: meta.titleGenerationStatus,
-        resumeAtMessageId: meta.resumeAtMessageId,
-        vaultSearchContexts: meta.vaultSearchContexts,
-        assistantResponseMetadata: meta.assistantResponseMetadata,
-      };
-    }).sort(
+    // The same projection the execution path applies to the one conversation a
+    // turn is running on. Two copies of it means a conversation means one thing
+    // to a tab and another to the turn inside it.
+    this.conversations = listing.metadata.map(meta => (
+      this.storage.sessions.toConversation(meta, DEFAULT_CHAT_PROVIDER_ID)
+    )).sort(
       (a, b) => (b.lastResponseAt ?? b.updatedAt) - (a.lastResponseAt ?? a.updatedAt)
     );
     setLocale(this.settings.locale as Locale);

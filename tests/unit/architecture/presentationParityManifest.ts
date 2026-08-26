@@ -828,6 +828,16 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: ['src/features/chat/application/ChatProjectionAttachment.ts'],
   },
   {
+    id: 'chat-conversation-store-port',
+    area: 'chat',
+    description:
+      'Where a turn\'s persistence barrier meets the vault: the record store\'s revisioned read and slot-scoped change, projected into the conversation a chat surface reads.',
+    state: 'pending',
+    owner:
+      'M5 — nothing constructs one. It is what the flip hands the coordinator; the legacy path still writes conversations through SessionStorage.updateMetadata from ConversationController.',
+    modules: ['src/app/chat/StoredChatConversations.ts'],
+  },
+  {
     id: 'execution-platform-dark',
     area: 'shell',
     description:

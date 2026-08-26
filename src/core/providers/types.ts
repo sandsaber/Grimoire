@@ -123,6 +123,8 @@ export interface AppSessionStorage {
   saveMetadata(meta: SessionMetadata): Promise<void>;
   deleteMetadata(id: string): Promise<void>;
   toSessionMetadata(conv: Conversation): SessionMetadata;
+  /** The stored record as the chat surface reads it. The inverse of the above. */
+  toConversation(meta: SessionMetadata, defaultProviderId: ProviderId): Conversation;
 }
 
 // ---------------------------------------------------------------------------

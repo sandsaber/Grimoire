@@ -7828,6 +7828,32 @@ change per write.
 
 Gates: unit 531 suites / 8,392 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The vault side of the barrier, and the projection it shares with the plugin (this commit)
+
+`StoredChatConversations` is the coordinator's conversation port over M4's record store — the last
+piece the flip needs that was not yet written, and deliberately thin: the store already refuses a
+stale write and applies a change inside its own slot, and `SessionStorage` already owns the
+projection between what is stored and what a chat reads. What was left was naming which of the two a
+coordinator gets.
+
+**The projection was written twice and is now written once.** `SessionStorage.toSessionMetadata` had
+no inverse, so `main.ts` mapped a stored record into a conversation inline — eighteen fields, one of
+them a rule worth keeping: a conversation with no session binding resumes under *its own id*, which
+is how every conversation written before that field existed still resumes, and `undefined` and `null`
+are different answers there because the second is a binding that was deliberately cleared. A second
+copy of that in the execution path would have meant a conversation means one thing to a tab and
+another to the turn inside it. `toConversation` is a method beside its twin now, `main.ts` calls it,
+and the three rules that are easy to lose have tests of their own.
+
+**The read reports what D5 requires.** A record this build cannot read is its own state rather than
+an absence, because a turn dispatched over "no conversation" writes a fresh one on top of a record it
+simply cannot parse — the legacy reader's recorded defect, not repeated here.
+
+The parity manifest's own gate is what noticed the module: an unreachable file with no manifest entry
+fails it, which is the rule that keeps a dark module from becoming an unowned one.
+
+Gates: unit 532 suites / 8,399 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

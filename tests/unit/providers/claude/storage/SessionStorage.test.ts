@@ -317,6 +317,85 @@ describe('SessionStorage', () => {
     });
   });
 
+  describe('toConversation', () => {
+    it('gives a conversation back the way the plugin loads one', async () => {
+      // The projection the plugin applies to every conversation it loads and
+      // the execution path applies to the one a turn is running on. Two copies
+      // of it means a conversation means one thing to a tab and another to the
+      // turn inside it.
+      const conversation: Conversation = {
+        id: 'conv-projection',
+        providerId: 'claude',
+        title: 'Tomatoes',
+        createdAt: 1,
+        updatedAt: 2,
+        lastResponseAt: 3,
+        sessionId: 'sdk-session',
+        model: 'a-model',
+        providerState: { providerSessionId: 'active-session' },
+        messages: [{ id: 'msg-1', role: 'user', content: 'Hi', timestamp: 1 }],
+        currentNote: 'Note.md',
+        externalContextPaths: ['/tmp/context'],
+        enabledMcpServers: ['server-1'],
+        orchestratorMode: true,
+        usage: {
+          inputTokens: 10,
+          contextWindow: 200_000,
+          contextTokens: 10,
+          percentage: 1,
+        },
+        titleGenerationStatus: 'success',
+        resumeAtMessageId: 'msg-1',
+      };
+
+      const restored = storage.toConversation(storage.toSessionMetadata(conversation), 'codex');
+
+      expect(restored).toMatchObject(conversation);
+      // Rebuilt from the messages rather than carried, which is what
+      // `toSessionMetadata` does with them: these messages have none.
+      expect(restored.vaultSearchContexts).toBeUndefined();
+      expect(restored.assistantResponseMetadata).toBeUndefined();
+    });
+
+    it('resumes a conversation with no binding under its own id', async () => {
+      // How every conversation written before the field existed still resumes.
+      const restored = storage.toConversation({
+        id: 'conv-legacy',
+        title: 'Older',
+        createdAt: 1,
+        updatedAt: 1,
+      }, 'claude');
+
+      expect(restored.sessionId).toBe('conv-legacy');
+      // `undefined` and `null` are different answers: the second is a binding
+      // that was deliberately cleared, and reviving it would resume a session
+      // the provider was told to forget.
+      expect(storage.toConversation({
+        id: 'conv-cleared',
+        title: 'Cleared',
+        createdAt: 1,
+        updatedAt: 1,
+        sessionId: null,
+      }, 'claude').sessionId).toBeNull();
+    });
+
+    it('takes the caller\'s provider only where the record names none', () => {
+      expect(storage.toConversation({
+        id: 'conv-1',
+        title: 'Older',
+        createdAt: 1,
+        updatedAt: 1,
+      }, 'codex').providerId).toBe('codex');
+      expect(storage.toConversation({
+        id: 'conv-2',
+        providerId: 'claude',
+        title: 'Newer',
+        createdAt: 1,
+        updatedAt: 1,
+      }, 'codex').providerId).toBe('claude');
+    });
+  });
+
   describe('toSessionMetadata - round trip', () => {
     it('round-trips providerState through save and load', async () => {
       const conversation: Conversation = {
