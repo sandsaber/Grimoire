@@ -3,7 +3,10 @@ import type {
   ExecutionInteractionRecord,
   ExecutionReconciliationRecord,
 } from '../../../core/execution/ExecutionControlRecords';
-import type { ExecutionEventEnvelope } from '../../../core/execution/ExecutionEvents';
+import {
+  type ExecutionEventEnvelope,
+  isTransientExecutionEvent,
+} from '../../../core/execution/ExecutionEvents';
 import type { ExecutionSessionId, RunId } from '../../../core/execution/ExecutionIds';
 import {
   applyRunReconciliation,
@@ -28,6 +31,16 @@ import type { ProviderId } from '../../../core/types/provider';
  * chat surface still consumes the adapter's chunk stream. Its first consumer,
  * `ChatExecutionCoordinator`, has landed beside it and is dark for the same
  * reason — what neither of them has yet is a renderer.
+ *
+ * **This projection does fold in transient content, and `RunProjection` does
+ * not.** The rule those two obey is one rule read at two altitudes. A run
+ * projection records what happened, and partial text is not a fact about the
+ * run — the committed result is. A chat projection is what a person is looking
+ * at, and while a turn is running the partial text is the whole of it. Keeping
+ * it out would have left exactly one way to render a running turn: a second
+ * channel of chunks beside the projection, which is the thing this step
+ * replaces. So it lives here, per turn, and never reaches the control store —
+ * D2's rule is about what is persisted, and nothing here is.
  */
 
 export interface MaterializedChatResult {
@@ -53,11 +66,28 @@ export interface ReconciledChatResultProjection {
   readonly result: MaterializedChatResult;
 }
 
+/**
+ * One piece of what the provider is saying, in the order it said it.
+ *
+ * Text arrives as many small deltas and is coalesced into one item per run of
+ * the same kind, so the list is as long as the number of times the provider
+ * changed what it was doing rather than as long as the answer. `payload` is
+ * opaque for the same reason it is opaque everywhere else: a tool call, a plan
+ * update and a compaction boundary are what the provider is saying, and only
+ * the provider's own host code knows what one of its items looks like.
+ */
+export type ChatLiveItem =
+  | { readonly kind: 'assistant-text'; readonly text: string }
+  | { readonly kind: 'reasoning-text'; readonly text: string }
+  | { readonly kind: 'provider-content'; readonly payload: unknown };
+
 export interface ChatTurnProjection {
   readonly commandId: string;
   readonly executionSessionId: ExecutionSessionId;
   readonly runId: RunId;
   readonly run: RunProjection;
+  /** What the provider said while the turn ran, in order. Never persisted. */
+  readonly live: readonly ChatLiveItem[];
   readonly result?: MaterializedChatResult;
   readonly observedResults: readonly ReconciledChatResultProjection[];
   readonly persistence: 'pending' | 'saving' | 'saved' | 'failed';
@@ -186,6 +216,7 @@ export function reduceChatProjection(
         executionSessionId: event.executionSessionId,
         runId: event.runId,
         run: createRunProjection(event.runId, event.resultExpectation),
+        live: [],
         observedResults: [],
         persistence: 'pending',
         startedAt: event.startedAt,
@@ -202,7 +233,8 @@ export function reduceChatProjection(
         ? projection.activeRunId
         : event.envelope.scope.runId, turn => {
         const run = reduceRunProjection(turn.run, event.envelope);
-        return run === turn.run ? turn : { ...turn, run };
+        const live = reduceLiveContent(turn, event.envelope);
+        return run === turn.run && live === turn.live ? turn : { ...turn, run, live };
       });
     case 'interaction-record': {
       if (!projection.turns.some(turn => turn.runId === event.record.runId)) return projection;
@@ -311,8 +343,62 @@ export function getActiveChatTurn(projection: ChatProjection): ChatTurnProjectio
   return projection.turns.find(turn => turn.runId === projection.activeRunId);
 }
 
+/**
+ * The answer as it has arrived so far, or `undefined` if none has.
+ *
+ * The two are different answers: a turn that said nothing gets no assistant
+ * message, and a turn that said the empty string is a provider bug worth
+ * seeing rather than one to round away.
+ */
+export function liveAssistantText(turn: ChatTurnProjection): string | undefined {
+  let text: string | undefined;
+  for (const item of turn.live) {
+    if (item.kind === 'assistant-text') {
+      text = (text ?? '') + item.text;
+    }
+  }
+  return text;
+}
+
 export function hasMissingRequiredResult(turn: ChatTurnProjection): boolean {
   return turn.run.terminal?.reason === 'missing-required-result';
+}
+
+/**
+ * Folds one transient envelope into what the turn is saying.
+ *
+ * Run scope only. A session-scoped envelope belongs to no turn's answer, and an
+ * agent-scoped one is a subagent talking — a surface of its own, which nothing
+ * consumes yet, so carrying it here would put a subagent's words in the parent
+ * turn's answer.
+ *
+ * Nothing deduplicates here on purpose. A backend delivers the same content on
+ * the run stream and the session stream, and the ingestor already retires the
+ * pair; a second opinion about that would need an unbounded set of its own,
+ * which is exactly what the ingestor refuses to keep for content.
+ */
+function reduceLiveContent(
+  turn: ChatTurnProjection,
+  envelope: ExecutionEventEnvelope,
+): readonly ChatLiveItem[] {
+  if (turn.run.terminal
+    || envelope.scope.kind !== 'run'
+    || !isTransientExecutionEvent(envelope.event)) {
+    return turn.live;
+  }
+  const event = envelope.event;
+  if (event.kind === 'provider-content') {
+    return [...turn.live, { kind: 'provider-content', payload: event.payload }];
+  }
+  const kind = event.channel === 'reasoning' ? 'reasoning-text' : 'assistant-text';
+  const last = turn.live.at(-1);
+  if (last?.kind === kind) {
+    return [
+      ...turn.live.slice(0, -1),
+      { kind, text: last.text + event.text },
+    ];
+  }
+  return [...turn.live, { kind, text: event.text }];
 }
 
 function updateTurn(

@@ -7431,6 +7431,44 @@ projection is waiting for.
 
 Gates: unit 527 suites / 8,335 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The projection carries live content, which is the decision the renderer waited on (this commit)
+
+The question the previous entry left open, answered where it had to be. A projection filled only at
+the persistence barrier can render a turn's *state* — thinking, tools, progress, interactions — and
+not a word of the answer until the turn is over, and there were exactly two ways out: fold the
+transient content into the projection, or run a second channel of chunks beside it. The second is
+*chunks appended as they arrive* under a new name, which is the consumption this whole step exists
+to replace, so it was never really two.
+
+**The rule this looks like it breaks is one rule read at two altitudes.** `RunProjection` refuses
+transient content because a projection of a *run* records what happened, and partial text is not a
+fact about the run — the committed result is. A projection of a *chat* is what a person is looking
+at, and while the turn is running the partial text is the whole of it. Nothing about D2 changes:
+that rule is about what is persisted, and live content is never written anywhere.
+
+Three properties it has, each with a test that goes red without it:
+
+- **coalesced**, so a turn's worth of token traffic is not a turn's worth of array entries: one item
+  per stretch of the same kind, ordered against the `provider-content` items the provider sent
+  between them — which is what keeps a tool call in the place the model put it;
+- **this turn's own**, so a session-scoped envelope and an agent-scoped one are both refused. A
+  subagent's words in the parent turn's answer would be persisted as the parent's answer;
+- **closed at the terminal**, so content that arrives after the barrier has run cannot leave the
+  projection and the stored message disagreeing about what the turn said.
+
+**The coordinator lost its private accumulator in the same commit, and that is the point rather than
+tidying.** It kept a `Map<RunId, string>` of the answer as it streamed; the projection now holds the
+same thing, and two accumulators over one stream are two answers that can differ — the surface
+rendering one and the barrier persisting the other. The barrier reads the turn, so what is stored is
+what was shown, and the composition test asserts exactly that: the partial answer reaches an attached
+listener mid-run, the conversation still holds only the question, and the message written at the end
+is the text the listener had been reading.
+
+Reasoning is kept apart from the answer for the same reason it is on the legacy path: it is not what
+gets persisted as the message.
+
+Gates: unit 527 suites / 8,341 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7507,24 +7545,22 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 **M3 is closed.** Everything below is M5 or later.
 
-1. **The chat renderer, and the decision it forces first.** The projection and its coordinator have
-   both landed and are dark; what is missing is the thing that maps a projection onto the existing
-   chat DOM, and one contract question that has to be answered before a line of it is written:
-   **a projection carries no live text.** `turn.result` is filled at the persistence barrier, so a
-   renderer driven by the projection alone can show a turn's state — thinking, tools, progress,
-   interactions — and not a word of the answer until the turn is over. Two ways out, and they are not
-   equivalent: a live-text field on the turn projection, fed by the transient envelopes the
-   coordinator already accumulates (`entry.streamed` is the producer, so this is a question of where
-   it surfaces, not whether it exists) — or a second channel beside the projection, which is
-   *chunks appended as they arrive* under a new name, and that is the thing this step exists to
-   replace. The same question covers `provider-content`, which is the four things a surface renders
-   that are not text; `ProviderContentPresenter` in the adapter is how the flipped providers answer it
-   today. `StreamController` is 2,100 lines of incremental append and `InputController` 2,150; the
-   move is from chunks appended as they arrive to a state the renderer diffs, which is the actual
-   work and cannot be done a chunk at a time. The first attempt's `ChatProjectionAttachment` (109
-   lines) and `ChatProjectionRenderer` (114) are the material, on
-   `codex/provider-architecture-research` at `8cab81b4` — and its renderer answered the question by
-   not rendering a running turn at all, so it is material for the DOM mapping and not for this.
+1. **The chat renderer.** The projection, its coordinator and its live content have all landed and
+   are dark; what is missing is the thing that maps a projection onto the existing chat DOM. The
+   contract question is answered — a turn carries its live items — so what is left is the mapping and
+   one thing it needs that core cannot supply: a `provider-content` payload is opaque, and turning
+   one into something a surface renders is the provider's own job. `ProviderContentPresenter` on the
+   adapter is how the flipped providers answer that today, and it is a port with nine real
+   implementations rather than a slot to invent. `StreamController` is 2,100 lines of incremental
+   append and `InputController` 2,150; the move is from chunks appended as they arrive to a state the
+   renderer diffs, which is the actual work and cannot be done a chunk at a time. The first attempt's
+   `ChatProjectionAttachment` (109 lines) and `ChatProjectionRenderer` (114) are the material, on
+   `codex/provider-architecture-research` at `8cab81b4` — its renderer rendered no running turn at
+   all, so it is material for the DOM mapping and not for the streaming half. Two contracts the
+   renderer will have to state rather than assume: a completed turn's answer lives in the durable
+   message, reachable from the turn by `assistantMessageId`, and the live items stay beside it, so a
+   renderer that draws both draws the answer twice; and a turn exists only for a run this session
+   started, while `messages` is the whole transcript.
    The thirteen provider rows handed over from M3 are re-implementations of the same UI-shaped
    consumers, so doing them first means rewriting each consumer twice.
 2. **An observation channel for control records**, which two separate things are now waiting on. The

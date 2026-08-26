@@ -35,6 +35,7 @@ import {
   type ChatProjectionEvent,
   type ChatTurnProjection,
   createChatProjection,
+  liveAssistantText,
   type MaterializedChatResult,
   reduceChatProjection,
 } from '../projections/ChatProjection';
@@ -58,9 +59,10 @@ import {
  *   is a *reference* — every provider's sink commits one without writing the
  *   answer, because D2 forbids a second copy of a provider transcript — so
  *   nothing can resolve one back to text. The answer this coordinator persists
- *   is the one it watched arrive, accumulated from the run's own
- *   `output-delta` envelopes, which is the same source the chat surface renders
- *   from today;
+ *   is the one it watched arrive: the projection folds the run's own
+ *   `output-delta` envelopes into the turn, and the barrier reads the turn.
+ *   Accumulating it here as well would be a second copy that can disagree with
+ *   the one a surface is rendering;
  * - **a conversation write applies a change rather than a copy.** M4's record
  *   store settles the concurrent-writer problem the first attempt solved with a
  *   revision-conflict retry loop, so the barrier below has neither.
@@ -211,8 +213,6 @@ interface ConversationEntry {
   active?: ActiveTurn;
   readonly queue: PendingTurn[];
   readonly listeners: Set<(projection: ChatProjection) => void>;
-  /** The answer as it arrives, per run. The durable copy is the message. */
-  readonly streamed: Map<RunId, string>;
 }
 
 export class ChatExecutionCoordinator {
@@ -415,7 +415,6 @@ export class ChatExecutionCoordinator {
       projection: createChatProjection(read.conversation, read.revision),
       queue: [],
       listeners: new Set(),
-      streamed: new Map(),
     };
     this.entries.set(conversationId, entry);
     return entry;
@@ -564,35 +563,11 @@ export class ChatExecutionCoordinator {
 
   private acceptEnvelope(entry: ConversationEntry, envelope: ExecutionEventEnvelope): void {
     const targetRunId = scopedRunId(envelope.scope) ?? entry.projection.activeRunId;
-    if (targetRunId) {
-      this.rememberStreamedText(entry, targetRunId, envelope);
-    }
     this.apply(entry, { kind: 'run-envelope', envelope });
     this.trackInteraction(entry, envelope);
     if (targetRunId) {
       this.settleIfTerminal(entry, targetRunId);
     }
-  }
-
-  /**
-   * Keeps the assistant text of a run as it streams.
-   *
-   * Run scope only, and assistant channel only. An agent-scoped delta is a
-   * subagent talking, which is a surface of its own rather than this turn's
-   * answer, and reasoning is not the answer either — the legacy path keeps it
-   * apart for the same reason.
-   */
-  private rememberStreamedText(
-    entry: ConversationEntry,
-    targetRunId: RunId,
-    envelope: ExecutionEventEnvelope,
-  ): void {
-    if (envelope.scope.kind !== 'run'
-      || envelope.event.kind !== 'output-delta'
-      || envelope.event.channel !== 'assistant') {
-      return;
-    }
-    entry.streamed.set(targetRunId, (entry.streamed.get(targetRunId) ?? '') + envelope.event.text);
   }
 
   /**
@@ -673,8 +648,9 @@ export class ChatExecutionCoordinator {
       lease = this.lifecycle.getSession(sessionId)
         ? this.lifecycle.acquireLease(this.nextLeaseId(), sessionId, 'persistence')
         : undefined;
-      const streamed = entry.streamed.get(activeRunId);
-      const resultRef = findTurn(entry.projection, activeRunId)?.run.result ?? terminal.resultRef;
+      const turn = findTurn(entry.projection, activeRunId);
+      const streamed = turn ? liveAssistantText(turn) : undefined;
+      const resultRef = turn?.run.result ?? terminal.resultRef;
       const materialized = materializeResult(resultRef, terminal, streamed);
       if (materialized) {
         this.apply(entry, {
@@ -702,7 +678,6 @@ export class ChatExecutionCoordinator {
         completedAt,
         ...(assistantMessage ? { assistantMessageId: assistantMessage.id } : {}),
       });
-      entry.streamed.delete(activeRunId);
       if (entry.active === active) {
         entry.active = undefined;
       }

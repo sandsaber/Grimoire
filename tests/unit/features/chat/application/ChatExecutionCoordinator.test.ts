@@ -24,6 +24,7 @@ import {
   type ChatExecutionLifecyclePort,
   type SubmitChatTurnCommand,
 } from '@/features/chat/application/ChatExecutionCoordinator';
+import { liveAssistantText } from '@/features/chat/projections/ChatProjection';
 
 /**
  * Turn acceptance, dispatch, the persistence barrier, and queued-input release.
@@ -271,6 +272,58 @@ describe('chat execution coordinator', () => {
         role: 'assistant',
         content: 'Botanically, yes.',
       }),
+    ]);
+  });
+
+  it('shows the answer while the turn is still running', async () => {
+    // What the projection is for. A surface that can only see the answer once
+    // the turn is over has to be fed a second stream of chunks beside the
+    // projection, and that is the consumption this step exists to replace.
+    const harness = await createHarness();
+    const seen: (string | undefined)[] = [];
+    const detach = await harness.coordinator.attach(CONVERSATION_ID, projection => {
+      seen.push(projection.turns[0] ? liveAssistantText(projection.turns[0]) : undefined);
+    });
+    const ticket = await harness.coordinator.submitTurn(turnCommand());
+    const started = await ticket.started;
+    harness.backend.emit(started.runId, {
+      kind: 'output-delta',
+      channel: 'assistant',
+      text: 'Botanically, ',
+    });
+    await harness.registry.waitForIdle();
+
+    expect(seen.at(-1)).toBe('Botanically, ');
+    const running = harness.coordinator.getProjection(CONVERSATION_ID)?.turns[0];
+    expect(running?.run.terminal).toBeUndefined();
+    expect(running?.persistence).toBe('pending');
+    // Nothing is in the conversation yet but the question: an answer still
+    // arriving is not an answer, and the barrier is what makes it one.
+    await expect(storedMessages(harness)).resolves.toEqual([
+      expect.objectContaining({ role: 'user' }),
+    ]);
+
+    harness.backend.emit(started.runId, {
+      kind: 'output-delta',
+      channel: 'assistant',
+      text: 'yes.',
+    });
+    harness.backend.emit(started.runId, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    });
+    await ticket.completion;
+    detach();
+
+    // The barrier persisted what the surface had been reading, because it read
+    // the same place: there is one accumulator, not one per consumer.
+    const settled = harness.coordinator.getProjection(CONVERSATION_ID)?.turns[0];
+    expect(liveAssistantText(settled!)).toBe('Botanically, yes.');
+    expect(settled?.assistantMessageId).toBeDefined();
+    await expect(storedMessages(harness)).resolves.toEqual([
+      expect.objectContaining({ role: 'user' }),
+      expect.objectContaining({ role: 'assistant', content: 'Botanically, yes.' }),
     ]);
   });
 
