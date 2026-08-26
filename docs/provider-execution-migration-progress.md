@@ -8047,6 +8047,28 @@ again in the new type, which the compiler accepted and a reader would not have.
 
 Gates: unit 534 suites / 8,417 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### What a tab brings to the path, and the one question that decides (this commit)
+
+`createTabProjectionExecution` is where the switch is asked and where a tab's own half of the binding
+is assembled: its column, its streaming cursor, and the provider ports its runtime was built with.
+Every one of those is read **late**, through the tab, because a cold tab has no runtime until it
+first sends and a conversation switch replaces the renderer — a binding holding the old one would
+draw into a column that is no longer mounted.
+
+**Turn framing is dropped where it arrives.** The content presenter still returns the whole
+`StreamChunk` union, because `InputController` reads `user_message_start` and
+`assistant_message_start` off that channel on the legacy path. A turn's shape is what the projection
+states here, so framing arriving as content would be a second opinion about where this turn begins
+and ends — and the same is true of `status`, `error` and `done`, which the terminal and the run state
+already say. Five variants filtered, and the test names all five.
+
+**The runtime is asked by shape, not by class.** A tab holds its runtime typed as the legacy
+`ChatRuntime`, which does not carry the encoder or the surface ports and must not — it is frozen. A
+provider on this path always has an adapter behind that type; one that somehow does not is refused
+rather than guessed at.
+
+Gates: unit 535 suites / 8,421 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

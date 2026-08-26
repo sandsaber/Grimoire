@@ -849,9 +849,9 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'M5 — the object the flip hands a tab. Nothing constructs one; InputController still drives the adapter\'s generator and ConversationController still creates the conversation lazily on save.',
     modules: [
       'src/app/chat/ChatTabExecution.ts',
-      // The switch, beside the thing it switches: both are unreachable until a
-      // tab asks whether its provider is on the projection path.
+      // The switch, beside the thing it switches, and the factory that asks it.
       'src/app/chat/projectionChatProviders.ts',
+      'src/features/chat/tabs/tabProjectionExecution.ts',
     ],
   },
   {
