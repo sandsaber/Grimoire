@@ -8220,6 +8220,33 @@ failed for a different reason than expected, which is the only reason it was fou
 
 Gates: unit 535 suites / 8,436 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The column draws in the order it was asked to (this commit)
+
+The review's fifth defect, and the one with the widest blast radius: every operation the render
+target performs was *started* and not waited for. Each is asynchronous and several are only partly
+synchronous — finalizing a text block awaits a pending render before it closes the element — so an
+append that follows a finalize could land in the block the finalize was still closing, and the `done`
+that ends a turn could overtake the tool call before it. The renderer decides the order; nothing was
+keeping it.
+
+They go through a queue now, and a failure in one does not stop the ones after it: the operations
+after it are a different part of the same turn, and a column that stops drawing because one block
+threw is worse than a column with one block missing. The two indicators moved into the queue with
+them — one that goes out while the last block is still being written says the turn is over before it
+looks over.
+
+**The column's work outliving the turn is a second thing, and it is why `settled` exists.** The work
+`InputController` does *after* a turn — the duration footer, the finalizations it performs itself —
+is against the same column, so it has to follow rather than interleave. `settled` runs up from the
+target through the renderer and the attachment to the tab, and the send awaits it.
+
+**And the first test for this proved nothing.** It recorded each operation when it was *called*,
+which a caller that starts everything without waiting produces in exactly the same order — the same
+call order and a different draw order, and only the second is what a person sees. Recorded on
+completion instead, breaking the queue fails it.
+
+Gates: unit 535 suites / 8,437 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

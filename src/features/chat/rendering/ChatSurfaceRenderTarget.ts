@@ -140,8 +140,44 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
   private readonly turnMessages = new Map<RunId, ChatMessage>();
   private readonly turnStates = new Map<RunId, RunState>();
   private open: OpenBlock | null = null;
+  /**
+   * The column's operations, in the order they were asked for.
+   *
+   * Every one of them is asynchronous and several are only *partly*
+   * synchronous: finalizing a text block awaits a pending render before it
+   * closes the element. Started and not awaited, an append that follows a
+   * finalize can land in the block the finalize is still closing, and the
+   * `done` that ends a turn can overtake the tool call before it. The renderer
+   * decided the order; this is what keeps it.
+   */
+  private queue: Promise<void> = Promise.resolve();
 
   constructor(private readonly deps: ChatSurfaceRenderTargetDeps) {}
+
+  /**
+   * Queues one column operation behind the ones already asked for.
+   *
+   * A failure does not stop the queue: the operations after it are a different
+   * part of the same turn, and a column that stops drawing because one block
+   * threw is worse than a column with one block missing.
+   */
+  /**
+   * Resolves when the column has done everything it has been asked for.
+   *
+   * The work after a turn ends — the duration footer, the finalizations the
+   * legacy path does itself — runs against the same column, so it has to
+   * follow rather than interleave.
+   */
+  settled(): Promise<void> {
+    return this.queue;
+  }
+
+  private enqueue(operation: () => Promise<unknown>): void {
+    this.queue = this.queue
+      .catch(() => undefined)
+      .then(() => operation())
+      .then(() => undefined, () => undefined);
+  }
 
   reset(view: ChatConversationView): void {
     this.turnMessages.clear();
@@ -192,24 +228,27 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
     // A new index means the previous block is finished. The legacy controller
     // decides this by watching the chunk type change; here the renderer has
     // already decided it, which is the whole point of the index.
-    void this.deps.stream.finalizeCurrentThinkingBlock(message);
-    void this.deps.stream.finalizeCurrentTextBlock(message);
+    this.enqueue(() => this.deps.stream.finalizeCurrentThinkingBlock(message));
+    this.enqueue(() => this.deps.stream.finalizeCurrentTextBlock(message));
     this.open = { runId, index, kind: item.kind };
     switch (item.kind) {
       case 'assistant-text':
         message.content += item.text;
-        void this.deps.stream.appendText(item.text);
+        this.enqueue(() => this.deps.stream.appendText(item.text));
         return;
       case 'reasoning-text':
-        void this.deps.stream.appendThinking(item.text);
+        this.enqueue(() => this.deps.stream.appendThinking(item.text));
         return;
       case 'provider-content': {
         const presented = this.deps.presentProviderContent(item.payload);
-        const handled = presented.map(content => (
-          this.deps.stream.handleStreamChunk(content, message)
-        ));
+        for (const content of presented) {
+          this.enqueue(() => this.deps.stream.handleStreamChunk(content, message));
+        }
         if (presented.some(content => content.type === 'usage')) {
-          void Promise.all(handled).then(() => {
+          // Behind the chunks rather than beside them: the controller is what
+          // decides which usage report to keep, and it decides it while
+          // handling the chunk this reads back.
+          this.enqueue(async () => {
             this.deps.recordTurnUsage(runId, this.deps.state.usage);
           });
         }
@@ -228,11 +267,11 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
       return;
     }
     if (this.open.kind === 'reasoning-text') {
-      void this.deps.stream.appendThinking(text);
+      this.enqueue(() => this.deps.stream.appendThinking(text));
       return;
     }
     message.content += text;
-    void this.deps.stream.appendText(text);
+    this.enqueue(() => this.deps.stream.appendText(text));
   }
 
   setTurnState(runId: RunId, state: RunState): void {
@@ -265,19 +304,24 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
     // reached the provider, and saying nothing leaves an empty assistant
     // message where the explanation belongs.
     if (terminal.kind === 'failed' || terminal.kind === 'invalidated') {
-      void this.deps.stream.handleStreamChunk(
+      this.enqueue(() => this.deps.stream.handleStreamChunk(
         { type: 'error', content: this.deps.describeTerminal(terminal) },
         message,
-      );
+      ));
     } else if (terminal.kind === 'indeterminate') {
-      void this.deps.stream.handleStreamChunk(
+      this.enqueue(() => this.deps.stream.handleStreamChunk(
         { type: 'notice', level: 'warning', content: this.deps.describeTerminal(terminal) },
         message,
-      );
+      ));
     }
-    void this.deps.stream.handleStreamChunk({ type: 'done' }, message);
-    this.deps.stream.hideThinkingIndicator();
-    this.deps.stream.stopTurnSilenceIndicator();
+    this.enqueue(() => this.deps.stream.handleStreamChunk({ type: 'done' }, message));
+    // Behind the drawing, not beside it: an indicator that goes out while the
+    // last block is still being written says the turn is over before it looks
+    // over.
+    this.enqueue(async () => {
+      this.deps.stream.hideThinkingIndicator();
+      this.deps.stream.stopTurnSilenceIndicator();
+    });
   }
 
   setTurnPersistence(
@@ -291,14 +335,14 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
     }
     // The one persistence state a person can act on: the answer is on screen
     // and not in the vault, which nothing said before this path existed.
-    void this.deps.stream.handleStreamChunk(
+    this.enqueue(() => this.deps.stream.handleStreamChunk(
       {
         type: 'notice',
         level: 'warning',
         content: `This answer could not be saved (${errorCode ?? 'unknown'}).`,
       },
       message,
-    );
+    ));
   }
 
   reconcileTurn(runId: RunId, outcome: ReconciledOutcomeProjection): void {
@@ -306,14 +350,14 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
     if (!message) {
       return;
     }
-    void this.deps.stream.handleStreamChunk(
+    this.enqueue(() => this.deps.stream.handleStreamChunk(
       {
         type: 'notice',
         level: 'info',
         content: `This turn was later established to have ${outcome.observedOutcome}.`,
       },
       message,
-    );
+    ));
   }
 
   showInteraction(_interaction: InteractionProjection): void {

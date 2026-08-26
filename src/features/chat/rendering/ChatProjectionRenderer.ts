@@ -89,6 +89,13 @@ export interface ChatRenderTarget {
    * completed" has this and nothing else to replace that sentence with.
    */
   reconcileTurn(runId: RunId, outcome: ReconciledOutcomeProjection): void;
+  /**
+   * Resolves when the target has done everything it has been asked for.
+   *
+   * Absent for a target whose calls are synchronous, which is what a recording
+   * one is. Present for one that draws into a column, because drawing is not.
+   */
+  settled?(): Promise<void>;
   setTurnPersistence(
     runId: RunId,
     persistence: ChatTurnProjection['persistence'],
@@ -117,6 +124,11 @@ export class ChatProjectionRenderer {
   private previous: ChatProjection | null = null;
 
   constructor(private readonly target: ChatRenderTarget) {}
+
+  /** Resolves when the target has drawn everything this renderer asked for. */
+  settled(): Promise<void> {
+    return this.target.settled?.() ?? Promise.resolve();
+  }
 
   render(projection: ChatProjection): void {
     const previous = this.previous;

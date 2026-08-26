@@ -57,6 +57,9 @@ describe('InputController on the projection path', () => {
         userMessage: { content: 'what the provider composed', currentNote: 'Note.md' },
       }),
       cancel: jest.fn().mockResolvedValue(undefined),
+      // The column's work is queued, so the turn waits for it before the block
+      // that runs after a turn touches the same column.
+      settled: jest.fn().mockResolvedValue(undefined),
       ...overrides,
     };
   }

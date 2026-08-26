@@ -32,10 +32,12 @@ interface RecordedCall {
 
 function harness() {
   const calls: RecordedCall[] = [];
-  const record = (method: string) => (...args: unknown[]) => {
+  // `jest.fn` rather than a plain arrow, so a test can make one of the column's
+  // operations slow — which is the only way to see that the order is kept.
+  const record = (method: string) => jest.fn((...args: unknown[]) => {
     calls.push({ method, args });
     return Promise.resolve();
-  };
+  });
   const messageEl = createMockEl();
   const contentEl = createMockEl();
   messageEl.querySelector = jest.fn().mockReturnValue(contentEl);
@@ -113,6 +115,7 @@ function harness() {
   });
   return {
     target,
+    stream,
     calls,
     state,
     contentEl,
@@ -138,7 +141,12 @@ function beginTurn(target: ChatSurfaceRenderTarget, target_run: RunId = RUN_ID):
 }
 
 describe('chat surface render target', () => {
-  it('is satisfied by the machinery it was written against', () => {
+  /** The column's work is queued, so a caller lets it drain before reading. */
+  async function drained(target: ChatSurfaceRenderTarget): Promise<void> {
+    await target.settled();
+  }
+
+  it('is satisfied by the machinery it was written against', async () => {
     // The ports are narrow views of three real classes. A method renamed on any
     // of them would leave this target compiling against a shape nothing
     // implements, and nothing would say so until the flip wired it up.
@@ -149,24 +157,66 @@ describe('chat surface render target', () => {
     expect([stream, messages, cursor].every(cast => typeof cast === 'function')).toBe(true);
   });
 
-  it('opens a turn with one bubble, a cursor into it, and both indicators', () => {
+  it('opens a turn with one bubble, a cursor into it, and both indicators', async () => {
     const chat = harness();
 
     beginTurn(chat.target);
 
     // One `renderer.addMessage`, not two: getting the element back by rendering
     // the message a second time is a second bubble on screen.
+    await drained(chat.target);
     expect(chat.methods()).toEqual([
       'state.addMessage',
       'renderer.addMessage',
       'showThinkingIndicator',
       'startTurnSilenceIndicator',
     ]);
+    await drained(chat.target);
     expect(chat.state.currentContentEl).toBe(chat.contentEl);
+    await drained(chat.target);
     expect(chat.state.messages).toHaveLength(1);
   });
 
-  it('finalizes the open block before opening the next one', () => {
+  it('draws in the order it was asked to, however slowly each part draws', async () => {
+    // Every column operation is asynchronous and several are only partly
+    // synchronous: finalizing a text block awaits a pending render before it
+    // closes the element. Started and not awaited, the append that follows a
+    // finalize lands in the block the finalize is still closing, and the `done`
+    // that ends a turn overtakes the tool call before it.
+    const chat = harness();
+    const slow = <T>(value: T) => new Promise<T>(resolve => {
+      setTimeout(() => resolve(value), 0);
+    });
+    // Recorded when it *finishes*, not when it is called: a caller that starts
+    // each operation without waiting produces the same call order and a
+    // different draw order, and only the second one is what a person sees.
+    (chat.stream.finalizeCurrentTextBlock as jest.Mock).mockImplementation(() => (
+      slow(undefined).then(() => {
+        chat.calls.push({ method: 'finalizeCurrentTextBlock', args: [] });
+      })
+    ));
+    beginTurn(chat.target);
+    chat.clear();
+
+    chat.target.openTurnBlock(RUN_ID, 0, { kind: 'assistant-text', text: 'first' });
+    chat.target.openTurnBlock(RUN_ID, 1, { kind: 'assistant-text', text: 'second' });
+    chat.target.endTurn(RUN_ID, terminal());
+
+    await drained(chat.target);
+    expect(chat.methods()).toEqual([
+      'finalizeCurrentThinkingBlock',
+      'finalizeCurrentTextBlock',
+      'appendText',
+      'finalizeCurrentThinkingBlock',
+      'finalizeCurrentTextBlock',
+      'appendText',
+      'handleStreamChunk',
+      'hideThinkingIndicator',
+      'stopTurnSilenceIndicator',
+    ]);
+  });
+
+  it('finalizes the open block before opening the next one', async () => {
     const chat = harness();
     beginTurn(chat.target);
     chat.clear();
@@ -175,6 +225,7 @@ describe('chat surface render target', () => {
     chat.target.extendTurnText(RUN_ID, 0, 'ally, ');
     chat.target.openTurnBlock(RUN_ID, 1, { kind: 'reasoning-text', text: 'Hmm.' });
 
+    await drained(chat.target);
     expect(chat.methods()).toEqual([
       // The legacy controller decides "new block?" by watching the chunk type
       // change; the index has already decided it here.
@@ -188,7 +239,7 @@ describe('chat surface render target', () => {
     ]);
   });
 
-  it('keeps the message content in step with the answer it is drawing', () => {
+  it('keeps the message content in step with the answer it is drawing', async () => {
     const chat = harness();
     beginTurn(chat.target);
 
@@ -199,10 +250,11 @@ describe('chat surface render target', () => {
 
     // Reasoning is not the answer, on this path for the same reason it is not
     // on the legacy one: the answer is what gets persisted as the message.
+    await drained(chat.target);
     expect(chat.state.messages[0]?.content).toBe('Botanically, yes.');
   });
 
-  it('hands provider content to the surface through the provider that owns it', () => {
+  it('hands provider content to the surface through the provider that owns it', async () => {
     const chat = harness();
     beginTurn(chat.target);
     chat.clear();
@@ -213,6 +265,7 @@ describe('chat surface render target', () => {
 
     chat.target.openTurnBlock(RUN_ID, 0, { kind: 'provider-content', payload: { any: 'shape' } });
 
+    await drained(chat.target);
     expect(chat.calls.filter(call => call.method === 'handleStreamChunk').map(call => (
       (call.args[0] as { type: string }).type
     ))).toEqual(['tool_use', 'tool_result']);
@@ -236,6 +289,7 @@ describe('chat surface render target', () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    await drained(chat.target);
     expect(chat.calls.filter(call => call.method === 'recordTurnUsage')).toEqual([{
       method: 'recordTurnUsage',
       args: [RUN_ID, { ...usageOf(10), model: 'kept-by-the-controller' }],
@@ -252,50 +306,55 @@ describe('chat surface render target', () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    await drained(chat.target);
     expect(chat.methods()).not.toContain('recordTurnUsage');
   });
 
-  it('ends a failed turn the way the adapter ends one, and stops both indicators', () => {
+  it('ends a failed turn the way the adapter ends one, and stops both indicators', async () => {
     const chat = harness();
     beginTurn(chat.target);
     chat.clear();
 
     chat.target.endTurn(RUN_ID, terminal({ kind: 'failed', reason: 'provider-failure' }));
 
+    await drained(chat.target);
     expect(chat.calls.filter(call => call.method === 'handleStreamChunk').map(call => call.args[0]))
       .toEqual([
         { type: 'error', content: 'ended: provider-failure' },
         { type: 'done' },
       ]);
+    await drained(chat.target);
     expect(chat.methods().slice(-2)).toEqual(['hideThinkingIndicator', 'stopTurnSilenceIndicator']);
   });
 
-  it('says a turn ended indeterminate rather than showing it as failed', () => {
+  it('says a turn ended indeterminate rather than showing it as failed', async () => {
     const chat = harness();
     beginTurn(chat.target);
     chat.clear();
 
     chat.target.endTurn(RUN_ID, terminal({ kind: 'indeterminate', reason: 'cancellation-unknown' }));
 
-    expect(chat.calls[0]?.args[0]).toEqual({
+    await drained(chat.target);
+    expect(chat.calls.find(call => call.method === 'handleStreamChunk')?.args[0]).toEqual({
       type: 'notice',
       level: 'warning',
       content: 'ended: cancellation-unknown',
     });
   });
 
-  it('closes a succeeded turn without adding anything to it', () => {
+  it('closes a succeeded turn without adding anything to it', async () => {
     const chat = harness();
     beginTurn(chat.target);
     chat.clear();
 
     chat.target.endTurn(RUN_ID, terminal());
 
+    await drained(chat.target);
     expect(chat.calls.filter(call => call.method === 'handleStreamChunk').map(call => call.args[0]))
       .toEqual([{ type: 'done' }]);
   });
 
-  it('stops the silence timer counting a person who is reading a question', () => {
+  it('stops the silence timer counting a person who is reading a question', async () => {
     const chat = harness();
     beginTurn(chat.target);
     chat.clear();
@@ -307,13 +366,14 @@ describe('chat surface render target', () => {
 
     // A turn waiting on a human is not a provider that has gone quiet, and the
     // repeat is not a second pause.
+    await drained(chat.target);
     expect(chat.calls).toEqual([
       { method: 'pauseTurnSilenceIndicator', args: [true] },
       { method: 'pauseTurnSilenceIndicator', args: [false] },
     ]);
   });
 
-  it('presents no interaction, and flushes what a prompt must appear below', () => {
+  it('presents no interaction, and flushes what a prompt must appear below', async () => {
     const chat = harness();
     beginTurn(chat.target);
     chat.clear();
@@ -331,10 +391,11 @@ describe('chat surface render target', () => {
 
     // The provider's own presenter already has the dialog on screen. A second
     // one here is two prompts for one question.
+    await drained(chat.target);
     expect(chat.methods()).toEqual(['flushPendingToolsForPermission']);
   });
 
-  it('says when an answer is on screen and not in the vault', () => {
+  it('says when an answer is on screen and not in the vault', async () => {
     const chat = harness();
     beginTurn(chat.target);
     chat.clear();
@@ -343,6 +404,7 @@ describe('chat surface render target', () => {
     chat.target.setTurnPersistence(RUN_ID, 'saved');
     chat.target.setTurnPersistence(RUN_ID, 'failed', 'conversation-persistence-failed');
 
+    await drained(chat.target);
     expect(chat.calls).toEqual([{
       method: 'handleStreamChunk',
       args: [
@@ -356,7 +418,7 @@ describe('chat surface render target', () => {
     }]);
   });
 
-  it('reports what was later established about a turn', () => {
+  it('reports what was later established about a turn', async () => {
     const chat = harness();
     beginTurn(chat.target);
     chat.clear();
@@ -368,11 +430,13 @@ describe('chat surface render target', () => {
       recordedAt: 20,
     });
 
-    expect((chat.calls[0]?.args[0] as { content: string }).content)
+    await drained(chat.target);
+    expect((chat.calls.find(call => call.method === 'handleStreamChunk')
+      ?.args[0] as { content: string }).content)
       .toBe('This turn was later established to have succeeded.');
   });
 
-  it('draws a conversation from nothing and forgets the turns it was holding', () => {
+  it('draws a conversation from nothing and forgets the turns it was holding', async () => {
     const chat = harness();
     beginTurn(chat.target);
     chat.clear();
@@ -387,8 +451,11 @@ describe('chat surface render target', () => {
     chat.target.extendTurnText(RUN_ID, 0, 'orphaned');
     chat.target.endTurn(RUN_ID, terminal());
 
+    await drained(chat.target);
     expect(chat.methods()).toEqual(['setTitle', 'renderer.renderMessages']);
+    await drained(chat.target);
     expect(chat.state.currentContentEl).toBeNull();
+    await drained(chat.target);
     expect(chat.state.messages).toEqual([expect.objectContaining({ id: 'msg-1' })]);
   });
 });

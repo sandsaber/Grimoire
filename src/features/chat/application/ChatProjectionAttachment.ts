@@ -28,6 +28,8 @@ export interface ChatProjectionSource {
 
 export interface ChatProjectionSink {
   render(projection: ChatProjection): void;
+  /** Resolves when everything rendered into it has actually been drawn. */
+  settled?(): Promise<void>;
 }
 
 export class ChatProjectionAttachment {
@@ -59,6 +61,11 @@ export class ChatProjectionAttachment {
       return;
     }
     this.release = release;
+  }
+
+  /** Resolves when the sink has drawn everything this attachment gave it. */
+  settled(): Promise<void> {
+    return this.sink.settled?.() ?? Promise.resolve();
   }
 
   detach(): void {

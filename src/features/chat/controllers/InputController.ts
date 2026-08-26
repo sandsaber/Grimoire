@@ -608,6 +608,10 @@ export class InputController {
         userMsg.content = submitted.userMessage.content;
         userMsg.currentNote = submitted.userMessage.currentNote;
         const completed = await submitted.ticket.completion;
+        // The column may still be drawing the end of the turn. Everything the
+        // block below does is against that same column, so it follows rather
+        // than interleaves.
+        await projection.settled();
         didEnqueueToSdk = completed.terminal.kind !== 'invalidated';
         wasInterrupted = completed.terminal.kind === 'cancelled';
         planCompleted = completed.planCompleted === true;

@@ -109,6 +109,17 @@ export class ChatTabExecution {
     });
   }
 
+  /**
+   * Resolves when the column has drawn everything this turn produced.
+   *
+   * Awaited before the work that runs *after* a turn — the duration footer, the
+   * finalizations the surface does itself — because that work is against the
+   * same column and following is not the same as interleaving.
+   */
+  settled(): Promise<void> {
+    return this.attachment.settled();
+  }
+
   async cancel(reason?: CancellationReason): Promise<void> {
     if (!this.bound) {
       return;
