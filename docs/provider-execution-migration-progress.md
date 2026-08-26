@@ -7691,6 +7691,51 @@ before writing it and none of them visible from the port's own signature: the co
 
 Gates: unit 529 suites / 8,366 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The render target: the first piece of this path allowed to touch a DOM (this commit)
+
+`ChatSurfaceRenderTarget` implements the renderer's port over `StreamController`, `MessageRenderer`
+and `ChatState`. Every call is an operation the chat column already performs, in the order it
+performs it — the target decides nothing about *what* changed, which the renderer did — so what is
+here is a translation, which is the shape the plan asks for when it calls the renderer a thin
+replaceable layer.
+
+**The ports are narrow views of three real classes, and a test casts each one into its port.** A
+method renamed on any of them would otherwise leave this compiling against a shape nothing
+implements, and nothing would say so until the flip wired it up — the same gate the coordinator has
+against the registry, for the same reason.
+
+**It synthesizes two lifecycle chunks and no others, both from the kernel's terminal.** `done`,
+because the legacy controller closes a turn on it and its finalization is private; `error`, because
+that is the failed ending this column already shows. The direction is what makes them right: a
+content presenter that emitted either would be a provider claiming a turn ended, which each presenter
+filters out. `status` and the two message-start boundaries are absent, because a projection-driven
+surface takes those from the run's state and the turn's own beginning — which is exactly the split
+the commit below this one named.
+
+**The indicators, after reading the six call sites the previous entry said to read.** The mapping is
+smaller than the six suggested: a turn's beginning shows the thinking indicator and starts the
+silence timer, its terminal hides and stops them, content arriving hides the thinking indicator
+already inside `appendText`, and the only thing left for `setTurnState` is the pause — a person
+reading a permission prompt is not a provider that has gone quiet, and counting it as one reports a
+turn waiting on a human as stalled.
+
+**Two defects the tests caught in the first draft**, both the kind that only a recorded call order
+shows: `beginTurn` rendered the assistant bubble *twice*, because it called the append pair and then
+called `addMessage` again to get the element back; and the renderability recovery was documented but
+unwired, so an unexpressible change threw out of `render` instead of redrawing — that one was in the
+renderer and is fixed in the commit above.
+
+**Tested against recording doubles rather than a DOM**, on purpose: the target is a translation —
+which operation, with what, in what order — and what those operations then do to the column is
+`StreamController`'s own behaviour with three thousand lines of tests of its own. Testing it through
+here would test it twice and this not at all.
+
+Still dark, and the release bundle does not contain it. What turns it on is the attachment that binds
+a tab to a coordinator, and that is the flip: `InputController` and `StreamController` stop owning
+the turn, which is a smoke matrix rather than a gate.
+
+Gates: unit 530 suites / 8,379 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7767,21 +7812,24 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 **M3 is closed.** Everything below is M5 or later.
 
-1. **The render target.** The content vocabulary is split and named, and the two questions that were
-   open around it are answered: a presenter stays typed as `StreamChunk` until the flip, because
-   `InputController` still reads turn framing off that channel, and `usage` is content, so the meter
-   is fed from what the target is handed rather than from a projection field. The target is thirteen
-   methods and every one of them is something `StreamController` and `MessageRenderer` already do; it
-   is the first piece allowed to touch a DOM, so it belongs in `src/features/chat/rendering/` beside
-   the renderer, and it may consume `ChatContentItem` from the provider presenter it resolves.
-   Two parts are not mechanical. **The two indicators**: the thinking indicator and the turn-silence
-   timer are driven from `setTurnState`, and `StreamController` starts and stops them from six
-   places, so read those six before deciding which the state covers. **Usage's write path**: the
-   barrier persists messages and `lastResponseAt`, and the legacy save wrote `conversation.usage`
-   too — a target that learns usage from content has to get it back to the coordinator, which is a
-   command on the coordinator rather than a field on the projection. After the target, the step that
-   turns this on is `ChatProjectionAttachment` (the first attempt's, 109 lines, at `8cab81b4`):
-   subscribe a tab to a coordinator, hand projections to a renderer, detach on close.
+1. **The attachment, and then the flip.** Every dark piece of the chat path now exists — projection,
+   live content, coordinator, adoption, renderer, target — and what is missing is the thing that
+   binds them to a tab: subscribe to a coordinator for the tab's conversation, hand each projection
+   to a renderer over a target built from that tab's controller and state, detach on close. The first
+   attempt's `ChatProjectionAttachment` (109 lines, at `8cab81b4`) is the material. It is small; what
+   is not small is what it replaces, and the three things that have to be settled in the same
+   checkpoint rather than discovered during it:
+   - **who creates the assistant message.** `InputController` does today, and the target does on
+     `beginTurn`. Both cannot;
+   - **usage's write path.** The meter is fed from content the target is handed, and the barrier
+     persists messages and `lastResponseAt` but not `conversation.usage`, which the legacy save
+     wrote. A target that learns usage has to get it back to the coordinator — a command on the
+     coordinator, not a field on the projection;
+   - **which interaction trigger survives**, per the note on the port: the provider's presenter has
+     the dialog on screen already, and the projection wants to show it from state so a reopened tab
+     shows the question.
+   This is the flip, so it is a smoke matrix rather than a gate, and per the standing rule it is
+   certified against a live provider before the next thing lands.
 2. **`InputController` and `StreamController` stop owning the turn**, once a target exists. That is
    the flip, and it is the one that needs a smoke matrix rather than a gate: 2,100 lines of
    incremental append and 2,150 of turn acceptance come out, and every provider's chat behaviour is

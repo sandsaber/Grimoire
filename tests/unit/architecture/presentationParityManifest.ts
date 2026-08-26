@@ -808,6 +808,16 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: ['src/features/chat/rendering/ChatProjectionRenderer.ts'],
   },
   {
+    id: 'chat-surface-render-target',
+    area: 'chat',
+    description:
+      'The renderer\'s port over the machinery that already draws the chat column: turn bubbles, streamed blocks, provider content, the two indicators, and the endings a terminal produces.',
+    state: 'pending',
+    owner:
+      'M5 — nothing constructs one. It is the last dark piece before the flip: what turns it on is the attachment that binds a tab to a coordinator, which is where InputController and StreamController stop owning the turn.',
+    modules: ['src/features/chat/rendering/ChatSurfaceRenderTarget.ts'],
+  },
+  {
     id: 'execution-platform-dark',
     area: 'shell',
     description:
