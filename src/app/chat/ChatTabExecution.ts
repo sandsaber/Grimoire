@@ -3,6 +3,7 @@ import type { CancellationReason } from '@/core/execution/ExecutionContracts';
 import type { ChatTurnEncoder } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatRuntimeQueryOptions, ChatTurnRequest } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
+import type { ProviderId } from '@/core/types/provider';
 import type { ChatProjectionAttachment } from '@/features/chat/application/ChatProjectionAttachment';
 
 import type {
@@ -30,6 +31,8 @@ import type {
 
 export interface ChatTabExecutionOptions {
   readonly composition: ChatExecutionComposition;
+  /** The provider this was built for. A tab that changes provider needs a new one. */
+  readonly providerId: ProviderId;
   readonly backendId: ExecutionBackendId;
   readonly surface: ChatSurfaceBinding;
   /**
@@ -55,6 +58,19 @@ export class ChatTabExecution {
   /** The conversation this tab is showing, or `null` while it is blank. */
   get conversationId(): string | null {
     return this.bound;
+  }
+
+  /**
+   * The provider this was built for.
+   *
+   * A tab's provider is not fixed — a blank tab derives it from the model that
+   * is picked, and a bound one changes with the conversation — so whoever holds
+   * this has to notice when it no longer matches and build another. Which
+   * provider a tab is on is the whole of what decides whether it takes this
+   * path at all.
+   */
+  get providerId(): ProviderId {
+    return this.options.providerId;
   }
 
   async open(conversationId: string): Promise<void> {

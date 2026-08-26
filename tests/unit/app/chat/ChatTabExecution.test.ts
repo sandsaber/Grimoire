@@ -156,6 +156,7 @@ async function createTab(options: { readonly encoder?: ChatTurnEncoder | null } 
   let commandOrdinal = 0;
   const tab = new ChatTabExecution({
     composition,
+    providerId: 'claude',
     backendId: BACKEND_ID,
     surface: drawn.binding,
     turnEncoder: () => (options.encoder === undefined ? encoder : options.encoder),

@@ -2,7 +2,10 @@ import '@/providers';
 
 import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import type { StreamChunk } from '@/core/types';
-import { createTabProjectionExecution } from '@/features/chat/tabs/tabProjectionExecution';
+import {
+  createTabProjectionExecution,
+  resolveTabProjectionExecution,
+} from '@/features/chat/tabs/tabProjectionExecution';
 import type { TabData } from '@/features/chat/tabs/types';
 
 jest.mock('@/app/chat/projectionChatProviders', () => ({
@@ -77,6 +80,50 @@ describe('tab projection execution', () => {
     asked.mockReturnValue(true);
 
     expect(createTabProjectionExecution(tabOf(), plugin)).not.toBeNull();
+  });
+
+  describe('resolving which path a tab is on', () => {
+    it('builds a new one when the tab changes provider', () => {
+      // A blank tab derives its provider from the model that is picked, and a
+      // bound one changes with the conversation. Built once, a tab that
+      // switched *away* would keep submitting turns under the provider it left.
+      asked.mockImplementation(providerId => providerId === 'codex');
+      const tab = tabOf({ providerId: 'codex' });
+
+      const first = resolveTabProjectionExecution(tab, plugin);
+      expect(first).not.toBeNull();
+      expect(resolveTabProjectionExecution(tab, plugin)).toBe(first);
+
+      tab.providerId = 'claude';
+      expect(resolveTabProjectionExecution(tab, plugin)).toBeNull();
+      expect(tab.execution).toBeNull();
+    });
+
+    it('takes a tab onto the path when its provider joins it', () => {
+      asked.mockReturnValue(false);
+      const tab = tabOf({ providerId: 'claude' });
+      expect(resolveTabProjectionExecution(tab, plugin)).toBeNull();
+
+      asked.mockReturnValue(true);
+      tab.providerId = 'codex';
+
+      expect(resolveTabProjectionExecution(tab, plugin)).not.toBeNull();
+    });
+
+    it('detaches the one it replaces', () => {
+      asked.mockReturnValue(true);
+      const tab = tabOf({ providerId: 'codex' });
+      const first = resolveTabProjectionExecution(tab, plugin);
+      const detach = jest.spyOn(first!, 'detach');
+
+      tab.providerId = 'claude';
+      asked.mockReturnValue(false);
+      resolveTabProjectionExecution(tab, plugin);
+
+      // A binding left attached draws the old provider's projection into a
+      // column the new one is now writing.
+      expect(detach).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('drops the turn framing a provider still sends down the content channel', () => {

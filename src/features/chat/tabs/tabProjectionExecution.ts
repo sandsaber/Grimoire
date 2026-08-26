@@ -10,6 +10,33 @@ import { getTabSettingsSnapshot } from './tabSettings';
 import type { TabData } from './types';
 
 /**
+ * A tab's end of the projection path for the provider it is on *now*.
+ *
+ * Resolved on every use rather than built once, because a tab's provider is not
+ * fixed: a blank tab derives it from the model that is picked, and a bound one
+ * changes with the conversation. Built once, a tab that started on a provider
+ * not on the path would stay on the legacy path after switching to one that is
+ * — and worse, a tab that switched *away* would keep submitting turns under the
+ * provider it left. Which provider a tab is on is the whole of what decides
+ * whether it takes this path, so it is asked each time.
+ */
+export function resolveTabProjectionExecution(
+  tab: TabData,
+  plugin: GrimoirePlugin,
+): ChatTabExecution | null {
+  const current = tab.execution;
+  if (current && current.providerId === tab.providerId) {
+    return current;
+  }
+  current?.detach();
+  tab.execution = createTabProjectionExecution(tab, plugin);
+  if (tab.execution && tab.conversationId) {
+    void tab.execution.open(tab.conversationId);
+  }
+  return tab.execution;
+}
+
+/**
  * A tab's end of the projection path, where its provider is on that path.
  *
  * `null` for every provider not listed in `projectionChatProviders`, which is
@@ -43,6 +70,7 @@ export function createTabProjectionExecution(
   }
   return new ChatTabExecution({
     composition,
+    providerId: tab.providerId,
     backendId,
     surface: {
       state: tab.state,

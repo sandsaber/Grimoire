@@ -32,7 +32,7 @@ import {
   setupServiceCallbacks,
   wireTabInputEvents,
 } from './Tab';
-import { createTabProjectionExecution } from './tabProjectionExecution';
+import { resolveTabProjectionExecution } from './tabProjectionExecution';
 import {
   type ClosedTabSnapshot,
   MAX_TAB_TITLE_LENGTH,
@@ -260,10 +260,11 @@ export class TabManager implements TabManagerInterface {
         // The tab is showing a different conversation now, so its projection is
         // a different conversation's. Detaching first is what stops the old
         // one's turn being drawn into the new one's column.
+        const execution = resolveTabProjectionExecution(tab, this.plugin);
         if (conversationId) {
-          void tab.execution?.open(conversationId);
+          void execution?.open(conversationId);
         } else {
-          tab.execution?.detach();
+          execution?.detach();
         }
         this.callbacks.onTabConversationChanged?.(tab.id, conversationId);
       },
@@ -302,10 +303,7 @@ export class TabManager implements TabManagerInterface {
     // After the controllers, because a tab's binding reads its renderer and its
     // stream controller. `null` unless this tab's provider is on the projection
     // path, which is what keeps the flip to one provider at a time.
-    tab.execution = createTabProjectionExecution(tab, this.plugin);
-    if (tab.execution && tab.conversationId) {
-      void tab.execution.open(tab.conversationId);
-    }
+    resolveTabProjectionExecution(tab, this.plugin);
 
     // Wire input event handlers
     wireTabInputEvents(tab, this.plugin);

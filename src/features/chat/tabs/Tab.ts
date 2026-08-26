@@ -62,6 +62,7 @@ import { buildAssistantResponseMetadata } from '../utils/assistantResponseMetada
 import { recalculateUsageForModel } from '../utils/usageInfo';
 import { getTabProviderId } from './providerResolution';
 import { attachInputResizeHandle, buildTabDOM } from './tabDOM';
+import { resolveTabProjectionExecution } from './tabProjectionExecution';
 import {
   AUTO_SCROLL_REENABLE_DELAY_MS,
   isTabScrollAtBottom,
@@ -1380,7 +1381,7 @@ export function initializeTabControllers(
     state,
     // Read late: the binding is built after the controllers are, and a tab
     // whose provider is not on the projection path never has one.
-    getProjectionExecution: () => tab.execution,
+    getProjectionExecution: () => resolveTabProjectionExecution(tab, plugin),
     renderer: tab.renderer,
     streamController: tab.controllers.streamController,
     selectionController: tab.controllers.selectionController,

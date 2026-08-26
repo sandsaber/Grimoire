@@ -8166,6 +8166,32 @@ surface went away while the question was open still answers, because the record 
 
 Gates: unit 535 suites / 8,431 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### An outside review of the flip, and the first of what it found (this commit)
+
+A review by a second model over the thirty-two unpushed commits reported seven defects, three
+suggestions, and one verdict worth repeating: *the empty switch is right, and the path one line would
+turn on is not ready.* Each is being checked against the code rather than taken, and this entry
+carries the first — the one that makes the documented flip procedure not mean what it says.
+
+**A tab's provider is not fixed, and the decision was.** `tab.execution` was built once, at tab
+creation, from the provider the tab had then. A blank tab derives its provider from the model that is
+picked, and a bound one changes with the conversation — so a tab that started on a provider not on
+the path would stay on the legacy path after switching to one that is, and, worse, a tab that
+switched *away* would keep submitting turns under the provider it left. "Add an id to the list" would
+then not describe what any given tab does.
+
+It is resolved on every use now, and the binding it replaces is detached — one left attached draws
+the old provider's projection into a column the new one is writing. Three call sites go through the
+resolver: tab creation, the conversation-bound callback, and the input controller's own read, which
+is what makes the decision current at the moment a turn is sent.
+
+Also corrected from the same review, in the commit above this one: the review is right that the
+review's own reading of the rewind identities was already fixed a commit earlier, and the parts of
+its bug 1 about `slice(0, -2)` describe the legacy branch rather than this one. What remains of that
+bug — the native session and the resume checkpoint — is real and is the next entry.
+
+Gates: unit 535 suites / 8,434 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
