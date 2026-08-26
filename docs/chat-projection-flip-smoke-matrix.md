@@ -29,7 +29,7 @@ the order they are most likely to break:
 |---|---|---|---|
 | 1 | The plan approval | Run a plan-mode turn on a provider that has one | The approval appears after the turn ends, and implement / revise / cancel each do what they do on the legacy path. `planCompleted` is derived from the turn's own resolved interactions now, by the same reading the adapter does — a response id that names a plan — so what is untested is the providers' ids, not the wiring |
 | 2 | Double finalization | Finish an ordinary turn | The answer renders once, no duplicated footer, no empty trailing block. The turn is finalized by the target's `done` and again by the `finally` block, whose guards should make the second a no-op |
-| 3 | The save after the barrier | Finish a turn, reload the vault | The conversation holds exactly what was on screen. The barrier writes the answer and `ConversationController.save` then writes `state.messages` over it; those must be the same thing |
+| 3 | The save after the barrier | Finish a turn, reload the vault | The conversation holds exactly what was on screen. The barrier writes the answer as **text**, and `ConversationController.save` then writes `state.messages` — which carries the tool calls and content blocks the barrier cannot. While a tab is open the second write is what survives; **a turn whose tab closed, or one adopted after a reload, keeps only the text.** That is the shape of what a `ResultRef` cannot resolve back to, not a defect of the save |
 | 4 | Title generation | Send the first message in a blank tab | A title is generated. It fires on `state.messages.length === 1`, and on this path the first message reaches `state.messages` from the projection rather than before the send |
 
 ## Rows for the surface itself

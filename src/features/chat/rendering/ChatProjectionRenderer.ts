@@ -36,7 +36,8 @@ import type {
  * index says so, which is the same decision made where the ordering is already
  * known.
  *
- * Dark: nothing constructs one yet, and no target implements the port.
+ * Built by the chat composition for every surface it binds. Whether a tab
+ * binds one is decided by `projectionChatProviders`, which is empty.
  */
 
 export interface ChatConversationView {

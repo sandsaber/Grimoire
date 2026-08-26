@@ -39,8 +39,8 @@ import type {
  * already on screen — see `showInteraction` on the port — so this flushes what
  * a permission prompt needs to appear above and presents nothing.
  *
- * Dark: nothing constructs one, because the thing that would is the attachment
- * that binds a tab to a coordinator, and that is the flip.
+ * Built for every surface the chat composition binds, which today is none:
+ * `projectionChatProviders` is empty, so no tab takes this path.
  */
 
 /**

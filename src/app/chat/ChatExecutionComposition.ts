@@ -41,7 +41,8 @@ import {
  * coordinator, the identities, and the route by which a turn's cost gets back to
  * the barrier that persists it.
  *
- * Dark: nothing constructs one. It is what the flip calls.
+ * Constructed by `main.ts` at plugin load and disposed before the kernel at
+ * unload.
  */
 
 export interface ChatExecutionCompositionOptions {
@@ -112,7 +113,11 @@ export class ChatExecutionComposition {
    *   a failure for producing no answer.
    */
   async submitTurn(command: SubmitChatMessageCommand): Promise<SubmittedChatTurn> {
-    const conversation = await this.coordinator.loadConversation(command.conversationId);
+    // Re-read rather than reuse: a surface saves what it drew, with the tool
+    // calls and content blocks the barrier does not carry, and a projection
+    // built from an earlier read has none of it. Encoding the history from the
+    // stale one sends the provider a poorer transcript than the one on screen.
+    const conversation = await this.coordinator.reloadConversation(command.conversationId);
     const prepared = command.encoder.prepareTurn(command.request);
     const requestRef = command.encoder.encodeRequestRef(
       prepared,

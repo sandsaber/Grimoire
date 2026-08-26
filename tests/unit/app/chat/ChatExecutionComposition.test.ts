@@ -310,6 +310,55 @@ describe('chat execution composition', () => {
       app.composition.dispose();
     });
 
+    it('encodes the history the vault has, not the one the coordinator last saw', async () => {
+      // This coordinator is not the only writer: a surface saves what it drew,
+      // with the tool calls and content blocks the barrier does not carry. A
+      // projection built from an earlier read has none of it, and encoding the
+      // history from that sends the provider a poorer transcript than the one
+      // on screen.
+      const app = await createComposition();
+      const turns = encoder();
+      const first = await app.composition.submitTurn({
+        commandId: 'cmd-1',
+        conversationId: CONVERSATION_ID,
+        backendId: executionBackendId('internal-deterministic-fake'),
+        encoder: turns,
+        request: turnRequest('first'),
+        userMessage: { id: 'msg-user-1', role: 'user', content: 'first', timestamp: 1 },
+      });
+      const started = await first.ticket.started;
+      app.backend.emit(started.runId, {
+        kind: 'terminal',
+        terminal: 'succeeded',
+        reason: 'completed',
+      });
+      await first.ticket.completion;
+
+      // Somebody else writes the conversation — which is exactly what the chat
+      // surface does when it saves the messages it drew.
+      await app.repository.apply(CONVERSATION_ID, current => ({
+        ...current,
+        messages: [
+          ...(current.messages ?? []),
+          { id: 'msg-from-elsewhere', role: 'assistant', content: 'richer', timestamp: 3 },
+        ],
+      }));
+
+      const second = await app.composition.submitTurn({
+        commandId: 'cmd-2',
+        conversationId: CONVERSATION_ID,
+        backendId: executionBackendId('internal-deterministic-fake'),
+        encoder: turns,
+        request: turnRequest('second'),
+        userMessage: { id: 'msg-user-2', role: 'user', content: 'second', timestamp: 4 },
+      });
+      await second.ticket.started;
+
+      const encoded = (turns as ChatTurnEncoder & { encoded: { history: ChatMessage[] }[] }).encoded;
+      expect(encoded.at(-1)?.history.map(message => message.id)).toContain('msg-from-elsewhere');
+      app.composition.dispose();
+    });
+
     it('expects no answer of a compacting turn, and keeps no note on it', async () => {
       // `isCompact` is a property of any prepared turn, and the rule is the
       // adapter's rather than any provider's: without it a compaction that did

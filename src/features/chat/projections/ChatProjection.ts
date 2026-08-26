@@ -29,10 +29,9 @@ import type { ProviderId } from '../../../core/types/provider';
  * is the plan's stop condition, and it is what makes a later UI redesign a
  * renderer swap rather than another architecture event.
  *
- * Dark for now, and listed as pending in the presentation parity manifest: the
- * chat surface still consumes the adapter's chunk stream. Its first consumer,
- * `ChatExecutionCoordinator`, has landed beside it and is dark for the same
- * reason — what neither of them has yet is a renderer.
+ * In the bundle and switched off: the whole path this feeds is built, and
+ * `projectionChatProviders` decides which providers' tabs take it. That list is
+ * empty, so the chat surface still consumes the adapter's chunk stream.
  *
  * **This projection does fold in transient content, and `RunProjection` does
  * not.** The rule those two obey is one rule read at two altitudes. A run

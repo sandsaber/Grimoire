@@ -26,7 +26,8 @@ import type {
  * before the run does, or a crash mid-turn leaves a run belonging to a
  * conversation nobody can open.
  *
- * Dark: nothing constructs one. This is the object the flip hands a tab.
+ * Built for a tab whose provider is on the projection path, and rebuilt when
+ * that provider changes.
  */
 
 export interface ChatTabExecutionOptions {

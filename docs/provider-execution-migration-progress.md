@@ -8247,6 +8247,31 @@ completion instead, breaking the queue fails it.
 
 Gates: unit 535 suites / 8,437 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The rest of the review: a stale transcript, and contracts that had stopped being true (this commit)
+
+**The next turn was encoded from a transcript nobody had updated.** This coordinator is not the only
+writer of a conversation: a surface saves what it *drew*, with the tool calls and content blocks the
+barrier does not carry, and a title is generated in the background. Neither reaches a projection that
+was built from an earlier read — so the second turn of a conversation was handed a poorer transcript
+than the one on screen, which is a difference a person can see in the answer. The send re-reads the
+conversation now, which costs one store read a turn.
+
+**And the file headers had stopped being true.** Six of them still said "dark: nothing constructs
+one", when the composition is built at plugin load, a tab builds its end of it, and
+`InputController` branches on whether it has one. What is actually true is narrower and more useful:
+*built, in the bundle, and switched off* — the switch being an empty provider list. A contract
+comment that describes the commit it was written in rather than the state it documents is worse than
+none, because it is read as current.
+
+**Two of the review's seven were already answered**, and are recorded rather than re-fixed: the
+rewind identities were repaired a commit earlier, and the `slice(0, -2)` it flagged is the legacy
+branch's line rather than this path's. **One is a limit rather than a defect**: the barrier persists
+the answer as text, because a `ResultRef` cannot be resolved back to provider content — while a tab
+is open the surface's own save carries the tool calls, and a turn whose tab closed keeps only the
+text. That is now what the matrix's row 3 says, instead of implying the two writes are the same thing.
+
+Gates: unit 535 suites / 8,438 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

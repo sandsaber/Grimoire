@@ -74,9 +74,8 @@ import {
  *   store settles the concurrent-writer problem the first attempt solved with a
  *   revision-conflict retry loop, so the barrier below has neither.
  *
- * Dark, and listed as pending in the presentation parity manifest: nothing
- * constructs one yet. Its own first consumer is the renderer that maps a
- * projection onto the existing chat DOM.
+ * Constructed once per plugin load, beside the kernel. Whether any tab submits
+ * through it is decided by `projectionChatProviders`, which is empty.
  */
 
 /** The kernel, as a chat turn needs it. `ExecutionLifecycleRegistry` satisfies it. */
@@ -281,6 +280,29 @@ export class ChatExecutionCoordinator {
   /** The conversation as a projection, loading it from the store on first ask. */
   async loadConversation(conversationId: string): Promise<ChatProjection> {
     return (await this.requireEntry(conversationId)).projection;
+  }
+
+  /**
+   * The conversation as the store has it *now*.
+   *
+   * This coordinator is not the only writer. A surface saves what it drew — with
+   * the tool calls and content blocks the barrier does not carry — and a title
+   * is generated in the background; neither reaches a projection that was built
+   * from an earlier read. A caller that is about to encode a turn's history from
+   * this projection would then send the provider a poorer transcript than the
+   * one on screen, which is a difference the user can see in the answer.
+   */
+  async reloadConversation(conversationId: string): Promise<ChatProjection> {
+    const entry = await this.requireEntry(conversationId);
+    const read = await this.conversations.read(conversationId);
+    if (read.kind === 'present') {
+      this.apply(entry, {
+        kind: 'conversation-loaded',
+        conversation: read.conversation,
+        revision: read.revision,
+      });
+    }
+    return entry.projection;
   }
 
   /**
