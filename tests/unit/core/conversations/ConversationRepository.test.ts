@@ -311,6 +311,78 @@ describe('conversation repository', () => {
     });
   });
 
+  describe('applying a change rather than a copy', () => {
+    it('appends beside another append instead of over it', async () => {
+      // The operation `merge` cannot express. A caller that computes the next
+      // message list outside the store computes it from a copy another writer
+      // may already have moved past, and the later write then reverts the
+      // earlier one's message. Both appends start from the same revision here.
+      const { repository } = createRepository();
+      await repository.save(metadata({ messages: [] }), null);
+
+      await Promise.all([
+        repository.apply('conv-1', current => ({
+          ...current,
+          messages: [...(current.messages ?? []), {
+            id: 'msg-1',
+            role: 'user',
+            content: 'First',
+            timestamp: 1,
+          }],
+        })),
+        repository.apply('conv-1', current => ({
+          ...current,
+          messages: [...(current.messages ?? []), {
+            id: 'msg-2',
+            role: 'assistant',
+            content: 'Second',
+            timestamp: 2,
+          }],
+        })),
+      ]);
+
+      const read = await repository.read('conv-1');
+      expect(read.kind === 'present' ? read.metadata.messages?.map(m => m.id) : [])
+        .toEqual(['msg-1', 'msg-2']);
+    });
+
+    it('answers with the conversation it wrote and its new revision', async () => {
+      const { repository } = createRepository();
+      await repository.save(metadata(), null);
+
+      const applied = await repository.apply('conv-1', current => ({
+        ...current,
+        title: 'Renamed',
+      }));
+
+      expect(applied).toEqual({ metadata: metadata({ title: 'Renamed' }), revision: 2 });
+    });
+
+    it('keeps the conversation id the caller asked for', async () => {
+      // The id is the record's name, not a field a change may set: a callback
+      // that returns a different one would write a conversation under the wrong
+      // file and leave the original where it was.
+      const { repository } = createRepository();
+      await repository.save(metadata(), null);
+
+      const applied = await repository.apply('conv-1', current => ({
+        ...current,
+        id: 'conv-elsewhere',
+      }));
+
+      expect(applied.metadata.id).toBe('conv-1');
+    });
+
+    it('refuses a conversation the vault does not hold', async () => {
+      // Inventing an empty one to change would hide a conversation that was
+      // deleted underneath the caller.
+      const { repository } = createRepository();
+
+      await expect(repository.apply('conv-1', current => current))
+        .rejects.toBeInstanceOf(RecordUnavailableError);
+    });
+  });
+
   it('lists the conversations it holds files for, adopted or not', async () => {
     const { repository, storage } = createRepository();
     await repository.save(metadata({ id: 'conv-1' }), null);

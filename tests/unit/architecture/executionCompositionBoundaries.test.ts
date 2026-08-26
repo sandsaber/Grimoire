@@ -301,8 +301,16 @@ describe('execution composition boundaries', () => {
      * another architecture event instead of a renderer swap. The strict-module
      * rule above already forbids DOM globals and `obsidian`; these are the
      * markers that arrive as *field names* instead, which no import check sees.
+     *
+     * The coordinator is held to the same rule and cannot be a strict module:
+     * it imports the projection, which lives under `src/features/`. So the two
+     * checks it would otherwise get from that list — no plugin, provider, DOM
+     * or `obsidian` — are asserted for it directly below.
      */
-    const PROJECTION_MODULES = ['src/features/chat/projections/ChatProjection.ts'];
+    const PROJECTION_MODULES = [
+      'src/features/chat/projections/ChatProjection.ts',
+      'src/features/chat/application/ChatExecutionCoordinator.ts',
+    ];
     const PRESENTATION_VOCABULARY = [
       /\bcssClass\b/,
       /\bclassName\b/,
@@ -338,6 +346,20 @@ describe('execution composition boundaries', () => {
       }
       expect(PRESENTATION_VOCABULARY.some(pattern => pattern.test('readonly title: string;')))
         .toBe(false);
+    });
+
+    it.each(PROJECTION_MODULES)('%s takes no plugin, provider, DOM or Obsidian surface', module => {
+      // The strict-module assertions, for the feature-layer modules that cannot
+      // join that list. A coordinator that learns the plugin type is a
+      // coordinator the next surface cannot construct without one, and a
+      // renderer swap turns back into an architecture event.
+      const source = read(module);
+
+      expect(importsPlugin(source)).toBe(false);
+      expect(launchesProcess(source)).toBe(false);
+      expect(importsFrom(module, source, 'providers')).toBe(false);
+      expect(source).not.toMatch(/from 'obsidian'/);
+      expect(source).not.toMatch(/\bHTMLElement\b|\bdocument\b|\bwindow\./);
     });
   });
 

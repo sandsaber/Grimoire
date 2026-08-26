@@ -142,6 +142,37 @@ export class ConversationRepository {
   }
 
   /**
+   * Applies a change to whatever the conversation currently is.
+   *
+   * The same operation `merge` performs, for the writer whose change cannot be
+   * written as fields: appending a message is *the current messages plus one*,
+   * and a caller that computes that outside the store computes it from a copy
+   * that another writer may already have moved past. Here the callback is given
+   * what is on disk and its result is written, inside the one queue slot, so an
+   * append cannot lose a message appended beside it.
+   *
+   * Refuses a conversation the vault does not hold, rather than creating one:
+   * the callers with a change to apply are the ones acting on a conversation
+   * they have already opened, and inventing an empty one to change would hide a
+   * conversation that was deleted underneath them.
+   */
+  async apply(
+    conversationId: string,
+    change: (current: SessionMetadata) => SessionMetadata,
+  ): Promise<{ metadata: SessionMetadata; revision: number }> {
+    const record = await this.records.merge(conversationId, current => {
+      if (current === null) {
+        throw new RecordUnavailableError(
+          conversationId,
+          `Conversation "${conversationId}" does not exist.`,
+        );
+      }
+      return { ...change(current), id: conversationId };
+    });
+    return { metadata: record.payload, revision: record.revision };
+  }
+
+  /**
    * Writes a conversation the vault does not have yet, and refuses one it does.
    *
    * `merge` would have applied the new conversation's fields over the stored

@@ -163,6 +163,18 @@ export interface ExecutionEventEnvelope {
   readonly occurredAt: number;
   readonly scope: ExecutionEventScope;
   readonly event: ExecutionEvent;
+  /**
+   * Stated by the registry rather than delivered by a backend.
+   *
+   * The one case is a terminal the registry reaches on its own — a pre-dispatch
+   * rejection, a recovery, a cancellation the provider never acknowledged.
+   * Nothing published it, so the registry does, and it has no sequence of its
+   * own to carry: the ingestor never saw it, and inventing one would claim a
+   * position in a space the ingestor owns. It carries the position it follows
+   * instead, which a consumer's ordering guard reads as a replay unless it is
+   * told — the same shape as a transient envelope, and told the same way.
+   */
+  readonly synthesized?: true;
 }
 
 export interface ExecutionGapDiagnostic {

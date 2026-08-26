@@ -25,8 +25,9 @@ import type { ProviderId } from '../../../core/types/provider';
  * renderer swap rather than another architecture event.
  *
  * Dark for now, and listed as pending in the presentation parity manifest: the
- * chat surface still consumes the adapter's chunk stream. Its first consumer is
- * the chat execution coordinator, which is the next step of M5.
+ * chat surface still consumes the adapter's chunk stream. Its first consumer,
+ * `ChatExecutionCoordinator`, has landed beside it and is dark for the same
+ * reason — what neither of them has yet is a renderer.
  */
 
 export interface MaterializedChatResult {
@@ -301,8 +302,10 @@ export function reduceChatProjection(
  * The first attempt's projection also folded in `ExecutionRunRecord`, so a run
  * recovered at startup could reach the surface without replaying its events.
  * `RunProjection` on this branch has no reducer for that, and adding one now
- * would be a slot with no producer: nothing feeds recovered records to a chat
- * surface until the coordinator does. It arrives with its consumer.
+ * would still be a slot with no producer — the coordinator has landed and does
+ * not feed one, because the registry answers `getRun` for a run you can name
+ * and has no query for the runs an owner has. Startup restore is what needs
+ * that query, and this event arrives with it.
  */
 export function getActiveChatTurn(projection: ChatProjection): ChatTurnProjection | undefined {
   return projection.turns.find(turn => turn.runId === projection.activeRunId);

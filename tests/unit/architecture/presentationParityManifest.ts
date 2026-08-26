@@ -788,6 +788,16 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: ['src/features/chat/projections/ChatProjection.ts'],
   },
   {
+    id: 'chat-execution-coordinator',
+    area: 'chat',
+    description:
+      'Turn acceptance, dispatch, the persistence barrier and queued-input release for a chat conversation, feeding the chat projection from what the kernel publishes.',
+    state: 'pending',
+    owner:
+      'M5 — nothing constructs one yet. Its own first consumer is the renderer that maps a projection onto the existing chat DOM; until that lands, InputController and StreamController still own turn acceptance and completion.',
+    modules: ['src/features/chat/application/ChatExecutionCoordinator.ts'],
+  },
+  {
     id: 'execution-platform-dark',
     area: 'shell',
     description:

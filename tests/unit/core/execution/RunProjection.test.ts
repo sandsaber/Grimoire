@@ -101,6 +101,57 @@ describe('RunProjection', () => {
       recordedAt: 20,
     })).toBe(reconciled);
   });
+
+  it('takes a terminal the registry synthesized at the position it follows', () => {
+    // A terminal the registry reaches on its own - a pre-dispatch rejection, a
+    // recovery, a cancellation the provider never acknowledged - never passes
+    // the ingestor, so it carries the sequence it follows rather than a new
+    // one. The guard below reads that as a replay and drops it, and a consumer
+    // that closes a turn on the terminal then waits for one that already
+    // happened. The same shape as the transient case, and the same fix: decide
+    // before the sequence guard, not inside it.
+    let projection = createRunProjection(RUN_ID, 'optional');
+    projection = reduceRunProjection(projection, envelope(7, 'thinking', {
+      kind: 'thinking-activity',
+    }));
+
+    const terminalized = reduceRunProjection(projection, {
+      ...envelope(7, `terminalized:${RUN_ID}`, {
+        kind: 'terminal',
+        terminal: 'indeterminate',
+        reason: 'cancellation-unknown',
+      }),
+      synthesized: true,
+    });
+
+    expect(terminalized.terminal?.kind).toBe('indeterminate');
+    expect(terminalized.state).toBe('indeterminate');
+    // Still deduplicated: the registry publishes one of these per run, and a
+    // second delivery of the same one must not rewrite a settled terminal.
+    expect(reduceRunProjection(terminalized, {
+      ...envelope(7, `terminalized:${RUN_ID}`, {
+        kind: 'terminal',
+        terminal: 'failed',
+        reason: 'provider-failure',
+      }),
+      synthesized: true,
+    })).toBe(terminalized);
+  });
+
+  it('still refuses an ingested envelope that repeats a position', () => {
+    // Guards the guard the test above relaxes: the ordering rule holds for
+    // every envelope that did pass the ingestor, which is all of them but one.
+    let projection = createRunProjection(RUN_ID, 'optional');
+    projection = reduceRunProjection(projection, envelope(7, 'thinking', {
+      kind: 'thinking-activity',
+    }));
+
+    expect(reduceRunProjection(projection, envelope(7, 'late-terminal', {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    }))).toBe(projection);
+  });
 });
 
 function envelope(sequence: number, eventId: string, event: ExecutionEvent) {

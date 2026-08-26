@@ -66,14 +66,20 @@ export function reduceRunProjection(
     return projection;
   }
   if (projection.terminal
-    || envelope.sequence <= projection.lastSequence
+    // A synthesized envelope carries the position it follows rather than a new
+    // one, for the same reason a transient one does and with the same
+    // consequence if it is not excused: read as a replay, the terminal the
+    // registry stated is dropped and the run stays running in every consumer
+    // that closes a turn on it. Its event id still makes a second delivery a
+    // no-op, which is what the ordering guard was protecting here.
+    || (!envelope.synthesized && envelope.sequence <= projection.lastSequence)
     || projection.recentEventIds.includes(envelope.eventId)
     || !belongsToRun(envelope, projection.runId)) {
     return projection;
   }
   const base = {
     ...projection,
-    lastSequence: envelope.sequence,
+    lastSequence: Math.max(projection.lastSequence, envelope.sequence),
     recentEventIds: rememberEventId(projection.recentEventIds, envelope.eventId),
   };
   switch (envelope.event.kind) {

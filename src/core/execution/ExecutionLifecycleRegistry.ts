@@ -2247,6 +2247,10 @@ export class ExecutionLifecycleRegistry {
         occurredAt,
         scope: { kind: 'run', runId: runId(run.record.runId) },
         event: { kind: 'terminal', terminal: kind, reason },
+        // The mark this comment used to claim. It was the event id and nothing
+        // else, which no consumer can read without matching a string, and the
+        // run projection's ordering guard dropped the envelope outright.
+        synthesized: true,
       });
       await this.markBackendTransitionsQuiescent(session.backend);
     }

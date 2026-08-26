@@ -7358,6 +7358,79 @@ return that makes a malformed event a no-op rather than a blank chat.
 
 Gates: unit 526 suites / 8,314 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The chat execution coordinator, dark, and the terminal nobody could see (this commit)
+
+The projection's first consumer, and M5's centre: turn acceptance, dispatch, the persistence
+barrier, and queued-input release. Harvested from the first attempt's Phase 7 as material and
+rebuilt against this branch's contracts — which is where the value was, because three of that
+attempt's parts had no producer here and reading each one out is what removed it.
+
+**The v1 coordinator took a result materializer. There is nothing on this branch that could
+implement one.** A `ResultRef` here is a *reference*: every provider's projection sink commits one
+without writing the answer, because D2 forbids a second copy of a provider transcript, and the open
+obligation above records that no result reference can be resolved back to the turn that produced it.
+So the injected port would have been a slot with nothing behind it. What the coordinator persists
+instead is the answer it watched arrive — accumulated from the run's own `output-delta` envelopes,
+which is the same source the chat surface renders from today, and the same one `ExecutionRunStream`
+folds into chunks.
+
+**The v1 coordinator subscribed to record notifications. This branch publishes envelopes.** `observe`
+is a real subscription on the registry, so a run's state is derived from what the ingestor committed
+rather than from a record delivered beside it — which is also why no `run-record` event is fed to the
+projection here. That event's producer is startup restore, which this step does not do, so the
+reducer note the projection commit wrote still stands.
+
+**The v1 coordinator retried a revision conflict four times. M4 removed the conflict.** A writer here
+applies a change rather than a copy, inside the store's own queue slot. The gap that exposed:
+`ConversationRepository.merge` takes *fields*, and appending a message is not a field — it is the
+current messages plus one, which a caller computing it outside the slot computes from a copy another
+writer may have moved past. `apply` is that operation, with the concurrent-append test that goes red
+without it.
+
+**A defect the coordinator made reachable, found by composing rather than by reading.** A terminal
+the registry reaches on its own — a pre-dispatch rejection, a recovery, a cancellation the provider
+never acknowledged — never passes the ingestor, so it is published carrying *the position it
+follows* rather than a new one. `reduceRunProjection` read that as a replay and dropped it. The run
+then stays running in every projection consumer forever: the answer is never saved, the input never
+unlocks, and the control store holds a settled run the surface cannot see. The envelope now says
+`synthesized: true` and the ordering guard excuses exactly that one case, with the event id still
+making a second delivery a no-op — the same shape as the transient-envelope rule directly above it,
+which was found the same way. The registry's own comment already claimed the envelope was "marked as
+such"; the mark was the event id, which no consumer can read without matching a string.
+
+**Two more the port found.** A provider that answers inside `startRun` — a warm CLI does, and every
+in-process backend does — publishes its first envelopes before the coordinator has a run to attribute
+them to, and the projection drops an envelope for a turn it does not have: the opening tokens of a
+fast turn were silently gone, in v1 too. They are held and flushed when the turn reaches the
+projection. And the kernel publishes no envelope for an interaction it resolves, because the provider
+reports its own closing; the person who clicked has already answered, so the committed record is read
+back and shown rather than leaving a resolved question on screen until a provider mentions it.
+
+**Composed against the real kernel and the real store, with the provider as the only fake.** Wave 1's
+lesson is that a seam both sides stub is not covered, so the test drives `ExecutionLifecycleRegistry`,
+`ConversationRepository` and `DeterministicFakeBackend` together, and reads the answer back through a
+store reopened over the same vault rather than through the writer's own cache. Six gates were proved
+by breaking them: the synthesized-terminal guard (the turn never completes), the pre-dispatch buffer
+(the answer is empty), the persistence hold (a failed write releases the queue anyway), the
+interaction read-back, `apply`'s slot (one append reverts the other), and both halves of the new
+boundary rule.
+
+**Still dark, and the build says so**: nothing imports it, and the release bundle does not contain it —
+tree-shaken out, while the `synthesized` marker beside it is in there, because that one is a fix to a
+path production already runs. It is listed as pending in the parity manifest; its own first consumer
+is the renderer that maps a projection onto the existing chat DOM, which is the next step.
+
+What this step deliberately does not do, each with its reason: **startup restore** — the coordinator
+adopts no run the kernel already owns, because `getRunsForOwner` and `getSessionsForOwner` do not
+exist on this registry and the projection's run-record event has no producer without them;
+**reconciliation** — an indeterminate run's later verdict is appended to the control store with no
+notification, so nothing can observe it; **agent-scoped output** — a subagent's deltas are a surface
+of their own rather than this turn's answer. The first two are the same missing thing: an observation
+channel for records, which is what restore needs and what the reconciled-result half of the
+projection is waiting for.
+
+Gates: unit 527 suites / 8,335 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7434,17 +7507,36 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 **M3 is closed.** Everything below is M5 or later.
 
-1. **The chat execution coordinator** — M5's centre, and the projection's first consumer. The
-   projection itself has landed and is dark; what is missing is the thing that feeds it (turn
-   acceptance, dispatch, persistence barriers, queued-input release) and the renderer that maps it
-   onto the existing DOM. `StreamController` is 2,100 lines of incremental append and
-   `InputController` 2,150; the move is from *chunks appended as they arrive* to *a state the
-   renderer diffs*, which is the actual work and cannot be done a chunk at a time. The first
-   attempt's `ChatExecutionCoordinator` (908 lines) and `ChatProjectionAttachment` (109) are the
-   material; both are on `codex/provider-architecture-research` at `8cab81b4`.
+1. **The chat renderer, and the decision it forces first.** The projection and its coordinator have
+   both landed and are dark; what is missing is the thing that maps a projection onto the existing
+   chat DOM, and one contract question that has to be answered before a line of it is written:
+   **a projection carries no live text.** `turn.result` is filled at the persistence barrier, so a
+   renderer driven by the projection alone can show a turn's state — thinking, tools, progress,
+   interactions — and not a word of the answer until the turn is over. Two ways out, and they are not
+   equivalent: a live-text field on the turn projection, fed by the transient envelopes the
+   coordinator already accumulates (`entry.streamed` is the producer, so this is a question of where
+   it surfaces, not whether it exists) — or a second channel beside the projection, which is
+   *chunks appended as they arrive* under a new name, and that is the thing this step exists to
+   replace. The same question covers `provider-content`, which is the four things a surface renders
+   that are not text; `ProviderContentPresenter` in the adapter is how the flipped providers answer it
+   today. `StreamController` is 2,100 lines of incremental append and `InputController` 2,150; the
+   move is from chunks appended as they arrive to a state the renderer diffs, which is the actual
+   work and cannot be done a chunk at a time. The first attempt's `ChatProjectionAttachment` (109
+   lines) and `ChatProjectionRenderer` (114) are the material, on
+   `codex/provider-architecture-research` at `8cab81b4` — and its renderer answered the question by
+   not rendering a running turn at all, so it is material for the DOM mapping and not for this.
    The thirteen provider rows handed over from M3 are re-implementations of the same UI-shaped
    consumers, so doing them first means rewriting each consumer twice.
-2. **The workspace context assembly comes *after* those consumers, not before.** It looked like the
+2. **An observation channel for control records**, which two separate things are now waiting on. The
+   coordinator adopts no run the kernel already owns at startup, because `getRunsForOwner` and
+   `getSessionsForOwner` do not exist on this registry; and an indeterminate run's reconciled verdict
+   is appended to the control store with nothing published for it, so the projection's
+   `reconciliation-record` and `reconciled-result-materialized` halves have no producer. Both are the
+   same missing thing, and the projection's `run-record` event waits on it too. The first attempt
+   added it as a `subscribe`/notification API on the registry; this branch's `observe` covers
+   envelopes only, and the choice between widening `observe` and adding a second channel is worth
+   making deliberately rather than by copying.
+3. **The workspace context assembly comes *after* those consumers, not before.** It looked like the
    next step until reading the rows: every provider's `workspace.initialize(context)` needs a
    context built from the plugin, eight have a `create<Provider>ModuleContext`, and the machinery is
    straightforward — but no workspace row can move onto it until its consumer is reworked, so
@@ -7452,30 +7544,30 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
    first row until reading it showed the module port is async while every launch path calls the
    legacy resolver synchronously. Pick a row by reading its consumer first; that is what this
    session taught five times over.
-3. **Rows 15 and 16 need `SubagentManager` before they can move.** The split made
+4. **Rows 15 and 16 need `SubagentManager` before they can move.** The split made
    `declarations.taskResults` and `declarations.nativeAgents` reachable, but the legacy
    `ProviderTaskResultInterpreter` the feature layer consumes is five low-level methods
    (`hasAsyncLaunchMarker`, `extractAgentId`, `extractStructuredResult`, `resolveTerminalStatus`,
    `extractTagValue`) against the module port's single `interpret`. `SubagentManager` reads the
    low-level ones directly, so this is an M5-shaped rework, not a row move.
-4. **Row 8, `chatUIConfig`, is an M5 row.** The legacy interface is twenty-odd
+5. **Row 8, `chatUIConfig`, is an M5 row.** The legacy interface is twenty-odd
    UI members — reasoning options, service-tier and mode toggles, permission mapping, model metadata
    discovery taking the plugin — and `ProviderModule.ts` may not acquire plugin or UI vocabulary. The
    plan's own M5 calls the renderer a thin replaceable layer; this row belongs to that step. Worth an
    explicit decision and an inventory correction rather than an attempt.
-5. **Row 9, `settingsReconciler`.** Unblocked but not small: `ProviderSettingsCoordinator` projects,
+6. **Row 9, `settingsReconciler`.** Unblocked but not small: `ProviderSettingsCoordinator` projects,
    clones and merges the settings record per provider, and the codec's `reconcile` works on decoded
    provider settings. Re-expressing that is a settings-behaviour risk, so it wants a fresh session
    and its own characterization tests.
-6. **Row 14 and app-level row 1**, then delete both registries. Laziness in
+7. **Row 14 and app-level row 1**, then delete both registries. Laziness in
    `ProviderWorkspaceManager` lands with these, since it is the synchronous consumers that force
    eager initialization today. App-level row 1 is a shape mismatch of its own: the legacy
    `ProviderWorkspaceCapabilities` is five resource kinds each carrying
    `{ inventory, manager, runtimeCommandDiscovery }`, and the descriptor's `workspace` map is one
    `CapabilitySupport` per key over a different key set.
-7. **The rest of M5**: durable agents, `ApplicationRuntime` as the composition root, seam deletion.
+8. **The rest of M5**: durable agents, `ApplicationRuntime` as the composition root, seam deletion.
    Auxiliary work and bang-bash are done.
-8. **M4's obligations are closed**, and one of them found a defect M4 had shipped on this branch:
+9. **M4's obligations are closed**, and one of them found a defect M4 had shipped on this branch:
    the conversation list was reading the versioned envelope as if it were the conversation.
 
 **Still waiting on the owner rather than on code: D9, redo.** Certification remains account-bound —
