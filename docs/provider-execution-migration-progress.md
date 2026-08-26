@@ -7854,6 +7854,32 @@ fails it, which is the rule that keeps a dark module from becoming an unowned on
 
 Gates: unit 532 suites / 8,399 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The path assembled: one coordinator, a binding per surface (this commit)
+
+`ChatExecutionComposition` is what the flip calls. It answers the question every previous piece left
+to whoever wired it: **a conversation's projection belongs to the conversation, not to whoever is
+looking at it.** One coordinator is constructed beside the kernel, and a surface asks it for a
+binding — so two tabs open on one chat, or a tab and the window beside it, see one turn rather than
+two, which the test proves by asserting the two surfaces received identical calls while the provider
+was dispatched once.
+
+What a surface brings is what only it knows: its own column, its own streaming cursor, its provider's
+content presenter and failure wording. What the composition brings is what must be identical for
+every surface: the coordinator, the identities, and the route by which a turn's cost gets back to the
+barrier — which is the whole reason `recordTurnUsage` is wired here rather than passed in.
+
+**A break that stayed green, and what it took to see it.** Replacing the run-id factory with a
+constant passed every test: the shape assertion is a regular expression and `run-000…0` matches it.
+A constant run id ends a conversation at its first turn, because the kernel refuses an id it already
+knows — so the test now runs a second turn and asserts the identities differ while the session stays
+the same. A gate over a *shape* cannot see a value that never changes; this is the same lesson as a
+gate over a subset, one level down.
+
+The parity manifest's unreachable-module rule caught both new files, which is what keeps a dark module
+from becoming an unowned one — the second time it has done that in two checkpoints.
+
+Gates: unit 533 suites / 8,402 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

@@ -838,6 +838,16 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: ['src/app/chat/StoredChatConversations.ts'],
   },
   {
+    id: 'chat-execution-composition',
+    area: 'chat',
+    description:
+      'The chat execution path assembled: one coordinator beside the kernel, a binding per surface, and the identities and the usage route that must be the same for every surface.',
+    state: 'pending',
+    owner:
+      'M5 — nothing constructs one. This is what the flip calls from a tab, and until it does, InputController drives the adapter\'s chunk stream instead.',
+    modules: ['src/app/chat/ChatExecutionComposition.ts'],
+  },
+  {
     id: 'execution-platform-dark',
     area: 'shell',
     description:
