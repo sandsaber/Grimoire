@@ -7907,7 +7907,8 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 1. **The flip.** Every dark piece of the chat path now exists and is composed end to end in
    `ChatProjectionAttachment.test.ts` — projection, live content, coordinator, adoption, renderer,
    target, attachment. What is left is turning it on inside a tab, and it is small next to what it
-   replaces. Four things have to be settled in that checkpoint rather than discovered during it:
+   replaces. Three of the four things that had to be settled first are settled, each in its own
+   checkpoint above; one is left, and it is the one only the flip itself can answer:
    - ~~**the id of the bubble and the id of the stored message differ**~~ and ~~**who creates the
      assistant message**~~ — **both closed in the entry above**: a turn names its answer at
      `turn-started`, the target draws under that id and the barrier stores under it. What is left of
@@ -7920,10 +7921,11 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
      shows the question.
    This is the flip, so it is a smoke matrix rather than a gate, and per the standing rule it is
    certified against a live provider before the next thing lands.
-2. **`InputController` and `StreamController` stop owning the turn**, once a target exists. That is
-   the flip, and it is the one that needs a smoke matrix rather than a gate: 2,100 lines of
-   incremental append and 2,150 of turn acceptance come out, and every provider's chat behaviour is
-   downstream of them.
+2. **`InputController` and `StreamController` stop owning the turn.** The other half of the same
+   flip: 2,100 lines of incremental append and 2,150 of turn acceptance come out, and every
+   provider's chat behaviour is downstream of them. Worth doing in the order the dark path was
+   built — a tab renders from the projection while the legacy path still owns acceptance, then
+   acceptance moves — rather than as one commit, so a red is attributable.
    The thirteen provider rows handed over from M3 are re-implementations of the same UI-shaped
    consumers, so doing them first means rewriting each consumer twice.
 3. ~~**An observation channel for control records.**~~ **Closed in the entry above**, and closed
