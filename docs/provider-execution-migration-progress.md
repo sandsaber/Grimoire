@@ -8051,10 +8051,24 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 **M3 is closed.** Everything below is M5 or later.
 
-1. **The flip.** Every dark piece of the chat path now exists and is composed end to end in
-   `ChatProjectionAttachment.test.ts` — projection, live content, coordinator, adoption, renderer,
-   target, attachment. What is left is turning it on inside a tab, and it is small next to what it
-   replaces. Three of the four things that had to be settled first are settled, each in its own
+1. **The flip, which the parity gate has shown to be one commit.** Every piece exists, is dark, and
+   is composed end to end — projection, live content, coordinator, adoption, renderer, target,
+   attachment, composition, tab handle, conversation port. Wiring the composition root ahead of the
+   flip was tried and refused: *a surface listed as pending must not be in the shipped bundle*, which
+   is right, and it means the composition root, the tab wiring and the manifest state change are the
+   same commit. Its contents, in the order they were built:
+   - `main.ts` constructs `ChatExecutionComposition` beside the kernel host, over
+     `storage.sessions.records` — **that store and no other**, per the entry above — and disposes it
+     before the kernel at unload;
+   - a tab constructs a `ChatTabExecution` with its own `ChatSurfaceBinding` (its `ChatState`, its
+     `MessageRenderer`, its `StreamController`, its provider's content presenter and failure
+     wording), and `turnEncoder: () => tab.service?.turnEncoder ?? null`;
+   - `InputController`'s send path calls `tab.execution.send(request, userMessage)` instead of
+     `agentService.query`, and its cancel path calls `cancel()`;
+   - `TabManager` opens the attachment when a tab binds a conversation and detaches it on close;
+   - the four chat manifest entries move off `pending`, which is what makes the bundle rule pass.
+   Everything the pieces know about each other is already tested; what this commit adds is the call
+   sites, and what it needs is the thing no gate here can give it — a live provider. Three of the four things that had to be settled first are settled, each in its own
    checkpoint above; one is left, and it is the one only the flip itself can answer:
    - ~~**the id of the bubble and the id of the stored message differ**~~ and ~~**who creates the
      assistant message**~~ — **both closed in the entry above**: a turn names its answer at
