@@ -8198,7 +8198,16 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 **M3 is closed.** Everything below is M5 or later.
 
-1. **The flip, which the parity gate has shown to be one commit.** Every piece exists, is dark, and
+1. **Certify the flip, one provider at a time.** The code is done: every branch is written, every
+   piece is in the bundle, and `src/app/chat/projectionChatProviders.ts` is empty, so no tab takes
+   the path. Adding one provider to that list is that provider's flip, and
+   `docs/chat-projection-flip-smoke-matrix.md` is what certifies it. **Row 1 is a known gap and is
+   expected to fail**: `planCompleted` came from the runtime's turn metadata and has no projection
+   equivalent, so a plan turn raises no approval — close that before putting a plan-capable provider
+   on the list. Rows 2 to 4 are the couplings the flip carried across from `InputController` that no
+   gate here can check.
+2. ~~**The flip, which the parity gate has shown to be one commit.**~~ **Done, and the entries below
+   record how.** Every piece exists, is dark, and
    is composed end to end — projection, live content, coordinator, adoption, renderer, target,
    attachment, composition, tab handle, conversation port. Wiring the composition root ahead of the
    flip was tried and refused: *a surface listed as pending must not be in the shipped bundle*, which
