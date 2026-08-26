@@ -7469,6 +7469,55 @@ gets persisted as the message.
 
 Gates: unit 527 suites / 8,341 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### A reload stopped orphaning the turn the kernel is still running (this commit)
+
+A hole in what the two commits above shipped, closed before building on top of them. A run is
+durable and the surface watching it is not: a reload, a reopened tab or a second window arrives at a
+conversation whose turn is still going inside the kernel, and the coordinator had no way to take it
+over. Nothing rendered it, nothing ran its persistence barrier, and the answer it was still
+producing was written nowhere — the exact failure the durable kernel exists to prevent, reintroduced
+one layer above it.
+
+**It needed less than the plan assumed.** The listed next step was an observation channel for
+control records, because the first attempt subscribed to record notifications. Reading what adoption
+actually needs shortened it to two queries: `getRunsForOwner` and `getSessionsForOwner`. Live updates
+after adoption already arrive — the registry publishes envelopes for everything it ingests and for
+the terminals it states itself — so what was missing was only the *starting position*, and a record
+is a query rather than an event. The notification channel is still owed, for reconciliation, and it
+is now owed for one thing instead of three.
+
+**Both queries answer for this process, not for the vault**, and say so: C1 bounds the registry's
+maps to live work plus whatever a reopened session brought back, so what comes back is what a
+surface can still attach to. That is the only thing a caller can do with the answer.
+
+**`applyRunRecord` adopts the record's position along with its state**, which is the part that is
+easy to leave out and impossible to see afterwards. Without `lastSequence` the projection sits at
+zero and every envelope still in flight behind the record replays into it — a tool call counted
+twice, an interaction reopened. The unit test that proves it applies an envelope from *before* the
+adopted position and asserts nothing moved.
+
+**Only unfinished runs are adopted.** A terminal run this process still holds is finished work: its
+events went to whoever was listening at the time, and the control store keeps facts rather than a
+transcript, so adopting one would add a turn whose answer this coordinator can never supply — beside
+the message that already holds it.
+
+The scope test is the one that matters most here and it is the one a single-conversation suite cannot
+have: a query that answered for every owner reads identically from inside one conversation's test and
+puts another chat's running turn into this one. There are two conversations in it now.
+
+**A structural thing adoption revealed.** `ActiveTurn` carried the whole `SubmitChatTurnCommand`, and
+an adopted run has no user message, no request ref and no backend choice — those belong to a turn
+somebody asked for. Carrying a command for it would have meant inventing the three fields that are
+not true, so the identity a turn needs (conversation, command id, result expectation) is flat now and
+the submitted command is what is optional.
+
+**And the session's own mistake, recorded because it is the second time.** A break test was reverted
+with `git checkout -- <file>` on uncommitted work and took the whole change with it, not the injected
+defect — the same mistake the 2026-08-24 entry recorded, made again on a file that had been backed up
+for an earlier break and not for this one. Back up before every break, and restore from the backup.
+
+Gates: unit 527 suites / 8,348 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7563,15 +7612,15 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
    started, while `messages` is the whole transcript.
    The thirteen provider rows handed over from M3 are re-implementations of the same UI-shaped
    consumers, so doing them first means rewriting each consumer twice.
-2. **An observation channel for control records**, which two separate things are now waiting on. The
-   coordinator adopts no run the kernel already owns at startup, because `getRunsForOwner` and
-   `getSessionsForOwner` do not exist on this registry; and an indeterminate run's reconciled verdict
-   is appended to the control store with nothing published for it, so the projection's
-   `reconciliation-record` and `reconciled-result-materialized` halves have no producer. Both are the
-   same missing thing, and the projection's `run-record` event waits on it too. The first attempt
-   added it as a `subscribe`/notification API on the registry; this branch's `observe` covers
-   envelopes only, and the choice between widening `observe` and adding a second channel is worth
-   making deliberately rather than by copying.
+2. **An observation channel for control records**, now owed to one thing rather than three. Startup
+   adoption turned out to need queries rather than notifications and has landed; what is left is
+   reconciliation — an indeterminate run's reconciled verdict is appended to the control store with
+   nothing published for it, so the projection's `reconciliation-record` and
+   `reconciled-result-materialized` halves still have no producer. The first attempt added a
+   `subscribe`/notification API on the registry; this branch's `observe` covers envelopes only, and
+   the choice between widening `observe` and adding a second channel is worth making deliberately
+   rather than by copying. Worth asking first whether a reconciliation should simply be published as
+   a synthesized envelope, the way a registry-stated terminal now is.
 3. **The workspace context assembly comes *after* those consumers, not before.** It looked like the
    next step until reading the rows: every provider's `workspace.initialize(context)` needs a
    context built from the plugin, eight have a `create<Provider>ModuleContext`, and the machinery is

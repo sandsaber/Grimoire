@@ -1348,6 +1348,38 @@ export class ExecutionLifecycleRegistry {
     return this.interactions.get(interactionId)?.record ?? null;
   }
 
+  /**
+   * The sessions this **process** holds for an owner, oldest first.
+   *
+   * Not "the sessions the vault has ever had for it". C1 bounds these maps by
+   * the work that is live plus whatever a reopened session brought back, and a
+   * startup deliberately does not load the finished history of every
+   * conversation — so this answers what can still be attached to, which is the
+   * only thing a caller can do with the answer.
+   */
+  getSessionsForOwner(owner: ExecutionOwner): readonly Readonly<ExecutionSessionRecord>[] {
+    requireOwner(owner);
+    return [...this.sessions.values()]
+      .filter(session => sameOwner(session.owner, owner))
+      .map(session => session.record)
+      .sort((first, second) => first.createdAt - second.createdAt);
+  }
+
+  /**
+   * The runs this **process** holds for an owner, oldest first.
+   *
+   * Bounded the same way, and for the same reason: a run whose session nobody
+   * reopened stays on disk, where deletion and history read it. What comes back
+   * here is what a surface can still adopt.
+   */
+  getRunsForOwner(owner: ExecutionOwner): readonly Readonly<ExecutionRunRecord>[] {
+    requireOwner(owner);
+    return [...this.runs.values()]
+      .filter(run => sameOwner(run.record.owner, owner))
+      .map(run => run.record)
+      .sort((first, second) => first.createdAt - second.createdAt);
+  }
+
   async waitForRunStream(runId: RunId): Promise<void> {
     await this.runs.get(runId)?.streamTask;
     await this.waitForIdle();

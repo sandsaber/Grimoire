@@ -48,6 +48,8 @@ interface Harness {
   readonly storage: TestDurableStorage;
   readonly conversations: ConversationRepository;
   advance(milliseconds: number): void;
+  /** A second coordinator over the same kernel and vault, as a reload gives. */
+  createCoordinator(): ChatExecutionCoordinator;
 }
 
 function opaque(prefix: string, ordinal: number): string {
@@ -162,7 +164,7 @@ async function createHarness(options: { readonly withRecovery?: boolean } = {}):
   let sessionOrdinal = 0;
   let runOrdinal = 0;
   let leaseOrdinal = 0;
-  const coordinator = new ChatExecutionCoordinator({
+  const createCoordinator = () => new ChatExecutionCoordinator({
     lifecycle: registry,
     conversations: conversationPort(conversations),
     nextExecutionSessionId: () => executionSessionId(opaque('es', ++sessionOrdinal)),
@@ -173,15 +175,27 @@ async function createHarness(options: { readonly withRecovery?: boolean } = {}):
   });
 
   return {
-    coordinator,
+    coordinator: createCoordinator(),
     registry,
     backend,
     storage,
     conversations,
+    createCoordinator,
     advance(milliseconds) {
       clock += milliseconds;
     },
   };
+}
+
+/** Waits for something the kernel drives, which no ticket is waiting on. */
+async function waitUntil(check: () => boolean, label: string): Promise<void> {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    if (check()) {
+      return;
+    }
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  throw new Error(`Timed out waiting for ${label}.`);
 }
 
 function userMessage(id: string, content: string): ChatMessage {
@@ -602,6 +616,158 @@ describe('chat execution coordinator', () => {
     coordinator.dispose();
   });
 
+  describe('adopting the work the kernel already owns', () => {
+    it('takes over a run that outlived the surface watching it', async () => {
+      // A run is durable and the surface watching it is not. Without adoption
+      // the turn is orphaned: nothing renders it, nothing runs its persistence
+      // barrier, and the answer it is still producing is written nowhere.
+      const harness = await createHarness();
+      const abandoned = await harness.coordinator.submitTurn(turnCommand());
+      const started = await abandoned.started;
+      harness.backend.emit(started.runId, { kind: 'run-started' });
+      harness.backend.emit(started.runId, {
+        kind: 'output-delta',
+        channel: 'assistant',
+        text: 'Botan',
+      });
+      await harness.registry.waitForIdle();
+
+      harness.coordinator.dispose();
+      await expect(abandoned.completion).rejects.toThrow(/detached/);
+
+      const reopened = harness.createCoordinator();
+      const adopted = await reopened.loadConversation(CONVERSATION_ID);
+
+      expect(adopted.turns).toHaveLength(1);
+      expect(adopted.turns[0]?.runId).toBe(started.runId);
+      expect(adopted.activeRunId).toBe(started.runId);
+      expect(adopted.turns[0]?.run.state).toBe('running');
+      // What was said before the reload went with the process that heard it:
+      // the control store keeps facts, not a transcript, and D2 is why.
+      expect(liveAssistantText(adopted.turns[0])).toBeUndefined();
+
+      harness.backend.emit(started.runId, {
+        kind: 'output-delta',
+        channel: 'assistant',
+        text: 'ically, yes.',
+      });
+      harness.backend.emit(started.runId, {
+        kind: 'terminal',
+        terminal: 'succeeded',
+        reason: 'completed',
+      });
+      await waitUntil(
+        () => reopened.getProjection(CONVERSATION_ID)?.turns[0]?.persistence === 'saved',
+        'the adopted turn to reach the persistence barrier',
+      );
+
+      await expect(storedMessages(harness)).resolves.toEqual([
+        expect.objectContaining({ role: 'user' }),
+        expect.objectContaining({ role: 'assistant', content: 'ically, yes.' }),
+      ]);
+      reopened.dispose();
+    });
+
+    it('queues a new turn behind the one it adopted', async () => {
+      const harness = await createHarness();
+      const abandoned = await harness.coordinator.submitTurn(turnCommand());
+      const started = await abandoned.started;
+      await harness.registry.waitForIdle();
+      harness.coordinator.dispose();
+      await expect(abandoned.completion).rejects.toThrow(/detached/);
+
+      const reopened = harness.createCoordinator();
+      const queued = await reopened.submitTurn(turnCommand({
+        commandId: 'cmd-2',
+        requestRef: 'req-2',
+        userMessage: userMessage('msg-user-2', 'And a vegetable?'),
+      }));
+
+      // Two runs over one conversation is two answers interleaved into one
+      // transcript, and a reload must not be the way to get there.
+      expect(queued.admission).toBe('queued');
+      expect(harness.backend.dispatchedRequests.size).toBe(1);
+
+      harness.backend.emit(started.runId, {
+        kind: 'terminal',
+        terminal: 'succeeded',
+        reason: 'completed',
+      });
+      const secondStarted = await queued.started;
+
+      expect(secondStarted.runId).not.toBe(started.runId);
+      expect(secondStarted.executionSessionId).toBe(started.executionSessionId);
+      expect(harness.backend.sessions.size).toBe(1);
+      reopened.dispose();
+    });
+
+    it('adopts only the conversation it was asked about', async () => {
+      // The filter is the whole of this: a query that answered for every owner
+      // would read exactly the same from inside one conversation's test, and
+      // put another chat's running turn into this one.
+      const harness = await createHarness();
+      await harness.conversations.save({
+        id: 'conv-2',
+        providerId: 'claude',
+        title: 'Cucumbers',
+        createdAt: 1,
+        updatedAt: 1,
+        messages: [],
+      }, null);
+      const mine = await harness.coordinator.submitTurn(turnCommand());
+      const mineStarted = await mine.started;
+      const theirs = await harness.coordinator.submitTurn(turnCommand({
+        commandId: 'cmd-2',
+        conversationId: 'conv-2',
+        requestRef: 'req-2',
+        userMessage: userMessage('msg-user-2', 'And cucumbers?'),
+      }));
+      const theirsStarted = await theirs.started;
+      harness.coordinator.dispose();
+      await expect(mine.completion).rejects.toThrow(/detached/);
+      await expect(theirs.completion).rejects.toThrow(/detached/);
+
+      const reopened = harness.createCoordinator();
+      const adopted = await reopened.loadConversation(CONVERSATION_ID);
+
+      expect(adopted.turns.map(turn => turn.runId)).toEqual([mineStarted.runId]);
+      expect(theirsStarted.runId).not.toBe(mineStarted.runId);
+      expect(theirsStarted.executionSessionId).not.toBe(mineStarted.executionSessionId);
+      reopened.dispose();
+    });
+
+    it('leaves a finished run to the transcript that already holds it', async () => {
+      const harness = await createHarness();
+      const ticket = await harness.coordinator.submitTurn(turnCommand());
+      const started = await ticket.started;
+      harness.backend.emit(started.runId, {
+        kind: 'output-delta',
+        channel: 'assistant',
+        text: 'Yes.',
+      });
+      harness.backend.emit(started.runId, {
+        kind: 'terminal',
+        terminal: 'succeeded',
+        reason: 'completed',
+      });
+      await ticket.completion;
+      harness.coordinator.dispose();
+
+      const reopened = harness.createCoordinator();
+      const adopted = await reopened.loadConversation(CONVERSATION_ID);
+
+      // Adopting it would add a turn whose answer this coordinator can never
+      // supply, beside the message that already holds it.
+      expect(adopted.turns).toEqual([]);
+      expect(adopted.activeRunId).toBeUndefined();
+      expect(adopted.messages.map(message => message.content)).toEqual([
+        'Are tomatoes a fruit?',
+        'Yes.',
+      ]);
+      reopened.dispose();
+    });
+  });
+
   it('detaches from a durable turn on dispose and refuses what never started', async () => {
     const harness = await createHarness();
     const running = await harness.coordinator.submitTurn(turnCommand());
@@ -694,6 +860,8 @@ function eagerLifecycle(): ChatExecutionLifecyclePort & {
     },
     getRun: () => null,
     getSession: () => null,
+    getSessionsForOwner: () => [],
+    getRunsForOwner: () => [],
     getInteraction: () => null,
     acquireLease: (leaseId: LifecycleLeaseId) => ({
       leaseId,

@@ -6,6 +6,7 @@ import type {
 } from './ExecutionContracts';
 import type {
   ExecutionReconciliationRecord,
+  ExecutionRunRecord,
   ReconciliationEvidenceRecord,
 } from './ExecutionControlRecords';
 import { type ExecutionEventEnvelope, isTransientExecutionEvent } from './ExecutionEvents';
@@ -148,6 +149,43 @@ export function reduceRunProjection(
         nativeAgentKeys: appendUnique(base.nativeAgentKeys, envelope.event.nativeAgentKey),
       };
   }
+}
+
+/**
+ * Takes a run's durable record as the starting position.
+ *
+ * For the one case a projection cannot reach by replaying events: a run this
+ * process is already running when a surface attaches to it. Its events are
+ * gone — they were delivered to whoever was listening at the time, and the
+ * control store keeps facts rather than a transcript — so the record is the
+ * only thing that can say where the run got to.
+ *
+ * The record's `lastSequence` is adopted along with its state, which is what
+ * stops the envelopes behind it from being replayed into a projection that has
+ * already accounted for them. Everything after it arrives the normal way.
+ *
+ * A projection that already has a terminal is left alone: the first terminal
+ * wins here exactly as it does for envelopes.
+ */
+export function applyRunRecord(
+  projection: RunProjection,
+  record: ExecutionRunRecord,
+): RunProjection {
+  if (record.runId !== projection.runId
+    || projection.terminal
+    || record.lastSequence < projection.lastSequence) {
+    return projection;
+  }
+  return {
+    ...projection,
+    state: record.state,
+    lastSequence: record.lastSequence,
+    interactionIds: [...record.openInteractionIds],
+    ...(record.resultRef ? { result: record.resultRef } : {}),
+    ...(record.terminal
+      ? { terminal: record.terminal, state: record.terminal.kind, interactionIds: [] }
+      : {}),
+  };
 }
 
 export function applyRunReconciliation(

@@ -2,6 +2,7 @@ import type { ResultExpectation, ResultRef } from '../../../core/execution/Execu
 import type {
   ExecutionInteractionRecord,
   ExecutionReconciliationRecord,
+  ExecutionRunRecord,
 } from '../../../core/execution/ExecutionControlRecords';
 import {
   type ExecutionEventEnvelope,
@@ -10,6 +11,7 @@ import {
 import type { ExecutionSessionId, RunId } from '../../../core/execution/ExecutionIds';
 import {
   applyRunReconciliation,
+  applyRunRecord,
   createRunProjection,
   reduceRunProjection,
   type RunProjection,
@@ -127,6 +129,10 @@ export type ChatProjectionEvent =
   }
   | { readonly kind: 'run-envelope'; readonly envelope: ExecutionEventEnvelope }
   | {
+    readonly kind: 'run-record';
+    readonly record: Readonly<ExecutionRunRecord>;
+  }
+  | {
     readonly kind: 'interaction-record';
     readonly record: Readonly<ExecutionInteractionRecord>;
   }
@@ -236,6 +242,11 @@ export function reduceChatProjection(
         const live = reduceLiveContent(turn, event.envelope);
         return run === turn.run && live === turn.live ? turn : { ...turn, run, live };
       });
+    case 'run-record':
+      return updateTurn(projection, event.record.runId as RunId, turn => {
+        const run = applyRunRecord(turn.run, event.record);
+        return run === turn.run ? turn : { ...turn, run };
+      });
     case 'interaction-record': {
       if (!projection.turns.some(turn => turn.runId === event.record.runId)) return projection;
       const interaction = projectInteraction(event.record);
@@ -328,17 +339,6 @@ export function reduceChatProjection(
   }
 }
 
-/**
- * A durable run record has no event here yet, on purpose.
- *
- * The first attempt's projection also folded in `ExecutionRunRecord`, so a run
- * recovered at startup could reach the surface without replaying its events.
- * `RunProjection` on this branch has no reducer for that, and adding one now
- * would still be a slot with no producer — the coordinator has landed and does
- * not feed one, because the registry answers `getRun` for a run you can name
- * and has no query for the runs an owner has. Startup restore is what needs
- * that query, and this event arrives with it.
- */
 export function getActiveChatTurn(projection: ChatProjection): ChatTurnProjection | undefined {
   return projection.turns.find(turn => turn.runId === projection.activeRunId);
 }

@@ -1,4 +1,7 @@
-import type { ExecutionBackendId } from '../../../core/execution/ExecutionBackendDescriptor';
+import {
+  type ExecutionBackendId,
+  executionBackendId,
+} from '../../../core/execution/ExecutionBackendDescriptor';
 import type {
   CancellationReason,
   ExecutionOwner,
@@ -19,10 +22,12 @@ import type {
 } from '../../../core/execution/ExecutionEvents';
 import {
   type ExecutionSessionId,
+  executionSessionId as toExecutionSessionId,
   type InteractionId,
   interactionId as toInteractionId,
   type LifecycleLeaseId,
   type RunId,
+  runId as toRunId,
 } from '../../../core/execution/ExecutionIds';
 import type {
   CreateExecutionSessionCommand,
@@ -87,6 +92,8 @@ export interface ChatExecutionLifecyclePort {
   ): () => void;
   getRun(runId: RunId): Readonly<ExecutionRunRecord> | null;
   getSession(executionSessionId: ExecutionSessionId): Readonly<ExecutionSessionRecord> | null;
+  getSessionsForOwner(owner: ExecutionOwner): readonly Readonly<ExecutionSessionRecord>[];
+  getRunsForOwner(owner: ExecutionOwner): readonly Readonly<ExecutionRunRecord>[];
   getInteraction(interactionId: InteractionId): Readonly<ExecutionInteractionRecord> | null;
   acquireLease(
     leaseId: LifecycleLeaseId,
@@ -187,10 +194,25 @@ interface PendingTurn {
 }
 
 interface ActiveTurn {
-  readonly pending: PendingTurn;
+  readonly commandId: string;
+  readonly conversationId: string;
+  readonly resultExpectation: ResultExpectation;
+  readonly started: Deferred<StartedChatTurn>;
+  readonly completion: Deferred<CompletedChatTurn>;
+  /**
+   * The command this turn was submitted as, absent for a run adopted from the
+   * kernel.
+   *
+   * The identity above is flat because of that absence: an adopted run has a
+   * conversation, a command id and a result expectation, and no user message,
+   * no request ref and no backend choice — those belong to a turn somebody
+   * asked for. Carrying a whole command for it would have meant inventing the
+   * three fields that are not true.
+   */
+  readonly submitted?: SubmitChatTurnCommand;
   executionSessionId?: ExecutionSessionId;
   runId?: RunId;
-  started: boolean;
+  dispatched: boolean;
   /**
    * Envelopes accepted between dispatch and the turn reaching the projection.
    *
@@ -366,11 +388,11 @@ export class ChatExecutionCoordinator {
       entry.unobserve = undefined;
       const active = entry.active;
       if (active) {
-        active.pending.completion.reject(new Error(active.started
+        active.completion.reject(new Error(active.dispatched
           ? 'Chat execution coordinator detached while the durable turn continues.'
           : 'Chat execution coordinator was disposed before turn admission.'));
-        if (!active.started) {
-          active.pending.started.reject(
+        if (!active.dispatched) {
+          active.started.reject(
             new Error('Chat execution coordinator was disposed before turn admission.'),
           );
         }
@@ -417,7 +439,95 @@ export class ChatExecutionCoordinator {
       listeners: new Set(),
     };
     this.entries.set(conversationId, entry);
+    this.adoptOwnedWork(entry, conversationId);
     return entry;
+  }
+
+  /**
+   * Takes over the work the kernel is already doing for this conversation.
+   *
+   * A run is durable and the surface watching it is not: a reload, a reopened
+   * tab, a second window all arrive at a conversation whose turn is still
+   * going inside the kernel. Without this the turn is orphaned — nothing
+   * renders it, nothing runs its persistence barrier, and the answer it is
+   * still producing is written nowhere.
+   *
+   * **Only runs that have not finished.** A terminal run this process still
+   * holds is finished work: its events were delivered to whoever was listening
+   * at the time and the control store keeps facts rather than a transcript, so
+   * adopting one would add a turn whose answer this coordinator can never
+   * supply. What it said is in the conversation already, or in the provider's
+   * own history where hydration reads it.
+   *
+   * More than one unfinished run is not expected and is adopted anyway, newest
+   * active: two of them means a previous process left one behind, and showing
+   * the conversation as idle would be the less honest of the two answers.
+   */
+  private adoptOwnedWork(entry: ConversationEntry, conversationId: string): void {
+    const owner: ExecutionOwner = { kind: 'conversation', ownerId: conversationId };
+    const unfinished = this.lifecycle.getRunsForOwner(owner).filter(run => !run.terminal);
+    const sessions = this.lifecycle.getSessionsForOwner(owner);
+    const latest = unfinished.at(-1);
+    const session = latest
+      ? sessions.find(candidate => candidate.executionSessionId === latest.executionSessionId)
+      : sessions.filter(candidate => candidate.status !== 'disposed').at(-1);
+    if (!session) {
+      return;
+    }
+    entry.sessionId = toExecutionSessionId(session.executionSessionId);
+    entry.backendId = executionBackendId(session.backendId);
+    entry.unobserve = this.lifecycle.observe(entry.sessionId, envelope => {
+      this.onEnvelope(entry, envelope);
+    });
+    for (const record of unfinished) {
+      this.adoptRun(entry, conversationId, record);
+    }
+  }
+
+  private adoptRun(
+    entry: ConversationEntry,
+    conversationId: string,
+    record: Readonly<ExecutionRunRecord>,
+  ): void {
+    const adoptedRunId = toRunId(record.runId);
+    const adoptedSessionId = toExecutionSessionId(record.executionSessionId);
+    const commandId = `adopted:${record.runId}`;
+    this.apply(entry, {
+      kind: 'turn-started',
+      commandId,
+      executionSessionId: adoptedSessionId,
+      runId: adoptedRunId,
+      resultExpectation: record.resultExpectation,
+      startedAt: record.createdAt,
+    });
+    // The record rather than the events, because the events are gone. It
+    // carries the position they reached, so the envelopes still to come are
+    // taken and the ones already accounted for cannot be replayed.
+    this.apply(entry, { kind: 'run-record', record });
+    for (const openInteractionId of record.openInteractionIds) {
+      const interaction = this.readInteraction(openInteractionId);
+      if (interaction) {
+        this.apply(entry, { kind: 'interaction-record', record: interaction });
+      }
+    }
+    const active: ActiveTurn = {
+      commandId,
+      conversationId,
+      resultExpectation: record.resultExpectation,
+      started: deferred<StartedChatTurn>(),
+      completion: deferred<CompletedChatTurn>(),
+      executionSessionId: adoptedSessionId,
+      runId: adoptedRunId,
+      dispatched: true,
+      buffered: [],
+      finalized: false,
+    };
+    active.started.resolve({
+      commandId,
+      executionSessionId: adoptedSessionId,
+      runId: adoptedRunId,
+    });
+    entry.active = active;
   }
 
   private startNext(entry: ConversationEntry): void {
@@ -429,17 +539,25 @@ export class ChatExecutionCoordinator {
       return;
     }
     const active: ActiveTurn = {
-      pending,
-      started: false,
+      commandId: pending.command.commandId,
+      conversationId: pending.command.conversationId,
+      resultExpectation: pending.command.resultExpectation,
+      started: pending.started,
+      completion: pending.completion,
+      submitted: pending.command,
+      dispatched: false,
       buffered: [],
       finalized: false,
     };
     entry.active = active;
-    void this.startActive(entry, active);
+    void this.startActive(entry, active, pending.command);
   }
 
-  private async startActive(entry: ConversationEntry, active: ActiveTurn): Promise<void> {
-    const command = active.pending.command;
+  private async startActive(
+    entry: ConversationEntry,
+    active: ActiveTurn,
+    command: SubmitChatTurnCommand,
+  ): Promise<void> {
     try {
       if (entry.backendId && entry.backendId !== command.backendId) {
         // One conversation, one backend. A second backend over the same
@@ -494,6 +612,7 @@ export class ChatExecutionCoordinator {
     entry.sessionId = sessionId;
     // Subscribed before the first run is started, so nothing this session emits
     // can arrive before there is somewhere to put it.
+    entry.unobserve?.();
     entry.unobserve = this.lifecycle.observe(sessionId, envelope => {
       this.onEnvelope(entry, envelope);
     });
@@ -506,17 +625,17 @@ export class ChatExecutionCoordinator {
     executionSessionId: ExecutionSessionId,
     startedRunId: RunId,
   ): void {
-    active.started = true;
+    active.dispatched = true;
     this.apply(entry, {
       kind: 'turn-started',
-      commandId: active.pending.command.commandId,
+      commandId: active.commandId,
       executionSessionId,
       runId: startedRunId,
-      resultExpectation: active.pending.command.resultExpectation,
+      resultExpectation: active.resultExpectation,
       startedAt: this.now(),
     });
-    active.pending.started.resolve({
-      commandId: active.pending.command.commandId,
+    active.started.resolve({
+      commandId: active.commandId,
       executionSessionId,
       runId: startedRunId,
     });
@@ -541,11 +660,11 @@ export class ChatExecutionCoordinator {
     if (!this.disposed) {
       this.apply(entry, {
         kind: 'command-rejected',
-        commandId: active.pending.command.commandId,
+        commandId: active.commandId,
       });
     }
-    active.pending.started.reject(error);
-    active.pending.completion.reject(error);
+    active.started.reject(error);
+    active.completion.reject(error);
     this.startNext(entry);
   }
 
@@ -554,7 +673,7 @@ export class ChatExecutionCoordinator {
       return;
     }
     const active = entry.active;
-    if (active && !active.started) {
+    if (active && !active.dispatched) {
       active.buffered.push(envelope);
       return;
     }
@@ -603,7 +722,7 @@ export class ChatExecutionCoordinator {
 
   private settleIfTerminal(entry: ConversationEntry, targetRunId: RunId): void {
     const active = entry.active;
-    if (!active?.started || active.runId !== targetRunId || active.finalized) {
+    if (!active?.dispatched || active.runId !== targetRunId || active.finalized) {
       return;
     }
     const terminal = findTurn(entry.projection, targetRunId)?.run.terminal;
@@ -666,7 +785,7 @@ export class ChatExecutionCoordinator {
         completedAt,
       );
       const saved = await this.conversations.apply(
-        active.pending.command.conversationId,
+        active.conversationId,
         current => completeConversation(current, assistantMessage, completedAt),
       );
       active.finalized = true;
@@ -681,8 +800,8 @@ export class ChatExecutionCoordinator {
       if (entry.active === active) {
         entry.active = undefined;
       }
-      active.pending.completion.resolve({
-        commandId: active.pending.command.commandId,
+      active.completion.resolve({
+        commandId: active.commandId,
         executionSessionId: sessionId,
         runId: activeRunId,
         terminal,
