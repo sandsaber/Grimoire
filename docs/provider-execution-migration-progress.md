@@ -8113,9 +8113,8 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
    flip was tried and refused: *a surface listed as pending must not be in the shipped bundle*, which
    is right, and it means the composition root, the tab wiring and the manifest state change are the
    same commit. Its contents, in the order they were built:
-   - `main.ts` constructs `ChatExecutionComposition` beside the kernel host, over
-     `storage.sessions.records` — **that store and no other**, per the entry above — and disposes it
-     before the kernel at unload;
+   - ~~`main.ts` constructs `ChatExecutionComposition` beside the kernel host~~ — **done**, with
+     eight surfaces moved to `wired` and the switch (`projectionChatProviders.ts`) empty;
    - a tab constructs a `ChatTabExecution` with its own `ChatSurfaceBinding` (its `ChatState`, its
      `MessageRenderer`, its `StreamController`, its provider's content presenter and failure
      wording), and `turnEncoder: () => tab.service?.turnEncoder ?? null`;

@@ -918,7 +918,12 @@ Work:
 - chat rendering migrates from generator consumption in `InputController` and `StreamController`
   to projection consumption, rendering into the existing DOM structure; turn acceptance,
   completion, persistence barriers, and queued-input release move to the chat execution
-  coordinator. Harvest the v1 Phase 7 reducers and coordinators as material for this rework, not as
+  coordinator. **This migration is gated per provider**, by the list in
+  `src/app/chat/projectionChatProviders.ts`, and each entry added to it is certified against a live
+  CLI the way an M2 flip was: the chat surface is provider-neutral but the risk is not — a
+  provider's content presenter, interaction presenter and failure wording are its own — and the
+  one-provider-per-checkpoint rule is what kept M2 honest. The list starts empty, with the whole
+  path built, composed end to end and in the bundle. Harvest the v1 Phase 7 reducers and coordinators as material for this rework, not as
   view replacements. **Projections and reducers stay presentation-agnostic**: no DOM types, CSS
   class names, element structure, or layout vocabulary in projection contracts — the renderer is a
   thin replaceable layer that maps projections onto the current DOM. This single rule is what makes
