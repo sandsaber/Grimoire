@@ -47,6 +47,40 @@ describe('two writers on one conversation', () => {
     };
   }
 
+  it('serializes a direct store write against the plugin\'s own', async () => {
+    // The execution path's persistence barrier writes conversations too, and it
+    // does it through the store directly. It must be **this** store: the queue
+    // that serializes writes to a conversation is held on the instance, so a
+    // second one over the same vault does not serialize against it at all —
+    // the compare-and-swap underneath catches the collision and raises a
+    // revision conflict, which for a turn means the answer is not saved.
+    const { storage, read } = createStorage();
+    await storage.createMetadata(storage.toSessionMetadata(conversation({
+      messages: [message('user', 'First')],
+    })));
+
+    await Promise.all([
+      storage.records.apply(CONVERSATION_ID, current => ({
+        ...current,
+        messages: [...(current.messages ?? []), message('assistant', 'From the barrier')],
+      })),
+      storage.updateMetadata(
+        conversation({ title: 'Renamed', messages: [message('user', 'First')] }),
+        ['title'],
+      ),
+    ]);
+
+    const written = read();
+    expect(written.messages.map((item: ChatMessage) => item.content))
+      .toEqual(['First', 'From the barrier']);
+    expect(written.title).toBe('Renamed');
+    // And the property that makes the above true rather than lucky: it is one
+    // store. A getter that built a fresh one per call would pass the assertions
+    // above whenever the two writes happened not to interleave, which is most
+    // of the time and none of the guarantee.
+    expect(storage.records).toBe(storage.records);
+  });
+
   it('keeps the messages a rename never saw', async () => {
     const { storage, read } = createStorage();
     // What both writers started from.

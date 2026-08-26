@@ -3,6 +3,7 @@ import type { CursorContext } from '../../utils/editor';
 import type { ConversationListing } from '../bootstrap/SessionStorage';
 import type { ConversationMetadataField } from '../bootstrap/SessionStorage';
 import type { SharedAppStorage } from '../bootstrap/storage';
+import type { ConversationRepository } from '../conversations/ConversationRepository';
 import type { McpServerManager } from '../mcp/McpServerManager';
 import type { ChatRuntime } from '../runtime/ChatRuntime';
 import type { HomeFileAdapter } from '../storage/HomeFileAdapter';
@@ -125,6 +126,15 @@ export interface AppSessionStorage {
   toSessionMetadata(conv: Conversation): SessionMetadata;
   /** The stored record as the chat surface reads it. The inverse of the above. */
   toConversation(meta: SessionMetadata, defaultProviderId: ProviderId): Conversation;
+  /**
+   * The one record store this vault has.
+   *
+   * Exposed for the callers that write conversations directly — the execution
+   * path's persistence barrier — and it must be *this* one: the queue that
+   * serializes writes to a conversation is held on the instance, so a second
+   * store over the same vault does not serialize against it.
+   */
+  readonly records: ConversationRepository;
 }
 
 // ---------------------------------------------------------------------------

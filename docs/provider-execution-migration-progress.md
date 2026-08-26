@@ -7949,6 +7949,32 @@ adoption gives from the other side, seen from the tab's end.
 
 Gates: unit 534 suites / 8,412 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The one record store, and the gate that decided where the flip begins (this commit)
+
+Two findings from trying to wire the composition root, one kept and one that sent the wiring back.
+
+**A vault has one record store, and that is a correctness rule.** The queue that serializes writes to
+a conversation is held on the *instance*, so two `ConversationRepository` objects over one vault do
+not serialize against each other at all — the compare-and-swap underneath catches the collision and
+raises a revision conflict, which for a turn's persistence barrier means the answer is not saved.
+`SessionStorage` exposes the one it owns, and the contract says why. Everything that writes
+conversations takes that one, the execution path's barrier included.
+
+**The test for it had to be rewritten, because the first version proved nothing.** Two concurrent
+writes through separate instances *usually* serialize by timing, so replacing the accessor with one
+that built a fresh store per call passed. What catches that mistake deterministically is the identity
+itself — one store, asserted as one object — and the concurrency assertion stays beside it as the
+behaviour that identity is for.
+
+**And the wiring went back.** Constructing the composition in `main.ts` failed the parity manifest's
+own rule: *a surface listed as pending must not be in the shipped bundle.* It is right — nothing
+consumes the composition yet, so shipping it is dead code in production — and it answers a question
+this session had been carrying: **the composition-root wiring belongs to the flip commit, not ahead
+of it.** The flip is where the surface stops being pending, and that is the same commit where it
+starts being reachable.
+
+Gates: unit 534 suites / 8,413 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

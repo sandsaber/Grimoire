@@ -341,6 +341,21 @@ export class SessionStorage {
     this.conversations = new ConversationRepository({ storage: durable });
   }
 
+  /**
+   * The one record store this vault has, for callers that need it directly.
+   *
+   * **One instance per vault, per process, and that is a correctness rule
+   * rather than a convenience.** The store serializes writes to a conversation
+   * through a queue held on the *instance*, so two of them over one vault do
+   * not serialize against each other at all: the compare-and-swap underneath
+   * catches the collision and raises a revision conflict, which for a turn's
+   * persistence barrier means the answer is not saved. Anything that writes
+   * conversations — the execution path's barrier included — takes this one.
+   */
+  get records(): ConversationRepository {
+    return this.conversations;
+  }
+
   getMetadataPath(id: string): string {
     return `${SESSIONS_PATH}/${requireStorableId(id)}.meta.json`;
   }
