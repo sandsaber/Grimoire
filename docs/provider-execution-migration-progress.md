@@ -7970,7 +7970,17 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
      reports none;
    - **which interaction trigger survives**, per the note on the port: the provider's presenter has
      the dialog on screen already, and the projection wants to show it from state so a reopened tab
-     shows the question.
+     shows the question;
+   - **and a fifth, found while assembling the composition rather than while flipping.**
+     `submitTurn` takes a `requestRef` — the provider's own reference to the prompt — and only the
+     provider can produce one. `InputController` gets it from `agentService.prepareTurn(request)`,
+     which is a method on the *presentation adapter*, routed to a host port because
+     `ProviderModule` has no slot for it (a standing obligation above, owner M3, "when the four
+     legacy prompt encoders move"). So a tab that submits through the coordinator and still asks the
+     adapter for its request ref keeps the adapter alive through the flip that was supposed to
+     remove it. Either the obligation closes first, or the flip carries `prepareTurn` on the surface
+     binding and closes it on the way — but it cannot be left unnoticed, because the flip compiles
+     either way.
    This is the flip, so it is a smoke matrix rather than a gate, and per the standing rule it is
    certified against a live provider before the next thing lands.
 2. **`InputController` and `StreamController` stop owning the turn.** The other half of the same
