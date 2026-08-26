@@ -498,7 +498,7 @@ export class InputController {
     }
     state.hasPendingConversationSave = true;
 
-    await this.triggerTitleGeneration();
+    await this.triggerTitleGeneration(projection ? userMsg : undefined);
 
     let assistantMsg = this.createAssistantMessage(queryOptions);
     if (!projection) {
@@ -558,10 +558,23 @@ export class InputController {
 
     // Restore pendingResumeAt from persisted conversation state (survives plugin reload)
     const conversationIdForSend = state.currentConversationId;
+    // What this turn continues, for the path that has to pass it rather than
+    // leave it on the runtime's session. Read from the same conversation the
+    // legacy path reads, so the two cannot answer differently.
+    let resumeCheckpoint: string | undefined;
+    let nativeSessionRef: string | undefined;
     if (conversationIdForSend) {
       const conv = plugin.getConversationSync(conversationIdForSend);
+      nativeSessionRef = conv?.sessionId ?? undefined;
       if (conv?.resumeAtMessageId) {
-        if (this.isResumeSessionAtStillNeeded(conv.resumeAtMessageId, state.messages.slice(0, -2))) {
+        // Whether the checkpoint still names something in the transcript, read
+        // from the transcript that *has* it. `state.messages` is the surface's,
+        // and on the projection path the surface has not drawn this turn's
+        // messages yet — so reading it there answers "no" for every checkpoint
+        // and clears one that was perfectly good.
+        const transcript = projection ? conv.messages ?? [] : state.messages.slice(0, -2);
+        if (this.isResumeSessionAtStillNeeded(conv.resumeAtMessageId, transcript)) {
+          resumeCheckpoint = conv.resumeAtMessageId;
           agentService.setResumeCheckpoint(conv.resumeAtMessageId);
         } else {
           try {
@@ -582,7 +595,16 @@ export class InputController {
         // attachment draws every part of it. What is awaited here is the turn
         // being *finished*, which is what the block below this one is written
         // against — everything it does after a turn ends still applies.
-        const submitted = await projection.send(turnRequest, userMsg, { queryOptions });
+        // The session this conversation continues and the checkpoint this turn
+        // resumes at both travel with the command. On the legacy path they are
+        // held on the runtime's own session, which this path does not go
+        // through — so a turn sent without them opens a *new* provider session
+        // and abandons the conversation's thread.
+        const submitted = await projection.send(turnRequest, userMsg, {
+          queryOptions,
+          ...(nativeSessionRef ? { nativeSessionRef } : {}),
+          ...(resumeCheckpoint ? { resumeCheckpoint } : {}),
+        });
         userMsg.content = submitted.userMessage.content;
         userMsg.currentNote = submitted.userMessage.currentNote;
         const completed = await submitted.ticket.completion;
@@ -1533,10 +1555,16 @@ export class InputController {
    * Triggers AI title generation after first user message.
    * Handles setting fallback title, firing async generation, and updating UI.
    */
-  private async triggerTitleGeneration(): Promise<void> {
+  private async triggerTitleGeneration(pendingUserMessage?: ChatMessage): Promise<void> {
     const { plugin, state, conversationController } = this.deps;
 
-    if (state.messages.length !== 1) {
+    // The first turn of a conversation, whichever path is drawing it. On the
+    // legacy path the message is already in state by now; on the projection
+    // path it is not, because the projection draws it once the coordinator has
+    // made it durable — so the caller hands it over and the count that means
+    // "first turn" is one lower. Without this a conversation started on that
+    // path never gets a title at all.
+    if (state.messages.length !== (pendingUserMessage ? 0 : 1)) {
       return;
     }
 
@@ -1553,7 +1581,7 @@ export class InputController {
     }
 
     // Find first user message by role (not by index)
-    const firstUserMsg = state.messages.find(m => m.role === 'user');
+    const firstUserMsg = pendingUserMessage ?? state.messages.find(m => m.role === 'user');
 
     if (!firstUserMsg) {
       return;

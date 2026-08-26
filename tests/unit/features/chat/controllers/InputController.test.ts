@@ -146,6 +146,61 @@ describe('InputController on the projection path', () => {
     expect(stored.completedAt).toEqual(expect.any(Number));
   });
 
+  it('names the conversation it starts, which the message count would have hidden', async () => {
+    // Title generation fires on "this is the first turn", which the legacy path
+    // reads as one message in state. On this path the question is not in state
+    // yet — the projection draws it — so the count is zero and the conversation
+    // would never have been named.
+    const projection = projectionOf();
+    deps.getProjectionExecution = () => projection as never;
+    deps.getInputEl().value = 'are tomatoes a fruit?';
+    deps.state.currentConversationId = 'conv-1';
+    const controller = new InputController(deps);
+
+    await controller.sendMessage();
+
+    expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', expect.any(String));
+  });
+
+  it('carries the session it continues and the checkpoint it resumes at', async () => {
+    // Held on the runtime's own session by the legacy path, which this one does
+    // not go through: a turn sent without them opens a new provider session and
+    // abandons the conversation's thread.
+    const projection = projectionOf();
+    deps.getProjectionExecution = () => projection as never;
+    deps.state.currentConversationId = 'conv-1';
+    (deps.plugin.getConversationSync as jest.Mock).mockReturnValue({
+      id: 'conv-1',
+      sessionId: 'provider-thread-1',
+      resumeAtMessageId: 'assistant-checkpoint',
+      // The checkpoint still names the last thing in the transcript, which is
+      // what makes it worth resuming at.
+      messages: [
+        { id: 'msg-1', role: 'user', content: 'first', timestamp: 1 },
+        {
+          id: 'msg-2',
+          role: 'assistant',
+          content: 'answer',
+          timestamp: 2,
+          assistantMessageId: 'assistant-checkpoint',
+        },
+      ],
+    });
+    deps.getInputEl().value = 'again';
+    const controller = new InputController(deps);
+
+    await controller.sendMessage();
+
+    expect(projection.send).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        nativeSessionRef: 'provider-thread-1',
+        resumeCheckpoint: 'assistant-checkpoint',
+      }),
+    );
+  });
+
   it('asks the kernel to stop, and does not also cancel the runtime', async () => {
     const projection = projectionOf();
     deps.getProjectionExecution = () => projection as never;

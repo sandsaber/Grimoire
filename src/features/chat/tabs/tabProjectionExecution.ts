@@ -115,6 +115,14 @@ export function createTabProjectionExecution(
     },
     turnEncoder: () => adapterOf(tab)?.turnEncoder ?? null,
     createConversation: async () => {
+      // Whatever already bound this tab wins. Title generation creates the
+      // conversation before the first turn is sent — that is where the fallback
+      // title comes from — and creating a second one here would leave the turn
+      // running in a conversation the tab is not showing.
+      const existing = tab.conversationId ?? tab.state.currentConversationId;
+      if (existing) {
+        return existing;
+      }
       const conversation = await plugin.createConversation({
         providerId: tab.providerId,
         ...(tab.service?.getSessionId?.() ? { sessionId: tab.service.getSessionId() as string } : {}),

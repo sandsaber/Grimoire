@@ -8192,6 +8192,34 @@ bug — the native session and the resume checkpoint — is real and is the next
 
 Gates: unit 535 suites / 8,434 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### What the send path was not carrying, and a title nobody would have got (this commit)
+
+Two more from the review, and a third the fix for the first uncovered.
+
+**The turn did not say what it continues.** The session a conversation resumes and the checkpoint a
+turn resumes at are held on the *runtime's own session* by the legacy path, and this path does not go
+through it. A turn sent without them opens a new provider session and abandons the conversation's
+thread — every second turn a fresh chat, no resume, nothing to fork from. Both travel with the
+command now, read from the same conversation the legacy path reads so the two cannot answer
+differently.
+
+**Nothing would ever have been named.** Title generation fires on "this is the first turn", which the
+legacy path reads as exactly one message in state. On this path the question is not in state yet —
+the projection draws it once the coordinator has made it durable — so the count is zero and the
+guard returned early: no fallback title, no generated one. The count that means *first turn* is one
+lower when the caller hands the message over. And because that guard is also where a conversation is
+lazily created, the tab binding now reuses one that already exists rather than creating a second and
+leaving the turn running in a conversation the tab is not showing.
+
+**And the checkpoint was being cleared for being stale, by reading the wrong transcript.** Whether a
+resume checkpoint still names something is asked of `state.messages` — the surface's list — and on
+this path the surface has not drawn the turn's messages. The answer was "no" for every checkpoint,
+which does not merely fail to resume: it *writes the clearing back*. It reads the conversation's own
+transcript on this path, which is the list that has it. Found because the test for the fix above it
+failed for a different reason than expected, which is the only reason it was found at all.
+
+Gates: unit 535 suites / 8,436 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
