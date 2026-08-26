@@ -196,6 +196,43 @@ function turnRequest(text: string): ChatTurnRequest {
 
 describe('chat execution composition', () => {
   describe('sending a message', () => {
+    it('hands back the message it persisted, and draws it once', async () => {
+      // The surface has its own copy of the question on screen. What the
+      // provider composed is what the conversation keeps, so the caller is
+      // handed it to match its copy to — the same line the legacy path writes
+      // as `userMsg.content = preparedTurn.persistedContent`.
+      //
+      // And it reaches the column exactly once: the conversation grows by the
+      // user message *before* the turn exists, so a renderer has no turn to ask
+      // whether it was already drawn. A surface on this path therefore does not
+      // draw its own — the projection does.
+      const app = await createComposition();
+      const drawn = surface();
+      const attachment = app.composition.bindSurface(drawn.binding);
+      await attachment.open(CONVERSATION_ID, app.composition.coordinator);
+      const turns = encoder();
+
+      const submitted = await app.composition.submitTurn({
+        commandId: 'cmd-1',
+        conversationId: CONVERSATION_ID,
+        backendId: executionBackendId('internal-deterministic-fake'),
+        encoder: turns,
+        request: turnRequest('are tomatoes a fruit?'),
+        userMessage: {
+          id: 'msg-user-1',
+          role: 'user',
+          content: 'are tomatoes a fruit?',
+          timestamp: 1,
+        },
+      });
+      await submitted.ticket.started;
+
+      expect(submitted.userMessage.content).toBe('composed: are tomatoes a fruit?');
+      expect(submitted.userMessage.id).toBe('msg-user-1');
+      expect(drawn.state.messages.filter(message => message.id === 'msg-user-1')).toHaveLength(1);
+      app.composition.dispose();
+    });
+
     it('persists what the provider composed and shows what was typed', async () => {
       const app = await createComposition();
       const drawn = surface();
@@ -203,7 +240,7 @@ describe('chat execution composition', () => {
       await attachment.open(CONVERSATION_ID, app.composition.coordinator);
       const turns = encoder();
 
-      const ticket = await app.composition.submitTurn({
+      const { ticket: ticket } = await app.composition.submitTurn({
         commandId: 'cmd-1',
         conversationId: CONVERSATION_ID,
         backendId: executionBackendId('internal-deterministic-fake'),
@@ -236,7 +273,7 @@ describe('chat execution composition', () => {
       // the provider the turn it is being asked to answer.
       const app = await createComposition();
       const turns = encoder();
-      const first = await app.composition.submitTurn({
+      const { ticket: first } = await app.composition.submitTurn({
         commandId: 'cmd-1',
         conversationId: CONVERSATION_ID,
         backendId: executionBackendId('internal-deterministic-fake'),
@@ -257,7 +294,7 @@ describe('chat execution composition', () => {
       });
       await first.completion;
 
-      const second = await app.composition.submitTurn({
+      const { ticket: second } = await app.composition.submitTurn({
         commandId: 'cmd-2',
         conversationId: CONVERSATION_ID,
         backendId: executionBackendId('internal-deterministic-fake'),
@@ -288,7 +325,7 @@ describe('chat execution composition', () => {
         }),
       });
 
-      const ticket = await app.composition.submitTurn({
+      const { ticket: ticket } = await app.composition.submitTurn({
         commandId: 'cmd-1',
         conversationId: CONVERSATION_ID,
         backendId: executionBackendId('internal-deterministic-fake'),
@@ -313,7 +350,7 @@ describe('chat execution composition', () => {
       const app = await createComposition();
       const turns = encoder({ resultExpectation: () => 'optional' });
 
-      const ticket = await app.composition.submitTurn({
+      const { ticket: ticket } = await app.composition.submitTurn({
         commandId: 'cmd-1',
         conversationId: CONVERSATION_ID,
         backendId: executionBackendId('internal-deterministic-fake'),

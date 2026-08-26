@@ -3,10 +3,13 @@ import type { CancellationReason } from '@/core/execution/ExecutionContracts';
 import type { ChatTurnEncoder } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatRuntimeQueryOptions, ChatTurnRequest } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
-import type { ChatTurnTicket } from '@/features/chat/application/ChatExecutionCoordinator';
 import type { ChatProjectionAttachment } from '@/features/chat/application/ChatProjectionAttachment';
 
-import type { ChatExecutionComposition, ChatSurfaceBinding } from './ChatExecutionComposition';
+import type {
+  ChatExecutionComposition,
+  ChatSurfaceBinding,
+  SubmittedChatTurn,
+} from './ChatExecutionComposition';
 
 /**
  * One tab's end of the chat execution path.
@@ -67,7 +70,7 @@ export class ChatTabExecution {
       readonly nativeSessionRef?: string;
       readonly resumeCheckpoint?: string;
     } = {},
-  ): Promise<ChatTurnTicket> {
+  ): Promise<SubmittedChatTurn> {
     const encoder = this.options.turnEncoder();
     if (!encoder) {
       // Refused rather than defaulted: without the provider's own encoding

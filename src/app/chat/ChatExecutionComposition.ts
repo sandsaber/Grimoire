@@ -111,7 +111,7 @@ export class ChatExecutionComposition {
    *   turn, and without it a compaction that did exactly what was asked ends as
    *   a failure for producing no answer.
    */
-  async submitTurn(command: SubmitChatMessageCommand): Promise<ChatTurnTicket> {
+  async submitTurn(command: SubmitChatMessageCommand): Promise<SubmittedChatTurn> {
     const conversation = await this.coordinator.loadConversation(command.conversationId);
     const prepared = command.encoder.prepareTurn(command.request);
     const requestRef = command.encoder.encodeRequestRef(
@@ -119,7 +119,14 @@ export class ChatExecutionComposition {
       [...conversation.messages],
       command.queryOptions,
     );
-    return this.coordinator.submitTurn({
+    const userMessage: ChatMessage = {
+      ...command.userMessage,
+      content: prepared.persistedContent,
+      ...(prepared.isCompact || !prepared.request.currentNotePath
+        ? {}
+        : { currentNote: prepared.request.currentNotePath }),
+    };
+    const ticket = await this.coordinator.submitTurn({
       commandId: command.commandId,
       conversationId: command.conversationId,
       backendId: command.backendId,
@@ -127,21 +134,26 @@ export class ChatExecutionComposition {
       resultExpectation: prepared.isCompact
         ? 'none'
         : command.encoder.resultExpectation?.(prepared) ?? 'required',
-      userMessage: {
-        ...command.userMessage,
-        content: prepared.persistedContent,
-        ...(prepared.isCompact || !prepared.request.currentNotePath
-          ? {}
-          : { currentNote: prepared.request.currentNotePath }),
-      },
+      userMessage,
       ...(command.nativeSessionRef ? { nativeSessionRef: command.nativeSessionRef } : {}),
       ...(command.resumeCheckpoint ? { resumeCheckpoint: command.resumeCheckpoint } : {}),
     });
+    // Handed back because the surface has already drawn its own copy: the
+    // legacy path overwrites the message it rendered with what the provider
+    // composed, and a surface that skipped that would show what was typed while
+    // the vault holds what was sent.
+    return { ticket, userMessage };
   }
 
   dispose(): void {
     this.coordinator.dispose();
   }
+}
+
+export interface SubmittedChatTurn {
+  readonly ticket: ChatTurnTicket;
+  /** The user message as it was persisted, for the surface to match its own to. */
+  readonly userMessage: ChatMessage;
 }
 
 export interface SubmitChatMessageCommand {

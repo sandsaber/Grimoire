@@ -7975,6 +7975,36 @@ starts being reachable.
 
 Gates: unit 534 suites / 8,413 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### Who draws the question, decided by reading the order the events arrive in (this commit)
+
+Reading the call site the flip will change found what looked like a defect in what was already
+shipped, and the fix for it disproved itself — which is the useful part.
+
+**The apparent defect.** `InputController` draws the user's message the moment it is typed, and the
+coordinator then appends the same message to the conversation, which the projection carries and the
+renderer draws. Two questions on screen for one turn. The obvious fix was to let the turn own the
+message id, the way it owns its answer's, and have the renderer skip it.
+
+**Why that cannot work.** The conversation grows *before* the turn exists: `startActive` writes the
+user message and applies `conversation-loaded`, and only then creates the session, mints the run and
+applies `turn-started`. So when the renderer sees the question there is no turn to ask whether it was
+already drawn. The slot was added, the end-to-end test did not move, and the reason it did not move
+is the order. It is backed out rather than left in as something that would only work if the order
+changed.
+
+**What is true instead**, and is now the rule the flip follows: **a surface on this path does not draw
+its own question — the projection does.** One draw, and it happens when the message is durable rather
+than when it is typed, which is a latency the legacy path does not pay. If that ever reads as slow,
+the fix is optimistic drawing plus a skip, and the skip needs the order to change first; that is a
+decision with a cost, not an omission.
+
+**One thing the surface does still need back.** The legacy path overwrites the message it rendered
+with what the provider composed — `userMsg.content = preparedTurn.persistedContent` — so `submitTurn`
+hands the persisted message back to its caller. Without it a surface shows what was typed while the
+vault holds what was sent.
+
+Gates: unit 534 suites / 8,414 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

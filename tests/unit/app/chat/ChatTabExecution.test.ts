@@ -186,7 +186,7 @@ describe('chat tab execution', () => {
     const app = await createTab();
 
     expect(app.tab.conversationId).toBeNull();
-    const ticket = await app.tab.send({ text: 'Hi' }, userMessage('msg-1', 'Hi'));
+    const { ticket: ticket } = await app.tab.send({ text: 'Hi' }, userMessage('msg-1', 'Hi'));
     const started = await ticket.started;
     app.backend.emit(started.runId, {
       kind: 'output-delta',
@@ -209,7 +209,7 @@ describe('chat tab execution', () => {
 
   it('creates one conversation however many turns follow', async () => {
     const app = await createTab();
-    const first = await app.tab.send({ text: 'Hi' }, userMessage('msg-1', 'Hi'));
+    const { ticket: first } = await app.tab.send({ text: 'Hi' }, userMessage('msg-1', 'Hi'));
     const firstStarted = await first.started;
     app.backend.emit(firstStarted.runId, {
       kind: 'terminal',
@@ -218,7 +218,7 @@ describe('chat tab execution', () => {
     });
     await first.completion;
 
-    const second = await app.tab.send({ text: 'Again' }, userMessage('msg-2', 'Again'));
+    const { ticket: second } = await app.tab.send({ text: 'Again' }, userMessage('msg-2', 'Again'));
     await second.started;
 
     expect(app.created).toEqual(['conv-1']);
@@ -243,7 +243,7 @@ describe('chat tab execution', () => {
 
     await expect(app.tab.cancel()).resolves.toBeUndefined();
 
-    const ticket = await app.tab.send({ text: 'Hi' }, userMessage('msg-1', 'Hi'));
+    const { ticket: ticket } = await app.tab.send({ text: 'Hi' }, userMessage('msg-1', 'Hi'));
     await ticket.started;
     await app.registry.waitForIdle();
     await app.tab.cancel();
@@ -255,7 +255,7 @@ describe('chat tab execution', () => {
 
   it('stops drawing when the tab closes, and the kernel keeps the turn', async () => {
     const app = await createTab();
-    const ticket = await app.tab.send({ text: 'Hi' }, userMessage('msg-1', 'Hi'));
+    const { ticket: ticket } = await app.tab.send({ text: 'Hi' }, userMessage('msg-1', 'Hi'));
     const started = await ticket.started;
 
     app.tab.detach();
