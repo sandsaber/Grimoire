@@ -314,6 +314,9 @@ describe('execution composition boundaries', () => {
       // is allowed to exist. A renderer that names one itself is a renderer a
       // redesign has to rewrite, which is the same stop condition one layer out.
       'src/features/chat/rendering/ChatProjectionRenderer.ts',
+      // The attachment holds the two together and draws nothing itself, so it
+      // has no more business naming a DOM than they do.
+      'src/features/chat/application/ChatProjectionAttachment.ts',
     ];
     const PRESENTATION_VOCABULARY = [
       /\bcssClass\b/,

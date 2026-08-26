@@ -7736,6 +7736,39 @@ the turn, which is a smoke matrix rather than a gate.
 
 Gates: unit 530 suites / 8,379 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The whole chat path, composed and proven before the flip touches it (this commit)
+
+`ChatProjectionAttachment` is the last dark piece: one tab's subscription to one conversation's
+projection. With it the path exists end to end — a provider talking, the kernel ingesting, the
+coordinator reducing, the renderer diffing, the target calling the column's own operations — and the
+composition test drives all of it with two fakes: the provider, and the DOM. Wave 1's rule is that a
+seam both sides stub is not covered, and this is M5's chat seam, run **before** the flip rather than
+after it. That order is the one thing wave 1 got right that everything since has depended on.
+
+The test asserts the call sequence a whole turn produces, and the sequence is the artifact: the
+conversation drawn, the question appended, one assistant bubble, three blocks in the order the model
+produced them — text, the provider's own item, text — one ending, both indicators stopped. Then the
+property the whole path exists to keep: **the answer the column drew and the answer the vault holds
+are the same one.**
+
+**The attachment's shape came from a test that could not be written.** The first draft was a static
+factory returning the attachment once the conversation had loaded — and the race it documented, a tab
+closed mid-load, was unreachable through it, because the caller had nothing to close until the load
+finished. Constructed first and opened after, the window is real and the test closes the tab inside
+it. The same generation counter answers the second case: a tab opened on another conversation while
+the first is still loading must not draw the first one's projection into the second one's column.
+
+**A coincidence the tests were passing on, and what it turned into.** The end-to-end sequence held
+partly because the harness's `assistantMessageIdForRun` and the target's own minting happened to
+produce the same string. They are not required to: the live bubble is minted by the target and the
+stored message is named by the provider's result id whenever the run commits one. A second test makes
+them differ, and the column still draws one answer — the renderer skips the stored message by the
+turn's record of what it drew, not by comparing ids. So the rule holds, and what the test now records
+is the divergence itself: **the id of the bubble on screen is not the id of the message in the vault**,
+which is what a rewind addresses before a reload versus after one. That belongs to the flip.
+
+Gates: unit 531 suites / 8,387 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7812,13 +7845,15 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 **M3 is closed.** Everything below is M5 or later.
 
-1. **The attachment, and then the flip.** Every dark piece of the chat path now exists — projection,
-   live content, coordinator, adoption, renderer, target — and what is missing is the thing that
-   binds them to a tab: subscribe to a coordinator for the tab's conversation, hand each projection
-   to a renderer over a target built from that tab's controller and state, detach on close. The first
-   attempt's `ChatProjectionAttachment` (109 lines, at `8cab81b4`) is the material. It is small; what
-   is not small is what it replaces, and the three things that have to be settled in the same
-   checkpoint rather than discovered during it:
+1. **The flip.** Every dark piece of the chat path now exists and is composed end to end in
+   `ChatProjectionAttachment.test.ts` — projection, live content, coordinator, adoption, renderer,
+   target, attachment. What is left is turning it on inside a tab, and it is small next to what it
+   replaces. Four things have to be settled in that checkpoint rather than discovered during it:
+   - **the id of the bubble and the id of the stored message differ**, because the live one is minted
+     by the target and the stored one is named by the provider's result id. Rewind and fork address
+     messages by id, so what a rewind means before a reload and after one is not the same thing
+     today. Either the target takes its id from the turn, or the barrier takes its id from the
+     bubble, and one of the two has to be chosen out loud;
    - **who creates the assistant message.** `InputController` does today, and the target does on
      `beginTurn`. Both cannot;
    - **usage's write path.** The meter is fed from content the target is handed, and the barrier

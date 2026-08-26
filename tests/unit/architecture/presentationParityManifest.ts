@@ -818,6 +818,16 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: ['src/features/chat/rendering/ChatSurfaceRenderTarget.ts'],
   },
   {
+    id: 'chat-projection-attachment',
+    area: 'chat',
+    description:
+      'One tab\'s subscription to one conversation\'s projection: opened before it loads so a tab can close mid-load, and released when the tab closes or moves to another conversation.',
+    state: 'pending',
+    owner:
+      'M5 — nothing constructs one. It is what the flip wires into a tab, and the flip is where InputController and StreamController stop owning the turn.',
+    modules: ['src/features/chat/application/ChatProjectionAttachment.ts'],
+  },
+  {
     id: 'execution-platform-dark',
     area: 'shell',
     description:
