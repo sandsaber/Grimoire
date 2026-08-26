@@ -7668,6 +7668,29 @@ becoming the answer. Its parser is guarded too: the first version terminated the
 
 Gates: unit 529 suites / 8,366 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+#### A fourth prerequisite the target has, found by reading who already presents an interaction
+
+Recorded against the renderer's port rather than discovered by whoever writes the target: **an
+approval is already on screen before the projection mentions it.** Every flipped provider has an
+interaction presenter — `CodexInteractionPresenter` and its eight siblings — triggered by its own
+backend when the interaction opens, rendering through the legacy approval callbacks the surface
+installed, and returning a response id the kernel records. The presentation is provider-owned because
+the ref is opaque and only the provider knows what its own question looks like; the *answer* already
+flows back through the kernel, so there is no conflict about who resolves.
+
+There is a conflict about who *shows*. A projection-driven surface wants the question shown from the
+projection, so that a tab reopened mid-question shows it — which is the whole point of the
+interaction being a durable record. A target that implements `showInteraction` today would open a
+second dialog beside the presenter's. Which trigger survives is settled by the flip that replaces the
+legacy approval callbacks, and the port now says so where an implementer will read it.
+
+That makes four prerequisites the render target had, three of them found by reading its consumers
+before writing it and none of them visible from the port's own signature: the content vocabulary
+(split, this commit), usage (answered — content, with its write path still owed), the two indicators
+(six call sites to read), and this.
+
+Gates: unit 529 suites / 8,366 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

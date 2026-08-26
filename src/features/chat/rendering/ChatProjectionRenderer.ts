@@ -92,6 +92,20 @@ export interface ChatRenderTarget {
     persistence: ChatTurnProjection['persistence'],
     errorCode?: string,
   ): void;
+  /**
+   * An interaction the turn is waiting on.
+   *
+   * **A target implementing this must not open a second dialog.** Today the
+   * provider's own interaction presenter is what puts an approval on screen —
+   * triggered by its backend when the interaction opens, rendering through the
+   * legacy approval callbacks, and returning a response id the kernel records.
+   * That path is live for every flipped provider. A projection-driven surface
+   * wants the same thing shown from here instead, so that a tab reopened
+   * mid-question shows the question; which of the two triggers survives is
+   * settled by the flip that replaces the legacy callbacks, not before it.
+   * Until then this says *what the turn is waiting on*, and a target may render
+   * it as state without presenting the choice twice.
+   */
   showInteraction(interaction: InteractionProjection): void;
   hideInteraction(interactionId: string): void;
   setQueuedCommandCount(count: number): void;
