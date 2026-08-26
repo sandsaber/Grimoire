@@ -564,6 +564,22 @@ describe('the assembled ChatRuntime adapter', () => {
     return ref === undefined ? undefined : refPayloads.get(ref);
   }
 
+  it('hands out the turn encoder it was built with, not a copy of it', async () => {
+    // M5's chat path submits through the coordinator and still needs the three
+    // provider steps from a message to a turn. They can only come from this
+    // construction: the ports close over this tab's conversation binding and
+    // its scope, so an encoder built beside the adapter would key its request
+    // scratch differently and free another tab's.
+    const harness = await createHarness();
+    const adapter = createAdapter(harness, {
+      encodeRequestRef: () => 'req-from-this-tab',
+      resultExpectation: () => 'optional',
+    });
+
+    expect(adapter.turnEncoder.encodeRequestRef({} as never)).toBe('req-from-this-tab');
+    expect(adapter.turnEncoder.resultExpectation?.({} as never)).toBe('optional');
+  });
+
   function createAdapter(
     harness: Harness,
     ports: Partial<ExecutionChatRuntimeHostPorts> = {},

@@ -673,6 +673,24 @@ export class ExecutionChatRuntimeAdapter {
     return toLegacyCapabilities(this.context.capabilities);
   }
 
+  /**
+   * The three provider steps from a message to a dispatchable turn.
+   *
+   * Exposed because M5's chat path submits through the coordinator and still
+   * needs them, and they can only come from *this* construction: the ports
+   * close over this tab's conversation binding and its scope, so an encoder
+   * built beside the adapter would key its request scratch differently and free
+   * another tab's.
+   *
+   * A handle rather than a home. The step that finishes this is each provider
+   * composition returning the encoder it already builds without constructing an
+   * adapter at all — after which a surface asks the composition and this
+   * accessor goes with the rest of the adapter.
+   */
+  get turnEncoder(): ChatTurnEncoder {
+    return this.ports;
+  }
+
   prepareTurn(request: ChatTurnRequest): PreparedChatTurn {
     // Synchronous on purpose: the controller writes the prepared content onto
     // the user message before sending, so turning this into a lifecycle

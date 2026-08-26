@@ -7916,6 +7916,17 @@ against.
 
 Gates: unit 533 suites / 8,406 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+**And the handle that makes it usable**, in the same commit: `ExecutionChatRuntimeAdapter` exposes
+its `turnEncoder`. Not a home — a handle. The ports close over *this* tab's conversation binding and
+its scope, so an encoder built beside the adapter would key its request scratch differently and free
+another tab's; they can only come from the construction that built them. What finishes it is each
+provider composition returning the encoder it already builds without constructing an adapter at all,
+after which a surface asks the composition and this accessor leaves with the rest of the adapter. The
+flip's send path is typed against `ChatTurnEncoder` either way, so that last step changes the
+compositions and not the tab.
+
+Gates: unit 533 suites / 8,407 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
