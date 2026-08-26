@@ -63,11 +63,6 @@ export interface InteractionProjection {
   readonly updatedAt: number;
 }
 
-export interface ReconciledChatResultProjection {
-  readonly reconciliationId: string;
-  readonly result: MaterializedChatResult;
-}
-
 /**
  * One piece of what the provider is saying, in the order it said it.
  *
@@ -91,7 +86,6 @@ export interface ChatTurnProjection {
   /** What the provider said while the turn ran, in order. Never persisted. */
   readonly live: readonly ChatLiveItem[];
   readonly result?: MaterializedChatResult;
-  readonly observedResults: readonly ReconciledChatResultProjection[];
   readonly persistence: 'pending' | 'saving' | 'saved' | 'failed';
   readonly persistenceErrorCode?: string;
   readonly assistantMessageId?: string;
@@ -143,12 +137,6 @@ export type ChatProjectionEvent =
   | {
     readonly kind: 'result-materialized';
     readonly runId: RunId;
-    readonly result: MaterializedChatResult;
-  }
-  | {
-    readonly kind: 'reconciled-result-materialized';
-    readonly runId: RunId;
-    readonly reconciliationId: string;
     readonly result: MaterializedChatResult;
   }
   | { readonly kind: 'persistence-started'; readonly runId: RunId }
@@ -223,7 +211,6 @@ export function reduceChatProjection(
         runId: event.runId,
         run: createRunProjection(event.runId, event.resultExpectation),
         live: [],
-        observedResults: [],
         persistence: 'pending',
         startedAt: event.startedAt,
       };
@@ -271,25 +258,6 @@ export function reduceChatProjection(
       return updateTurn(projection, event.runId, turn => (
         sameResult(turn.result, event.result) ? turn : { ...turn, result: event.result }
       ));
-    case 'reconciled-result-materialized':
-      return updateTurn(projection, event.runId, turn => {
-        const existing = turn.observedResults.find(item => (
-          item.reconciliationId === event.reconciliationId
-        ));
-        if (existing && sameResult(existing.result, event.result)) return turn;
-        const materialized = {
-          reconciliationId: event.reconciliationId,
-          result: event.result,
-        };
-        return {
-          ...turn,
-          observedResults: existing
-            ? turn.observedResults.map(item => (
-              item.reconciliationId === event.reconciliationId ? materialized : item
-            ))
-            : [...turn.observedResults, materialized],
-        };
-      });
     case 'persistence-started':
       return updateTurn(projection, event.runId, turn => (
         turn.persistence === 'saving' && turn.persistenceErrorCode === undefined
@@ -339,6 +307,18 @@ export function reduceChatProjection(
   }
 }
 
+/**
+ * A reconciled outcome carries no text, and cannot.
+ *
+ * The first attempt's projection kept a materialized result per reconciliation,
+ * because that attempt had a service that could resolve a `ResultRef` back to
+ * an answer. Nothing on this branch can: every provider's sink commits a
+ * reference without writing the answer, which is what D2 requires. The outcome
+ * itself — succeeded, failed, cancelled — is on `run.reconciledOutcomes`, and
+ * that is the whole of what later evidence establishes. The slot was carried
+ * over in the harvest and is gone rather than waiting for a producer that the
+ * persistence decisions forbid.
+ */
 export function getActiveChatTurn(projection: ChatProjection): ChatTurnProjection | undefined {
   return projection.turns.find(turn => turn.runId === projection.activeRunId);
 }

@@ -273,6 +273,42 @@ describe('chat execution coordinator', () => {
     ]);
   });
 
+  it('shows what was later established about a turn that could not say', async () => {
+    // The one durable record with no other way out. A run that ended
+    // indeterminate is rendered as "could not establish whether this run
+    // completed", and without this channel it stays that way for a run the
+    // recovery has since established.
+    const harness = await createHarness();
+    harness.backend.cancellationMode = 'silent';
+    const ticket = await harness.coordinator.submitTurn(turnCommand());
+    const started = await ticket.started;
+    await harness.registry.waitForIdle();
+    await harness.coordinator.cancelActive(CONVERSATION_ID);
+    await harness.registry.recoverRun(started.runId);
+    const completed = await ticket.completion;
+    expect(completed.terminal.kind).toBe('indeterminate');
+
+    await harness.registry.appendReconciliation({
+      reconciliationId: `rec-${'5'.repeat(32)}`,
+      runId: started.runId,
+      originalTerminal: 'indeterminate',
+      observedOutcome: 'succeeded',
+      evidence: { kind: 'native-history', evidenceRef: 'thread-1' },
+      recordedAt: 1_500,
+    });
+
+    expect(harness.coordinator.getProjection(CONVERSATION_ID)?.turns[0]?.run.reconciledOutcomes)
+      .toEqual([expect.objectContaining({
+        reconciliationId: `rec-${'5'.repeat(32)}`,
+        observedOutcome: 'succeeded',
+      })]);
+    // The terminal is not rewritten: the turn did end without an answer, and
+    // this is evidence about it rather than a correction of it.
+    expect(harness.coordinator.getProjection(CONVERSATION_ID)?.turns[0]?.run.terminal?.kind)
+      .toBe('indeterminate');
+    harness.coordinator.dispose();
+  });
+
   it('shows an interaction from the record the kernel committed', async () => {
     const harness = await createHarness();
     const ticket = await harness.coordinator.submitTurn(turnCommand());
@@ -676,6 +712,7 @@ function eagerLifecycle(): ChatExecutionLifecyclePort & {
       observers.add(observer);
       return () => observers.delete(observer);
     },
+    observeReconciliations: () => () => undefined,
     getRun: () => null,
     getSession: () => null,
     getSessionsForOwner: () => [],

@@ -7571,6 +7571,63 @@ half of it, where `ProviderContentPresenter` turns an opaque payload into someth
 
 Gates: unit 528 suites / 8,360 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### Reconciliation reaches the surface, and the slot that never could is gone (this commit)
+
+Two dead slots in the projection, opposite answers, and reading which was which is the whole entry.
+
+**`reconciliation-record` had no producer and now has one.** A reconciliation is the one durable
+record with no other way out of the kernel: a run's every state reaches a reader as an envelope —
+either an event the ingestor accepted or a terminal the registry states — and this is neither. It is
+later evidence about a run that already ended indeterminate, written straight to the store by
+whoever gathered it. Without a channel the surface keeps saying "could not establish whether this run
+completed" about a run the recovery has since established. `observeReconciliations` is that channel,
+shaped like `observe` and separate from it because the two answer different questions; the
+coordinator subscribes to both at the session, and the renderer reports the outcome *after* the
+terminal rather than instead of it — the turn did end without an answer, and this is evidence about
+it, not a correction of it.
+
+**`reconciled-result-materialized` had no producer and never can have one.** It carried a
+`MaterializedChatResult` per reconciliation, harvested from an attempt that had a service able to
+resolve a `ResultRef` back to an answer. Nothing on this branch can, and not by omission: every
+provider's sink commits a reference without writing the answer because D2 requires it. So the slot is
+deleted rather than left waiting for a producer the persistence decisions forbid, and the reason is
+written where it stood. The outcome itself — succeeded, failed, cancelled — is on
+`run.reconciledOutcomes`, and that is the whole of what evidence establishes.
+
+The general record-notification channel the plan expected is still not built, and after this it is
+not owed either: runs and interactions reach a reader through envelopes, adoption reaches them
+through queries, and reconciliation now has a channel of its own. A union with one member and a
+discriminator nobody reads twice would have been the copy of the first attempt's shape rather than
+this branch's answer.
+
+#### What reading the render target found, before building it
+
+The next step was going to be the target. Three things came out of reading its consumers first, and
+each would have been discovered halfway through writing it:
+
+- **`ProviderContentPresenter` returns `StreamChunk[]`, which the target may not consume.** The
+  structural deletion gate searches for `\bStreamChunk\b` and the plan says a neutral projection
+  content type "receives a new projection-specific name". So the content half of `StreamChunk` needs
+  its own name and owner before a target can be written against it. The *shape* is right — it is what
+  the surface already renders — so this is a split and a rename, not a redesign:
+  `StreamChunk = <content> | <lifecycle>`, where the lifecycle half is what the projection replaced
+  (`done`, `error`, `status`, `user_message_start`, `assistant_message_start`) and is what gets
+  deleted;
+- **the producers are the provider routers, and they are the part deliberately kept.** Eight content
+  presenters, 2,252 lines, each delegating to a normalizer proven against real transcripts —
+  `CodexNotificationRouter` alone is a thousand. The rename lands on them. They also emit lifecycle
+  chunks that the presenters partly filter today (Codex drops its own error chunk and keeps the
+  words, because the kernel already renders one error for a failed run), so the split has to be made
+  where that filtering is, not above it;
+- **the projection carries no usage, and the context-window meter is a baseline surface.** `usage` is
+  emitted nineteen times across production and reaches the surface as a chunk; the kernel carries no
+  token counts and neither does the chat projection. A target driven only by a projection cannot draw
+  the meter. That is a contract decision — does a turn's usage belong on the projection, or does the
+  target read it from the provider content it is already being handed — and it is the third
+  prerequisite rather than a detail of the target.
+
+Gates: unit 528 suites / 8,362 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7647,33 +7704,30 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
 **M3 is closed.** Everything below is M5 or later.
 
-1. **The render target** — the last dark piece of the chat step, and the first one that is allowed to
-   touch a DOM. `ChatRenderTarget` has twelve methods and every one of them is something
-   `StreamController` and `MessageRenderer` already do; the work is an adapter over what exists, not
-   new rendering. Two parts of it are not mechanical. **Provider content**: the payload is opaque and
-   only the provider's own code knows what one of its items looks like, so the target needs
-   `ProviderContentPresenter` — a port with nine real implementations, reached today through the
-   presentation adapter, and the thing to check first is what a presenter needs that a target can
-   supply. **The two indicators**: the thinking indicator and the turn-silence timer are driven from
+1. **The content vocabulary split, then the render target.** In that order, and the entry above says
+   why: the target may not consume `StreamChunk`, so the content half needs its own projection-specific
+   name and owner first. `StreamChunk = <content> | <lifecycle>` in `src/core/types/chat.ts`, the
+   lifecycle half being what the projection replaced; the eight provider content presenters and the
+   routers behind them are the producers, and the split has to be made where their filtering already
+   is. Do it *with* the target rather than before it — a rename nothing consumes is churn, and the
+   target is what proves the split is in the right place. Then the target itself: thirteen methods,
+   every one of them something `StreamController` and `MessageRenderer` already do. Two parts are not
+   mechanical. **Usage**: the projection has none and the context meter is a baseline surface — decide
+   whether a turn's usage belongs on the projection or is read from the content the target is already
+   handed. **The two indicators**: the thinking indicator and the turn-silence timer are driven from
    `setTurnState` here, and `StreamController` starts and stops them from six places, so read those
-   six before deciding which of them the state covers. After the target, the step that turns this on
-   is `ChatProjectionAttachment` (the first attempt's, 109 lines, at `8cab81b4`): subscribe a tab to
-   a coordinator, hand projections to a renderer, detach on close.
+   six before deciding which the state covers. After the target, the step that turns this on is
+   `ChatProjectionAttachment` (the first attempt's, 109 lines, at `8cab81b4`): subscribe a tab to a
+   coordinator, hand projections to a renderer, detach on close.
 2. **`InputController` and `StreamController` stop owning the turn**, once a target exists. That is
    the flip, and it is the one that needs a smoke matrix rather than a gate: 2,100 lines of
    incremental append and 2,150 of turn acceptance come out, and every provider's chat behaviour is
    downstream of them.
    The thirteen provider rows handed over from M3 are re-implementations of the same UI-shaped
    consumers, so doing them first means rewriting each consumer twice.
-3. **An observation channel for control records**, now owed to one thing rather than three. Startup
-   adoption turned out to need queries rather than notifications and has landed; what is left is
-   reconciliation — an indeterminate run's reconciled verdict is appended to the control store with
-   nothing published for it, so the projection's `reconciliation-record` and
-   `reconciled-result-materialized` halves still have no producer. The first attempt added a
-   `subscribe`/notification API on the registry; this branch's `observe` covers envelopes only, and
-   the choice between widening `observe` and adding a second channel is worth making deliberately
-   rather than by copying. Worth asking first whether a reconciliation should simply be published as
-   a synthesized envelope, the way a registry-stated terminal now is.
+3. ~~**An observation channel for control records.**~~ **Closed in the entry above**, and closed
+   smaller than it was written: adoption needed queries, reconciliation needed a channel of its own,
+   and the third waiting slot was one that can never have a producer and is deleted.
 4. **The workspace context assembly comes *after* those consumers, not before.** It looked like the
    next step until reading the rows: every provider's `workspace.initialize(context)` needs a
    context built from the plugin, eight have a `create<Provider>ModuleContext`, and the machinery is

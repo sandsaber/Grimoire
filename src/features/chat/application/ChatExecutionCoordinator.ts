@@ -13,6 +13,7 @@ import type {
 } from '../../../core/execution/ExecutionContracts';
 import type {
   ExecutionInteractionRecord,
+  ExecutionReconciliationRecord,
   ExecutionRunRecord,
   ExecutionSessionRecord,
 } from '../../../core/execution/ExecutionControlRecords';
@@ -32,6 +33,7 @@ import {
 import type {
   CreateExecutionSessionCommand,
   ExecutionEnvelopeObserver,
+  ExecutionReconciliationObserver,
   LifecycleLease,
 } from '../../../core/execution/ExecutionLifecycleRegistry';
 import type { ChatMessage, Conversation } from '../../../core/types';
@@ -89,6 +91,10 @@ export interface ChatExecutionLifecyclePort {
   observe(
     executionSessionId: ExecutionSessionId,
     observer: ExecutionEnvelopeObserver,
+  ): () => void;
+  observeReconciliations(
+    executionSessionId: ExecutionSessionId,
+    observer: ExecutionReconciliationObserver,
   ): () => void;
   getRun(runId: RunId): Readonly<ExecutionRunRecord> | null;
   getSession(executionSessionId: ExecutionSessionId): Readonly<ExecutionSessionRecord> | null;
@@ -232,6 +238,7 @@ interface ConversationEntry {
   backendId?: ExecutionBackendId;
   sessionId?: ExecutionSessionId;
   unobserve?: () => void;
+  unobserveReconciliations?: () => void;
   active?: ActiveTurn;
   readonly queue: PendingTurn[];
   readonly listeners: Set<(projection: ChatProjection) => void>;
@@ -386,6 +393,8 @@ export class ChatExecutionCoordinator {
     for (const entry of this.entries.values()) {
       entry.unobserve?.();
       entry.unobserve = undefined;
+      entry.unobserveReconciliations?.();
+      entry.unobserveReconciliations = undefined;
       const active = entry.active;
       if (active) {
         active.completion.reject(new Error(active.dispatched
@@ -476,9 +485,7 @@ export class ChatExecutionCoordinator {
     }
     entry.sessionId = toExecutionSessionId(session.executionSessionId);
     entry.backendId = executionBackendId(session.backendId);
-    entry.unobserve = this.lifecycle.observe(entry.sessionId, envelope => {
-      this.onEnvelope(entry, envelope);
-    });
+    this.observeSession(entry, entry.sessionId);
     for (const record of unfinished) {
       this.adoptRun(entry, conversationId, record);
     }
@@ -610,13 +617,37 @@ export class ChatExecutionCoordinator {
     });
     entry.backendId = command.backendId;
     entry.sessionId = sessionId;
-    // Subscribed before the first run is started, so nothing this session emits
-    // can arrive before there is somewhere to put it.
+    this.observeSession(entry, sessionId);
+    return sessionId;
+  }
+
+  /**
+   * Both of the session's channels, subscribed before the first run starts.
+   *
+   * Envelopes say what a run did; reconciliations say what was later
+   * established about one that could not say. Nothing this session emits can
+   * arrive before there is somewhere to put it, which is why this happens at
+   * the session rather than at the run.
+   */
+  private observeSession(entry: ConversationEntry, sessionId: ExecutionSessionId): void {
     entry.unobserve?.();
+    entry.unobserveReconciliations?.();
     entry.unobserve = this.lifecycle.observe(sessionId, envelope => {
       this.onEnvelope(entry, envelope);
     });
-    return sessionId;
+    entry.unobserveReconciliations = this.lifecycle.observeReconciliations(sessionId, record => {
+      this.onReconciliation(entry, record);
+    });
+  }
+
+  private onReconciliation(
+    entry: ConversationEntry,
+    record: Readonly<ExecutionReconciliationRecord>,
+  ): void {
+    if (this.disposed) {
+      return;
+    }
+    this.apply(entry, { kind: 'reconciliation-record', record });
   }
 
   private establishStartedTurn(

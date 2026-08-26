@@ -1,5 +1,6 @@
 import type { RunState, RunTerminal } from '../../../core/execution/ExecutionContracts';
 import type { RunId } from '../../../core/execution/ExecutionIds';
+import type { ReconciledOutcomeProjection } from '../../../core/execution/RunProjection';
 import type { ChatMessage } from '../../../core/types';
 import type {
   ChatLiveItem,
@@ -77,6 +78,15 @@ export interface ChatRenderTarget {
   extendTurnText(runId: RunId, index: number, text: string): void;
   setTurnState(runId: RunId, state: RunState): void;
   endTurn(runId: RunId, terminal: RunTerminal): void;
+  /**
+   * What was later established about a turn that ended indeterminate.
+   *
+   * Arrives after `endTurn`, sometimes much later, and never instead of it: the
+   * turn did end without an answer, and this is evidence about it rather than a
+   * correction of it. A surface showing "could not establish whether this run
+   * completed" has this and nothing else to replace that sentence with.
+   */
+  reconcileTurn(runId: RunId, outcome: ReconciledOutcomeProjection): void;
   setTurnPersistence(
     runId: RunId,
     persistence: ChatTurnProjection['persistence'],
@@ -159,6 +169,9 @@ export class ChatProjectionRenderer {
     if (turn.run.terminal) {
       this.target.endTurn(turn.runId, turn.run.terminal);
     }
+    for (const outcome of turn.run.reconciledOutcomes) {
+      this.target.reconcileTurn(turn.runId, outcome);
+    }
   }
 
   private updateTurn(before: ChatTurnProjection, turn: ChatTurnProjection): void {
@@ -185,6 +198,13 @@ export class ChatProjectionRenderer {
     }
     if (!before.run.terminal && turn.run.terminal) {
       this.target.endTurn(turn.runId, turn.run.terminal);
+    }
+    if (before.run.reconciledOutcomes !== turn.run.reconciledOutcomes) {
+      for (const outcome of turn.run.reconciledOutcomes.slice(
+        before.run.reconciledOutcomes.length,
+      )) {
+        this.target.reconcileTurn(turn.runId, outcome);
+      }
     }
   }
 

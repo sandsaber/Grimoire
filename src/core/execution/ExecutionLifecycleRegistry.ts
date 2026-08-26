@@ -152,6 +152,22 @@ interface BackendEntry {
 /** Receives every accepted envelope for a session, durable and transient alike. */
 export type ExecutionEnvelopeObserver = (envelope: ExecutionEventEnvelope) => void;
 
+/**
+ * Receives a run's reconciled outcome, once one is recorded for the session.
+ *
+ * A channel of its own rather than a general record feed, because a
+ * reconciliation is the one durable record with no other way out. Runs and
+ * interactions reach a reader through envelopes — every state they take is an
+ * event the ingestor accepted, or a terminal the registry states — and a
+ * reconciliation is neither: it is later evidence about a run that already
+ * finished indeterminate, written straight to the store by whoever gathered it.
+ * Without this the reader keeps rendering "could not establish whether this run
+ * completed" for a run the recovery has since established.
+ */
+export type ExecutionReconciliationObserver = (
+  record: Readonly<ExecutionReconciliationRecord>,
+) => void;
+
 interface SessionEntry {
   readonly session: ExecutionSession;
   readonly backend: BackendEntry;
@@ -219,6 +235,10 @@ export class ExecutionLifecycleRegistry {
   private readonly envelopeObservers = new Map<
   ExecutionSessionId,
   Set<ExecutionEnvelopeObserver>
+  >();
+  private readonly reconciliationObservers = new Map<
+  ExecutionSessionId,
+  Set<ExecutionReconciliationObserver>
   >();
   private readonly eventTasks = new Set<Promise<void>>();
   private readonly admissionWaiters = new Set<() => void>();
@@ -879,7 +899,52 @@ export class ExecutionLifecycleRegistry {
       await this.commitWrites([
         write('reconciliations', record.reconciliationId, null, record),
       ]);
+      this.publishReconciliation(sessionId, record);
     });
+  }
+
+  /**
+   * Observes reconciled outcomes for one session.
+   *
+   * Shaped like `observe` and separate from it on purpose: an envelope carries
+   * what a run did, and this carries what was later established about a run
+   * that could not say. A reader wants both and they arrive from different
+   * places, so they are two subscriptions rather than one union with a
+   * discriminator nobody reads twice.
+   */
+  observeReconciliations(
+    executionSessionId: ExecutionSessionId,
+    observer: ExecutionReconciliationObserver,
+  ): () => void {
+    const observers = this.reconciliationObservers.get(executionSessionId)
+      ?? new Set<ExecutionReconciliationObserver>();
+    observers.add(observer);
+    this.reconciliationObservers.set(executionSessionId, observers);
+    return () => {
+      const current = this.reconciliationObservers.get(executionSessionId);
+      if (!current) {
+        return;
+      }
+      current.delete(observer);
+      if (current.size === 0) {
+        this.reconciliationObservers.delete(executionSessionId);
+      }
+    };
+  }
+
+  private publishReconciliation(
+    executionSessionId: ExecutionSessionId,
+    record: Readonly<ExecutionReconciliationRecord>,
+  ): void {
+    for (const observer of [...this.reconciliationObservers.get(executionSessionId) ?? []]) {
+      // Swallowed like an envelope observer's throw, and for the same reason:
+      // presentation is downstream of the record, not part of it.
+      try {
+        observer(record);
+      } catch {
+        // Deliberately swallowed; a presentation fault is not a control fault.
+      }
+    }
   }
 
   async beginSettingsTransition(command: BeginSettingsTransitionCommand): Promise<void> {

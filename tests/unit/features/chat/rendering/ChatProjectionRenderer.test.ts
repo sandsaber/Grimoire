@@ -57,6 +57,7 @@ function recordingTarget(): ChatRenderTarget & { readonly calls: RecordedCall[] 
     setTurnState: record('setTurnState'),
     endTurn: record('endTurn'),
     setTurnPersistence: record('setTurnPersistence'),
+    reconcileTurn: record('reconcileTurn'),
     showInteraction: record('showInteraction'),
     hideInteraction: record('hideInteraction'),
     setQueuedCommandCount: record('setQueuedCommandCount'),
@@ -162,6 +163,38 @@ describe('chat projection renderer', () => {
         args: [RUN_ID, expect.objectContaining({ kind: 'succeeded', reason: 'completed' })],
       },
     ]);
+  });
+
+  it('reports a reconciled outcome after the terminal, not instead of it', () => {
+    const target = recordingTarget();
+    const renderer = new ChatProjectionRenderer(target);
+    let projection = started(createChatProjection(conversation([]), 1));
+    projection = envelope(projection, 1, {
+      kind: 'terminal',
+      terminal: 'indeterminate',
+      reason: 'cancellation-unknown',
+    });
+    renderer.render(projection);
+    target.calls.splice(0);
+
+    projection = reduceChatProjection(projection, {
+      kind: 'reconciliation-record',
+      record: {
+        reconciliationId: `rec-${'5'.repeat(32)}`,
+        runId: RUN_ID,
+        originalTerminal: 'indeterminate',
+        observedOutcome: 'succeeded',
+        evidence: { kind: 'native-history', evidenceRef: 'thread-1' },
+        recordedAt: 20,
+      },
+    });
+    renderer.render(projection);
+    renderer.render(projection);
+
+    expect(target.calls).toEqual([{
+      method: 'reconcileTurn',
+      args: [RUN_ID, expect.objectContaining({ observedOutcome: 'succeeded' })],
+    }]);
   });
 
   it('redraws when the transcript is rewritten rather than extended', () => {
