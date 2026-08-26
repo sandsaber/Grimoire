@@ -33,8 +33,16 @@ export function createTabProjectionExecution(
     return null;
   }
   const backendId = module.execution.descriptor.backendId;
+  // A tab can be created before the kernel has started — a restored workspace
+  // builds its tabs while `loadSettings` is still running — and asking for a
+  // composition that does not exist yet throws. A tab without one runs the
+  // legacy path, which is what it would have done anyway.
+  const composition = chatExecutionOrNull(plugin);
+  if (!composition) {
+    return null;
+  }
   return new ChatTabExecution({
-    composition: plugin.getChatExecution(),
+    composition,
     backendId,
     surface: {
       state: tab.state,
@@ -115,6 +123,14 @@ const TURN_LIFECYCLE_TYPES = new Set([
 
 function isChatContent(chunk: StreamChunk): chunk is ChatContentItem {
   return !TURN_LIFECYCLE_TYPES.has(chunk.type);
+}
+
+function chatExecutionOrNull(plugin: GrimoirePlugin) {
+  try {
+    return plugin.getChatExecution();
+  } catch {
+    return null;
+  }
 }
 
 function requireRenderer(tab: TabData) {

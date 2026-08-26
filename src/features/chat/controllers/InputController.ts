@@ -478,7 +478,10 @@ export class InputController {
     fileContextManager?.markCurrentNoteSent();
 
     const userCompletedAt = Date.now();
-    const userMsg: ChatMessage = {
+    // Reassigned on the projection path once the turn is durable, so the block
+    // that runs after a turn ends writes to the messages that are on screen and
+    // in the vault rather than to the copies this method built.
+    let userMsg: ChatMessage = {
       id: this.deps.generateId(),
       role: 'user',
       content: displayContent,
@@ -497,7 +500,7 @@ export class InputController {
 
     await this.triggerTitleGeneration();
 
-    const assistantMsg = this.createAssistantMessage(queryOptions);
+    let assistantMsg = this.createAssistantMessage(queryOptions);
     if (!projection) {
       // On the projection path both messages arrive from the projection: the
       // question when the coordinator has made it durable, and the answer as a
@@ -585,6 +588,13 @@ export class InputController {
         const completed = await submitted.ticket.completion;
         didEnqueueToSdk = completed.terminal.kind !== 'invalidated';
         wasInterrupted = completed.terminal.kind === 'cancelled';
+        // The messages the projection drew and the barrier stored are the ones
+        // everything after a turn writes to: the native identities a rewind
+        // addresses, the completion time, the duration footer. Written to the
+        // copies this method built, all of that would be thrown away with them.
+        userMsg = findMessage(state.messages, userMsg.id) ?? userMsg;
+        assistantMsg = findMessage(state.messages, completed.assistantMessageId) ?? assistantMsg;
+        this.activeStreamingAssistantMessage = assistantMsg;
         return;
       }
       const preparedTurn = agentService.prepareTurn(turnRequest);
@@ -2195,4 +2205,9 @@ export class InputController {
       }
     );
   }
+}
+
+/** The message a turn actually wrote, by the id it was written under. */
+function findMessage(messages: ChatMessage[], id: string | undefined): ChatMessage | undefined {
+  return id ? messages.find(message => message.id === id) : undefined;
 }

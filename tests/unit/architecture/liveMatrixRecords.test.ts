@@ -70,6 +70,9 @@ describe('live smoke matrix records', () => {
     // every assertion below vacuously true.
     expect(matrices.map(matrix => matrix.file)).toEqual([
       'antigravity-flip-smoke-matrix.md',
+      // Not a provider's matrix: the chat projection flip is one surface across
+      // every provider, gated per provider by the list it names.
+      'chat-projection-flip-smoke-matrix.md',
       'claude-flip-smoke-matrix.md',
       'codex-flip-smoke-matrix.md',
       'gemini-flip-smoke-matrix.md',
@@ -135,6 +138,9 @@ describe('live smoke matrix records', () => {
       // and the last to get a matrix: its rows lived in the journal for four
       // days, where the assertion above could not see them.
       'antigravity-flip-smoke-matrix.md: 2026-08-23',
+      // Never run, and it says so: the chat projection flip's switch is empty,
+      // so no provider is on that path to certify.
+      'chat-projection-flip-smoke-matrix.md: never',
       'claude-flip-smoke-matrix.md: 2026-08-21',
       'codex-flip-smoke-matrix.md: 2026-08-21',
       // Run, and mostly blocked — by the account's daily quota rather than by

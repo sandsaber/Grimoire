@@ -111,6 +111,41 @@ describe('InputController on the projection path', () => {
     expect(userMessage.content).toBe('what the provider composed');
   });
 
+  it('writes what happens after a turn to the messages the turn actually wrote', async () => {
+    // The native identities a rewind addresses, the completion time and the
+    // duration footer are all written after the turn ends. Written to the
+    // copies `sendMessage` built — which on this path are neither on screen nor
+    // in the vault — every one of them is thrown away with them.
+    const stored: ChatMessage = {
+      id: 'assistant-run-1',
+      role: 'assistant',
+      content: 'Botanically, yes.',
+      timestamp: 1,
+    };
+    const projection = projectionOf({
+      send: jest.fn().mockResolvedValue({
+        ticket: {
+          started: Promise.resolve({}),
+          completion: Promise.resolve({
+            terminal: { kind: 'succeeded', reason: 'completed' },
+            assistantMessageId: 'assistant-run-1',
+          }),
+        },
+        userMessage: { content: 'composed', currentNote: undefined },
+      }),
+    });
+    deps.getProjectionExecution = () => projection as never;
+    // The projection put both messages into the surface's state, which is what
+    // the target does through `appendMessage` and `beginTurn`.
+    deps.state.addMessage(stored);
+    deps.getInputEl().value = 'are tomatoes a fruit?';
+    const controller = new InputController(deps);
+
+    await controller.sendMessage();
+
+    expect(stored.completedAt).toEqual(expect.any(Number));
+  });
+
   it('asks the kernel to stop, and does not also cancel the runtime', async () => {
     const projection = projectionOf();
     deps.getProjectionExecution = () => projection as never;

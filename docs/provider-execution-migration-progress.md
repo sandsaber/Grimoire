@@ -8122,6 +8122,32 @@ Those four are the smoke matrix's first four rows.
 
 Gates: unit 535 suites / 8,425 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### Reviewing the flip found three defects in it (this commit)
+
+Read back with fresh eyes, because the flip is the change on this branch that no gate here can
+exercise. Three things, two of them real.
+
+**The work after a turn was writing to messages nobody would ever see.** `sendMessage` builds a user
+message and an assistant message, and on the projection path draws neither — the projection does,
+and the objects it draws are *different objects*. Everything the `finally` block does after a turn
+ends was landing on the copies: the native identities a rewind addresses, the completion time, the
+duration and its flavour word. All of it thrown away with them, and the conversation left without the
+identity `rewind` refuses to run without. Both references now point at the messages the turn actually
+wrote, found by id once the turn is durable, so the block that runs after a turn is correct on both
+paths without knowing which it is on.
+
+**A tab built before the kernel started would have thrown.** A restored workspace builds its tabs
+while `loadSettings` is still running, and `getChatExecution()` refuses before load — by design, and
+correctly. The factory now treats an absent composition as "not on this path", which is what such a
+tab would have done anyway. Invisible today because the switch is empty; a stop condition the first
+time it is not.
+
+**And the matrix had the wrong shape**, which its own gate said before a person could: a
+`## Record` table with `never` in the date column is what `liveMatrixRecords.test.ts` reads, and a
+matrix without one looks exactly like a matrix that passed. It is listed there now, as never run.
+
+Gates: unit 535 suites / 8,429 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

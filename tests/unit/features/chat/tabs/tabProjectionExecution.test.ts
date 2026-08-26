@@ -58,6 +58,21 @@ describe('tab projection execution', () => {
     expect(createTabProjectionExecution(tabOf({ providerId: 'not-a-provider' }), plugin)).toBeNull();
   });
 
+  it('builds nothing before the chat path exists', () => {
+    // A restored workspace builds its tabs while `loadSettings` is still
+    // running, so the composition may not be there yet. A tab without one runs
+    // the legacy path, which is what it would have done anyway.
+    asked.mockReturnValue(true);
+    const beforeLoad = {
+      settings: {},
+      getChatExecution: () => {
+        throw new Error('Chat execution is not available before plugin load.');
+      },
+    } as never;
+
+    expect(createTabProjectionExecution(tabOf(), beforeLoad)).toBeNull();
+  });
+
   it('builds one for a provider on the path', () => {
     asked.mockReturnValue(true);
 

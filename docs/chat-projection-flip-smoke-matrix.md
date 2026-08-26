@@ -47,8 +47,12 @@ the order they are most likely to break:
 | 13 | The context meter | Moves after a turn, and the conversation still has its usage after a reload |
 | 14 | A failing turn | The provider's own failure wording renders, not the neutral sentence, where the provider has one |
 
-## Recording
+## Record
 
-| Date | Provider | CLI version | Rows passed | Notes |
+One row per run. `never` in the Date column is a real answer, and it is what
+`liveMatrixRecords.test.ts` reads — so a matrix that has never been run says so
+here rather than by the absence of a table.
+
+| Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
-| — | — | — | not run | The switch is empty; no provider is on this path yet |
+| never | — | — | — | the switch is empty, so no provider is on this path yet |
