@@ -7767,7 +7767,12 @@ turn's record of what it drew, not by comparing ids. So the rule holds, and what
 is the divergence itself: **the id of the bubble on screen is not the id of the message in the vault**,
 which is what a rewind addresses before a reload versus after one. That belongs to the flip.
 
-Gates: unit 531 suites / 8,387 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+**The reload is drawn too**, in the same composition: a run outliving the column that watched it, a
+tab opened onto the conversation afterwards, the turn shown in progress with a bubble of its own, and
+the barrier running for a turn no ticket in this process is waiting on. That is the whole of what
+adoption was for, seen from the surface for the first time.
+
+Gates: unit 531 suites / 8,388 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
 ## Current blocker
 

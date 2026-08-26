@@ -245,6 +245,51 @@ describe('chat projection attachment', () => {
     expect(drawn.state.messages.at(-1)?.id).toBe(`assistant-${started.runId}`);
   });
 
+  it('draws a turn the kernel was already running when the tab opened', async () => {
+    // The reload, end to end. The run outlives the column that was watching it,
+    // and a tab opened onto the conversation afterwards has to show a turn in
+    // progress and then finish drawing it — including the barrier, which no
+    // ticket is waiting on because nobody in this process asked for the turn.
+    const harness = await createHarness();
+    const abandoned = await harness.coordinator.submitTurn(turnCommand());
+    const started = await abandoned.started;
+    harness.backend.emit(started.runId, { kind: 'run-started' });
+    await harness.registry.waitForIdle();
+    harness.coordinator.dispose();
+    await expect(abandoned.completion).rejects.toThrow(/detached/);
+
+    const reopened = harness.createCoordinator();
+    const drawn = surface();
+    const attachment = new ChatProjectionAttachment(drawn.sink);
+    await attachment.open(CONVERSATION_ID, reopened);
+
+    // The question is in the transcript, the turn has a bubble of its own, and
+    // it is drawn as running rather than as finished.
+    expect(drawn.methods()).toEqual([
+      'renderMessages',
+      'addMessage',
+      'showThinkingIndicator',
+    ]);
+
+    harness.backend.emit(started.runId, {
+      kind: 'output-delta',
+      channel: 'assistant',
+      text: 'Picked up.',
+    });
+    harness.backend.emit(started.runId, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    });
+    await waitUntil(() => drawn.methods().includes('chunk:done'), 'the adopted turn to finish');
+    attachment.detach();
+
+    const stored = await harness.conversations.read(CONVERSATION_ID);
+    expect(stored.kind === 'present' ? stored.metadata.messages?.at(-1)?.content : null)
+      .toBe('Picked up.');
+    reopened.dispose();
+  });
+
   it('stops the silence timer while a question is on screen', async () => {
     const harness = await createHarness();
     const drawn = surface();
