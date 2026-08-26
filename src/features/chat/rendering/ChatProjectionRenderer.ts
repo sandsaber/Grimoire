@@ -48,6 +48,8 @@ export interface ChatConversationView {
 export interface ChatTurnView {
   readonly runId: RunId;
   readonly commandId: string;
+  /** The message this turn's answer is, named before a word of it arrives. */
+  readonly assistantMessageId: string;
   readonly startedAt: number;
 }
 
@@ -171,6 +173,7 @@ export class ChatProjectionRenderer {
     this.target.beginTurn({
       runId: turn.runId,
       commandId: turn.commandId,
+      assistantMessageId: turn.assistantMessageId,
       startedAt: turn.startedAt,
     });
     for (const [index, item] of turn.live.entries()) {
@@ -351,13 +354,7 @@ function extendedText(previous: ChatLiveItem, next: ChatLiveItem): string {
 }
 
 function turnAnswerIds(projection: ChatProjection): Set<string> {
-  const ids = new Set<string>();
-  for (const turn of projection.turns) {
-    if (turn.assistantMessageId) {
-      ids.add(turn.assistantMessageId);
-    }
-  }
-  return ids;
+  return new Set(projection.turns.map(turn => turn.assistantMessageId));
 }
 
 function withoutTurnAnswers(projection: ChatProjection): readonly ChatMessage[] {

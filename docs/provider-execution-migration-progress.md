@@ -7774,6 +7774,33 @@ adoption was for, seen from the surface for the first time.
 
 Gates: unit 531 suites / 8,388 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The drawn answer and the stored answer become one message (this commit)
+
+The first of the flip's four open questions, closed on its own so the flip does not have to carry it.
+A turn's answer had two identities: the bubble a surface draws was minted by the target, and the
+message the barrier stores was named by the provider's result id whenever the run committed one.
+Everything that addresses a message by id — rewind, fork, the action buttons, `state.messages` —
+therefore meant one thing before a reload and another after it.
+
+**A turn now names its answer before a word of it arrives.** `assistantMessageId` is on the turn
+projection from `turn-started` rather than appearing at the barrier, the target draws under it, and
+the barrier stores under it. That also answers the second question — who creates the assistant
+message — without a rule: the coordinator names it, the target draws it, the barrier stores it, and
+there is nothing left to arbitrate.
+
+**The provider's result id was doing a job it is still needed for**, so it moved to the field that
+asks that question. `ChatMessage` has both `id` and `assistantMessageId`, and the second is
+documented as the *provider-native* identifier a rewind or a fork resumes at; the barrier was writing
+the result id into both. They are two questions and now have two answers.
+
+Found because a test was passing on a coincidence. The end-to-end sequence held partly because the
+harness's `assistantMessageIdForRun` and the target's own minting produced the same string; the test
+written to separate them recorded the divergence as a finding, and the finding turned out to be a
+defect worth fixing rather than a decision worth deferring. That test now asserts the invariant
+instead, and goes red from either end — a barrier that mints its own id, or a target that does.
+
+Gates: unit 531 suites / 8,388 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -7854,13 +7881,10 @@ runtime-scoped ports — and splitting it is the move that unblocks the rest.
    `ChatProjectionAttachment.test.ts` — projection, live content, coordinator, adoption, renderer,
    target, attachment. What is left is turning it on inside a tab, and it is small next to what it
    replaces. Four things have to be settled in that checkpoint rather than discovered during it:
-   - **the id of the bubble and the id of the stored message differ**, because the live one is minted
-     by the target and the stored one is named by the provider's result id. Rewind and fork address
-     messages by id, so what a rewind means before a reload and after one is not the same thing
-     today. Either the target takes its id from the turn, or the barrier takes its id from the
-     bubble, and one of the two has to be chosen out loud;
-   - **who creates the assistant message.** `InputController` does today, and the target does on
-     `beginTurn`. Both cannot;
+   - ~~**the id of the bubble and the id of the stored message differ**~~ and ~~**who creates the
+     assistant message**~~ — **both closed in the entry above**: a turn names its answer at
+     `turn-started`, the target draws under that id and the barrier stores under it. What is left of
+     the second is only that `InputController` also creates one today, and stops at the flip;
    - **usage's write path.** The meter is fed from content the target is handed, and the barrier
      persists messages and `lastResponseAt` but not `conversation.usage`, which the legacy save
      wrote. A target that learns usage has to get it back to the coordinator — a command on the

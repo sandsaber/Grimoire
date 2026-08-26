@@ -91,8 +91,8 @@ function harness() {
     renderer,
     stream,
     presentProviderContent: () => presented,
-    createAssistantMessage: forRunId => ({
-      id: `assistant-${forRunId}`,
+    createAssistantMessage: messageId => ({
+      id: messageId,
       role: 'assistant',
       content: '',
       timestamp: 1,
@@ -125,7 +125,12 @@ function terminal(overrides: Partial<RunTerminal> = {}): RunTerminal {
 }
 
 function beginTurn(target: ChatSurfaceRenderTarget, target_run: RunId = RUN_ID): void {
-  target.beginTurn({ runId: target_run, commandId: 'cmd-1', startedAt: 1 });
+  target.beginTurn({
+    runId: target_run,
+    commandId: 'cmd-1',
+    assistantMessageId: `assistant-${target_run}`,
+    startedAt: 1,
+  });
 }
 
 describe('chat surface render target', () => {

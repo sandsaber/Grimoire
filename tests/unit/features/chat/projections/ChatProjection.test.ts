@@ -21,6 +21,7 @@ describe('ChatProjection', () => {
       executionSessionId: SESSION_ID,
       runId: RUN_ID,
       resultExpectation: 'required',
+      assistantMessageId: 'assistant-1',
       startedAt: 10,
     });
     projection = reduceChatProjection(projection, {
@@ -64,6 +65,7 @@ describe('ChatProjection', () => {
       executionSessionId: SESSION_ID,
       runId: RUN_ID,
       resultExpectation: 'optional',
+      assistantMessageId: 'assistant-1',
       startedAt: 10,
     });
     // Through the run's own events rather than a durable record: this branch's
@@ -139,6 +141,7 @@ describe('ChatProjection', () => {
       executionSessionId: SESSION_ID,
       runId: RUN_ID,
       resultExpectation: 'optional',
+      assistantMessageId: 'assistant-1',
       startedAt: 10,
     });
     const interactionRecord = {
@@ -287,6 +290,7 @@ function startedTurn(): ChatProjection {
     executionSessionId: SESSION_ID,
     runId: RUN_ID,
     resultExpectation: 'optional',
+    assistantMessageId: 'assistant-1',
     startedAt: 10,
   });
 }

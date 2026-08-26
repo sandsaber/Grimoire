@@ -240,12 +240,13 @@ describe('chat projection renderer', () => {
       runId: RUN_ID,
       conversation: conversation([
         message('msg-1', 'user', 'Hi'),
-        message('msg-answer', 'assistant', 'Hello.'),
+        // The id the turn was given when it started, which is what the barrier
+        // stores the answer under.
+        message('assistant-1', 'assistant', 'Hello.'),
         message('msg-3', 'user', 'And again?'),
       ]),
       revision: 2,
       completedAt: 20,
-      assistantMessageId: 'msg-answer',
     }));
 
     // The turn's own answer is on screen block by block already; the message
@@ -402,6 +403,7 @@ function started(projection: ChatProjection): ChatProjection {
     executionSessionId: SESSION_ID,
     runId: RUN_ID,
     resultExpectation: 'optional',
+    assistantMessageId: 'assistant-1',
     startedAt: 10,
   });
 }

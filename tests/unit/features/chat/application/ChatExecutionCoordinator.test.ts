@@ -100,9 +100,14 @@ describe('chat execution coordinator', () => {
     await expect(storedMessages(harness)).resolves.toEqual([
       expect.objectContaining({ id: 'msg-user-1', role: 'user' }),
       expect.objectContaining({
-        id: `result-${started.runId}`,
+        // The identity the turn was given when it started, so the message a
+        // surface drew and the message the vault holds are one message.
+        id: `assistant-${started.runId}`,
         role: 'assistant',
         content: 'Botanically, yes.',
+        // The provider's own name for the answer, which is what a rewind or a
+        // fork resumes at. A second question, on the field that asks it.
+        assistantMessageId: `result-${started.runId}`,
       }),
     ]);
   });

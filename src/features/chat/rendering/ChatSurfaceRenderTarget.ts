@@ -92,8 +92,15 @@ export interface ChatSurfaceRenderTargetDeps {
   readonly stream: ChatStreamOperations;
   /** Turns one opaque provider item into what the surface draws. */
   presentProviderContent(payload: unknown): readonly ChatContentItem[];
-  /** The message a live turn is drawn into, before the barrier writes one. */
-  createAssistantMessage(runId: RunId): ChatMessage;
+  /**
+   * The message a live turn is drawn into, under the id the turn was given.
+   *
+   * The id is the turn's rather than this factory's, which is the difference
+   * between one message and two: the barrier stores the answer under the same
+   * one, so what a surface drew and what the vault holds are the same message
+   * and everything that addresses it by id means one thing.
+   */
+  createAssistantMessage(messageId: string, runId: RunId): ChatMessage;
   /** The provider's wording for a terminal, where it has one. */
   describeTerminal(terminal: RunTerminal): string;
   getGreeting(): string;
@@ -142,7 +149,7 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
   }
 
   beginTurn(turn: ChatTurnView): void {
-    const message = this.deps.createAssistantMessage(turn.runId);
+    const message = this.deps.createAssistantMessage(turn.assistantMessageId, turn.runId);
     this.turnMessages.set(turn.runId, message);
     // The same pair `appendMessage` performs, kept open here because the turn
     // needs the element back: rendering it twice to get it is a second bubble.

@@ -88,7 +88,17 @@ export interface ChatTurnProjection {
   readonly result?: MaterializedChatResult;
   readonly persistence: 'pending' | 'saving' | 'saved' | 'failed';
   readonly persistenceErrorCode?: string;
-  readonly assistantMessageId?: string;
+  /**
+   * The message this turn's answer is, named before a word of it arrives.
+   *
+   * Known from the start rather than at the barrier, because a surface draws
+   * the answer while it is arriving and the barrier stores it afterwards: two
+   * identities for one answer means the drawn one and the stored one are
+   * different messages, and everything that addresses a message by id — rewind,
+   * fork, the action buttons — means one thing before a reload and another
+   * after it.
+   */
+  readonly assistantMessageId: string;
   readonly startedAt: number;
   readonly completedAt?: number;
 }
@@ -119,6 +129,7 @@ export type ChatProjectionEvent =
     readonly executionSessionId: ExecutionSessionId;
     readonly runId: RunId;
     readonly resultExpectation: ResultExpectation;
+    readonly assistantMessageId: string;
     readonly startedAt: number;
   }
   | { readonly kind: 'run-envelope'; readonly envelope: ExecutionEventEnvelope }
@@ -151,7 +162,6 @@ export type ChatProjectionEvent =
     readonly conversation: Conversation;
     readonly revision: number;
     readonly completedAt: number;
-    readonly assistantMessageId?: string;
   };
 
 export function createChatProjection(
@@ -212,6 +222,7 @@ export function reduceChatProjection(
         run: createRunProjection(event.runId, event.resultExpectation),
         live: [],
         persistence: 'pending',
+        assistantMessageId: event.assistantMessageId,
         startedAt: event.startedAt,
       };
       return {
@@ -285,9 +296,6 @@ export function reduceChatProjection(
         persistence: 'saved',
         persistenceErrorCode: undefined,
         completedAt: event.completedAt,
-        ...(event.assistantMessageId
-          ? { assistantMessageId: event.assistantMessageId }
-          : {}),
       }));
       return completed.activeRunId === event.runId
         ? { ...completed, activeRunId: undefined }

@@ -7,7 +7,7 @@ import {
 } from '@test/unit/features/chat/chatExecutionHarness';
 
 import type { RunTerminal } from '@/core/execution/ExecutionContracts';
-import { interactionId,type RunId } from '@/core/execution/ExecutionIds';
+import { interactionId } from '@/core/execution/ExecutionIds';
 import type { ChatContentItem, ChatMessage } from '@/core/types';
 import {
   ChatProjectionAttachment,
@@ -92,8 +92,8 @@ function surface() {
     renderer,
     stream,
     presentProviderContent: () => presented,
-    createAssistantMessage: (forRunId: RunId) => ({
-      id: `assistant-${forRunId}`,
+    createAssistantMessage: (messageId: string) => ({
+      id: messageId,
       role: 'assistant',
       content: '',
       timestamp: 1,
@@ -202,12 +202,11 @@ describe('chat projection attachment', () => {
       .toBe('Botanically, yes.');
   });
 
-  it('draws one answer when the stored message has an id of its own', async () => {
-    // The live bubble is minted by the target and the durable message is named
-    // by the provider's own result id, so the two differ whenever the run
-    // commits a result. The column must still show one answer: the renderer
-    // skips the message the turn already drew, by the turn's own record of what
-    // it drew rather than by comparing ids that were never required to match.
+  it('draws and stores one message, with the provider\'s own name beside it', async () => {
+    // The identity the turn was given when it started is the one the surface
+    // draws under and the one the barrier stores under. The provider's result
+    // id is a second question — what a rewind or a fork resumes at — and rides
+    // on the field that asks it.
     const harness = await createHarness();
     const drawn = surface();
     const attachment = new ChatProjectionAttachment(drawn.sink);
@@ -238,11 +237,14 @@ describe('chat projection attachment', () => {
     expect(drawn.calls.filter(call => call.method === 'addMessage').map(call => call.args[0]))
       .toEqual(['user', 'assistant']);
     const stored = await harness.conversations.read(CONVERSATION_ID);
-    const storedId = stored.kind === 'present' ? stored.metadata.messages?.at(-1)?.id : null;
-    // Recorded rather than asserted equal: the ids differ by construction, and
-    // what a rewind addresses before a reload is not what it addresses after.
-    expect(storedId).toBe(`result-${started.runId}`);
-    expect(drawn.state.messages.at(-1)?.id).toBe(`assistant-${started.runId}`);
+    const storedMessage = stored.kind === 'present'
+      ? stored.metadata.messages?.at(-1)
+      : undefined;
+    // One message, not two: what a rewind addresses before a reload is what it
+    // addresses after one.
+    expect(storedMessage?.id).toBe(`assistant-${started.runId}`);
+    expect(drawn.state.messages.at(-1)?.id).toBe(storedMessage?.id);
+    expect(storedMessage?.assistantMessageId).toBe(`result-${started.runId}`);
   });
 
   it('draws a turn the kernel was already running when the tab opened', async () => {

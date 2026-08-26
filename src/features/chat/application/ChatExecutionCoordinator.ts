@@ -505,6 +505,7 @@ export class ChatExecutionCoordinator {
       executionSessionId: adoptedSessionId,
       runId: adoptedRunId,
       resultExpectation: record.resultExpectation,
+      assistantMessageId: this.assistantMessageIdForRun(adoptedRunId),
       startedAt: record.createdAt,
     });
     // The record rather than the events, because the events are gone. It
@@ -663,6 +664,7 @@ export class ChatExecutionCoordinator {
       executionSessionId,
       runId: startedRunId,
       resultExpectation: active.resultExpectation,
+      assistantMessageId: this.assistantMessageIdForRun(startedRunId),
       startedAt: this.now(),
     });
     active.started.resolve({
@@ -811,7 +813,12 @@ export class ChatExecutionCoordinator {
       }
       const completedAt = this.now();
       const assistantMessage = createAssistantMessage(
-        resultRef?.resultId ?? this.assistantMessageIdForRun(activeRunId),
+        // The identity the turn was given when it started, not one minted here:
+        // a surface has been drawing this answer under that id since the first
+        // token, and a second identity at the barrier makes the drawn answer
+        // and the stored answer two different messages.
+        turn?.assistantMessageId ?? this.assistantMessageIdForRun(activeRunId),
+        resultRef,
         streamed,
         completedAt,
       );
@@ -826,7 +833,6 @@ export class ChatExecutionCoordinator {
         conversation: saved.conversation,
         revision: saved.revision,
         completedAt,
-        ...(assistantMessage ? { assistantMessageId: assistantMessage.id } : {}),
       });
       if (entry.active === active) {
         entry.active = undefined;
@@ -959,6 +965,7 @@ function materializeResult(
 
 function createAssistantMessage(
   messageId: string,
+  resultRef: ResultRef | undefined,
   streamed: string | undefined,
   completedAt: number,
 ): ChatMessage | undefined {
@@ -974,7 +981,11 @@ function createAssistantMessage(
     content: streamed,
     timestamp: completedAt,
     completedAt,
-    assistantMessageId: messageId,
+    // Two fields because they answer two questions. `id` names the message in
+    // this conversation, and this names the answer in the provider's own terms
+    // — which is what a rewind or a fork asks it to resume at. Conflating them
+    // was what made the drawn message and the stored one differ.
+    ...(resultRef ? { assistantMessageId: resultRef.resultId } : {}),
   };
 }
 
