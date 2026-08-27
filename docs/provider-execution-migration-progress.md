@@ -8926,6 +8926,30 @@ naming it, and the recorder names it in a comment describing what it takes over 
 that reason is still a count rising, and recording it is cheaper than wording a comment around a
 grep. It falls by two when the recorder is wired.
 
+#### The next checkpoint, scoped
+
+The plan binds three things into one checkpoint and the binding is the point: **tab close stops
+cancelling background work only in the same commit that ships the surface showing it**. So the next
+one is all three, and the pieces are already identified:
+
+1. **The wiring** is one call site: `Tab.ts`'s `subagentManager.setCallback`, where the state-change
+   hook already persists the conversation. The recorder observes there, with the tab's conversation
+   id and provider. `SubagentManager` learns nothing about agents.
+2. **The work card** reads the durable records rather than `activeAsyncSubagents`, which is what
+   makes work started in a tab that has since closed visible at all. `SubagentRenderer` keeps its
+   rendering; what it loses is being the only place that knows.
+3. **`orphanAllActive` stops being what tab close does** — the three call sites are `Tab.ts:1761` and
+   `ConversationController` at two places — and the records are what the reattachment reads.
+
+Two questions to settle before writing it, both recorded rather than guessed:
+
+- **a hung `port.dispatch()` holds the whole coordinator**, through `enqueueTopology`. Whoever writes
+  the producer's dispatch path chooses whether it is bounded by `controlTimeoutMs` like every other
+  external call, and that decision is about what a provider is allowed to take;
+- **retention**. D4 finds a deleted conversation's records by owner, and these are owned by the
+  conversation, so deletion works — but nothing yet prunes a completed agent's records, and a vault
+  that runs a hundred background agents keeps a hundred instances, runs and results for ever.
+
 #### What to pick up next, in order
 
 This list supersedes the numbered one further down, which was written before the chat flip.
