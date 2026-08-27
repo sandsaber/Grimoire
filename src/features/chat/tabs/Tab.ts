@@ -62,7 +62,7 @@ import { buildAssistantResponseMetadata } from '../utils/assistantResponseMetada
 import { recalculateUsageForModel } from '../utils/usageInfo';
 import { getTabProviderId } from './providerResolution';
 import { attachInputResizeHandle, buildTabDOM } from './tabDOM';
-import { recordDurableSubagent } from './tabDurableSubagents';
+import { recordDurableSubagent, refreshBackgroundAgentCard } from './tabDurableSubagents';
 import { resolveTabProjectionExecution } from './tabProjectionExecution';
 import {
   AUTO_SCROLL_REENABLE_DELAY_MS,
@@ -1277,7 +1277,11 @@ export function initializeTabControllers(
   services.subagentManager.setCallback(
     (subagent) => {
       tab.controllers.streamController?.onAsyncSubagentStateChange(subagent);
+      // Recorded, then redrawn from what was recorded: the card shows the
+      // vault's answer rather than this callback's, so an agent this tab never
+      // saw appears beside the ones it did.
       recordDurableSubagent(tab, plugin, subagent);
+      void refreshBackgroundAgentCard(tab, plugin);
 
       // During active stream, regular end-of-turn save captures latest state.
       if (!tab.state.isStreaming && tab.state.currentConversationId) {
@@ -1763,7 +1767,12 @@ export async function destroyTab(tab: TabData): Promise<void> {
   tab.ui.navigationSidebar?.destroy();
   tab.ui.navigationSidebar = null;
 
-  tab.services.subagentManager.orphanAllActive();
+  // **Closing a tab no longer abandons the work it started.** This used to mark
+  // every running background agent `orphaned` — a status meaning "nobody is
+  // watching this any more", which was true and was all anyone ever learned
+  // about it. The records outlive the tab now and the status panel draws them
+  // from the vault, so reopening the conversation shows the agent still running
+  // and how it ended. The in-memory maps still go: they belong to this tab.
   tab.services.subagentManager.clear();
 
   for (const cleanup of tab.dom.eventCleanups) {

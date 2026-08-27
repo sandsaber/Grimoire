@@ -896,15 +896,14 @@ export const PARITY_SURFACES: ParitySurface[] = [
     id: 'durable-agents-surface',
     area: 'chat',
     description:
-      'What a person sees of work running out of sight: how much of an agent a provider lets us '
-      + 'observe, which is what decides whether a card may promise progress or only an ending.',
-    state: 'pending',
-    owner:
-      'M5 — the work card. It is the first reader of a fidelity profile, and it ships in the same '
-      + 'checkpoint that stops tab close cancelling background work: work nobody can see or '
-      + 'reattach to is worse than work that stops.',
+      'What a person sees of work running out of sight. The status panel draws a card per '
+      + 'background agent from the durable records, so an agent started in a tab that has since '
+      + 'closed still appears — and what a card may say about progress comes from how much of an '
+      + 'agent that provider lets anyone observe, rather than from the work itself.',
+    state: 'wired',
     modules: [
       'src/core/agents/AgentFidelity.ts',
+      'src/features/chat/tabs/tabBackgroundAgents.ts',
     ],
   },
   {

@@ -38,6 +38,14 @@
       "unavailableStreaming": "스트리밍 중에는 되감기할 수 없습니다",
       "unavailableNoUuid": "되감기 불가: 메시지 식별자 누락"
     },
+    "agents": {
+      "runningCount": "백그라운드에서 {count}개 실행 중",
+      "finished": "백그라운드 작업",
+      "finishedOne": "완료",
+      "failedOne": "실패",
+      "runningOne": "실행 중",
+      "unobservable": "실행 중, 진행 상황은 보고되지 않음"
+    },
     "history": {
       "deleteAll": "모두 삭제",
       "deleteAllAriaLabel": "모든 기록 삭제",
@@ -954,7 +962,46 @@
       }
     },
     "hub": {
-      "general": "일반", "providers": "제공업체", "workspace": "고급", "about": "정보", "cliDetected": "CLI 감지됨", "cliNotDetected": "CLI가 감지되지 않음", "geminiLegacy": "Gemini CLI(레거시)", "providerDetails": "{provider} 설정", "skills": "스킬", "agents": "하위 에이전트", "mcp": "MCP", "environment": "환경", "commands": "명령", "search": "이름, 설명, 소스 또는 제공업체 검색", "name": "이름", "source": "소스", "provider": "제공업체", "actions": "작업", "manage": "관리", "manageTitle": "{section} 관리", "edit": "편집", "delete": "삭제", "deleteConfirm": "“{name}”을(를) 삭제하시겠습니까?", "deleted": "“{name}”을(를) 삭제했습니다", "deleteFailed": "삭제 실패: {message}", "providerOptions": "제공업체 고급 옵션", "readonly": "읽기 전용", "available": "사용 가능", "connected": "연결됨", "disabled": "사용 안 함", "shared": "공유됨", "loading": "리소스를 불러오는 중…", "unsupported": "이 제공업체는 이 리소스 범주를 지원하지 않습니다.", "none": "일치하는 고급 리소스가 없습니다.", "aboutCopy": "Grimoire는 Obsidian 내에서 로컬 AI 에이전트를 연결합니다. 버전과 릴리스 노트는 여기에서 확인할 수 있습니다.", "native": "네이티브", "nativeCli": "네이티브 CLI", "nativeMcpDescription": "네이티브 MCP 지원", "runtimeCommandsPending": "{provider} 채팅을 한 번 시작하면 네이티브 명령을 불러옵니다.", "releases": "릴리스"
+      "general": "일반",
+      "providers": "제공업체",
+      "workspace": "고급",
+      "about": "정보",
+      "cliDetected": "CLI 감지됨",
+      "cliNotDetected": "CLI가 감지되지 않음",
+      "geminiLegacy": "Gemini CLI(레거시)",
+      "providerDetails": "{provider} 설정",
+      "skills": "스킬",
+      "agents": "하위 에이전트",
+      "mcp": "MCP",
+      "environment": "환경",
+      "commands": "명령",
+      "search": "이름, 설명, 소스 또는 제공업체 검색",
+      "name": "이름",
+      "source": "소스",
+      "provider": "제공업체",
+      "actions": "작업",
+      "manage": "관리",
+      "manageTitle": "{section} 관리",
+      "edit": "편집",
+      "delete": "삭제",
+      "deleteConfirm": "“{name}”을(를) 삭제하시겠습니까?",
+      "deleted": "“{name}”을(를) 삭제했습니다",
+      "deleteFailed": "삭제 실패: {message}",
+      "providerOptions": "제공업체 고급 옵션",
+      "readonly": "읽기 전용",
+      "available": "사용 가능",
+      "connected": "연결됨",
+      "disabled": "사용 안 함",
+      "shared": "공유됨",
+      "loading": "리소스를 불러오는 중…",
+      "unsupported": "이 제공업체는 이 리소스 범주를 지원하지 않습니다.",
+      "none": "일치하는 고급 리소스가 없습니다.",
+      "aboutCopy": "Grimoire는 Obsidian 내에서 로컬 AI 에이전트를 연결합니다. 버전과 릴리스 노트는 여기에서 확인할 수 있습니다.",
+      "native": "네이티브",
+      "nativeCli": "네이티브 CLI",
+      "nativeMcpDescription": "네이티브 MCP 지원",
+      "runtimeCommandsPending": "{provider} 채팅을 한 번 시작하면 네이티브 명령을 불러옵니다.",
+      "releases": "릴리스"
     },
     "grok": {
       "cliPath": {
@@ -1428,8 +1475,61 @@
       }
     }
   },
-  "plugin": { "openRibbon": "Grimoire 열기", "openChatView": "채팅 보기 열기", "inlineEdit": "인라인 편집", "inlineEditViewUnavailable": "인라인 편집을 사용할 수 없습니다. 활성 Markdown 보기에 접근할 수 없습니다.", "inlineEditInserted": "삽입됨", "inlineEditApplied": "편집 적용됨", "newTab": "새 탭", "newSession": "새 세션(현재 탭)", "closeCurrentTab": "현재 탭 닫기", "switchToTab": "탭 {index}(으)로 전환", "environmentRestartFailed": "환경 변경이 적용되었지만 영향을 받은 탭 {count}개를 다시 시작하지 못했습니다.", "environmentAppliedRebuild": "환경 변수가 적용되었습니다. 다음 메시지에서 세션을 다시 만듭니다.", "environmentApplied": "환경 변수가 적용되었습니다." },
-  "shared": { "slashCommands": { "noMatches": "일치하는 명령이 없습니다" }, "resumeConversation": { "title": "대화 재개", "empty": "대화가 없습니다", "current": "현재 세션" }, "instructionModal": { "title": "사용자 지정 지침 추가", "yourInput": "입력:", "processingInstruction": "지침을 처리하는 중...", "yourResponse": "응답:", "responsePlaceholder": "자세한 내용을 입력하세요...", "refinedSnippet": "다듬은 스니펫:", "processing": "처리 중...", "submit": "제출", "submitResponseAria": "응답 제출", "editAria": "지침 편집", "accept": "수락", "acceptAria": "지침 수락", "preview": "미리 보기" }, "whatsNew": { "title": "Grimoire v{version}의 새로운 기능", "released": "출시일 {date}", "latestReleaseNotes": "최신 릴리스 노트", "fullChangelog": "전체 변경 로그", "gotIt": "알겠습니다" } },
-  "inlineEdit": { "rejectTitle": "거부 (Esc)", "acceptTitle": "수락 (Enter)", "editorUnavailable": "인라인 편집을 사용할 수 없습니다. 활성 편집기에 접근할 수 없습니다. 노트를 다시 여세요.", "vaultFilesLoadFailed": "Vault 파일을 불러오지 못했습니다. @ 멘션을 사용할 수 없을 수 있습니다.", "invalidFilePath": "파일을 첨부하지 못했습니다: 잘못된 경로" },
-  "storage": { "tabLayoutSaveFailed": "탭 레이아웃을 저장하지 못했습니다" }
+  "plugin": {
+    "openRibbon": "Grimoire 열기",
+    "openChatView": "채팅 보기 열기",
+    "inlineEdit": "인라인 편집",
+    "inlineEditViewUnavailable": "인라인 편집을 사용할 수 없습니다. 활성 Markdown 보기에 접근할 수 없습니다.",
+    "inlineEditInserted": "삽입됨",
+    "inlineEditApplied": "편집 적용됨",
+    "newTab": "새 탭",
+    "newSession": "새 세션(현재 탭)",
+    "closeCurrentTab": "현재 탭 닫기",
+    "switchToTab": "탭 {index}(으)로 전환",
+    "environmentRestartFailed": "환경 변경이 적용되었지만 영향을 받은 탭 {count}개를 다시 시작하지 못했습니다.",
+    "environmentAppliedRebuild": "환경 변수가 적용되었습니다. 다음 메시지에서 세션을 다시 만듭니다.",
+    "environmentApplied": "환경 변수가 적용되었습니다."
+  },
+  "shared": {
+    "slashCommands": {
+      "noMatches": "일치하는 명령이 없습니다"
+    },
+    "resumeConversation": {
+      "title": "대화 재개",
+      "empty": "대화가 없습니다",
+      "current": "현재 세션"
+    },
+    "instructionModal": {
+      "title": "사용자 지정 지침 추가",
+      "yourInput": "입력:",
+      "processingInstruction": "지침을 처리하는 중...",
+      "yourResponse": "응답:",
+      "responsePlaceholder": "자세한 내용을 입력하세요...",
+      "refinedSnippet": "다듬은 스니펫:",
+      "processing": "처리 중...",
+      "submit": "제출",
+      "submitResponseAria": "응답 제출",
+      "editAria": "지침 편집",
+      "accept": "수락",
+      "acceptAria": "지침 수락",
+      "preview": "미리 보기"
+    },
+    "whatsNew": {
+      "title": "Grimoire v{version}의 새로운 기능",
+      "released": "출시일 {date}",
+      "latestReleaseNotes": "최신 릴리스 노트",
+      "fullChangelog": "전체 변경 로그",
+      "gotIt": "알겠습니다"
+    }
+  },
+  "inlineEdit": {
+    "rejectTitle": "거부 (Esc)",
+    "acceptTitle": "수락 (Enter)",
+    "editorUnavailable": "인라인 편집을 사용할 수 없습니다. 활성 편집기에 접근할 수 없습니다. 노트를 다시 여세요.",
+    "vaultFilesLoadFailed": "Vault 파일을 불러오지 못했습니다. @ 멘션을 사용할 수 없을 수 있습니다.",
+    "invalidFilePath": "파일을 첨부하지 못했습니다: 잘못된 경로"
+  },
+  "storage": {
+    "tabLayoutSaveFailed": "탭 레이아웃을 저장하지 못했습니다"
+  }
 }

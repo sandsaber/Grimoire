@@ -250,7 +250,14 @@ describe('SubagentManager', () => {
       expect(manager.getByTaskId('task-err')).toBeUndefined();
     });
 
-    it('marks pending and running async subagents as orphaned', () => {
+    it('forgets its running async subagents without declaring them lost', () => {
+      // **`orphanAllActive` is deleted, and this is what replaced it.** Leaving
+      // a conversation used to mark every running background agent `orphaned`
+      // with the result "Conversation ended" — a status meaning "nobody is
+      // watching this", which was true and was all anyone ever learned about
+      // it. The agents are recorded against the conversation now and the status
+      // panel draws them from the vault, so leaving and coming back shows them
+      // still running. What this manager drops is its own maps.
       const { manager } = createManager();
       const parentEl = createMockEl();
 
@@ -258,15 +265,11 @@ describe('SubagentManager', () => {
       manager.handleTaskToolUse('running-task', { description: 'Running task', run_in_background: true }, parentEl);
       manager.handleTaskToolResult('running-task', JSON.stringify({ agent_id: 'agent-running' }));
 
-      const orphaned = manager.orphanAllActive();
+      manager.clear();
 
-      expect(orphaned).toHaveLength(2);
-      orphaned.forEach((subagent) => {
-        expect(subagent.asyncStatus).toBe('orphaned');
-        expect(subagent.result).toContain('Conversation ended');
-      });
       expect(manager.getByTaskId('pending-task')).toBeUndefined();
       expect(manager.getByTaskId('running-task')).toBeUndefined();
+      expect(manager.hasRunningSubagents()).toBe(false);
     });
 
     it('ignores Task results for unknown tasks', () => {

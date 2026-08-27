@@ -38,6 +38,14 @@
       "unavailableStreaming": "Não é possível retroceder durante a transmissão",
       "unavailableNoUuid": "Não é possível retroceder: identificadores de mensagem ausentes"
     },
+    "agents": {
+      "runningCount": "{count} em segundo plano",
+      "finished": "Trabalho em segundo plano",
+      "finishedOne": "concluído",
+      "failedOne": "com erro",
+      "runningOne": "em execução",
+      "unobservable": "em execução, sem relato de progresso"
+    },
     "history": {
       "deleteAll": "Excluir tudo",
       "deleteAllAriaLabel": "Excluir todo o histórico",
@@ -954,7 +962,46 @@
       }
     },
     "hub": {
-      "general": "Geral", "providers": "Provedores", "workspace": "Avançado", "about": "Sobre", "cliDetected": "CLI detectada", "cliNotDetected": "CLI não detectada", "geminiLegacy": "Gemini CLI (legada)", "providerDetails": "Configurações de {provider}", "skills": "Habilidades", "agents": "Subagentes", "mcp": "MCP", "environment": "Ambiente", "commands": "Comandos", "search": "Pesquisar nome, descrição, fonte ou provedor", "name": "Nome", "source": "Fonte", "provider": "Provedor", "actions": "Ações", "manage": "Gerenciar", "manageTitle": "Gerenciar {section}", "edit": "Editar", "delete": "Excluir", "deleteConfirm": "Excluir “{name}”?", "deleted": "“{name}” excluído", "deleteFailed": "Falha ao excluir: {message}", "providerOptions": "Opções avançadas do provedor", "readonly": "Somente leitura", "available": "Disponível", "connected": "Conectado", "disabled": "Desativado", "shared": "Compartilhado", "loading": "Carregando recursos…", "unsupported": "Este provedor não oferece suporte a esta categoria de recurso.", "none": "Nenhum recurso avançado correspondente.", "aboutCopy": "O Grimoire conecta agentes de IA locais dentro do Obsidian. A versão e as notas de lançamento ficam aqui.", "native": "Nativo", "nativeCli": "CLI nativa", "nativeMcpDescription": "Suporte nativo a MCP", "runtimeCommandsPending": "Inicie um chat do {provider} uma vez para carregar os comandos nativos.", "releases": "Versões"
+      "general": "Geral",
+      "providers": "Provedores",
+      "workspace": "Avançado",
+      "about": "Sobre",
+      "cliDetected": "CLI detectada",
+      "cliNotDetected": "CLI não detectada",
+      "geminiLegacy": "Gemini CLI (legada)",
+      "providerDetails": "Configurações de {provider}",
+      "skills": "Habilidades",
+      "agents": "Subagentes",
+      "mcp": "MCP",
+      "environment": "Ambiente",
+      "commands": "Comandos",
+      "search": "Pesquisar nome, descrição, fonte ou provedor",
+      "name": "Nome",
+      "source": "Fonte",
+      "provider": "Provedor",
+      "actions": "Ações",
+      "manage": "Gerenciar",
+      "manageTitle": "Gerenciar {section}",
+      "edit": "Editar",
+      "delete": "Excluir",
+      "deleteConfirm": "Excluir “{name}”?",
+      "deleted": "“{name}” excluído",
+      "deleteFailed": "Falha ao excluir: {message}",
+      "providerOptions": "Opções avançadas do provedor",
+      "readonly": "Somente leitura",
+      "available": "Disponível",
+      "connected": "Conectado",
+      "disabled": "Desativado",
+      "shared": "Compartilhado",
+      "loading": "Carregando recursos…",
+      "unsupported": "Este provedor não oferece suporte a esta categoria de recurso.",
+      "none": "Nenhum recurso avançado correspondente.",
+      "aboutCopy": "O Grimoire conecta agentes de IA locais dentro do Obsidian. A versão e as notas de lançamento ficam aqui.",
+      "native": "Nativo",
+      "nativeCli": "CLI nativa",
+      "nativeMcpDescription": "Suporte nativo a MCP",
+      "runtimeCommandsPending": "Inicie um chat do {provider} uma vez para carregar os comandos nativos.",
+      "releases": "Versões"
     },
     "grok": {
       "cliPath": {
@@ -1428,8 +1475,61 @@
       }
     }
   },
-  "plugin": { "openRibbon": "Abrir Grimoire", "openChatView": "Abrir visualização de chat", "inlineEdit": "Edição em linha", "inlineEditViewUnavailable": "A edição em linha está indisponível: não foi possível acessar a visualização Markdown ativa.", "inlineEditInserted": "Inserido", "inlineEditApplied": "Edição aplicada", "newTab": "Nova aba", "newSession": "Nova sessão (na aba atual)", "closeCurrentTab": "Fechar aba atual", "switchToTab": "Alternar para a aba {index}", "environmentRestartFailed": "As alterações de ambiente foram aplicadas, mas não foi possível reiniciar {count} abas afetadas.", "environmentAppliedRebuild": "Variáveis de ambiente aplicadas. As sessões serão recriadas na próxima mensagem.", "environmentApplied": "Variáveis de ambiente aplicadas." },
-  "shared": { "slashCommands": { "noMatches": "Nenhum comando correspondente" }, "resumeConversation": { "title": "Retomar conversa", "empty": "Nenhuma conversa", "current": "Sessão atual" }, "instructionModal": { "title": "Adicionar instrução personalizada", "yourInput": "Sua entrada:", "processingInstruction": "Processando sua instrução...", "yourResponse": "Sua resposta:", "responsePlaceholder": "Forneça mais detalhes...", "refinedSnippet": "Trecho refinado:", "processing": "Processando...", "submit": "Enviar", "submitResponseAria": "Enviar resposta", "editAria": "Editar instrução", "accept": "Aceitar", "acceptAria": "Aceitar instrução", "preview": "Prévia" }, "whatsNew": { "title": "Novidades do Grimoire v{version}", "released": "Lançado em {date}", "latestReleaseNotes": "Notas da versão mais recente", "fullChangelog": "Registro completo de alterações", "gotIt": "Entendi" } },
-  "inlineEdit": { "rejectTitle": "Rejeitar (Esc)", "acceptTitle": "Aceitar (Enter)", "editorUnavailable": "A edição em linha está indisponível: não foi possível acessar o editor ativo. Reabra a nota.", "vaultFilesLoadFailed": "Não foi possível carregar os arquivos do vault. As menções @ podem estar indisponíveis.", "invalidFilePath": "Não foi possível anexar o arquivo: caminho inválido" },
-  "storage": { "tabLayoutSaveFailed": "Não foi possível salvar o layout das abas" }
+  "plugin": {
+    "openRibbon": "Abrir Grimoire",
+    "openChatView": "Abrir visualização de chat",
+    "inlineEdit": "Edição em linha",
+    "inlineEditViewUnavailable": "A edição em linha está indisponível: não foi possível acessar a visualização Markdown ativa.",
+    "inlineEditInserted": "Inserido",
+    "inlineEditApplied": "Edição aplicada",
+    "newTab": "Nova aba",
+    "newSession": "Nova sessão (na aba atual)",
+    "closeCurrentTab": "Fechar aba atual",
+    "switchToTab": "Alternar para a aba {index}",
+    "environmentRestartFailed": "As alterações de ambiente foram aplicadas, mas não foi possível reiniciar {count} abas afetadas.",
+    "environmentAppliedRebuild": "Variáveis de ambiente aplicadas. As sessões serão recriadas na próxima mensagem.",
+    "environmentApplied": "Variáveis de ambiente aplicadas."
+  },
+  "shared": {
+    "slashCommands": {
+      "noMatches": "Nenhum comando correspondente"
+    },
+    "resumeConversation": {
+      "title": "Retomar conversa",
+      "empty": "Nenhuma conversa",
+      "current": "Sessão atual"
+    },
+    "instructionModal": {
+      "title": "Adicionar instrução personalizada",
+      "yourInput": "Sua entrada:",
+      "processingInstruction": "Processando sua instrução...",
+      "yourResponse": "Sua resposta:",
+      "responsePlaceholder": "Forneça mais detalhes...",
+      "refinedSnippet": "Trecho refinado:",
+      "processing": "Processando...",
+      "submit": "Enviar",
+      "submitResponseAria": "Enviar resposta",
+      "editAria": "Editar instrução",
+      "accept": "Aceitar",
+      "acceptAria": "Aceitar instrução",
+      "preview": "Prévia"
+    },
+    "whatsNew": {
+      "title": "Novidades do Grimoire v{version}",
+      "released": "Lançado em {date}",
+      "latestReleaseNotes": "Notas da versão mais recente",
+      "fullChangelog": "Registro completo de alterações",
+      "gotIt": "Entendi"
+    }
+  },
+  "inlineEdit": {
+    "rejectTitle": "Rejeitar (Esc)",
+    "acceptTitle": "Aceitar (Enter)",
+    "editorUnavailable": "A edição em linha está indisponível: não foi possível acessar o editor ativo. Reabra a nota.",
+    "vaultFilesLoadFailed": "Não foi possível carregar os arquivos do vault. As menções @ podem estar indisponíveis.",
+    "invalidFilePath": "Não foi possível anexar o arquivo: caminho inválido"
+  },
+  "storage": {
+    "tabLayoutSaveFailed": "Não foi possível salvar o layout das abas"
+  }
 }

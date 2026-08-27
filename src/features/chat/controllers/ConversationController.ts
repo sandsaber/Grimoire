@@ -154,7 +154,11 @@ export class ConversationController {
         await this.save();
       }
 
-      subagentManager.orphanAllActive();
+      // **Leaving a conversation no longer abandons its background work.** The
+      // agents this conversation started are recorded against it, so they are
+      // still there when someone comes back — and marking them `orphaned` said
+      // only "nobody is watching", which is what leaving already means. The
+      // maps go because they are this tab's.
       subagentManager.clear();
 
       // Clear streaming state and related DOM references
@@ -290,7 +294,7 @@ export class ConversationController {
       this.deps.dismissPendingInlinePrompts?.();
       await this.save();
 
-      subagentManager.orphanAllActive();
+      // Switching away is leaving; see the note in `createNew` above.
       subagentManager.clear();
 
       plugin.recordDebugLog?.({

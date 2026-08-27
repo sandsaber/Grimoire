@@ -534,29 +534,6 @@ export class SubagentManager {
     this.pendingTasks.clear();
   }
 
-  public orphanAllActive(): SubagentInfo[] {
-    const orphaned: SubagentInfo[] = [];
-
-    for (const subagent of this.pendingAsyncSubagents.values()) {
-      this.markOrphaned(subagent);
-      orphaned.push(subagent);
-    }
-
-    for (const subagent of this.activeAsyncSubagents.values()) {
-      if (subagent.asyncStatus === 'running') {
-        this.markOrphaned(subagent);
-        orphaned.push(subagent);
-      }
-    }
-
-    this.pendingAsyncSubagents.clear();
-    this.activeAsyncSubagents.clear();
-    this.taskIdToAgentId.clear();
-    this.outputToolIdToAgentId.clear();
-
-    return orphaned;
-  }
-
   public clear(): void {
     this.syncSubagents.clear();
     this.pendingTasks.clear();
@@ -571,14 +548,6 @@ export class SubagentManager {
   // Private: State Transitions
   // ============================================
 
-  private markOrphaned(subagent: SubagentInfo): void {
-    subagent.asyncStatus = 'orphaned';
-    subagent.status = 'error';
-    subagent.result = 'Conversation ended before task completed';
-    subagent.completedAt = Date.now();
-    this.updateAsyncDomState(subagent);
-    this.onStateChange(subagent);
-  }
 
   private transitionToError(subagent: SubagentInfo, taskToolId: string, errorResult: string): void {
     subagent.asyncStatus = 'error';

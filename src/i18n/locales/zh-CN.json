@@ -38,6 +38,14 @@
       "unavailableStreaming": "流式响应中无法回退",
       "unavailableNoUuid": "无法回退：缺少消息标识符"
     },
+    "agents": {
+      "runningCount": "{count} 个在后台运行",
+      "finished": "后台工作",
+      "finishedOne": "已完成",
+      "failedOne": "已失败",
+      "runningOne": "运行中",
+      "unobservable": "运行中，未报告进度"
+    },
     "history": {
       "deleteAll": "全部删除",
       "deleteAllAriaLabel": "删除全部历史记录",
@@ -954,7 +962,46 @@
       }
     },
     "hub": {
-      "general": "常规", "providers": "供应商", "workspace": "高级设置", "about": "关于", "cliDetected": "已检测到 CLI", "cliNotDetected": "未检测到 CLI", "geminiLegacy": "Gemini CLI（旧版）", "providerDetails": "{provider} 设置", "skills": "技能", "agents": "子代理", "mcp": "MCP", "environment": "环境", "commands": "命令", "search": "搜索名称、说明、来源或供应商", "name": "名称", "source": "来源", "provider": "供应商", "actions": "操作", "manage": "管理", "manageTitle": "管理 {section}", "edit": "修改", "delete": "删除", "deleteConfirm": "确定删除“{name}”吗？", "deleted": "已删除“{name}”", "deleteFailed": "删除失败：{message}", "providerOptions": "供应商高级选项", "readonly": "只读", "available": "可用", "connected": "已连接", "disabled": "已停用", "shared": "共享", "loading": "正在加载资源…", "unsupported": "当前供应商不支持此类资源管理。", "none": "没有匹配的高级设置资源。", "aboutCopy": "Grimoire 在 Obsidian 中连接本地 AI Agent。此处保留插件版本、说明和更新入口。", "native": "原生", "nativeCli": "原生 CLI", "nativeMcpDescription": "原生 MCP 支持", "runtimeCommandsPending": "启动一次 {provider} 聊天以加载其原生命令。", "releases": "发布版本"
+      "general": "常规",
+      "providers": "供应商",
+      "workspace": "高级设置",
+      "about": "关于",
+      "cliDetected": "已检测到 CLI",
+      "cliNotDetected": "未检测到 CLI",
+      "geminiLegacy": "Gemini CLI（旧版）",
+      "providerDetails": "{provider} 设置",
+      "skills": "技能",
+      "agents": "子代理",
+      "mcp": "MCP",
+      "environment": "环境",
+      "commands": "命令",
+      "search": "搜索名称、说明、来源或供应商",
+      "name": "名称",
+      "source": "来源",
+      "provider": "供应商",
+      "actions": "操作",
+      "manage": "管理",
+      "manageTitle": "管理 {section}",
+      "edit": "修改",
+      "delete": "删除",
+      "deleteConfirm": "确定删除“{name}”吗？",
+      "deleted": "已删除“{name}”",
+      "deleteFailed": "删除失败：{message}",
+      "providerOptions": "供应商高级选项",
+      "readonly": "只读",
+      "available": "可用",
+      "connected": "已连接",
+      "disabled": "已停用",
+      "shared": "共享",
+      "loading": "正在加载资源…",
+      "unsupported": "当前供应商不支持此类资源管理。",
+      "none": "没有匹配的高级设置资源。",
+      "aboutCopy": "Grimoire 在 Obsidian 中连接本地 AI Agent。此处保留插件版本、说明和更新入口。",
+      "native": "原生",
+      "nativeCli": "原生 CLI",
+      "nativeMcpDescription": "原生 MCP 支持",
+      "runtimeCommandsPending": "启动一次 {provider} 聊天以加载其原生命令。",
+      "releases": "发布版本"
     },
     "grok": {
       "cliPath": {
@@ -1428,8 +1475,61 @@
       }
     }
   },
-  "plugin": { "openRibbon": "打开 Grimoire", "openChatView": "打开聊天视图", "inlineEdit": "内联编辑", "inlineEditViewUnavailable": "内联编辑不可用：无法访问当前 Markdown 视图。", "inlineEditInserted": "已插入", "inlineEditApplied": "已应用编辑", "newTab": "新建标签页", "newSession": "新建会话（当前标签页）", "closeCurrentTab": "关闭当前标签页", "switchToTab": "切换到标签页 {index}", "environmentRestartFailed": "环境更改已应用，但有 {count} 个受影响的标签页无法重启。", "environmentAppliedRebuild": "环境变量已应用。会话将在下一条消息时重建。", "environmentApplied": "环境变量已应用。" },
-  "shared": { "slashCommands": { "noMatches": "没有匹配的命令" }, "resumeConversation": { "title": "恢复对话", "empty": "没有对话", "current": "当前会话" }, "instructionModal": { "title": "添加自定义指令", "yourInput": "你的输入：", "processingInstruction": "正在处理你的指令...", "yourResponse": "你的回复：", "responsePlaceholder": "请提供更多详细信息...", "refinedSnippet": "优化后的片段：", "processing": "正在处理...", "submit": "提交", "submitResponseAria": "提交回复", "editAria": "编辑指令", "accept": "接受", "acceptAria": "接受指令", "preview": "预览" }, "whatsNew": { "title": "Grimoire v{version} 的新功能", "released": "发布于 {date}", "latestReleaseNotes": "最新发行说明", "fullChangelog": "完整更新日志", "gotIt": "知道了" } },
-  "inlineEdit": { "rejectTitle": "拒绝 (Esc)", "acceptTitle": "接受 (Enter)", "editorUnavailable": "内联编辑不可用：无法访问当前编辑器。请重新打开笔记。", "vaultFilesLoadFailed": "无法加载 vault 文件。@ 提及可能不可用。", "invalidFilePath": "无法附加文件：路径无效" },
-  "storage": { "tabLayoutSaveFailed": "无法保存标签页布局" }
+  "plugin": {
+    "openRibbon": "打开 Grimoire",
+    "openChatView": "打开聊天视图",
+    "inlineEdit": "内联编辑",
+    "inlineEditViewUnavailable": "内联编辑不可用：无法访问当前 Markdown 视图。",
+    "inlineEditInserted": "已插入",
+    "inlineEditApplied": "已应用编辑",
+    "newTab": "新建标签页",
+    "newSession": "新建会话（当前标签页）",
+    "closeCurrentTab": "关闭当前标签页",
+    "switchToTab": "切换到标签页 {index}",
+    "environmentRestartFailed": "环境更改已应用，但有 {count} 个受影响的标签页无法重启。",
+    "environmentAppliedRebuild": "环境变量已应用。会话将在下一条消息时重建。",
+    "environmentApplied": "环境变量已应用。"
+  },
+  "shared": {
+    "slashCommands": {
+      "noMatches": "没有匹配的命令"
+    },
+    "resumeConversation": {
+      "title": "恢复对话",
+      "empty": "没有对话",
+      "current": "当前会话"
+    },
+    "instructionModal": {
+      "title": "添加自定义指令",
+      "yourInput": "你的输入：",
+      "processingInstruction": "正在处理你的指令...",
+      "yourResponse": "你的回复：",
+      "responsePlaceholder": "请提供更多详细信息...",
+      "refinedSnippet": "优化后的片段：",
+      "processing": "正在处理...",
+      "submit": "提交",
+      "submitResponseAria": "提交回复",
+      "editAria": "编辑指令",
+      "accept": "接受",
+      "acceptAria": "接受指令",
+      "preview": "预览"
+    },
+    "whatsNew": {
+      "title": "Grimoire v{version} 的新功能",
+      "released": "发布于 {date}",
+      "latestReleaseNotes": "最新发行说明",
+      "fullChangelog": "完整更新日志",
+      "gotIt": "知道了"
+    }
+  },
+  "inlineEdit": {
+    "rejectTitle": "拒绝 (Esc)",
+    "acceptTitle": "接受 (Enter)",
+    "editorUnavailable": "内联编辑不可用：无法访问当前编辑器。请重新打开笔记。",
+    "vaultFilesLoadFailed": "无法加载 vault 文件。@ 提及可能不可用。",
+    "invalidFilePath": "无法附加文件：路径无效"
+  },
+  "storage": {
+    "tabLayoutSaveFailed": "无法保存标签页布局"
+  }
 }

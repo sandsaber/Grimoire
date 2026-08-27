@@ -124,6 +124,7 @@ const createMockStatusPanel = () => ({
   mount: jest.fn(),
   remount: jest.fn(),
   updateTodos: jest.fn(),
+  updateBackgroundAgents: jest.fn(),
   destroy: jest.fn(),
 });
 
@@ -1620,7 +1621,13 @@ describe('Tab - Destruction', () => {
       expect(removeSpy).toHaveBeenCalled();
     });
 
-    it('should cleanup subagents', async () => {
+    it('drops its own maps without abandoning the work they described', async () => {
+      // **Closing a tab used to mark every running background agent
+      // `orphaned`** — a status meaning "nobody is watching this any more",
+      // which was true and was all anyone ever learned about it. The records
+      // outlive the tab now and the status panel draws them from the vault, so
+      // reopening the conversation shows the agent still running and how it
+      // ended. The maps still go: they belong to this tab.
       const options = createMockOptions();
       const tab = createTab(options);
 
@@ -1630,8 +1637,8 @@ describe('Tab - Destruction', () => {
 
       await destroyTab(tab);
 
-      expect(orphanAllActive).toHaveBeenCalled();
       expect(clear).toHaveBeenCalled();
+      expect(orphanAllActive).not.toHaveBeenCalled();
     });
 
     it('should cleanup UI components', async () => {

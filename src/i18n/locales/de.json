@@ -38,6 +38,14 @@
       "unavailableStreaming": "Zurückspulen während des Streamings nicht möglich",
       "unavailableNoUuid": "Zurückspulen nicht möglich: Nachrichtenkennungen fehlen"
     },
+    "agents": {
+      "runningCount": "{count} laufen im Hintergrund",
+      "finished": "Hintergrundarbeit",
+      "finishedOne": "abgeschlossen",
+      "failedOne": "fehlgeschlagen",
+      "runningOne": "läuft",
+      "unobservable": "läuft, kein Fortschritt gemeldet"
+    },
     "history": {
       "deleteAll": "Alle löschen",
       "deleteAllAriaLabel": "Gesamten Verlauf löschen",
@@ -954,7 +962,46 @@
       }
     },
     "hub": {
-      "general": "Allgemein", "providers": "Anbieter", "workspace": "Erweitert", "about": "Über", "cliDetected": "CLI erkannt", "cliNotDetected": "CLI nicht erkannt", "geminiLegacy": "Gemini CLI (Legacy)", "providerDetails": "{provider}-Einstellungen", "skills": "Fähigkeiten", "agents": "Subagenten", "mcp": "MCP", "environment": "Umgebung", "commands": "Befehle", "search": "Name, Beschreibung, Quelle oder Anbieter suchen", "name": "Name", "source": "Quelle", "provider": "Anbieter", "actions": "Aktionen", "manage": "Verwalten", "manageTitle": "{section} verwalten", "edit": "Bearbeiten", "delete": "Löschen", "deleteConfirm": "„{name}“ löschen?", "deleted": "„{name}“ gelöscht", "deleteFailed": "Löschen fehlgeschlagen: {message}", "providerOptions": "Erweiterte Anbieteroptionen", "readonly": "Schreibgeschützt", "available": "Verfügbar", "connected": "Verbunden", "disabled": "Deaktiviert", "shared": "Geteilt", "loading": "Ressourcen werden geladen…", "unsupported": "Dieser Anbieter unterstützt diese Ressourcenkategorie nicht.", "none": "Keine passenden erweiterten Ressourcen.", "aboutCopy": "Grimoire verbindet lokale KI-Agenten in Obsidian. Version und Versionshinweise sind hier verfügbar.", "native": "Nativ", "nativeCli": "Native CLI", "nativeMcpDescription": "Native MCP-Unterstützung", "runtimeCommandsPending": "Starten Sie einmal einen {provider}-Chat, um die nativen Befehle zu laden.", "releases": "Veröffentlichungen"
+      "general": "Allgemein",
+      "providers": "Anbieter",
+      "workspace": "Erweitert",
+      "about": "Über",
+      "cliDetected": "CLI erkannt",
+      "cliNotDetected": "CLI nicht erkannt",
+      "geminiLegacy": "Gemini CLI (Legacy)",
+      "providerDetails": "{provider}-Einstellungen",
+      "skills": "Fähigkeiten",
+      "agents": "Subagenten",
+      "mcp": "MCP",
+      "environment": "Umgebung",
+      "commands": "Befehle",
+      "search": "Name, Beschreibung, Quelle oder Anbieter suchen",
+      "name": "Name",
+      "source": "Quelle",
+      "provider": "Anbieter",
+      "actions": "Aktionen",
+      "manage": "Verwalten",
+      "manageTitle": "{section} verwalten",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "deleteConfirm": "„{name}“ löschen?",
+      "deleted": "„{name}“ gelöscht",
+      "deleteFailed": "Löschen fehlgeschlagen: {message}",
+      "providerOptions": "Erweiterte Anbieteroptionen",
+      "readonly": "Schreibgeschützt",
+      "available": "Verfügbar",
+      "connected": "Verbunden",
+      "disabled": "Deaktiviert",
+      "shared": "Geteilt",
+      "loading": "Ressourcen werden geladen…",
+      "unsupported": "Dieser Anbieter unterstützt diese Ressourcenkategorie nicht.",
+      "none": "Keine passenden erweiterten Ressourcen.",
+      "aboutCopy": "Grimoire verbindet lokale KI-Agenten in Obsidian. Version und Versionshinweise sind hier verfügbar.",
+      "native": "Nativ",
+      "nativeCli": "Native CLI",
+      "nativeMcpDescription": "Native MCP-Unterstützung",
+      "runtimeCommandsPending": "Starten Sie einmal einen {provider}-Chat, um die nativen Befehle zu laden.",
+      "releases": "Veröffentlichungen"
     },
     "grok": {
       "cliPath": {
@@ -1428,8 +1475,61 @@
       }
     }
   },
-  "plugin": { "openRibbon": "Grimoire öffnen", "openChatView": "Chatansicht öffnen", "inlineEdit": "Inline bearbeiten", "inlineEditViewUnavailable": "Inline-Bearbeitung nicht verfügbar: Die aktive Markdown-Ansicht konnte nicht aufgerufen werden.", "inlineEditInserted": "Eingefügt", "inlineEditApplied": "Bearbeitung angewendet", "newTab": "Neuer Tab", "newSession": "Neue Sitzung (im aktuellen Tab)", "closeCurrentTab": "Aktuellen Tab schließen", "switchToTab": "Zu Tab {index} wechseln", "environmentRestartFailed": "Umgebungsänderungen wurden angewendet, aber {count} betroffene Tabs konnten nicht neu gestartet werden.", "environmentAppliedRebuild": "Umgebungsvariablen angewendet. Sitzungen werden bei der nächsten Nachricht neu aufgebaut.", "environmentApplied": "Umgebungsvariablen angewendet." },
-  "shared": { "slashCommands": { "noMatches": "Keine passenden Befehle" }, "resumeConversation": { "title": "Unterhaltung fortsetzen", "empty": "Keine Unterhaltungen", "current": "Aktuelle Sitzung" }, "instructionModal": { "title": "Benutzerdefinierte Anweisung hinzufügen", "yourInput": "Ihre Eingabe:", "processingInstruction": "Ihre Anweisung wird verarbeitet...", "yourResponse": "Ihre Antwort:", "responsePlaceholder": "Weitere Details angeben...", "refinedSnippet": "Verfeinerter Ausschnitt:", "processing": "Wird verarbeitet...", "submit": "Senden", "submitResponseAria": "Antwort senden", "editAria": "Anweisung bearbeiten", "accept": "Übernehmen", "acceptAria": "Anweisung übernehmen", "preview": "Vorschau" }, "whatsNew": { "title": "Neu in Grimoire v{version}", "released": "Veröffentlicht am {date}", "latestReleaseNotes": "Neueste Versionshinweise", "fullChangelog": "Vollständiges Änderungsprotokoll", "gotIt": "Verstanden" } },
-  "inlineEdit": { "rejectTitle": "Ablehnen (Esc)", "acceptTitle": "Übernehmen (Eingabe)", "editorUnavailable": "Inline-Bearbeitung nicht verfügbar: Der aktive Editor konnte nicht aufgerufen werden. Öffnen Sie die Notiz erneut.", "vaultFilesLoadFailed": "Vault-Dateien konnten nicht geladen werden. @-Erwähnungen sind möglicherweise nicht verfügbar.", "invalidFilePath": "Datei konnte nicht angehängt werden: ungültiger Pfad" },
-  "storage": { "tabLayoutSaveFailed": "Tab-Layout konnte nicht gespeichert werden" }
+  "plugin": {
+    "openRibbon": "Grimoire öffnen",
+    "openChatView": "Chatansicht öffnen",
+    "inlineEdit": "Inline bearbeiten",
+    "inlineEditViewUnavailable": "Inline-Bearbeitung nicht verfügbar: Die aktive Markdown-Ansicht konnte nicht aufgerufen werden.",
+    "inlineEditInserted": "Eingefügt",
+    "inlineEditApplied": "Bearbeitung angewendet",
+    "newTab": "Neuer Tab",
+    "newSession": "Neue Sitzung (im aktuellen Tab)",
+    "closeCurrentTab": "Aktuellen Tab schließen",
+    "switchToTab": "Zu Tab {index} wechseln",
+    "environmentRestartFailed": "Umgebungsänderungen wurden angewendet, aber {count} betroffene Tabs konnten nicht neu gestartet werden.",
+    "environmentAppliedRebuild": "Umgebungsvariablen angewendet. Sitzungen werden bei der nächsten Nachricht neu aufgebaut.",
+    "environmentApplied": "Umgebungsvariablen angewendet."
+  },
+  "shared": {
+    "slashCommands": {
+      "noMatches": "Keine passenden Befehle"
+    },
+    "resumeConversation": {
+      "title": "Unterhaltung fortsetzen",
+      "empty": "Keine Unterhaltungen",
+      "current": "Aktuelle Sitzung"
+    },
+    "instructionModal": {
+      "title": "Benutzerdefinierte Anweisung hinzufügen",
+      "yourInput": "Ihre Eingabe:",
+      "processingInstruction": "Ihre Anweisung wird verarbeitet...",
+      "yourResponse": "Ihre Antwort:",
+      "responsePlaceholder": "Weitere Details angeben...",
+      "refinedSnippet": "Verfeinerter Ausschnitt:",
+      "processing": "Wird verarbeitet...",
+      "submit": "Senden",
+      "submitResponseAria": "Antwort senden",
+      "editAria": "Anweisung bearbeiten",
+      "accept": "Übernehmen",
+      "acceptAria": "Anweisung übernehmen",
+      "preview": "Vorschau"
+    },
+    "whatsNew": {
+      "title": "Neu in Grimoire v{version}",
+      "released": "Veröffentlicht am {date}",
+      "latestReleaseNotes": "Neueste Versionshinweise",
+      "fullChangelog": "Vollständiges Änderungsprotokoll",
+      "gotIt": "Verstanden"
+    }
+  },
+  "inlineEdit": {
+    "rejectTitle": "Ablehnen (Esc)",
+    "acceptTitle": "Übernehmen (Eingabe)",
+    "editorUnavailable": "Inline-Bearbeitung nicht verfügbar: Der aktive Editor konnte nicht aufgerufen werden. Öffnen Sie die Notiz erneut.",
+    "vaultFilesLoadFailed": "Vault-Dateien konnten nicht geladen werden. @-Erwähnungen sind möglicherweise nicht verfügbar.",
+    "invalidFilePath": "Datei konnte nicht angehängt werden: ungültiger Pfad"
+  },
+  "storage": {
+    "tabLayoutSaveFailed": "Tab-Layout konnte nicht gespeichert werden"
+  }
 }

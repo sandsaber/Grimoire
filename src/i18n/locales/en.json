@@ -38,6 +38,14 @@
       "unavailableStreaming": "Cannot rewind while streaming",
       "unavailableNoUuid": "Cannot rewind: missing message identifiers"
     },
+    "agents": {
+      "runningCount": "{count} running in the background",
+      "finished": "Background work",
+      "finishedOne": "finished",
+      "failedOne": "failed",
+      "runningOne": "running",
+      "unobservable": "running, progress not reported"
+    },
     "history": {
       "deleteAll": "Delete all",
       "deleteAllAriaLabel": "Delete all history",
@@ -954,7 +962,46 @@
       }
     },
     "hub": {
-      "general": "General", "providers": "Providers", "workspace": "Advanced", "about": "About", "cliDetected": "CLI detected", "cliNotDetected": "CLI not detected", "geminiLegacy": "Gemini CLI (Legacy)", "providerDetails": "{provider} settings", "skills": "Skills", "agents": "Subagents", "mcp": "MCP", "environment": "Environment", "commands": "Commands", "search": "Search name, description, source, or provider", "name": "Name", "source": "Source", "provider": "Provider", "actions": "Actions", "manage": "Manage", "manageTitle": "Manage {section}", "edit": "Edit", "delete": "Delete", "deleteConfirm": "Delete “{name}”?", "deleted": "Deleted “{name}”", "deleteFailed": "Delete failed: {message}", "providerOptions": "Provider advanced options", "readonly": "Read only", "available": "Available", "connected": "Connected", "disabled": "Disabled", "shared": "Shared", "loading": "Loading resources…", "unsupported": "This provider does not support this resource category.", "none": "No matching advanced resources.", "aboutCopy": "Grimoire connects local AI agents inside Obsidian. Version and release notes are kept here.", "native": "Native", "nativeCli": "Native CLI", "nativeMcpDescription": "Native MCP support", "runtimeCommandsPending": "Start a {provider} chat once to load its native commands.", "releases": "Releases"
+      "general": "General",
+      "providers": "Providers",
+      "workspace": "Advanced",
+      "about": "About",
+      "cliDetected": "CLI detected",
+      "cliNotDetected": "CLI not detected",
+      "geminiLegacy": "Gemini CLI (Legacy)",
+      "providerDetails": "{provider} settings",
+      "skills": "Skills",
+      "agents": "Subagents",
+      "mcp": "MCP",
+      "environment": "Environment",
+      "commands": "Commands",
+      "search": "Search name, description, source, or provider",
+      "name": "Name",
+      "source": "Source",
+      "provider": "Provider",
+      "actions": "Actions",
+      "manage": "Manage",
+      "manageTitle": "Manage {section}",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteConfirm": "Delete “{name}”?",
+      "deleted": "Deleted “{name}”",
+      "deleteFailed": "Delete failed: {message}",
+      "providerOptions": "Provider advanced options",
+      "readonly": "Read only",
+      "available": "Available",
+      "connected": "Connected",
+      "disabled": "Disabled",
+      "shared": "Shared",
+      "loading": "Loading resources…",
+      "unsupported": "This provider does not support this resource category.",
+      "none": "No matching advanced resources.",
+      "aboutCopy": "Grimoire connects local AI agents inside Obsidian. Version and release notes are kept here.",
+      "native": "Native",
+      "nativeCli": "Native CLI",
+      "nativeMcpDescription": "Native MCP support",
+      "runtimeCommandsPending": "Start a {provider} chat once to load its native commands.",
+      "releases": "Releases"
     },
     "grok": {
       "cliPath": {
@@ -1444,15 +1491,45 @@
     "environmentApplied": "Environment variables applied."
   },
   "shared": {
-    "slashCommands": { "noMatches": "No matching commands" },
-    "resumeConversation": { "title": "Resume conversation", "empty": "No conversations", "current": "Current session" },
-    "instructionModal": {
-      "title": "Add custom instruction", "yourInput": "Your input:", "processingInstruction": "Processing your instruction...", "yourResponse": "Your response:", "responsePlaceholder": "Provide more details...", "refinedSnippet": "Refined snippet:", "processing": "Processing...", "submit": "Submit", "submitResponseAria": "Submit response", "editAria": "Edit instruction", "accept": "Accept", "acceptAria": "Accept instruction", "preview": "Preview"
+    "slashCommands": {
+      "noMatches": "No matching commands"
     },
-    "whatsNew": { "title": "What's New in Grimoire v{version}", "released": "Released {date}", "latestReleaseNotes": "Latest release notes", "fullChangelog": "Full changelog", "gotIt": "Got it" }
+    "resumeConversation": {
+      "title": "Resume conversation",
+      "empty": "No conversations",
+      "current": "Current session"
+    },
+    "instructionModal": {
+      "title": "Add custom instruction",
+      "yourInput": "Your input:",
+      "processingInstruction": "Processing your instruction...",
+      "yourResponse": "Your response:",
+      "responsePlaceholder": "Provide more details...",
+      "refinedSnippet": "Refined snippet:",
+      "processing": "Processing...",
+      "submit": "Submit",
+      "submitResponseAria": "Submit response",
+      "editAria": "Edit instruction",
+      "accept": "Accept",
+      "acceptAria": "Accept instruction",
+      "preview": "Preview"
+    },
+    "whatsNew": {
+      "title": "What's New in Grimoire v{version}",
+      "released": "Released {date}",
+      "latestReleaseNotes": "Latest release notes",
+      "fullChangelog": "Full changelog",
+      "gotIt": "Got it"
+    }
   },
   "inlineEdit": {
-    "rejectTitle": "Reject (Esc)", "acceptTitle": "Accept (Enter)", "editorUnavailable": "Inline edit unavailable: could not access the active editor. Try reopening the note.", "vaultFilesLoadFailed": "Failed to load vault files. Vault @-mentions may be unavailable.", "invalidFilePath": "Failed to attach file: invalid path"
+    "rejectTitle": "Reject (Esc)",
+    "acceptTitle": "Accept (Enter)",
+    "editorUnavailable": "Inline edit unavailable: could not access the active editor. Try reopening the note.",
+    "vaultFilesLoadFailed": "Failed to load vault files. Vault @-mentions may be unavailable.",
+    "invalidFilePath": "Failed to attach file: invalid path"
   },
-  "storage": { "tabLayoutSaveFailed": "Failed to save tab layout" }
+  "storage": {
+    "tabLayoutSaveFailed": "Failed to save tab layout"
+  }
 }

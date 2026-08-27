@@ -17,6 +17,22 @@ export interface PanelBashOutput {
 const MAX_BASH_OUTPUTS = 50;
 
 /**
+ * One piece of background work, as the panel draws it.
+ *
+ * Presentation-shaped on purpose: the projection contract carries no DOM, no
+ * class names and no layout vocabulary, so whatever maps a durable record onto
+ * this is the thin replaceable layer the plan asks for.
+ */
+export interface BackgroundAgentCard {
+  readonly agentInstanceId: string;
+  /** What it was asked to do, as a person can read it. */
+  readonly label: string;
+  /** How it is going, in the provider's own terms of what is observable. */
+  readonly detail: string;
+  readonly state: 'running' | 'succeeded' | 'failed';
+}
+
+/**
  * StatusPanel - persistent bottom panel for todos and command output.
  */
 export class StatusPanel {
@@ -27,6 +43,9 @@ export class StatusPanel {
   private bashOutputContainerEl: HTMLElement | null = null;
   private bashHeaderEl: HTMLElement | null = null;
   private bashContentEl: HTMLElement | null = null;
+  private agentsContainerEl: HTMLElement | null = null;
+  private agentsHeaderEl: HTMLElement | null = null;
+  private agentsContentEl: HTMLElement | null = null;
   private isBashExpanded = true;
   private currentBashOutputs: Map<string, PanelBashOutput> = new Map();
   private bashEntryExpanded: Map<string, boolean> = new Map();
@@ -167,6 +186,80 @@ export class StatusPanel {
     this.todoContentEl = this.todoContainerEl.createDiv({
       cls: 'grimoire-status-panel-content grimoire-todo-list-container grimoire-hidden',
     });
+
+    // Background agents: work this conversation started that outlives the tab
+    // watching it. Read from durable records rather than from anything live,
+    // which is the only way an agent launched in a tab that has since closed
+    // can be shown at all.
+    this.agentsContainerEl = this.panelEl.createDiv({
+      cls: 'grimoire-status-panel-agents grimoire-hidden',
+    });
+    this.agentsHeaderEl = this.agentsContainerEl.createDiv({
+      cls: 'grimoire-status-panel-header',
+    });
+    this.agentsContentEl = this.agentsContainerEl.createDiv({
+      cls: 'grimoire-status-panel-content grimoire-agent-card-list',
+    });
+  }
+
+  /**
+   * Shows the background work this conversation owns.
+   *
+   * **Every one of these is durable.** A subagent that runs inside a turn is
+   * drawn in the transcript and finished before the turn is; these are the ones
+   * a person started and walked away from, and the point of the card is that
+   * walking away — or closing the tab — stops meaning they are lost.
+   *
+   * An empty list hides the section rather than showing "no agents", because
+   * most conversations never start one and a permanent empty row is noise.
+   */
+  updateBackgroundAgents(agents: readonly BackgroundAgentCard[]): void {
+    if (!this.agentsContainerEl || !this.agentsHeaderEl || !this.agentsContentEl) {
+      return;
+    }
+    if (agents.length === 0) {
+      this.agentsContainerEl.addClass('grimoire-hidden');
+      this.agentsHeaderEl.empty();
+      this.agentsContentEl.empty();
+      this.updatePanelVisibility();
+      return;
+    }
+    this.agentsContainerEl.removeClass('grimoire-hidden');
+
+    const running = agents.filter(agent => agent.state === 'running').length;
+    this.agentsHeaderEl.empty();
+    const headerIcon = this.agentsHeaderEl.createSpan({ cls: 'grimoire-status-panel-icon' });
+    setIcon(headerIcon, 'bot');
+    this.agentsHeaderEl.createSpan({
+      cls: 'grimoire-status-panel-title',
+      text: running > 0
+        ? t('chat.agents.runningCount', { count: String(running) })
+        : t('chat.agents.finished'),
+    });
+    this.agentsHeaderEl.setAttribute('aria-label', running > 0
+      ? t('chat.agents.runningCount', { count: String(running) })
+      : t('chat.agents.finished'));
+
+    this.agentsContentEl.empty();
+    for (const agent of agents) {
+      const card = this.agentsContentEl.createDiv({
+        cls: `grimoire-agent-card grimoire-agent-card--${agent.state}`,
+        attr: { 'data-agent-instance-id': agent.agentInstanceId },
+      });
+      const icon = card.createSpan({ cls: 'grimoire-agent-card-icon' });
+      setIcon(icon, agent.state === 'running' ? 'loader' : agent.state === 'succeeded'
+        ? 'check'
+        : 'alert-circle');
+      card.createSpan({ cls: 'grimoire-agent-card-label', text: agent.label });
+      // **What the provider lets anyone see, said out loud.** A card that
+      // implied progress for a provider reporting none would be promising
+      // something nobody can deliver.
+      card.createSpan({
+        cls: 'grimoire-agent-card-state',
+        text: agent.detail,
+      });
+    }
+    this.updatePanelVisibility();
   }
 
   /**
@@ -470,8 +563,14 @@ export class StatusPanel {
     const hasBashOutput = this.bashOutputContainerEl
       ? !this.bashOutputContainerEl.classList.contains('grimoire-hidden')
       : false;
+    const hasAgents = this.agentsContainerEl
+      ? !this.agentsContainerEl.classList.contains('grimoire-hidden')
+      : false;
 
-    this.panelEl.classList.toggle('grimoire-hidden', !hasTodos && !hasBashOutput);
+    this.panelEl.classList.toggle(
+      'grimoire-hidden',
+      !hasTodos && !hasBashOutput && !hasAgents,
+    );
   }
 
   private async copyLatestBashOutput(): Promise<void> {

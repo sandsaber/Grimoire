@@ -38,6 +38,14 @@
       "unavailableStreaming": "Impossible de rembobiner pendant le streaming",
       "unavailableNoUuid": "Impossible de rembobiner : identifiants de message manquants"
     },
+    "agents": {
+      "runningCount": "{count} en arrière-plan",
+      "finished": "Travail en arrière-plan",
+      "finishedOne": "terminé",
+      "failedOne": "en échec",
+      "runningOne": "en cours",
+      "unobservable": "en cours, progression non communiquée"
+    },
     "history": {
       "deleteAll": "Tout supprimer",
       "deleteAllAriaLabel": "Supprimer tout l’historique",
@@ -954,7 +962,46 @@
       }
     },
     "hub": {
-      "general": "Général", "providers": "Fournisseurs", "workspace": "Avancé", "about": "À propos", "cliDetected": "CLI détectée", "cliNotDetected": "CLI non détectée", "geminiLegacy": "Gemini CLI (ancienne)", "providerDetails": "Paramètres de {provider}", "skills": "Compétences", "agents": "Sous-agents", "mcp": "MCP", "environment": "Environnement", "commands": "Commandes", "search": "Rechercher par nom, description, source ou fournisseur", "name": "Nom", "source": "Source", "provider": "Fournisseur", "actions": "Actions", "manage": "Gérer", "manageTitle": "Gérer {section}", "edit": "Modifier", "delete": "Supprimer", "deleteConfirm": "Supprimer « {name} » ?", "deleted": "« {name} » supprimé", "deleteFailed": "Échec de la suppression : {message}", "providerOptions": "Options avancées du fournisseur", "readonly": "Lecture seule", "available": "Disponible", "connected": "Connecté", "disabled": "Désactivé", "shared": "Partagé", "loading": "Chargement des ressources…", "unsupported": "Ce fournisseur ne prend pas en charge cette catégorie de ressources.", "none": "Aucune ressource avancée correspondante.", "aboutCopy": "Grimoire connecte des agents IA locaux dans Obsidian. La version et les notes de version sont disponibles ici.", "native": "Natif", "nativeCli": "CLI native", "nativeMcpDescription": "Prise en charge native de MCP", "runtimeCommandsPending": "Lancez une fois un chat {provider} pour charger ses commandes natives.", "releases": "Versions"
+      "general": "Général",
+      "providers": "Fournisseurs",
+      "workspace": "Avancé",
+      "about": "À propos",
+      "cliDetected": "CLI détectée",
+      "cliNotDetected": "CLI non détectée",
+      "geminiLegacy": "Gemini CLI (ancienne)",
+      "providerDetails": "Paramètres de {provider}",
+      "skills": "Compétences",
+      "agents": "Sous-agents",
+      "mcp": "MCP",
+      "environment": "Environnement",
+      "commands": "Commandes",
+      "search": "Rechercher par nom, description, source ou fournisseur",
+      "name": "Nom",
+      "source": "Source",
+      "provider": "Fournisseur",
+      "actions": "Actions",
+      "manage": "Gérer",
+      "manageTitle": "Gérer {section}",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "deleteConfirm": "Supprimer « {name} » ?",
+      "deleted": "« {name} » supprimé",
+      "deleteFailed": "Échec de la suppression : {message}",
+      "providerOptions": "Options avancées du fournisseur",
+      "readonly": "Lecture seule",
+      "available": "Disponible",
+      "connected": "Connecté",
+      "disabled": "Désactivé",
+      "shared": "Partagé",
+      "loading": "Chargement des ressources…",
+      "unsupported": "Ce fournisseur ne prend pas en charge cette catégorie de ressources.",
+      "none": "Aucune ressource avancée correspondante.",
+      "aboutCopy": "Grimoire connecte des agents IA locaux dans Obsidian. La version et les notes de version sont disponibles ici.",
+      "native": "Natif",
+      "nativeCli": "CLI native",
+      "nativeMcpDescription": "Prise en charge native de MCP",
+      "runtimeCommandsPending": "Lancez une fois un chat {provider} pour charger ses commandes natives.",
+      "releases": "Versions"
     },
     "grok": {
       "cliPath": {
@@ -1170,7 +1217,7 @@
         },
         "advancedSummary": "Compétences, sous-agents, MCP et paramètres de lancement",
         "skills": {
-        "name": "Compétences Codex",
+          "name": "Compétences Codex",
           "desc": "Gérez les compétences Codex au niveau du coffre, stockées dans .codex/skills/ ou .agents/skills/. Les compétences du répertoire personnel sont exclues ici."
         },
         "hiddenSkills": {
@@ -1178,7 +1225,7 @@
           "desc": "Masquez certaines compétences Codex du menu déroulant. Saisissez les noms de compétences sans le $ initial, un par ligne."
         },
         "subagents": {
-        "name": "Sous-agents Codex",
+          "name": "Sous-agents Codex",
           "desc": "Gérez les sous-agents Codex au niveau du coffre, stockés dans .codex/agents/. Chaque fichier TOML définit un agent personnalisé."
         },
         "mcp": {
@@ -1428,8 +1475,61 @@
       }
     }
   },
-  "plugin": { "openRibbon": "Ouvrir Grimoire", "openChatView": "Ouvrir la vue de chat", "inlineEdit": "Modification en ligne", "inlineEditViewUnavailable": "La modification en ligne est indisponible : impossible d'accéder à la vue Markdown active.", "inlineEditInserted": "Inséré", "inlineEditApplied": "Modification appliquée", "newTab": "Nouvel onglet", "newSession": "Nouvelle session (dans l'onglet actuel)", "closeCurrentTab": "Fermer l'onglet actuel", "switchToTab": "Passer à l'onglet {index}", "environmentRestartFailed": "Les modifications d'environnement ont été appliquées, mais {count} onglets concernés n'ont pas pu redémarrer.", "environmentAppliedRebuild": "Variables d'environnement appliquées. Les sessions seront recréées au prochain message.", "environmentApplied": "Variables d'environnement appliquées." },
-  "shared": { "slashCommands": { "noMatches": "Aucune commande correspondante" }, "resumeConversation": { "title": "Reprendre la conversation", "empty": "Aucune conversation", "current": "Session actuelle" }, "instructionModal": { "title": "Ajouter une instruction personnalisée", "yourInput": "Votre saisie :", "processingInstruction": "Traitement de votre instruction...", "yourResponse": "Votre réponse :", "responsePlaceholder": "Fournissez plus de détails...", "refinedSnippet": "Extrait affiné :", "processing": "Traitement...", "submit": "Envoyer", "submitResponseAria": "Envoyer la réponse", "editAria": "Modifier l'instruction", "accept": "Accepter", "acceptAria": "Accepter l'instruction", "preview": "Aperçu" }, "whatsNew": { "title": "Nouveautés de Grimoire v{version}", "released": "Publié le {date}", "latestReleaseNotes": "Dernières notes de version", "fullChangelog": "Journal des modifications complet", "gotIt": "Compris" } },
-  "inlineEdit": { "rejectTitle": "Rejeter (Échap)", "acceptTitle": "Accepter (Entrée)", "editorUnavailable": "La modification en ligne est indisponible : impossible d'accéder à l'éditeur actif. Réouvrez la note.", "vaultFilesLoadFailed": "Impossible de charger les fichiers du vault. Les mentions @ peuvent être indisponibles.", "invalidFilePath": "Impossible de joindre le fichier : chemin non valide" },
-  "storage": { "tabLayoutSaveFailed": "Impossible d'enregistrer la disposition des onglets" }
+  "plugin": {
+    "openRibbon": "Ouvrir Grimoire",
+    "openChatView": "Ouvrir la vue de chat",
+    "inlineEdit": "Modification en ligne",
+    "inlineEditViewUnavailable": "La modification en ligne est indisponible : impossible d'accéder à la vue Markdown active.",
+    "inlineEditInserted": "Inséré",
+    "inlineEditApplied": "Modification appliquée",
+    "newTab": "Nouvel onglet",
+    "newSession": "Nouvelle session (dans l'onglet actuel)",
+    "closeCurrentTab": "Fermer l'onglet actuel",
+    "switchToTab": "Passer à l'onglet {index}",
+    "environmentRestartFailed": "Les modifications d'environnement ont été appliquées, mais {count} onglets concernés n'ont pas pu redémarrer.",
+    "environmentAppliedRebuild": "Variables d'environnement appliquées. Les sessions seront recréées au prochain message.",
+    "environmentApplied": "Variables d'environnement appliquées."
+  },
+  "shared": {
+    "slashCommands": {
+      "noMatches": "Aucune commande correspondante"
+    },
+    "resumeConversation": {
+      "title": "Reprendre la conversation",
+      "empty": "Aucune conversation",
+      "current": "Session actuelle"
+    },
+    "instructionModal": {
+      "title": "Ajouter une instruction personnalisée",
+      "yourInput": "Votre saisie :",
+      "processingInstruction": "Traitement de votre instruction...",
+      "yourResponse": "Votre réponse :",
+      "responsePlaceholder": "Fournissez plus de détails...",
+      "refinedSnippet": "Extrait affiné :",
+      "processing": "Traitement...",
+      "submit": "Envoyer",
+      "submitResponseAria": "Envoyer la réponse",
+      "editAria": "Modifier l'instruction",
+      "accept": "Accepter",
+      "acceptAria": "Accepter l'instruction",
+      "preview": "Aperçu"
+    },
+    "whatsNew": {
+      "title": "Nouveautés de Grimoire v{version}",
+      "released": "Publié le {date}",
+      "latestReleaseNotes": "Dernières notes de version",
+      "fullChangelog": "Journal des modifications complet",
+      "gotIt": "Compris"
+    }
+  },
+  "inlineEdit": {
+    "rejectTitle": "Rejeter (Échap)",
+    "acceptTitle": "Accepter (Entrée)",
+    "editorUnavailable": "La modification en ligne est indisponible : impossible d'accéder à l'éditeur actif. Réouvrez la note.",
+    "vaultFilesLoadFailed": "Impossible de charger les fichiers du vault. Les mentions @ peuvent être indisponibles.",
+    "invalidFilePath": "Impossible de joindre le fichier : chemin non valide"
+  },
+  "storage": {
+    "tabLayoutSaveFailed": "Impossible d'enregistrer la disposition des onglets"
+  }
 }

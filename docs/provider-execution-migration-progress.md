@@ -9010,6 +9010,38 @@ Two decisions in it worth naming:
 What remains for the card itself is presentation and the reattachment gesture — and the tab-close
 change ships with them, never before.
 
+#### Closing a tab stops abandoning the work it started
+
+The three things the plan binds into one commit, in one commit: the card that shows background work,
+the read that feeds it, and `orphanAllActive` deleted.
+
+**What `orphaned` actually was.** Closing a tab — or leaving a conversation — marked every running
+background agent with that status and the result text "Conversation ended". It meant *nobody is
+watching this any more*, which was true, and it was the only thing anyone ever learned about that
+agent again. The work carried on somewhere; the record of it did not.
+
+Now the agents are recorded against the conversation, and the status panel draws a card per agent
+**from the vault rather than from any live map** — which is the only way an agent started in a tab
+that has since closed can appear at all. Reopening the conversation shows it still running, and how
+it ended. `orphanAllActive` and `markOrphaned` are deleted; what `clear()` still does is drop this
+tab's own maps, which are this tab's.
+
+**The card says only what the provider can report.** Whether it may imply progress comes from
+`agentFidelityFromCapabilities` — Claude observes `full`, the ACP family observes `none` — because a
+card showing "working…" for a provider that reports nothing leaves someone waiting for an update
+that is never coming. It is the fidelity profile's first reader, which is what that surface was
+waiting for.
+
+**Three gates fired and each was right**: the status panel's test double had no
+`updateBackgroundAgents`, the parity manifest refused `AgentFidelity` as `pending` once something
+imported it, and `Tab.test` still pinned the orphaning it was written for. That last one is the
+useful kind — a behaviour change is supposed to break the test that describes the old behaviour, and
+a checkpoint where none did would mean nothing was pinned.
+
+**The scoreboard did not move, and that is honest.** `SubagentManager lifecycle` counts files naming
+it, and the consumers still import its type; deleting `orphanAllActive` removed the *authority*, not
+the reference. The number falls when those consumers stop holding one.
+
 #### The next checkpoint, scoped
 
 The plan binds three things into one checkpoint and the binding is the point: **tab close stops
