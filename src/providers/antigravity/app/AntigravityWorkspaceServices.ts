@@ -2,7 +2,6 @@ import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorks
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
@@ -22,12 +21,6 @@ export interface AntigravityWorkspaceServices extends ProviderWorkspaceServices 
 function createAntigravityCliResolver(): ProviderCliResolver {
   return new AntigravityCliResolver();
 }
-
-const antigravityTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'none';
-  },
-};
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -170,7 +163,6 @@ export async function createAntigravityWorkspaceServices(plugin: GrimoirePlugin)
     modelCatalog: createAntigravityModelCatalog(plugin),
     usageProvider: antigravityPlanUsageStore,
     settingsTabRenderer: antigravitySettingsTabRenderer,
-    tabWarmupPolicy: antigravityTabWarmupPolicy,
   };
 }
 

@@ -4,7 +4,6 @@ import { ProviderModelCatalogRefreshCache } from '../../../core/providers/Provid
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
@@ -29,12 +28,6 @@ export interface KimicodeWorkspaceServices extends ProviderWorkspaceServices {
   mcpServerManager: McpServerManager;
 }
 
-
-const kimicodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'commands';
-  },
-};
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -114,7 +107,6 @@ export async function createKimicodeWorkspaceServices(
     usageProvider: kimicodePlanUsageStore,
     runtimeCommandLoader: new KimicodeRuntimeCommandLoader(),
     settingsTabRenderer: kimicodeSettingsTabRenderer,
-    tabWarmupPolicy: kimicodeTabWarmupPolicy,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();
     },

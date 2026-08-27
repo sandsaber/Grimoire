@@ -326,7 +326,6 @@ CodexProviderSettings
           refresh: () => context.refreshModels(),
         },
         usage: { read: () => context.readPlanUsage() },
-        residency: { shouldKeepWarm: () => context.shouldKeepWarm() },
         settingsPresentation: { render: host => context.renderSettingsTab(host) },
       };
     },
@@ -351,6 +350,7 @@ CodexProviderSettings
   capabilities: codexCapabilities,
 
   declarations: {
+    warmup: 'runtime',
     providerId: 'codex',
     chatUI: codexChatUi,
     // Read straight off the normalization adapter. It used to arrive through

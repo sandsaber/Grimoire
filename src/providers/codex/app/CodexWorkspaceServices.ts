@@ -4,7 +4,6 @@ import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorks
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
@@ -35,12 +34,6 @@ export interface CodexWorkspaceServices extends ProviderWorkspaceServices {
 function createCodexCliResolver(): ProviderCliResolver {
   return new CodexCliResolver();
 }
-
-const codexTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'runtime';
-  },
-};
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -171,7 +164,6 @@ export async function createCodexWorkspaceServices(
     modelCatalog: createCodexModelCatalog(plugin),
     usageProvider: codexPlanUsageStore,
     settingsTabRenderer: codexSettingsTabRenderer,
-    tabWarmupPolicy: codexTabWarmupPolicy,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();
     },

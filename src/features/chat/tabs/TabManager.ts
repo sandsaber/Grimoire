@@ -2,13 +2,12 @@ import { Notice } from 'obsidian';
 
 import { getOpaqueProviderState } from '../../../core/providers/getOpaqueProviderState';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
+import type { ProviderWarmupMode } from '../../../core/providers/ProviderModule';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderId,
-  ProviderTabWarmupContext,
-  ProviderTabWarmupMode,
 } from '../../../core/providers/types';
 import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
 import type { ChatMessage, Conversation, SlashCommand } from '../../../core/types';
@@ -42,6 +41,7 @@ import {
   type TabBarItem,
   type TabData,
   type TabId,
+  type TabLifecycleState,
   type TabManagerCallbacks,
   type TabManagerInterface,
   type TabManagerViewHost,
@@ -83,8 +83,20 @@ type ProviderWarmupContext = {
   conversation: Conversation | null;
   externalContextPaths: string[];
   runtime: ChatRuntime | null;
-  tab: ProviderTabWarmupContext['tab'];
-  warmupMode: ProviderTabWarmupMode;
+  /**
+   * The tab, as the warm-up path reads it.
+   *
+   * Declared here now rather than borrowed from a provider contribution's
+   * context type: that context was built for a policy nobody consulted, and
+   * this is the only shape still using any of it.
+   */
+  tab: {
+    conversationId: string | null;
+    draftModel: string | null;
+    lifecycleState: TabLifecycleState;
+    providerId: ProviderId;
+  };
+  warmupMode: ProviderWarmupMode;
 };
 
 type ProviderCommandContext = ProviderWarmupContext & {
@@ -1197,18 +1209,7 @@ export class TabManager implements TabManagerInterface {
         ? conversation?.externalContextPaths ?? []
         : this.plugin.settings.persistentExternalContextPaths ?? []);
     const runtime = tab.service?.providerId === providerId ? tab.service : null;
-    const warmupMode = this.resolveProviderTabWarmupMode({
-      conversation,
-      externalContextPaths,
-      plugin: this.plugin,
-      runtime,
-      tab: {
-        conversationId: tab.conversationId,
-        draftModel: tab.draftModel,
-        lifecycleState: tab.lifecycleState,
-        providerId,
-      },
-    });
+    const warmupMode = this.resolveProviderTabWarmupMode(providerId);
 
     return {
       conversation,
@@ -1224,8 +1225,16 @@ export class TabManager implements TabManagerInterface {
     };
   }
 
-  private resolveProviderTabWarmupMode(context: ProviderTabWarmupContext): ProviderTabWarmupMode {
-    return ProviderWorkspaceRegistry.getTabWarmupPolicy(context.tab.providerId)?.resolveMode(context) ?? 'none';
+  /**
+   * How much of this tab's provider to prime before anything is sent.
+   *
+   * **Read from the catalog's declaration, not from a workspace service.** It
+   * used to be a policy taking the conversation, the plugin, the runtime and
+   * the tab's lifecycle state — and every provider that had one returned a
+   * constant and read none of it. A declaration is what it always was.
+   */
+  private resolveProviderTabWarmupMode(providerId: ProviderId): ProviderWarmupMode {
+    return providerCatalog().declarations(providerId).warmup;
   }
 
   private buildProviderCommandContext(

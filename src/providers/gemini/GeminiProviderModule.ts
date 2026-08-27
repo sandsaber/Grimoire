@@ -356,7 +356,6 @@ GeminiProviderSettings
           start: serverId => context.startMcpServer(serverId),
           stop: serverId => context.stopMcpServer(serverId),
         },
-        residency: { shouldKeepWarm: () => context.shouldKeepWarm() },
         settingsPresentation: { render: host => context.renderSettingsTab(host) },
       };
     },
@@ -376,6 +375,7 @@ GeminiProviderSettings
   capabilities: geminiCapabilities,
 
   declarations: {
+    warmup: 'runtime',
     providerId: 'gemini',
     chatUI: geminiChatUi,
   },

@@ -4,7 +4,6 @@ import { ProviderModelCatalogRefreshCache } from '../../../core/providers/Provid
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
@@ -28,12 +27,6 @@ export interface OpencodeWorkspaceServices extends ProviderWorkspaceServices {
   mcpStorage: AcpMcpStorage;
   mcpServerManager: McpServerManager;
 }
-
-const opencodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'commands';
-  },
-};
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -113,7 +106,6 @@ export async function createOpencodeWorkspaceServices(
     usageProvider: opencodePlanUsageStore,
     runtimeCommandLoader: new OpencodeRuntimeCommandLoader(),
     settingsTabRenderer: opencodeSettingsTabRenderer,
-    tabWarmupPolicy: opencodeTabWarmupPolicy,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();
     },

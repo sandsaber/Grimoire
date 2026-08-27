@@ -419,27 +419,9 @@ export interface ProviderPlanUsageProvider {
 
 // `commands` warms provider-owned command discovery without fully priming the
 // bound tab runtime. `runtime` primes the real tab runtime itself.
-export type ProviderTabWarmupMode = 'none' | 'commands' | 'runtime';
 
-export type ProviderTabWarmupLifecycleState = 'blank' | 'bound_cold' | 'bound_active' | 'closing';
 
-export interface ProviderTabWarmupContext {
-  conversation: Conversation | null;
-  externalContextPaths: string[];
-  plugin: GrimoirePlugin;
-  runtime: ChatRuntime | null;
-  tab: {
-    conversationId: string | null;
-    draftModel: string | null;
-    draftSettings?: Record<string, unknown> | null;
-    lifecycleState: ProviderTabWarmupLifecycleState;
-    providerId: ProviderId;
-  };
-}
 
-export interface ProviderTabWarmupPolicy {
-  resolveMode(context: ProviderTabWarmupContext): ProviderTabWarmupMode;
-}
 
 export type ProviderWorkspaceResourceKind =
   | 'skills'
@@ -470,7 +452,6 @@ export interface ProviderWorkspaceServices {
   modelCatalog?: ProviderModelCatalog | null;
   usageProvider?: ProviderPlanUsageProvider | null;
   runtimeCommandLoader?: ProviderRuntimeCommandLoader | null;
-  tabWarmupPolicy?: ProviderTabWarmupPolicy | null;
   mcpStorage?: AppMcpStorage | null;
   mcpServerManager?: McpServerManager | null;
   settingsTabRenderer?: ProviderSettingsTabRenderer | null;

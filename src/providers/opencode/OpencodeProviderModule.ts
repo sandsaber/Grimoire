@@ -332,7 +332,6 @@ OpencodeProviderSettings
           start: serverId => context.startMcpServer(serverId),
           stop: serverId => context.stopMcpServer(serverId),
         },
-        residency: { shouldKeepWarm: () => context.shouldKeepWarm() },
         settingsPresentation: { render: host => context.renderSettingsTab(host) },
       };
     },
@@ -352,6 +351,7 @@ OpencodeProviderSettings
   capabilities: opencodeCapabilities,
 
   declarations: {
+    warmup: 'commands',
     providerId: 'opencode',
     chatUI: opencodeChatUi,
   },

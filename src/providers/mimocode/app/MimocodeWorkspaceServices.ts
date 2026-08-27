@@ -4,7 +4,6 @@ import { ProviderModelCatalogRefreshCache } from '../../../core/providers/Provid
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
@@ -29,12 +28,6 @@ export interface MimocodeWorkspaceServices extends ProviderWorkspaceServices {
   mcpServerManager: McpServerManager;
 }
 
-
-const mimocodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'commands';
-  },
-};
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -114,7 +107,6 @@ export async function createMimocodeWorkspaceServices(
     usageProvider: mimocodePlanUsageStore,
     runtimeCommandLoader: new MimocodeRuntimeCommandLoader(),
     settingsTabRenderer: mimocodeSettingsTabRenderer,
-    tabWarmupPolicy: mimocodeTabWarmupPolicy,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();
     },

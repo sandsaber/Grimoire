@@ -275,6 +275,7 @@ AntigravityProviderSettings
 
   // No task results or native agents: print mode spawns no subagents.
   declarations: {
+    warmup: 'none',
     providerId: 'antigravity',
     chatUI: antigravityChatUi,
   },

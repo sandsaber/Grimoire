@@ -62,6 +62,7 @@ function testModule(
     auxiliary: { providerId },
     capabilities: { providerId } as CatalogProviderModule['capabilities'],
     declarations: {
+      warmup: 'none' as const,
       providerId,
       chatUI: {
         modelPresentation: {

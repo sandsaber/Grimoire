@@ -401,7 +401,7 @@ describe('execution composition boundaries', () => {
       { row: 'modelCatalog', owner: 'ProviderWorkspaceSlots', slot: 'models' },
       { row: 'usageProvider', owner: 'ProviderWorkspaceSlots', slot: 'usage' },
       { row: 'runtimeCommandLoader', owner: 'ProviderWorkspaceSlots', slot: 'runtimeCommands' },
-      { row: 'tabWarmupPolicy', owner: 'ProviderWorkspaceSlots', slot: 'residency' },
+      { row: 'tabWarmupPolicy', owner: 'ProviderDeclarations', slot: 'warmup' },
       { row: 'mcpStorage', owner: 'ProviderWorkspaceSlots', slot: 'mcp' },
       { row: 'mcpServerManager', owner: 'ProviderWorkspaceSlots', slot: 'mcp' },
       { row: 'settingsTabRenderer', owner: 'ProviderWorkspaceSlots', slot: 'settingsPresentation' },

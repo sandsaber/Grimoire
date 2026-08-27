@@ -161,8 +161,10 @@ describe('Claude provider module', () => {
   });
 
   describe('honest absences', () => {
-    it('registers no warmup policy, unlike Codex', async () => {
-      expect((await workspaceSlots()).residency).toBeUndefined();
+    it('warms nothing before a turn, unlike Codex', async () => {
+      // A declaration rather than a registered policy: every provider that had
+      // one returned a constant and read none of the context it was given.
+      expect(claudeProviderModule.declarations.warmup).toBe('none');
     });
 
     it('preloads no context files of its own', () => {

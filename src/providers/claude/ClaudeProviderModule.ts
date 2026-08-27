@@ -364,6 +364,7 @@ ClaudeProviderSettings
   capabilities: claudeCapabilities,
 
   declarations: {
+    warmup: 'none',
     providerId: 'claude',
     chatUI: claudeChatUi,
     taskResults: {

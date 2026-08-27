@@ -4,7 +4,6 @@ import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorks
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
@@ -30,12 +29,6 @@ export interface QwenWorkspaceServices extends ProviderWorkspaceServices {
 function createQwenCliResolver(): ProviderCliResolver {
   return new QwenCliResolver();
 }
-
-const qwenTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'runtime';
-  },
-};
 
 function createQwenModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
   return {
@@ -71,7 +64,6 @@ export async function createQwenWorkspaceServices(
     mcpServerManager,
     usageProvider: qwenPlanUsageStore,
     settingsTabRenderer: qwenSettingsTabRenderer,
-    tabWarmupPolicy: qwenTabWarmupPolicy,
   };
 }
 

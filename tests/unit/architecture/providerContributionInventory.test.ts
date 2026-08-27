@@ -192,7 +192,11 @@ describe('provider contribution inventory', () => {
     });
 
     it('claims the count the heading advertises', () => {
-      expect(documented).toHaveLength(11);
+      // Ten, not eleven: row 7 left this table when `tabWarmupPolicy` became
+      // `ProviderDeclarations.warmup`. A row whose member no longer exists on
+      // the interface cannot stay here — the rule above is that the two agree
+      // exactly — so a moved row is recorded in the migration log instead.
+      expect(documented).toHaveLength(10);
     });
 
     it.each(Object.entries(WORKSPACE_REGISTRATIONS))(

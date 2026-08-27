@@ -127,8 +127,7 @@ describe('Kimi Code provider module', () => {
         'commands',
         'mcp',
         'models',
-        'residency',
-        'runtimeCommands',
+          'runtimeCommands',
         'settingsPresentation',
         'usage',
       ]);

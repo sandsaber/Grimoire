@@ -330,7 +330,6 @@ GrokProviderSettings
           start: serverId => context.startMcpServer(serverId),
           stop: serverId => context.stopMcpServer(serverId),
         },
-        residency: { shouldKeepWarm: () => context.shouldKeepWarm() },
         settingsPresentation: { render: host => context.renderSettingsTab(host) },
       };
     },
@@ -350,6 +349,7 @@ GrokProviderSettings
   capabilities: grokCapabilities,
 
   declarations: {
+    warmup: 'commands',
     providerId: 'grok',
     chatUI: grokChatUi,
     // The only provider that preloads a file of its own: Grok has no agent

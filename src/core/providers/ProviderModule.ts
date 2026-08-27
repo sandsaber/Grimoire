@@ -152,11 +152,6 @@ export interface ProviderWorkspaceSlots {
   readonly usage?: ProviderUsagePort;
   /** Active-session command discovery. Workspace row 6. */
   readonly runtimeCommands?: ProviderRuntimeCommandsPort;
-  /**
-   * Warmup policy. Workspace row 7, replaced by lifecycle residency at M5;
-   * the slot exists so the contribution is not lost before then.
-   */
-  readonly residency?: ProviderResidencyPort;
   /** Grimoire-owned MCP storage and server lifecycle. Workspace rows 8 and 9. */
   readonly mcp?: ProviderMcpPort;
   /** Provider settings tab. Workspace row 10. */
@@ -220,9 +215,6 @@ export interface ProviderRuntimeCommandsPort {
   listForSession(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
 }
 
-export interface ProviderResidencyPort {
-  shouldKeepWarm(): boolean;
-}
 
 export interface ProviderMcpPort {
   loadServers(): Promise<readonly ProviderMcpServer[]>;
@@ -279,7 +271,25 @@ export interface ProviderDeclarations<TSettings extends object = Record<string, 
   readonly taskResults?: ProviderTaskResultPort;
   /** Subagent tool-name recognition and display parsing. Inventory row 16. */
   readonly nativeAgents?: ProviderNativeAgentPort;
+  /**
+   * How much of a provider a tab primes before anything is sent. Workspace row 7.
+   *
+   * **A declaration rather than a policy, because every implementation was a
+   * constant.** The contribution this replaces was `resolveMode(context)` over
+   * a context carrying the conversation, the plugin, the runtime and the tab's
+   * lifecycle state — and all eight providers that had one returned the same
+   * value unconditionally and read none of it. The slot before that was worse:
+   * `shouldKeepWarm(): boolean`, which cannot express three modes, and every
+   * module filled it with a stub answering `false`.
+   *
+   * `commands` warms provider-owned command discovery without priming the bound
+   * tab runtime; `runtime` primes the runtime itself; `none` warms nothing.
+   */
+  readonly warmup: ProviderWarmupMode;
 }
+
+/** What a tab primes before a turn: nothing, commands only, or the runtime. */
+export type ProviderWarmupMode = 'none' | 'commands' | 'runtime';
 
 /**
  * The ports that only mean something for a running conversation.

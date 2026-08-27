@@ -162,8 +162,7 @@ describe('Codex provider module', () => {
         'cliResolution',
         'commands',
         'models',
-        'residency',
-        'settingsPresentation',
+          'settingsPresentation',
         'usage',
       ]);
     });

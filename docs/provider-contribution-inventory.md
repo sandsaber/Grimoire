@@ -47,7 +47,7 @@ plan and this file both refer to rows by number.
 | 15 | `taskResultInterpreter` | provider task/tool result interpretation | chat rendering | result-interpretation port | M5 |
 | 16 | `subagentLifecycleAdapter?` | subagent tool-name recognition and display parsing | `SubagentManager` | native-agent observation port | M5 |
 
-## `ProviderWorkspaceServices` members (11) — [types.ts:436](../src/core/providers/types.ts)
+## `ProviderWorkspaceServices` members (10) — [types.ts:436](../src/core/providers/types.ts)
 
 | # | Member | What it carries | Consumed by today | Target home | Moves at |
 |---|---|---|---|---|---|
@@ -57,7 +57,6 @@ plan and this file both refer to rows by number.
 | 4 | `modelCatalog?` | model discovery and listing | settings, model picker | model-routing port | M5 |
 | 5 | `usageProvider?` | plan/usage indicators | status UI | usage port | M5 |
 | 6 | `runtimeCommandLoader?` | active-session command discovery | chat UI | commands capability port | M5 |
-| 7 | `tabWarmupPolicy?` | provider warmup policy | `TabManager` | replaced by lifecycle residency policy | M5 |
 | 8 | `mcpStorage?` | Grimoire-owned MCP config storage | MCP UI, session injection | MCP port | M5 |
 | 9 | `mcpServerManager?` | MCP server lifecycle | MCP UI, sessions | MCP port | M5 |
 | 10 | `settingsTabRenderer?` | provider settings tab | `GrimoireSettings` | settings presentation slot | M5 |

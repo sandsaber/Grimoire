@@ -4,7 +4,6 @@ import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorks
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
@@ -30,12 +29,6 @@ export interface GeminiWorkspaceServices extends ProviderWorkspaceServices {
 function createGeminiCliResolver(): ProviderCliResolver {
   return new GeminiCliResolver();
 }
-
-const geminiTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'runtime';
-  },
-};
 
 function createGeminiModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
   return {
@@ -75,7 +68,6 @@ export async function createGeminiWorkspaceServices(
     mcpServerManager,
     usageProvider: geminiPlanUsageStore,
     settingsTabRenderer: geminiSettingsTabRenderer,
-    tabWarmupPolicy: geminiTabWarmupPolicy,
   };
 }
 

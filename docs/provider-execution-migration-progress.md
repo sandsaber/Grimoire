@@ -9042,6 +9042,33 @@ a checkpoint where none did would mean nothing was pinned.
 it, and the consumers still import its type; deleting `orphanAllActive` removed the *authority*, not
 the reference. The number falls when those consumers stop holding one.
 
+#### The first provider row: it was never a policy
+
+Workspace row 7, `tabWarmupPolicy`, is moved — and the interesting part is what reading it found.
+
+The slot waiting for it was `shouldKeepWarm(): boolean`, which cannot express three modes, and **every
+module filled it with a stub answering `false`**. The contribution it was meant to hold was
+`resolveMode(context)` over a context carrying the conversation, the plugin, the runtime and the
+tab's lifecycle state. So the recorded plan was to widen the slot to match the contribution.
+
+Then all eight implementations turned out to **return a constant and read none of the context**.
+Qwen, Gemini and Codex `runtime`; OpenCode, Grok, MiMoCode and Kimi Code `commands`; Antigravity
+`none`; Claude has none at all and defaulted to `none`. The rich context existed for nobody.
+
+So it is `ProviderDeclarations.warmup`, a declared mode on the catalog, read by the one line in
+`TabManager` that asked. `ProviderTabWarmupPolicy`, `ProviderTabWarmupContext`,
+`ProviderTabWarmupLifecycleState`, the registry accessor, the `residency` slot and eight registrations
+are deleted, and the row has left the workspace-members table because its member no longer exists on
+the interface.
+
+**This is the sequencing lesson paying out.** *"Pick a row by reading its consumer first"* found four
+wrong target homes in an earlier session; reading this one's **implementations** found that the whole
+contract was a shape nobody used. Neither reading is optional, and the shape a row *should* have is
+not always the shape either side declares today.
+
+The registry file count did not fall, and that is expected: those files reference the registry for
+other rows too. It falls when a file loses its last one.
+
 #### The next checkpoint, scoped
 
 The plan binds three things into one checkpoint and the binding is the point: **tab close stops

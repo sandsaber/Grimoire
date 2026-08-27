@@ -3,7 +3,6 @@ import type { ProviderCommandCatalog } from '../../../core/providers/commands/Pr
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
@@ -35,12 +34,6 @@ export interface GrokWorkspaceServices extends ProviderWorkspaceServices {
   mcpStorage: AcpMcpStorage;
   mcpServerManager: McpServerManager;
 }
-
-const grokTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'commands';
-  },
-};
 
 function createGrokModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
   let pendingRefresh: Promise<boolean> | null = null;
@@ -152,7 +145,6 @@ export async function createGrokWorkspaceServices(
     usageProvider: grokPlanUsageStore,
     runtimeCommandLoader: new GrokRuntimeCommandLoader(),
     settingsTabRenderer: grokSettingsTabRenderer,
-    tabWarmupPolicy: grokTabWarmupPolicy,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();
     },

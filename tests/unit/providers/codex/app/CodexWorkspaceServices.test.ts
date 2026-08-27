@@ -36,18 +36,9 @@ describe('createCodexWorkspaceServices', () => {
     const services = await createCodexWorkspaceServices(plugin as any, vaultAdapter as any, homeAdapter as any);
 
     expect(services.usageProvider).toBeDefined();
-    expect(services.tabWarmupPolicy?.resolveMode({
-      conversation: null,
-      externalContextPaths: [],
-      plugin: plugin as any,
-      runtime: null,
-      tab: {
-        conversationId: null,
-        draftModel: 'gpt-5.5',
-        lifecycleState: 'blank',
-        providerId: 'codex',
-      },
-    })).toBe('runtime');
+    // The warm-up mode is a declaration on the provider module now, not a
+    // service registered here: every implementation returned a constant and
+    // read none of the context it was given.
   });
 
   it('refreshes Codex model discovery through the workspace model catalog', async () => {
