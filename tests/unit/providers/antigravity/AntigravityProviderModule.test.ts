@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import {
   antigravityProviderModule,
   antigravitySettingsCodec,
@@ -28,12 +31,23 @@ describe('Antigravity provider module', () => {
   });
 
   describe('honest absences', () => {
-    it('contributes no auxiliary execution, because the provider registers no-ops', () => {
-      const auxiliary = antigravityProviderModule.auxiliary;
+    it('contributes no auxiliary source, so it has no auxiliary execution', () => {
+      // The module carried three `ExecutionBackendFactory` slots for this until
+      // the auxiliary rows moved, and auxiliary work is not three backends. It
+      // is a runner over the backend the provider already has, contributed by
+      // the composition — so what a provider with none contributes is nothing,
+      // and the assertion is that `ApplicationRuntime` leaves it out.
+      const composition = readFileSync(
+        resolve(process.cwd(), 'src/app/ApplicationRuntime.ts'),
+        'utf8',
+      );
+      const sources = composition.slice(
+        composition.indexOf('sources: new Map(['),
+        composition.indexOf(']),', composition.indexOf('sources: new Map([')),
+      );
 
-      expect(auxiliary.title).toBeUndefined();
-      expect(auxiliary.instructionRefine).toBeUndefined();
-      expect(auxiliary.inlineEdit).toBeUndefined();
+      expect(sources).not.toBe('');
+      expect(sources).not.toContain("'antigravity'");
     });
 
     it('declares the stateless topology and no resume', () => {

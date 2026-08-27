@@ -350,7 +350,6 @@ QwenProviderSettings
     create: async context => new QwenExecutionBackend(context),
   },
 
-  auxiliary: { providerId: 'qwen' },
 
   capabilities: qwenCapabilities,
 

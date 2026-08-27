@@ -1,4 +1,5 @@
 import type { ChatRuntime } from '../runtime/ChatRuntime';
+import { NO_TASK_RESULT_INTERPRETATION } from './noTaskResultInterpretation';
 import { providerCatalog } from './ProviderCatalog';
 import {
   type CreateChatRuntimeOptions,
@@ -73,7 +74,8 @@ export class ProviderRegistry {
   static getTaskResultInterpreter(
     providerId: ProviderId = DEFAULT_CHAT_PROVIDER_ID,
   ): ProviderTaskResultInterpreter {
-    return this.getProviderRegistration(providerId).taskResultInterpreter;
+    return this.getProviderRegistration(providerId).taskResultInterpreter
+      ?? NO_TASK_RESULT_INTERPRETATION;
   }
 
   static getSubagentLifecycleAdapter(

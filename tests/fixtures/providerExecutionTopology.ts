@@ -178,7 +178,6 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     isolationEvidence: 'Absent means unsupported',
     evidence: [
       'src/providers/antigravity/execution/AntigravityExecutionBackend.ts',
-      'src/providers/antigravity/auxiliary/AntigravityTaskResultInterpreter.ts',
     ],
   },
   {
@@ -272,7 +271,6 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     isolationEvidence: 'Absent means unsupported',
     evidence: [
       'src/providers/gemini/execution/GeminiExecutionBackend.ts',
-      'src/providers/gemini/auxiliary/GeminiTaskResultInterpreter.ts',
     ],
   },
   {
@@ -422,7 +420,6 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     isolationEvidence: 'Absent means unsupported',
     evidence: [
       'src/providers/qwen/execution/QwenExecutionBackend.ts',
-      'src/providers/qwen/auxiliary/QwenTaskResultInterpreter.ts',
     ],
   },
 ];

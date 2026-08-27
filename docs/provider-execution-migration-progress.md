@@ -9084,6 +9084,43 @@ that is coming, about work nothing was watching: the exact promise that code was
 It reads the record's own observation now, and `AgentFidelity` went back to `pending` with an owner
 that says giving it that consumer was the mistake.
 
+#### The slot that was never deleted, and the gate that found eight more
+
+**The commit above says the module's three auxiliary slots are deleted. They were not.** The
+sentence was written from the intent, and the interface, the `auxiliary` field on `ProviderModule`,
+the nine `auxiliary: { providerId }` lines and the catalog's identity check for them all survived
+it — through a full green gate, because nothing reads a dark slot. That is the whole hazard of dark
+code stated in one commit message: the only thing that could have caught the claim was reading the
+file, and the tests had no reason to. Deleted now, and the row map points at
+`ProviderAuxiliarySource.createRunner` — with a per-row module path, because the home for these
+turned out not to be the provider module at all.
+
+**Then a new gate: a provider that registers a row must have a filled slot to move it into.** The
+row-to-slot map proves a *contract* exists for every inventory row; nothing proved a *provider* had
+filled it. A provider that registers a row and declares nothing is a contribution that vanishes at
+that row's flip with nothing failing — the failure mode this whole migration exists to prevent, and
+the one the v1 attempt actually suffered.
+
+**It found nine gaps immediately, and eight of them were the same discovery as the auxiliary
+rows.** Only Claude has a real `taskResultInterpreter`: the async task protocol these read is
+Claude's own, and the other eight providers each shipped the same twenty-nine lines answering
+`null`, `false`, and "whatever you already thought" — a provider implementing a protocol emptily in
+order to say it does not speak it. The row is optional now, the eight files are gone, and an absence
+is read as `NO_TASK_RESULT_INTERPRETATION` in one place.
+
+**The ninth gap is recorded rather than filled, and the reason is a third wrong slot.** Grok
+registers an eight-member `subagentLifecycleAdapter` against a two-member `nativeAgents` slot that
+cannot hold it: `recognizesToolName` collapses four questions the live consumer asks separately, and
+`parseDisplay` receives one payload while a Grok subagent's label comes from the spawn tool's
+**input** and its id from the **result**. Filling it would mean inventing a mapping no consumer
+matches — the guessed-schema failure this branch has been burned by. It closes when the row moves.
+
+That is three slots in three consecutive rows — `warmup`, the auxiliary trio, `nativeAgents` — where
+what M1 declared did not fit what the providers do. The pattern is consistent enough to state:
+**a slot designed from the row's name rather than from its implementations is a slot that will not
+fit**, and the only thing that has ever revealed it is reading all nine implementations before
+moving one.
+
 #### The auxiliary rows: one contribution wearing three names
 
 Inventory rows 11, 12 and 13 are moved. They were `createTitleGenerationService`,

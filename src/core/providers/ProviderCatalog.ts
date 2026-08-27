@@ -297,11 +297,9 @@ function validateModules(modules: readonly CatalogProviderModule[]): void {
     const settings = requirePresent(module, 'settings');
     const workspace = requirePresent(module, 'workspace');
     const execution = requirePresent(module, 'execution');
-    const auxiliary = requirePresent(module, 'auxiliary');
     const capabilities = requirePresent(module, 'capabilities');
     requireIdentity(providerId, 'settings', settings.providerId);
     requireIdentity(providerId, 'workspace', workspace.providerId);
-    requireIdentity(providerId, 'auxiliary', auxiliary.providerId);
     requireIdentity(providerId, 'capabilities', capabilities.providerId);
 
     if (!Number.isSafeInteger(settings.schemaVersion) || settings.schemaVersion < 1) {

@@ -346,7 +346,6 @@ OpencodeProviderSettings
     create: async context => new OpencodeExecutionBackend(context),
   },
 
-  auxiliary: { providerId: 'opencode' },
 
   capabilities: opencodeCapabilities,
 

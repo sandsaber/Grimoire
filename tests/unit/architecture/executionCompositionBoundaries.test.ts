@@ -17,6 +17,7 @@ import { listAllSourceModules } from '@test/helpers/moduleReachability';
  */
 
 const MODULE_PATH = 'src/core/providers/ProviderModule.ts';
+const AUXILIARY_SOURCE_PATH = 'src/core/auxiliary/ProviderAuxiliarySource.ts';
 const DESCRIPTOR_PATH = 'src/core/execution/ExecutionBackendDescriptor.ts';
 
 /** New composition and kernel code, held to the rule with no exemptions. */
@@ -381,7 +382,9 @@ describe('execution composition boundaries', () => {
      * carries it. A contribution with no slot is how the v1 cutover lost most
      * of the product.
      */
-    const ROW_SLOTS: Array<{ row: string; owner: string; slot: string }> = [
+    // `path` names the module the owner interface lives in, for the rows whose
+    // home turned out not to be the provider module at all.
+    const ROW_SLOTS: Array<{ row: string; owner: string; path?: string; slot: string }> = [
       { row: 'displayName', owner: 'ProviderManifest', slot: 'displayName' },
       { row: 'blankTabOrder', owner: 'ProviderManifest', slot: 'order' },
       { row: 'isEnabled', owner: 'ProviderSettingsCodec', slot: 'isEnabled' },
@@ -392,9 +395,15 @@ describe('execution composition boundaries', () => {
       { row: 'chatUIConfig', owner: 'ProviderDeclarations', slot: 'chatUI' },
       { row: 'settingsReconciler', owner: 'ProviderSettingsCodec', slot: 'reconcile' },
       { row: 'createRuntime', owner: 'ProviderModule', slot: 'execution' },
-      { row: 'createTitleGenerationService', owner: 'ProviderAuxiliaryContributions', slot: 'title' },
-      { row: 'createInstructionRefineService', owner: 'ProviderAuxiliaryContributions', slot: 'instructionRefine' },
-      { row: 'createInlineEditService', owner: 'ProviderAuxiliaryContributions', slot: 'inlineEdit' },
+      // Not a module slot. Auxiliary work runs through the backend the provider
+      // already has, and the runner that reaches it is built by the host from a
+      // composition — so the contribution is a `ProviderAuxiliarySource` the
+      // composition hands over, and there is nothing for a static module to
+      // hold. The three `ExecutionBackendFactory` slots that used to be here
+      // described a shape no provider had.
+      { row: 'createTitleGenerationService', owner: 'ProviderAuxiliarySource', path: AUXILIARY_SOURCE_PATH, slot: 'createRunner' },
+      { row: 'createInstructionRefineService', owner: 'ProviderAuxiliarySource', path: AUXILIARY_SOURCE_PATH, slot: 'createRunner' },
+      { row: 'createInlineEditService', owner: 'ProviderAuxiliarySource', path: AUXILIARY_SOURCE_PATH, slot: 'createRunner' },
       { row: 'historyService', owner: 'ProviderRuntimePorts', slot: 'history' },
       { row: 'taskResultInterpreter', owner: 'ProviderDeclarations', slot: 'taskResults' },
       { row: 'subagentLifecycleAdapter', owner: 'ProviderDeclarations', slot: 'nativeAgents' },
@@ -418,8 +427,8 @@ describe('execution composition boundaries', () => {
       expect(ROW_SLOTS).toHaveLength(30);
     });
 
-    it.each(ROW_SLOTS)('$row has the typed slot $owner.$slot', ({ owner, slot }) => {
-      expect(readInterfaceMembers(MODULE_PATH, owner)).toContain(slot);
+    it.each(ROW_SLOTS)('$row has the typed slot $owner.$slot', ({ owner, path, slot }) => {
+      expect(readInterfaceMembers(path ?? MODULE_PATH, owner)).toContain(slot);
     });
 
     it('declares both halves of the workspace lifecycle', () => {

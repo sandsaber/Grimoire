@@ -370,7 +370,6 @@ GeminiProviderSettings
     create: async context => new GeminiExecutionBackend(context),
   },
 
-  auxiliary: { providerId: 'gemini' },
 
   capabilities: geminiCapabilities,
 

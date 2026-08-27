@@ -364,7 +364,6 @@ KimicodeProviderSettings
     create: async context => new KimicodeExecutionBackend(context),
   },
 
-  auxiliary: { providerId: 'kimicode' },
 
   capabilities: kimicodeCapabilities,
 

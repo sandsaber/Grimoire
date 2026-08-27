@@ -1,5 +1,4 @@
 import type { ProviderRegistration } from '../../core/providers/types';
-import { CodexTaskResultInterpreter } from './auxiliary/CodexTaskResultInterpreter';
 import { codexSettingsReconciler } from './env/CodexSettingsReconciler';
 import { CodexConversationHistoryService } from './history/CodexConversationHistoryService';
 import { codexSubagentLifecycleAdapter } from './normalization/codexSubagentNormalization';
@@ -14,6 +13,5 @@ export const codexProviderRegistration: ProviderRegistration = {
   // holds until M5.
   createRuntime: ({ plugin }) => plugin.getCodexExecution().createRuntime(),
   historyService: new CodexConversationHistoryService(),
-  taskResultInterpreter: new CodexTaskResultInterpreter(),
   subagentLifecycleAdapter: codexSubagentLifecycleAdapter,
 };

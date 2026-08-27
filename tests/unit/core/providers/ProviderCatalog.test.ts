@@ -59,7 +59,6 @@ function testModule(
       },
       create: async () => ({}),
     },
-    auxiliary: { providerId },
     capabilities: { providerId } as CatalogProviderModule['capabilities'],
     declarations: {
       warmup: 'none' as const,
@@ -166,7 +165,6 @@ describe('ProviderCatalog', () => {
     it.each([
       ['settings', { settings: { ...testModule('one').settings, providerId: 'other' } }],
       ['workspace', { workspace: { ...testModule('one').workspace, providerId: 'other' } }],
-      ['auxiliary', { auxiliary: { providerId: 'other' } }],
       ['capabilities', { capabilities: { providerId: 'other' } }],
     ])('rejects a %s contribution claiming another provider', (contribution, patch) => {
       expect(() => new ProviderCatalog([moduleWith('one', patch)]))
@@ -208,7 +206,6 @@ describe('ProviderCatalog', () => {
       ['settings', { settings: undefined }],
       ['workspace', { workspace: undefined }],
       ['execution', { execution: undefined }],
-      ['auxiliary', { auxiliary: undefined }],
       ['capabilities', { capabilities: undefined }],
     ])('rejects a module missing its %s contribution', (contribution, patch) => {
       expect(() => new ProviderCatalog([moduleWith('one', patch)]))

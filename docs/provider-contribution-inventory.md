@@ -41,7 +41,7 @@ plan and this file both refer to rows by number.
 | 9 | `settingsReconciler` | settings/model normalization on load and env change | settings load, environment change | `ProviderSettingsCodec` | M5 |
 | 10 | `createRuntime` | chat execution (`ChatRuntime`) | `TabManager` / `Tab` | `ExecutionBackendFactory` behind the presentation adapter | **M2 — this is the flip** |
 | 14 | `historyService` | hydration, fork state, session resolution, deletion | conversation controllers, history UI | history capability port | M5 |
-| 15 | `taskResultInterpreter` | provider task/tool result interpretation | chat rendering | result-interpretation port | M5 |
+| 15 | `taskResultInterpreter?` | provider task/tool result interpretation | chat rendering | result-interpretation port | M5 |
 | 16 | `subagentLifecycleAdapter?` | subagent tool-name recognition and display parsing | `SubagentManager` | native-agent observation port | M5 |
 
 ## `ProviderWorkspaceServices` members (10) — [types.ts:436](../src/core/providers/types.ts)

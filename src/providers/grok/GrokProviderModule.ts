@@ -344,7 +344,6 @@ GrokProviderSettings
     create: async context => new GrokExecutionBackend(context),
   },
 
-  auxiliary: { providerId: 'grok' },
 
   capabilities: grokCapabilities,
 

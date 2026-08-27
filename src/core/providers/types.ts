@@ -69,7 +69,15 @@ export interface ProviderRegistration {
   settingsReconciler: ProviderSettingsReconciler;
   createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => ChatRuntime;
   historyService: ProviderConversationHistoryService;
-  taskResultInterpreter: ProviderTaskResultInterpreter;
+  /**
+   * How this provider reads a subagent task result.
+   *
+   * Optional, because absent means unsupported: eight providers filled it with
+   * an interpreter that answered nothing, which is a provider claiming to speak
+   * a protocol it does not. `NO_TASK_RESULT_INTERPRETATION` is what the host
+   * reads an absence as.
+   */
+  taskResultInterpreter?: ProviderTaskResultInterpreter;
   subagentLifecycleAdapter?: ProviderSubagentLifecycleAdapter;
 }
 

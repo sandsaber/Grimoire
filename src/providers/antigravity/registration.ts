@@ -1,5 +1,4 @@
 import type { ProviderRegistration } from '../../core/providers/types';
-import { AntigravityTaskResultInterpreter } from './auxiliary/AntigravityTaskResultInterpreter';
 import { antigravitySettingsReconciler } from './env/AntigravitySettingsReconciler';
 import { AntigravityConversationHistoryService } from './history/AntigravityConversationHistoryService';
 import { antigravityChatUIConfig } from './ui/AntigravityChatUIConfig';
@@ -12,5 +11,4 @@ export const antigravityProviderRegistration: ProviderRegistration = {
   createRuntime: ({ plugin }) => plugin.getAntigravityExecution().createRuntime(),
   historyService: new AntigravityConversationHistoryService(),
   settingsReconciler: antigravitySettingsReconciler,
-  taskResultInterpreter: new AntigravityTaskResultInterpreter(),
 };

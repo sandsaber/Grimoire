@@ -341,11 +341,6 @@ CodexProviderSettings
     create: async context => new CodexExecutionBackend(context),
   },
 
-  // Codex runs all three auxiliary workflows on their own app-server process
-  // and thread, which is what the topology record calls isolated auxiliary
-  // execution. The factories are supplied by the host at M5; the slots are
-  // declared now so the contribution is not lost the way v1 lost it.
-  auxiliary: { providerId: 'codex' },
 
   capabilities: codexCapabilities,
 

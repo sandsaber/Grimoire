@@ -266,10 +266,6 @@ AntigravityProviderSettings
     create: async context => new AntigravityExecutionBackend(context),
   },
 
-  // No auxiliary execution: title generation, instruction refine, and inline
-  // edit are registered as no-ops for this provider today. Contributing them
-  // as present-but-empty would be exactly the lie the contract forbids.
-  auxiliary: { providerId: 'antigravity' },
 
   capabilities: antigravityCapabilities,
 

@@ -454,27 +454,6 @@ export interface ProviderNativeAgentDisplay {
 }
 
 // ---------------------------------------------------------------------------
-// Auxiliary execution — inventory rows 11-13
-// ---------------------------------------------------------------------------
-
-/**
- * Provider execution outside chat.
- *
- * Kept as its own slot group because a flip moves chat execution only: until
- * M5 a flipped provider intentionally runs new chat execution beside legacy
- * auxiliary execution, and the two must hold disjoint sessions and processes.
- */
-export interface ProviderAuxiliaryContributions<TContext = unknown> {
-  readonly providerId: ProviderId;
-  /** Inventory row 11. */
-  readonly title?: ExecutionBackendFactory<TContext>;
-  /** Inventory row 12. */
-  readonly instructionRefine?: ExecutionBackendFactory<TContext>;
-  /** Inventory row 13. */
-  readonly inlineEdit?: ExecutionBackendFactory<TContext>;
-}
-
-// ---------------------------------------------------------------------------
 // Capabilities — inventory row 6 and app-level row 1
 // ---------------------------------------------------------------------------
 
@@ -646,7 +625,6 @@ export interface ProviderModule<
   readonly workspace: ProviderWorkspaceContribution<TWorkspaceContext>;
   /** Chat execution. Inventory row 10 — the only row an M2 flip moves. */
   readonly execution: ExecutionBackendFactory<TExecutionContext>;
-  readonly auxiliary: ProviderAuxiliaryContributions<TExecutionContext>;
   readonly capabilities: ProviderCapabilityDescriptor;
   /** What the provider declares about itself, reachable without a plugin. */
   readonly declarations: ProviderDeclarations<TSettings>;

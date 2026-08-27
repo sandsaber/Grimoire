@@ -358,7 +358,6 @@ MimocodeProviderSettings
     create: async context => new MimocodeExecutionBackend(context),
   },
 
-  auxiliary: { providerId: 'mimocode' },
 
   capabilities: mimocodeCapabilities,
 

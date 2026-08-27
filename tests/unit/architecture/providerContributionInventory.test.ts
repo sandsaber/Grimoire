@@ -1,8 +1,11 @@
+import '@/providers';
+
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { readInterfaceMembers } from '@test/helpers/interfaceMembers';
 
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { antigravityWorkspaceRegistration } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
 import { antigravityProviderRegistration } from '@/providers/antigravity/registration';
 import { claudeWorkspaceRegistration } from '@/providers/claude/app/ClaudeWorkspaceServices';
@@ -179,7 +182,9 @@ describe('provider contribution inventory', () => {
     );
 
     it.each(Object.entries(REGISTRATIONS))('%s supplies every required field', (_providerId, registration) => {
-      const optional = ['subagentLifecycleAdapter'];
+      // `taskResultInterpreter` joined this list when eight of nine providers
+      // turned out to be filling it with an interpreter that answered nothing.
+      const optional = ['subagentLifecycleAdapter', 'taskResultInterpreter'];
       const missing = documented.filter(
         field => !optional.includes(field) && !(field in registration),
       );
@@ -215,6 +220,72 @@ describe('provider contribution inventory', () => {
         expect(registration.workspaceCapabilities).toBeDefined();
       },
     );
+  });
+
+
+  describe('a registered row has a filled slot to move into', () => {
+    /**
+     * Rows whose module slot is a *declaration* — filled at module definition,
+     * not by the host — paired with the registration field they replace.
+     *
+     * A provider that registers the row and leaves the slot empty is a
+     * contribution that disappears at that row's flip with nothing failing,
+     * which is how the first attempt lost most of the product. The slot being
+     * dark is exactly why nothing else notices.
+     */
+    const DECLARED_ROW_SLOTS = [
+      { registration: 'taskResultInterpreter', slot: 'taskResults' },
+      { registration: 'subagentLifecycleAdapter', slot: 'nativeAgents' },
+    ] as const;
+
+    /**
+     * Providers that register a row today and declare nothing for it.
+     *
+     * May shrink, never grow. Each entry is a contribution that would be lost
+     * if its row flipped right now.
+     */
+    const KNOWN_GAPS: ReadonlySet<string> = new Set([
+      // This gate found eight more the moment it was written, all on
+      // `taskResultInterpreter`: only Claude had a real one, and the other
+      // eight registered the same twenty-nine-line no-op. They are deleted —
+      // the row is optional now, and an absence is read as
+      // `NO_TASK_RESULT_INTERPRETATION`. One gap is left.
+      //
+      // Grok's eight-member lifecycle adapter against a two-member slot that
+      // cannot express it: `recognizesToolName` collapses four distinct
+      // questions the live consumer asks separately, and `parseDisplay` gets
+      // one payload while a Grok subagent's label comes from the spawn tool's
+      // *input* and its id from the *result*. Filling it would mean inventing a
+      // mapping no consumer matches. It closes when the row moves and the slot
+      // is reshaped to what the four providers actually do.
+      'grok:subagentLifecycleAdapter',
+    ]);
+
+    it.each(
+      Object.entries(REGISTRATIONS).flatMap(([providerId, registration]) => (
+        DECLARED_ROW_SLOTS
+          .filter(row => row.registration in registration)
+          .map(row => [`${providerId}.${row.registration}`, providerId, registration, row] as const)
+      )),
+    )('%s has somewhere to land', (_label, providerId, _registration, row) => {
+      const declared = providerCatalog().declarations(providerId) as unknown as Record<string, unknown>;
+      const isKnownGap = KNOWN_GAPS.has(`${providerId}:${row.registration}`);
+
+      // A recorded gap is asserted to still *be* one, so an entry that has
+      // quietly been filled is caught the same way an unrecorded gap is.
+      expect(declared[row.slot] === undefined).toBe(isKnownGap);
+    });
+
+    it('records every gap that exists, and no gap that does not', () => {
+      const actual = Object.entries(REGISTRATIONS).flatMap(([providerId, registration]) => {
+        const declared = providerCatalog().declarations(providerId) as unknown as Record<string, unknown>;
+        return DECLARED_ROW_SLOTS
+          .filter(row => row.registration in registration && declared[row.slot] === undefined)
+          .map(row => `${providerId}:${row.registration}`);
+      });
+
+      expect(actual.sort()).toEqual([...KNOWN_GAPS].sort());
+    });
   });
 
   describe('agreement with the presentation parity manifest', () => {

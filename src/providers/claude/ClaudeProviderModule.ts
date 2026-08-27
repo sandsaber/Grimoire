@@ -356,10 +356,6 @@ ClaudeProviderSettings
     create: async context => new ClaudeExecutionBackend(context),
   },
 
-  // All three auxiliary workflows exist and run on their own cold-start query,
-  // which the topology record calls isolated auxiliary execution. The factories
-  // arrive with the host at M5.
-  auxiliary: { providerId: 'claude' },
 
   capabilities: claudeCapabilities,
 
