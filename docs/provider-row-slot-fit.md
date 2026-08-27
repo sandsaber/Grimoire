@@ -44,13 +44,13 @@ asserted only so the table cannot drift away from the code.
 | `chatUIConfig` | 20 | 3 | reshape | Reasoning (4 members), the service-tier toggle, the mode selector and its apply hook, bang-bash enablement, model options, custom model ids, model defaults, variant normalization, and metadata preparation. `permissionToggles` is a static `{id,label}[]` against a row that has a descriptor plus two settings-dependent behaviors. This is the largest row and the worst fit. |
 | `settingsReconciler` | 3 | 1 of 10 | reshape | `ProviderSettingsCodec.reconcile(TSettings, reason)` sees only the provider's own settings, and every reconciler computes its environment hash from `getRuntimeEnvironmentText`, which joins the **shared** environment scope with the provider's. A user who sets `XAI_API_KEY` in the shared scope would stop invalidating Grok's model cache. |
 | `createRuntime` | — | — | moved | `ExecutionBackendFactory`, flipped for all nine. |
-| `historyService` | 6 | 5 | fits | The renames are deliberate and `buildSessionPatch` replaces `buildForkProviderState` plus `buildPersistedProviderState` by returning the two named fields instead of an opaque bag. |
+| `historyService` | 6 | 5 | reshape | Four members map cleanly under deliberate renames. The other two do not: `buildForkProviderState(sourceSessionId, resumeAt, sourceProviderState)` builds the state a **fork** starts from, and `buildPersistedProviderState(conversation)` is what `SessionStorage` writes on **save**. `buildSessionPatch` is neither — it is a third operation, already live in `ExecutionChatRuntimeAdapter`, producing the session binding a **finished turn** leaves behind. Three moments, three shapes, one slot. |
 | `taskResultInterpreter?` | 5 | 1 | reshape | All five questions: async launch marker, agent id, structured result, terminal status, tag value. Only Claude has a real implementation, so the reshape is small — but `interpret(toolName, payload)` answers none of them. |
 | `subagentLifecycleAdapter?` | 8 | 2 | reshape | Four tool-name predicates the live consumer asks separately, spawn-id resolution, subagent-info building, and both result extractors. `parseDisplay(payload)` receives one payload while a Grok subagent's label comes from the spawn tool's **input** and its id from the **result**. |
 | `commandCatalog` | 8 | 1 | reshape | The catalog also **writes**: vault entries are saved and deleted through it, it owns the dropdown config and the default vault storage path, and it takes runtime commands from the session loader. `list()` is one of eight. |
-| `agentMentionProvider` | 1 | 2 | fits | `list` plus `refresh`, which is workspace row 11 arriving in the same port. |
+| `agentMentionProvider` | 1 | 2 | reshape | `searchAgents(query)` becomes `list()`, so the matching moves from the provider to the host — the mention dropdown passes a real query today and the provider decides what matches it. And `ProviderAgentMention` has no `source`, which the row returns on every result and the settings UI reads. `refresh` arriving in the same port is right; the other half is not. |
 | `cliResolver` | 2 | 1 | reshape | `reset()` has no slot. It is what a settings change calls to drop a cached resolution, and without it a user who fixes a CLI path keeps the old failure until reload. |
-| `modelCatalog` | 2 | 2 | fits | `isAvailable` is absent by design — a provider that cannot discover models contributes no `models` port, which is the contract's own "absent means unsupported". The slot adds `list`, which the row lacked. |
+| `modelCatalog` | 2 | 2 | fits | `isAvailable` is absent by design — a provider that cannot discover models contributes no `models` port, which is the contract's own "absent means unsupported", and both call sites guard on it exactly that way. `refreshModels` returns a `Promise<boolean>` that **neither call site reads**, so the slot returning descriptors instead loses nothing. The slot adds `list`, which the row lacked. |
 | `usageProvider` | 3 | 1 | reshape | `getCachedUsage` and `refreshUsage` are one `read()`. The plan indicator shows the cached snapshot immediately and refreshes behind it; one method makes every read either a network call or permanently stale. |
 | `runtimeCommandLoader` | 2 | 1 | reshape | `listForSession(sessionId)` presumes a session exists, and the row's context carries `allowSessionCreation` — command discovery may *start* a short-lived session, and the tab manager decides when that is allowed. The context also carries the conversation, the runtime and the external context paths. |
 | `mcpStorage` | 3 | 4 (shared) | reshape | `tryParseClipboardConfig` has nowhere to go. It is how a user pastes a server config, and it is the only member that parses rather than stores. |
@@ -59,9 +59,22 @@ asserted only so the table cannot drift away from the code.
 
 ## What this means for sequencing
 
-`historyService`, `agentMentionProvider` and `modelCatalog` can move as moves. Every other remaining
-row needs its slot reshaped first, and the reshape has to be designed from the implementations —
-which is what the notes above are for.
+**One row of fourteen can move as a move**: `modelCatalog`. Every other remaining row needs its slot
+reshaped first, and the reshape has to be designed from the implementations — which is what the
+notes above are for.
 
 It also means the M1 slot count was never a measure of readiness. Twenty-odd rows had a typed slot
-from the beginning and roughly three of them could have received their row.
+from the beginning and one of them could have received its row.
+
+### The first version of this table said three, and it was written from the counts
+
+`historyService`, `agentMentionProvider` and `modelCatalog` were all graded `fits` on a first pass
+that compared member counts and assumed the differences were renames. Reading them properly changed
+two of the three — and the errors were not small ones. `historyService` looked like a six-into-five
+rename and is three unrelated operations sharing a name. `agentMentionProvider` looked like a
+one-into-two widening and quietly relocates the matching out of the provider while dropping a field
+the settings UI reads.
+
+That is the same shortcut this file exists to stop, taken while writing the file that says not to
+take it. The counts are load-bearing only as drift detection; the verdict has to come from opening
+every implementation and every consumer, and there is no version of this that a count can do.

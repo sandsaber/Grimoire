@@ -9091,9 +9091,16 @@ Three checkpoints in a row hit the same wall — `tabWarmupPolicy`, the auxiliar
 remaining row before touching one, and the result is
 [`docs/provider-row-slot-fit.md`](provider-row-slot-fit.md).
 
-**Three of fourteen fit.** `historyService`, `agentMentionProvider` and `modelCatalog` can move as
-moves. Everything else needs its slot reshaped, and the notes say what has nowhere to go rather than
-leaving it to be found later.
+**One of fourteen fits.** `modelCatalog` can move as a move. Everything else needs its slot
+reshaped, and the notes say what has nowhere to go rather than leaving it to be found later.
+
+The first version of that table said three, **and it was written from the member counts** — the
+exact shortcut the file's own instructions say not to take. Reading the other two properly changed
+both. `historyService` looked like a six-into-five rename and is three unrelated operations sharing
+a name: the state a **fork** starts from, the state `SessionStorage` writes on **save**, and the
+binding a **finished turn** leaves behind, which is the only one the slot describes.
+`agentMentionProvider` looked like a one-into-two widening and quietly relocates matching from the
+provider to the host while dropping the `source` field the settings UI reads.
 
 The worst is the largest. **`chatUIConfig` is twenty members against a slot of three**, and the
 missing seventeen are not detail: the whole reasoning group, the service-tier toggle, the mode
