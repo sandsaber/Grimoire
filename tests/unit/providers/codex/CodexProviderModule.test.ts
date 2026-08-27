@@ -21,7 +21,7 @@ describe('Codex provider module', () => {
   function createContext(): CodexWorkspaceContext {
     return {
       listSkills: async () => [{ name: 'review', source: 'project' as const }],
-      listAgentMentions: async () => [{ id: 'planner', label: 'Planner' }],
+      listAgentMentions: async () => [{ id: 'planner', label: 'Planner' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
       resolveCliPath: async () => '/usr/local/bin/codex',
       listModels: async () => [{ id: 'gpt-5.5', label: 'GPT-5.5' }],

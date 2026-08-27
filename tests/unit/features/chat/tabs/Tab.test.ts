@@ -1030,12 +1030,12 @@ describe('Tab - Service Initialization', () => {
     it('resolves the agent mention service through the provider-specific lookup', () => {
       jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
-      const codexAgentMentionProvider = { searchAgents: jest.fn().mockReturnValue([]) };
-      const getAgentMentionProviderSpy = jest.spyOn(ProviderWorkspaceRegistry, 'getAgentMentionProvider')
-        .mockReturnValue(codexAgentMentionProvider);
-      const plugin = createMockPlugin({
-        codexAgentMentionProvider,
-      });
+      const list = jest.fn(async () => [
+        { id: 'reviewer', label: 'Reviewer', source: 'vault' as const },
+      ]);
+      const workspaceFor = jest.fn(async () => ({ agentMentions: { list, refresh: jest.fn() } }));
+      const plugin = createMockPlugin();
+      plugin.getApplicationRuntimeOrNull = () => ({ workspaceFor });
       const tab = createTab(createMockOptions({
         plugin,
         conversation: {
@@ -1051,8 +1051,14 @@ describe('Tab - Service Initialization', () => {
 
       initializeTabUI(tab, plugin);
 
-      expect(getAgentMentionProviderSpy).toHaveBeenCalledWith('codex');
-      expect(mockFileContextManager.setAgentService).toHaveBeenCalledWith(codexAgentMentionProvider);
+      // The service is the host's now, filtering a list the provider supplies —
+      // and it is the *same* object across renders, because the dropdown
+      // compares by identity to decide whether to close the list a user is
+      // typing into.
+      const service = mockFileContextManager.setAgentService.mock.calls.at(-1)?.[0];
+      expect(service).not.toBeNull();
+      initializeTabUI(tab, plugin);
+      expect(mockFileContextManager.setAgentService).toHaveBeenLastCalledWith(service);
     });
 
     it('falls back blank Codex draft to Claude when Codex is disabled', () => {

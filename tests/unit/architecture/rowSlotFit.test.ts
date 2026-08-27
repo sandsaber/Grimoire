@@ -65,19 +65,9 @@ const ROWS: readonly RowFit[] = [
     slot: { name: 'ProviderCommandsPort', path: MODULE },
   },
   {
-    row: 'agentMentionProvider',
-    real: { name: 'AgentMentionProvider', path: TYPES },
-    slot: { name: 'ProviderAgentMentionsPort', path: MODULE },
-  },
-  {
     row: 'cliResolver',
     real: { name: 'ProviderCliResolver', path: TYPES },
     slot: { name: 'ProviderCliResolutionPort', path: MODULE },
-  },
-  {
-    row: 'usageProvider',
-    real: { name: 'ProviderPlanUsageProvider', path: TYPES },
-    slot: { name: 'ProviderUsagePort', path: MODULE },
   },
   {
     row: 'runtimeCommandLoader',
@@ -148,7 +138,7 @@ describe('provider row slot fit', () => {
   const table = fitTable();
 
   it('records every row that has not moved', () => {
-    // `modelCatalog` is the first to leave: its consumers read
+    // `modelCatalog` and `usageProvider` have left: their consumers read
     // `ApplicationRuntime.workspaceFor(providerId)` and the registry accessor
     // is deleted. It stays in the document with a `moved` verdict, which is
     // what keeps this list and that table from disagreeing about it.

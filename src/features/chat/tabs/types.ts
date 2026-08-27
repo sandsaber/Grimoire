@@ -1,6 +1,7 @@
 import type { Component, WorkspaceLeaf } from 'obsidian';
 
 import type { ChatTabExecution } from '../../../app/chat/ChatTabExecution';
+import type { ProviderAgentMentionService } from '../../../app/mentions/ProviderAgentMentionService';
 import type { RelevantNotesService } from '../../../core/context/RelevantNotesService';
 import type { VaultSearchService } from '../../../core/context/VaultSearchService';
 import type { VaultTextIndex } from '../../../core/context/VaultTextIndex';
@@ -106,6 +107,14 @@ export interface TabControllers {
  * Services managed per-tab.
  */
 export interface TabServices {
+  /**
+   * The `@agents/` list per provider this tab has shown.
+   *
+   * Per tab and per provider, because the mention dropdown compares the service
+   * it was handed by identity: a new object on every render would close the
+   * list while the user is typing into it.
+   */
+  agentMentionServices: Map<ProviderId, ProviderAgentMentionService>;
   subagentManager: SubagentManager;
   instructionRefineService: InstructionRefineService | null;
   titleGenerationService: TitleGenerationService | null;

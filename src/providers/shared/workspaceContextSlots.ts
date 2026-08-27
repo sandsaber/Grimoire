@@ -1,5 +1,6 @@
 import type {
   ProviderAgentMention,
+  ProviderAgentMentionSource,
   ProviderCommandDescriptor,
   ProviderMcpServer,
   ProviderModelDescriptor,
@@ -48,6 +49,7 @@ export interface WorkspaceContextServices {
       id: string;
       name: string;
       description?: string;
+      source: ProviderAgentMentionSource;
     }>;
   } | null;
   readonly commandCatalog?: {
@@ -130,6 +132,7 @@ export function createWorkspaceContextSlots(
       return found.map(agent => ({
         id: agent.id,
         label: agent.name,
+        source: agent.source,
         ...(agent.description ? { description: agent.description } : {}),
       }));
     },

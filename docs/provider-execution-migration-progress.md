@@ -9129,6 +9129,34 @@ they rest on are asserted — because a document that keeps saying `reshape` abo
 since fixed is worse than no document. Proven by growing the chat-UI slot by one member and watching
 it go red.
 
+#### The mention row: five filters that were one filter
+
+`agentMentionProvider` is the third row on the module. What the row was is
+`searchAgents(query)` on every provider, and what all five implementations were is the same
+case-insensitive substring match. Not provider knowledge — **generic matching, written five times.**
+
+The one that looked different was Claude's, which also matches an agent's id. The other four set an
+agent's id to its own name, so matching ids everywhere is the same answer for all of them and
+Claude's answer for Claude. One filter, in `ProviderAgentMentionService`, and a provider says what
+it has rather than how to search it.
+
+**The slot was missing the field the dropdown draws.** `ProviderAgentMention` had id, label and
+description; every one of the five rows returns a `source` on every result, and the mention list
+shows it beside the name so a user can tell a vault agent from one a plugin installed. It is the
+kind of field only missed once something renders a list with a blank column.
+
+Two things the move had to keep that a naive one would not:
+
+- **The service is held per tab and per provider.** The dropdown compares the service it was handed
+  by identity to decide whether to close, so a new object on every render would close the list the
+  user is typing into.
+- **The filter is synchronous, so the list is held rather than fetched.** `load()` is started when a
+  tab binds a provider, long before anything can be typed; before it lands there are no agents,
+  which is what a provider whose definitions have not been read has always looked like.
+
+The break: `refresh()` taking the list before asking the provider to re-read, which is the stale
+answer the two-step exists to avoid.
+
 #### The usage slot: one read where the product has two, one window where it has several
 
 `ProviderUsagePort` is reshaped. What it said was `read(): Promise<ProviderUsageSnapshot | null>`

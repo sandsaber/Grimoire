@@ -73,13 +73,13 @@ describe('Claude module context workspace slots', () => {
 
   it('asks the mention provider for everything it knows', async () => {
     const searchAgents = jest.fn(() => [
-      { id: 'reviewer', name: 'Reviewer', description: 'Reads diffs', source: 'project' },
+      { id: 'reviewer', name: 'Reviewer', description: 'Reads diffs', source: 'vault' as const },
     ]);
     const plugin = pluginWith({ agentMentionProvider: { searchAgents } });
     const context = createClaudeModuleContext(plugin, () => null, ports);
 
     expect(await context.listAgentMentions()).toEqual([
-      { id: 'reviewer', label: 'Reviewer', description: 'Reads diffs' },
+      { id: 'reviewer', label: 'Reviewer', description: 'Reads diffs', source: 'vault' },
     ]);
     expect(searchAgents).toHaveBeenCalledWith('');
   });

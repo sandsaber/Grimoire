@@ -242,6 +242,7 @@ export function createTab(options: TabCreateOptions): TabData {
       navigationController: null,
     },
     services: {
+      agentMentionServices: new Map(),
       subagentManager,
       instructionRefineService: null,
       titleGenerationService: null,

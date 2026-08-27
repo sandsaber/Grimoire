@@ -168,6 +168,17 @@ export interface ProviderCommandDescriptor {
   readonly source: 'built-in' | 'project' | 'user' | 'session';
 }
 
+/**
+ * The agents a provider offers to `@`-mention.
+ *
+ * **Listing, not searching.** The row this replaces was `searchAgents(query)`,
+ * and all five implementations were the same case-insensitive substring filter
+ * over name, id and description — generic matching, not provider knowledge.
+ * Four of the five set `id` to the agent's own name, so the one filter that
+ * looked different (Claude's, which also matches on id) is the same answer for
+ * every provider that is not Claude. The host filters once; a provider says
+ * what it has.
+ */
 export interface ProviderAgentMentionsPort {
   list(): Promise<readonly ProviderAgentMention[]>;
   refresh(): Promise<void>;
@@ -177,7 +188,19 @@ export interface ProviderAgentMention {
   readonly id: string;
   readonly label: string;
   readonly description?: string;
+  /**
+   * Where the definition came from. The mention dropdown shows it beside the
+   * name, so a user can tell a vault agent from one a plugin installed.
+   *
+   * Absent from the first version of this slot, which had a row returning it on
+   * every result and a UI reading it — the kind of field that is only missed
+   * once something renders a list with a blank column.
+   */
+  readonly source: ProviderAgentMentionSource;
 }
+
+/** Matches `AgentDefinition['source']`, which every provider already reports. */
+export type ProviderAgentMentionSource = 'builtin' | 'global' | 'plugin' | 'vault';
 
 export interface ProviderCliResolutionPort {
   resolve(): Promise<ProviderCliResolution>;

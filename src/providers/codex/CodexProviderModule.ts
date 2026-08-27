@@ -1,4 +1,5 @@
 import type {
+  ProviderAgentMention,
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandDescriptor,
@@ -92,7 +93,7 @@ const CODEX_DEFAULT_CONTEXT_WINDOW = 200_000;
 
 export interface CodexWorkspaceContext {
   listSkills(): Promise<readonly ProviderCommandDescriptor[]>;
-  listAgentMentions(): Promise<readonly { id: string; label: string; description?: string }[]>;
+  listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
   resolveCliPath(): Promise<string | null>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;

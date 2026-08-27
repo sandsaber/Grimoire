@@ -22,7 +22,7 @@ describe('Gemini provider module', () => {
   function createContext(): GeminiWorkspaceContext {
     return {
       listCommands: async () => [{ name: 'init', source: 'project' as const }],
-      listAgentMentions: async () => [{ id: 'planner', label: 'Planner' }],
+      listAgentMentions: async () => [{ id: 'planner', label: 'Planner' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
       resolveCliPath: async () => '/usr/local/bin/gemini',
       listModels: async () => [{ id: 'gemini-2.5-pro', label: 'gemini-2.5-pro' }],

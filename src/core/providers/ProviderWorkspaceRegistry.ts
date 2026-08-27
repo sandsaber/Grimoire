@@ -2,7 +2,6 @@ import type GrimoirePlugin from '../../main';
 import { HomeFileAdapter } from '../storage/HomeFileAdapter';
 import type { ProviderCommandCatalog } from './commands/ProviderCommandCatalog';
 import type {
-  AgentMentionProvider,
   ProviderCliResolver,
   ProviderId,
   ProviderRuntimeCommandLoader,
@@ -98,10 +97,6 @@ export class ProviderWorkspaceRegistry {
 
   static getCommandCatalog(providerId: ProviderId): ProviderCommandCatalog | null {
     return this.getServices(providerId)?.commandCatalog ?? null;
-  }
-
-  static getAgentMentionProvider(providerId: ProviderId): AgentMentionProvider | null {
-    return this.getServices(providerId)?.agentMentionProvider ?? null;
   }
 
   static async refreshAgentMentions(providerId: ProviderId): Promise<void> {

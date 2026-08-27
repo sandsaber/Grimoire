@@ -1,4 +1,5 @@
 import { AuxiliaryExecutionOwner } from '../../../app/auxiliary/AuxiliaryExecutionOwner';
+import { ProviderAgentMentionService } from '../../../app/mentions/ProviderAgentMentionService';
 import { getEnabledProviderForModel } from '../../../core/providers/modelRouting';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type {
@@ -7,7 +8,6 @@ import type {
 } from '../../../core/providers/ProviderModule';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderChatUIConfig,
   ProviderId,
@@ -324,11 +324,44 @@ export function applyProviderUIGating(tab: TabData, plugin: GrimoirePlugin): voi
   tab.ui.fileContextManager?.setMcpManager(mcpManager);
 
   tab.ui.fileContextManager?.setAgentService(
-    ProviderWorkspaceRegistry.getAgentMentionProvider(capabilities.providerId),
+    agentMentionServiceFor(tab, plugin, capabilities.providerId),
   );
 
   tab.ui.imageContextManager?.setEnabled(capabilities.supportsImageAttachments);
   tab.ui.contextUsageMeter?.update(tab.state.usage);
+}
+
+/**
+ * This tab's `@agents/` list, one service per provider it has shown.
+ *
+ * Held per tab rather than rebuilt on every sync: the dropdown compares the
+ * service by identity to decide whether to close, so handing it a new object on
+ * each render would close the list the user is typing into. The load is started
+ * here, well before anything can be typed, because the dropdown filters
+ * synchronously and a workspace is built on the first question.
+ */
+function agentMentionServiceFor(
+  tab: TabData,
+  plugin: GrimoirePlugin,
+  providerId: ProviderId,
+): ProviderAgentMentionService | null {
+  const runtime = plugin.getApplicationRuntimeOrNull();
+  if (!runtime) {
+    return null;
+  }
+  const existing = tab.services.agentMentionServices.get(providerId);
+  if (existing) {
+    return existing;
+  }
+  const service = new ProviderAgentMentionService({
+    list: async () => (await runtime.workspaceFor(providerId)).agentMentions?.list() ?? [],
+    refresh: async () => {
+      await (await runtime.workspaceFor(providerId)).agentMentions?.refresh();
+    },
+  });
+  tab.services.agentMentionServices.set(providerId, service);
+  void service.load().catch(() => undefined);
+  return service;
 }
 
 export function syncTabProviderServices(

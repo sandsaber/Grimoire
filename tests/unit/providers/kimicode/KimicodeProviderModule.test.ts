@@ -22,7 +22,7 @@ describe('Kimi Code provider module', () => {
     return {
       listCommands: async () => [{ name: 'init', source: 'project' as const }],
       listSessionCommands: async () => [{ name: 'undo', source: 'session' as const }],
-      listAgentMentions: async () => [{ id: 'build', label: 'Build' }],
+      listAgentMentions: async () => [{ id: 'build', label: 'Build' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
       resolveCliPath: async () => '/usr/local/bin/kimicode',
       listModels: async () => [{ id: 'anthropic/claude-sonnet', label: 'Sonnet' }],

@@ -22,7 +22,7 @@ describe('Claude provider module', () => {
     return {
       listCommands: async () => [{ name: 'review', source: 'project' as const }],
       listSessionCommands: async () => [{ name: 'compact', source: 'session' as const }],
-      listAgentMentions: async () => [{ id: 'planner', label: 'Planner' }],
+      listAgentMentions: async () => [{ id: 'planner', label: 'Planner' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
       resolveCliPath: async () => '/usr/local/bin/claude',
       listModels: async () => [{ id: 'opus', label: 'Opus 5' }],

@@ -7,21 +7,6 @@ describe('ProviderWorkspaceRegistry', () => {
     ProviderWorkspaceRegistry.clear();
   });
 
-  it('returns agent mention providers through the workspace registry', () => {
-    const claudeProvider = { searchAgents: jest.fn().mockReturnValue([]) };
-    const codexProvider = { searchAgents: jest.fn().mockReturnValue([]) };
-
-    ProviderWorkspaceRegistry.setServices('claude', {
-      agentMentionProvider: claudeProvider,
-    });
-    ProviderWorkspaceRegistry.setServices('codex', {
-      agentMentionProvider: codexProvider,
-    });
-
-    expect(ProviderWorkspaceRegistry.getAgentMentionProvider('claude')).toBe(claudeProvider);
-    expect(ProviderWorkspaceRegistry.getAgentMentionProvider('codex')).toBe(codexProvider);
-  });
-
   it('refreshes agent mention state through the workspace registry', async () => {
     const refreshClaude = jest.fn().mockResolvedValue(undefined);
     const refreshCodex = jest.fn().mockResolvedValue(undefined);
