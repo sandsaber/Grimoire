@@ -9084,6 +9084,47 @@ that is coming, about work nothing was watching: the exact promise that code was
 It reads the record's own observation now, and `AgentFidelity` went back to `pending` with an owner
 that says giving it that consumer was the mistake.
 
+#### Reading all the remaining rows at once, instead of one per checkpoint
+
+Three checkpoints in a row hit the same wall — `tabWarmupPolicy`, the auxiliary trio,
+`taskResultInterpreter` — and each hit it *while moving the row*. So the fourth attempt read every
+remaining row before touching one, and the result is
+[`docs/provider-row-slot-fit.md`](provider-row-slot-fit.md).
+
+**Three of fourteen fit.** `historyService`, `agentMentionProvider` and `modelCatalog` can move as
+moves. Everything else needs its slot reshaped, and the notes say what has nowhere to go rather than
+leaving it to be found later.
+
+The worst is the largest. **`chatUIConfig` is twenty members against a slot of three**, and the
+missing seventeen are not detail: the whole reasoning group, the service-tier toggle, the mode
+selector and its apply hook, bang-bash enablement, model options, custom model ids. Its
+`permissionToggles` is a static `{id,label}[]` against a row that has a descriptor plus two
+settings-dependent behaviours. Twenty-three consumers read this row, and it had a slot covering a
+seventh of it from M1 onward.
+
+Two of the reshapes name a concrete user-visible failure rather than a shape:
+
+- **`settingsReconciler`** — `ProviderSettingsCodec.reconcile(TSettings, reason)` sees the
+  provider's settings, and every reconciler computes its environment hash from
+  `getRuntimeEnvironmentText`, which joins the **shared** environment scope with the provider's. Move
+  it as declared and a user who sets `XAI_API_KEY` in the shared scope stops invalidating Grok's
+  model cache.
+- **`usageProvider`** — `getCachedUsage` and `refreshUsage` become one `read()`. The plan indicator
+  shows the cached snapshot immediately and refreshes behind it; one method makes every read either
+  a network call or permanently stale.
+
+And one row is not an interface at all: `mcpServerManager` is typed as a concrete class, so a
+provider cannot contribute an MCP port without constructing Grimoire's own manager. That is the
+reshape, before a single member is counted.
+
+The table is gated. The verdicts come from reading and no test can check them, but the member counts
+they rest on are asserted — because a document that keeps saying `reshape` about a slot somebody has
+since fixed is worse than no document. Proven by growing the chat-UI slot by one member and watching
+it go red.
+
+**What this changes about sequencing.** The M1 slot count was never a measure of readiness. Twenty
+rows had a typed slot from the beginning and three of them could have received their row.
+
 #### The slot that was never deleted, and the gate that found eight more
 
 **The commit above says the module's three auxiliary slots are deleted. They were not.** The
