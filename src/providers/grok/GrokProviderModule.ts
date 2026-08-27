@@ -207,13 +207,11 @@ const grokCapabilities: ProviderCapabilityDescriptor = {
   security: { enforcement: 'native' },
   reasoningControl: { kind: 'effort', tiers: ['low', 'medium', 'high'] },
   workspace: {
-    commands: 'grimoire',
-    agents: 'grimoire',
-    mcp: 'grimoire',
-    cliResolution: 'native',
-    models: 'native',
-    usage: 'native',
-    environment: 'grimoire',
+    skills: { inventory: 'managed', manager: 'managed' },
+    commands: { inventory: 'readonly', manager: 'managed', runtimeCommandDiscovery: 'active-session-only' },
+    agents: { inventory: 'managed', manager: 'managed' },
+    mcp: { inventory: 'managed', manager: 'managed' },
+    environment: { inventory: 'managed', manager: 'managed' },
   },
 };
 

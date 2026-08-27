@@ -9129,6 +9129,29 @@ they rest on are asserted — because a document that keeps saying `reshape` abo
 since fixed is worse than no document. Proven by growing the chat-UI slot by one member and watching
 it go red.
 
+#### The workspace capability map answered a question nobody asked
+
+App-level inventory row 1 is on the descriptor. What it had there was
+`Partial<Record<key, 'native' | 'grimoire' | 'unsupported'>>` — a statement about **who owns** each
+resource — and the three settings surfaces that read this record ask something else entirely:
+whether a list can be shown, and whether it can be written. They read the two separately.
+
+Codex is the provider that proves one value could not have said it: `mcp` is
+`{ inventory: 'none', manager: 'guidance' }`. Grimoire cannot list its MCP servers *and* still points
+the user at where to set them up. Collapse that into one word and either the list appears empty or
+the guidance disappears.
+
+**Three keys went, and that is the same finding from the other side.** `cliResolution`, `models` and
+`usage` were in the map with ownership values, no consumer, and no honest inventory-or-manager
+answer available: a model is discovered rather than listed out of a vault, and Grimoire's model
+settings are not a manager for the provider's catalogue. A key nothing produces and nothing reads is
+a key that gets filled by guessing — which is what the ownership values were.
+
+The values are not invented. Each descriptor now carries **the record its own registration already
+had**, copied field for field, and a parity gate compares the two for as long as both exist —
+because two inventories of one fact is the thing this migration keeps finding. The gate goes when
+the registry does. Proven by drifting Codex's `mcp` and watching two rows go red.
+
 #### The mention row: five filters that were one filter
 
 `agentMentionProvider` is the third row on the module. What the row was is

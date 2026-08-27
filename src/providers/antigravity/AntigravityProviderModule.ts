@@ -159,7 +159,13 @@ const antigravityCapabilities: ProviderCapabilityDescriptor = {
   // surface; that is why Safe mode stays fail-closed for this provider.
   security: { enforcement: 'grimoire' },
   reasoningControl: { kind: 'none' },
-  workspace: { cliResolution: 'native', models: 'native' },
+  workspace: {
+    skills: { inventory: 'none', manager: 'none' },
+    commands: { inventory: 'none', manager: 'none' },
+    agents: { inventory: 'none', manager: 'none' },
+    mcp: { inventory: 'none', manager: 'none' },
+    environment: { inventory: 'managed', manager: 'managed' },
+  },
 };
 
 export const antigravitySettingsCodec: ProviderSettingsCodec<AntigravityProviderSettings> = {

@@ -96,7 +96,7 @@ a row moves or a slot changes.
 
 ## What this means for sequencing
 
-**Three rows have moved.** `modelCatalog` was the one whose slot fitted, and it was blocked twice over
+**Four rows have moved**, counting the app-level workspace capability row. `modelCatalog` was the one whose slot fitted, and it was blocked twice over
 — by eight contexts whose `listModels`/`refreshModels` threw, and by nothing building a workspace at
 all. `usageProvider` needed its slot reshaped first, and then moved the same way. Both read
 `ApplicationRuntime.workspaceFor(providerId)` — or `builtWorkspaceFor` on the paint path — and

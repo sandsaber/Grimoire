@@ -6,7 +6,6 @@ import type {
   ProviderId,
   ProviderRuntimeCommandLoader,
   ProviderSettingsTabRenderer,
-  ProviderWorkspaceCapabilities,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from './types';
@@ -79,10 +78,6 @@ export class ProviderWorkspaceRegistry {
     providerId: ProviderId,
   ): ProviderWorkspaceServices | null {
     return this.services[providerId] ?? null;
-  }
-
-  static getCapabilities(providerId: ProviderId): ProviderWorkspaceCapabilities {
-    return this.getWorkspaceRegistration(providerId).workspaceCapabilities;
   }
 
   static requireServices(

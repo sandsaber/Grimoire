@@ -2,7 +2,10 @@ import { isRecord } from '../../utils/records';
 import type { ProviderId } from '../types/provider';
 import { toLegacyCapabilities } from './legacyCapabilities';
 import { getProviderConfig, setProviderConfig } from './providerConfig';
-import type { ProviderModule } from './ProviderModule';
+import type {
+  ProviderModule,
+  ProviderWorkspaceCapabilityMap,
+} from './ProviderModule';
 import type { ProviderCapabilities } from './types';
 
 /**
@@ -165,6 +168,18 @@ export class ProviderCatalog {
    */
   declarations(providerId: string): CatalogProviderModule['declarations'] {
     return this.require(providerId).declarations;
+  }
+
+  /**
+   * What Grimoire may do with each of a provider's workspace resources.
+   *
+   * Read off the descriptor rather than the projection beside it: the
+   * projection is the record the chat UI reads, and this answers a different
+   * question — whether a settings surface can list a resource and whether it
+   * can write it. App-level inventory row 1.
+   */
+  workspaceCapabilities(providerId: string): ProviderWorkspaceCapabilityMap {
+    return this.require(providerId).capabilities.workspace;
   }
 
   /** Inventory row 5. */

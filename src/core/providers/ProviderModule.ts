@@ -671,14 +671,38 @@ export type ProviderWorkspaceCapabilityKey =
   | 'commands'
   | 'agents'
   | 'mcp'
-  | 'cliResolution'
-  | 'models'
-  | 'usage'
   | 'environment';
+
+/**
+ * What Grimoire may do with one kind of workspace resource.
+ *
+ * **Two axes, because the settings surface reads them separately.** The first
+ * version of this slot was a single `CapabilitySupport` per key — `'native'` or
+ * `'grimoire'`, a statement about *who owns* the resource — and no consumer
+ * asks that. What they ask is whether a list can be shown and whether it can be
+ * written, and the two differ: Codex's MCP is `inventory: 'none'` with
+ * `manager: 'guidance'`, meaning Grimoire cannot list its servers but does point
+ * the user at where to set them up. One value cannot say that.
+ *
+ * The map also lost three keys — `cliResolution`, `models`, `usage`. They were
+ * ownership statements with no consumer, and there is no honest
+ * inventory-or-manager answer for them: a model is discovered, not listed from a
+ * vault, and Grimoire's model settings are not a manager for the provider's
+ * catalogue. A key nothing produces and nothing reads is a key that will be
+ * filled by guessing.
+ */
+export interface ProviderWorkspaceCapability {
+  /** Whether Grimoire can list what exists, and whether it may write it. */
+  readonly inventory: 'managed' | 'readonly' | 'none';
+  /** Whether Grimoire offers a manager for it, or only points at the provider's. */
+  readonly manager: 'managed' | 'guidance' | 'none';
+  /** How a live session's own commands are discovered, where that applies. */
+  readonly runtimeCommandDiscovery?: 'active-session-only' | 'ephemeral' | 'none';
+}
 
 /** Absent means unsupported here too, so a provider declares only what it has. */
 export type ProviderWorkspaceCapabilityMap = Readonly<
-  Partial<Record<ProviderWorkspaceCapabilityKey, CapabilitySupport>>
+  Partial<Record<ProviderWorkspaceCapabilityKey, ProviderWorkspaceCapability>>
 >;
 
 // ---------------------------------------------------------------------------

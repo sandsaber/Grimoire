@@ -66,7 +66,7 @@ fields of either service interface.
 
 | # | Contribution | Where it lives today | Consumed by today | Target home | Moves at |
 |---|---|---|---|---|---|
-| 1 | `workspaceCapabilities` | `ProviderWorkspaceRegistration.workspaceCapabilities` ([types.ts:484](../src/core/providers/types.ts)) | `ProviderWorkspaceRegistry.getCapabilities()`, settings gating | workspace part of `ProviderCapabilityDescriptor` in the module | M5 |
+| 1 | `workspaceCapabilities` | `ProviderCapabilityDescriptor.workspace`, read through `ProviderCatalog.workspaceCapabilities()` | settings gating | **arrived**; the registration still carries the record because the registry validates it, and a parity gate compares the two until the registry goes | M5 |
 
 ## Moved to their target homes (12)
 

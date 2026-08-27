@@ -200,12 +200,11 @@ const codexCapabilities: ProviderCapabilityDescriptor = {
   security: { enforcement: 'native' },
   reasoningControl: { kind: 'effort', tiers: [...CODEX_EFFORT_TIERS] },
   workspace: {
-    skills: 'grimoire',
-    agents: 'grimoire',
-    cliResolution: 'native',
-    models: 'native',
-    usage: 'native',
-    environment: 'grimoire',
+    skills: { inventory: 'managed', manager: 'managed' },
+    commands: { inventory: 'none', manager: 'none' },
+    agents: { inventory: 'managed', manager: 'managed' },
+    mcp: { inventory: 'none', manager: 'guidance' },
+    environment: { inventory: 'managed', manager: 'managed' },
   },
 };
 

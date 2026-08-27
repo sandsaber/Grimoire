@@ -232,13 +232,11 @@ const geminiCapabilities: ProviderCapabilityDescriptor = {
   security: { enforcement: 'native' },
   reasoningControl: { kind: 'none' },
   workspace: {
-    commands: 'grimoire',
-    agents: 'grimoire',
-    mcp: 'grimoire',
-    cliResolution: 'native',
-    models: 'native',
-    usage: 'native',
-    environment: 'grimoire',
+    skills: { inventory: 'managed', manager: 'managed' },
+    commands: { inventory: 'managed', manager: 'managed', runtimeCommandDiscovery: 'none' },
+    agents: { inventory: 'managed', manager: 'managed' },
+    mcp: { inventory: 'managed', manager: 'managed' },
+    environment: { inventory: 'managed', manager: 'managed' },
   },
 };
 

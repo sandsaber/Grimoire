@@ -851,7 +851,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
     section: WorkspaceSection,
   ): string[] {
     const supportedProviders = providerIds.filter((providerId) => (
-      ProviderWorkspaceRegistry.getCapabilities(providerId)[section].manager === 'managed'
+      providerCatalog().workspaceCapabilities(providerId)[section]?.manager === 'managed'
     ));
     return section === 'environment'
       ? ['__shared__', ...supportedProviders]
@@ -1238,8 +1238,8 @@ export class GrimoireSettingTab extends PluginSettingTab {
     const rows: WorkspaceResourceRow[] = [];
     if (section === 'skills' || section === 'commands') {
       for (const providerId of providerIds) {
-        const capability = ProviderWorkspaceRegistry.getCapabilities(providerId)[section];
-        if (capability.inventory === 'none') continue;
+        const capability = providerCatalog().workspaceCapabilities(providerId)[section];
+        if (!capability || capability.inventory === 'none') continue;
         const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
         if (!catalog) continue;
         try {
@@ -1348,10 +1348,10 @@ export class GrimoireSettingTab extends PluginSettingTab {
       }
     } else if (section === 'mcp') {
       for (const providerId of providerIds) {
-        const capability = ProviderWorkspaceRegistry.getCapabilities(providerId).mcp;
+        const capability = providerCatalog().workspaceCapabilities(providerId).mcp;
         const services = this.getWorkspaceServices(providerId);
         const manager = services?.mcpServerManager;
-        if (manager && capability.inventory === 'managed') {
+        if (manager && capability?.inventory === 'managed') {
           try {
             for (const server of manager.getServers()) {
               const storage = services.mcpStorage;
@@ -1393,7 +1393,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
           } catch {
             // Ignore a provider whose MCP config cannot currently be read.
           }
-        } else if (capability.manager === 'guidance') {
+        } else if (capability?.manager === 'guidance') {
           rows.push({
             key: `mcp-guidance:${providerId}`,
             section: 'mcp',
