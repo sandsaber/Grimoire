@@ -87,6 +87,7 @@ import { buildQwenRuntimeEnv } from '@/providers/qwen/runtime/QwenRuntimeEnviron
 import { getVaultPath } from '@/utils/path';
 
 import { delayThroughWindow } from '../hostTimers';
+import { ProviderWorkspaceHolder } from '../ProviderWorkspaceHolder';
 
 /** What a turn may answer with, before it is refused as too large. */
 const MAX_RESULT_BYTES = 256_000;
@@ -188,6 +189,20 @@ export class QwenExecution {
    * turn spawns one that reads the new files.
    */
   private workspaceGeneration = 0;
+
+  /**
+   * This provider's workspace slots, built on the first question.
+   *
+   * The context is built with no conversation and with every runtime port
+   * refusing: a workspace slot answers about the plugin, never about a tab, and
+   * one that reached for a tab's session would be answering from whichever tab
+   * happened to build the workspace first. Refusing says so where it happens.
+   */
+  private readonly workspaceHolder = new ProviderWorkspaceHolder(
+    qwenProviderModule.workspace,
+    () => createQwenModuleContext(this.plugin, () => null,
+      { sessionCommands: () => runtimeOnly('sessionCommands') }),
+  );
 
   constructor(
     private readonly plugin: GrimoirePlugin,
@@ -325,6 +340,12 @@ export class QwenExecution {
    * about *this* conversation's session: what it is set to, what it has said,
    * and which prompt is on screen.
    */
+
+  /** This provider's workspace slots, built on the first question. */
+  workspace(): Promise<ProviderWorkspaceSlots> {
+    return this.workspaceHolder.resolve();
+  }
+
   createRuntime(): ChatRuntime {
     let conversation: BoundConversation | null = null;
     let adapter: QwenRuntimeAdapter | undefined;
@@ -611,6 +632,11 @@ export class QwenExecution {
 
   /** Drops every reference held, and takes down whatever is on screen. */
   dispose(): void {
+    // The half the contract makes mandatory: a workspace built lazily is still
+    // a workspace, and an unload that never released it leaves whatever it
+    // opened behind the plugin that opened it.
+    void this.workspaceHolder.dispose().catch(() => undefined);
+
     // Taken down before the subscriptions are dropped: unsubscribing first
     // empties the set this iterates, and the prompts stay on screen.
     for (const presenter of this.presenters) {
@@ -981,4 +1007,16 @@ async function readQwenContextUsage(
     delayThroughWindow(QWEN_CONTEXT_USAGE_TIMEOUT_MS).then(() => null),
   ]).catch(() => null);
   return parseQwenContextUsage(answered);
+}
+
+/**
+ * A runtime port reached from a workspace context.
+ *
+ * Refused rather than answered: these are a tab's, and a workspace slot that
+ * asked for one would be answering from whichever tab happened to build the
+ * workspace first. Nothing does today, and this is what would happen if
+ * something started.
+ */
+function runtimeOnly(port: string): never {
+  throw new Error(`Runtime port "${port}" is not available from a workspace context.`);
 }

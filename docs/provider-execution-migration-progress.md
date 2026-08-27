@@ -9129,6 +9129,41 @@ they rest on are asserted — because a document that keeps saying `reshape` abo
 since fixed is worse than no document. Proven by growing the chat-UI slot by one member and watching
 it go red.
 
+#### The keystone: a workspace a consumer can actually reach
+
+The slot-fit audit found the workspace rows blocked by contexts that threw, and wiring them fixed
+that — but they stayed blocked for a second reason the audit had not looked for: **nothing built a
+workspace.** `module.workspace.initialize` had exactly one caller, Codex's composition, and no
+consumer could reach the slots at all. A perfect slot with a wired context still had no path to a
+consumer.
+
+`ProviderWorkspaceHolder` is that path, and `ApplicationRuntime.workspaceFor(providerId)` is the one
+call a consumer will use. Every provider is behind it; none of them exists until something asks.
+
+**Lazy, deliberately.** Codex's was eager because a synchronous `createRuntime` needed the slots to
+already exist. Nothing else does, and the plan's own note says it is those synchronous consumers
+that force eagerness. So a provider the user never opens costs nothing, a workspace that fails to
+build fails where the question was asked rather than during load, and a failed build is not cached —
+which is what makes a transient failure transient.
+
+Four behaviours a composition would otherwise have got wrong eight separate ways, and each has its
+test: two callers arriving together share one initialization rather than opening a handle twice; a
+failed build is retried by the next question; `dispose` releases what was built and nothing when
+nothing was; and an unload arriving mid-build **aborts** rather than awaiting, because awaiting
+would make unload wait on a provider that may never answer. That last one is why the contract takes
+a signal, and until now nothing passed a real one.
+
+**Two things the keystone exposed rather than caused.** Antigravity's composition had no `dispose`
+at all and the application never called one — true while print mode held no session, no daemon and
+no scratch, and false the moment it held a workspace. And every runtime port in a workspace context
+now **refuses** rather than answering: a workspace slot answers about the plugin, never about a tab,
+and one that reached for a tab's session would be answering from whichever tab happened to build the
+workspace first.
+
+The break that mattered was the one that did not fire. Removing Qwen from the lookup left the test
+green, because it asserted the answer was *defined* — and a provider missing from the switch answers
+with an empty workspace, which is defined. It asserts the slots now, and the same break turns it red.
+
 #### Reviewing the shared helper found the thing sharing it was supposed to prevent
 
 The review of the wiring above turned up one real defect, in the shared code, put there by this

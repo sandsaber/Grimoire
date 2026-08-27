@@ -1,5 +1,6 @@
 import { AgentCoordinator } from '@/core/agents/AgentCoordinator';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
+import type { ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
 import type { AppSessionStorage } from '@/core/providers/types';
 import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 import type { ProviderId } from '@/core/types/provider';
@@ -211,6 +212,44 @@ export class ApplicationRuntime {
   }
 
   /**
+   * A provider's workspace slots, built the first time one is asked for.
+   *
+   * The one place a consumer can reach what the workspace registry holds today,
+   * and the seam that lets it be deleted: every provider's slots are behind
+   * this call rather than a static lookup, and none of them
+   * exists until something asks — so a provider the user never opens costs
+   * nothing, and one whose workspace fails to build fails where the question
+   * was asked rather than during load.
+   */
+  workspaceFor(providerId: ProviderId): Promise<ProviderWorkspaceSlots> {
+    const composition = this.compositionFor(providerId);
+    if (!composition) {
+      // Not an error: the catalog validates provider ids, so an id with no
+      // composition is an id this build does not compose — which reads the same
+      // as a provider with nothing to offer.
+      return Promise.resolve({});
+    }
+    return composition.workspace();
+  }
+
+  private compositionFor(
+    providerId: ProviderId,
+  ): { workspace(): Promise<ProviderWorkspaceSlots> } | null {
+    switch (providerId) {
+      case 'antigravity': return this.antigravity;
+      case 'claude': return this.claude;
+      case 'codex': return this.codex;
+      case 'gemini': return this.gemini;
+      case 'grok': return this.grok;
+      case 'kimicode': return this.kimicode;
+      case 'mimocode': return this.mimocode;
+      case 'opencode': return this.opencode;
+      case 'qwen': return this.qwen;
+      default: return null;
+    }
+  }
+
+  /**
    * Opens the kernel's gate, then does the work that needs it open.
    *
    * A kernel that cannot start must not take the load down with it: every
@@ -262,6 +301,10 @@ export class ApplicationRuntime {
    */
   dispose(): void {
     void this.localShell.dispose();
+    // Added when it acquired something to release: print mode keeps no session
+    // and no daemon, so this composition had no `dispose` and the application
+    // never called one.
+    void this.antigravity.dispose();
     this.codex.dispose();
     this.claude.dispose();
     this.opencode.dispose();

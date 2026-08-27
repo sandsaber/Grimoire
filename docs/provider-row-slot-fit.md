@@ -103,6 +103,9 @@ the reshape has to be designed from the implementations — which is what the no
 So the work splits in two, and only one half is design:
 
 1. **Write the eight module contexts.** Done — see the table above. It blocked every workspace row.
+   So did a second thing the first version of this file did not look for: **nothing built a
+   workspace.** `module.workspace.initialize` had one caller. `ProviderWorkspaceHolder` and
+   `ApplicationRuntime.workspaceFor(providerId)` are the path a consumer takes; both are done.
 2. **Reshape eleven slots.** Design, from the implementations, with the notes above as input.
 
 **Two of the eleven wait on their consumers rather than on design.** `taskResultInterpreter` and

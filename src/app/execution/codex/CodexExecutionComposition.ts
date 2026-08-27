@@ -71,6 +71,7 @@ import { getVaultPath } from '@/utils/path';
 import { auxiliaryPurposeKey } from '../auxiliaryPurpose';
 import { delayThroughWindow } from '../hostTimers';
 import { KernelAuxQueryRunner } from '../KernelAuxQueryRunner';
+import { ProviderWorkspaceHolder } from '../ProviderWorkspaceHolder';
 
 /**
  * What an auxiliary turn may answer with, which is much less than a chat turn.
@@ -144,7 +145,12 @@ export class CodexExecution {
   private auxiliaryFactory: CodexExecutionConnectionFactory | undefined;
   private backend: CodexExecutionBackend | undefined;
   private readonly presenters = new Set<CodexInteractionPresenter>();
-  private workspaceSlots: ProviderWorkspaceSlots | undefined;
+  private readonly workspaceHolder = new ProviderWorkspaceHolder(
+    codexProviderModule.workspace,
+    // No conversation: the workspace slots are the plugin's, not a tab's, which
+    // is also the only way a synchronous `createRuntime` can have them.
+    () => createCodexModuleContext(this.plugin, () => null),
+  );
   private runtimeContext: ReturnType<typeof createCodexRuntimeContext> | undefined;
   private readonly disposers: Array<() => void> = [];
 
@@ -411,7 +417,7 @@ export class CodexExecution {
       },
       ports,
       contributions,
-      workspace ?? this.workspaceSlots,
+      workspace ?? this.workspaceHolder.peek(),
       // The tab closing is the only lifecycle the adapter has no port for, and
       // it is when a tab's images and any prompt it is showing stop being
       // anyone's. Waiting for the tab's next turn is waiting for one that never
@@ -463,12 +469,12 @@ export class CodexExecution {
    * which is also the only way a synchronous `createRuntime` can have them.
    */
   async initializeWorkspace(): Promise<void> {
-    this.workspaceSlots = await codexProviderModule.workspace.initialize(
-      createCodexModuleContext(this.plugin, () => null),
-      // Nothing here awaits anything cancellable; the signal exists so a
-      // provider whose workspace does can honour an unload that overtakes it.
-      new AbortController().signal,
-    );
+    await this.workspaceHolder.resolve();
+  }
+
+  /** This provider's workspace slots, built on the first question. */
+  workspace(): Promise<ProviderWorkspaceSlots> {
+    return this.workspaceHolder.resolve();
   }
 
   /** The store every tab runtime references its turns through. */
@@ -478,6 +484,11 @@ export class CodexExecution {
 
   /** Releases the scratch directories and takes down whatever is on screen. */
   dispose(): void {
+    // The half the contract makes mandatory: a workspace built lazily is still
+    // a workspace, and an unload that never released it leaves whatever it
+    // opened behind the plugin that opened it.
+    void this.workspaceHolder.dispose().catch(() => undefined);
+
     // Taken down before the subscriptions are dropped: unsubscribing first
     // empties the set this iterates, and the prompts stay on screen.
     for (const presenter of this.presenters) {

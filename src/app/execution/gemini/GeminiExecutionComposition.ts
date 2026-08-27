@@ -70,6 +70,7 @@ import { buildGeminiRuntimeEnv } from '@/providers/gemini/runtime/GeminiRuntimeE
 import { getVaultPath } from '@/utils/path';
 
 import { delayThroughWindow } from '../hostTimers';
+import { ProviderWorkspaceHolder } from '../ProviderWorkspaceHolder';
 
 /** What a turn may answer with, before it is refused as too large. */
 const MAX_RESULT_BYTES = 256_000;
@@ -134,6 +135,19 @@ export class GeminiExecution {
   private readonly presenters = new Set<GeminiInteractionPresenter>();
 
   private backend: GeminiExecutionBackend | undefined;
+
+  /**
+   * This provider's workspace slots, built on the first question.
+   *
+   * The context is built with no conversation and with every runtime port
+   * refusing: a workspace slot answers about the plugin, never about a tab, and
+   * one that reached for a tab's session would be answering from whichever tab
+   * happened to build the workspace first. Refusing says so where it happens.
+   */
+  private readonly workspaceHolder = new ProviderWorkspaceHolder(
+    geminiProviderModule.workspace,
+    () => createGeminiModuleContext(this.plugin, () => null),
+  );
 
   constructor(
     private readonly plugin: GrimoirePlugin,
@@ -239,6 +253,12 @@ export class GeminiExecution {
    * about *this* conversation's session: what it is set to, what it has said,
    * and which prompt is on screen.
    */
+
+  /** This provider's workspace slots, built on the first question. */
+  workspace(): Promise<ProviderWorkspaceSlots> {
+    return this.workspaceHolder.resolve();
+  }
+
   createRuntime(): ChatRuntime {
     let conversation: BoundConversation | null = null;
     let adapter: GeminiRuntimeAdapter | undefined;
@@ -493,6 +513,11 @@ export class GeminiExecution {
 
   /** Drops every reference held, and takes down whatever is on screen. */
   dispose(): void {
+    // The half the contract makes mandatory: a workspace built lazily is still
+    // a workspace, and an unload that never released it leaves whatever it
+    // opened behind the plugin that opened it.
+    void this.workspaceHolder.dispose().catch(() => undefined);
+
     // Taken down before the subscriptions are dropped: unsubscribing first
     // empties the set this iterates, and the prompts stay on screen.
     for (const presenter of this.presenters) {

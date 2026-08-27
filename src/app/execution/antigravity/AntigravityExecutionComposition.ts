@@ -4,6 +4,7 @@ import { NodeAntigravityProcessTransport } from '@/app/execution/antigravity/Nod
 import type { RunTerminalReason } from '@/core/execution/ExecutionContracts';
 import { executionSessionId, runId, sessionInstanceId } from '@/core/execution/ExecutionIds';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
+import type { ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
 import {
@@ -20,6 +21,7 @@ import type { ChatMessage } from '@/core/types';
 import { t } from '@/i18n/i18n';
 import type GrimoirePlugin from '@/main';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
+import { createAntigravityModuleContext } from '@/providers/antigravity/app/AntigravityModuleContext';
 import {
   AntigravityExecutionBackend,
   type AntigravityExecutionBackendContext,
@@ -42,6 +44,7 @@ import { getAntigravityProviderSettings } from '@/providers/antigravity/settings
 import { getVaultPath } from '@/utils/path';
 
 import { delayThroughWindow } from '../hostTimers';
+import { ProviderWorkspaceHolder } from '../ProviderWorkspaceHolder';
 
 /** Combined stdout, stderr, and recovered-transcript ceiling for one run. */
 const OUTPUT_BYTE_LIMIT = 64_000;
@@ -62,6 +65,17 @@ const OUTPUT_BYTE_LIMIT = 64_000;
 export class AntigravityExecution {
   private readonly requests = new AntigravityRequestStore(() => opaqueId('agyreq'));
 
+  /**
+   * This provider's workspace slots, built on the first question.
+   *
+   * No runtime ports to refuse: print mode binds to no conversation, so the
+   * whole context is the workspace half.
+   */
+  private readonly workspaceHolder = new ProviderWorkspaceHolder(
+    antigravityProviderModule.workspace,
+    () => createAntigravityModuleContext(this.plugin),
+  );
+
   constructor(
     private readonly plugin: GrimoirePlugin,
     private readonly registry: ExecutionLifecycleRegistry,
@@ -74,6 +88,25 @@ export class AntigravityExecution {
    * and process ownership, and a test that has to launch `agy` to check how a
    * turn is composed is testing the wrong thing.
    */
+
+  /** This provider's workspace slots, built on the first question. */
+  workspace(): Promise<ProviderWorkspaceSlots> {
+    return this.workspaceHolder.resolve();
+  }
+
+
+  /**
+   * Releases the workspace, which is all this composition holds.
+   *
+   * It had no `dispose` at all until it had a workspace: print mode keeps no
+   * session, no daemon and no scratch, so there was nothing to release and the
+   * application never called one. A lazily built workspace is still a
+   * workspace, and the contract's `dispose` half is mandatory for that reason.
+   */
+  async dispose(): Promise<void> {
+    await this.workspaceHolder.dispose();
+  }
+
   createBackend(
     processRunner: AntigravityProcessRunner = this.createProcessRunner(),
   ): AntigravityExecutionBackend {

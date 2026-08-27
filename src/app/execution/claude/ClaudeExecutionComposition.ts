@@ -14,6 +14,7 @@ import type {
   BackendLifecycleRegistration,
   ExecutionLifecycleRegistry,
 } from '@/core/execution/ExecutionLifecycleRegistry';
+import type { ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
 import type { ProviderRuntimePorts } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
@@ -62,6 +63,7 @@ import { getVaultPath } from '@/utils/path';
 
 import { isRecord } from '../../../utils/records';
 import { delayThroughWindow } from '../hostTimers';
+import { ProviderWorkspaceHolder } from '../ProviderWorkspaceHolder';
 
 /** What an auxiliary answer may be, before it is refused as too large. */
 const AUXILIARY_RESULT_BYTE_LIMIT = 64_000;
@@ -118,6 +120,23 @@ export class ClaudeExecution {
       QueryOptionsBuilder.resolveClaudeSdkPermissionMode(mode)
     ),
   });
+
+  /**
+   * This provider's workspace slots, built on the first question.
+   *
+   * The context is built with no conversation and with every runtime port
+   * refusing: a workspace slot answers about the plugin, never about a tab, and
+   * one that reached for a tab's session would be answering from whichever tab
+   * happened to build the workspace first. Refusing says so where it happens.
+   */
+  private readonly workspaceHolder = new ProviderWorkspaceHolder(
+    claudeProviderModule.workspace,
+    () => createClaudeModuleContext(this.plugin, () => null,
+      {
+      executionSessionId: () => runtimeOnly('executionSessionId'),
+      rewind: () => runtimeOnly('rewind'),
+    }),
+  );
 
   constructor(
     private readonly plugin: GrimoirePlugin,
@@ -261,6 +280,12 @@ export class ClaudeExecution {
    * it tracks a turn's streamed text and the session the tab is on, and the
    * interaction presenter, because a prompt belongs to the tab that raised it.
    */
+
+  /** This provider's workspace slots, built on the first question. */
+  workspace(): Promise<ProviderWorkspaceSlots> {
+    return this.workspaceHolder.resolve();
+  }
+
   createRuntime(): ChatRuntime {
     let conversation: BoundConversation | null = null;
     let adapter: ClaudeRuntimeAdapter | undefined;
@@ -463,6 +488,11 @@ export class ClaudeExecution {
 
   /** Drops every reference held, and takes down whatever is on screen. */
   dispose(): void {
+    // The half the contract makes mandatory: a workspace built lazily is still
+    // a workspace, and an unload that never released it leaves whatever it
+    // opened behind the plugin that opened it.
+    void this.workspaceHolder.dispose().catch(() => undefined);
+
     // Taken down before the subscriptions are dropped: unsubscribing first
     // empties the set this iterates, and the prompts stay on screen.
     for (const presenter of this.presenters) {
@@ -600,3 +630,15 @@ function claudeSessionIntent(
   return sessionId ? { kind: 'resume', sessionId } : { kind: 'new' };
 }
 
+
+/**
+ * A runtime port reached from a workspace context.
+ *
+ * Refused rather than answered: these are a tab's, and a workspace slot that
+ * asked for one would be answering from whichever tab happened to build the
+ * workspace first. Nothing does today, and this is what would happen if
+ * something started.
+ */
+function runtimeOnly(port: string): never {
+  throw new Error(`Runtime port "${port}" is not available from a workspace context.`);
+}
