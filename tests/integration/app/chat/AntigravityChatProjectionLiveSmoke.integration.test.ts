@@ -6,25 +6,16 @@ import { join } from 'node:path';
 
 import { ownedProcesses } from '@test/helpers/execution/hostProcessTree';
 import { createDurableInMemoryVaultAdapter } from '@test/helpers/inMemoryVaultAdapter';
-import { createMockEl } from '@test/helpers/mockElement';
+import {
+  openChatProjection,
+  userMessage,
+} from '@test/integration/app/chat/chatProjectionLiveHarness';
 
-import { ChatExecutionComposition } from '@/app/chat/ChatExecutionComposition';
-import { ChatTabExecution } from '@/app/chat/ChatTabExecution';
 import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
-import { StoredChatConversations } from '@/app/chat/StoredChatConversations';
 import { AntigravityExecution } from '@/app/execution/antigravity/AntigravityExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
-import { SessionStorage } from '@/core/bootstrap/SessionStorage';
-import type { RunTerminal } from '@/core/execution/ExecutionContracts';
 import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
-import { describeRunFailure } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
-import type { ChatContentItem, ChatMessage, StreamChunk } from '@/core/types';
-import type {
-  ChatMessageOperations,
-  ChatStreamingCursor,
-  ChatStreamOperations,
-} from '@/features/chat/rendering/ChatSurfaceRenderTarget';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
 import { updateAntigravityProviderSettings } from '@/providers/antigravity/settings';
 
@@ -37,15 +28,10 @@ import { updateAntigravityProviderSettings } from '@/providers/antigravity/setti
  * kernel over a real CLI, drawn by the real render target, and read back out of
  * a real record store.
  *
- * Nothing below the composition is a fake. The backend is the one production
- * registers, over the OS process runner; the conversation store is
- * `SessionStorage` over a vault adapter, so the barrier's write goes through
- * the same envelope a vault in the field holds. What is doubled is the column
- * itself — the DOM — and it is doubled by *recording* rather than by answering,
- * so an assertion here is about what the surface was asked to draw.
- *
- * What it cannot reach stays in the matrix: what the drawn text looks like, and
- * the two-tab and reload-mid-turn rows that need a plugin around it.
+ * Print mode is the smallest whole turn there is — no session to resume, no
+ * interaction channel, one `output-delta` carrying the whole answer — so what
+ * these rows measure is submit, draw, barrier and terminal, with none of the
+ * couplings that would confound a first reading of them.
  *
  * Off by default — it starts a CLI and spends the account's tokens. Run it with
  * `GRIMOIRE_ANTIGRAVITY_LIVE=1`.
@@ -60,6 +46,12 @@ live('Antigravity chat projection live smoke', () => {
 
   const running: Array<() => Promise<void>> = [];
 
+  afterEach(async () => {
+    for (const release of running.splice(0)) {
+      await release().catch(() => undefined);
+    }
+  });
+
   /**
    * The flip this file certifies, asserted rather than assumed.
    *
@@ -70,12 +62,6 @@ live('Antigravity chat projection live smoke', () => {
    */
   it('is about a provider that is on the projection path', () => {
     expect(usesProjectionChat('antigravity')).toBe(true);
-  });
-
-  afterEach(async () => {
-    for (const release of running.splice(0)) {
-      await release().catch(() => undefined);
-    }
   });
 
   /** The `agy` invocations this process is responsible for, right now. */
@@ -109,150 +95,35 @@ live('Antigravity chat projection live smoke', () => {
     };
   }
 
-  /**
-   * A column that records what it was asked to draw.
-   *
-   * The operations are the ones `StreamController` and `MessageRenderer`
-   * perform; recording them rather than answering them is what keeps this a
-   * statement about the path instead of about a stub's return value.
-   */
-  function surface(runtime: ExecutionChatRuntimeAdapter) {
-    const drawn: string[] = [];
-    const chunks: StreamChunk[] = [];
-    const element = createMockEl();
-    element.querySelector = jest.fn().mockReturnValue(createMockEl());
-    const state: ChatStreamingCursor = {
-      messages: [],
-      usage: null,
-      currentContentEl: null,
-      currentTextEl: null,
-      currentTextContent: '',
-      currentThinkingState: null,
-      addMessage(message) {
-        this.messages.push(message);
-      },
-    };
-    return {
-      chunks,
-      drawn,
-      state,
-      binding: {
-        state,
-        renderer: {
-          addMessage: () => element as unknown as HTMLElement,
-          renderMessages: () => element as unknown as HTMLElement,
-        } as unknown as ChatMessageOperations,
-        stream: {
-          handleStreamChunk: (chunk: StreamChunk) => {
-            chunks.push(chunk);
-            return Promise.resolve();
-          },
-          appendText: (text: string) => {
-            drawn.push(text);
-            return Promise.resolve();
-          },
-          appendThinking: () => Promise.resolve(),
-          finalizeCurrentTextBlock: () => Promise.resolve(),
-          finalizeCurrentThinkingBlock: () => Promise.resolve(),
-          flushPendingToolsForPermission: () => undefined,
-          showThinkingIndicator: () => undefined,
-          hideThinkingIndicator: () => undefined,
-          startTurnSilenceIndicator: () => undefined,
-          pauseTurnSilenceIndicator: () => undefined,
-          stopTurnSilenceIndicator: () => undefined,
-        } as unknown as ChatStreamOperations,
-        // Read through the runtime, exactly as `tabProjectionExecution` does,
-        // so a provider that grows a content presenter is covered by this file
-        // without it being edited.
-        presentProviderContent: (payload: unknown) => (
-          runtime.surfacePorts.presentProviderContent?.(payload) ?? []
-        ) as readonly ChatContentItem[],
-        createAssistantMessage: (messageId: string): ChatMessage => ({
-          id: messageId,
-          role: 'assistant',
-          content: '',
-          timestamp: Date.now(),
-          toolCalls: [],
-          contentBlocks: [],
-        }),
-        describeTerminal: (terminal: RunTerminal) => (
-          runtime.surfacePorts.describeFailure?.(terminal.reason)
-          ?? describeRunFailure(terminal.reason)
-        ),
-        getGreeting: () => '',
-        getProviderId: () => 'antigravity' as const,
-        updateQueueIndicator: () => undefined,
-        setTitle: () => undefined,
-      },
-    };
-  }
-
   async function createHarness() {
     const vault = mkdtempSync(join(tmpdir(), 'grimoire-agy-projection-'));
     writeFileSync(join(vault, 'Note.md'), '# Note\n\nThe vault has one note in it.\n');
-    const adapter = createDurableInMemoryVaultAdapter();
-    const sessions = new SessionStorage(adapter, new VaultDurableStorage(adapter));
     const host = new ExecutionKernelHost({
-      storage: new VaultDurableStorage(adapter),
+      storage: new VaultDurableStorage(createDurableInMemoryVaultAdapter()),
       scheduler: {
         setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
         clearTimeout: handle => clearTimeout(handle as NodeJS.Timeout),
       },
     });
     const execution = new AntigravityExecution(createPlugin(vault), host.registry);
+    // No runner argument: the default is the OS one, which is the whole point.
     host.registerBackend({ backend: execution.createBackend() });
     await host.start();
 
-    const composition = new ChatExecutionComposition({
-      lifecycle: host.registry,
-      conversations: new StoredChatConversations({
-        repository: sessions.records,
-        projection: sessions,
-        defaultProviderId: 'antigravity',
-      }),
-    });
-    await sessions.records.save({
-      id: CONVERSATION_ID,
-      providerId: 'antigravity',
-      title: 'New conversation',
-      createdAt: 1,
-      updatedAt: 1,
-      messages: [],
-    }, null);
-
     const runtime = execution.createRuntime() as unknown as ExecutionChatRuntimeAdapter;
-    const column = surface(runtime);
-    const tab = new ChatTabExecution({
-      composition,
-      providerId: 'antigravity',
+    const harness = await openChatProjection({
       backendId: antigravityProviderModule.execution.descriptor.backendId,
-      surface: column.binding,
-      turnEncoder: () => runtime.turnEncoder,
-      createConversation: async () => CONVERSATION_ID,
-      nextCommandId: () => `turn-${Date.now().toString(36)}`,
+      conversationId: CONVERSATION_ID,
+      lifecycle: host.registry,
+      providerId: 'antigravity',
+      runtime,
     });
-    await tab.open(CONVERSATION_ID);
-
-    const release = async (): Promise<void> => {
-      tab.detach();
-      composition.dispose();
+    running.push(async () => {
+      await harness.close();
       await host.dispose();
       rmSync(vault, { force: true, recursive: true });
-    };
-    running.push(release);
-    return { column, composition, release, sessions, tab };
-  }
-
-  function userMessage(text: string): ChatMessage {
-    const timestamp = Date.now();
-    return {
-      id: `user-${timestamp.toString(36)}`,
-      role: 'user',
-      content: text,
-      displayContent: text,
-      timestamp,
-      completedAt: timestamp,
-    };
+    });
+    return harness;
   }
 
   function pause(delayMs: number): Promise<void> {

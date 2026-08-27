@@ -3,8 +3,9 @@ import { usesProjectionChat } from '../../../app/chat/projectionChatProviders';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { describeRunFailure } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
-import type { ChatContentItem, ChatMessage, StreamChunk } from '../../../core/types';
+import type { ChatMessage } from '../../../core/types';
 import type GrimoirePlugin from '../../../main';
+import { isChatContent } from '../rendering/chatContentChunks';
 import { buildAssistantResponseMetadata } from '../utils/assistantResponseMetadata';
 import { getTabSettingsSnapshot } from './tabSettings';
 import type { TabData } from './types';
@@ -146,19 +147,6 @@ export function createTabProjectionExecution(
 function adapterOf(tab: TabData): ExecutionChatRuntimeAdapter | null {
   const service = tab.service as ExecutionChatRuntimeAdapter | null;
   return service && 'turnEncoder' in service && 'surfacePorts' in service ? service : null;
-}
-
-/** The five variants the projection states itself, dropped where they arrive. */
-const TURN_LIFECYCLE_TYPES = new Set([
-  'user_message_start',
-  'assistant_message_start',
-  'status',
-  'error',
-  'done',
-]);
-
-function isChatContent(chunk: StreamChunk): chunk is ChatContentItem {
-  return !TURN_LIFECYCLE_TYPES.has(chunk.type);
 }
 
 function chatExecutionOrNull(plugin: GrimoirePlugin) {

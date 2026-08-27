@@ -8281,9 +8281,9 @@ Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`)
 
 ### Where the session of 2026-08-27 is
 
-**The chat projection path has its first provider on it.** `projectionChatProviders` holds
-`antigravity`, so an Antigravity tab now submits its turns to the chat execution coordinator, the
-kernel runs them, and the surface draws what the projection says. Every other provider is unchanged
+**The chat projection path has its first two providers on it.** `projectionChatProviders` holds
+`antigravity` and `codex`, so those tabs now submit their turns to the chat execution coordinator,
+the kernel runs them, and the surface draws what the projection says. The other seven are unchanged
 and still on `InputController`'s generator.
 
 **Antigravity is first because it is the smallest whole turn.** Print mode has no provider-native
@@ -8332,7 +8332,54 @@ Gate: unit 535 suites / 8438 tests green, integration 5 suites / 156 tests green
 the live harnesses), typecheck clean, lint clean, `build:release` clean including `review:source`,
 `review:css` and `review:deps`.
 
-Next: the second provider. Claude is the natural one — it is wave 3, certified, has a content
+**Codex is the second provider on the path**, and the first that brought anything to it: a content
+presenter whose items the surface draws, a thread the next turn resumes, and its own words for a
+failure. Its driven rows are `CodexChatProjectionLiveSmoke`, over a shared
+`chatProjectionLiveHarness` the Antigravity file was refactored onto in the same commit — one
+assembly, so a row that passes for one provider is measuring the same thing for the next.
+
+**Codex's answer renders once on this path.** `CodexLiveSmoke` row 1 carries a live finding that the
+legacy adapter path sees the answer three times; the projection path draws one `done`, one assistant
+bubble and one piece of text. Recorded rather than celebrated — nothing was fixed here, and which of
+the two readings is right is a question for whoever owns that duplication.
+
+**Row C was green three times before it was worth anything, and that is the finding of this
+checkpoint.** It asks whether a reloaded tab resumes its thread. It passed with `nativeSessionRef`
+deleted from the coordinator command, passed again with the conversation never synced to the
+runtime, and passed a third time with the transcript emptied first. Three breaks, three greens. The
+reasons, in the order they were found:
+
+- the composition encodes the conversation's history into every request, so a second turn answers
+  from the transcript whatever the thread does;
+- Codex's `thread/resume` **with no id resumes the most recent thread in its own store** — which, on
+  a machine that just ran the first half of the row, is exactly the thread the row wants;
+- **the thread is carried twice.** `nativeSessionRef` on the kernel command restores it at session
+  open, and the conversation binding rides inside the request reference. Either alone resumes, so
+  breaking either alone is invisible.
+
+The row asserts the wire now — that `thread/resume` carried the conversation's own id — and it goes
+red only with both carriers gone, where `thread/start` replaces `thread/resume` and the model has
+never heard of the word. **A live row that reads only the model's answer is not evidence.**
+
+**And the harness measured itself once.** Its `presentProviderContent` was a copy of
+`tabProjectionExecution`'s that left the filter out, so the first Codex run drew
+`user_message_start` and `assistant_message_start` into the column and reported it as a product
+finding. The filter is `src/features/chat/rendering/chatContentChunks.ts` now, one definition used by
+the binding and by every harness. The same shape twice more in this checkpoint: a wire probe that
+truncated `thread/resume` params at 4000 characters cut off the very id it was asserting, because
+`baseInstructions` is longer than that on its own.
+
+**One observation that is not a finding**: Codex sends a single tool call's result twice — once when
+the item completes and again from `flushPendingRawToolOutputs` at `turn.completed`, because the raw
+`function_call_output` arrives after the item did and the consume meant to claim it found nothing.
+`StreamController.handleToolResult` looks a result up by id and updates the call in place, so the
+repeat lands on the same card on both paths. Row B asserts the shape — every result names a call the
+turn made — rather than a count.
+
+Gate after Codex: unit 535 suites / 8438 tests green, integration green, typecheck, lint and
+`build:release` clean. Codex live: 4 rows of 4.
+
+Next: the third provider. Claude is the natural one — it is wave 3, certified, has a content
 presenter this path has never exercised, and is the only provider whose auxiliary work is
 deliberately outside the kernel — but Codex is the cheaper read, because its content presenter is
 the one whose six unconsumed notifications are already pinned.

@@ -22,7 +22,7 @@ import type { ProviderId } from '@/core/types/provider';
  * of the couplings that would confound a first reading of them. It is also the
  * only provider certified end to end on the machine this branch is built on.
  */
-export const PROJECTION_CHAT_PROVIDERS: readonly ProviderId[] = ['antigravity'];
+export const PROJECTION_CHAT_PROVIDERS: readonly ProviderId[] = ['antigravity', 'codex'];
 
 export function usesProjectionChat(providerId: ProviderId): boolean {
   return PROJECTION_CHAT_PROVIDERS.includes(providerId);

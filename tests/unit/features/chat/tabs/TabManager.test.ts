@@ -82,6 +82,13 @@ jest.mock('@/core/providers/ProviderRegistry', () => ({
 jest.mock('@/core/providers/ProviderCatalog', () => ({
   providerCatalog: () => ({
     capabilities: (...args: any[]) => mockGetCapabilities(...args),
+    // Answered rather than absent: a tab whose provider is on the projection
+    // path asks the catalog for its module on creation, and a double that has
+    // only the method the suite happened to need throws for every provider
+    // added to that list. `undefined` is a real answer here — it means this
+    // suite is not exercising the projection path — while a missing method is
+    // a suite that breaks on a switch it has no opinion about.
+    get: () => undefined,
   }),
 }));
 
