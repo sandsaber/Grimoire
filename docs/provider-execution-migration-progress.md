@@ -8952,6 +8952,21 @@ parent *instance* with no run type-legal, and adoption wrote the command's `unde
 through, so the schema refused it with a message about a pair. `prepareDispatch` already derived it
 from the parent it had just resolved; adoption does now too.
 
+#### A decision nobody had implemented
+
+Found by writing down the two open questions and then checking one of them against the code rather
+than against itself — the same move that caught four stale obligations earlier in this session.
+"Retention" was not open: **D3 decided it**, and the deletion path did not implement it. The details
+are in the scoped list below, but the shape is worth keeping separate from them: *a written decision
+is not a gate*, and the only thing standing between this one and a vault full of orphaned agent
+records was that nothing had written an agent record yet.
+
+The agent store gained transactional removal to do it — the same shape the execution control store
+already deletes with, because a deletion interrupted half-way must be finished at the next start
+rather than leave an instance whose runs are gone. And the append-only result store gained a removal
+too: **append-only is a rule about writing, not about a conversation's lifetime**, and a store that
+could not be emptied would make D4 impossible to honour.
+
 #### The next checkpoint, scoped
 
 The plan binds three things into one checkpoint and the binding is the point: **tab close stops
@@ -8972,9 +8987,16 @@ Two questions to settle before writing it, both recorded rather than guessed:
 - **a hung `port.dispatch()` holds the whole coordinator**, through `enqueueTopology`. Whoever writes
   the producer's dispatch path chooses whether it is bounded by `controlTimeoutMs` like every other
   external call, and that decision is about what a provider is allowed to take;
-- **retention**. D4 finds a deleted conversation's records by owner, and these are owned by the
-  conversation, so deletion works — but nothing yet prunes a completed agent's records, and a vault
-  that runs a hundred background agents keeps a hundred instances, runs and results for ever.
+- ~~**retention**.~~ **Not a question — D3 decided it, and nothing did it.** The decision is that an
+  agent instance and its attempts are kept "until its owning conversation is deleted", deliberately,
+  so that "deleting the chat deletes its traces" stays true without a second retention concept to
+  explain. And `ExecutionLifecycleRegistry.deleteOwnedRecords` removes sessions, runs, interactions
+  and reconciliations — it knows nothing about the agent domain, which is right, so the deletion had
+  to live there and did not exist at all. `AgentCoordinator.deleteOwnedRecords` closes it, deepest
+  first and inside one intent, so a deletion interrupted half-way leaves an instance whose parts are
+  gone rather than parts whose instance is gone. Written while nothing calls the recorder, so the
+  first conversation ever deleted with agent records already loses them. **Its call site lands with
+  the wiring**, beside the registry's.
 
 #### What to pick up next, in order
 

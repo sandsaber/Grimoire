@@ -21,7 +21,10 @@ import type {
   AgentRunRecoveryPort,
   AgentTerminalStatus,
 } from './AgentContracts';
-import { AgentControlTransactionCoordinator } from './AgentControlTransactionCoordinator';
+import {
+  type AgentControlRemoval,
+  AgentControlTransactionCoordinator,
+} from './AgentControlTransactionCoordinator';
 import type {
   AgentDispatchToken,
   AgentInstanceId,
@@ -561,6 +564,59 @@ export class AgentCoordinator {
       }
       return this.linkResultUnlocked(canonical);
     });
+  }
+
+  /**
+   * Removes every agent record a conversation owns.
+   *
+   * **D3 decided this and nothing did it.** The persistence decisions say an
+   * agent instance and its attempts are kept "until its owning conversation is
+   * deleted", deliberately, so that "deleting the chat deletes its traces"
+   * stays true without a second retention concept. `deleteOwnedRecords` on the
+   * lifecycle registry removes sessions, runs, interactions and reconciliations
+   * — and knows nothing about this domain, which is right, so the deletion had
+   * to be here and was not. Written now, while nothing calls the recorder, so
+   * the first conversation ever deleted with agent records already loses them.
+   *
+   * Deepest first: results, then runs and intents, then the instances. A
+   * deletion interrupted half-way then leaves an instance whose parts are gone
+   * rather than parts whose instance is gone, and only the first is recoverable
+   * by reading the instance's own list.
+   */
+  async deleteOwnedRecords(owner: ExecutionOwner, transactionId: string): Promise<void> {
+    const ownerKey = stableSerialize(owner);
+    const removals: AgentControlRemoval[] = [];
+    const runIds: string[] = [];
+    for (const instanceId of await this.repositories.instances.listRecordIds()) {
+      const instance = await this.repositories.instances.read(instanceId);
+      if (instance.kind !== 'current' && instance.kind !== 'migrated') continue;
+      if (stableSerialize(instance.record.payload.rootOwner) !== ownerKey) continue;
+      runIds.push(...instance.record.payload.runIds);
+      removals.push({ repository: 'instances', recordId: instanceId });
+    }
+    if (runIds.length === 0 && removals.length === 0) {
+      return;
+    }
+    const owned = new Set(runIds);
+    for (const resultId of await this.repositories.results.listRecordIds()) {
+      const result = await this.repositories.results.read(resultId);
+      if (result.kind !== 'current' && result.kind !== 'migrated') continue;
+      if (!owned.has(result.record.payload.agentRunId)) continue;
+      removals.unshift({ repository: 'results', recordId: resultId });
+    }
+    for (const runId of runIds) {
+      const run = await this.repositories.runs.read(runId);
+      const dispatchToken = (run.kind === 'current' || run.kind === 'migrated')
+        ? run.record.payload.dispatchToken
+        : undefined;
+      // An adopted agent has no dispatch intent — Grimoire never dispatched it,
+      // so there is nothing to remove for it.
+      if (dispatchToken) {
+        removals.unshift({ repository: 'dispatch-intents', recordId: dispatchToken });
+      }
+      removals.unshift({ repository: 'runs', recordId: runId });
+    }
+    await this.transactions.delete(transactionId, removals);
   }
 
   async recoverResultLinks(): Promise<AgentResultLinkRecoveryReport> {

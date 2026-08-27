@@ -36,6 +36,17 @@ export class MutableAgentRepository<TRecord> {
     return this.records.save(recordId, record, null);
   }
 
+  /**
+   * Removes a record if it is there, and says nothing if it is not.
+   *
+   * Written for deletion by owner, which is replayable by design: a deletion
+   * interrupted half-way is finished at the next start, against records some of
+   * which are already gone.
+   */
+  removeIfPresent(recordId: string): Promise<void> {
+    return this.records.removeIfPresent(recordId);
+  }
+
   update(
     recordId: string,
     expectedRevision: number,
@@ -58,6 +69,18 @@ export class AppendOnlyAgentRepository<TRecord> {
 
   append(recordId: string, record: TRecord): Promise<VersionedRecord<TRecord>> {
     return this.records.save(recordId, record, null);
+  }
+
+  /**
+   * Removes a record if it is there.
+   *
+   * **Append-only is a rule about writing, not about a conversation's
+   * lifetime.** D3 keeps a result until its owning conversation is deleted, and
+   * D4 deletes every record that conversation owns; a store that could not be
+   * emptied would make the second impossible to honour.
+   */
+  removeIfPresent(recordId: string): Promise<void> {
+    return this.records.removeIfPresent(recordId);
   }
 }
 

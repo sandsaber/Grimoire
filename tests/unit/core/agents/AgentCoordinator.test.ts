@@ -397,6 +397,47 @@ describe('AgentCoordinator', () => {
     expect(run.kind === 'current' && run.record.payload.state).toBe('running');
   });
 
+  it('deletes every record a conversation owns, and nothing another owns', async () => {
+    // **D3 decided this and nothing did it.** An agent instance and its
+    // attempts are kept until the owning conversation is deleted, deliberately,
+    // so "deleting the chat deletes its traces" stays true without a second
+    // retention concept. `deleteOwnedRecords` on the lifecycle registry removes
+    // sessions, runs, interactions and reconciliations — and knows nothing
+    // about this domain, which is right, so the deletion had to be here and was
+    // not.
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+    await coordinator.prepareAndDispatch(rootCommand(), {
+      dispatch: async () => ({ kind: 'accepted' }),
+    });
+    const other = await coordinator.adoptNativeAgent({
+      transactionId: tx('e'),
+      terminalTransactionId: tx('f'),
+      adoptionKey: nativeAgentAdoptionKey(`nad-${'e'.repeat(32)}`),
+      agentRunId: agentRunId(`agr-${'e'.repeat(32)}`),
+      providerId: 'claude',
+      definition: DEFINITION,
+      rootOwner: { kind: 'conversation', ownerId: 'conv-other' },
+      attachment: 'detached',
+      observation: 'aggregate',
+      nativeAgentRef: 'native-other',
+      goalRef: 'goal-other',
+      policyInputs: POLICY_INPUTS,
+    });
+
+    await coordinator.deleteOwnedRecords(
+      { kind: 'conversation', ownerId: 'conversation-1' },
+      tx('9'),
+    );
+
+    expect(await coordinator.repositories.instances.listRecordIds()).toEqual([
+      other.agentInstanceId,
+    ]);
+    expect(await coordinator.repositories.dispatchIntents.listRecordIds()).toEqual([]);
+    // The other conversation's run is untouched.
+    expect(await coordinator.repositories.runs.listRecordIds()).toEqual(other.runIds);
+  });
+
   it('refuses a retry on an instance with no attempt to retry', async () => {
     // The schema permits `runIds: []`, and a record in the field can have one —
     // half-written, or hand-edited. It used to raise `Reduce of empty array

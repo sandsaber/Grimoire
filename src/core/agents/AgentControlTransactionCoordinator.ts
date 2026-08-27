@@ -15,6 +15,14 @@ import {
 
 export type AgentControlRepositoryKind = 'instances' | 'runs' | 'dispatch-intents';
 
+/** The four stores a conversation's deletion has to empty, results included. */
+export type AgentControlRemovableKind = AgentControlRepositoryKind | 'results';
+
+export interface AgentControlRemoval {
+  readonly repository: AgentControlRemovableKind;
+  readonly recordId: string;
+}
+
 export interface AgentControlWrite {
   readonly repository: AgentControlRepositoryKind;
   readonly recordId: string;
@@ -37,8 +45,8 @@ export class AgentControlTransactionCoordinator {
   ) {
     this.transactions = new TransactionIntentCoordinator(storage, {
       namespace: AGENT_TRANSACTIONS_PATH,
-      kinds: ['agent-control-write'],
-      handlers: [createWriteHandler(repositories)],
+      kinds: ['agent-control-write', 'agent-control-delete'],
+      handlers: [createWriteHandler(repositories), createRemoveHandler(repositories)],
       now: options.now,
       crashInjector: options.crashInjector,
     });
@@ -56,8 +64,75 @@ export class AgentControlTransactionCoordinator {
     }).then(() => undefined);
   }
 
+  /**
+   * Removes several agent records as one intent.
+   *
+   * The same shape the execution control store deletes with, and for the same
+   * reason: a deletion interrupted half-way must be finished at the next start
+   * rather than leave an instance whose runs are gone. Every step is
+   * replayable, because recovery runs the ones it cannot prove were applied.
+   */
+  delete(transactionId: string, removals: readonly AgentControlRemoval[]): Promise<void> {
+    return this.transactions.execute({
+      transactionId,
+      kind: 'agent-control-delete',
+      steps: removals.map((removal, index) => ({
+        id: `step-${index}`,
+        handlerId: 'agent-record-remove',
+        input: { ...removal },
+      })),
+    }).then(() => undefined);
+  }
+
   recoverPending(): Promise<void> {
     return this.transactions.recoverPending().then(() => undefined);
+  }
+}
+
+function createRemoveHandler(repositories: AgentRepositories): TransactionStepHandler {
+  return {
+    handlerId: 'agent-record-remove',
+    validate(input) {
+      const removal = decodeRemoval(input);
+      return { repository: removal.repository, recordId: removal.recordId };
+    },
+    async apply(input) {
+      const removal = decodeRemoval(input);
+      await removableFor(repositories, removal.repository).removeIfPresent(removal.recordId);
+    },
+  };
+}
+
+function decodeRemoval(input: unknown): AgentControlRemoval {
+  const record = input as { repository?: unknown; recordId?: unknown };
+  const repository = record.repository;
+  if (repository !== 'instances' && repository !== 'runs'
+    && repository !== 'dispatch-intents' && repository !== 'results') {
+    throw new Error('Agent control repository kind is invalid.');
+  }
+  if (typeof record.recordId !== 'string' || record.recordId.length === 0) {
+    throw new Error('Agent control removal requires a record id.');
+  }
+  return { repository, recordId: record.recordId };
+}
+
+function removableFor(
+  repositories: AgentRepositories,
+  kind: AgentControlRemovableKind,
+): { removeIfPresent(recordId: string): Promise<void> } {
+  switch (kind) {
+    case 'instances':
+      return repositories.instances;
+    case 'runs':
+      return repositories.runs;
+    case 'dispatch-intents':
+      return repositories.dispatchIntents;
+    case 'results':
+      return repositories.results;
+    default: {
+      const unhandled: never = kind;
+      throw new Error(`Agent control repository kind is invalid: ${String(unhandled)}`);
+    }
   }
 }
 
