@@ -139,13 +139,17 @@ export function createWorkspaceContextSlots(
     },
 
     readPlanUsage: async () => {
-      const usage = services()?.usageProvider?.getCachedUsage({
-        plugin,
-        providerId,
-        settings: plugin.settings,
-      });
+      const provider = services()?.usageProvider;
+      // Asked on every read, not once when the port was built: for seven of the
+      // nine this answers "is the provider enabled", and a provider the user
+      // switched off after the workspace initialized would otherwise keep
+      // reporting the plan it had. The live status panel asks it the same way.
+      if (!provider || provider.isAvailable?.(plugin.settings) === false) {
+        return null;
+      }
       // The store speaks plans and windows; the slot wants a label, and a plan
       // with no window is still worth showing.
+      const usage = provider.getCachedUsage({ plugin, providerId, settings: plugin.settings });
       return usage ? { label: usage.plan } : null;
     },
 

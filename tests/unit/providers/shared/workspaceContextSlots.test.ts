@@ -98,6 +98,31 @@ describe('provider workspace context slots', () => {
     ]);
   });
 
+  it('reports no plan for a provider the user has switched off', async () => {
+    const getCachedUsage = jest.fn(() => ({ plan: 'Pro' }));
+    ProviderWorkspaceRegistry.setServices('grok', {
+      usageProvider: { getCachedUsage, isAvailable: () => false },
+    } as never);
+
+    const usage = await createGrokModuleContext(plugin(), () => null, ports).readPlanUsage();
+
+    // Asked on every read rather than once when the port was built: enablement
+    // changes while a workspace stays initialized, and a provider switched off
+    // would otherwise keep reporting the plan it had.
+    expect(usage).toBeNull();
+    expect(getCachedUsage).not.toHaveBeenCalled();
+  });
+
+  it('reports the plan a provider that is on has cached', async () => {
+    ProviderWorkspaceRegistry.setServices('grok', {
+      usageProvider: { getCachedUsage: () => ({ plan: 'Pro' }), isAvailable: () => true },
+    } as never);
+
+    const usage = await createGrokModuleContext(plugin(), () => null, ports).readPlanUsage();
+
+    expect(usage).toEqual({ label: 'Pro' });
+  });
+
   it.each(WIRINGS)('$providerId offers nothing before its workspace is registered', async ({ build }) => {
     const context = build(plugin());
 

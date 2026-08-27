@@ -9146,6 +9146,12 @@ shape with `'project'` hard-coded, which is how it survived the flip that certif
 implementation, and Codex's `listSkills` is that implementation under the name its module uses. The
 only thing left in a hand-written slot is `renderSettingsTab`, in all nine.
 
+A second, quieter one from the same review: **`readPlanUsage` dropped the availability check the
+live path makes.** For seven of the nine providers `isAvailable(settings)` answers "is this provider
+enabled", the status panel asks it before every read, and the port did not — so a provider the user
+switched off after its workspace initialized would have kept reporting the plan it had. Asked per
+read now, because enablement changes while a workspace stays initialized.
+
 #### The eight contexts, written once
 
 All eight are wired: ten-to-twelve stubs each down to at most two, and neither of the two is wiring.
