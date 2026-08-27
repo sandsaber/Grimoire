@@ -10,7 +10,7 @@ import { GRIMOIRE_CONTROL_PATH } from '../execution/ExecutionControlPaths';
  * and the comment on that module — warning about exactly this, one level up —
  * is what caught it.
  *
- * **Four, not seven.** The harvest these come from declared three more for work
+ * **Five, not eight.** The harvest these come from declared three more for work
  * graphs, and M5 bans those outright: a graph, its scheduler and its synthesis
  * runs are post-migration scope, built when a real dependent workflow exists. A
  * path is the cheapest thing to add and the hardest to remove once a vault in
@@ -21,3 +21,5 @@ export const AGENT_INSTANCES_PATH = `${GRIMOIRE_CONTROL_PATH}/agent-instances`;
 export const AGENT_RUNS_PATH = `${GRIMOIRE_CONTROL_PATH}/agent-runs`;
 export const AGENT_DISPATCH_INTENTS_PATH = `${GRIMOIRE_CONTROL_PATH}/agent-dispatch-intents`;
 export const AGENT_RESULTS_PATH = `${GRIMOIRE_CONTROL_PATH}/agent-results`;
+/** Where a multi-record agent change records its intent before applying it. */
+export const AGENT_TRANSACTIONS_PATH = `${GRIMOIRE_CONTROL_PATH}/agent-transactions`;

@@ -135,6 +135,7 @@ describe('dark code stays out of the shipped bundle', () => {
       { path: 'agent-runs', surface: 'durable-agents-dark' },
       { path: 'agent-dispatch-intents', surface: 'durable-agents-dark' },
       { path: 'agent-results', surface: 'durable-agents-dark' },
+      { path: 'agent-transactions', surface: 'durable-agents-dark' },
     ];
     // Guards the rule: a marker no build could ever contain would pass this
     // whatever the bundle held, which is how the first version of the live

@@ -885,6 +885,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: [
       'src/core/agents/AgentContracts.ts',
       'src/core/agents/AgentControlPaths.ts',
+      'src/core/agents/AgentControlTransactionCoordinator.ts',
+      'src/core/agents/AgentCoordinator.ts',
       'src/core/agents/AgentFidelity.ts',
       'src/core/agents/AgentIds.ts',
       'src/core/agents/AgentPolicy.ts',

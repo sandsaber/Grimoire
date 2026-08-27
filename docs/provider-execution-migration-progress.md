@@ -8788,8 +8788,21 @@ it cannot pass over an empty bundle, and proven by declaring one in the reachabl
 modules with no owning entry, listed as `durable-agents-dark` with the checkpoint that makes them
 reachable. That gate is the one the v1 cutover did not have, and it left 324 files unreachable.
 
-Next in this piece: the coordinator that writes these records, then the work card that reads them —
-and **tab close stops cancelling background work in that same checkpoint, never before**.
+**The coordinator came across in the commit below this entry**, with its transaction coordinator and
+its 906-line test suite, and it needed **one** reconciliation: the `work` field on three commands and
+the two guards that require an agent's owner to *be* a work graph. Deleted rather than kept — a slot
+whose only possible value is refused is worse than no slot, because it reads as a capability. The
+type system found both guards; the field they read was the harvest's own optional surface for a
+feature this milestone does not have.
+
+The domain is 2,491 lines across nine modules, all unreachable, all attributed. Its own tests pass
+unchanged apart from the fidelity suite: 34 of them, including the coordinator's dispatch,
+adoption, retry, cancellation and post-order teardown.
+
+Next in this piece: a producer — the thing that turns a provider's subagent into an agent instance —
+then the work card that reads them, and **tab close stops cancelling background work in that same
+checkpoint, never before**. `SubagentManager` keeps its rendering and loses its lifecycle authority;
+it is 18 files on the deletion scoreboard and every one of them is that authority leaking outward.
 
 **Next: the rest of M5** — durable agents with tab-close ownership, the thirteen provider rows,
 registry deletion, and the seam deletion. That step was written as
