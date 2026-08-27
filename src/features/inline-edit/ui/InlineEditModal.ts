@@ -4,8 +4,8 @@ import { Decoration, EditorView, WidgetType } from '@codemirror/view';
 import type { App, Editor, MarkdownView } from 'obsidian';
 import { Notice } from 'obsidian';
 
+import { AuxiliaryExecutionOwner } from '../../../app/auxiliary/AuxiliaryExecutionOwner';
 import { getHiddenProviderCommandSet } from '../../../core/providers/commands/hiddenCommands';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import { DEFAULT_CHAT_PROVIDER_ID, type InlineEditMode, type InlineEditService, type ProviderId } from '../../../core/providers/types';
 import { t } from '../../../i18n/i18n';
@@ -322,7 +322,9 @@ class InlineEditController {
       ?? activeTab?.service?.providerId
       ?? activeTab?.providerId
       ?? DEFAULT_CHAT_PROVIDER_ID;
-    this.inlineEditService = ProviderRegistry.createInlineEditService(plugin, providerId);
+    const auxiliary = plugin.getApplicationRuntimeOrNull()?.auxiliary
+      ?? AuxiliaryExecutionOwner.unavailable(providerId);
+    this.inlineEditService = auxiliary.inlineEditService(providerId);
     const auxiliaryModel = activeTab?.service?.providerId === providerId
       ? activeTab.service.getAuxiliaryModel?.()
       : activeTab?.providerId === providerId

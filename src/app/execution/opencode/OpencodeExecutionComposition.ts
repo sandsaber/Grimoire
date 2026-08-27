@@ -7,6 +7,8 @@ import {
   OpencodeMetadataSession,
 } from '@/app/execution/opencode/OpencodeMetadataSession';
 import type { AuxQueryRunner } from '@/core/auxiliary/AuxQueryRunner';
+import type { ProviderAuxiliarySource } from '@/core/auxiliary/ProviderAuxiliarySource';
+import { resolveConfiguredTitleModel } from '@/core/auxiliary/titleModel';
 import {
   executionSessionId,
   interactionId,
@@ -87,9 +89,11 @@ import {
 import { prepareOpencodeLaunchArtifacts } from '@/providers/opencode/runtime/OpencodeLaunchArtifacts';
 import { buildOpencodeRuntimeEnv } from '@/providers/opencode/runtime/OpencodeRuntimeEnvironment';
 import { getOpencodeState } from '@/providers/opencode/types';
+import { opencodeChatUIConfig } from '@/providers/opencode/ui/OpencodeChatUIConfig';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
+import { auxiliaryPurposeKey } from '../auxiliaryPurpose';
 import { delayThroughWindow } from '../hostTimers';
 import { KernelAuxQueryRunner } from '../KernelAuxQueryRunner';
 
@@ -603,6 +607,23 @@ export class OpencodeExecution {
    * holds one for as long as the edit lasts. That is the unit a process is kept
    * for, so it is the unit the conversation id is minted for.
    */
+
+  /**
+   * Every auxiliary service this provider has, behind the one seam all nine
+   * share. The runner is per service, and the model is only offered when this
+   * provider is the one that owns the configured title model.
+   */
+  auxiliarySource(): ProviderAuxiliarySource {
+    return {
+      createRunner: purpose => this.createAuxRunner(auxiliaryPurposeKey(purpose)),
+      resolveTitleModel: () => resolveConfiguredTitleModel(
+        this.plugin.settings,
+        (modelId, settings) => opencodeChatUIConfig.ownsModel(modelId, settings),
+        decodeOpencodeModelId,
+      ),
+    };
+  }
+
   createAuxRunner(purpose: OpencodeAuxiliaryPurpose): AuxQueryRunner {
     const conversationId = opaqueId('ocaux');
     return new KernelAuxQueryRunner({

@@ -1,8 +1,5 @@
 import type { ProviderRegistration } from '../../core/providers/types';
-import { GrokInlineEditService } from './auxiliary/GrokInlineEditService';
-import { GrokInstructionRefineService } from './auxiliary/GrokInstructionRefineService';
 import { GrokTaskResultInterpreter } from './auxiliary/GrokTaskResultInterpreter';
-import { GrokTitleGenerationService } from './auxiliary/GrokTitleGenerationService';
 import { grokSettingsReconciler } from './env/GrokSettingsReconciler';
 import { GrokConversationHistoryService } from './history/GrokConversationHistoryService';
 import { grokSubagentLifecycleAdapter } from './normalization/grokSubagentNormalization';
@@ -10,10 +7,7 @@ import { grokChatUIConfig } from './ui/GrokChatUIConfig';
 
 export const grokProviderRegistration: ProviderRegistration = {
   chatUIConfig: grokChatUIConfig,
-  createInlineEditService: (plugin) => new GrokInlineEditService(plugin),
-  createInstructionRefineService: (plugin) => new GrokInstructionRefineService(plugin),
   createRuntime: ({ plugin }) => plugin.getGrokExecution().createRuntime(),
-  createTitleGenerationService: (plugin) => new GrokTitleGenerationService(plugin),
   historyService: new GrokConversationHistoryService(),
   settingsReconciler: grokSettingsReconciler,
   subagentLifecycleAdapter: grokSubagentLifecycleAdapter,

@@ -1,3 +1,4 @@
+import { AuxiliaryExecutionOwner } from '../../../app/auxiliary/AuxiliaryExecutionOwner';
 import { getEnabledProviderForModel } from '../../../core/providers/modelRouting';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
@@ -345,7 +346,8 @@ export function syncTabProviderServices(
 ): void {
   tab.services.instructionRefineService?.cancel();
   tab.services.instructionRefineService?.resetConversation();
-  tab.services.instructionRefineService = ProviderRegistry.createInstructionRefineService(plugin, tab.providerId);
+  tab.services.instructionRefineService = auxiliaryExecution(plugin, tab.providerId)
+    .instructionRefineService(tab.providerId);
   tab.services.subagentManager.setTaskResultInterpreter?.(
     ProviderRegistry.getTaskResultInterpreter(tab.providerId)
   );
@@ -353,8 +355,24 @@ export function syncTabProviderServices(
 
 export function ensureTitleGenerationService(tab: TabData, plugin: GrimoirePlugin): void {
   if (!tab.services.titleGenerationService) {
-    tab.services.titleGenerationService = ProviderRegistry.createTitleGenerationService(plugin);
+    tab.services.titleGenerationService = auxiliaryExecution(plugin, tab.providerId)
+      .titleGenerationService();
   }
+}
+
+/**
+ * The application's auxiliary owner, or one that reports it has none.
+ *
+ * A tab can be built before the kernel has started and survives an unload that
+ * takes the composition down, and neither is a reason to hand back a service
+ * that fails somewhere the user cannot see.
+ */
+function auxiliaryExecution(
+  plugin: GrimoirePlugin,
+  providerId: ProviderId,
+): AuxiliaryExecutionOwner {
+  return plugin.getApplicationRuntimeOrNull()?.auxiliary
+    ?? AuxiliaryExecutionOwner.unavailable(providerId);
 }
 
 export function cleanupTabRuntime(tab: TabData): void {

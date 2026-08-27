@@ -5,6 +5,8 @@ import {
   NodeCodexExecutionConnectionFactory,
 } from '@/app/execution/codex/NodeCodexExecutionConnectionFactory';
 import type { AuxQueryRunner } from '@/core/auxiliary/AuxQueryRunner';
+import type { ProviderAuxiliarySource } from '@/core/auxiliary/ProviderAuxiliarySource';
+import { resolveConfiguredTitleModel } from '@/core/auxiliary/titleModel';
 import {
   executionSessionId,
   interactionId,
@@ -63,8 +65,10 @@ import type { CodexExecutionConnection } from '@/providers/codex/runtime/CodexEx
 import { createCodexRuntimeContext } from '@/providers/codex/runtime/CodexRuntimeContext';
 import { CodexSkillListingService } from '@/providers/codex/skills/CodexSkillListingService';
 import { DEFAULT_CODEX_PRIMARY_MODEL } from '@/providers/codex/types/models';
+import { codexChatUIConfig } from '@/providers/codex/ui/CodexChatUIConfig';
 import { getVaultPath } from '@/utils/path';
 
+import { auxiliaryPurposeKey } from '../auxiliaryPurpose';
 import { delayThroughWindow } from '../hostTimers';
 import { KernelAuxQueryRunner } from '../KernelAuxQueryRunner';
 
@@ -214,6 +218,22 @@ export class CodexExecution {
    * holds one for as long as the edit lasts. That is the unit a daemon and its
    * thread are kept for, so it is the unit the conversation id is minted for.
    */
+
+  /**
+   * Every auxiliary service this provider has, behind the one seam all nine
+   * share. The runner is per service, and the model is only offered when this
+   * provider is the one that owns the configured title model.
+   */
+  auxiliarySource(): ProviderAuxiliarySource {
+    return {
+      createRunner: purpose => this.createAuxRunner(auxiliaryPurposeKey(purpose)),
+      resolveTitleModel: () => resolveConfiguredTitleModel(
+        this.plugin.settings,
+        (modelId, settings) => codexChatUIConfig.ownsModel(modelId, settings)
+      ),
+    };
+  }
+
   createAuxRunner(purpose: CodexAuxiliaryPurpose): AuxQueryRunner {
     const conversationId = opaqueId('codexaux');
     return new KernelAuxQueryRunner({

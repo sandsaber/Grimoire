@@ -53,13 +53,21 @@ describe('provider execution topology', () => {
   });
 
   describe('auxiliary isolation matches the code', () => {
-    it.each(PROVIDER_EXECUTION_TOPOLOGY.filter(record => record.auxiliary === 'noop'))(
-      '$providerId registers no-op auxiliary services',
+    it.each(PROVIDER_EXECUTION_TOPOLOGY.filter(record => record.auxiliary === 'absent'))(
+      '$providerId contributes no auxiliary source at all',
       record => {
         const source = readFileSync(resolve(process.cwd(), record.auxiliaryOwner), 'utf8');
+        const map = source.slice(
+          source.indexOf('sources: new Map(['),
+          source.indexOf(']),', source.indexOf('sources: new Map([')),
+        );
 
-        expect(record.auxiliaryOwner).toContain('NoopServices');
-        expect(source).toMatch(/TitleGenerationService/);
+        // The proof is the application's own map, not a file that happens to
+        // be named after the absence. A provider added to it starts running
+        // auxiliary work, and this is what notices.
+        expect(map).not.toBe('');
+        expect(map).not.toContain(`'${record.providerId}'`);
+        expect(source).toContain(record.isolationEvidence);
       },
     );
 

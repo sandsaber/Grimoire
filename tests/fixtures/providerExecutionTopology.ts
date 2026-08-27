@@ -69,8 +69,18 @@ export type AuxiliaryExecution =
    * Codex has neither, and isolates on the thread it starts.
    */
   | 'kernel-isolated'
-  /** Auxiliary services are registered but do nothing. */
-  | 'noop';
+  /**
+   * The provider contributes no auxiliary source, so it has no auxiliary
+   * execution at all.
+   *
+   * It was `'noop'` and proved by a file named `*NoopServices.ts`: three
+   * providers shipped three classes each that answered every auxiliary request
+   * with the same refusal. The absence is the contribution now, and what proves
+   * it is the application's own source map — a provider that is not in it
+   * cannot run auxiliary work, which no file can accidentally stop being true
+   * of.
+   */
+  | 'absent';
 
 export interface SharedResource {
   /** What both paths touch. */
@@ -89,7 +99,11 @@ export interface ProviderExecutionTopology {
   /** How more than one concurrent turn is served, in the provider's own terms. */
   concurrency: string;
   auxiliary: AuxiliaryExecution;
-  /** Module that owns auxiliary execution: a dedicated runner, or the noop services. */
+  /**
+   * Module that owns auxiliary execution: a dedicated runner, the provider's
+   * composition, or — for a provider with none — the application composition
+   * whose source map leaves it out.
+   */
   auxiliaryOwner: string;
   /**
    * Resources the chat path and the auxiliary path both touch.
@@ -105,6 +119,10 @@ export interface ProviderExecutionTopology {
   /**
    * A literal string that must appear in `auxiliaryOwner`, proving the
    * isolation claim rather than pattern-matching around it.
+   *
+   * An `absent` provider proves something different — that it contributes no
+   * auxiliary source at all — so there the owner's own source map is read and
+   * this line only says which claim is being made.
    */
   isolationEvidence: string;
   /**
@@ -147,8 +165,8 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     sessionBoundary: 'none',
     resume: 'reconstructed',
     concurrency: 'one process per run; concurrent turns are concurrent processes',
-    auxiliary: 'noop',
-    auxiliaryOwner: 'src/providers/antigravity/auxiliary/AntigravityNoopServices.ts',
+    auxiliary: 'absent',
+    auxiliaryOwner: 'src/app/ApplicationRuntime.ts',
     sharedResources: [
       {
         resource: 'auxiliary execution',
@@ -157,10 +175,10 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
       },
     ],
     capabilities: ANTIGRAVITY_PROVIDER_CAPABILITIES,
-    isolationEvidence: 'TitleGenerationService',
+    isolationEvidence: 'Absent means unsupported',
     evidence: [
       'src/providers/antigravity/execution/AntigravityExecutionBackend.ts',
-      'src/providers/antigravity/auxiliary/AntigravityNoopServices.ts',
+      'src/providers/antigravity/auxiliary/AntigravityTaskResultInterpreter.ts',
     ],
   },
   {
@@ -188,7 +206,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     evidence: [
       'src/providers/claude/execution/ClaudeExecutionBackend.ts',
       'src/providers/claude/runtime/claudeColdStartQuery.ts',
-      'src/providers/claude/auxiliary/ClaudeTitleGenerationService.ts',
+      'src/providers/claude/auxiliary/ClaudeAuxQueryRunner.ts',
     ],
   },
   {
@@ -241,8 +259,8 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     sessionBoundary: 'acp-session',
     resume: 'native',
     concurrency: 'one ACP session per conversation runtime',
-    auxiliary: 'noop',
-    auxiliaryOwner: 'src/providers/gemini/auxiliary/GeminiNoopServices.ts',
+    auxiliary: 'absent',
+    auxiliaryOwner: 'src/app/ApplicationRuntime.ts',
     sharedResources: [
       {
         resource: 'auxiliary execution',
@@ -251,10 +269,10 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
       },
     ],
     capabilities: GEMINI_PROVIDER_CAPABILITIES,
-    isolationEvidence: 'TitleGenerationService',
+    isolationEvidence: 'Absent means unsupported',
     evidence: [
       'src/providers/gemini/execution/GeminiExecutionBackend.ts',
-      'src/providers/gemini/auxiliary/GeminiNoopServices.ts',
+      'src/providers/gemini/auxiliary/GeminiTaskResultInterpreter.ts',
     ],
   },
   {
@@ -391,8 +409,8 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     sessionBoundary: 'acp-session',
     resume: 'native',
     concurrency: 'one ACP session per conversation runtime',
-    auxiliary: 'noop',
-    auxiliaryOwner: 'src/providers/qwen/auxiliary/QwenNoopServices.ts',
+    auxiliary: 'absent',
+    auxiliaryOwner: 'src/app/ApplicationRuntime.ts',
     sharedResources: [
       {
         resource: 'auxiliary execution',
@@ -401,10 +419,10 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
       },
     ],
     capabilities: QWEN_PROVIDER_CAPABILITIES,
-    isolationEvidence: 'TitleGenerationService',
+    isolationEvidence: 'Absent means unsupported',
     evidence: [
       'src/providers/qwen/execution/QwenExecutionBackend.ts',
-      'src/providers/qwen/auxiliary/QwenNoopServices.ts',
+      'src/providers/qwen/auxiliary/QwenTaskResultInterpreter.ts',
     ],
   },
 ];

@@ -68,9 +68,6 @@ export interface ProviderRegistration {
   chatUIConfig: ProviderChatUIConfig;
   settingsReconciler: ProviderSettingsReconciler;
   createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => ChatRuntime;
-  createTitleGenerationService: (plugin: GrimoirePlugin) => TitleGenerationService;
-  createInstructionRefineService: (plugin: GrimoirePlugin) => InstructionRefineService;
-  createInlineEditService: (plugin: GrimoirePlugin) => InlineEditService;
   historyService: ProviderConversationHistoryService;
   taskResultInterpreter: ProviderTaskResultInterpreter;
   subagentLifecycleAdapter?: ProviderSubagentLifecycleAdapter;

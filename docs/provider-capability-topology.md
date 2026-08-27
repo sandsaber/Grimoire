@@ -64,19 +64,25 @@ on top of the four every provider gets — new session, cancel, history, model s
 
 | Provider | Auxiliary execution | Owner |
 |---|---|---|
-| Antigravity | no-op | `auxiliary/AntigravityNoopServices.ts` |
+| Antigravity | absent | `app/ApplicationRuntime.ts` |
 | Claude | isolated | `runtime/claudeColdStartQuery.ts` |
 | Codex | kernel-isolated | `app/execution/codex/CodexExecutionComposition.ts` |
-| Gemini | no-op | `auxiliary/GeminiNoopServices.ts` |
+| Gemini | absent | `app/ApplicationRuntime.ts` |
 | Grok | kernel-isolated | `app/execution/grok/GrokExecutionComposition.ts` |
 | Kimi Code | kernel-isolated | `app/execution/kimicode/KimicodeExecutionComposition.ts` |
 | MiMoCode | kernel-isolated | `app/execution/mimocode/MimocodeExecutionComposition.ts` |
 | OpenCode | kernel-isolated | `app/execution/opencode/OpencodeExecutionComposition.ts` |
-| Qwen | no-op | `auxiliary/QwenNoopServices.ts` |
+| Qwen | absent | `app/ApplicationRuntime.ts` |
 
-Three providers — Antigravity, Gemini, and Qwen — register auxiliary services that do nothing.
-Their flips cannot produce auxiliary contention at all, which makes them the cheapest providers to
-flip on this axis.
+Three providers — Antigravity, Gemini, and Qwen — contribute no auxiliary source, so they have no
+auxiliary execution at all. Their flips cannot produce auxiliary contention, which makes them the
+cheapest providers to flip on this axis.
+
+They used to *register* auxiliary services that did nothing: three classes each, nine in all,
+answering every request with the same refusal. The owner column named the file holding them, which
+made the claim provable only by a file's name. The absence is the contribution now, and the owner
+column names the composition whose source map leaves them out — a map a provider cannot be added to
+without the topology gate noticing.
 
 The six with real auxiliary execution each isolate it by construction, verified in code rather than
 assumed. Five of the six now run it on the execution kernel; **Claude is the only provider left with

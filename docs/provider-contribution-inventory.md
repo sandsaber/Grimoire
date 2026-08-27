@@ -28,10 +28,10 @@ that is produced by `initialize(context)` and needs a live plugin. A provider th
 optional workspace member is caught only by the parity gate, and only if its module leaves the
 bundle.
 
-## `ProviderRegistration` fields (9) — [types.ts:56](../src/core/providers/types.ts)
+## `ProviderRegistration` fields (6) — [types.ts:56](../src/core/providers/types.ts)
 
 Rows that have already moved are not deleted; they are listed under
-[Moved to the provider catalog](#moved-to-the-provider-catalog-5) with where they live now. Row
+[Moved to their target homes](#moved-to-their-target-homes-12) with where they live now. Row
 numbers are stable: a moved row leaves a gap rather than renumbering the rows below it, because the
 plan and this file both refer to rows by number.
 
@@ -40,9 +40,6 @@ plan and this file both refer to rows by number.
 | 8 | `chatUIConfig` | provider chat UI configuration | chat feature rendering | UI-config feature contribution | M5 |
 | 9 | `settingsReconciler` | settings/model normalization on load and env change | settings load, environment change | `ProviderSettingsCodec` | M5 |
 | 10 | `createRuntime` | chat execution (`ChatRuntime`) | `TabManager` / `Tab` | `ExecutionBackendFactory` behind the presentation adapter | **M2 — this is the flip** |
-| 11 | `createTitleGenerationService` | auxiliary provider execution | title generation | auxiliary owner over an isolated execution session | M5 (legacy path allowed until then) |
-| 12 | `createInstructionRefineService` | auxiliary provider execution | instruction refine | auxiliary owner | M5 |
-| 13 | `createInlineEditService` | auxiliary provider execution | inline edit modal | auxiliary owner | M5 |
 | 14 | `historyService` | hydration, fork state, session resolution, deletion | conversation controllers, history UI | history capability port | M5 |
 | 15 | `taskResultInterpreter` | provider task/tool result interpretation | chat rendering | result-interpretation port | M5 |
 | 16 | `subagentLifecycleAdapter?` | subagent tool-name recognition and display parsing | `SubagentManager` | native-agent observation port | M5 |
@@ -71,7 +68,7 @@ fields of either service interface.
 |---|---|---|---|---|---|
 | 1 | `workspaceCapabilities` | `ProviderWorkspaceRegistration.workspaceCapabilities` ([types.ts:484](../src/core/providers/types.ts)) | `ProviderWorkspaceRegistry.getCapabilities()`, settings gating | workspace part of `ProviderCapabilityDescriptor` in the module | M5 |
 
-## Moved to their target homes (9)
+## Moved to their target homes (12)
 
 Rows that have reached the home the tables above name for them. They stay recorded here for the
 same reason those tables exist: a contribution that simply disappears from an inventory is
@@ -87,8 +84,19 @@ each table's total still adds up.
 | 5 | `getPreloadedContextFiles` | registration | `ProviderDeclarations.context` | `ProviderCatalog.preloadedContextFiles()` | M3 |
 | 6 | `capabilities` | registration | `ProviderCapabilityDescriptor` | `ProviderCatalog.capabilities()`, projected by `toLegacyCapabilities` | M3 |
 | 7 | `environmentKeyPatterns` | registration | `ProviderSettingsCodec.environmentKeyPrefixes` | `ProviderCatalog.environmentKeyOwner()` | M3 |
+| 11 | `createTitleGenerationService` | registration | `ProviderAuxiliarySource` supplied by the provider's execution composition | `AuxiliaryExecutionOwner.titleGenerationService()` | M5 |
+| 12 | `createInstructionRefineService` | registration | the same source, purpose `instruction-refine` | `AuxiliaryExecutionOwner.instructionRefineService()` | M5 |
+| 13 | `createInlineEditService` | registration | the same source, purpose `inline-edit` | `AuxiliaryExecutionOwner.inlineEditService()` | M5 |
 | 2 | default provider configs | app-level | `ProviderSettingsCodec.defaults()` | `ProviderCatalog.defaultConfigs()` | M3 |
 | 3 | workspace initialize/dispose lifecycle | app-level | `ProviderWorkspaceContribution`, both halves required | `ProviderWorkspaceManager`, owned by the plugin instance | M3 |
+
+Rows 11-13 moved together because they were one contribution wearing three names. Every provider
+supplied all three or none, five supplied the same wrapper around a runner three times, three
+supplied nine no-op classes, and the only per-provider facts in any of them were which auxiliary
+conversation a purpose maps to and whether the provider owns the configured title model. What a
+provider contributes now is a `ProviderAuxiliarySource` — a runner per purpose — and a provider that
+contributes nothing is a provider that cannot do auxiliary work, which the owner says once in the
+provider's own display name.
 
 Both moved together, and had to: ordering with the names still on the registration would have left
 two inventories able to disagree about the same provider — which they already did. Three modules

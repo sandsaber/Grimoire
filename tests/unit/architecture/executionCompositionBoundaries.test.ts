@@ -63,7 +63,10 @@ const STRICT_MODULES = [
  * list may shrink but never grow.
  */
 const LEGACY_CORE_PLUGIN_IMPORTS = [
-  'src/core/providers/ProviderRegistry.ts',
+  // `ProviderRegistry` left this list before the class did: its three auxiliary
+  // factories were the only members that took a plugin, and they went with the
+  // auxiliary owner. The registry survives for the rows still on it, taking no
+  // plugin.
   'src/core/providers/ProviderWorkspaceRegistry.ts',
   'src/core/providers/types.ts',
 ];

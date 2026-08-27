@@ -138,7 +138,9 @@ describe('provider contribution inventory', () => {
     });
 
     it('claims the count the heading advertises', () => {
-      expect(documented).toHaveLength(9);
+      // Six, not nine: the three auxiliary factories left with the auxiliary
+      // owner, and are recorded in the moved table below.
+      expect(documented).toHaveLength(6);
     });
 
     it('accounts for every field the registration ever declared', () => {
@@ -161,6 +163,9 @@ describe('provider contribution inventory', () => {
         'getPreloadedContextFiles',
         'capabilities',
         'environmentKeyPatterns',
+        'createTitleGenerationService',
+        'createInstructionRefineService',
+        'createInlineEditService',
       ]);
     });
 

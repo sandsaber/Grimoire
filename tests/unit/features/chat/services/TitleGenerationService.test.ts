@@ -6,8 +6,9 @@ import {
   resetMockMessages,
   setMockMessages,
 } from '@test/__mocks__/claude-agent-sdk';
+import { claudeAuxiliaryServices } from '@test/helpers/auxiliary/claudeAuxiliaryServices';
 
-import { type TitleGenerationResult, TitleGenerationService } from '@/providers/claude/auxiliary/ClaudeTitleGenerationService';
+import type { TitleGenerationResult, TitleGenerationService } from '@/core/providers/types';
 function createMockPlugin(settings = {}) {
   return {
     settings: {
@@ -36,7 +37,7 @@ describe('TitleGenerationService', () => {
     jest.clearAllMocks();
     resetMockMessages();
     mockPlugin = createMockPlugin();
-    service = new TitleGenerationService(mockPlugin);
+    service = claudeAuxiliaryServices(mockPlugin).titleServiceFor('claude');
   });
 
   describe('generateTitle', () => {

@@ -6,6 +6,7 @@ import type { ProviderId } from '@/core/types/provider';
 import type GrimoirePlugin from '@/main';
 
 import { SubagentAgentRecorder } from './agents/SubagentAgentRecorder';
+import { AuxiliaryExecutionOwner } from './auxiliary/AuxiliaryExecutionOwner';
 import { ChatExecutionComposition } from './chat/ChatExecutionComposition';
 import { StoredChatConversations } from './chat/StoredChatConversations';
 import { AntigravityExecution } from './execution/antigravity/AntigravityExecutionComposition';
@@ -56,6 +57,14 @@ export interface ApplicationRuntimeOptions {
    */
   readonly sessions: Pick<AppSessionStorage, 'records' | 'toConversation' | 'toSessionMetadata'>;
   readonly defaultProviderId: ProviderId;
+  /**
+   * Which provider generates a title, asked once per title.
+   *
+   * Supplied rather than resolved here because the answer is model ownership,
+   * which is still a registry row: this composition would otherwise take a
+   * dependency on the registry purely to pass it straight through.
+   */
+  resolveTitleProviderId(): ProviderId;
   /** Reports a failure that must not take the load down; never thrown at the caller. */
   report(event: {
     readonly error?: unknown;
@@ -79,6 +88,8 @@ export class ApplicationRuntime {
   readonly agents: AgentCoordinator;
   readonly agentRecorder: SubagentAgentRecorder;
   readonly localShell: LocalShellExecution;
+  /** Titles, instruction refinement and inline edits, for every provider. */
+  readonly auxiliary: AuxiliaryExecutionOwner;
   readonly antigravity: AntigravityExecution;
   readonly codex: CodexExecution;
   readonly claude: ClaudeExecution;
@@ -135,6 +146,22 @@ export class ApplicationRuntime {
     this.kernel.registerBackend(this.gemini.createBackendRegistration());
     this.qwen = new QwenExecution(plugin, registry);
     this.kernel.registerBackend(this.qwen.createBackendRegistration());
+
+    // **Absent means unsupported**, and three providers are absent: Antigravity
+    // runs in print mode, and Gemini and Qwen have never had auxiliary
+    // execution. They shipped three no-op services each instead of saying so,
+    // which is a failure the UI could not tell from a real one.
+    this.auxiliary = new AuxiliaryExecutionOwner({
+      resolveTitleProviderId: () => options.resolveTitleProviderId(),
+      sources: new Map([
+        ['claude', this.claude.auxiliarySource()],
+        ['codex', this.codex.auxiliarySource()],
+        ['grok', this.grok.auxiliarySource()],
+        ['kimicode', this.kimicode.auxiliarySource()],
+        ['mimocode', this.mimocode.auxiliarySource()],
+        ['opencode', this.opencode.auxiliarySource()],
+      ]),
+    });
 
     this.agents = new AgentCoordinator(new VaultDurableStorage(options.adapter), {
       scheduler: {

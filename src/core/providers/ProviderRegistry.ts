@@ -1,11 +1,8 @@
-import type GrimoirePlugin from '../../main';
 import type { ChatRuntime } from '../runtime/ChatRuntime';
 import { providerCatalog } from './ProviderCatalog';
 import {
   type CreateChatRuntimeOptions,
   DEFAULT_CHAT_PROVIDER_ID,
-  type InlineEditService,
-  type InstructionRefineService,
   type ProviderChatUIConfig,
   type ProviderConversationHistoryService,
   type ProviderId,
@@ -13,8 +10,6 @@ import {
   type ProviderSettingsReconciler,
   type ProviderSubagentLifecycleAdapter,
   type ProviderTaskResultInterpreter,
-  type TitleGenerationCallback,
-  type TitleGenerationService,
 } from './types';
 
 /**
@@ -55,13 +50,6 @@ export class ProviderRegistry {
     return this.getProviderRegistration(providerId).createRuntime(options);
   }
 
-  static createTitleGenerationService(plugin: GrimoirePlugin, providerId?: ProviderId): TitleGenerationService {
-    if (!providerId) {
-      return new RoutedTitleGenerationService(plugin);
-    }
-    return this.getProviderRegistration(providerId).createTitleGenerationService(plugin);
-  }
-
   static resolveTitleGenerationProviderId(settings: Record<string, unknown>): ProviderId {
     const titleModel = typeof settings.titleGenerationModel === 'string'
       ? settings.titleGenerationModel.trim()
@@ -74,14 +62,6 @@ export class ProviderRegistry {
     return this.resolveProviderForModel(titleModel, settings, {
       fallbackProviderId: DEFAULT_CHAT_PROVIDER_ID,
     });
-  }
-
-  static createInstructionRefineService(plugin: GrimoirePlugin, providerId: ProviderId = DEFAULT_CHAT_PROVIDER_ID): InstructionRefineService {
-    return this.getProviderRegistration(providerId).createInstructionRefineService(plugin);
-  }
-
-  static createInlineEditService(plugin: GrimoirePlugin, providerId: ProviderId = DEFAULT_CHAT_PROVIDER_ID): InlineEditService {
-    return this.getProviderRegistration(providerId).createInlineEditService(plugin);
   }
 
   static getConversationHistoryService(
@@ -179,54 +159,5 @@ export class ProviderRegistry {
       }
     }
     return ids;
-  }
-}
-
-interface ActiveTitleGeneration {
-  service: TitleGenerationService;
-}
-
-class RoutedTitleGenerationService implements TitleGenerationService {
-  private readonly activeGenerations = new Map<string, ActiveTitleGeneration>();
-
-  constructor(private readonly plugin: GrimoirePlugin) {}
-
-  async generateTitle(
-    conversationId: string,
-    userMessage: string,
-    callback: TitleGenerationCallback,
-  ): Promise<void> {
-    const providerId = ProviderRegistry.resolveTitleGenerationProviderId(
-      this.plugin.settings,
-    );
-    const service = ProviderRegistry.createTitleGenerationService(this.plugin, providerId);
-    const generation = { service };
-    const previous = this.activeGenerations.get(conversationId);
-
-    this.activeGenerations.set(conversationId, generation);
-    previous?.service.cancel();
-
-    try {
-      await service.generateTitle(conversationId, userMessage, async (convId, result) => {
-        if (this.activeGenerations.get(conversationId) !== generation) {
-          return;
-        }
-        await callback(convId, result);
-      });
-    } finally {
-      if (this.activeGenerations.get(conversationId) === generation) {
-        this.activeGenerations.delete(conversationId);
-      }
-    }
-  }
-
-  cancel(): void {
-    const services = new Set<TitleGenerationService>(
-      [...this.activeGenerations.values()].map(generation => generation.service),
-    );
-    this.activeGenerations.clear();
-    for (const service of services) {
-      service.cancel();
-    }
   }
 }

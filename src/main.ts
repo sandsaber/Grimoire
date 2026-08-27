@@ -583,6 +583,10 @@ export default class GrimoirePlugin extends Plugin {
       sessions: this.storage.sessions,
       defaultProviderId: DEFAULT_CHAT_PROVIDER_ID,
       report: event => this.recordDebugLog(event),
+      // Read per title rather than captured: the model that decides which
+      // provider writes a title is a setting the user can change with tabs
+      // already open.
+      resolveTitleProviderId: () => ProviderRegistry.resolveTitleGenerationProviderId(this.settings),
     });
     await this.applicationRuntime.start();
   }

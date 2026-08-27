@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { type Options,query as agentQuery } from '@anthropic-ai/claude-agent-sdk';
 
+import type { ProviderAuxiliarySource } from '@/core/auxiliary/ProviderAuxiliarySource';
+import { resolveConfiguredTitleModel } from '@/core/auxiliary/titleModel';
 import {
   executionSessionId,
   interactionId,
@@ -26,6 +28,7 @@ import type GrimoirePlugin from '@/main';
 import { createClaudeModuleContext } from '@/providers/claude/app/ClaudeModuleContext';
 import { claudePlanUsageStore } from '@/providers/claude/app/ClaudePlanUsageStore';
 import { getClaudeWorkspaceServices } from '@/providers/claude/app/ClaudeWorkspaceServices';
+import { ClaudeAuxQueryRunner } from '@/providers/claude/auxiliary/ClaudeAuxQueryRunner';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
 import { ClaudeAuxiliaryQuery } from '@/providers/claude/execution/ClaudeAuxiliaryQuery';
 import { ClaudeContentPresenter } from '@/providers/claude/execution/ClaudeContentPresenter';
@@ -53,6 +56,7 @@ import { encodeClaudeTurn } from '@/providers/claude/prompt/ClaudeTurnEncoder';
 import { QueryOptionsBuilder } from '@/providers/claude/runtime/ClaudeQueryOptionsBuilder';
 import { createClaudeRewindBackup } from '@/providers/claude/runtime/ClaudeRewindService';
 import { getClaudeState } from '@/providers/claude/types/providerState';
+import { claudeChatUIConfig } from '@/providers/claude/ui/ClaudeChatUIConfig';
 import { getEnhancedPath,parseEnvironmentVariables } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
 
@@ -139,6 +143,45 @@ export class ClaudeExecution {
    * it — the startup reference, the options built from live settings, the store
    * the request came from — is the real path.
    */
+
+  /**
+   * Claude's auxiliary services, behind the seam all nine now share.
+   *
+   * The runner is still a cold SDK query rather than a kernel run: this
+   * composition's auxiliary reference space is the one thing it refuses rather
+   * than answers, and wiring it is a step of its own — behind this seam, which
+   * is why the seam went uniform first.
+   */
+  auxiliarySource(): ProviderAuxiliarySource {
+    return {
+      createRunner: purpose => new ClaudeAuxQueryRunner(this.plugin, purpose),
+      resolveTitleModel: () => this.resolveTitleModel(),
+    };
+  }
+
+  /**
+   * Claude answers with a model even when it does not own the configured one.
+   *
+   * The other five return nothing and let the provider pick — Claude names a
+   * cheap model instead, because a title is one short answer and the
+   * conversation model may be the expensive one. Preserved exactly, including
+   * the environment override that lets a user redirect it.
+   */
+  private resolveTitleModel(): string {
+    const settings = this.plugin.settings as unknown as Record<string, unknown>;
+    const owned = resolveConfiguredTitleModel(
+      settings,
+      (modelId, scoped) => claudeChatUIConfig.ownsModel(modelId, scoped),
+    );
+    if (owned) {
+      return owned;
+    }
+    const envVars = parseEnvironmentVariables(
+      this.plugin.getActiveEnvironmentVariables('claude'),
+    );
+    return envVars.ANTHROPIC_DEFAULT_HAIKU_MODEL || 'claude-haiku-4-5';
+  }
+
   createBackend(
     queryFunction: ClaudeSdkQueryFunction = agentQuery,
   ): ClaudeExecutionBackend {

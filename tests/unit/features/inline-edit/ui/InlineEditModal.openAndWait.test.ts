@@ -3,7 +3,6 @@ import '@/providers';
 import { createMockEl } from '@test/helpers/mockElement';
 import { Notice } from 'obsidian';
 
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { type InlineEditContext, InlineEditModal } from '@/features/inline-edit/ui/InlineEditModal';
 import { VaultFolderCache } from '@/shared/mention/VaultMentionCache';
 import * as editorUtils from '@/utils/editor';
@@ -100,6 +99,7 @@ describe('InlineEditModal - openAndWait', () => {
         },
       } as any;
       const plugin = {
+        getApplicationRuntimeOrNull: () => null,
         settings: {
           hiddenProviderCommands: {
             claude: [],
@@ -198,6 +198,7 @@ describe('InlineEditModal - openAndWait', () => {
         },
       } as any;
       const plugin = {
+        getApplicationRuntimeOrNull: () => null,
         settings: {
           hiddenProviderCommands: {
             claude: ['commit'],
@@ -299,10 +300,11 @@ describe('InlineEditModal - openAndWait', () => {
         resetConversation: jest.fn(),
         setModelOverride: jest.fn(),
       };
-      const providerSpy = jest
-        .spyOn(ProviderRegistry, 'createInlineEditService')
-        .mockReturnValue(inlineEditService);
+      // The modal reaches the application's auxiliary owner now; a plugin that
+      // has not composed one gets services that say the provider has none.
+      const providerSpy = jest.fn().mockReturnValue(inlineEditService);
       const plugin = {
+        getApplicationRuntimeOrNull: () => ({ auxiliary: { inlineEditService: providerSpy } }),
         settings: {
           hiddenProviderCommands: {
             claude: [],
@@ -373,13 +375,12 @@ describe('InlineEditModal - openAndWait', () => {
       const modal = new InlineEditModal(app, plugin, editor, view, editContext, 'note.md');
       const resultPromise = modal.openAndWait();
 
-      expect(providerSpy).toHaveBeenCalledWith(plugin, 'opencode');
+      expect(providerSpy).toHaveBeenCalledWith('opencode');
       expect(inlineEditService.setModelOverride).toHaveBeenCalledWith('opencode:openai/gpt-5.4');
 
       widgetRef.reject();
       await expect(resultPromise).resolves.toEqual({ decision: 'reject' });
       getEditorViewSpy.mockRestore();
-      providerSpy.mockRestore();
     } finally {
       (window as any).document = originalDocument;
     }
@@ -408,6 +409,7 @@ describe('InlineEditModal - openAndWait', () => {
         },
       } as any;
       const plugin = {
+        getApplicationRuntimeOrNull: () => null,
         settings: {
           hiddenProviderCommands: {
             claude: [],
@@ -550,6 +552,7 @@ describe('InlineEditModal - openAndWait', () => {
         },
       } as any;
       const plugin = {
+        getApplicationRuntimeOrNull: () => null,
         settings: {
           hiddenProviderCommands: {
             claude: [],
@@ -655,6 +658,7 @@ describe('InlineEditModal - openAndWait', () => {
         },
       } as any;
       const plugin = {
+        getApplicationRuntimeOrNull: () => null,
         settings: {
           hiddenProviderCommands: {
             claude: [],
@@ -786,6 +790,7 @@ describe('InlineEditModal - openAndWait', () => {
         },
       } as any;
       const plugin = {
+        getApplicationRuntimeOrNull: () => null,
         settings: {
           hiddenProviderCommands: {
             claude: [],
@@ -891,6 +896,7 @@ describe('InlineEditModal - openAndWait', () => {
         },
       } as any;
       const plugin = {
+        getApplicationRuntimeOrNull: () => null,
         settings: {
           hiddenProviderCommands: {
             claude: [],

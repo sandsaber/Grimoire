@@ -67,8 +67,13 @@ const SEARCHES: readonly DeletionSearch[] = [
     what: 'core importing the plugin type',
     pattern: /GrimoirePlugin/,
     within: 'src/core',
-    files: 3,
-    closedBy: 'the provider rows — two of the three are the registries themselves',
+    // **Three until the auxiliary row.** `ProviderRegistry` took a plugin for
+    // exactly three members — the title, refine and inline-edit factories — and
+    // handing them a plugin was the whole reason a provider's auxiliary
+    // services could not be reached without one. They are the application's
+    // now, and the registry names no plugin type at all.
+    files: 2,
+    closedBy: 'the provider rows — one of the two is the workspace registry itself',
   },
   {
     what: 'subagent hooks and loaders',
@@ -149,7 +154,7 @@ describe('structural deletion progress', () => {
     expect(remaining.map(search => `${search.what}: ${search.files}`)).toEqual([
       'runtime interaction callbacks: 3',
       'worker tab ownership: 3',
-      'core importing the plugin type: 3',
+      'core importing the plugin type: 2',
       'subagent hooks and loaders: 7',
       'SubagentManager lifecycle: 20',
       'the application importing a concrete provider module: 20',

@@ -9084,6 +9084,57 @@ that is coming, about work nothing was watching: the exact promise that code was
 It reads the record's own observation now, and `AgentFidelity` went back to `pending` with an owner
 that says giving it that consumer was the mistake.
 
+#### The auxiliary rows: one contribution wearing three names
+
+Inventory rows 11, 12 and 13 are moved. They were `createTitleGenerationService`,
+`createInstructionRefineService` and `createInlineEditService` — three factories per provider,
+twenty-seven in all — and reading them found one contribution, three times.
+
+**Fifteen of the twenty-seven were the same wrapper.** Five providers each shipped three classes
+whose entire body was `super(new LazyAuxQueryRunner(() => plugin.getXExecution().createAuxRunner(
+'inline')))`, differing in the provider name and, for four of them, which decoder a composite model
+id goes through.
+
+**Nine of them were the same refusal.** Antigravity, Gemini and Qwen each shipped a `NoopServices`
+file: three classes answering every request with `'<Provider> auxiliary tasks are not implemented
+yet.'` The module contract already says what to do instead — *absent means unsupported; a present
+slot that no-ops is a lie the UI cannot detect* — and this was nine classes of exactly that lie,
+kept alive only because the registration required something in the slot.
+
+**And three were Claude's, which were the wrapper written out longhand**, holding the resumed
+session id by hand in each of three services. That id is what `AuxQueryRunner.reset()` means.
+
+What a provider contributes now is a `ProviderAuxiliarySource`: a runner per purpose, and — where
+the provider owns the configured title model — the model to use. The services are the application's,
+built once by `AuxiliaryExecutionOwner`, along with the routing that decides which provider writes a
+title.
+
+**The module slot for this was three `ExecutionBackendFactory`s, and it was wrong.** Auxiliary work
+is not three backends: every provider that runs it runs it through the backend it already has, on a
+conversation retained under a purpose key. The slot could never have been filled from a provider
+module anyway, because the composition a runner needs is built by the host from a plugin at load —
+which the slot's own comment predicted ("supplied by the host at M5") without noticing that a slot
+the host fills is not a slot. It is deleted, and the contract lives where the host can honour it.
+
+**One count fell that was not the point of the work.** `ProviderRegistry` took a plugin for exactly
+three members — these three — so removing them took the registry out of the core-imports-plugin
+list. Two files left, and both are the registries' own.
+
+**Two behaviours changed, and both are recorded rather than smuggled.** Claude's refine and
+inline-edit services never implemented `setModelOverride`, so the auxiliary model a user picked was
+silently dropped for Claude and honoured by every other provider; the shared service honours it.
+And the refusal for a provider with no auxiliary source now names the provider the way the picker
+does — "Qwen Code", "Gemini CLI (Legacy)" — instead of the directory it lives in.
+
+**The topology record stopped proving the absence with a filename.** `auxiliary: 'noop'` was checked
+by asserting the owner module's path contained `NoopServices`; there is no such module now, and the
+claim is read out of `ApplicationRuntime`'s own source map instead. A provider added to that map
+starts running auxiliary work, and the gate says so — which the old check could not have.
+
+Three breaks, three reds: a provider recorded as having no auxiliary execution given one, a
+refinement mapped onto the conversation an inline edit holds, and the runner built when the service
+is rather than when it is asked.
+
 #### The first provider row: it was never a policy
 
 Workspace row 7, `tabWarmupPolicy`, is moved — and the interesting part is what reading it found.

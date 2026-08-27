@@ -421,19 +421,6 @@ jest.mock('@/features/chat/services/SubagentManager', () => ({
   })),
 }));
 
-jest.mock('@/providers/claude/auxiliary/ClaudeInstructionRefineService', () => ({
-  InstructionRefineService: jest.fn().mockImplementation(() => ({
-    cancel: jest.fn(),
-    resetConversation: jest.fn(),
-  })),
-}));
-
-jest.mock('@/providers/claude/auxiliary/ClaudeTitleGenerationService', () => ({
-  TitleGenerationService: jest.fn().mockImplementation(() => ({
-    cancel: jest.fn(),
-  })),
-}));
-
 // Mock path util
 jest.mock('@/utils/path', () => ({
   getVaultPath: jest.fn().mockReturnValue('/test/vault'),
@@ -443,7 +430,17 @@ jest.mock('@/utils/path', () => ({
 function createMockPlugin(overrides: Record<string, any> = {}): any {
   const claudeAgentMentionProvider = { searchAgents: jest.fn().mockReturnValue([]) };
   const codexAgentMentionProvider = { searchAgents: jest.fn().mockReturnValue([]) };
+  // Auxiliary services come from the application's owner now, not from three
+  // registry factories over the plugin.
+  const auxiliary = {
+    inlineEditService: jest.fn(() => ({ cancel: jest.fn(), resetConversation: jest.fn() })),
+    instructionRefineService: jest.fn(() => ({ cancel: jest.fn(), resetConversation: jest.fn() })),
+    titleGenerationService: jest.fn(() => ({ cancel: jest.fn() })),
+    titleServiceFor: jest.fn(() => ({ cancel: jest.fn() })),
+  };
   return {
+    auxiliary,
+    getApplicationRuntimeOrNull: () => ({ auxiliary }),
     // Since the Claude flip a tab's runtime comes from the plugin's execution
     // composition rather than from a constructor the registration calls.
     getClaudeExecution: () => ({
@@ -977,8 +974,6 @@ describe('Tab - Service Initialization', () => {
     it('should initialize toolbar config for the tab provider', () => {
       const getChatUIConfigSpy = jest.spyOn(ProviderRegistry, 'getChatUIConfig');
       const getCapabilitiesSpy = jest.spyOn(ProviderCatalog.prototype, 'capabilities');
-      jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
       jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
       getChatUIConfigSpy.mockReturnValue({
         getModelOptions: jest.fn().mockReturnValue([]),
@@ -1033,8 +1028,6 @@ describe('Tab - Service Initialization', () => {
     });
 
     it('resolves the agent mention service through the provider-specific lookup', () => {
-      jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
       jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
       const codexAgentMentionProvider = { searchAgents: jest.fn().mockReturnValue([]) };
@@ -1063,8 +1056,6 @@ describe('Tab - Service Initialization', () => {
     });
 
     it('falls back blank Codex draft to Claude when Codex is disabled', () => {
-      jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
       jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
       const plugin = createMockPlugin();
@@ -1094,13 +1085,11 @@ describe('Tab - Service Initialization', () => {
     });
 
     it('rebinds provider-scoped helper services when a newly enabled provider takes over the draft model', () => {
-      const createInstructionRefineServiceSpy = jest.spyOn(ProviderRegistry, 'createInstructionRefineService')
-        .mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      const createTitleGenerationServiceSpy = jest.spyOn(ProviderRegistry, 'createTitleGenerationService')
-        .mockReturnValue({ cancel: jest.fn() } as any);
       jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
       const plugin = createMockPlugin();
+      const createInstructionRefineServiceSpy = plugin.auxiliary.instructionRefineService;
+      const createTitleGenerationServiceSpy = plugin.auxiliary.titleGenerationService;
       plugin.settings.settingsProvider = 'claude';
       plugin.settings.model = DEFAULT_CODEX_PRIMARY_MODEL;
       plugin.settings.providerConfigs = {
@@ -1128,8 +1117,10 @@ describe('Tab - Service Initialization', () => {
       onProviderAvailabilityChanged(tab, plugin);
 
       expect(tab.providerId).toBe('codex');
-      expect(createInstructionRefineServiceSpy).toHaveBeenLastCalledWith(plugin, 'codex');
-      expect(createTitleGenerationServiceSpy).not.toHaveBeenCalledWith(plugin, 'codex');
+      expect(createInstructionRefineServiceSpy).toHaveBeenLastCalledWith('codex');
+      // The title service is built once and routes per title, so a provider
+      // change must not rebind it.
+      expect(createTitleGenerationServiceSpy).toHaveBeenCalledTimes(1);
     });
 
     it('surfaces provider-scoped model settings for inactive-provider tabs and saves back to that provider snapshot', async () => {
@@ -1305,8 +1296,6 @@ describe('Tab - Service Initialization', () => {
     });
 
     it('resets to blank state when the new-conversation callback fires', () => {
-      jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
       jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
       const plugin = createMockPlugin();
@@ -1333,8 +1322,6 @@ describe('Tab - Service Initialization', () => {
     });
 
     it('preserves codex provider on new session when tab was codex', () => {
-      jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
       jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
       const plugin = createMockPlugin();
@@ -1359,8 +1346,6 @@ describe('Tab - Service Initialization', () => {
     });
 
     it('cleans up the active runtime when resetting to a new blank session', () => {
-      jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
       jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
       const plugin = createMockPlugin();
@@ -4022,8 +4007,6 @@ describe('Tab - Blank Tab Model Selector', () => {
 
 describe('Tab - Cross-Provider Model Rejection', () => {
   it('offers all enabled provider model groups on a bound tab', () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['codex', 'claude']);
     jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
@@ -4067,8 +4050,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('rejects cross-provider model change on bound tab via toolbar onModelChange', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
@@ -4096,8 +4077,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
 
   it('allows same-provider model change on bound tab', async () => {
     (Notice as unknown as jest.Mock).mockClear();
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
       getModelOptions: jest.fn().mockReturnValue([]),
@@ -4137,8 +4116,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('makes a bound model change visible before deferred conversation persistence completes', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversation = {
       id: 'conv-1', providerId: 'claude', title: 'Chat', createdAt: 1, updatedAt: 1,
@@ -4174,8 +4151,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('serializes durable model writes so the final persisted payload is the latest selection', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversation = {
       id: 'conv-1', providerId: 'claude', title: 'Chat', createdAt: 1, updatedAt: 1,
@@ -4231,8 +4206,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('serializes same-provider defaults across tabs in selection order', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversations = new Map([
       ['conv-a', { id: 'conv-a', providerId: 'claude', title: 'A', createdAt: 1, updatedAt: 1, sessionId: 'a', model: 'sonnet', messages: [] }],
@@ -4279,8 +4252,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('restores the preceding same-provider default when a later tab selection fails', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversations = new Map([
       ['conv-a', { id: 'conv-a', providerId: 'claude', title: 'A', createdAt: 1, updatedAt: 1, sessionId: 'a', model: 'sonnet', messages: [] }],
@@ -4316,8 +4287,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('rolls a failed latest selection back to the durable conversation model after a stale selection', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversation = {
       id: 'conv-1', providerId: 'claude', title: 'Chat', createdAt: 1, updatedAt: 1,
@@ -4355,8 +4324,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('uses a stale selection that finished writing as the durable rollback baseline', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversation = {
       id: 'conv-1', providerId: 'claude', title: 'Chat', createdAt: 1, updatedAt: 1,
@@ -4397,8 +4364,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('does not persist a deferred selection into a conversation loaded after it began', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversations = new Map([
       ['conv-1', { id: 'conv-1', providerId: 'claude', title: 'First', createdAt: 1, updatedAt: 1, sessionId: 'one', model: 'sonnet', messages: [] }],
@@ -4465,8 +4430,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('updates draft model and provider without creating runtime', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
       getModelOptions: jest.fn().mockReturnValue([]),
@@ -4507,8 +4470,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('notifies when the blank-tab draft model changes', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
@@ -4530,8 +4491,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('notifies when blank-tab provider settings change before first send', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
@@ -4611,8 +4570,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('refreshes the service-tier toggle when the model changes on a blank tab', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
       getModelOptions: jest.fn().mockReturnValue([]),
@@ -4646,8 +4603,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('does not wait for provider warmup before resolving blank-tab provider changes', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
@@ -4675,8 +4630,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('does not wait for OpenCode metadata warmup before resolving blank-tab model changes', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const originalGetChatUIConfig = ProviderRegistry.getChatUIConfig.bind(ProviderRegistry);
@@ -4728,8 +4681,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('does not trigger provider warmup when a blank-tab model switch stays on OpenCode', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     jest.spyOn(ProviderRegistry, 'resolveProviderForModel').mockImplementation((model: string) => {
       if (model.startsWith('opencode:')) {
@@ -4786,8 +4737,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('preserves the saved Codex fast preference when switching away and back', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
@@ -4826,8 +4775,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('swaps dropdown provider catalog on blank tab model change', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
       getModelOptions: jest.fn().mockReturnValue([]),
@@ -4912,8 +4859,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('updates hidden commands on blank tab model change', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockReturnValue({
       getModelOptions: jest.fn().mockReturnValue([]),
@@ -4996,10 +4941,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('rebinds provider helper services and clears stale runtime on blank tab provider change', async () => {
-    const createInstructionRefineServiceSpy = jest.spyOn(ProviderRegistry, 'createInstructionRefineService')
-      .mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    const createTitleGenerationServiceSpy = jest.spyOn(ProviderRegistry, 'createTitleGenerationService')
-      .mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
       getModelOptions: jest.fn().mockReturnValue([]),
@@ -5019,6 +4960,8 @@ describe('Tab - Blank Tab Draft Model Change', () => {
     }));
 
     const plugin = createMockPlugin();
+    const createInstructionRefineServiceSpy = plugin.auxiliary.instructionRefineService;
+    const createTitleGenerationServiceSpy = plugin.auxiliary.titleGenerationService;
     const tab = createTab(createMockOptions({ plugin }));
     initializeTabUI(tab, plugin);
 
@@ -5209,8 +5152,6 @@ describe('Tab - First Send Binding', () => {
 
 describe('Tab - History Bind Without Runtime', () => {
   it('ensureServiceForConversation binds to bound_cold without starting runtime', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
@@ -5239,8 +5180,6 @@ describe('Tab - History Bind Without Runtime', () => {
   });
 
   it('ensureServiceForConversation updates hidden commands when the provider changes', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const codexCatalog = {
@@ -5414,8 +5353,6 @@ describe('Tab - Destroy Lifecycle Transition', () => {
 
 describe('Tab - InputController getTabProviderId wiring', () => {
   it('wires getTabProviderId to InputController deps', () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();

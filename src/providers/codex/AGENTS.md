@@ -24,8 +24,9 @@
 - `CodexAuxiliaryQuery` runs auxiliary work — titles, refinement, inline edits — on its own
   app-server process and its own thread, one per retained conversation. What makes a turn
   auxiliary is on `thread/start`: `approvalPolicy: 'never'`, `sandbox: 'read-only'` whatever the
-  chat is set to, and `persistExtendedHistory: false`. The three services reach it through
-  `CodexExecution.createAuxRunner`; there is no provider-owned runner any more.
+  chat is set to, and `persistExtendedHistory: false`. What this provider contributes is
+  `CodexExecution.auxiliarySource()` — a runner per purpose — and the three services themselves are
+  the application's, shared with every other provider.
 - `CodexTaskResultInterpreter` is intentionally no-op because Grimoire's async Claude task system does not apply to Codex.
 - Image inputs are written to a temp directory, sent as local image paths, and cleaned up in `query()` finally blocks.
 

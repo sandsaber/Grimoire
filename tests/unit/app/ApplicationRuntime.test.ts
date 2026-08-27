@@ -39,6 +39,7 @@ describe('application runtime', () => {
       adapter,
       sessions,
       defaultProviderId: 'claude',
+      resolveTitleProviderId: () => 'codex',
       report,
     });
   }
