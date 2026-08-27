@@ -8680,7 +8680,7 @@ watches a scoreboard instead of re-reading prose:
 | worker tab ownership (`createWorkerTab`, `orchestratorTabId`, `workerTabIds`) | 3 |
 | `src/core` importing the plugin type | 3 |
 | subagent hooks and loaders | 7 |
-| `SubagentManager` lifecycle | 19 |
+| `SubagentManager` lifecycle | 20 |
 | `app` importing a concrete provider module | 20 |
 | turn metadata and session updates | 24 |
 | `StreamChunk` and the subagent chunk vocabulary | 25 |
@@ -8966,6 +8966,32 @@ already deletes with, because a deletion interrupted half-way must be finished a
 rather than leave an instance whose runs are gone. And the append-only result store gained a removal
 too: **append-only is a rule about writing, not about a conversation's lifetime**, and a store that
 could not be emptied would make D4 impossible to honour.
+
+#### The producer is live, and tab close still cancels
+
+Records exist now. A provider's background subagent — one with an async status and an id the provider
+assigned, which together are what "a person started this and walked away" means — is adopted as an
+agent instance the conversation owns, and its result is appended when it ends. Wired at the one call
+site the plan pointed at: `subagentManager.setCallback` in `Tab.ts`, where the state-change hook
+already persists the conversation. `SubagentManager` learned nothing about agents.
+
+**`orphaned` is deliberately not recorded.** It is what the *surface* does when a tab closes, and the
+whole point of these records is that closing a tab stops meaning the work is lost — writing it would
+persist the very thing this replaces.
+
+**And the deletion landed with it**, beside the registry's, because a store that fills has to be a
+store that empties. Two calls rather than one: the two stores are two domains and the registry knows
+nothing about agents, which is right.
+
+**Nothing about behaviour changed**, and that is the plan's rule rather than an accident: tab close
+still cancels background work, because the surface that would let someone *see* and reattach to it
+does not exist yet. Work nobody can find is worse than work that stopped.
+
+Three gates fired on this commit and each was right: the parity manifest refused a `pending` surface
+that had become reachable; the dark-bundle rule refused vault paths it had been told were dark and
+were now live; and the deletion scoreboard rose by one. The manifest is split now — the domain is
+`wired`, and `AgentFidelity` is its own `pending` surface owned by the work card, because the card is
+its first reader and a profile with no reader is exactly the kind of thing the v1 cutover left 324 of.
 
 #### The next checkpoint, scoped
 

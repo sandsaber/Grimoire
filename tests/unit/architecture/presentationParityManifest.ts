@@ -870,32 +870,41 @@ export const PARITY_SURFACES: ParitySurface[] = [
     ],
   },
   {
-    id: 'durable-agents-dark',
+    id: 'durable-agents',
     area: 'shell',
     description:
       'The agent domain: instances, runs, dispatch intents and results, with their schemas, their '
       + 'repositories, the permission policy that bounds a child by its parent, and the fidelity a '
-      + 'provider\'s capabilities allow. Harvested from the first attempt\'s Phase 6 and reconciled '
-      + 'against this branch; unreachable until the coordinator that writes them lands.',
-    state: 'pending',
-    owner:
-      'M5 — durable agents. These become reachable with the coordinator and the work card that '
-      + 'reads them; tab close stops cancelling background work in that same checkpoint and never '
-      + 'before.',
+      + 'provider\'s capabilities allow. A provider\'s background subagent is recorded as an agent '
+      + 'instance the conversation owns, and the records are deleted with it. What is still to come '
+      + 'is the surface that reads them — until it exists, closing a tab still cancels the work.',
+    state: 'wired',
     modules: [
       'src/core/agents/AgentContracts.ts',
       'src/core/agents/AgentControlPaths.ts',
       'src/core/agents/AgentControlTransactionCoordinator.ts',
       'src/core/agents/AgentCoordinator.ts',
-      'src/core/agents/AgentFidelity.ts',
       'src/core/agents/AgentIds.ts',
       'src/core/agents/AgentPolicy.ts',
       'src/core/agents/AgentRepositories.ts',
       'src/core/agents/AgentSchemas.ts',
-      // The adapter between a provider's subagent and a durable agent. It has
-      // no caller yet: wiring it is the checkpoint that also ships the work
-      // card and stops tab close cancelling background work.
       'src/app/agents/SubagentAgentRecorder.ts',
+      'src/features/chat/tabs/tabDurableSubagents.ts',
+    ],
+  },
+  {
+    id: 'durable-agents-surface',
+    area: 'chat',
+    description:
+      'What a person sees of work running out of sight: how much of an agent a provider lets us '
+      + 'observe, which is what decides whether a card may promise progress or only an ending.',
+    state: 'pending',
+    owner:
+      'M5 — the work card. It is the first reader of a fidelity profile, and it ships in the same '
+      + 'checkpoint that stops tab close cancelling background work: work nobody can see or '
+      + 'reattach to is worse than work that stops.',
+    modules: [
+      'src/core/agents/AgentFidelity.ts',
     ],
   },
   {

@@ -4,6 +4,8 @@ patchSetMaxListenersForElectron();
 
 import './providers';
 
+import { randomUUID } from 'node:crypto';
+
 import type { Command, Editor, WorkspaceLeaf } from 'obsidian';
 import { addIcon, MarkdownView, Notice, Plugin, setTooltip } from 'obsidian';
 
@@ -422,6 +424,17 @@ export default class GrimoirePlugin extends Plugin {
    * outlives the instance a reload replaces, and two registries over one
    * control store would each believe they own every run in it.
    */
+  /**
+   * Everything this load composed, or `null` before it has.
+   *
+   * The `null` is the point: a tab can be built while `loadSettings` is still
+   * running, and a caller that only wants to record something in passing should
+   * skip it rather than throw. The getters below that must have it still throw.
+   */
+  getApplicationRuntimeOrNull(): ApplicationRuntime | null {
+    return this.applicationRuntime;
+  }
+
   getExecutionKernel(): ExecutionKernelHost {
     if (!this.applicationRuntime) {
       throw new Error('Execution kernel is not available before plugin load.');
@@ -1219,15 +1232,32 @@ export default class GrimoirePlugin extends Plugin {
     if (!this.applicationRuntime) {
       return;
     }
+    const owner = { kind: 'conversation' as const, ownerId: id };
     try {
-      await this.applicationRuntime.kernel.registry.deleteOwnedRecords({
-        kind: 'conversation',
-        ownerId: id,
-      });
+      await this.applicationRuntime.kernel.registry.deleteOwnedRecords(owner);
     } catch (error) {
       this.recordDebugLog({
         error,
         event: 'execution.control.deleteFailed',
+        level: 'warn',
+        scope: 'plugin',
+      });
+    }
+    // **Its own call, because the two stores are two domains.** The registry
+    // removes sessions, runs, interactions and reconciliations and knows
+    // nothing about agents, which is right; D3 keeps an agent's records until
+    // its owning conversation is deleted, and this is the deletion. Attempted
+    // even when the first failed: they are separate stores, and leaving one
+    // full because the other would not empty helps nobody.
+    try {
+      await this.applicationRuntime.agents.deleteOwnedRecords(
+        owner,
+        `tx-${randomUUID().replaceAll('-', '')}`,
+      );
+    } catch (error) {
+      this.recordDebugLog({
+        error,
+        event: 'agents.control.deleteFailed',
         level: 'warn',
         scope: 'plugin',
       });

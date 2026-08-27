@@ -1,9 +1,11 @@
+import { AgentCoordinator } from '@/core/agents/AgentCoordinator';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
 import type { AppSessionStorage } from '@/core/providers/types';
 import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 import type { ProviderId } from '@/core/types/provider';
 import type GrimoirePlugin from '@/main';
 
+import { SubagentAgentRecorder } from './agents/SubagentAgentRecorder';
 import { ChatExecutionComposition } from './chat/ChatExecutionComposition';
 import { StoredChatConversations } from './chat/StoredChatConversations';
 import { AntigravityExecution } from './execution/antigravity/AntigravityExecutionComposition';
@@ -67,6 +69,15 @@ export interface ApplicationRuntimeOptions {
 export class ApplicationRuntime {
   readonly kernel: ExecutionKernelHost;
   readonly chat: ChatExecutionComposition;
+  /**
+   * The agent domain, and the thing that feeds it.
+   *
+   * Composed here because it has the load's lifetime for the reason everything
+   * else here does: one store per vault per process, and two coordinators over
+   * one control store would each believe they own every agent in it.
+   */
+  readonly agents: AgentCoordinator;
+  readonly agentRecorder: SubagentAgentRecorder;
   readonly localShell: LocalShellExecution;
   readonly antigravity: AntigravityExecution;
   readonly codex: CodexExecution;
@@ -124,6 +135,39 @@ export class ApplicationRuntime {
     this.kernel.registerBackend(this.gemini.createBackendRegistration());
     this.qwen = new QwenExecution(plugin, registry);
     this.kernel.registerBackend(this.qwen.createBackendRegistration());
+
+    this.agents = new AgentCoordinator(new VaultDurableStorage(options.adapter), {
+      scheduler: {
+        setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+        clearTimeout: handle => window.clearTimeout(handle as ReturnType<typeof setTimeout>),
+      },
+    });
+    this.agentRecorder = new SubagentAgentRecorder({
+      coordinator: this.agents,
+      // What a provider's background agent *is*, as a definition a record can
+      // hold. There is no per-agent definition to snapshot — the provider names
+      // its own — so this says which provider's notion of one it was.
+      definitionFor: providerId => ({
+        definitionId: `${providerId}-subagent`,
+        revisionDigest: '0'.repeat(64),
+        source: 'provider-native',
+      }),
+      // **The ceiling, not a grant.** A background agent may do no more than the
+      // chat it was launched from, and the resolver intersects these rather than
+      // adding them up.
+      policyFor: () => ({
+        provider: { granted: [], approvable: [] },
+        workspace: { granted: [], approvable: [] },
+        root: { granted: [], approvable: [] },
+        definition: { requested: [], approvable: [] },
+      }),
+      report: error => options.report({
+        error,
+        event: 'agents.record.failed',
+        level: 'warn',
+        scope: 'agents',
+      }),
+    });
 
     // Assembled beside the kernel it runs on. The store it writes through is
     // the vault's own, because the queue that serializes writes to a

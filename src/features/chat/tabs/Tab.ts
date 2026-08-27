@@ -62,6 +62,7 @@ import { buildAssistantResponseMetadata } from '../utils/assistantResponseMetada
 import { recalculateUsageForModel } from '../utils/usageInfo';
 import { getTabProviderId } from './providerResolution';
 import { attachInputResizeHandle, buildTabDOM } from './tabDOM';
+import { recordDurableSubagent } from './tabDurableSubagents';
 import { resolveTabProjectionExecution } from './tabProjectionExecution';
 import {
   AUTO_SCROLL_REENABLE_DELAY_MS,
@@ -1276,6 +1277,7 @@ export function initializeTabControllers(
   services.subagentManager.setCallback(
     (subagent) => {
       tab.controllers.streamController?.onAsyncSubagentStateChange(subagent);
+      recordDurableSubagent(tab, plugin, subagent);
 
       // During active stream, regular end-of-turn save captures latest state.
       if (!tab.state.isStreaming && tab.state.currentConversationId) {

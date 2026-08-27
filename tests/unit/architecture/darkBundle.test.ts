@@ -38,6 +38,8 @@ const BUNDLE_PATH = 'main.js';
  */
 const LIVE_MARKERS = [
   { marker: 'execution-runs', why: 'the control record directory' },
+  { marker: 'agent-instances', why: 'the durable agent record directory' },
+  { marker: 'agent-transactions', why: 'the agent transaction intent directory' },
   { marker: 'transaction-intents', why: 'the transaction intent directory' },
   { marker: 'Expected current control record', why: 'the lifecycle registry' },
   { marker: 'Execution owner kind is invalid', why: 'lifecycle registry validation' },
@@ -130,13 +132,13 @@ describe('dark code stays out of the shipped bundle', () => {
     // the agent paths began in `ExecutionControlPaths`, which the kernel makes
     // reachable. Both times the fix was a module of the surface's own, and both
     // times only a comment caught it.
-    const darkPaths = [
-      { path: 'agent-instances', surface: 'durable-agents-dark' },
-      { path: 'agent-runs', surface: 'durable-agents-dark' },
-      { path: 'agent-dispatch-intents', surface: 'durable-agents-dark' },
-      { path: 'agent-results', surface: 'durable-agents-dark' },
-      { path: 'agent-transactions', surface: 'durable-agents-dark' },
-    ];
+    // **Empty, and the rule is what matters.** The agent paths were the entry
+    // that proved this: they shipped as dead strings from a module the kernel
+    // already reached, twice over — the execution paths did the same from
+    // `StoragePaths` before them. They are live now, and listed among the
+    // markers above that must be *present*. The next dark surface with vault
+    // paths of its own belongs here.
+    const darkPaths: { path: string; surface: string }[] = [];
     // Guards the rule: a marker no build could ever contain would pass this
     // whatever the bundle held, which is how the first version of the live
     // markers above measured nothing.

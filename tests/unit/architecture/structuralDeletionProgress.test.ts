@@ -79,12 +79,13 @@ const SEARCHES: readonly DeletionSearch[] = [
   {
     what: 'SubagentManager lifecycle',
     pattern: /\bSubagentManager\b|\bSubagentInfo\b|orphanAllActive/,
-    // **19, and one of them is the replacement rather than the thing being
-    // replaced**: `SubagentAgentRecorder` names it in a comment explaining what
-    // it takes over. A count that went up for that reason is still a count
-    // going up, and saying so here is cheaper than wording a comment around a
-    // grep. It goes down by two when the recorder is wired.
-    files: 19,
+    // **20, and two of them are the replacement rather than the thing being
+    // replaced**: `SubagentAgentRecorder` and `tabDurableSubagents`, which name
+    // it while describing what they take over from it. A count that rises for
+    // that reason is still a count rising, and recording it is cheaper than
+    // wording a comment around a grep. The real fall comes when the work card
+    // ships and `orphanAllActive` stops being what tab close does.
+    files: 20,
     closedBy: 'durable agents — it loses lifecycle authority and keeps its rendering',
   },
   {
@@ -150,7 +151,7 @@ describe('structural deletion progress', () => {
       'worker tab ownership: 3',
       'core importing the plugin type: 3',
       'subagent hooks and loaders: 7',
-      'SubagentManager lifecycle: 19',
+      'SubagentManager lifecycle: 20',
       'the application importing a concrete provider module: 20',
       'turn metadata and session updates: 24',
       'StreamChunk and the subagent chunk vocabulary: 25',
