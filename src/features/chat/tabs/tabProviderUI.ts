@@ -2,6 +2,7 @@ import { AuxiliaryExecutionOwner } from '../../../app/auxiliary/AuxiliaryExecuti
 import { ProviderAgentMentionService } from '../../../app/mentions/ProviderAgentMentionService';
 import { getEnabledProviderForModel } from '../../../core/providers/modelRouting';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
+import type { ProviderChatUiContribution } from '../../../core/providers/ProviderModule';
 import type {
   ProviderUsageSnapshot,
   ProviderUsageWindow,
@@ -9,7 +10,6 @@ import type {
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import type {
-  ProviderChatUIConfig,
   ProviderId,
 } from '../../../core/providers/types';
 import { DEFAULT_CHAT_PROVIDER_ID } from '../../../core/providers/types';
@@ -279,11 +279,11 @@ export function prepareModelMetadataInBackground(
   plugin: GrimoirePlugin,
   providerId: ProviderId,
   model: string,
-  uiConfig: ProviderChatUIConfig,
+  chatUI: ProviderChatUiContribution,
 ): void {
   let metadataWarmup: Promise<void> | void;
   try {
-    metadataWarmup = uiConfig.prepareModelMetadata?.(model, plugin.settings, { plugin });
+    metadataWarmup = chatUI.models.prepareMetadata?.(model, plugin.settings, { plugin });
   } catch {
     return;
   }
@@ -310,11 +310,11 @@ export function prepareModelMetadataInBackground(
  */
 export function applyProviderUIGating(tab: TabData, plugin: GrimoirePlugin): void {
   const capabilities = getTabCapabilities(tab, plugin);
-  const uiConfig = getTabChatUIConfig(tab, plugin);
+  const chatUI = getTabChatUIConfig(tab, plugin);
   const mcpManager = capabilities.supportsMcpTools
     ? getProviderMcpManager(capabilities.providerId)
     : null;
-  const hasPermissionToggle = Boolean(uiConfig.getPermissionModeToggle?.());
+  const hasPermissionToggle = Boolean(chatUI.permissionMode?.toggle());
 
   if (!capabilities.supportsMcpTools) {
     tab.ui.mcpServerSelector?.clearEnabled();

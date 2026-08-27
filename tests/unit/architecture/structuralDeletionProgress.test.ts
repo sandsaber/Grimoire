@@ -115,10 +115,10 @@ const SEARCHES: readonly DeletionSearch[] = [
   {
     what: 'the two registries',
     pattern: /\bProviderRegistry\b|\bProviderWorkspaceRegistry\b/,
-    // **43.** `StreamController` is the first feature module to lose its
-    // registry import outright rather than one accessor among several: the
-    // provider icon it drew was the only thing it asked for.
-    files: 43,
+    // **42.** `StreamController` and `assistantResponseMetadata` have lost
+    // their registry imports outright rather than one accessor among several,
+    // as the chat-UI row's consumers move.
+    files: 42,
     closedBy: 'the provider rows, when the last consumer of each has moved',
   },
 ];
@@ -163,7 +163,7 @@ describe('structural deletion progress', () => {
       'the application importing a concrete provider module: 20',
       'turn metadata and session updates: 24',
       'StreamChunk and the subagent chunk vocabulary: 25',
-      'the two registries: 43',
+      'the two registries: 42',
     ]);
     // Two of eleven are zero, and both closed in the 2026-08-27 session.
     expect(SEARCHES).toHaveLength(remaining.length + 2);

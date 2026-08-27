@@ -3,12 +3,12 @@ import { getHiddenProviderCommandSet } from '../../../core/providers/commands/hi
 import type { ProviderCommandDropdownConfig } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
+import type { ProviderChatUiContribution } from '../../../core/providers/ProviderModule';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderCapabilities,
-  ProviderChatUIConfig,
   ProviderId,
   ProviderUIOption,
 } from '../../../core/providers/types';
@@ -100,11 +100,11 @@ export function getBlankTabModelOptions(
   settings: Record<string, unknown>,
 ): ProviderUIOption[] {
   return providerCatalog().enabledIds(settings).flatMap((providerId) => {
-    const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
-    const providerIcon = uiConfig.getProviderIcon?.() ?? undefined;
+    const chatUI = providerCatalog().declarations(providerId).chatUI;
+    const providerIcon = chatUI.icon() ?? undefined;
     const group = providerCatalog().displayName(providerId);
 
-    return uiConfig.getModelOptions(settings)
+    return chatUI.models.options(settings)
       .map(model => ({
         ...model,
         group,
@@ -296,8 +296,9 @@ export function getTabChatUIConfig(
   tab: TabProviderContext,
   plugin: GrimoirePlugin,
   conversation?: Conversation | null,
-): ProviderChatUIConfig {
-  return ProviderRegistry.getChatUIConfig(getTabProviderId(tab, plugin, conversation));
+): ProviderChatUiContribution {
+  return providerCatalog()
+    .declarations(getTabProviderId(tab, plugin, conversation)).chatUI;
 }
 
 export function resolveLegacyConversationModel(conversation: Conversation | null | undefined): string | undefined {

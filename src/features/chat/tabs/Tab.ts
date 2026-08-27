@@ -614,20 +614,20 @@ function initializeInputToolbar(
 
         // Update settings for the new provider
         plugin.settings.settingsProvider = newProvider;
-        const uiConfig = ProviderRegistry.getChatUIConfig(newProvider);
+        const newChatUI = providerCatalog().declarations(newProvider).chatUI;
         await updateTabProviderSettings(
           tab,
           plugin,
           (settings) => {
             settings.model = model;
-            uiConfig.applyModelDefaults(model, settings);
+            newChatUI.models.applyDefaults(model, settings);
           },
           onDraftSettingsChanged,
         );
         if (didProviderChange) {
           runProviderChangedInBackground(onProviderChanged, newProvider);
         }
-        prepareModelMetadataInBackground(tab, plugin, newProvider, model, uiConfig);
+        prepareModelMetadataInBackground(tab, plugin, newProvider, model, newChatUI);
         tab.ui.thinkingBudgetSelector?.updateDisplay();
         tab.ui.serviceTierToggle?.updateDisplay();
         tab.ui.modelSelector?.updateDisplay();
@@ -652,7 +652,7 @@ function initializeInputToolbar(
         return;
       }
 
-      const uiConfig: ProviderChatUIConfig = getTabChatUIConfig(tab, plugin);
+      const chatUI = getTabChatUIConfig(tab, plugin);
       const modelSelectionGeneration = (tab.modelSelectionGeneration ?? 0) + 1;
       tab.modelSelectionGeneration = modelSelectionGeneration;
       const targetConversationId = tab.conversationId;
@@ -697,7 +697,7 @@ function initializeInputToolbar(
               plugin,
               (settings) => {
                 settings.model = model;
-                uiConfig.applyModelDefaults(model, settings);
+                chatUI.models.applyDefaults(model, settings);
               },
               onDraftSettingsChanged,
             );
@@ -738,7 +738,7 @@ function initializeInputToolbar(
       if (!providerSettings || !isCurrentSelection()) {
         return;
       }
-      prepareModelMetadataInBackground(tab, plugin, boundProvider, model, uiConfig);
+      prepareModelMetadataInBackground(tab, plugin, boundProvider, model, chatUI);
       tab.ui.thinkingBudgetSelector?.updateDisplay();
       tab.ui.serviceTierToggle?.updateDisplay();
       tab.ui.modelSelector?.updateDisplay();
@@ -749,10 +749,10 @@ function initializeInputToolbar(
       // Recalculate context usage percentage for the new model's context window
       const currentUsage = tab.state.usage;
       if (currentUsage) {
-        const newContextWindow = uiConfig.getContextWindowSize(
+        const newContextWindow = chatUI.models.contextWindow(
           model,
-          providerSettings.customContextLimits,
           providerSettings,
+          providerSettings.customContextLimits,
         );
         tab.state.usage = recalculateUsageForModel(currentUsage, model, newContextWindow);
       }
@@ -763,7 +763,7 @@ function initializeInputToolbar(
         tab,
         plugin,
         (settings) => {
-          getTabChatUIConfig(tab, plugin).applyModeSelection?.(mode, settings);
+          getTabChatUIConfig(tab, plugin).modeSelector?.apply(mode, settings);
         },
         onDraftSettingsChanged,
       );
@@ -776,7 +776,7 @@ function initializeInputToolbar(
         plugin,
         (settings) => {
           settings.thinkingBudget = budget;
-          getTabChatUIConfig(tab, plugin).applyReasoningSelection?.(settings.model, budget, settings);
+          getTabChatUIConfig(tab, plugin).reasoning?.apply?.(settings.model, budget, settings);
         },
         onDraftSettingsChanged,
       );
@@ -788,7 +788,7 @@ function initializeInputToolbar(
         plugin,
         (settings) => {
           settings.effortLevel = effort;
-          getTabChatUIConfig(tab, plugin).applyReasoningSelection?.(settings.model, effort, settings);
+          getTabChatUIConfig(tab, plugin).reasoning?.apply?.(settings.model, effort, settings);
         },
         onDraftSettingsChanged,
       );
@@ -811,9 +811,12 @@ function initializeInputToolbar(
         tab,
         plugin,
         (settings) => {
-          const uiConfig = getTabChatUIConfig(tab, plugin);
-          if (uiConfig.applyPermissionMode) {
-            uiConfig.applyPermissionMode(mode, settings);
+          // A provider that publishes a toggle but implements no apply hook —
+          // Claude and Codex — keeps the shared field written directly, which
+          // is what the optional member on the row makes visible.
+          const permissionMode = getTabChatUIConfig(tab, plugin).permissionMode;
+          if (permissionMode?.apply) {
+            permissionMode.apply(mode, settings);
           } else {
             settings.permissionMode = mode;
           }

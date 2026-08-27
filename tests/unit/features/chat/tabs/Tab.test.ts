@@ -3968,10 +3968,13 @@ describe('Tab - Blank Tab Model Selector', () => {
     jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'claude' ? 'Claude' : 'Codex'
     ));
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: () => providerId === 'claude' ? claudeModels : [],
-      getProviderIcon: jest.fn().mockReturnValue(null),
-    } as any));
+    const codexModels: typeof claudeModels = [];
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        icon: () => null,
+        models: { options: () => (providerId === 'claude' ? claudeModels : codexModels) },
+      },
+    } as never));
 
     const result = getBlankTabModelOptions({ codexEnabled: false });
     expect(result).toEqual(claudeModels.map(m => ({ ...m, group: 'Claude', providerId: 'claude' })));
@@ -3990,10 +3993,12 @@ describe('Tab - Blank Tab Model Selector', () => {
     jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'codex' ? 'Codex' : 'Claude'
     ));
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: () => providerId === 'codex' ? codexModels : claudeModels,
-      getProviderIcon: jest.fn().mockReturnValue(null),
-    } as any));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        icon: () => null,
+        models: { options: () => (providerId === 'claude' ? claudeModels : codexModels) },
+      },
+    } as never));
 
     const result = getBlankTabModelOptions({ codexEnabled: true });
     expect(result).toEqual([
@@ -4004,10 +4009,10 @@ describe('Tab - Blank Tab Model Selector', () => {
 
   it('returns no models when every provider is disabled', () => {
     jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue([]);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig');
+    const declarations = jest.spyOn(ProviderCatalog.prototype, 'declarations');
 
     expect(getBlankTabModelOptions({})).toEqual([]);
-    expect(ProviderRegistry.getChatUIConfig).not.toHaveBeenCalled();
+    expect(declarations).not.toHaveBeenCalled();
   });
 });
 
@@ -4018,25 +4023,28 @@ describe('Tab - Cross-Provider Model Rejection', () => {
     jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'codex' ? 'Codex' : 'Claude'
     ));
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue(providerId === 'codex'
-        ? [{ value: DEFAULT_CODEX_PRIMARY_MODEL, label: DEFAULT_CODEX_PRIMARY_MODEL_LABEL }]
-        : [{ value: 'opus', label: 'Opus 4.8' }]),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'codex'
-          ? model.startsWith('gpt-') || /^o\d/.test(model)
-          : providerId === 'claude' && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-      getProviderIcon: jest.fn().mockReturnValue(null),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: () => (providerId === 'codex'
+            ? [{ label: DEFAULT_CODEX_PRIMARY_MODEL_LABEL, value: DEFAULT_CODEX_PRIMARY_MODEL }]
+            : [{ label: 'Opus 4.8', value: 'opus' }]),
+          ownsModel: (model: string) => (
+            providerId === 'codex'
+              ? model.startsWith('gpt-') || /^o\d/.test(model)
+              : providerId === 'claude'
+                && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
+          ),
+        },
+      },
+    } as never));
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4084,22 +4092,21 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   it('allows same-provider model change on bound tab', async () => {
     (Notice as unknown as jest.Mock).mockClear();
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue([]),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'codex'
-          ? model.startsWith('gpt-') || /^o\d/.test(model)
-          : providerId === 'claude' && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: () => false,
+        },
+      },
+    } as never));
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4437,22 +4444,21 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 
   it('updates draft model and provider without creating runtime', async () => {
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue([]),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'codex'
-          ? model.startsWith('gpt-') || /^o\d/.test(model)
-          : providerId === 'claude' && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: () => false,
+        },
+      },
+    } as never));
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4575,22 +4581,21 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 
   it('refreshes the service-tier toggle when the model changes on a blank tab', async () => {
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue([]),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'codex'
-          ? model.startsWith('gpt-') || /^o\d/.test(model)
-          : providerId === 'claude' && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: () => false,
+        },
+      },
+    } as never));
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4636,17 +4641,24 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   it('does not wait for OpenCode metadata warmup before resolving blank-tab model changes', async () => {
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
-    const originalGetChatUIConfig = ProviderRegistry.getChatUIConfig.bind(ProviderRegistry);
+    const originalDeclarations = ProviderCatalog.prototype.declarations;
     let releaseMetadataWarmup!: () => void;
     const prepareModelMetadata = jest.fn().mockImplementation(() => new Promise<void>((resolve) => {
       releaseMetadataWarmup = resolve;
     }));
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: any) => {
-      const config = originalGetChatUIConfig(providerId);
-      return providerId === 'opencode'
-        ? { ...config, prepareModelMetadata }
-        : config;
-    });
+    jest.spyOn(ProviderCatalog.prototype, 'declarations')
+      .mockImplementation(function declarations(this: never, providerId: string) {
+        const real = originalDeclarations.call(this, providerId);
+        return providerId === 'opencode'
+          ? {
+            ...real,
+            chatUI: {
+              ...real.chatUI,
+              models: { ...real.chatUI.models, prepareMetadata: prepareModelMetadata },
+            },
+          }
+          : real;
+      });
 
     const plugin = createMockPlugin();
     plugin.settings.providerConfigs = {
@@ -4780,22 +4792,21 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 
   it('swaps dropdown provider catalog on blank tab model change', async () => {
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue([]),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'codex'
-          ? model.startsWith('gpt-') || /^o\d/.test(model)
-          : providerId === 'claude' && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: () => false,
+        },
+      },
+    } as never));
 
     const codexCatalog = {
       listDropdownEntries: jest.fn().mockResolvedValue([]),
@@ -4946,22 +4957,21 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 
   it('rebinds provider helper services and clears stale runtime on blank tab provider change', async () => {
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue([]),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'codex'
-          ? model.startsWith('gpt-') || /^o\d/.test(model)
-          : providerId === 'claude' && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: () => false,
+        },
+      },
+    } as never));
 
     const plugin = createMockPlugin();
     const createInstructionRefineServiceSpy = plugin.auxiliary.instructionRefineService;
@@ -4997,22 +5007,21 @@ describe('Tab - Blank Tab Draft Model Change', () => {
     jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'antigravity' ? 'Antigravity' : 'Claude'
     ));
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue(providerId === 'antigravity' ? antigravityModels : claudeModels),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'antigravity'
-          ? model === 'antigravity'
-          : model === 'haiku'
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(true),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('high'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue(providerId === 'antigravity' ? antigravityModels : claudeModels),
+          ownsModel: () => false,
+        },
+      },
+    } as never));
     const plugin = createMockPlugin({
       settings: {
         ...createMockPlugin().settings,
