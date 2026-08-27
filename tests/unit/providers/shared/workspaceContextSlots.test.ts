@@ -72,7 +72,7 @@ describe('provider workspace context slots', () => {
 
   it('asks the catalog for the dropdown list, without built-ins', async () => {
     const listDropdownEntries = jest.fn(async () => []);
-    ProviderWorkspaceRegistry.setServices('grok' as never, {
+    ProviderWorkspaceRegistry.setServices('grok', {
       commandCatalog: { listDropdownEntries },
     } as never);
 
