@@ -71,8 +71,6 @@ export interface SubagentAgentRecorderOptions {
 }
 
 export class SubagentAgentRecorder {
-  private readonly runs = new Map<string, ReturnType<typeof agentRunId>>();
-
   constructor(private readonly options: SubagentAgentRecorderOptions) {}
 
   /**
@@ -91,15 +89,17 @@ export class SubagentAgentRecorder {
   }
 
   private async record(observation: SubagentObservation): Promise<void> {
-    const adoptionKey = nativeAgentAdoptionKey(
-      `nad-${createHash('sha256').update(observation.nativeAgentRef).digest('hex').slice(0, 32)}`,
-    );
+    // **Every id here is derived, and nothing is remembered.** A first version
+    // minted the run id and cached it on this object, which failed in exactly
+    // the case this class exists for: a reload builds a new recorder with an
+    // empty cache, so the next observation of a still-running agent adopts with
+    // a *different* run id, the coordinator refuses the mismatch, and that
+    // agent is never recorded again. A duplicate terminal event did the same,
+    // because the cache is cleared when a run ends.
+    const identity = this.identity(observation);
+    const adoptionKey = nativeAgentAdoptionKey(`nad-${identity}`);
     const instanceId = adoptedAgentInstanceId(adoptionKey);
-    // Minted once per native agent and kept, because a result has to name the
-    // run it belongs to and the provider never tells us that id.
-    const runId = this.runs.get(observation.nativeAgentRef)
-      ?? agentRunId(`agr-${randomUUID().replaceAll('-', '')}`);
-    this.runs.set(observation.nativeAgentRef, runId);
+    const runId = agentRunId(`agr-${identity}`);
 
     await this.options.coordinator.adoptNativeAgent({
       transactionId: this.transactionId(),
@@ -125,7 +125,12 @@ export class SubagentAgentRecorder {
     }
     const completedAt = (this.options.now ?? Date.now)();
     await this.options.coordinator.appendResult({
-      agentResultId: agentResultId(`ares-${randomUUID().replaceAll('-', '')}`),
+      // Derived too, so a second terminal observation of the same agent writes
+      // the same result rather than a second one. `appendResult` dedupes by
+      // comparing content on a revision conflict, and a random id defeated it:
+      // two concurrent terminals wrote two durable results for one run, with
+      // nothing reported.
+      agentResultId: agentResultId(`ares-${identity}`),
       agentInstanceId: instanceId,
       agentRunId: runId,
       status: observation.status === 'completed' ? 'succeeded' : 'failed',
@@ -155,7 +160,22 @@ export class SubagentAgentRecorder {
       },
       completedAt,
     });
-    this.runs.delete(observation.nativeAgentRef);
+  }
+
+  /**
+   * One agent's identity, from the three things that name it.
+   *
+   * **The provider and the conversation are in it deliberately.** A native ref
+   * is only promised to be unique within a session — an ACP `toolCallId` is
+   * `call_1` — so hashing the ref alone collides across conversations, and the
+   * collision is permanent: the coordinator refuses the mismatched adoption and
+   * that agent is never recorded at all.
+   */
+  private identity(observation: SubagentObservation): string {
+    return createHash('sha256')
+      .update(`${observation.providerId}\u0000${observation.conversationId}\u0000${observation.nativeAgentRef}`)
+      .digest('hex')
+      .slice(0, 32);
   }
 
   private transactionId(): string {

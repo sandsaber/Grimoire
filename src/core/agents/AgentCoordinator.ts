@@ -327,8 +327,19 @@ export class AgentCoordinator {
         executionMode: 'provider-native',
         origin: 'observed-native',
         rootOwner: command.rootOwner,
-        parentAgentInstanceId: command.parentAgentInstanceId,
-        parentAgentRunId: command.parentAgentRunId,
+        // **Derived from the parent, not copied from the command**, the way
+        // `prepareDispatch` above does it. Making the run id optional made a
+        // command naming a parent instance and no run type-legal;
+        // `requireParentRun` falls back to the parent's latest run and uses its
+        // policy as the ceiling, but writing `undefined` here then failed at
+        // the schema with a message about a pair — a confusing failure at the
+        // wrong layer, rather than the right answer at this one.
+        ...(parent && parentRun
+          ? {
+            parentAgentInstanceId: parent.agentInstanceId,
+            parentAgentRunId: parentRun.agentRunId,
+          }
+          : {}),
         attachment: command.attachment,
         observation: command.observation,
         nativeAdoptionKey: command.adoptionKey,

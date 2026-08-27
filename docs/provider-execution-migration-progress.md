@@ -8926,6 +8926,32 @@ naming it, and the recorder names it in a comment describing what it takes over 
 that reason is still a count rising, and recording it is cheaper than wording a comment around a
 grep. It falls by two when the recorder is wired.
 
+#### The review of the producer: everything it remembered was wrong
+
+Four findings, all verified by probe, all in code written an hour earlier — and three of them are the
+same mistake in three places: **the recorder remembered instead of deriving**.
+
+- **the run id lived only in memory.** Minted with a random uuid and cached on the object, cleared
+  when a run ended. So a *reload* — the exact case this class exists for — built a recorder with an
+  empty cache, adopted a still-running agent under a different run id, and the coordinator refused
+  the mismatch. That agent was then never recorded again. A duplicate terminal event did the same
+  thing;
+- **the result id was random**, which defeated `appendResult`'s own dedup — it compares content on a
+  revision conflict, and two different ids never conflict. Two concurrent terminal observations wrote
+  two durable results for one run, with nothing reported;
+- **the adoption key was scoped to the native ref alone**, and a native ref is only unique within a
+  session: an ACP tool call is `call_1`. Two conversations, one ref, and the second conversation's
+  agent was refused permanently.
+
+Every id is derived from `providerId + conversationId + nativeAgentRef` now, and the recorder holds
+no state at all. **The adoption key was already derived** — the same commit got that one right and
+the other three wrong, which is what makes the shape worth naming rather than the individual bugs.
+
+The fourth is mine from the entry above: making `parentAgentRunId` optional made a command naming a
+parent *instance* with no run type-legal, and adoption wrote the command's `undefined` straight
+through, so the schema refused it with a message about a pair. `prepareDispatch` already derived it
+from the parent it had just resolved; adoption does now too.
+
 #### The next checkpoint, scoped
 
 The plan binds three things into one checkpoint and the binding is the point: **tab close stops

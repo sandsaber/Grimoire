@@ -159,6 +159,79 @@ describe('subagent agent recorder', () => {
     expect(new Set(goals).size).toBe(2);
   });
 
+  it('records the same agent after a reload, when nothing is remembered', async () => {
+    // **The case this class exists for.** A first version minted the run id and
+    // cached it on the recorder; a reload builds a new one with an empty cache,
+    // so the next observation of a still-running agent adopted with a different
+    // run id, the coordinator refused the mismatch, and that agent was never
+    // recorded again.
+    const storage = new TestDurableStorage();
+    let clock = 1_000;
+    const coordinator = new AgentCoordinator(storage, { now: () => (clock += 1) });
+    const build = () => {
+      const reported: unknown[] = [];
+      return {
+        reported,
+        recorder: new SubagentAgentRecorder({
+          coordinator,
+          definitionFor: () => ({
+            definitionId: 'task',
+            revisionDigest: 'd'.repeat(64),
+            source: 'provider-native' as const,
+          }),
+          policyFor: () => ({
+            provider: { granted: ['read'], approvable: [] },
+            workspace: { granted: ['read'], approvable: [] },
+            root: { granted: ['read'], approvable: [] },
+            definition: { requested: ['read'], approvable: [] },
+          }),
+          now: () => clock,
+          report: error => reported.push(error),
+        }),
+      };
+    };
+
+    const before = build();
+    await before.recorder.observe(running());
+    const after = build();
+    await after.recorder.observe(running({ status: 'completed', resultText: 'done' }));
+
+    expect(before.reported).toEqual([]);
+    expect(after.reported).toEqual([]);
+    expect(await coordinator.repositories.instances.listRecordIds()).toHaveLength(1);
+    expect(await coordinator.repositories.results.listRecordIds()).toHaveLength(1);
+  });
+
+  it('writes one result when the same ending is observed twice at once', async () => {
+    // A random result id defeated `appendResult`'s own dedup, which compares
+    // content on a revision conflict: two concurrent terminals wrote two
+    // durable results for one run, and nothing was reported.
+    const { coordinator, recorder, reported } = createRecorder();
+    await recorder.observe(running());
+
+    await Promise.all([
+      recorder.observe(running({ status: 'completed', resultText: 'done' })),
+      recorder.observe(running({ status: 'completed', resultText: 'done' })),
+    ]);
+
+    expect(reported).toEqual([]);
+    expect(await coordinator.repositories.results.listRecordIds()).toHaveLength(1);
+  });
+
+  it('keeps one conversation\'s agent apart from another with the same native ref', async () => {
+    // **A native ref is only unique within a session.** An ACP tool call is
+    // `call_1`, and hashing the ref alone collided across conversations — the
+    // coordinator refused the mismatched adoption and the second conversation's
+    // agent was never recorded at all.
+    const { coordinator, recorder, reported } = createRecorder();
+
+    await recorder.observe(running({ conversationId: 'conv-A', nativeAgentRef: 'call_1' }));
+    await recorder.observe(running({ conversationId: 'conv-B', nativeAgentRef: 'call_1' }));
+
+    expect(reported).toEqual([]);
+    expect(await coordinator.repositories.instances.listRecordIds()).toHaveLength(2);
+  });
+
   it('never lets a failed recording take the turn down with it', async () => {
     // These records exist so work survives a tab. A tab that crashed because
     // one could not be written has survived nothing.
