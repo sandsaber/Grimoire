@@ -136,18 +136,6 @@ export interface KimicodeWorkspaceContext {
 
 export type KimicodeWorkspace = ProviderWorkspaceSlots;
 
-/**
- * The live config, grouped — never a second implementation of it.
- *
- * What stood here was a hand-written model presentation answering three of
- * the row's twenty questions against decoded settings, while the config the
- * chat surface already asks answered all twenty against the app's. Two
- * inventories of which models this provider owns, and no test that could see
- * them disagree.
- */
-const kimicodeChatUi: ProviderChatUiContribution = chatUiContributionFor(
-  kimicodeChatUIConfig,
-);
 
 const kimicodeCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'kimicode',
@@ -215,6 +203,20 @@ const kimicodeCapabilities: ProviderCapabilityDescriptor = {
     environment: { inventory: 'managed', manager: 'managed' },
   },
 };
+
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const kimicodeChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  kimicodeChatUIConfig,
+  kimicodeCapabilities.reasoningControl,
+);
 
 export const kimicodeSettingsCodec: ProviderSettingsCodec<KimicodeProviderSettings> = {
   providerId: 'kimicode',

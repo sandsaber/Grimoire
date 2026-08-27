@@ -9129,6 +9129,64 @@ they rest on are asserted — because a document that keeps saying `reshape` abo
 since fixed is worse than no document. Proven by growing the chat-UI slot by one member and watching
 it go red.
 
+#### The review of that reshape, and the four lies inside it
+
+Fifteen findings on the chat-UI checkpoint. **Every one I checked held**, and the pattern in them is
+the one this session keeps producing: the code was right and the *claims around it* were not.
+
+**Three groups were declared from a method's presence rather than from a capability.**
+
+- `getReasoningOptions` is a **required** member of the config, so `config.getReasoningOptions ? …`
+  is always true and every provider got a reasoning group — including Gemini and Antigravity, which
+  declare `reasoningControl: { kind: 'none' }`. A toolbar built on it would draw a reasoning row
+  offering tiers their runtime cannot apply. It reads the declared control now.
+- `permissionMode.apply` and `.resolve` were required members delegating to optional hooks, and the
+  two providers with the richest permission models are exactly the two that implement neither:
+  Claude and Codex publish a toggle and read their mode themselves. A host calling `apply('plan', …)`
+  was told it succeeded having written nothing. Both are optional now, offered only where the
+  provider has them.
+- `modeSelector` was declared for four providers whose `getModeSelector` is typed `(): null`, with
+  an apply hook **no provider implements**. The group is gone: a slot with no filler is a provider
+  saying it has none; a slot filled with a control that can never render an option is the lie this
+  contract forbids.
+
+**Two doc comments taught the opposite of the code.** `defaultsFor` was documented as "a patch
+rather than a mutation" while returning `void` and delegating to something that writes into the
+caller's object — a consumer following that doc would have got `undefined` and lost the effort
+default and last-model tracking silently. It is `applyDefaults` now, and the doc says it mutates and
+why that is not the shape it should have. `contextWindow` was typed `number | undefined` and
+documented as answering nothing for a model the provider does not own; `getContextWindowSize`
+returns a number unconditionally, so `undefined` was unreachable and the doc taught a test nobody
+could pass.
+
+**Two restatements dropped fields the product renders from.** `ProviderModelOption` omitted
+`providerIcon` and `providerId`, which the toolbar reads off each option to put the right mark
+beside it in a mixed-provider dropdown — the delegation passed them through at runtime, so the
+declared type and its own value disagreed. And a second `ProviderReasoningOption` was exported
+beside the existing one in the same folder; it is `ProviderReasoningTier` now.
+
+**And the gate I wrote to catch all of this could not.** Two of its assertions were tautologies —
+comparing a group against the same truthiness test the contribution derives it from — in the test
+named for the thing they were meant to catch. It compared five of the row's twenty members while the
+commit message said "every provider and every member". It called `contextWindow` only without a
+per-model override, never exercising the delegation's one genuine parameter transposition. And it
+compared icons by `viewBox` alone, which cannot see a composite icon's children dropped and cannot
+even tell Gemini's mark from Antigravity's, because they are the same object.
+
+**Two smaller ones, both mine.** `prepareMetadata` cast its host to `{ plugin: never }` — a type no
+value inhabits — deleting the one check protecting a seam four providers dereference two levels
+deep. And the catalog validated that `chatUI` *exists* while validating every neighbouring
+contribution method by method, so a provider registering `chatUI: {}` passed construction and threw
+at first render. Both fixed; the catalog checks the row member by member now.
+
+Two documentation blocks were also orphaned by an insertion — a new doc placed *between* an existing
+one and the interface it describes, so tooling attaches the wrong text to both symbols.
+
+**And I broke test files with a regex again**, converting seven module tests to the app settings
+record. Restored from git, redone scoped to the one describe block each. That is the second time in
+this session; the rule is now simple enough to state: **an automated rewrite of code gets a
+brace-matched or block-scoped edit, never a pattern that can match past its intent.**
+
 #### The biggest row, and the two inventories that disagreed
 
 `chatUIConfig` is the row twenty-three consumers read and the one whose slot covered three of its

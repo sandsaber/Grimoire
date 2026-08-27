@@ -405,21 +405,6 @@ export interface ProviderContextPort {
 }
 
 /**
- * Everything a provider decides about how its chat controls look and behave.
- *
- * **Twenty members, not three.** The first version had a model presentation, a
- * static `{id,label}[]` of permission toggles and an icon string, against a row
- * with twenty methods — so the entire reasoning group, the service-tier toggle,
- * the mode selector and its apply hook, bang-bash enablement, model options,
- * custom model ids, variant normalization and metadata preparation had nowhere
- * to go. Twenty-three consumers read this row; the slot covered three of them.
- *
- * Grouped rather than flattened, because the toolbar reads them in groups: a
- * provider either has a reasoning control or it does not, and a provider with
- * none should say so by leaving the group out rather than by answering `[]` to
- * four separate questions.
- */
-/**
  * The settings a presentation member is asked about.
  *
  * **The whole record, not the provider's own decoded settings.** The slot took
@@ -435,12 +420,41 @@ export interface ProviderContextPort {
  */
 export type ProviderScopedSettings = Record<string, unknown>;
 
+/**
+ * Everything a provider decides about how its chat controls look and behave.
+ *
+ * **Twenty members, not three.** The first version had a model presentation, a
+ * static `{id,label}[]` of permission toggles and an icon string, against a row
+ * with twenty methods — so the entire reasoning group, the service-tier toggle,
+ * the mode selector and its apply hook, bang-bash enablement, model options,
+ * custom model ids, variant normalization and metadata preparation had nowhere
+ * to go. Twenty-three consumers read this row; the slot covered three of them.
+ *
+ * Grouped rather than flattened, because the toolbar reads them in groups: a
+ * provider either has a reasoning control or it does not, and a provider with
+ * none should say so by leaving the group out rather than by answering `[]` to
+ * four separate questions.
+ */
+
 export interface ProviderChatUiContribution {
   readonly models: ProviderModelPresentation;
-  /** The reasoning control, where the provider has one. */
+  /**
+   * The reasoning control, where the provider has one.
+   *
+   * Absent is a real statement: Gemini and Antigravity declare
+   * `reasoningControl: { kind: 'none' }`, and a toolbar that drew a reasoning
+   * row for them would offer tiers their runtime cannot apply. The first
+   * version of the delegation decided this from whether the config *had* a
+   * `getReasoningOptions` method — which every config has, because it is a
+   * required member — so the group was present for all nine.
+   */
   readonly reasoning?: ProviderReasoningPresentation;
   /** The permission-mode toggle, where the provider exposes one. */
   readonly permissionMode?: ProviderPermissionModePresentation;
+  // `serviceTier` and `modeSelector` below are absent for every provider today.
+  // That is the contract working: a slot with no filler is a provider saying it
+  // has none, which is a different thing from a slot filled with a control that
+  // can never render an option.
   /** The fast/standard toggle, where the provider has service tiers. */
   readonly serviceTier?: ProviderServiceTierPresentation;
   /** A provider-owned selector beside the model picker, where there is one. */
@@ -472,7 +486,11 @@ export interface ProviderChatUiContribution {
  * nothing would have failed until an icon rendered wrong.
  */
 export type ProviderChatIcon =
-  | { readonly kind: 'path'; readonly viewBox: string; readonly path: string }
+  // `kind` is optional on the path variant, as it is on the row: a provider
+  // that writes only a viewBox and a path is writing a path icon, and
+  // requiring the tag here would have made this restatement reject values the
+  // product already produces.
+  | { readonly kind?: 'path'; readonly viewBox: string; readonly path: string }
   | { readonly kind: 'composite'; readonly viewBox: string; readonly children: readonly ProviderChatIconChild[] };
 
 export type ProviderChatIconChild =
@@ -490,25 +508,39 @@ export interface ProviderReasoningPresentation {
    * model rather than declared once per provider.
    */
   isTiered(modelId: string, settings: ProviderScopedSettings): boolean;
-  options(modelId: string, settings: ProviderScopedSettings): readonly ProviderReasoningOption[];
+  options(modelId: string, settings: ProviderScopedSettings): readonly ProviderReasoningTier[];
   defaultValue(modelId: string, settings: ProviderScopedSettings): string;
   /** Applied when the toolbar changes the selection, where the provider cares. */
   apply?(modelId: string, value: string, settings: ProviderScopedSettings): void;
 }
 
-export interface ProviderReasoningOption {
-  readonly value: string;
-  readonly label: string;
-  readonly description?: string;
+/**
+ * One reasoning tier, or one token budget.
+ *
+ * Named `ProviderReasoningTier` rather than `ProviderReasoningOption`: the
+ * latter already exists in `types.ts`, in the same folder, with a different
+ * shape — and two same-named exports beside each other is an import that
+ * silently loses fields.
+ */
+export interface ProviderReasoningTier extends ProviderModelOption {
   /** Token budget, for the providers whose reasoning is bought rather than tiered. */
   readonly tokens?: number;
 }
 
 export interface ProviderPermissionModePresentation {
   toggle(): ProviderPermissionModeToggle | null;
-  /** This provider's current mode in the shared vocabulary, or nothing. */
-  resolve(settings: ProviderScopedSettings): string | null;
-  apply(value: string, settings: ProviderScopedSettings): void;
+  /**
+   * This provider's current mode in the shared vocabulary.
+   *
+   * Optional, and the two providers with the richest permission models are
+   * exactly the two that do not have it: Claude and Codex publish a toggle and
+   * read their mode from their own settings. A required member delegating to a
+   * hook they do not implement answers `null` for them — indistinguishable from
+   * "no mode set", which is the failure this contract's own rule forbids.
+   */
+  resolve?(settings: ProviderScopedSettings): string | null;
+  /** Applied when the toolbar changes the mode, for the providers that take it. */
+  apply?(value: string, settings: ProviderScopedSettings): void;
 }
 
 export interface ProviderPermissionModeToggle {
@@ -561,14 +593,19 @@ export interface ProviderModelPresentation {
    * The window this model has, honouring a per-model override the user set.
    *
    * The overrides are the host's — one map for every provider — so they are
-   * passed rather than read, and a provider that has no opinion answers
-   * nothing rather than a guess the meter would draw.
+   * passed rather than read.
+   *
+   * **Always a number, including for a model this provider does not own.** Six
+   * providers answer a constant and three answer their own default; none looks
+   * at whether it owns the id. This said `number | undefined` and taught that
+   * `undefined` meant "not mine", which no implementation can produce — ask
+   * `ownsModel` for that.
    */
   contextWindow(
     modelId: string,
     settings: ProviderScopedSettings,
     customLimits?: Readonly<Record<string, number>>,
-  ): number | undefined;
+  ): number;
   /**
    * What the picker lists for this provider, each option carrying its own label.
    *
@@ -590,13 +627,18 @@ export interface ProviderModelPresentation {
   /** Model ids this provider recognizes in a set of environment variables. */
   customModelIds(environment: Readonly<Record<string, string>>): ReadonlySet<string>;
   /**
-   * The settings a model change implies, as a patch rather than a mutation.
+   * Writes the settings a model change implies, into the record it is given.
    *
-   * The row this replaces takes the settings object and writes into it, which
-   * is why a caller cannot tell what a model change touched — and why two
-   * providers writing the same field is invisible.
+   * **A mutation, and the name says so.** This was `defaultsFor` returning "a
+   * patch rather than a mutation", which is what the shape *should* be — a
+   * caller cannot see what a model change touched, and two providers writing
+   * the same field is invisible. But every implementation writes in place
+   * (`applyModelDefaults` sets the effort default and the last-model tracking),
+   * and a contract that documents the opposite of what nine providers do is
+   * worse than one that admits the shape it has. Changing it is a change to
+   * those nine, recorded in the slot-fit audit rather than claimed here.
    */
-  defaultsFor(modelId: string, settings: ProviderScopedSettings): void;
+  applyDefaults(modelId: string, settings: ProviderScopedSettings): void;
   /**
    * Provider-owned discovery after a model is selected, where there is any.
    *
@@ -606,6 +648,16 @@ export interface ProviderModelPresentation {
   prepareMetadata?(modelId: string, settings: ProviderScopedSettings, host: unknown): Promise<void>;
 }
 
+/**
+ * One entry in the model picker.
+ *
+ * Every field the picker draws, including the two that only matter when a
+ * dropdown mixes providers: it reads `providerIcon` and `providerId` off each
+ * option to put the right mark beside it. The first version of this type left
+ * both out while the delegation passed them through at runtime — a declared
+ * type disagreeing with its own value, where the loss appears only once a
+ * consumer trusts the type.
+ */
 export interface ProviderModelOption {
   readonly value: string;
   readonly label: string;
@@ -614,6 +666,10 @@ export interface ProviderModelOption {
   readonly description?: string;
   /** A heading to group this option under, where a picker separates them. */
   readonly group?: string;
+  /** Which provider owns this option, where one dropdown mixes several. */
+  readonly providerId?: string;
+  /** This option's own mark, overriding the provider's. */
+  readonly providerIcon?: ProviderChatIcon;
 }
 
 /**
@@ -628,11 +684,6 @@ export type ProviderReasoningControl =
   | { readonly kind: 'none' }
   | { readonly kind: 'effort'; readonly tiers: readonly string[] }
   | { readonly kind: 'token-budget' };
-
-export interface ProviderPermissionToggle {
-  readonly id: string;
-  readonly label: string;
-}
 
 export interface ProviderHistoryPort {
   hydrate(conversationId: string): Promise<ProviderHistoryHydration>;

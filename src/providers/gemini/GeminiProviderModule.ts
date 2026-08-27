@@ -123,18 +123,6 @@ export interface GeminiWorkspaceContext {
 
 export type GeminiWorkspace = ProviderWorkspaceSlots;
 
-/**
- * The live config, grouped — never a second implementation of it.
- *
- * What stood here was a hand-written model presentation answering three of
- * the row's twenty questions against decoded settings, while the config the
- * chat surface already asks answered all twenty against the app's. Two
- * inventories of which models this provider owns, and no test that could see
- * them disagree.
- */
-const geminiChatUi: ProviderChatUiContribution = chatUiContributionFor(
-  geminiChatUIConfig,
-);
 
 const geminiCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'gemini',
@@ -220,6 +208,20 @@ const geminiCapabilities: ProviderCapabilityDescriptor = {
     environment: { inventory: 'managed', manager: 'managed' },
   },
 };
+
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const geminiChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  geminiChatUIConfig,
+  geminiCapabilities.reasoningControl,
+);
 
 export const geminiSettingsCodec: ProviderSettingsCodec<GeminiProviderSettings> = {
   providerId: 'gemini',

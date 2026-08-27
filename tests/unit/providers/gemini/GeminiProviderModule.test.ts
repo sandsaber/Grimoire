@@ -253,10 +253,20 @@ describe('Gemini provider module', () => {
       // way nothing would have caught until M3: a chat model id is encoded and
       // the settings hold the CLI's raw one, so a list lookup on the encoded id
       // answers false for every model this provider has.
+      // The app record, which is what these members take. Seven of the nine
+      // module tests still fed the provider's own decoded settings after the
+      // contract changed, and passed only because these providers' ownership is
+      // prefix-based and ignores the argument — so the day one of them consults
+      // `visibleModels`, the assertion would have kept passing against an
+      // unreachable branch.
       const settings = {
-        ...geminiSettingsCodec.defaults(),
-        visibleModels: ['gemini-2.5-pro'],
-        modelAliases: { 'gemini-3.5-flash': 'Fast' },
+        providerConfigs: {
+          gemini: {
+            ...geminiSettingsCodec.encode(geminiSettingsCodec.defaults()),
+                visibleModels: ['gemini-2.5-pro'],
+                modelAliases: { 'gemini-3.5-flash': 'Fast' },
+          },
+        },
       };
       const presentation = geminiProviderModule.declarations.chatUI.models;
 

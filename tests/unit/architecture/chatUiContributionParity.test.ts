@@ -98,15 +98,92 @@ describe('chat UI contribution parity', () => {
     }
   });
 
-  it.each(CONFIGS)('%s declares a reasoning control only where its config has one', (providerId, config) => {
+  it.each(CONFIGS)('%s declares a group only where the provider has that control', (providerId, config) => {
     const chatUI = providerCatalog().declarations(providerId).chatUI;
+    // The descriptor, not the legacy projection beside it: what decides the
+    // group is what the provider declares about itself.
+    const capabilities = providerCatalog().require(providerId).capabilities;
 
-    // Absent means unsupported: a provider with no reasoning control has no
-    // reasoning row, which is a different statement from an empty tier list.
-    expect(chatUI.reasoning !== undefined).toBe(config.getReasoningOptions !== undefined);
+    // **Not `config.getReasoningOptions !== undefined`.** That is a required
+    // member of the config, so comparing the group against it was
+    // `true === true` for all nine — a gate that could not fail, in the test
+    // named for the thing it was supposed to catch. What decides the group is
+    // the provider's declared control.
+    expect(chatUI.reasoning !== undefined)
+      .toBe(capabilities.reasoningControl.kind !== 'none');
     expect(chatUI.permissionMode !== undefined).toBe(config.getPermissionModeToggle !== undefined);
+    // A hook the provider does not implement is not offered: Claude and Codex
+    // publish a toggle and implement neither, and a required `apply` delegating
+    // to an absent hook reports success having written nothing.
+    expect(chatUI.permissionMode?.apply !== undefined)
+      .toBe(config.applyPermissionMode !== undefined);
+    expect(chatUI.permissionMode?.resolve !== undefined)
+      .toBe(config.resolvePermissionMode !== undefined);
     expect(chatUI.serviceTier !== undefined).toBe(config.getServiceTierToggle !== undefined);
-    expect(chatUI.modeSelector !== undefined).toBe(config.getModeSelector !== undefined);
+  });
+
+  it.each(CONFIGS)('%s offers no mode selector, because no provider has one', providerId => {
+    // All four implementations of `getModeSelector` are typed `(): null` and no
+    // provider implements `applyModeSelection`. Deriving the group from the
+    // method's presence declared a control that can never render an option.
+    expect(providerCatalog().declarations(providerId).chatUI.modeSelector).toBeUndefined();
+  });
+
+  it.each(CONFIGS)('%s answers every reasoning question as its config does', (providerId, config) => {
+    const reasoning = providerCatalog().declarations(providerId).chatUI.reasoning;
+    if (!reasoning) {
+      return;
+    }
+    for (const modelId of MODEL_IDS) {
+      expect(reasoning.isTiered(modelId, settings()))
+        .toBe(config.isAdaptiveReasoningModel(modelId, settings()));
+      expect(reasoning.options(modelId, settings()))
+        .toEqual(config.getReasoningOptions(modelId, settings()));
+      expect(reasoning.defaultValue(modelId, settings()))
+        .toBe(config.getDefaultReasoningValue(modelId, settings()));
+    }
+  });
+
+  it.each(CONFIGS)('%s answers its permission toggle as its config does', (providerId, config) => {
+    const permissionMode = providerCatalog().declarations(providerId).chatUI.permissionMode;
+
+    expect(permissionMode?.toggle() ?? null).toEqual(config.getPermissionModeToggle?.() ?? null);
+    expect(permissionMode?.resolve?.(settings()) ?? null)
+      .toBe(config.resolvePermissionMode?.(settings()) ?? null);
+  });
+
+  it.each(CONFIGS)('%s answers custom model ids and bang-bash as its config does', (providerId, config) => {
+    const chatUI = providerCatalog().declarations(providerId).chatUI;
+    const environment = { ANTHROPIC_MODEL: 'claude-custom', OPENAI_MODEL: 'gpt-custom' };
+
+    expect([...chatUI.models.customModelIds(environment)])
+      .toEqual([...config.getCustomModelIds(environment)]);
+    expect(chatUI.bangBashEnabled(settings()))
+      .toBe(config.isBangBashEnabled?.(settings()) ?? false);
+  });
+
+  it.each(CONFIGS)('%s writes the same model defaults its config writes', (providerId, config) => {
+    const models = providerCatalog().declarations(providerId).chatUI.models;
+    const throughRow = settings();
+    const throughConfig = settings();
+
+    models.applyDefaults('gpt-5.5', throughRow);
+    config.applyModelDefaults('gpt-5.5', throughConfig);
+
+    // In place, both of them. The contract says so now; it used to say the
+    // opposite while delegating to this.
+    expect(throughRow).toEqual(throughConfig);
+  });
+
+  it.each(CONFIGS)('%s honours a per-model override as its config does', (providerId, config) => {
+    const models = providerCatalog().declarations(providerId).chatUI.models;
+    const overrides = { 'gpt-5.5': 12_345 };
+
+    // The delegation's one genuine parameter transposition — the row takes
+    // `(model, customLimits, settings)` and the slot `(model, settings,
+    // customLimits)` — and it was never exercised with an override present.
+    expect(models.contextWindow('gpt-5.5', settings(), overrides))
+      .toBe(config.getContextWindowSize('gpt-5.5', overrides, settings()));
   });
 
   it.each(CONFIGS)('%s resolves its icon only when asked', (providerId, config) => {
@@ -116,6 +193,11 @@ describe('chat UI contribution parity', () => {
     // whatever resolves it before the application has composed anything, which
     // is how this first went in.
     expect(typeof chatUI.icon).toBe('function');
-    expect(chatUI.icon()?.viewBox).toBe(config.getProviderIcon?.()?.viewBox);
+    // The whole icon, not its viewBox: a `toChatIcon` that returned an empty
+    // path, or dropped every group child, would pass a viewBox comparison —
+    // and the contract's own note says a flattened icon fails nowhere until it
+    // renders wrong. Two providers share a mark, so a viewBox cannot even tell
+    // them apart.
+    expect(chatUI.icon()).toEqual(config.getProviderIcon?.() ?? null);
   });
 });

@@ -118,18 +118,6 @@ export interface OpencodeWorkspaceContext {
 
 export type OpencodeWorkspace = ProviderWorkspaceSlots;
 
-/**
- * The live config, grouped — never a second implementation of it.
- *
- * What stood here was a hand-written model presentation answering three of
- * the row's twenty questions against decoded settings, while the config the
- * chat surface already asks answered all twenty against the app's. Two
- * inventories of which models this provider owns, and no test that could see
- * them disagree.
- */
-const opencodeChatUi: ProviderChatUiContribution = chatUiContributionFor(
-  opencodeChatUIConfig,
-);
 
 const opencodeCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'opencode',
@@ -197,6 +185,20 @@ const opencodeCapabilities: ProviderCapabilityDescriptor = {
     environment: { inventory: 'managed', manager: 'managed' },
   },
 };
+
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const opencodeChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  opencodeChatUIConfig,
+  opencodeCapabilities.reasoningControl,
+);
 
 export const opencodeSettingsCodec: ProviderSettingsCodec<OpencodeProviderSettings> = {
   providerId: 'opencode',

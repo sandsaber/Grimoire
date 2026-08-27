@@ -228,10 +228,20 @@ describe('Qwen provider module', () => {
 
   describe('model presentation', () => {
     it('owns a model by the prefix, which is what the live config does', () => {
+      // The app record, which is what these members take. Seven of the nine
+      // module tests still fed the provider's own decoded settings after the
+      // contract changed, and passed only because these providers' ownership is
+      // prefix-based and ignores the argument — so the day one of them consults
+      // `visibleModels`, the assertion would have kept passing against an
+      // unreachable branch.
       const settings = {
-        ...qwenSettingsCodec.defaults(),
-        visibleModels: ['qwen3-coder-plus'],
-        modelAliases: { 'qwen3-max': 'Max' },
+        providerConfigs: {
+          qwen: {
+            ...qwenSettingsCodec.encode(qwenSettingsCodec.defaults()),
+                visibleModels: ['qwen3-coder-plus'],
+                modelAliases: { 'qwen3-max': 'Max' },
+          },
+        },
       };
       const presentation = qwenProviderModule.declarations.chatUI.models;
 

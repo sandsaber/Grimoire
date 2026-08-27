@@ -219,10 +219,20 @@ describe('Kimi Code provider module', () => {
       // claim. A provider-qualified raw id does not make ownership a settings
       // question: the chat never sees a raw id, it sees `kimicode:<raw id>`, so a
       // lookup in a list keyed by raw ids answers false for every model.
+      // The app record, which is what these members take. Seven of the nine
+      // module tests still fed the provider's own decoded settings after the
+      // contract changed, and passed only because these providers' ownership is
+      // prefix-based and ignores the argument — so the day one of them consults
+      // `visibleModels`, the assertion would have kept passing against an
+      // unreachable branch.
       const settings = {
-        ...kimicodeSettingsCodec.defaults(),
-        visibleModels: ['anthropic/claude-sonnet'],
-        modelAliases: { 'openai/gpt-5.5': 'Fast' },
+        providerConfigs: {
+          kimicode: {
+            ...kimicodeSettingsCodec.encode(kimicodeSettingsCodec.defaults()),
+                visibleModels: ['anthropic/claude-sonnet'],
+                modelAliases: { 'openai/gpt-5.5': 'Fast' },
+          },
+        },
       };
       const presentation = kimicodeProviderModule.declarations.chatUI.models;
 

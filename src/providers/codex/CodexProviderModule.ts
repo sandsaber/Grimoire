@@ -111,18 +111,6 @@ export interface CodexWorkspaceContext {
 
 export type CodexWorkspace = ProviderWorkspaceSlots;
 
-/**
- * The live config, grouped — never a second implementation of it.
- *
- * What stood here was a hand-written model presentation answering three of
- * the row's twenty questions against decoded settings, while the config the
- * chat surface already asks answered all twenty against the app's. Two
- * inventories of which models this provider owns, and no test that could see
- * them disagree.
- */
-const codexChatUi: ProviderChatUiContribution = chatUiContributionFor(
-  codexChatUIConfig,
-);
 
 const codexCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'codex',
@@ -192,6 +180,20 @@ const codexCapabilities: ProviderCapabilityDescriptor = {
     environment: { inventory: 'managed', manager: 'managed' },
   },
 };
+
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const codexChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  codexChatUIConfig,
+  codexCapabilities.reasoningControl,
+);
 
 export const codexSettingsCodec: ProviderSettingsCodec<CodexProviderSettings> = {
   providerId: 'codex',

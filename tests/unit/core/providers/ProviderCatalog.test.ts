@@ -67,9 +67,9 @@ function testModule(
         bangBashEnabled: () => false,
         icon: () => null,
         models: {
-          contextWindow: () => undefined,
+          contextWindow: () => 0,
           customModelIds: () => new Set<string>(),
-          defaultsFor: () => undefined,
+          applyDefaults: () => undefined,
           isBuiltIn: () => false,
           normalizeVariant: (modelId: string) => modelId,
           options: () => [],
@@ -203,6 +203,53 @@ describe('ProviderCatalog', () => {
 
       expect(() => new ProviderCatalog([moduleWith('one', patch)]))
         .toThrow('must associate its backend with a provider');
+    });
+
+    it.each([
+      ['bangBashEnabled', 'bangBashEnabled'],
+      ['icon', 'icon'],
+    ])('rejects a chat UI contribution missing %s', (_label, member) => {
+      const module = moduleWith('one', {});
+      const chatUI = { ...module.declarations.chatUI } as Record<string, unknown>;
+      delete chatUI[member];
+      const patch = {
+        declarations: { ...module.declarations, chatUI } as never,
+      };
+
+      // Existence was the whole check while the row had three members, and it
+      // stayed the whole check when it grew to seven groups — so a provider
+      // that renamed a member while migrating passed construction and threw at
+      // first render.
+      expect(() => new ProviderCatalog([moduleWith('one', patch)]))
+        .toThrow(`chat UI.${member} must be a function`);
+    });
+
+    it('rejects a chat UI contribution with no model presentation', () => {
+      const module = moduleWith('one', {});
+      const patch = {
+        declarations: {
+          ...module.declarations,
+          chatUI: { ...module.declarations.chatUI, models: undefined },
+        } as never,
+      };
+
+      expect(() => new ProviderCatalog([moduleWith('one', patch)]))
+        .toThrow('declares a chat UI with no model presentation');
+    });
+
+    it('rejects a model presentation missing a member', () => {
+      const module = moduleWith('one', {});
+      const models = { ...module.declarations.chatUI.models } as Record<string, unknown>;
+      delete models.ownsModel;
+      const patch = {
+        declarations: {
+          ...module.declarations,
+          chatUI: { ...module.declarations.chatUI, models },
+        } as never,
+      };
+
+      expect(() => new ProviderCatalog([moduleWith('one', patch)]))
+        .toThrow('chat UI models.ownsModel must be a function');
     });
 
     it.each([

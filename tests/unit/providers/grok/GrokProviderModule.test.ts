@@ -243,10 +243,20 @@ describe('Grok provider module', () => {
 
   describe('model presentation', () => {
     it('owns a model by Grimoire\'s own encoding rather than by the visible list', () => {
+      // The app record, which is what these members take. Seven of the nine
+      // module tests still fed the provider's own decoded settings after the
+      // contract changed, and passed only because these providers' ownership is
+      // prefix-based and ignores the argument — so the day one of them consults
+      // `visibleModels`, the assertion would have kept passing against an
+      // unreachable branch.
       const settings = {
-        ...grokSettingsCodec.defaults(),
-        modelAliases: { 'grok-4.6': 'Fast' },
-        visibleModels: ['grok-4.6'],
+        providerConfigs: {
+          grok: {
+            ...grokSettingsCodec.encode(grokSettingsCodec.defaults()),
+                modelAliases: { 'grok-4.6': 'Fast' },
+                visibleModels: ['grok-4.6'],
+          },
+        },
       };
       const presentation = grokProviderModule.declarations.chatUI.models;
 

@@ -336,9 +336,7 @@ function validateModules(modules: readonly CatalogProviderModule[]): void {
     requireMethod(providerId, 'module', module, 'runtimePorts');
     const declarations = requirePresent(module, 'declarations');
     requireIdentity(providerId, 'declarations', declarations.providerId);
-    if (!declarations.chatUI) {
-      throw new Error(`Provider "${providerId}" declares no chat UI contribution.`);
-    }
+    validateChatUiContribution(providerId, declarations.chatUI);
     validateSettingsCodec(providerId, settings);
 
     const association = execution.descriptor?.association;
@@ -446,6 +444,57 @@ function requireIdentity(
       `Provider "${providerId}" has a ${contribution} contribution claiming `
       + `"${String(declaredId)}".`,
     );
+  }
+}
+
+/**
+ * The chat UI contribution, member by member.
+ *
+ * Existence was the whole check while the row had three members, and it stayed
+ * the whole check when the row grew to seven groups — so a provider registering
+ * `chatUI: {}`, or one that renamed a member while migrating, passed
+ * construction and threw at first render instead. Every neighbouring
+ * contribution is validated method by method; this one was not, while its own
+ * contract claimed the row was "split into named members so a migrated config
+ * cannot quietly lose the model picker".
+ *
+ * The optional groups are checked only if present: absent means the provider
+ * has no such control, which is the contract working.
+ */
+function validateChatUiContribution(
+  providerId: string,
+  chatUI: CatalogProviderModule['declarations']['chatUI'] | undefined,
+): void {
+  if (!chatUI) {
+    throw new Error(`Provider "${providerId}" declares no chat UI contribution.`);
+  }
+  requireMethod(providerId, 'chat UI', chatUI, 'bangBashEnabled');
+  requireMethod(providerId, 'chat UI', chatUI, 'icon');
+  const models = chatUI.models;
+  if (!models) {
+    throw new Error(`Provider "${providerId}" declares a chat UI with no model presentation.`);
+  }
+  for (const member of [
+    'applyDefaults', 'contextWindow', 'customModelIds', 'isBuiltIn', 'normalizeVariant',
+    'options', 'ownsModel',
+  ]) {
+    requireMethod(providerId, 'chat UI models', models, member);
+  }
+  if (chatUI.reasoning) {
+    for (const member of ['defaultValue', 'isTiered', 'options']) {
+      requireMethod(providerId, 'chat UI reasoning', chatUI.reasoning, member);
+    }
+  }
+  if (chatUI.permissionMode) {
+    requireMethod(providerId, 'chat UI permission mode', chatUI.permissionMode, 'toggle');
+  }
+  if (chatUI.serviceTier) {
+    requireMethod(providerId, 'chat UI service tier', chatUI.serviceTier, 'toggle');
+  }
+  if (chatUI.modeSelector) {
+    for (const member of ['apply', 'selector']) {
+      requireMethod(providerId, 'chat UI mode selector', chatUI.modeSelector, member);
+    }
   }
 }
 

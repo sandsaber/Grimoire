@@ -1,6 +1,7 @@
 import type {
   ProviderChatIcon,
   ProviderChatUiContribution,
+  ProviderReasoningControl,
 } from '../../core/providers/ProviderModule';
 import type { ProviderChatUIConfig } from '../../core/providers/types';
 
@@ -18,7 +19,19 @@ import type { ProviderChatUIConfig } from '../../core/providers/types';
  * decides anything: every answer comes from the object the chat surface already
  * asks, which is what makes moving this row a move rather than a rewrite.
  */
-export function chatUiContributionFor(config: ProviderChatUIConfig): ProviderChatUiContribution {
+/** The host handle `prepareModelMetadata` takes, named rather than invented. */
+type MetadataHost = Parameters<NonNullable<ProviderChatUIConfig['prepareModelMetadata']>>[2];
+
+export function chatUiContributionFor(
+  config: ProviderChatUIConfig,
+  /**
+   * What the provider declares about reasoning, which decides whether the
+   * group exists. Passed rather than read off the config: the config's
+   * reasoning methods are required members and say nothing about whether the
+   * provider has a control.
+   */
+  reasoningControl: ProviderReasoningControl,
+): ProviderChatUiContribution {
   return {
     bangBashEnabled: settings => config.isBangBashEnabled?.(settings) ?? false,
 
@@ -29,25 +42,30 @@ export function chatUiContributionFor(config: ProviderChatUIConfig): ProviderCha
         config.getContextWindowSize(modelId, customLimits, settings)
       ),
       customModelIds: environment => config.getCustomModelIds(environment),
-      defaultsFor: (modelId, settings) => { config.applyModelDefaults(modelId, settings); },
+      applyDefaults: (modelId, settings) => { config.applyModelDefaults(modelId, settings); },
       isBuiltIn: modelId => config.isDefaultModel(modelId),
       normalizeVariant: (modelId, settings) => config.normalizeModelVariant(modelId, settings),
       options: settings => config.getModelOptions(settings),
       ownsModel: (modelId, settings) => config.ownsModel(modelId, settings),
       ...(config.prepareModelMetadata
         ? {
+          // Cast to the config's own parameter type, not to a shape invented
+          // here: `as { plugin: never }` is a type no value inhabits, so it
+          // silenced the compiler at the one place that could have caught a
+          // caller passing the plugin instead of `{ plugin }`.
           prepareMetadata: (modelId, settings, host) => (
-            config.prepareModelMetadata?.(modelId, settings, host as { plugin: never })
+            config.prepareModelMetadata?.(modelId, settings, host as MetadataHost)
               ?? Promise.resolve()
           ),
         }
         : {}),
     },
 
-    // Absent means unsupported: a provider with no reasoning control is one
-    // whose picker has no reasoning row, which is a different statement from
-    // one that offers an empty list of tiers.
-    ...(config.getReasoningOptions
+    // **From the capability, not from the method.** `getReasoningOptions` is a
+    // required member of the config, so a presence check on it is always true
+    // and every provider got a reasoning group — including the two that declare
+    // they have no reasoning control at all.
+    ...(reasoningControl.kind !== 'none'
       ? {
         reasoning: {
           apply: (modelId, value, settings) => {
@@ -60,12 +78,19 @@ export function chatUiContributionFor(config: ProviderChatUIConfig): ProviderCha
       }
       : {}),
 
+    // The two hooks are offered only where the provider implements them: Claude
+    // and Codex publish a toggle and implement neither, so a required `apply`
+    // delegating to an absent hook would report success having written nothing.
     ...(config.getPermissionModeToggle
       ? {
         permissionMode: {
-          apply: (value, settings) => { config.applyPermissionMode?.(value, settings); },
-          resolve: settings => config.resolvePermissionMode?.(settings) ?? null,
           toggle: () => config.getPermissionModeToggle?.() ?? null,
+          ...(config.applyPermissionMode
+            ? { apply: (value, settings) => { config.applyPermissionMode?.(value, settings); } }
+            : {}),
+          ...(config.resolvePermissionMode
+            ? { resolve: settings => config.resolvePermissionMode?.(settings) ?? null }
+            : {}),
         },
       }
       : {}),
@@ -74,30 +99,23 @@ export function chatUiContributionFor(config: ProviderChatUIConfig): ProviderCha
       ? { serviceTier: { toggle: settings => config.getServiceTierToggle?.(settings) ?? null } }
       : {}),
 
-    ...(config.getModeSelector
-      ? {
-        modeSelector: {
-          apply: (value, settings) => { config.applyModeSelection?.(value, settings); },
-          selector: settings => config.getModeSelector?.(settings) ?? null,
-        },
-      }
-      : {}),
+    // **No provider has one.** All four implementations of `getModeSelector`
+    // are typed `(): null` and no provider implements `applyModeSelection`, so
+    // deriving the group from the method's presence declared a control that can
+    // never render an option — for four providers, with an apply hook nobody
+    // wrote. A slot with no filler is a provider saying it has none; a slot
+    // filled with that is the lie this contract forbids.
   };
 }
 
 /**
- * The provider's icon, as a structure rather than a name.
+ * The provider's icon, exactly as the provider returns it.
  *
- * The slot held a string — an icon *id* the host would have had to resolve
- * against a registry it does not own. What a provider actually returns is a
- * viewBox and one or more paths.
+ * Passed through, not rebuilt. The first version constructed a new object per
+ * variant and added a `kind: 'path'` the row leaves off — which is a
+ * conversion, and a conversion is where a composite icon's group children get
+ * dropped without anything failing until the mark renders wrong.
  */
 function toChatIcon(config: ProviderChatUIConfig): ProviderChatIcon | null {
-  const icon = config.getProviderIcon?.();
-  if (!icon) {
-    return null;
-  }
-  return icon.kind === 'composite'
-    ? { kind: 'composite', children: icon.children, viewBox: icon.viewBox }
-    : { kind: 'path', path: icon.path, viewBox: icon.viewBox };
+  return config.getProviderIcon?.() ?? null;
 }
