@@ -64,13 +64,6 @@ export interface WorkspaceContextServices {
 
 export interface WorkspaceContextSlotOptions {
   readonly chatUI: Pick<ProviderChatUIConfig, 'getModelOptions'>;
-  /**
-   * Whether the command dropdown offers the CLI's own commands beside the
-   * vault's. Codex says no — a provider command there *is* a vault skill —
-   * and Claude says yes. It is a real difference between products, so it is
-   * asked rather than assumed.
-   */
-  readonly includeBuiltInCommands: boolean;
   readonly plugin: GrimoirePlugin;
   readonly providerId: ProviderId;
   /** Read when a slot is called, never captured: a workspace can be registered later. */
@@ -92,7 +85,7 @@ export interface WorkspaceContextSlots {
 export function createWorkspaceContextSlots(
   options: WorkspaceContextSlotOptions,
 ): WorkspaceContextSlots {
-  const { chatUI, includeBuiltInCommands, plugin, providerId, services } = options;
+  const { chatUI, plugin, providerId, services } = options;
 
   const models = (): readonly ProviderModelDescriptor[] => {
     // Nothing without a workspace: an unregistered workspace has discovered no
@@ -118,8 +111,15 @@ export function createWorkspaceContextSlots(
     },
 
     listCommands: async () => {
+      // `false`, like every caller in the product: `TabManager`, `tabSettings`,
+      // `InlineEditModal` and the settings tab all ask for the dropdown without
+      // built-ins, and this slot reports the list the dropdown shows. Only one
+      // of the nine catalogs reads the flag at all — Codex's, which would
+      // prepend its compact command — and Codex asks for `false` too. It was
+      // briefly `true` for seven providers here: inert, because their catalogs
+      // ignore it, and a statement about the product that was not true.
       const entries = await services()?.commandCatalog
-        ?.listDropdownEntries({ includeBuiltIns: includeBuiltInCommands }) ?? [];
+        ?.listDropdownEntries({ includeBuiltIns: false }) ?? [];
       return entries.map((entry): ProviderCommandDescriptor => ({
         name: entry.name,
         ...(entry.description ? { description: entry.description } : {}),

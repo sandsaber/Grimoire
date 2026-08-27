@@ -70,6 +70,20 @@ describe('provider workspace context slots', () => {
     expect(servers.map(server => server.id)).toEqual([`${providerId}-server`]);
   });
 
+  it('asks the catalog for the dropdown list, without built-ins', async () => {
+    const listDropdownEntries = jest.fn(async () => []);
+    ProviderWorkspaceRegistry.setServices('grok' as never, {
+      commandCatalog: { listDropdownEntries },
+    } as never);
+
+    await createGrokModuleContext(plugin(), () => null, ports).listCommands();
+
+    // Every caller in the product asks for `false`, and only one of the nine
+    // catalogs reads the flag at all. Asking for `true` here would have made
+    // this slot report a list no dropdown shows.
+    expect(listDropdownEntries).toHaveBeenCalledWith({ includeBuiltIns: false });
+  });
+
   it('names where a command came from, in all four of the slot\'s words', async () => {
     ProviderWorkspaceRegistry.setServices('grok', {
       commandCatalog: {

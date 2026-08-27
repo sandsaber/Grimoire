@@ -45,7 +45,6 @@ export function createKimicodeModuleContext(
   const history = new KimicodeConversationHistoryService();
   const workspace = createWorkspaceContextSlots({
     chatUI: kimicodeChatUIConfig,
-    includeBuiltInCommands: true,
     plugin,
     providerId: 'kimicode',
     services: () => maybeGetKimicodeWorkspaceServices(),

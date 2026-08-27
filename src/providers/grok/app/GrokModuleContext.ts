@@ -51,7 +51,6 @@ export function createGrokModuleContext(
   const history = new GrokConversationHistoryService();
   const workspace = createWorkspaceContextSlots({
     chatUI: grokChatUIConfig,
-    includeBuiltInCommands: true,
     plugin,
     providerId: 'grok',
     services: () => maybeGetGrokWorkspaceServices(),

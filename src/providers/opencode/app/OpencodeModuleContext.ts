@@ -45,7 +45,6 @@ export function createOpencodeModuleContext(
   const history = new OpencodeConversationHistoryService();
   const workspace = createWorkspaceContextSlots({
     chatUI: opencodeChatUIConfig,
-    includeBuiltInCommands: true,
     plugin,
     providerId: 'opencode',
     services: () => maybeGetOpencodeWorkspaceServices(),

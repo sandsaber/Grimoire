@@ -9146,6 +9146,16 @@ shape with `'project'` hard-coded, which is how it survived the flip that certif
 implementation, and Codex's `listSkills` is that implementation under the name its module uses. The
 only thing left in a hand-written slot is `renderSettingsTab`, in all nine.
 
+A third, and the one the reviewer was asked about but I checked first: **`includeBuiltInCommands`
+was a statement about the product that was not true.** I set it to `true` for seven providers with a
+comment saying their dropdowns offer the CLI's commands beside the vault's. They do not: every
+caller in the product — `TabManager`, `tabSettings`, `InlineEditModal`, the settings tab — asks the
+catalog for `includeBuiltIns: false`, and only one of the nine catalogs reads the flag at all
+(Codex's, which would prepend its compact command, and which asks for `false` too). The `true` was
+inert, because the other catalogs ignore it — which is exactly why it would have survived: a lie
+that changes no behaviour is a lie no test can catch. The option is gone and the call is `false`,
+with the reason written where the call is.
+
 A second, quieter one from the same review: **`readPlanUsage` dropped the availability check the
 live path makes.** For seven of the nine providers `isAvailable(settings)` answers "is this provider
 enabled", the status panel asks it before every read, and the port did not — so a provider the user

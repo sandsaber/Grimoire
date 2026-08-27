@@ -47,7 +47,6 @@ export function createQwenModuleContext(
   const history = new QwenConversationHistoryService();
   const workspace = createWorkspaceContextSlots({
     chatUI: qwenChatUIConfig,
-    includeBuiltInCommands: true,
     plugin,
     providerId: 'qwen',
     services: () => maybeGetQwenWorkspaceServices(),

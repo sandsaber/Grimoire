@@ -39,7 +39,6 @@ export function createGeminiModuleContext(
   const history = new GeminiConversationHistoryService();
   const workspace = createWorkspaceContextSlots({
     chatUI: geminiChatUIConfig,
-    includeBuiltInCommands: false,
     plugin,
     providerId: 'gemini',
     services: () => maybeGetGeminiWorkspaceServices(),

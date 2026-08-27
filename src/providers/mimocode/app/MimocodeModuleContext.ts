@@ -45,7 +45,6 @@ export function createMimocodeModuleContext(
   const history = new MimocodeConversationHistoryService();
   const workspace = createWorkspaceContextSlots({
     chatUI: mimocodeChatUIConfig,
-    includeBuiltInCommands: true,
     plugin,
     providerId: 'mimocode',
     services: () => maybeGetMimocodeWorkspaceServices(),

@@ -49,7 +49,7 @@ describe('Claude module context workspace slots', () => {
     await expect(context.saveMcpServers([])).resolves.toBeUndefined();
   });
 
-  it('reads the command catalog the dropdown reads, built-ins included', async () => {
+  it('reads the command catalog the dropdown reads', async () => {
     const plugin = pluginWith({
       commandCatalog: {
         listDropdownEntries: jest.fn(async () => [
@@ -62,8 +62,9 @@ describe('Claude module context workspace slots', () => {
 
     const commands = await context.listCommands();
 
-    // Built-ins are included on purpose: for Claude a slash command is as much
-    // the CLI's own as a vault file, and the composer offers both.
+    // The same list the composer offers: every caller in the product asks the
+    // catalog for the dropdown without built-ins, and this slot reports what
+    // the dropdown shows.
     expect(commands).toEqual([
       { name: 'compact', description: 'Compact the transcript', source: 'built-in' },
       { name: 'review', source: 'project' },

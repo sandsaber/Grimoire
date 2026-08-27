@@ -37,9 +37,6 @@ export function createCodexModuleContext(
   const history = new CodexConversationHistoryService();
   const workspace = createWorkspaceContextSlots({
     chatUI: codexChatUIConfig,
-    // Codex's dropdown offers no CLI built-ins: for this product a provider
-    // command is a vault skill, which is the difference the option exists for.
-    includeBuiltInCommands: false,
     plugin,
     providerId: 'codex',
     services: () => maybeGetCodexWorkspaceServices(),

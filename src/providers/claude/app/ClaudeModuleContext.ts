@@ -50,9 +50,6 @@ export function createClaudeModuleContext(
   const history = new ClaudeConversationHistoryService();
   const workspace = createWorkspaceContextSlots({
     chatUI: claudeChatUIConfig,
-    // Claude's dropdown offers the CLI's own commands beside the vault's: for
-    // this product a slash command is as much the CLI's as a vault file.
-    includeBuiltInCommands: true,
     plugin,
     providerId: 'claude',
     services: () => maybeGetClaudeWorkspaceServices(),
