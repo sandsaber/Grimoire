@@ -630,6 +630,18 @@ export class InputController {
         rawErrorMessage,
         providerCatalog().displayName(providerId),
       ).message;
+      // **The turn may have failed before it had a bubble to fail in.** A throw
+      // out of `send` — no encoder, a conversation that could not be created, a
+      // backend that refused before dispatch — happens before the projection
+      // opens the turn, so nothing has been drawn and `appendText` returns
+      // early on a null cursor. The person is left with a spinner that stops
+      // and no reason for it. So the message gets somewhere to go.
+      if (!state.currentContentEl) {
+        state.addMessage(assistantMsg);
+        const messageEl = renderer.addMessage(assistantMsg);
+        this.activeStreamingAssistantMessage = assistantMsg;
+        state.currentContentEl = messageEl.querySelector<HTMLElement>('.grimoire-message-content');
+      }
       await streamController.appendText(
         `\n\n**${t('chat.ui.messages.errorLabel')}:** ${errorMsg}`,
       );

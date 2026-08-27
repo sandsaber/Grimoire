@@ -2195,6 +2195,28 @@ describe('InputController - Message Queue', () => {
   });
 
   describe('Streaming error handling', () => {
+    it('shows a turn that failed before it had anywhere to fail', async () => {
+      // **A throw out of `send` happens before the projection opens the turn**
+      // — no encoder, a conversation that could not be created, a backend that
+      // refused before dispatch — so nothing has been drawn and `appendText`
+      // returns early on a null cursor. The person was left with a spinner that
+      // stopped and no reason for it, on every provider, since this became the
+      // only path.
+      deps = createSendableDeps();
+      deps.mockProjection.send = jest.fn().mockRejectedValue(new Error('no runtime to encode with'));
+      deps.state.currentContentEl = null;
+      inputEl = deps.getInputEl();
+      inputEl.value = 'hello';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      expect(deps.state.messages.some(message => message.role === 'assistant')).toBe(true);
+      expect(deps.streamController.appendText).toHaveBeenCalledWith(
+        expect.stringContaining('no runtime to encode with'),
+      );
+    });
+
     it('should catch errors and display via appendText', async () => {
       deps = createSendableDeps();
 

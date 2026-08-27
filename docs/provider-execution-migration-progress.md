@@ -8744,6 +8744,14 @@ because the branch was carrying things nobody had listed.
 Each fix has a test, and the two behavioural ones were proven by breaking them: an appended message
 left where it landed, and prose made invisible to the metrics.
 
+**And the note the review filed beside them, which was the worst of the seven.** A throw out of
+`projection.send` happens *before* the projection opens the turn — no encoder, a conversation that
+could not be created, a backend that refused before dispatch — so nothing has been drawn, and the
+`catch` renders the message through `appendText`, which returns early on a null cursor. The person
+was left with a spinner that stopped and no reason for it. It predates the flip for a tab on this
+path; the deletion made it the only path, for every provider. A turn that fails before it has a
+bubble is given one.
+
 **Next: the rest of M5** — durable agents with tab-close ownership, the thirteen provider rows,
 registry deletion, and the seam deletion. That step was written as
 "only after a provider has been certified on the projection path"; all nine are on it now, so what
