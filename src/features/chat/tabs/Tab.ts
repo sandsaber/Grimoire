@@ -1305,6 +1305,9 @@ export function initializeTabControllers(
       getTitleGenerationService: () => services.titleGenerationService,
       getStatusPanel: () => ui.statusPanel,
       getAgentService: () => tab.service, // Use tab's service instead of plugin's
+      // For one thing only: stopping a turn. The kernel owns the run, so the
+      // runtime's own `cancel` acts on a run it never started.
+      getProjectionExecution: () => resolveTabProjectionExecution(tab, plugin),
       getActiveProviderSettings: () => getTabSettingsSnapshot(tab, plugin),
       getOrchestratorMode: () => tab.orchestratorMode,
       dismissPendingInlinePrompts: () => tab.controllers.inputController?.dismissPendingApproval(),

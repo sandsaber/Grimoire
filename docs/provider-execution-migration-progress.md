@@ -8804,6 +8804,19 @@ then the work card that reads them, and **tab close stops cancelling background 
 checkpoint, never before**. `SubagentManager` keeps its rendering and loses its lifecycle authority;
 it is 18 files on the deletion scoreboard and every one of them is that authority leaking outward.
 
+#### A third `cancel` on a run the runtime never started
+
+Found by reading the neighbours of the one the review found, which is the cheapest way to find the
+rest of a family. `ConversationController.createNew({ force: true })` stops a streaming turn by
+calling `getAgentService()?.cancel()` — and the adapter's `cancel` returns immediately when it has no
+active run of its own, which on this path it never does. **Starting a new conversation over a
+streaming turn left that turn running**, writing into a conversation the tab had already left.
+
+`InputController.cancelStreaming` was fixed when the chat path was built and `ChatTabExecution.steer`
+when the review found steering; this was the third and last. The family has one shape: *anything that
+asks the runtime to act on the current turn is asking the wrong object now*, and the compiler cannot
+see it because the method exists and returns.
+
 #### What to pick up next, in order
 
 This list supersedes the numbered one further down, which was written before the chat flip.

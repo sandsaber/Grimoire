@@ -64,6 +64,14 @@ export interface ConversationControllerDeps {
   getTitleGenerationService: () => TitleGenerationService | null;
   getStatusPanel: () => StatusPanel | null;
   getAgentService?: () => ChatRuntime | null;
+  /**
+   * This tab's end of the projection path, where it has one.
+   *
+   * Needed for exactly one thing: stopping a turn. The kernel owns the run, so
+   * the runtime's own `cancel` acts on a run it never started and returns
+   * having done nothing.
+   */
+  getProjectionExecution?: () => { cancel(): Promise<void> } | null;
   getActiveProviderSettings?: () => Record<string, unknown>;
   getOrchestratorMode?: () => boolean;
   ensureServiceForConversation?: (conversation: Conversation | null) => Promise<void>;
@@ -125,7 +133,17 @@ export class ConversationController {
       if (force && state.isStreaming) {
         state.cancelRequested = true;
         state.bumpStreamGeneration();
-        this.getAgentService()?.cancel();
+        // **The kernel owns the run**, so the stop goes to it. Asked of the
+        // runtime instead — which is what this did — `cancel` acts on a run it
+        // never started and returns having done nothing: starting a new
+        // conversation over a streaming turn left that turn running, writing
+        // into a conversation the tab had already left.
+        const projection = this.deps.getProjectionExecution?.() ?? null;
+        if (projection) {
+          void projection.cancel();
+        } else {
+          this.getAgentService()?.cancel();
+        }
       }
 
       // Save current conversation if it has messages

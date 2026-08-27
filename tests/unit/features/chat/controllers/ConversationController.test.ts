@@ -1801,6 +1801,22 @@ describe('ConversationController - Race Condition Guards', () => {
       expect(deps.state.currentConversationId).toBeNull();
     });
 
+    it('stops the turn through the kernel that is running it', async () => {
+      // **The runtime's own `cancel` acts on a run it never started.** The
+      // coordinator owns the run on the projection path, so asking the runtime
+      // returned having done nothing: starting a new conversation over a
+      // streaming turn left that turn running, writing into a conversation the
+      // tab had already left.
+      const cancel = jest.fn().mockResolvedValue(undefined);
+      deps.getProjectionExecution = () => ({ cancel });
+      deps.state.isStreaming = true;
+
+      await controller.createNew({ force: true });
+
+      expect(cancel).toHaveBeenCalled();
+      expect((deps as any).mockAgentService?.cancel ?? jest.fn()).not.toHaveBeenCalled();
+    });
+
     it('should set and reset isCreatingConversation flag during entry point reset', async () => {
       // Entry point model: createNew() just resets state, doesn't create conversation
       // But isCreatingConversation flag should still be set during the reset
