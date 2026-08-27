@@ -82,7 +82,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
-| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete** and **the chat path is built, reviewed, and carrying its first provider**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design, and all five runners are deleted; bang-bash runs on the local-shell backend. The chat projection, its coordinator, startup adoption, the renderer, the render target, the attachment, the composition, the tab handle and the conversation port all exist, are composed end to end in one test, are **in the bundle**, and **every provider's tabs are on it**: `projectionChatProviders` holds all nine, and adding the next is that provider's flip, certified by `docs/chat-projection-flip-smoke-matrix.md`, whose driven half ran against a real `agy` on 2026-08-27. Still untouched: durable agents, tab-close ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as composition root, and the seam deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
+| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the chat surface is done**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design; bang-bash runs on the local-shell backend; **all nine providers execute their chat turns through the projection path**, and `InputController`'s generator branch is deleted with the turn-framing machinery it carried. `ApplicationRuntime` is the composition root. The durable agent domain is harvested from the v1 Phase 6 and dark, minus the work graphs M5 bans. Certification is account-bound and recorded per provider in `docs/chat-projection-flip-smoke-matrix.md`. **Two of the plan's eleven structural deletion searches are zero**, and all eleven are now a gate rather than a shell command. Still open: a producer for agent instances and the work card that reads them, tab-close ownership, the thirteen provider rows, registry deletion, and the seam deletion | `fa9cfbc` … `bd1083b` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
@@ -8804,8 +8804,28 @@ then the work card that reads them, and **tab close stops cancelling background 
 checkpoint, never before**. `SubagentManager` keeps its rendering and loses its lifecycle authority;
 it is 18 files on the deletion scoreboard and every one of them is that authority leaking outward.
 
-**Next: the rest of M5** — durable agents with tab-close ownership, the thirteen provider rows,
-registry deletion, and the seam deletion. That step was written as
+#### What to pick up next, in order
+
+This list supersedes the numbered one further down, which was written before the chat flip.
+
+1. **Durable agents, continued.** The domain is harvested and dark; what it has no producer for is
+   an agent instance. The next slice is the thing that turns a provider's subagent into one —
+   `SubagentManager` is where that knowledge lives today, and it keeps its rendering and loses its
+   lifecycle authority. Then the work card that reads the records, and **only in that same
+   checkpoint** does tab close stop cancelling background work. Never before: the plan says so, and
+   the reason is that background work nobody can see or reattach to is worse than work that stops.
+2. **The provider rows, by consumer.** Read *"The thirteen provider rows"* above first — eight of
+   thirteen slots are the wrong shape, and picking a row before reading its consumer is how the same
+   fact got discovered five times. The registries are 44 files on the scoreboard and they empty as
+   their last consumers move.
+3. **The seam deletion**, last, because the two above are what make it possible: `StreamChunk`'s
+   lifecycle meaning, the turn metadata, the runtime interaction callbacks.
+4. **The counts are the progress.** `structuralDeletionProgress.test.ts` holds them and goes red when
+   one moves in either direction. Update it in the same commit that earns the move.
+
+**Still waiting on the owner rather than on code: D9, redo.** And certification remains account-bound
+— Gemini one turn per replenishment, OpenCode intermittent against its vendor, MiMoCode, Kimi Code
+and Qwen not certifiable on this machine. That step was written as
 "only after a provider has been certified on the projection path"; all nine are on it now, so what
 comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and the branch in
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
@@ -8877,7 +8897,14 @@ context, and rows 15 and 16 use the context only for plugin-owned services rathe
 conversation. So `features(context)` is really two contracts — static provider declarations and
 runtime-scoped ports — and splitting it is the move that unblocks the rest.
 
-#### What to pick up next, in order
+#### What to pick up next, in order — **superseded**
+
+**Read the 2026-08-27 section above instead.** Every numbered item below was written before the chat
+projection flip and describes a switch that is empty and a path nobody takes; all nine providers are
+on it now and `InputController`'s generator branch is deleted. Kept because the *reasoning* in items
+4 to 8 — why each provider row's home is wrong, and why a row must be picked by reading its consumer
+— is still the best account of that problem, and the 2026-08-27 entry extends it rather than
+replacing it.
 
 **M3 is closed.** Everything below is M5 or later.
 
