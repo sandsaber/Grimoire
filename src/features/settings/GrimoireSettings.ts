@@ -2296,7 +2296,8 @@ export class GrimoireSettingTab extends PluginSettingTab {
       const envVars = parseEnvironmentVariables(
         this.plugin.getActiveEnvironmentVariables(targetProviderId),
       );
-      for (const modelId of ProviderRegistry.getChatUIConfig(targetProviderId).getCustomModelIds(envVars)) {
+      const targetModels = providerCatalog().declarations(targetProviderId).chatUI.models;
+      for (const modelId of targetModels.customModelIds(envVars)) {
         uniqueModelIds.add(modelId);
       }
     }

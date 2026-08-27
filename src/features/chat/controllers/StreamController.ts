@@ -1,7 +1,6 @@
 import { TFile } from 'obsidian';
 
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import {
   DEFAULT_CHAT_PROVIDER_ID,
@@ -1846,7 +1845,7 @@ export class StreamController {
     const statusEl = contentEl.createDiv({ cls: 'grimoire-silent-turn-status' });
     statusEl.setAttribute('aria-live', 'polite');
     statusEl.setAttribute('role', 'status');
-    const icon = ProviderRegistry.getChatUIConfig(providerId).getProviderIcon?.();
+    const icon = providerCatalog().declarations(providerId).chatUI.icon();
     if (icon) {
       statusEl.appendChild(createProviderIconSvg(icon, {
         className: 'grimoire-silent-turn-status-icon',

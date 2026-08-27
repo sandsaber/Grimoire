@@ -906,8 +906,8 @@ export class GrimoireView extends ItemView {
         if (!activeTab) return;
         const providerId = getTabProviderId(activeTab, this.plugin);
         const capabilities = providerCatalog().capabilities(providerId);
-        const toggleConfig = ProviderRegistry.getChatUIConfig(providerId)
-          .getPermissionModeToggle?.() ?? null;
+        const toggleConfig = providerCatalog().declarations(providerId)
+          .chatUI.permissionMode?.toggle() ?? null;
         if (!toggleConfig) return;
         const current = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
           this.plugin.settings,

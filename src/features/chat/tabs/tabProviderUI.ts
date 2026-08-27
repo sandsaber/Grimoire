@@ -436,8 +436,8 @@ export function onProviderAvailabilityChanged(tab: TabData, plugin: GrimoirePlug
       .ownsModel(tab.draftModel, settingsSnapshot);
     if (!enabledProviderIds.includes(draftProvider) || !draftProviderOwnsModel) {
       const fallbackProviderId = enabledProviderIds[0] ?? DEFAULT_CHAT_PROVIDER_ID;
-      const fallbackModels = ProviderRegistry.getChatUIConfig(fallbackProviderId)
-        .getModelOptions(settingsSnapshot);
+      const fallbackModels = providerCatalog().declarations(fallbackProviderId)
+        .chatUI.models.options(settingsSnapshot);
       tab.draftModel = fallbackModels[0]?.value ?? tab.draftModel;
       nextProviderId = fallbackProviderId;
     } else {

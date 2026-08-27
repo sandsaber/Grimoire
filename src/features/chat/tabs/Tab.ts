@@ -522,7 +522,7 @@ function isBangBashEnabledForProvider(
   settings: Record<string, unknown>,
   providerId: ProviderId,
 ): boolean {
-  return ProviderRegistry.getChatUIConfig(providerId).isBangBashEnabled?.(settings) ?? false;
+  return providerCatalog().declarations(providerId).chatUI.bangBashEnabled(settings);
 }
 
 function getModelCatalogProviderIds(

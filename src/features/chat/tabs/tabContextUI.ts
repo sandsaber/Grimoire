@@ -227,7 +227,8 @@ export function getReasoningLabel(settings: TabProviderSettings): string {
 }
 
 export function getPermissionSummary(providerId: ProviderId, permissionMode: string): string {
-  const toggle = ProviderRegistry.getChatUIConfig(providerId).getPermissionModeToggle?.() ?? null;
+  const toggle = providerCatalog().declarations(providerId)
+    .chatUI.permissionMode?.toggle() ?? null;
   if (toggle) {
     if (permissionMode === toggle.activeValue) {
       return t('chat.ui.context.autoApprove');
@@ -251,7 +252,8 @@ export function getPermissionSummary(providerId: ProviderId, permissionMode: str
 }
 
 export function getPermissionTitle(providerId: ProviderId, permissionMode: string): string {
-  const toggle = ProviderRegistry.getChatUIConfig(providerId).getPermissionModeToggle?.() ?? null;
+  const toggle = providerCatalog().declarations(providerId)
+    .chatUI.permissionMode?.toggle() ?? null;
   if (toggle) {
     if (permissionMode === toggle.activeValue) {
       return t('chat.ui.toolbar.permissionAuto');

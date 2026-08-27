@@ -257,7 +257,8 @@ export interface ProviderSvgPathChild {
 export interface ProviderSvgGroupChild {
   tag: 'g';
   attributes: Record<string, string>;
-  children: ProviderSvgPathChild[];
+  /** Readonly: an icon is data a renderer reads, never one it edits. */
+  children: readonly ProviderSvgPathChild[];
 }
 
 export type ProviderSvgChild = ProviderSvgGroupChild | ProviderSvgPathChild;
@@ -265,7 +266,7 @@ export type ProviderSvgChild = ProviderSvgGroupChild | ProviderSvgPathChild;
 export interface ProviderCompositeIconSvg {
   kind: 'composite';
   viewBox: string;
-  children: ProviderSvgChild[];
+  children: readonly ProviderSvgChild[];
 }
 
 /** SVG icon descriptor for provider branding in selectors and headers. */
