@@ -892,6 +892,10 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/core/agents/AgentPolicy.ts',
       'src/core/agents/AgentRepositories.ts',
       'src/core/agents/AgentSchemas.ts',
+      // The adapter between a provider's subagent and a durable agent. It has
+      // no caller yet: wiring it is the checkpoint that also ships the work
+      // card and stops tab close cancelling background work.
+      'src/app/agents/SubagentAgentRecorder.ts',
     ],
   },
   {

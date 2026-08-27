@@ -8680,7 +8680,7 @@ watches a scoreboard instead of re-reading prose:
 | worker tab ownership (`createWorkerTab`, `orchestratorTabId`, `workerTabIds`) | 3 |
 | `src/core` importing the plugin type | 3 |
 | subagent hooks and loaders | 7 |
-| `SubagentManager` lifecycle | 18 |
+| `SubagentManager` lifecycle | 19 |
 | `app` importing a concrete provider module | 20 |
 | turn metadata and session updates | 24 |
 | `StreamChunk` and the subagent chunk vocabulary | 25 |
@@ -8894,6 +8894,37 @@ already required the pair, so the record shape did not move.
 
 **This is what the producer slice is for.** The domain is 2,500 lines that passed its own suite and a
 review; the first thing that tried to *use* it found a shape it could not express.
+
+#### The producer, dark, and the second thing it found
+
+`SubagentAgentRecorder` is the only object that knows both halves: `SubagentManager` knows a provider
+launched something and what it is called, the agent domain knows what a durable agent is, and neither
+should learn the other. It adopts a running subagent as an agent instance the *conversation* owns —
+detached, because these are the ones a person starts and walks away from, and the record exists so
+walking away stops meaning losing them — and appends its result when it ends. It has **no caller**:
+wiring it is the checkpoint that also ships the work card and stops tab close cancelling background
+work, and the plan is explicit that those three go together.
+
+**Two things it found by being written**, both the same shape as findings the review had already
+made about the domain:
+
+- the first was the conversation-rooted adoption, in the entry above;
+- the second is that **a goal reference is not a goal**. A subagent's description is free text a
+  person typed — "Summarize the vault" — and a control record holds a constrained identifier, so the
+  write was refused. That is the dispatch rejection code's problem again, and it takes the same
+  answer: **normalize at the boundary** rather than make every caller learn the record's rules. The
+  slug carries the agent's own id behind it, so two agents asked the same thing stay two agents, and
+  the description itself stays in the conversation where it belongs.
+
+The error summary got the same treatment for the same reason: `AgentErrorSummary` carries a code, not
+a message, and a free-text provider message is exactly where a path or a name arrives in a store that
+may hold neither. The provider's own wording is the result text, which is whitelisted; the
+classification is what the record keeps.
+
+**The deletion scoreboard went up by one and it says why.** `SubagentManager lifecycle` counts files
+naming it, and the recorder names it in a comment describing what it takes over — a count rising for
+that reason is still a count rising, and recording it is cheaper than wording a comment around a
+grep. It falls by two when the recorder is wired.
 
 #### What to pick up next, in order
 
