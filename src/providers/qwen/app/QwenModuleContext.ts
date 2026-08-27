@@ -81,8 +81,6 @@ export function createQwenModuleContext(
     readPlanUsage: () => notWired('readPlanUsage'),
     loadMcpServers: () => notWired('loadMcpServers'),
     saveMcpServers: () => notWired('saveMcpServers'),
-    startMcpServer: () => notWired('startMcpServer'),
-    stopMcpServer: () => notWired('stopMcpServer'),
     renderSettingsTab: () => {
       void notWired('renderSettingsTab');
     },

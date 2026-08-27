@@ -568,8 +568,6 @@ export class KimicodeExecution {
             }));
           },
           saveServers: () => notWiredHere('saveServers'),
-          start: () => notWiredHere('start'),
-          stop: () => notWiredHere('stop'),
         },
       },
       () => {

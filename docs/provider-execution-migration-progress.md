@@ -9129,6 +9129,37 @@ they rest on are asserted — because a document that keeps saying `reshape` abo
 since fixed is worse than no document. Proven by growing the chat-UI slot by one member and watching
 it go red.
 
+#### Two operations the product does not have, and one it does
+
+Wiring Claude's module context — the first of the eight — found the MCP port describing a lifecycle
+Grimoire has never had. `ProviderMcpPort.start(serverId)` and `stop(serverId)`: **nothing in the
+product starts or stops an MCP server.** A server is a record with an `enabled` flag, and the
+provider's own CLI launches it. Those two members existed in the contract and in the nine contexts
+that stubbed them, and nowhere else — two invented operations every provider would eventually have
+had to implement as a lie.
+
+`tryParseClipboardConfig` is the mirror image: it is how a user pastes a server config, it is the
+only member of the real row that parses rather than stores, and it had no slot at all. The port is
+`loadServers`, `saveServers` and that now, and `mcpStorage` becomes the second row whose verdict is
+`fits` — by being reshaped to what the product does.
+
+**Claude's context is wired: ten stubs to one.** The one left is `renderSettingsTab`, which is not
+wiring — its slot types the host as `unknown` against a seven-member context, and that is the
+settings row's reshape.
+
+The riskiest part is the MCP save, and it has the test to match. The port carries three fields —
+id, label, enabled — and a save that rebuilt the stored record from them would drop the command, the
+args, the context-saving mode and the disabled tools on the first toggle of a checkbox. It reads the
+stored records and applies enablement to them, and a server the caller never mentioned is left
+exactly as it was: **saving a subset is not deleting the rest.** Both are pinned, and both went red
+when the save was rewritten the naive way.
+
+**And the counter written one commit ago was already wrong.** It matched
+`x: () => notWired('x')` and missed the block-bodied form — `renderSettingsTab` in all eight
+providers — so every number it reported was one too low, silently, in the direction that flatters
+the count. It matches both forms now. A counter that can only be wrong downwards is worse than no
+counter, and this one had been green for exactly one commit.
+
 #### And then none of them could move, for a reason no gate could see
 
 The table graded `modelCatalog` as the one row ready to move. It is not, and neither is any other

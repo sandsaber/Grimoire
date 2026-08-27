@@ -560,8 +560,6 @@ export class MimocodeExecution {
             }));
           },
           saveServers: () => notWiredHere('saveServers'),
-          start: () => notWiredHere('start'),
-          stop: () => notWiredHere('stop'),
         },
       },
       () => {

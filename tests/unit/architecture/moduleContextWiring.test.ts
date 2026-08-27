@@ -21,21 +21,38 @@ import { resolve } from 'node:path';
  */
 
 const CONTEXTS: ReadonlyArray<{ providerId: string; path: string; notWired: number }> = [
-  { providerId: 'claude', path: 'src/providers/claude/app/ClaudeModuleContext.ts', notWired: 10 },
+  {
+    // One left: the settings tab, whose slot types the host as `unknown` and
+    // whose real contract is a seven-member context the host supplies. It
+    // closes with that row's reshape, not with wiring.
+    providerId: 'claude', path: 'src/providers/claude/app/ClaudeModuleContext.ts', notWired: 1,
+  },
   // The only context that is entirely real, which is why Codex is the only
   // provider whose workspace is initialized today.
   { providerId: 'codex', path: 'src/providers/codex/app/CodexModuleContext.ts', notWired: 0 },
-  { providerId: 'gemini', path: 'src/providers/gemini/app/GeminiModuleContext.ts', notWired: 11 },
-  { providerId: 'grok', path: 'src/providers/grok/app/GrokModuleContext.ts', notWired: 12 },
-  { providerId: 'kimicode', path: 'src/providers/kimicode/app/KimicodeModuleContext.ts', notWired: 12 },
-  { providerId: 'mimocode', path: 'src/providers/mimocode/app/MimocodeModuleContext.ts', notWired: 12 },
-  { providerId: 'opencode', path: 'src/providers/opencode/app/OpencodeModuleContext.ts', notWired: 12 },
-  { providerId: 'qwen', path: 'src/providers/qwen/app/QwenModuleContext.ts', notWired: 11 },
+  { providerId: 'gemini', path: 'src/providers/gemini/app/GeminiModuleContext.ts', notWired: 10 },
+  { providerId: 'grok', path: 'src/providers/grok/app/GrokModuleContext.ts', notWired: 11 },
+  { providerId: 'kimicode', path: 'src/providers/kimicode/app/KimicodeModuleContext.ts', notWired: 11 },
+  { providerId: 'mimocode', path: 'src/providers/mimocode/app/MimocodeModuleContext.ts', notWired: 11 },
+  { providerId: 'opencode', path: 'src/providers/opencode/app/OpencodeModuleContext.ts', notWired: 11 },
+  { providerId: 'qwen', path: 'src/providers/qwen/app/QwenModuleContext.ts', notWired: 10 },
 ];
 
+/**
+ * Both stub forms, because the first version of this counter saw only one.
+ *
+ * A member returning a promise is `x: () => notWired('x')`; a member returning
+ * void wraps it in a block — `renderSettingsTab` in all eight — and matching
+ * only the arrow form under-reported every provider by exactly one, silently
+ * and in the direction that flatters the number. A counter that can only be
+ * wrong downwards is worse than no counter.
+ */
 function stubbedMembers(path: string): string[] {
   const source = readFileSync(resolve(process.cwd(), path), 'utf8');
-  return [...source.matchAll(/^\s{4}(\w+): \([^)]*\) => notWired\b/gm)].map(match => match[1]);
+  return [
+    ...[...source.matchAll(/^\s{4}(\w+): \([^)]*\) => notWired\b/gm)],
+    ...[...source.matchAll(/^\s{4}(\w+): \([^)]*\) => \{\n\s*void notWired\b/gm)],
+  ].map(match => match[1]);
 }
 
 describe('provider module context wiring', () => {
@@ -47,14 +64,14 @@ describe('provider module context wiring', () => {
     // Antigravity has no module context at all: its workspace contribution is
     // built inline and covers two slots, so there is nothing here to stub.
     expect(CONTEXTS.map(context => `${context.providerId}: ${context.notWired}`)).toEqual([
-      'claude: 10',
+      'claude: 1',
       'codex: 0',
-      'gemini: 11',
-      'grok: 12',
-      'kimicode: 12',
-      'mimocode: 12',
-      'opencode: 12',
-      'qwen: 11',
+      'gemini: 10',
+      'grok: 11',
+      'kimicode: 11',
+      'mimocode: 11',
+      'opencode: 11',
+      'qwen: 10',
     ]);
   });
 

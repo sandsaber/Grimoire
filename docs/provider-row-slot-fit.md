@@ -53,7 +53,7 @@ asserted only so the table cannot drift away from the code.
 | `modelCatalog` | 2 | 2 | fits | `isAvailable` is absent by design — a provider that cannot discover models contributes no `models` port, which is the contract's own "absent means unsupported", and both call sites guard on it exactly that way. `refreshModels` returns a `Promise<boolean>` that **neither call site reads**, so the slot returning descriptors instead loses nothing. The slot adds `list`, which the row lacked. |
 | `usageProvider` | 3 | 1 | reshape | `getCachedUsage` and `refreshUsage` are one `read()`. The plan indicator shows the cached snapshot immediately and refreshes behind it; one method makes every read either a network call or permanently stale. |
 | `runtimeCommandLoader` | 2 | 1 | reshape | `listForSession(sessionId)` presumes a session exists, and the row's context carries `allowSessionCreation` — command discovery may *start* a short-lived session, and the tab manager decides when that is allowed. The context also carries the conversation, the runtime and the external context paths. |
-| `mcpStorage` | 3 | 4 (shared) | reshape | `tryParseClipboardConfig` has nowhere to go. It is how a user pastes a server config, and it is the only member that parses rather than stores. |
+| `mcpStorage` | 3 | 3 (shared) | fits | Reshaped in place. The port had `start(serverId)` and `stop(serverId)` — **operations the product does not have**: an MCP server is a record with an `enabled` flag that the provider's own CLI launches, and those two members existed only in this contract and the nine contexts that stubbed them. `tryParseClipboardConfig`, which the product does have and which had no slot, is on the port now. |
 | `mcpServerManager` | class | 4 (shared) | reshape | Mention extraction and transformation, disallowed-tool computation (two forms), context-saving servers, and the enabled count — ten public members against a port describing storage and start/stop. **And the row is typed as a concrete class, not an interface**, so nothing else can satisfy it: a provider cannot contribute an MCP port without constructing Grimoire's own manager. That is the reshape, before any member is counted. |
 | `settingsTabRenderer` | 1 + a 7-member context | 1 | reshape | The contract is the context, not the method: the host supplies section builders, model-selector refresh, custom context limits, the advanced section, the hidden-command setting and a discovery suppression flag. `render(host)` types the host as `unknown`, which is honest about the DOM and silent about all seven. |
 
@@ -68,13 +68,13 @@ it, and calling it raises.
 | Provider | Unwired context members |
 |---|---|
 | Codex | 0 — the only real one, and the only provider whose workspace is initialized today |
-| Claude | 10 |
-| Gemini | 11 |
-| Qwen | 11 |
-| Grok | 12 |
-| Kimi Code | 12 |
-| MiMoCode | 12 |
-| OpenCode | 12 |
+| Claude | 1 — wired; only the settings tab is left, and that is a slot reshape rather than wiring |
+| Gemini | 10 |
+| Qwen | 10 |
+| Grok | 11 |
+| Kimi Code | 11 |
+| MiMoCode | 11 |
+| OpenCode | 11 |
 | Antigravity | no module context at all; its two slots are built inline |
 
 This is invisible to every other gate: the parity manifest sees a module in the bundle, the

@@ -570,8 +570,6 @@ export class QwenExecution {
             }));
           },
           saveServers: () => notWiredHere('saveServers'),
-          start: () => notWiredHere('start'),
-          stop: () => notWiredHere('stop'),
         },
       },
       () => {

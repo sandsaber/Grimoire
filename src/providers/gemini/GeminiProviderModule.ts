@@ -114,8 +114,6 @@ export interface GeminiWorkspaceContext {
   readPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   loadMcpServers(): Promise<readonly ProviderMcpServer[]>;
   saveMcpServers(servers: readonly ProviderMcpServer[]): Promise<void>;
-  startMcpServer(serverId: string): Promise<void>;
-  stopMcpServer(serverId: string): Promise<void>;
   renderSettingsTab(host: unknown): void;
   hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
   deleteConversationSession(conversationId: string): Promise<void>;
@@ -352,8 +350,6 @@ GeminiProviderSettings
         mcp: {
           loadServers: () => context.loadMcpServers(),
           saveServers: servers => context.saveMcpServers(servers),
-          start: serverId => context.startMcpServer(serverId),
-          stop: serverId => context.stopMcpServer(serverId),
         },
         settingsPresentation: { render: host => context.renderSettingsTab(host) },
       };

@@ -685,8 +685,6 @@ export class GrokExecution {
             }));
           },
           saveServers: () => notWiredHere('saveServers'),
-          start: () => notWiredHere('start'),
-          stop: () => notWiredHere('stop'),
         },
       },
       () => {

@@ -216,11 +216,25 @@ export interface ProviderRuntimeCommandsPort {
 }
 
 
+/**
+ * Grimoire-owned MCP configuration.
+ *
+ * **Storage and one parser, not a lifecycle.** The first version of this port
+ * had `start(serverId)` and `stop(serverId)`, and nothing in the product starts
+ * or stops an MCP server: a server is a record with an `enabled` flag that the
+ * provider's own CLI launches. Those two members existed only in this contract
+ * and in the nine contexts that stubbed them — invented operations that every
+ * provider would have had to implement as a lie.
+ *
+ * `tryParseClipboardConfig` went the other way. It is how a user pastes a
+ * server config, it is the only member that parses rather than stores, and it
+ * had no slot at all.
+ */
 export interface ProviderMcpPort {
   loadServers(): Promise<readonly ProviderMcpServer[]>;
   saveServers(servers: readonly ProviderMcpServer[]): Promise<void>;
-  start(serverId: string): Promise<void>;
-  stop(serverId: string): Promise<void>;
+  /** Reads a pasted config, or answers `null` when the text is not one. */
+  tryParseClipboardConfig?(text: string): unknown;
 }
 
 export interface ProviderMcpServer {

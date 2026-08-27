@@ -30,8 +30,6 @@ describe('Claude provider module', () => {
       readPlanUsage: async () => ({ label: 'Max', usedFraction: 0.5 }),
       loadMcpServers: async () => [{ id: 'vault', label: 'Vault', enabled: true }],
       saveMcpServers: async () => undefined,
-      startMcpServer: async () => undefined,
-      stopMcpServer: async () => undefined,
       renderSettingsTab: () => undefined,
       hydrateConversation: async () => ({ outcome: 'complete' as const }),
       deleteConversationSession: async () => undefined,
@@ -117,7 +115,6 @@ describe('Claude provider module', () => {
       expect(await mcp?.loadServers()).toEqual([
         { id: 'vault', label: 'Vault', enabled: true },
       ]);
-      await expect(mcp?.start('vault')).resolves.toBeUndefined();
     });
 
     it('performs a rewind through a port, not only by declaring the capability', async () => {
