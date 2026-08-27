@@ -870,6 +870,29 @@ export const PARITY_SURFACES: ParitySurface[] = [
     ],
   },
   {
+    id: 'durable-agents-dark',
+    area: 'shell',
+    description:
+      'The agent domain: instances, runs, dispatch intents and results, with their schemas, their '
+      + 'repositories, the permission policy that bounds a child by its parent, and the fidelity a '
+      + 'provider\'s capabilities allow. Harvested from the first attempt\'s Phase 6 and reconciled '
+      + 'against this branch; unreachable until the coordinator that writes them lands.',
+    state: 'pending',
+    owner:
+      'M5 — durable agents. These become reachable with the coordinator and the work card that '
+      + 'reads them; tab close stops cancelling background work in that same checkpoint and never '
+      + 'before.',
+    modules: [
+      'src/core/agents/AgentContracts.ts',
+      'src/core/agents/AgentControlPaths.ts',
+      'src/core/agents/AgentFidelity.ts',
+      'src/core/agents/AgentIds.ts',
+      'src/core/agents/AgentPolicy.ts',
+      'src/core/agents/AgentRepositories.ts',
+      'src/core/agents/AgentSchemas.ts',
+    ],
+  },
+  {
     id: 'conversation-persistence',
     area: 'shell',
     description:

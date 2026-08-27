@@ -117,4 +117,30 @@ describe('dark code stays out of the shipped bundle', () => {
 
     expect(leaked).toEqual([]);
   });
+
+  it('keeps a dark surface\'s vault paths out of the bundle too', () => {
+    if (bundle === null) {
+      return;
+    }
+
+    // **A class leaks by its name; a path leaks by its string.** A dark module's
+    // *constants* reach the bundle whenever they are declared in a module the
+    // running application already imports — nothing has to read them. It has
+    // happened twice: the execution control paths began in `StoragePaths`, and
+    // the agent paths began in `ExecutionControlPaths`, which the kernel makes
+    // reachable. Both times the fix was a module of the surface's own, and both
+    // times only a comment caught it.
+    const darkPaths = [
+      { path: 'agent-instances', surface: 'durable-agents-dark' },
+      { path: 'agent-runs', surface: 'durable-agents-dark' },
+      { path: 'agent-dispatch-intents', surface: 'durable-agents-dark' },
+      { path: 'agent-results', surface: 'durable-agents-dark' },
+    ];
+    // Guards the rule: a marker no build could ever contain would pass this
+    // whatever the bundle held, which is how the first version of the live
+    // markers above measured nothing.
+    expect(bundle).toContain('execution-runs');
+
+    expect(darkPaths.filter(entry => bundle.includes(entry.path))).toEqual([]);
+  });
 });

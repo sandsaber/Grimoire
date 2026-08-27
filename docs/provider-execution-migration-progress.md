@@ -8752,6 +8752,45 @@ was left with a spinner that stopped and no reason for it. It predates the flip 
 path; the deletion made it the only path, for every provider. A turn that fails before it has a
 bubble is given one.
 
+#### Durable agents: the domain is harvested, dark
+
+The agent domain from the first attempt's Phase 6 (`63320547`), **minus everything M5 bans**. That
+commit is 5,517 lines and roughly half of it is work graphs, their scheduler and their synthesis
+runs — post-migration scope, built when a real dependent workflow exists. What came across is the
+agent half: ids, contracts, schemas, repositories, the permission policy that bounds a child by its
+parent, and the fidelity a provider's capabilities allow.
+
+**Ported, not copied.** Four things had to be reconciled against this branch, and each one is the
+reason the plan says harvest rather than merge:
+
+- the four vault paths belong in a module of the agent domain's own — see below;
+- `AgentFidelity` read a capability descriptor that M3 rewrote: `definitionInventory`,
+  `spawnOrigins` and `observation` are `definitions`, `spawnOrigin` and `progressObservation` now,
+  and four `CapabilitySupport` values became booleans. Keeping the harvest's names would have left
+  two vocabularies for one set of facts;
+- **its test had drifted from the providers it describes.** It expected Grok to observe aggregate
+  progress with a stable identity and Qwen to observe opaquely; this branch's catalog says `none` for
+  both. Rewritten to assert the *rule* — every field is projected from the descriptor and none is
+  inferred — with the observation fidelity pinned per provider beside it, because a copy of today's
+  values is a second declaration and that is what drifted;
+- **`work-graph` was an owner kind an agent could be rooted in.** The type system refused it, which
+  is the ban enforcing itself. A record naming one is now refused at decode rather than half-honoured.
+
+**A dark surface leaks by its strings, not only by its classes.** The four vault paths went into
+`ExecutionControlPaths` first, and that module is reachable from the kernel — so four dead literals
+shipped in the bundle before anything could read them. It is the second time: the execution control
+paths began in `StoragePaths` for the same reason, and the comment that module carries about it is
+the only thing that caught this one. They live in `AgentControlPaths` now, and `darkBundle` gained a
+rule of its own — a class leaks by its name, a path leaks by its string — guarded by a live marker so
+it cannot pass over an empty bundle, and proven by declaring one in the reachable module again.
+
+**The parity manifest caught the harvest immediately**, which is what it is for: six unreachable
+modules with no owning entry, listed as `durable-agents-dark` with the checkpoint that makes them
+reachable. That gate is the one the v1 cutover did not have, and it left 324 files unreachable.
+
+Next in this piece: the coordinator that writes these records, then the work card that reads them —
+and **tab close stops cancelling background work in that same checkpoint, never before**.
+
 **Next: the rest of M5** — durable agents with tab-close ownership, the thirteen provider rows,
 registry deletion, and the seam deletion. That step was written as
 "only after a provider has been certified on the projection path"; all nine are on it now, so what
