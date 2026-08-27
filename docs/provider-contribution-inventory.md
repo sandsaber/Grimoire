@@ -160,3 +160,10 @@ the same layer. The evidence table is in the progress log.
   permission toggles, icons). The M0a surface manifest must expand its contents into individual
   surfaces; losing the model picker inside a "migrated" `chatUIConfig` is exactly the v1 failure
   shape.
+- **A typed slot exists for every row, and for more than half of them it is the wrong shape.** The
+  slots were written from the row *names* in these tables rather than from the contributions'
+  shapes, so `usage` is one window where the contribution has several, `models` is a reader where
+  the contribution is a settings writer, `agentMentions` is async where the consumer searches while
+  someone types, and `residency` is a boolean where the contribution answers one of three modes over
+  a context. Read the slot beside its consumer before treating a row as a move; the eight known
+  mismatches are enumerated in the migration progress log under *"The thirteen provider rows"*.

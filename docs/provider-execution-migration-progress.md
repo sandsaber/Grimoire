@@ -8635,6 +8635,37 @@ file, and now it is a red test.
 Gate: unit 8438 green, integration green, typecheck, lint, `build:release` clean; Antigravity live
 3/3 after the move.
 
+#### The thirteen provider rows: read every slot before picking one
+
+The 2026-08-25 session found four rows whose declared home was wrong and wrote each up as it was
+discovered. Reading the *rest* of them in one pass says why, and it is one finding rather than seven:
+**`ProviderModule`'s slots were written from the inventory's row names, not from the contributions'
+shapes.** More than half are too narrow to carry what they are named for. Nobody should pick a row
+without reading its slot beside its consumer first.
+
+The four already recorded: `historyService` (row 14) is workspace-global while the module port is
+runtime-scoped; `chatUIConfig` (row 8) is twenty-odd UI members against three; row 5's slot has no
+provider filling it; and app-level row 1's `workspaceCapabilities` is five resource kinds each
+carrying three services, against one `CapabilitySupport` per key. Four more, read on 2026-08-27:
+
+| Row | Slot as declared | What it has to carry |
+|---|---|---|
+| `usageProvider` | `read(): Promise<Snapshot \| null>` — one label, one fraction, one reset | `getCachedUsage` **synchronously** plus an async `refreshUsage`, returning *many* windows each with its own label, percentage, known-ness and reset, and an `isAvailable(settings)` |
+| `modelCatalog` | `list()` / `refresh()` returning descriptors | `refreshModels(context): Promise<boolean>` — a **settings writer** that reports whether anything changed, not a reader that returns models |
+| `agentMentionProvider` | `list()` / `refresh()`, async, everything | `searchAgents(query)` — **synchronous**, filtered, and carrying each mention's `source`. The consumer runs it while someone is typing |
+| warmup (`residency`) | `shouldKeepWarm(): boolean`, no arguments | `resolveMode(context)` answering one of **three** modes over a context carrying the conversation, external paths, the plugin, the runtime and the tab's lifecycle state |
+
+The warmup slot's own comment already says it is "replaced by lifecycle residency at M5", so that one
+is honest about being a placeholder. The other three are not: they read as slots waiting for a move,
+and each is a re-implementation with a product question inside it — does a plan indicator keep its
+several windows, does model discovery stop writing settings, can mention search become async.
+
+**What this means for sequencing.** A row is cheap only when its slot already fits, and the ones that
+fit are the ones nobody has needed yet. So the order to work them is by *consumer*, not by row: pick
+the consumer that would be rewritten anyway — the settings tabs, the mention UI, the plan indicator —
+and let the row follow it, widening the slot as part of that consumer's own rework. Picking rows
+first is how this list produced five separate discoveries of the same fact.
+
 **Next: the rest of M5** — durable agents with tab-close ownership, the thirteen provider rows,
 registry deletion, and the seam deletion. That step was written as
 "only after a provider has been certified on the projection path"; all nine are on it now, so what
