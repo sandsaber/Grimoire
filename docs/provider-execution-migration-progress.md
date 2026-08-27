@@ -8875,6 +8875,26 @@ that needs a decision rather than a repair — the other external calls go throu
 about what a provider is allowed to take. Owner: whoever gives the domain its producer, since that is
 who chooses the timeout.
 
+#### An observed agent may be rooted in a conversation
+
+Found by starting the producer rather than by reading the domain: the first question it has to answer
+is which coordinator command records a provider's background subagent, and **neither of them did**.
+`prepareDispatch` is `grimoire-dispatched`, which such an agent is not — Grimoire did not start it.
+`adoptNativeAgent` is `observed-native`, which it is, and it **required a parent agent instance**.
+
+A provider launching a background subagent from a *chat turn* has no parent agent at all. Its root is
+the conversation, which is exactly what `rootOwner` already says. Required, such an agent could only
+have been recorded by inventing a parent for it — and a fabricated parent is a permission ceiling and
+a cancellation cascade that came from nowhere.
+
+The parent is now optional, and the two things it answered are answered without it: the permission
+ceiling is what the command asks for, resolved by the same policy resolver, and nothing cascades
+because there is nothing above it to cascade from. The schema already permitted an absent parent and
+already required the pair, so the record shape did not move.
+
+**This is what the producer slice is for.** The domain is 2,500 lines that passed its own suite and a
+review; the first thing that tried to *use* it found a shape it could not express.
+
 #### What to pick up next, in order
 
 This list supersedes the numbered one further down, which was written before the chat flip.

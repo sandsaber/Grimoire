@@ -362,6 +362,41 @@ describe('AgentCoordinator', () => {
     expect(intent.kind === 'current' && intent.record.payload.rejectionCode).toBeFalsy();
   });
 
+  it('adopts a native agent that a conversation started, with no parent agent', async () => {
+    // **The shape Grimoire actually has.** A provider launching a background
+    // subagent from a chat turn has no parent *agent* — its root is the
+    // conversation. The harvest required a parent, because there every observed
+    // agent was already the child of one, so such an agent could only be
+    // recorded by inventing a parent for it.
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+
+    const adopted = await coordinator.adoptNativeAgent({
+      transactionId: tx('1'),
+      terminalTransactionId: tx('2'),
+      adoptionKey: nativeAgentAdoptionKey(`nad-${'9'.repeat(32)}`),
+      agentRunId: agentRunId(`agr-${'9'.repeat(32)}`),
+      providerId: 'claude',
+      definition: DEFINITION,
+      rootOwner: { kind: 'conversation', ownerId: 'conv-1' },
+      attachment: 'detached',
+      observation: 'aggregate',
+      nativeAgentRef: 'native-background-1',
+      goalRef: 'goal-background',
+      policyInputs: POLICY_INPUTS,
+    });
+
+    expect(adopted).toMatchObject({
+      origin: 'observed-native',
+      rootOwner: { kind: 'conversation', ownerId: 'conv-1' },
+      status: 'active',
+    });
+    expect(adopted.parentAgentInstanceId).toBeUndefined();
+    // Nothing above it to cascade from, so it runs.
+    const run = await coordinator.repositories.runs.read(adopted.runIds[0]);
+    expect(run.kind === 'current' && run.record.payload.state).toBe('running');
+  });
+
   it('refuses a retry on an instance with no attempt to retry', async () => {
     // The schema permits `runIds: []`, and a record in the field can have one —
     // half-written, or hand-edited. It used to raise `Reduce of empty array

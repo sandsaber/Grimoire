@@ -62,8 +62,23 @@ export interface AdoptNativeAgentCommand {
   readonly providerId: ProviderId;
   readonly definition: AgentDefinitionSnapshot;
   readonly rootOwner: ExecutionOwner;
-  readonly parentAgentInstanceId: AgentInstanceId;
-  readonly parentAgentRunId: AgentRunId;
+  /**
+   * The agent that spawned this one, where an agent did.
+   *
+   * **Optional, and that is the shape Grimoire actually needs.** The harvest
+   * required a parent, because there every observed agent was a child of one
+   * already known. A provider launching a background subagent from a *chat
+   * turn* has no parent agent at all — its root is the conversation, which is
+   * exactly what `rootOwner` says. Required, such an agent could only be
+   * recorded by inventing a parent for it.
+   *
+   * The parent answers two questions when it is there: the permission ceiling a
+   * child may not exceed, and whether a cancelling parent takes an attached
+   * child with it. Without one the ceiling is what the command asks for and
+   * nothing cascades — there is nothing above it to cascade from.
+   */
+  readonly parentAgentInstanceId?: AgentInstanceId;
+  readonly parentAgentRunId?: AgentRunId;
   readonly attachment: AgentAttachmentPolicy;
   readonly observation: Exclude<AgentObservationFidelity, 'opaque' | 'none'>;
   readonly nativeAgentRef: string;
@@ -290,7 +305,11 @@ export class AgentCoordinator {
         true,
         true,
       );
-      const parentRun = await this.requireParentRun(parent!, command.parentAgentRunId);
+      // An agent rooted in a conversation has no parent run to read a ceiling
+      // or a cancellation from. Both are answered below rather than here.
+      const parentRun = parent
+        ? await this.requireParentRun(parent, command.parentAgentRunId)
+        : undefined;
       const existing = await this.repositories.instances.read(instanceId);
       if (existing.kind === 'current' || existing.kind === 'migrated') {
         requireMatchingAdoption(existing.record.payload, command);
@@ -299,6 +318,7 @@ export class AgentCoordinator {
       if (existing.kind !== 'absent') await requireCurrent(Promise.resolve(existing));
       const timestamp = this.now();
       const inheritsCancellation = command.attachment === 'attached'
+        && !!parentRun
         && hasCancellationCascade(parentRun);
       const instance: AgentInstanceRecord = {
         agentInstanceId: instanceId,
@@ -325,7 +345,10 @@ export class AgentCoordinator {
         goalRef: command.goalRef,
         policy: await this.resolveCommandPolicy(
           command.policyInputs,
-          [effectivePolicyBoundary(parentRun.policy)],
+          // No parent, no ceiling from one: what the command asks for is what
+          // the conversation was already allowed, and the policy resolver is
+          // still what decides it.
+          parentRun ? [effectivePolicyBoundary(parentRun.policy)] : [],
         ),
         terminalTransactionId: command.terminalTransactionId,
         nativeAgentRef: command.nativeAgentRef,
