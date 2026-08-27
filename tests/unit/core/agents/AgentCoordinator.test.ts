@@ -397,6 +397,72 @@ describe('AgentCoordinator', () => {
     expect(run.kind === 'current' && run.record.payload.state).toBe('running');
   });
 
+  it('lists a conversation\'s agents from the records, not from anything live', async () => {
+    // **The whole reason the records exist.** A subagent launched in a tab that
+    // has since closed is in no live map anywhere, and it is exactly the work a
+    // person needs to find again.
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+    await coordinator.prepareAndDispatch(rootCommand(), {
+      dispatch: async () => ({ kind: 'accepted' }),
+    });
+    await coordinator.adoptNativeAgent({
+      transactionId: tx('e'),
+      terminalTransactionId: tx('f'),
+      adoptionKey: nativeAgentAdoptionKey(`nad-${'e'.repeat(32)}`),
+      agentRunId: agentRunId(`agr-${'e'.repeat(32)}`),
+      providerId: 'claude',
+      definition: DEFINITION,
+      rootOwner: { kind: 'conversation', ownerId: 'conv-other' },
+      attachment: 'detached',
+      observation: 'aggregate',
+      nativeAgentRef: 'native-other',
+      goalRef: 'goal-other',
+      policyInputs: POLICY_INPUTS,
+    });
+
+    const listed = await coordinator.listOwnedAgents({
+      kind: 'conversation',
+      ownerId: 'conversation-1',
+    });
+
+    // Only this conversation's, and carrying no text: a goal *reference*, not
+    // the goal, and no result — a card shows that work exists and how it ended.
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({ state: 'running', attempt: 1 });
+    expect(listed[0]).not.toHaveProperty('finalText');
+  });
+
+  it('lists the attempt that is happening, not the ones before it', async () => {
+    // A retry keeps its predecessors and they are history; a card showing three
+    // attempts of one agent is showing one agent.
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+    await coordinator.prepareAndDispatch(rootCommand(), {
+      dispatch: async () => ({ kind: 'rejected', code: 'refused', sideEffectFree: true }),
+    });
+    await coordinator.retry({
+      prepareTransactionId: tx('8'),
+      dispatchStartTransactionId: tx('9'),
+      settlementTransactionId: tx('a'),
+      terminalTransactionId: tx('b'),
+      agentInstanceId: ROOT_INSTANCE_ID,
+      agentRunId: agentRunId(`agr-${'c'.repeat(32)}`),
+      dispatchToken: agentDispatchToken(`adt-${'d'.repeat(32)}`),
+      goalRef: 'second-attempt',
+      policyInputs: POLICY_INPUTS,
+      idempotency: 'provider-key',
+    }, { dispatch: async () => ({ kind: 'accepted' }) });
+
+    const listed = await coordinator.listOwnedAgents({
+      kind: 'conversation',
+      ownerId: 'conversation-1',
+    });
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({ attempt: 2, goalRef: 'second-attempt', state: 'running' });
+  });
+
   it('deletes every record a conversation owns, and nothing another owns', async () => {
     // **D3 decided this and nothing did it.** An agent instance and its
     // attempts are kept until the owning conversation is deleted, deliberately,

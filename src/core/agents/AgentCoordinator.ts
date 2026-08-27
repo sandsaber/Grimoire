@@ -19,6 +19,8 @@ import type {
   AgentResultRecord,
   AgentRunRecord,
   AgentRunRecoveryPort,
+  AgentRunState,
+  AgentRunTerminal,
   AgentTerminalStatus,
 } from './AgentContracts';
 import {
@@ -105,6 +107,29 @@ export interface RetryAgentCommand {
 export type AgentDispatchPolicyInputs = Omit<AgentPolicyInputs, 'parent'> & {
   readonly parent?: never;
 };
+
+/**
+ * One agent, as a surface needs it.
+ *
+ * Carries no text: a goal *reference*, not the goal, and no result — a card
+ * shows that work exists and how it ended, and what it said is read from the
+ * result store when someone opens it. Everything here comes from a record, so
+ * the answer is the same whether the tab that started it is still open.
+ */
+export interface OwnedAgentSummary {
+  readonly agentInstanceId: AgentInstanceId;
+  readonly agentRunId: AgentRunId;
+  readonly providerId: ProviderId;
+  readonly goalRef: string;
+  readonly nativeAgentRef?: string;
+  readonly state: AgentRunState;
+  readonly terminal?: AgentRunTerminal;
+  readonly attempt: number;
+  /** How much of this agent's progress the provider lets anyone see. */
+  readonly observation: AgentObservationFidelity;
+  readonly startedAt: number;
+  readonly updatedAt: number;
+}
 
 export interface CancelAttachedAgentTreeCommand {
   readonly transactionId: string;
@@ -564,6 +589,47 @@ export class AgentCoordinator {
       }
       return this.linkResultUnlocked(canonical);
     });
+  }
+
+  /**
+   * What a conversation's agents are doing, for a surface to draw.
+   *
+   * **Read from the records rather than from anything in memory**, which is the
+   * whole reason they exist: a subagent launched in a tab that has since closed
+   * is in no live map anywhere, and it is exactly the work a person needs to
+   * find. Latest run per instance, because that is the attempt that is
+   * happening — a retry keeps its predecessors and they are history.
+   *
+   * Ordered newest first, so a surface that shows three shows the three that
+   * matter.
+   */
+  async listOwnedAgents(owner: ExecutionOwner): Promise<readonly OwnedAgentSummary[]> {
+    const ownerKey = stableSerialize(owner);
+    const summaries: OwnedAgentSummary[] = [];
+    for (const instanceId of await this.repositories.instances.listRecordIds()) {
+      const instance = await this.repositories.instances.read(instanceId);
+      if (instance.kind !== 'current' && instance.kind !== 'migrated') continue;
+      const record = instance.record.payload;
+      if (stableSerialize(record.rootOwner) !== ownerKey) continue;
+      const latestRunId = record.runIds.at(-1);
+      if (!latestRunId) continue;
+      const run = await this.repositories.runs.read(latestRunId);
+      if (run.kind !== 'current' && run.kind !== 'migrated') continue;
+      summaries.push({
+        agentInstanceId: record.agentInstanceId,
+        agentRunId: run.record.payload.agentRunId,
+        providerId: record.providerId,
+        goalRef: run.record.payload.goalRef,
+        nativeAgentRef: record.nativeAgentRef,
+        state: run.record.payload.state,
+        terminal: run.record.payload.terminal,
+        attempt: run.record.payload.attempt,
+        observation: record.observation,
+        startedAt: run.record.payload.createdAt,
+        updatedAt: run.record.payload.updatedAt,
+      });
+    }
+    return summaries.sort((left, right) => right.startedAt - left.startedAt);
   }
 
   /**

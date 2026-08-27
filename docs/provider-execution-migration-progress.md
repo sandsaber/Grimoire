@@ -8993,6 +8993,23 @@ were now live; and the deletion scoreboard rose by one. The manifest is split no
 `wired`, and `AgentFidelity` is its own `pending` surface owned by the work card, because the card is
 its first reader and a profile with no reader is exactly the kind of thing the v1 cutover left 324 of.
 
+#### The reader, so the records can be seen
+
+`listOwnedAgents` answers what a conversation's agents are doing, **from the records and from nothing
+in memory** — which is the whole reason the records exist: a subagent launched in a tab that has
+since closed is in no live map anywhere, and it is exactly the work a person needs to find again.
+
+Two decisions in it worth naming:
+
+- **the latest run per instance**, because that is the attempt that is happening. A retry keeps its
+  predecessors and they are history; a card showing three attempts of one agent is showing one agent;
+- **it carries no text.** A goal *reference*, not the goal, and no result. A card shows that work
+  exists and how it ended; what it *said* is read from the result store when someone opens it, which
+  keeps the summary a thing that can be listed cheaply and often.
+
+What remains for the card itself is presentation and the reattachment gesture — and the tab-close
+change ships with them, never before.
+
 #### The next checkpoint, scoped
 
 The plan binds three things into one checkpoint and the binding is the point: **tab close stops
