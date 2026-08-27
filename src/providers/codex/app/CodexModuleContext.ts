@@ -1,14 +1,13 @@
-import type { ProviderCommandDescriptor } from '../../../core/providers/ProviderModule';
 import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
 import type { BoundConversation } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { Conversation } from '../../../core/types';
 import type GrimoirePlugin from '../../../main';
 import { getVaultPath } from '../../../utils/path';
+import { createWorkspaceContextSlots } from '../../shared/workspaceContextSlots';
 import type { CodexWorkspaceContext } from '../CodexProviderModule';
 import { readCodexConversationBinding } from '../execution/CodexConversationBinding';
 import { CodexConversationHistoryService } from '../history/CodexConversationHistoryService';
-import { getCodexModelOptions } from '../modelOptions';
-import { codexPlanUsageStore } from './CodexPlanUsageStore';
+import { codexChatUIConfig } from '../ui/CodexChatUIConfig';
 import { maybeGetCodexWorkspaceServices } from './CodexWorkspaceServices';
 
 /**
@@ -36,52 +35,21 @@ export function createCodexModuleContext(
   conversation: CodexBoundConversation,
 ): CodexWorkspaceContext {
   const history = new CodexConversationHistoryService();
+  const workspace = createWorkspaceContextSlots({
+    chatUI: codexChatUIConfig,
+    // Codex's dropdown offers no CLI built-ins: for this product a provider
+    // command is a vault skill, which is the difference the option exists for.
+    includeBuiltInCommands: false,
+    plugin,
+    providerId: 'codex',
+    services: () => maybeGetCodexWorkspaceServices(),
+  });
 
   return {
-    listSkills: async () => {
-      const catalog = maybeGetCodexWorkspaceServices()?.commandCatalog;
-      // The dropdown is the same list the composer offers, which is what a
-      // provider command *is* for Codex: a vault skill, not a built-in.
-      const entries = await catalog?.listDropdownEntries({ includeBuiltIns: false }) ?? [];
-      return entries.map((entry): ProviderCommandDescriptor => ({
-        name: entry.name,
-        ...(entry.description ? { description: entry.description } : {}),
-        source: 'project',
-      }));
-    },
-    listAgentMentions: async () => {
-      const mentions = maybeGetCodexWorkspaceServices()?.agentMentionProvider;
-      // The provider searches; an empty query is how the mention UI asks for
-      // everything it knows about.
-      return (mentions?.searchAgents('') ?? []).map(agent => ({
-        id: agent.id,
-        label: agent.name,
-        ...(agent.description ? { description: agent.description } : {}),
-      }));
-    },
-    refreshAgentMentions: async () => {
-      await maybeGetCodexWorkspaceServices()?.refreshAgentMentions?.();
-    },
-    resolveCliPath: async () => plugin.getResolvedProviderCliPath('codex'),
-    listModels: async () => codexModels(plugin),
-    refreshModels: async () => {
-      const catalog = maybeGetCodexWorkspaceServices()?.modelCatalog;
-      await catalog?.refreshModels({ plugin, settings: plugin.settings });
-      return codexModels(plugin);
-    },
-    readPlanUsage: async () => {
-      const usage = codexPlanUsageStore.getCachedUsage({
-        plugin,
-        providerId: 'codex',
-        settings: plugin.settings,
-      });
-      // The store speaks plans and windows; the module's slot wants a label and
-      // a fraction, and a plan with no window is still worth showing.
-      return usage ? { label: usage.plan } : null;
-    },
-    // Codex keeps a daemon per tab, which is what its warmup policy reports
-    // unconditionally; asking the policy here would need a tab and a
-    // conversation this context has no business holding.
+    ...workspace,
+    // The dropdown is the same list the composer offers, which is what a
+    // provider command *is* for Codex: a vault skill, not a built-in.
+    listSkills: () => workspace.listCommands(),
     renderSettingsTab: host => {
       const rendered = host as {
         container: HTMLElement;
@@ -146,15 +114,4 @@ function bindingFor(
 ): ReturnType<typeof readCodexConversationBinding> | null {
   const bound = conversation();
   return bound && bound.id === conversationId ? readCodexConversationBinding(bound) : null;
-}
-
-function codexModels(plugin: GrimoirePlugin): readonly { id: string; label: string }[] {
-  const discovered = maybeGetCodexWorkspaceServices();
-  if (!discovered) {
-    return [];
-  }
-  return getCodexModelOptions(plugin.settings).map(option => ({
-    id: option.value,
-    label: option.label,
-  }));
 }

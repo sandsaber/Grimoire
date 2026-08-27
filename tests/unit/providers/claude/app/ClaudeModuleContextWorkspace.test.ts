@@ -53,8 +53,8 @@ describe('Claude module context workspace slots', () => {
     const plugin = pluginWith({
       commandCatalog: {
         listDropdownEntries: jest.fn(async () => [
-          { name: 'compact', description: 'Compact the transcript', source: 'builtin' },
-          { name: 'review', source: 'project' },
+          { name: 'compact', description: 'Compact the transcript', scope: 'builtin' },
+          { name: 'review', scope: 'vault' },
         ]),
       },
     });

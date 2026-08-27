@@ -70,6 +70,34 @@ describe('provider workspace context slots', () => {
     expect(servers.map(server => server.id)).toEqual([`${providerId}-server`]);
   });
 
+  it('names where a command came from, in all four of the slot\'s words', async () => {
+    ProviderWorkspaceRegistry.setServices('grok', {
+      commandCatalog: {
+        listDropdownEntries: async () => [
+          { name: 'compact', scope: 'builtin', source: 'builtin' },
+          { name: 'review', scope: 'vault', source: 'plugin' },
+          { name: 'mine', scope: 'user', source: 'user' },
+          { name: 'announced', scope: 'runtime', source: 'sdk' },
+          { name: 'internal', scope: 'system', source: 'builtin' },
+        ],
+      },
+    } as never);
+
+    const commands = await createGrokModuleContext(plugin(), () => null, ports).listCommands();
+
+    // The slot has four words and the first version of this mapping used two:
+    // it read the entry's *provenance* and sent everything that was not
+    // `builtin` to `project`, so a command the user wrote and one the live
+    // session announced were reported as the same kind of thing.
+    expect(commands).toEqual([
+      { name: 'compact', source: 'built-in' },
+      { name: 'review', source: 'project' },
+      { name: 'mine', source: 'user' },
+      { name: 'announced', source: 'session' },
+      { name: 'internal', source: 'built-in' },
+    ]);
+  });
+
   it.each(WIRINGS)('$providerId offers nothing before its workspace is registered', async ({ build }) => {
     const context = build(plugin());
 

@@ -52,7 +52,8 @@ export interface WorkspaceContextServices {
     listDropdownEntries(context: { includeBuiltIns: boolean }): Promise<ReadonlyArray<{
       name: string;
       description?: string;
-      source?: string;
+      /** Where the entry came from. See `commandSource` for why not `source`. */
+      scope?: string;
     }>>;
   } | null;
   readonly mcpStorage?: AppMcpStorage | null;
@@ -122,7 +123,7 @@ export function createWorkspaceContextSlots(
       return entries.map((entry): ProviderCommandDescriptor => ({
         name: entry.name,
         ...(entry.description ? { description: entry.description } : {}),
-        source: entry.source === 'builtin' ? 'built-in' : 'project',
+        source: commandSource(entry.scope),
       }));
     },
 
@@ -181,4 +182,30 @@ export function createWorkspaceContextSlots(
       )));
     },
   };
+}
+
+/**
+ * Where a command came from, in the slot's vocabulary.
+ *
+ * Read from the entry's `scope`, not its `source`. `source` is
+ * `'builtin' | 'user' | 'plugin' | 'sdk'` — a *provenance* — while the slot asks
+ * where the user would go to change it, which is what `scope` answers. The
+ * first version of this mapped `source`, sent everything that was not
+ * `'builtin'` to `'project'`, and collapsed two of the slot's four values: a
+ * command the user wrote in their own directory and one the live session
+ * announced both came back as a project command. Codex's hand-written version
+ * had the same shape with `'project'` hard-coded.
+ */
+function commandSource(scope: string | undefined): ProviderCommandDescriptor['source'] {
+  switch (scope) {
+    case 'builtin':
+    case 'system':
+      return 'built-in';
+    case 'user':
+      return 'user';
+    case 'runtime':
+      return 'session';
+    default:
+      return 'project';
+  }
 }

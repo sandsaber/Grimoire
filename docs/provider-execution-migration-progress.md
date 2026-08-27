@@ -9129,6 +9129,23 @@ they rest on are asserted — because a document that keeps saying `reshape` abo
 since fixed is worse than no document. Proven by growing the chat-UI slot by one member and watching
 it go red.
 
+#### Reviewing the shared helper found the thing sharing it was supposed to prevent
+
+The review of the wiring above turned up one real defect, in the shared code, put there by this
+session: **`listCommands` mapped a command's origin onto two of the slot's four words.** It read the
+entry's `source` — `'builtin' | 'user' | 'plugin' | 'sdk'`, a *provenance* — and sent everything
+that was not `builtin` to `'project'`. So a command the user wrote in their own directory and one
+the live session announced came back as the same kind of thing, and the slot's `'user'` and
+`'session'` were unreachable.
+
+The right field is `scope`: `'builtin' | 'vault' | 'user' | 'system' | 'runtime'` answers *where the
+user would go to change it*, which is what the slot asks. Codex's hand-written version had the same
+shape with `'project'` hard-coded, which is how it survived the flip that certified Codex.
+
+**Codex moved onto the shared helper with the fix**, so all nine now answer these questions from one
+implementation, and Codex's `listSkills` is that implementation under the name its module uses. The
+only thing left in a hand-written slot is `renderSettingsTab`, in all nine.
+
 #### The eight contexts, written once
 
 All eight are wired: ten-to-twelve stubs each down to at most two, and neither of the two is wiring.
