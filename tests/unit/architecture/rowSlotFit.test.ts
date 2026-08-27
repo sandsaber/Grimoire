@@ -112,14 +112,17 @@ function fitTable(): Map<string, { real: number; slot: string; verdict: string }
   const document = readFileSync(resolve(process.cwd(), FIT_PATH), 'utf8');
   const rows = new Map<string, { real: number; slot: string; verdict: string }>();
   for (const line of document.split('\n')) {
-    const match = line.match(/^\| `([^`]+)` \| ([^|]+) \| ([^|]+) \| (\w+) \|/);
+    // The verdict may carry a qualifier — `reshape, **but not yet**` — so it is
+    // read up to the next column and the leading word taken from it, rather
+    // than assuming one word and silently skipping the row that has two.
+    const match = line.match(/^\| `([^`]+)` \| ([^|]+) \| ([^|]+) \| ([^|]+) \|/);
     if (!match) {
       continue;
     }
     rows.set(match[1], {
       real: Number.parseInt(match[2].trim(), 10),
       slot: match[3].trim(),
-      verdict: match[4],
+      verdict: match[4].trim().split(/[,\s]/)[0],
     });
   }
   return rows;
