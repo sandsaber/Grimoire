@@ -9644,6 +9644,37 @@ Two questions to settle before writing it, both recorded rather than guessed:
   first conversation ever deleted with agent records already loses them. **Its call site lands with
   the wiring**, beside the registry's.
 
+#### Where to pick this up
+
+The chat-UI row is half moved. **Eleven call sites left**, and they are not all the same kind of
+work:
+
+| Where | Sites | What it needs |
+|---|---|---|
+| `ProviderSettingsCoordinator` | 4 | The only ones in **core**. Two of them iterate every provider asking `isDefaultModel`; one is `resolveProviderForModel`'s neighbour. Moving them takes the registry's model-routing statics with it, which is the row's real end. |
+| `Tab.ts` | 3 | The blank-tab provider switch and the draft-model path. |
+| `GrimoireView`, `GrimoireSettings`, `tabContextUI`, `main.ts` | 1 each | Single questions, like the seven already moved. |
+
+**One user-visible change is queued and deliberate.** Gemini and Antigravity declare
+`reasoningControl: { kind: 'none' }`, their chat-UI configs offer four reasoning options each, and
+neither runtime reads a reasoning level — Gemini's module says its session carries no config option
+one could be set through. The picker draws a control that changes nothing. When the toolbar reads
+`chatUI.reasoning`, that row disappears for both. It is a fix, and it should be stated in the
+release notes rather than discovered.
+
+After the row: **`ProviderRegistry.resolveProviderForModel` and `getCustomModelIds`** are the last
+two statics that read `getChatUIConfig`, and both are model routing rather than presentation. They
+are what stands between the chat-UI row and deleting `ProviderRegistry` itself.
+
+Then the ten rows still marked `reshape` in
+[`provider-row-slot-fit.md`](provider-row-slot-fit.md), of which two —
+`taskResultInterpreter` and `subagentLifecycleAdapter` — are deliberately **last**, because their
+consumers are mid-replacement and a slot shaped for a consumer being replaced is a slot shaped
+twice.
+
+Untouched: the seam deletion (`StreamChunk` lifecycle meaning, turn metadata, interaction
+callbacks) and M6 entirely.
+
 #### What to pick up next, in order
 
 This list supersedes the numbered one further down, which was written before the chat flip.
