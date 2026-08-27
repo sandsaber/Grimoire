@@ -7,29 +7,27 @@ import './providers';
 import type { Command, Editor, WorkspaceLeaf } from 'obsidian';
 import { addIcon, MarkdownView, Notice, Plugin, setTooltip } from 'obsidian';
 
+import { ApplicationRuntime } from './app/ApplicationRuntime';
 import { shouldShowWhatsNew } from './app/changelog/display';
 import { parseChangelogRelease } from './app/changelog/parser';
 import { readBundledChangelog } from './app/changelog/source';
 import type { ChangelogRelease } from './app/changelog/types';
-import { ChatExecutionComposition } from './app/chat/ChatExecutionComposition';
-import { StoredChatConversations } from './app/chat/StoredChatConversations';
-import { AntigravityExecution } from './app/execution/antigravity/AntigravityExecutionComposition';
-import { ClaudeExecution } from './app/execution/claude/ClaudeExecutionComposition';
-import { CodexExecution } from './app/execution/codex/CodexExecutionComposition';
-import { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
-import { GeminiExecution } from './app/execution/gemini/GeminiExecutionComposition';
-import { GrokExecution } from './app/execution/grok/GrokExecutionComposition';
-import { KimicodeExecution } from './app/execution/kimicode/KimicodeExecutionComposition';
+import type { ChatExecutionComposition } from './app/chat/ChatExecutionComposition';
+import type { AntigravityExecution } from './app/execution/antigravity/AntigravityExecutionComposition';
+import type { ClaudeExecution } from './app/execution/claude/ClaudeExecutionComposition';
+import type { CodexExecution } from './app/execution/codex/CodexExecutionComposition';
+import type { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
+import type { GeminiExecution } from './app/execution/gemini/GeminiExecutionComposition';
+import type { GrokExecution } from './app/execution/grok/GrokExecutionComposition';
+import type { KimicodeExecution } from './app/execution/kimicode/KimicodeExecutionComposition';
 import {
   type LocalShellCommandOutcome,
-  LocalShellExecution,
 } from './app/execution/local/LocalShellExecution';
-import { MimocodeExecution } from './app/execution/mimocode/MimocodeExecutionComposition';
-import { OpencodeExecution } from './app/execution/opencode/OpencodeExecutionComposition';
-import { QwenExecution } from './app/execution/qwen/QwenExecutionComposition';
+import type { MimocodeExecution } from './app/execution/mimocode/MimocodeExecutionComposition';
+import type { OpencodeExecution } from './app/execution/opencode/OpencodeExecutionComposition';
+import type { QwenExecution } from './app/execution/qwen/QwenExecutionComposition';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
-import { VaultDurableStorage } from './app/storage/VaultDurableStorage';
 import type { UnreadableConversation } from './core/bootstrap/SessionStorage';
 import {
   applyAssistantResponseMetadataToMessages,
@@ -121,17 +119,16 @@ export default class GrimoirePlugin extends Plugin {
    * that starts again looks again.
    */
   private readonly historyHydration = new Map<string, ProviderHistoryHydration>();
-  private executionKernelHost: ExecutionKernelHost | null = null;
-  private chatExecution: ChatExecutionComposition | null = null;
-  private antigravityExecution: AntigravityExecution | null = null;
-  private codexExecution: CodexExecution | null = null;
-  private claudeExecution: ClaudeExecution | null = null;
-  private opencodeExecution: OpencodeExecution | null = null;
-  private grokExecution: GrokExecution | null = null;
-  private mimocodeExecution: MimocodeExecution | null = null;
-  private kimicodeExecution: KimicodeExecution | null = null;
-  private geminiExecution: GeminiExecution | null = null;
-  private qwenExecution: QwenExecution | null = null;
+  /**
+   * Everything one load composes, owned by one object with one lifetime.
+   *
+   * These were eleven fields, each with a getter naming a provider. The getters
+   * below still do — that is the seam the provider rows remove, since a
+   * provider's registration asks the plugin for its own composition today — but
+   * what they answer from is `ApplicationRuntime`, and it is what a reload
+   * replaces.
+   */
+  private applicationRuntime: ApplicationRuntime | null = null;
   private unloading = false;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
@@ -140,7 +137,6 @@ export default class GrimoirePlugin extends Plugin {
   private ribbonIconEl: HTMLElement | null = null;
   private readonly shellCommands = new Map<string, Command>();
   private providerWorkspaces: ProviderWorkspaceManager<ProviderWorkspaceServices> | null = null;
-  private localShellExecution: LocalShellExecution | null = null;
   /**
    * Conversations the vault holds and this build cannot read.
    *
@@ -396,21 +392,11 @@ export default class GrimoirePlugin extends Plugin {
     // the kernel's shutdown is not: `onunload` returns void.
     void this.providerWorkspaces?.disposeAll();
     this.providerWorkspaces = null;
-    void this.localShellExecution?.dispose();
-    this.localShellExecution = null;
-    this.codexExecution?.dispose();
-    this.claudeExecution?.dispose();
-    this.opencodeExecution?.dispose();
-    this.grokExecution?.dispose();
-    this.mimocodeExecution?.dispose();
-    this.kimicodeExecution?.dispose();
-    this.geminiExecution?.dispose();
-    this.qwenExecution?.dispose();
-    // Before the kernel's own shutdown: this detaches the surfaces watching runs,
-    // and the kernel is what then decides what happens to the runs themselves.
-    this.chatExecution?.dispose();
-    this.chatExecution = null;
-    void this.executionKernelHost?.dispose();
+    // One call, and the order inside it is the runtime's: providers release the
+    // scratch a turn was holding, the chat surface detaches what is watching
+    // runs, and the kernel decides last what happens to the runs themselves.
+    this.applicationRuntime?.dispose();
+    this.applicationRuntime = null;
     void this.persistOpenTabStates();
   }
 
@@ -423,10 +409,10 @@ export default class GrimoirePlugin extends Plugin {
    * on one chat must see one turn rather than two.
    */
   getChatExecution(): ChatExecutionComposition {
-    if (!this.chatExecution) {
+    if (!this.applicationRuntime) {
       throw new Error('Chat execution is not available before plugin load.');
     }
-    return this.chatExecution;
+    return this.applicationRuntime.chat;
   }
 
   /**
@@ -437,10 +423,10 @@ export default class GrimoirePlugin extends Plugin {
    * control store would each believe they own every run in it.
    */
   getExecutionKernel(): ExecutionKernelHost {
-    if (!this.executionKernelHost) {
+    if (!this.applicationRuntime) {
       throw new Error('Execution kernel is not available before plugin load.');
     }
-    return this.executionKernelHost;
+    return this.applicationRuntime.kernel;
   }
 
   /**
@@ -453,74 +439,74 @@ export default class GrimoirePlugin extends Plugin {
    * the only place with that lifetime.
    */
   getAntigravityExecution(): AntigravityExecution {
-    if (!this.antigravityExecution) {
+    if (!this.applicationRuntime) {
       throw new Error('Antigravity execution is not available before plugin load.');
     }
-    return this.antigravityExecution;
+    return this.applicationRuntime.antigravity;
   }
 
   /** The Codex execution this plugin instance owns; see the note above. */
   getCodexExecution(): CodexExecution {
-    if (!this.codexExecution) {
+    if (!this.applicationRuntime) {
       throw new Error('Codex execution is not available before plugin load.');
     }
-    return this.codexExecution;
+    return this.applicationRuntime.codex;
   }
 
   /** The Claude execution this plugin instance owns; see the note above. */
   getClaudeExecution(): ClaudeExecution {
-    if (!this.claudeExecution) {
+    if (!this.applicationRuntime) {
       throw new Error('Claude execution is not available before plugin load.');
     }
-    return this.claudeExecution;
+    return this.applicationRuntime.claude;
   }
 
   /** The OpenCode execution this plugin instance owns; see the note above. */
   getOpencodeExecution(): OpencodeExecution {
-    if (!this.opencodeExecution) {
+    if (!this.applicationRuntime) {
       throw new Error('OpenCode execution is not available before plugin load.');
     }
-    return this.opencodeExecution;
+    return this.applicationRuntime.opencode;
   }
 
   /** The Grok execution this plugin instance owns; see the note above. */
   getGrokExecution(): GrokExecution {
-    if (!this.grokExecution) {
+    if (!this.applicationRuntime) {
       throw new Error('Grok execution is not available before plugin load.');
     }
-    return this.grokExecution;
+    return this.applicationRuntime.grok;
   }
 
   /** The MiMoCode execution this plugin instance owns; see the note above. */
   getMimocodeExecution(): MimocodeExecution {
-    if (!this.mimocodeExecution) {
+    if (!this.applicationRuntime) {
       throw new Error('MiMoCode execution is not available before plugin load.');
     }
-    return this.mimocodeExecution;
+    return this.applicationRuntime.mimocode;
   }
 
   /** The Kimi Code execution this plugin instance owns; see the note above. */
   getKimicodeExecution(): KimicodeExecution {
-    if (!this.kimicodeExecution) {
+    if (!this.applicationRuntime) {
       throw new Error('Kimi Code execution is not available before plugin load.');
     }
-    return this.kimicodeExecution;
+    return this.applicationRuntime.kimicode;
   }
 
   /** The Gemini execution this plugin instance owns; see the note above. */
   getGeminiExecution(): GeminiExecution {
-    if (!this.geminiExecution) {
+    if (!this.applicationRuntime) {
       throw new Error('Gemini execution is not available before plugin load.');
     }
-    return this.geminiExecution;
+    return this.applicationRuntime.gemini;
   }
 
   /** The Qwen execution this plugin instance owns; see the note above. */
   getQwenExecution(): QwenExecution {
-    if (!this.qwenExecution) {
+    if (!this.applicationRuntime) {
       throw new Error('Qwen execution is not available before plugin load.');
     }
-    return this.qwenExecution;
+    return this.applicationRuntime.qwen;
   }
 
   /**
@@ -574,121 +560,18 @@ export default class GrimoirePlugin extends Plugin {
 
   private async startExecutionKernel(): Promise<void> {
     if (this.unloading) {
-      // Unload won the race with settings loading. A host built now would open
-      // a gate that the shutdown which already ran can no longer close.
+      // Unload won the race with settings loading. A runtime built now would
+      // open a gate that the shutdown which already ran can no longer close.
       return;
     }
-    const host = new ExecutionKernelHost({
-      storage: new VaultDurableStorage(this.storage.getAdapter()),
-      reportShutdownFailure: error => {
-        this.recordDebugLog({
-          error,
-          event: 'execution.shutdown.failed',
-          level: 'warn',
-          scope: 'plugin',
-        });
-      },
+    this.applicationRuntime = new ApplicationRuntime({
+      plugin: this,
+      adapter: this.storage.getAdapter(),
+      sessions: this.storage.sessions,
+      defaultProviderId: DEFAULT_CHAT_PROVIDER_ID,
+      report: event => this.recordDebugLog(event),
     });
-    // The application's own shell, registered like any provider backend: a
-    // bang-bash command is a run the kernel owns, so shutdown cancels it
-    // instead of leaving a process behind the plugin that started it.
-    this.localShellExecution = new LocalShellExecution(host.registry);
-    host.registerBackend({ backend: this.localShellExecution.createBackend() });
-    this.antigravityExecution = new AntigravityExecution(this, host.registry);
-    host.registerBackend({ backend: this.antigravityExecution.createBackend() });
-    this.codexExecution = new CodexExecution(this, host.registry);
-    // Registered with its interaction and recovery ports, not as a bare
-    // backend: Codex answers approvals and reconciles turns, and a backend
-    // registered without them leaves an approval the user answered with nowhere
-    // to send the answer.
-    host.registerBackend(this.codexExecution.createBackendRegistration());
-    this.claudeExecution = new ClaudeExecution(this, host.registry);
-    // Registered the same way and for the same reason: Claude answers
-    // approvals, questions and plan decisions, and a backend registered without
-    // its interaction port leaves the SDK waiting on a permission for ever.
-    host.registerBackend(this.claudeExecution.createBackendRegistration());
-    this.opencodeExecution = new OpencodeExecution(this, host.registry);
-    // The first ACP provider on the kernel, registered the same way and for the
-    // same reason: ACP asks the client before every edit and every command, so
-    // a backend registered without its interaction port refuses work the user
-    // already approved.
-    host.registerBackend(this.opencodeExecution.createBackendRegistration());
-    this.grokExecution = new GrokExecution(this, host.registry);
-    // The second ACP provider, on the same shared backend and registered the
-    // same way. What differs is beside it rather than here: its own launch
-    // flags, its own update envelope, and a plan indicator that asks the live
-    // process.
-    host.registerBackend(this.grokExecution.createBackendRegistration());
-    this.mimocodeExecution = new MimocodeExecution(this, host.registry);
-    // The third ACP provider, and the one that added nothing to the shared
-    // stack: same managed backend, same client adapter, same launcher. What is
-    // its own is beside this — the `mimo acp` launch, its own database per
-    // conversation, and a thinking level that lives inside the model id.
-    host.registerBackend(this.mimocodeExecution.createBackendRegistration());
-    this.kimicodeExecution = new KimicodeExecution(this, host.registry);
-    // The fourth ACP provider, and the last of wave 6. Registered the same way
-    // as the three before it; what is its own is beside this — the `kimi acp`
-    // launch, and mode ids the CLI names itself rather than Grimoire.
-    host.registerBackend(this.kimicodeExecution.createBackendRegistration());
-    this.geminiExecution = new GeminiExecution(this, host.registry);
-    // The fifth ACP provider and the first of wave 7. What is its own is
-    // beside this: a `--acp` flag rather than a subcommand, dedicated
-    // `session/set_model` and `session/set_mode` where the OpenCode family
-    // sets a config option, and no launch artifacts at all.
-    host.registerBackend(this.geminiExecution.createBackendRegistration());
-    this.qwenExecution = new QwenExecution(this, host.registry);
-    // The sixth ACP provider and the last of the migration. What is its own
-    // is beside this: a reasoning level applied by talking to the session,
-    // the first `kind: 'question'` interaction the kernel has ever carried,
-    // a context window the CLI answers only when asked, and a subagent
-    // stream it refuses to draw in the conversation.
-    host.registerBackend(this.qwenExecution.createBackendRegistration());
-    this.executionKernelHost = host;
-    // The chat execution path, assembled beside the kernel it runs on. The
-    // store it writes through is the plugin's own, because the queue that
-    // serializes writes to a conversation is held on that instance and a second
-    // one would not serialize against it.
-    this.chatExecution = new ChatExecutionComposition({
-      lifecycle: host.registry,
-      conversations: new StoredChatConversations({
-        repository: this.storage.sessions.records,
-        projection: this.storage.sessions,
-        defaultProviderId: DEFAULT_CHAT_PROVIDER_ID,
-      }),
-    });
-    try {
-      await host.start();
-    } catch (error) {
-      this.recordDebugLog({
-        error,
-        event: 'execution.start.failed',
-        level: 'error',
-        scope: 'plugin',
-      });
-      return;
-    }
-    // After the gate is open, because it reaches provider services that expect
-    // a started plugin, and nothing renders a Codex tab before it resolves.
-    void this.codexExecution.initializeWorkspace().catch(error => {
-      this.recordDebugLog({
-        error,
-        event: 'execution.workspace.failed',
-        level: 'warn',
-        scope: 'codex',
-      });
-    });
-    const migration = host.migrationRequirement();
-    if (migration) {
-      // Persistence decision D5: a control record this build cannot read opens
-      // the store read-only rather than being guessed at or discarded. Recorded
-      // so the reason a provider refuses work is answerable.
-      this.recordDebugLog({
-        data: { recordKind: migration.recordKind },
-        event: 'execution.migrationRequired',
-        level: 'warn',
-        scope: 'plugin',
-      });
-    }
+    await this.applicationRuntime.start();
   }
 
   async writeDebugLog(event: DebugLogEvent): Promise<void> {
@@ -1136,7 +1019,7 @@ export default class GrimoirePlugin extends Plugin {
    * still running at unload had nobody to stop it.
    */
   async runShellCommand(invocation: LocalShellInvocation): Promise<LocalShellCommandOutcome> {
-    const shell = this.localShellExecution;
+    const shell = this.applicationRuntime?.localShell;
     if (!shell) {
       throw new Error('Shell execution is not available.');
     }
@@ -1333,11 +1216,11 @@ export default class GrimoirePlugin extends Plugin {
    * chat that would not delete.
    */
   private async deleteConversationControlRecords(id: string): Promise<void> {
-    if (!this.executionKernelHost) {
+    if (!this.applicationRuntime) {
       return;
     }
     try {
-      await this.executionKernelHost.registry.deleteOwnedRecords({
+      await this.applicationRuntime.kernel.registry.deleteOwnedRecords({
         kind: 'conversation',
         ownerId: id,
       });

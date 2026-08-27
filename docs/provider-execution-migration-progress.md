@@ -8607,7 +8607,36 @@ the deleted machinery and went with it.
 
 Live after the deletion: Antigravity 3/3, Codex 5/5, Grok 4/4.
 
-**Next: `StreamController` and the rest of M5.** That step was written as
+#### `ApplicationRuntime` is the composition root
+
+The plan called this a promotion rather than an architecture switch, and it was — but there was
+nothing to promote: `ApplicationRuntime` existed only as a name in a comment on `main.ts`. What
+existed was **eleven fields and ten getters on the plugin**, one per provider composition plus the
+kernel host, the chat composition and the local shell, each with its own lifetime to keep in step
+with one load, and a hundred-and-twenty-line `startExecutionKernel` that built them all.
+
+That is one object now. It builds the kernel, registers every backend against it, assembles the chat
+execution path beside it, and takes them down in the order that matters — providers release the
+scratch a turn was holding, the chat surface detaches what is watching runs, and the kernel decides
+last what happens to the runs themselves. `main.ts` is 132 lines shorter and holds one field.
+
+**The getters stay, and they still name providers.** That is the seam the provider rows remove — a
+provider's registration asks the plugin for its own composition, fifty call sites over nine
+providers — and moving them is that step's work, not this one's. What changed is what they answer
+from.
+
+**It came with the gate only a composition root can hold**: every provider the catalog declares has
+a backend registered against the kernel, asked of the registry rather than counted here, with a
+guard so a catalog that answered nothing cannot satisfy it. Proven by not registering Qwen. A
+provider added to the catalog and never registered has a settings tab, a model list and a chat tab,
+and refuses every turn with a message that reads as a kernel defect — it is a missing line in one
+file, and now it is a red test.
+
+Gate: unit 8438 green, integration green, typecheck, lint, `build:release` clean; Antigravity live
+3/3 after the move.
+
+**Next: the rest of M5** — durable agents with tab-close ownership, the thirteen provider rows,
+registry deletion, and the seam deletion. That step was written as
 "only after a provider has been certified on the projection path"; all nine are on it now, so what
 comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and the branch in
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
