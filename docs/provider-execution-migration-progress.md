@@ -9129,6 +9129,35 @@ they rest on are asserted — because a document that keeps saying `reshape` abo
 since fixed is worse than no document. Proven by growing the chat-UI slot by one member and watching
 it go red.
 
+#### The usage slot: one read where the product has two, one window where it has several
+
+`ProviderUsagePort` is reshaped. What it said was `read(): Promise<ProviderUsageSnapshot | null>`
+over `{ label, usedFraction?, resetsAt? }`, and both halves of that were wrong about the product.
+
+**One read, where the indicator makes two.** It shows the snapshot it already holds the moment a tab
+paints, then refreshes behind it. A single method makes every paint either a network call or
+permanently stale, and which of the two it becomes is decided by whoever writes the implementation
+rather than by the contract. `cached()` is synchronous now, because a promise on the paint path is a
+paint that waits.
+
+**One window, where a plan has several.** A provider on a five-hour *and* a weekly quota reports
+both, and the flattened record could carry one with no way to say which. Plans billed by amount
+report `spend` and no window at all, and a window whose percentage the provider does not know is
+`pctKnown: false` rather than a missing number — so "no percentage" and "zero percent" stay
+different things.
+
+**And no `isAvailable`, correctly.** All nine providers implement one and all nine answer
+`settings.enabled` — the question the catalog decides. A port that asked it again would be a second
+inventory of the same fact, and the two rows before this one had exactly that duplicate.
+
+The row is reshaped but not yet moved: the consumer's cached read is synchronous and
+`workspaceFor` is not, so moving it changes *when* a plan first appears on a badge after a reload.
+That is its own step rather than something to smuggle into this one.
+
+**A gate of mine needed correcting twice in one sitting.** The slot-fit table's verdict column now
+carries emphasis and past tense — `**moved**`, `reshaped` — and my first fix stripped a trailing `d`
+with a regex, which would have silently accepted any word ending in one. The verdicts are listed.
+
 #### The first workspace row moves, and a guard that could not fail goes with it
 
 `modelCatalog` is on the module. Both consumers — the tab's model refresh and the settings tab's —

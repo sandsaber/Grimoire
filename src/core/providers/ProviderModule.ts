@@ -201,14 +201,55 @@ export interface ProviderModelDescriptor {
   readonly contextWindow?: number;
 }
 
+/**
+ * Plan and usage, as the provider reports it.
+ *
+ * **Two reads, not one.** The first version had a single
+ * `read(): Promise<...>`, and the indicator this serves shows the snapshot it
+ * already holds the moment a tab paints, then refreshes behind it. One method
+ * makes every paint either a network call or permanently stale, and which of
+ * those it becomes is decided by whoever writes the implementation.
+ *
+ * There is no `isAvailable`. All nine providers had one and all nine answered
+ * `settings.enabled`, which is the question the catalog decides — so a port
+ * that asked it again would be a second inventory of the same fact.
+ */
 export interface ProviderUsagePort {
-  read(): Promise<ProviderUsageSnapshot | null>;
+  /** The snapshot already held, if any. Never fetches. */
+  cached(): ProviderUsageSnapshot | null;
+  /** Fetches a fresh snapshot, answering `null` when the provider has none. */
+  refresh(): Promise<ProviderUsageSnapshot | null>;
 }
 
+/**
+ * **Not one window flattened.** The first version was
+ * `{ label, usedFraction?, resetsAt? }` — a single quota — and the providers
+ * that have quotas report several at once: a Codex user on a five-hour and a
+ * weekly window would have seen one of them, with no way to tell which. Plans
+ * billed by amount report `spend` and no window at all.
+ */
 export interface ProviderUsageSnapshot {
+  /** The plan's name, in the provider's own words. */
+  readonly plan: string;
+  /** Quota windows, in the order the provider reports them. */
+  readonly windows?: readonly ProviderUsageWindow[];
+  /** Amount spent, for plans billed that way rather than by quota. */
+  readonly spend?: string;
+  readonly note?: string;
+  /** When the provider last answered, in epoch milliseconds. */
+  readonly updatedAt?: number;
+}
+
+export interface ProviderUsageWindow {
   readonly label: string;
-  readonly usedFraction?: number;
-  readonly resetsAt?: number;
+  readonly pct: number;
+  /**
+   * `false` where the provider reports a window whose percentage it does not
+   * know. Absent means known, so a window that simply has no percentage and one
+   * whose percentage is genuinely zero stay distinguishable.
+   */
+  readonly pctKnown?: boolean;
+  readonly reset: string;
 }
 
 export interface ProviderRuntimeCommandsPort {

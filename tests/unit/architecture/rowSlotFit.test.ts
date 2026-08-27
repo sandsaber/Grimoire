@@ -103,6 +103,27 @@ const ROWS: readonly RowFit[] = [
   },
 ];
 
+/**
+ * The verdict, out of a cell written for a reader.
+ *
+ * The cell carries emphasis and sometimes a qualifier — `**moved**`,
+ * `reshape, **but not yet**`, `reshaped` — and the past tense means the work is
+ * done rather than that the verdict changed. Listed rather than derived: a
+ * regex that stripped a trailing letter would also silently accept a word
+ * nobody meant to write.
+ */
+const VERDICTS: Readonly<Record<string, string>> = {
+  fits: 'fits',
+  moved: 'moved',
+  reshape: 'reshape',
+  reshaped: 'reshape',
+};
+
+function readVerdict(cell: string): string {
+  const word = cell.trim().replace(/\*/g, '').split(/[,\s]/)[0];
+  return VERDICTS[word] ?? word;
+}
+
 function fitTable(): Map<string, { real: number; slot: string; verdict: string }> {
   const document = readFileSync(resolve(process.cwd(), FIT_PATH), 'utf8');
   const rows = new Map<string, { real: number; slot: string; verdict: string }>();
@@ -117,7 +138,7 @@ function fitTable(): Map<string, { real: number; slot: string; verdict: string }
     rows.set(match[1], {
       real: Number.parseInt(match[2].trim(), 10),
       slot: match[3].trim(),
-      verdict: match[4].trim().replace(/\*/g, '').split(/[,\s]/)[0],
+      verdict: readVerdict(match[4]),
     });
   }
   return rows;

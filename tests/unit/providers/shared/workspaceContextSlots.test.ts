@@ -23,7 +23,7 @@ describe('provider workspace context slots', () => {
       listCommands(): Promise<readonly unknown[]>;
       listModels(): Promise<readonly unknown[]>;
       loadMcpServers(): Promise<readonly { id: string }[]>;
-      readPlanUsage(): Promise<unknown>;
+      cachedPlanUsage(): unknown;
     };
     readonly providerId: string;
   }
@@ -118,7 +118,7 @@ describe('provider workspace context slots', () => {
       usageProvider: { getCachedUsage, isAvailable: () => false },
     } as never);
 
-    const usage = await createGrokModuleContext(plugin(), () => null, ports).readPlanUsage();
+    const usage = createGrokModuleContext(plugin(), () => null, ports).cachedPlanUsage();
 
     // Asked on every read rather than once when the port was built: enablement
     // changes while a workspace stays initialized, and a provider switched off
@@ -132,9 +132,9 @@ describe('provider workspace context slots', () => {
       usageProvider: { getCachedUsage: () => ({ plan: 'Pro' }), isAvailable: () => true },
     } as never);
 
-    const usage = await createGrokModuleContext(plugin(), () => null, ports).readPlanUsage();
+    const usage = createGrokModuleContext(plugin(), () => null, ports).cachedPlanUsage();
 
-    expect(usage).toEqual({ label: 'Pro' });
+    expect(usage).toEqual({ plan: 'Pro' });
   });
 
   it.each(WIRINGS)('$providerId offers nothing before its workspace is registered', async ({ build }) => {
@@ -143,6 +143,6 @@ describe('provider workspace context slots', () => {
     expect(await context.listCommands()).toEqual([]);
     expect(await context.listModels()).toEqual([]);
     expect(await context.loadMcpServers()).toEqual([]);
-    expect(await context.readPlanUsage()).toBeNull();
+    expect(context.cachedPlanUsage()).toBeNull();
   });
 });

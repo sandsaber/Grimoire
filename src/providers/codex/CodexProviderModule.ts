@@ -97,7 +97,8 @@ export interface CodexWorkspaceContext {
   resolveCliPath(): Promise<string | null>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
-  readPlanUsage(): Promise<ProviderUsageSnapshot | null>;
+  cachedPlanUsage(): ProviderUsageSnapshot | null;
+  refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   renderSettingsTab(host: unknown): void;
   hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
   deleteConversationSession(conversationId: string): Promise<void>;
@@ -324,7 +325,10 @@ CodexProviderSettings
           list: () => context.listModels(),
           refresh: () => context.refreshModels(),
         },
-        usage: { read: () => context.readPlanUsage() },
+        usage: {
+          cached: () => context.cachedPlanUsage(),
+          refresh: () => context.refreshPlanUsage(),
+        },
         settingsPresentation: { render: host => context.renderSettingsTab(host) },
       };
     },

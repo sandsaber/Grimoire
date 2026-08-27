@@ -14,7 +14,7 @@ import { resolve } from 'node:path';
  * `workspace.initialize(context)`, and all nine modules fill them. What the
  * slot-fit audit missed on its first pass is that **eight of nine fill them
  * from a context whose workspace half throws**: `listModels`, `resolveCliPath`,
- * `readPlanUsage` and the rest are `notWired(...)`, so a slot exists, is
+ * `cachedPlanUsage` and the rest are `notWired(...)`, so a slot exists, is
  * declared, is filled, and answers with an exception.
  *
  * That is invisible to every other gate. The parity manifest sees a module in

@@ -27,7 +27,8 @@ describe('Gemini provider module', () => {
       resolveCliPath: async () => '/usr/local/bin/gemini',
       listModels: async () => [{ id: 'gemini-2.5-pro', label: 'gemini-2.5-pro' }],
       refreshModels: async () => [{ id: 'gemini-2.5-pro', label: 'gemini-2.5-pro' }],
-      readPlanUsage: async () => null,
+      cachedPlanUsage: () => null,
+      refreshPlanUsage: async () => null,
       loadMcpServers: async () => [{ id: 'vault', label: 'Vault', enabled: true }],
       saveMcpServers: async () => undefined,
       renderSettingsTab: () => undefined,
@@ -320,7 +321,7 @@ describe('Gemini provider module', () => {
       await expect(context.listModels()).resolves.toEqual([]);
       await expect(context.loadMcpServers()).resolves.toEqual([]);
       await expect(context.listCommands()).resolves.toEqual([]);
-      await expect(context.readPlanUsage()).resolves.toBeNull();
+      expect(context.cachedPlanUsage()).toBeNull();
     });
   });
 });

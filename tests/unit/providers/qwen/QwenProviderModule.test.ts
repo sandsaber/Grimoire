@@ -30,7 +30,8 @@ describe('Qwen provider module', () => {
       resolveCliPath: async () => '/usr/local/bin/qwen',
       listModels: async () => [{ id: 'qwen3-coder-plus', label: 'qwen3-coder-plus' }],
       refreshModels: async () => [{ id: 'qwen3-coder-plus', label: 'qwen3-coder-plus' }],
-      readPlanUsage: async () => null,
+      cachedPlanUsage: () => null,
+      refreshPlanUsage: async () => null,
       loadMcpServers: async () => [{ id: 'vault', label: 'Vault', enabled: true }],
       saveMcpServers: async () => undefined,
       renderSettingsTab: () => undefined,
@@ -287,7 +288,7 @@ describe('Qwen provider module', () => {
       await expect(context.listModels()).resolves.toEqual([]);
       await expect(context.loadMcpServers()).resolves.toEqual([]);
       await expect(context.listCommands()).resolves.toEqual([]);
-      await expect(context.readPlanUsage()).resolves.toBeNull();
+      expect(context.cachedPlanUsage()).toBeNull();
     });
   });
 });

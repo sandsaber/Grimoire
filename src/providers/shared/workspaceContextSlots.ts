@@ -9,6 +9,8 @@ import type {
   AppMcpStorage,
   ProviderChatUIConfig,
   ProviderModelCatalog,
+  ProviderPlanUsage,
+  ProviderPlanUsageContext,
   ProviderPlanUsageProvider,
 } from '../../core/providers/types';
 import type { ManagedMcpServer } from '../../core/types/mcp';
@@ -75,7 +77,8 @@ export interface WorkspaceContextSlots {
   listCommands(): Promise<readonly ProviderCommandDescriptor[]>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   loadMcpServers(): Promise<readonly ProviderMcpServer[]>;
-  readPlanUsage(): Promise<ProviderUsageSnapshot | null>;
+  cachedPlanUsage(): ProviderUsageSnapshot | null;
+  refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   refreshAgentMentions(): Promise<void>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   resolveCliPath(): Promise<string | null>;
@@ -86,6 +89,27 @@ export function createWorkspaceContextSlots(
   options: WorkspaceContextSlotOptions,
 ): WorkspaceContextSlots {
   const { chatUI, plugin, providerId, services } = options;
+
+  const usageContext = (): ProviderPlanUsageContext => ({
+    plugin,
+    providerId,
+    settings: plugin.settings,
+  });
+
+  /**
+   * The usage provider, when this provider is one the user has switched on.
+   *
+   * Asked per read rather than once when the port was built: enablement changes
+   * while a workspace stays initialized, and a provider switched off would
+   * otherwise keep reporting the plan it had. All nine `isAvailable`
+   * implementations answer exactly that question, which is why the module's
+   * port does not have one.
+   */
+  const availableUsageProvider = (): ProviderPlanUsageProvider | null => {
+    const provider = services()?.usageProvider;
+    const settings = plugin.settings as unknown as Record<string, unknown>;
+    return provider && provider.isAvailable?.(settings) !== false ? provider : null;
+  };
 
   const models = (): readonly ProviderModelDescriptor[] => {
     // Nothing without a workspace: an unregistered workspace has discovered no
@@ -138,19 +162,18 @@ export function createWorkspaceContextSlots(
       }));
     },
 
-    readPlanUsage: async () => {
-      const provider = services()?.usageProvider;
-      // Asked on every read, not once when the port was built: for seven of the
-      // nine this answers "is the provider enabled", and a provider the user
-      // switched off after the workspace initialized would otherwise keep
-      // reporting the plan it had. The live status panel asks it the same way.
-      if (!provider || provider.isAvailable?.(plugin.settings) === false) {
-        return null;
-      }
-      // The store speaks plans and windows; the slot wants a label, and a plan
-      // with no window is still worth showing.
-      const usage = provider.getCachedUsage({ plugin, providerId, settings: plugin.settings });
-      return usage ? { label: usage.plan } : null;
+    cachedPlanUsage: () => {
+      const provider = availableUsageProvider();
+      return provider
+        ? toSnapshot(provider.getCachedUsage(usageContext()))
+        : null;
+    },
+
+    refreshPlanUsage: async () => {
+      const provider = availableUsageProvider();
+      return provider
+        ? toSnapshot(await provider.refreshUsage(usageContext()))
+        : null;
     },
 
     refreshAgentMentions: async () => {
@@ -212,4 +235,34 @@ function commandSource(scope: string | undefined): ProviderCommandDescriptor['so
     default:
       return 'project';
   }
+}
+
+/**
+ * A provider's plan record, as the module's slot describes it.
+ *
+ * Every field carried, deliberately. The slot was one flattened window until
+ * this checkpoint — `{ label, usedFraction?, resetsAt? }` — and the providers
+ * that have quotas report several at once, while plans billed by amount report
+ * `spend` and no window at all.
+ */
+function toSnapshot(usage: ProviderPlanUsage | null): ProviderUsageSnapshot | null {
+  if (!usage) {
+    return null;
+  }
+  return {
+    plan: usage.plan,
+    ...(usage.windows?.length
+      ? {
+        windows: usage.windows.map(window => ({
+          label: window.label,
+          pct: window.pct,
+          ...(window.pctKnown === false ? { pctKnown: false } : {}),
+          reset: window.reset,
+        })),
+      }
+      : {}),
+    ...(usage.spend ? { spend: usage.spend } : {}),
+    ...(usage.note ? { note: usage.note } : {}),
+    ...(usage.updatedAt !== undefined ? { updatedAt: usage.updatedAt } : {}),
+  };
 }

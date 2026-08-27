@@ -110,7 +110,8 @@ export interface MimocodeWorkspaceContext {
   resolveCliPath(): Promise<string | null>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
-  readPlanUsage(): Promise<ProviderUsageSnapshot | null>;
+  cachedPlanUsage(): ProviderUsageSnapshot | null;
+  refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   loadMcpServers(): Promise<readonly ProviderMcpServer[]>;
   saveMcpServers(servers: readonly ProviderMcpServer[]): Promise<void>;
   renderSettingsTab(host: unknown): void;
@@ -334,7 +335,10 @@ MimocodeProviderSettings
           list: () => context.listModels(),
           refresh: () => context.refreshModels(),
         },
-        usage: { read: () => context.readPlanUsage() },
+        usage: {
+          cached: () => context.cachedPlanUsage(),
+          refresh: () => context.refreshPlanUsage(),
+        },
         mcp: {
           loadServers: () => context.loadMcpServers(),
           saveServers: servers => context.saveMcpServers(servers),

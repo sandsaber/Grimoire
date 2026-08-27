@@ -65,7 +65,10 @@ describe('Codex module context', () => {
     await expect(context.listSkills()).resolves.toEqual([]);
     await expect(context.listAgentMentions()).resolves.toEqual([]);
     await expect(context.listModels()).resolves.toEqual([]);
-    await expect(context.readPlanUsage()).resolves.toBeNull();
+    // Cached is synchronous now: the indicator reads it while a tab paints,
+    // and a promise there is a paint that waits.
+    expect(context.cachedPlanUsage()).toBeNull();
+    await expect(context.refreshPlanUsage()).resolves.toBeNull();
     await expect(context.refreshAgentMentions()).resolves.toBeUndefined();
     expect(() => context.renderSettingsTab({ container: null, context: null })).not.toThrow();
   });
