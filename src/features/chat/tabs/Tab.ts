@@ -1277,11 +1277,14 @@ export function initializeTabControllers(
   services.subagentManager.setCallback(
     (subagent) => {
       tab.controllers.streamController?.onAsyncSubagentStateChange(subagent);
-      // Recorded, then redrawn from what was recorded: the card shows the
-      // vault's answer rather than this callback's, so an agent this tab never
-      // saw appears beside the ones it did.
-      recordDurableSubagent(tab, plugin, subagent);
-      void refreshBackgroundAgentCard(tab, plugin);
+      // **Recorded, then redrawn from what was recorded** — and the redraw
+      // waits for the write. Fired side by side, the read wins: the first
+      // `running` event drew an empty list because nothing was adopted yet, and
+      // a terminal drew the record before its result was appended, which the
+      // card reads as still running. Nothing follows a terminal, so it stayed
+      // that way.
+      void recordDurableSubagent(tab, plugin, subagent)
+        .then(() => refreshBackgroundAgentCard(tab, plugin));
 
       // During active stream, regular end-of-turn save captures latest state.
       if (!tab.state.isStreaming && tab.state.currentConversationId) {
@@ -1373,14 +1376,25 @@ export function initializeTabControllers(
         refreshTabProviderUI(tab, plugin);
         applyProviderUIGating(tab, plugin);
         syncSlashCommandDropdownForProvider(tab, plugin, getProviderCatalogConfig);
+        // A blank tab owns no conversation, so it shows no background work.
+        // Without this the cards of the conversation just left stay on screen.
+        void refreshBackgroundAgentCard(tab, plugin);
       },
       onConversationLoaded: () => {
         ui.slashCommandDropdown?.resetSdkSkillsCache();
         refreshRuntimeContextUI(tab, plugin);
+        // **This is what makes the card mean anything.** An agent started in a
+        // tab that has since closed fires no live event, so opening the
+        // conversation is the only moment it can appear at all — and the whole
+        // point of recording it was that it appears.
+        void refreshBackgroundAgentCard(tab, plugin);
       },
       onConversationSwitched: () => {
         ui.slashCommandDropdown?.resetSdkSkillsCache();
         refreshRuntimeContextUI(tab, plugin);
+        // And on the way in to another conversation, which also clears the
+        // cards belonging to the one being left.
+        void refreshBackgroundAgentCard(tab, plugin);
       },
     }
   );

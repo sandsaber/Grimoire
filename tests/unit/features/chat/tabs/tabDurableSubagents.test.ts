@@ -1,5 +1,8 @@
 import type { SubagentInfo } from '@/core/types';
-import { recordDurableSubagent } from '@/features/chat/tabs/tabDurableSubagents';
+import {
+  recordDurableSubagent,
+  refreshBackgroundAgentCard,
+} from '@/features/chat/tabs/tabDurableSubagents';
 
 /**
  * The one call site that turns a provider's background subagent into a record.
@@ -40,10 +43,10 @@ describe('recording a durable subagent', () => {
     };
   }
 
-  it('records a background agent the provider has named', () => {
+  it('records a background agent the provider has named', async () => {
     const { observed, plugin, tab } = harness();
 
-    recordDurableSubagent(tab as never, plugin as never, subagent());
+    await recordDurableSubagent(tab as never, plugin as never, subagent());
 
     expect(observed).toEqual([{
       conversationId: 'conv-1',
@@ -54,10 +57,10 @@ describe('recording a durable subagent', () => {
     }]);
   });
 
-  it('records what it answered when it ends', () => {
+  it('records what it answered when it ends', async () => {
     const { observed, plugin, tab } = harness();
 
-    recordDurableSubagent(tab as never, plugin as never, subagent({
+    await recordDurableSubagent(tab as never, plugin as never, subagent({
       asyncStatus: 'completed',
       result: 'forty-two notes',
     }));
@@ -68,12 +71,84 @@ describe('recording a durable subagent', () => {
     })]);
   });
 
-  it('records nothing for a subagent that runs inside the turn', () => {
+  describe('redrawing the card', () => {
+    function readable(overrides: {
+      conversationId?: string | null;
+      listed?: () => Promise<unknown[]>;
+    } = {}) {
+      const drawn: unknown[][] = [];
+      let reads = 0;
+      const tab = {
+        providerId: 'claude' as const,
+        state: {
+          currentConversationId: overrides.conversationId === undefined
+            ? 'conv-1'
+            : overrides.conversationId,
+        },
+        ui: { statusPanel: { updateBackgroundAgents: (cards: unknown[]) => { drawn.push(cards); } } },
+      };
+      const plugin = {
+        getApplicationRuntimeOrNull: () => ({
+          agentRecorder: { observe: async () => undefined },
+          agents: {
+            listOwnedAgents: async () => {
+              reads += 1;
+              return overrides.listed ? overrides.listed() : [];
+            },
+          },
+        }),
+      };
+      return { drawn, plugin, readCount: () => reads, tab };
+    }
+
+    it('clears the card for a tab that owns no conversation', async () => {
+      // A blank tab shows no background work; without this the cards of the
+      // conversation just left stay on screen.
+      const { drawn, plugin, tab } = readable({ conversationId: null });
+
+      await refreshBackgroundAgentCard(tab as never, plugin as never);
+
+      expect(drawn).toEqual([[]]);
+    });
+
+    it('drops an answer that arrives after the tab has moved on', async () => {
+      // The read is several file reads, and a tab can be closed or switched in
+      // that window: the list belongs to a conversation nobody is looking at.
+      const { drawn, plugin, tab } = readable({
+        listed: async () => {
+          tab.state.currentConversationId = 'conv-2';
+          return [];
+        },
+      });
+
+      await refreshBackgroundAgentCard(tab as never, plugin as never);
+
+      expect(drawn).toEqual([]);
+    });
+
+    it('coalesces a burst of refreshes into one more read', async () => {
+      // Every subagent state change asks for a refresh and each reads every
+      // agent record in the vault. A second request arriving while one runs
+      // replaces the queue rather than adding to it — the card only ever needs
+      // the latest answer.
+      const { plugin, readCount, tab } = readable();
+
+      await Promise.all([
+        refreshBackgroundAgentCard(tab as never, plugin as never),
+        refreshBackgroundAgentCard(tab as never, plugin as never),
+        refreshBackgroundAgentCard(tab as never, plugin as never),
+      ]);
+
+      expect(readCount()).toBe(2);
+    });
+  });
+
+  it('records nothing for a subagent that runs inside the turn', async () => {
     // No async status and no agent id: it is drawn and finished before the turn
     // is, so there is nothing for it to survive.
     const { observed, plugin, tab } = harness();
 
-    recordDurableSubagent(tab as never, plugin as never, subagent({
+    await recordDurableSubagent(tab as never, plugin as never, subagent({
       asyncStatus: undefined,
       agentId: undefined,
     }));
@@ -81,31 +156,31 @@ describe('recording a durable subagent', () => {
     expect(observed).toEqual([]);
   });
 
-  it('records nothing for an orphaned one', () => {
+  it('records nothing for an orphaned one', async () => {
     // `orphaned` is what the *surface* does when a tab closes, and the whole
     // point of the record is that closing a tab stops meaning the work is
     // lost. Recording it would write the very thing this replaces.
     const { observed, plugin, tab } = harness();
 
-    recordDurableSubagent(tab as never, plugin as never, subagent({ asyncStatus: 'orphaned' }));
+    await recordDurableSubagent(tab as never, plugin as never, subagent({ asyncStatus: 'orphaned' }));
 
     expect(observed).toEqual([]);
   });
 
-  it('records nothing from a tab with no conversation to own it', () => {
+  it('records nothing from a tab with no conversation to own it', async () => {
     const { observed, plugin, tab } = harness({ conversationId: null });
 
-    recordDurableSubagent(tab as never, plugin as never, subagent());
+    await recordDurableSubagent(tab as never, plugin as never, subagent());
 
     expect(observed).toEqual([]);
   });
 
-  it('records nothing before the load has composed anything', () => {
+  it('records nothing before the load has composed anything', async () => {
     // A tab is built while `loadSettings` is still running, and a caller that
     // only wants to record something in passing skips it rather than throws.
     const { observed, tab } = harness();
 
-    recordDurableSubagent(
+    await recordDurableSubagent(
       tab as never,
       { getApplicationRuntimeOrNull: () => null } as never,
       subagent(),

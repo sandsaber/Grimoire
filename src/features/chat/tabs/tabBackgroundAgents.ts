@@ -1,6 +1,4 @@
 import type { OwnedAgentSummary } from '../../../core/agents/AgentCoordinator';
-import { agentFidelityFromCapabilities } from '../../../core/agents/AgentFidelity';
-import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { t } from '../../../i18n/i18n';
 import type { BackgroundAgentCard } from '../ui/StatusPanel';
 
@@ -42,16 +40,23 @@ function describe(agent: OwnedAgentSummary): string {
       ? t('chat.agents.finishedOne')
       : t('chat.agents.failedOne');
   }
-  // Read from the provider's declared capabilities rather than from this
-  // agent's record: what is observable is the same for every agent a provider
-  // runs, and the record would only be repeating it.
-  const capabilities = providerCatalog().get(agent.providerId)?.capabilities;
-  const observation = capabilities
-    ? agentFidelityFromCapabilities(capabilities).observation
-    : agent.observation;
-  return observation === 'none' || observation === 'opaque'
-    ? t('chat.agents.unobservable')
-    : t('chat.agents.runningOne');
+  // **The record's own fidelity, not the provider's declared one**, and the two
+  // disagree on purpose. A provider's capability describes its *live stream* —
+  // Claude reports `full` — and this surface consumes no stream: it is drawn
+  // from records that are written once at adoption and once at the end. So
+  // every agent here is `terminal-only` whatever its provider can do, and
+  // saying "running" — the phrase reserved for progress that is coming — would
+  // be the exact promise this is meant not to make.
+  //
+  // The declared capability is still what *decides* the record's fidelity when
+  // one is written, which is where `agentFidelityFromCapabilities` belongs.
+  return observesProgress(agent.observation)
+    ? t('chat.agents.runningOne')
+    : t('chat.agents.unobservable');
+}
+
+function observesProgress(observation: OwnedAgentSummary['observation']): boolean {
+  return observation === 'full' || observation === 'aggregate';
 }
 
 /**

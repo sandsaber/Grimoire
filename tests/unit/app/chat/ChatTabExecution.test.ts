@@ -255,6 +255,26 @@ describe('chat tab execution', () => {
     app.composition.dispose();
   });
 
+  it('leaves the turn running when the tab that started it goes', async () => {
+    // **The claim the durable-agent card rests on**, and it is not obvious: a
+    // tab's teardown calls `ChatRuntime.cleanup()`, which cancels and disposes
+    // *the adapter's own* session — and on this path that session holds no runs
+    // at all, because the coordinator opened the one the turns go through.
+    // Nothing else disposes a session outside the registry, so a background
+    // agent spawned by a turn is still alive when its tab is gone. If that ever
+    // stops being true, the card starts saying "running" about work that was
+    // killed, which is worse than the `orphaned` marker it replaced.
+    const app = await createTab();
+    const { ticket } = await app.tab.send({ text: 'Hi' }, userMessage('msg-1', 'Hi'));
+    const started = await ticket.started;
+
+    app.tab.detach();
+
+    expect(app.registry.getRun(started.runId)?.terminal).toBeUndefined();
+    expect(app.registry.getSession(started.executionSessionId)).not.toBeNull();
+    app.composition.dispose();
+  });
+
   it('names the session its turns run in, and nothing while it is blank', async () => {
     // **What a rewind is keyed by.** The provider runtime opens a session of
     // its own when a tab is primed and it holds no runs; this is the one the

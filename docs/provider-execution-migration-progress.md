@@ -9034,13 +9034,55 @@ waiting for.
 
 **Three gates fired and each was right**: the status panel's test double had no
 `updateBackgroundAgents`, the parity manifest refused `AgentFidelity` as `pending` once something
-imported it, and `Tab.test` still pinned the orphaning it was written for. That last one is the
+imported it, and `Tab.test` still pinned the orphaning it was written for.
+
+> **Correction, from the review of this checkpoint.** The paragraphs above claimed the card shows an
+> agent started in a tab that has since closed. **It did not.** `refreshBackgroundAgentCard` had one
+> call site — inside the subagent state-change callback — so opening a conversation drew nothing at
+> all, because no live event ever fires for an agent nobody is watching. The entire stated purpose
+> was unreachable, and the manifest, the commit message and this log all asserted it. Fixed in the
+> entry below; the claim above is left standing with this note under it, because a journal that
+> quietly edits its own claims is worse than one that records being wrong. That last one is the
 useful kind — a behaviour change is supposed to break the test that describes the old behaviour, and
 a checkpoint where none did would mean nothing was pinned.
 
 **The scoreboard did not move, and that is honest.** `SubagentManager lifecycle` counts files naming
 it, and the consumers still import its type; deleting `orphanAllActive` removed the *authority*, not
 the reference. The number falls when those consumers stop holding one.
+
+#### The review of the card: the purpose was unreachable
+
+Eight findings, and the first three take the checkpoint apart.
+
+**The card was never drawn on opening a conversation.** One call site, inside the subagent
+state-change callback — so an agent started in a tab that has since closed fires no live event and
+the panel stayed empty. That is the entire stated purpose, asserted in three places and true in
+none. It is drawn on conversation load, on switch, and on going blank now.
+
+**The redraw raced the write it was redrawing.** `void observe(...)` and `void refresh(...)` side by
+side: the read won. The first `running` event drew an empty list because nothing was adopted yet,
+and a terminal drew the record before its result was appended — which the card reads as *still
+running*, and nothing follows a terminal, so it stayed that way. The redraw waits for the write.
+
+**The third finding said tab close still kills the agent, and it does not — but the reasoning that it
+might was sound enough to need answering with a test rather than a paragraph.** `cleanup()` cancels
+and disposes *the adapter's own* session; on this path that session holds no runs, because the
+coordinator opened the one the turns go through, and nothing outside the registry disposes a session.
+`ChatTabExecution.test` now pins it: a run started by the coordinator is still alive after its tab
+detaches. **If that ever stops being true the card starts saying "running" about work that was
+killed, which is worse than the `orphaned` marker it replaced** — so it is a test, not a comment.
+
+The rest: switching conversations left the previous one's cards on screen; the read captured its
+panel and conversation before an await with no staleness guard; `destroy()` left the three agent
+element references pointing at detached nodes, which a late redraw would have built cards into; and
+every subagent state change triggered a full scan of the agent store, which now coalesces.
+
+**And one where the fix was to undo a decision from the checkpoint before.** The card read fidelity
+from the *provider's capability* — Claude declares `full` — while every record it draws is written
+twice, at adoption and at the end. So a Claude card said "running", the phrase reserved for progress
+that is coming, about work nothing was watching: the exact promise that code was written to avoid.
+It reads the record's own observation now, and `AgentFidelity` went back to `pending` with an owner
+that says giving it that consumer was the mistake.
 
 #### The first provider row: it was never a policy
 

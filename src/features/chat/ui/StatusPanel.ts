@@ -662,6 +662,14 @@ export class StatusPanel {
     this.todoContainerEl = null;
     this.todoHeaderEl = null;
     this.todoContentEl = null;
+    // Nulled with the rest, and it matters more than it looks: the background
+    // agent read is asynchronous, so an `updateBackgroundAgents` can arrive
+    // after the tab is gone. Left pointing at detached nodes, these would pass
+    // the guard at the top of that method and build cards into DOM nobody can
+    // see, holding the whole subtree for as long as the closed tab's panel.
+    this.agentsContainerEl = null;
+    this.agentsHeaderEl = null;
+    this.agentsContentEl = null;
     this.containerEl = null;
     this.currentTodos = null;
   }

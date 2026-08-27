@@ -19,17 +19,17 @@ export function recordDurableSubagent(
   tab: TabData,
   plugin: GrimoirePlugin,
   subagent: SubagentInfo,
-): void {
+): Promise<void> {
   const status = durableStatus(subagent);
   const conversationId = tab.state.currentConversationId;
   if (!status || !subagent.agentId || !conversationId) {
-    return;
+    return Promise.resolve();
   }
   const runtime = plugin.getApplicationRuntimeOrNull?.();
   if (!runtime) {
-    return;
+    return Promise.resolve();
   }
-  void runtime.agentRecorder.observe({
+  return runtime.agentRecorder.observe({
     conversationId,
     goal: subagent.description,
     nativeAgentRef: subagent.agentId,
@@ -47,18 +47,49 @@ export function recordDurableSubagent(
  * a reload — is in no live map anywhere, and reading is the only way it appears
  * at all.
  */
-export async function refreshBackgroundAgentCard(
+/**
+ * Refreshes in flight or queued, per tab.
+ *
+ * **A refresh reads every agent record in the vault**, filtering by owner
+ * afterwards — several file reads per agent, for a handful of cards belonging
+ * to one conversation. Every subagent state change asks for one, and a
+ * sidecar hydration retry can produce a burst of them, so a second request
+ * arriving while one is running replaces the queue rather than adding to it:
+ * the card only ever needs the latest answer.
+ */
+const refreshing = new WeakMap<TabData, { running: Promise<void>; queued: boolean }>();
+
+export function refreshBackgroundAgentCard(
   tab: TabData,
   plugin: GrimoirePlugin,
 ): Promise<void> {
-  const panel = tab.ui.statusPanel;
+  const inFlight = refreshing.get(tab);
+  if (inFlight) {
+    inFlight.queued = true;
+    return inFlight.running;
+  }
+  const entry = { queued: false, running: Promise.resolve() };
+  entry.running = readBackgroundAgents(tab, plugin).then(async () => {
+    refreshing.delete(tab);
+    if (entry.queued) {
+      await refreshBackgroundAgentCard(tab, plugin);
+    }
+  });
+  refreshing.set(tab, entry);
+  return entry.running;
+}
+
+async function readBackgroundAgents(
+  tab: TabData,
+  plugin: GrimoirePlugin,
+): Promise<void> {
   const conversationId = tab.state.currentConversationId;
   const runtime = plugin.getApplicationRuntimeOrNull?.();
-  if (!panel) {
+  if (!tab.ui.statusPanel) {
     return;
   }
   if (!runtime || !conversationId) {
-    panel.updateBackgroundAgents([]);
+    tab.ui.statusPanel.updateBackgroundAgents([]);
     return;
   }
   try {
@@ -66,7 +97,16 @@ export async function refreshBackgroundAgentCard(
       kind: 'conversation',
       ownerId: conversationId,
     });
-    panel.updateBackgroundAgents(toBackgroundAgentCards(agents));
+    // **Re-read after the await, both of them.** The read is several file
+    // reads, and in that window a tab can be closed or moved to another
+    // conversation: the panel captured before it may be detached, and the list
+    // belongs to a conversation nobody is looking at. Two overlapping refreshes
+    // can also land out of order, and the conversation check is what stops the
+    // older one being written over the newer.
+    if (tab.state.currentConversationId !== conversationId) {
+      return;
+    }
+    tab.ui.statusPanel?.updateBackgroundAgents(toBackgroundAgentCards(agents));
   } catch {
     // The card is an addition to a conversation, not a condition of it: a read
     // that failed leaves the panel as it was rather than taking the tab with

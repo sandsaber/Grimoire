@@ -898,12 +898,29 @@ export const PARITY_SURFACES: ParitySurface[] = [
     description:
       'What a person sees of work running out of sight. The status panel draws a card per '
       + 'background agent from the durable records, so an agent started in a tab that has since '
-      + 'closed still appears — and what a card may say about progress comes from how much of an '
-      + 'agent that provider lets anyone observe, rather than from the work itself.',
+      + 'closed still appears, and what a card says about progress comes from the record rather '
+      + 'than from what the provider could report if anything were streaming.',
     state: 'wired',
     modules: [
-      'src/core/agents/AgentFidelity.ts',
       'src/features/chat/tabs/tabBackgroundAgents.ts',
+    ],
+  },
+  {
+    id: 'durable-agents-fidelity',
+    area: 'shell',
+    description:
+      'How much of an agent a provider can report while it runs, projected from its declared '
+      + 'capabilities.',
+    state: 'pending',
+    owner:
+      'Post-migration — whatever streams an agent\'s progress into records. **It had a consumer '
+      + 'for one commit and giving it that one was the mistake**: the card reads records written '
+      + 'twice, at adoption and at the end, so every agent it draws is `terminal-only` whatever '
+      + 'its provider could stream. Asking the capability there made a Claude card say "running" — '
+      + 'the phrase reserved for progress that is coming — about work nothing was watching. It is '
+      + 'the right answer to a question this surface does not ask.',
+    modules: [
+      'src/core/agents/AgentFidelity.ts',
     ],
   },
   {

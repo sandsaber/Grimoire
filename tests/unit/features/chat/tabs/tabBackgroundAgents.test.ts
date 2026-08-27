@@ -37,15 +37,23 @@ describe('background agent cards', () => {
     });
   });
 
-  it('says a provider reports progress only when it does', () => {
-    // Claude observes `full`; Qwen and the ACP family observe `none`. Read from
-    // the provider's declared capabilities rather than the record, because what
-    // is observable is the same for every agent that provider runs.
-    const [claude] = toBackgroundAgentCards([summary({ providerId: 'claude' })]);
-    const [qwen] = toBackgroundAgentCards([summary({ providerId: 'qwen' })]);
+  it('promises progress only where the record says any is observed', () => {
+    // **The record, not the provider's capability**, and the two disagree on
+    // purpose: a capability describes a provider's live stream, and this
+    // surface consumes no stream — it is drawn from records written twice, at
+    // adoption and at the end. Every agent it draws is `terminal-only` whatever
+    // its provider could do, and asking Claude's capability made its card say
+    // "running" — the phrase reserved for progress that is coming — about work
+    // nothing was watching.
+    const [recorded] = toBackgroundAgentCards([
+      summary({ providerId: 'claude', observation: 'terminal-only' }),
+    ]);
+    const [streamed] = toBackgroundAgentCards([
+      summary({ providerId: 'claude', observation: 'full' }),
+    ]);
 
-    expect(claude?.detail).not.toBe(qwen?.detail);
-    expect(qwen?.detail).toContain('progress');
+    expect(recorded?.detail).toContain('progress');
+    expect(streamed?.detail).not.toBe(recorded?.detail);
   });
 
   it('shows how it ended once it has', () => {
