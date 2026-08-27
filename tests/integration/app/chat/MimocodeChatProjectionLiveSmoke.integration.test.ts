@@ -21,10 +21,12 @@ import { updateMimocodeProviderSettings } from '@/providers/mimocode/settings';
 /**
  * The MiMoCode chat projection flip, against a real `mimo acp` process.
  *
- * MiMoCode and OpenCode are deliberate forks of one another, so this file is
- * OpenCode's with the name changed and must stay that way: a change to one
- * provider's launch, runtime, workspace, storage, history, settings or UI is a
- * change to the other's unless the CLIs intentionally differ.
+ * **One file per ACP provider, all derived from Grok's**, differing only in the
+ * provider's name, its env gate and its CLI default. That is deliberate and it
+ * is not the fork rule: MiMoCode, Kimi Code and OpenCode are forks of one
+ * another in their *provider* code, and a change to one's launch, runtime,
+ * workspace, storage, history, settings or UI is a change to the others. These
+ * harnesses are all six providers' because the path is one path.
  *
  * **This account cannot generate.** Every turn returns `end_turn` with zero
  * tokens, and `mimo acp` answers the same way when driven directly — recorded
@@ -289,9 +291,8 @@ live('MiMoCode chat projection live smoke', () => {
       ? afterFirst.metadata.sessionId ?? undefined
       : undefined;
     report('ROW C session', String(nativeSessionRef));
-    // Grok resumes from a session id **and the directory its transcript is in**
-    // — `GrokLiveSmoke` row 8 says so in as many words: "a session id hydrates
-    // nothing" without it. So the row reports what the vault actually kept.
+    // MiMoCode's session, like every ACP one, belongs to the project it was
+    // opened in, so the directory is handed over and not only the record store.
     report('ROW C providerState', JSON.stringify(
       afterFirst.kind === 'present' ? afterFirst.metadata.providerState : null,
     ));

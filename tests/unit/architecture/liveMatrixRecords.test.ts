@@ -173,8 +173,9 @@ describe('live smoke matrix records', () => {
       // and the last to get a matrix: its rows lived in the journal for four
       // days, where the assertion above could not see them.
       'antigravity-flip-smoke-matrix.md: 2026-08-23',
-      // Antigravity's chat projection flip, driven half only: the rows a person
-      // has to watch in a vault are outstanding under the standing override.
+      // Not a provider's matrix: one surface across all nine, each flipped and
+      // recorded separately. The driven half only — the rows a person has to
+      // watch in a vault are outstanding under the standing override.
       'chat-projection-flip-smoke-matrix.md: 2026-08-27',
       'claude-flip-smoke-matrix.md: 2026-08-21',
       'codex-flip-smoke-matrix.md: 2026-08-21',

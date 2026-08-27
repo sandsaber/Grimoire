@@ -550,6 +550,73 @@ describe('chat execution composition', () => {
     app.composition.dispose();
   });
 
+  describe('steering a turn that is already running', () => {
+    /**
+     * **The one feature the flip took away without saying so.** Typing while a
+     * turn runs and sending goes to `steer` for a provider that declares it —
+     * Codex is the only one that does — and the adapter's `steer` reads the run
+     * *it* started. On this path the coordinator starts the run, so the adapter
+     * had nothing active, `steer` answered `false`, and the controller quietly
+     * put the message back in the queue. A feature loss that looks exactly like
+     * a provider that never supported steering.
+     */
+    it('sends the input to the run the conversation has going', async () => {
+      const app = await createComposition();
+      const ticket = await app.composition.coordinator.submitTurn({
+        commandId: 'cmd-steered',
+        conversationId: CONVERSATION_ID,
+        backendId: executionBackendId('internal-deterministic-fake'),
+        requestRef: 'req-steered',
+        resultExpectation: 'optional',
+        userMessage: { id: 'msg-user-steered', role: 'user', content: 'First', timestamp: 1 },
+      });
+      await ticket.started;
+
+      const accepted = await app.composition.coordinator.steerActive(
+        CONVERSATION_ID,
+        'req-steer-1',
+        { id: 'msg-user-steer', role: 'user', content: 'And also this', timestamp: 2 },
+      );
+
+      expect(accepted).toBe(true);
+      // Drawn and kept, the way a first message is. Steered input that reaches
+      // the provider but never the transcript is a question the answer refers
+      // to and nobody can see — and on the legacy path the provider's echo of
+      // it is what put it on screen, which this path filters out as framing.
+      const stored = await app.repository.read(CONVERSATION_ID);
+      expect(stored.kind === 'present' ? stored.metadata.messages?.map(m => m.content) : [])
+        .toEqual(['First', 'And also this']);
+      // Asked of the session rather than the backend: a steer is delivered to
+      // the one the run is on, and a backend-level counter would pass for a
+      // steer sent to any session at all.
+      expect([...app.backend.sessions.values()].flatMap(session => session.steeredRefs))
+        .toEqual(['req-steer-1']);
+      app.composition.dispose();
+    });
+
+    it('answers false when nothing is running, so the input is queued instead', async () => {
+      // What the controller does with `false` is put the message back, which is
+      // exactly right when there is no turn to join. Saying `true` here would
+      // swallow it.
+      const app = await createComposition();
+
+      const accepted = await app.composition.coordinator.steerActive(
+        CONVERSATION_ID,
+        'req-steer-2',
+        { id: 'msg-user-unsteered', role: 'user', content: 'Nowhere to go', timestamp: 2 },
+      );
+
+      expect(accepted).toBe(false);
+      // And nothing is written. A message the provider never received must stay
+      // in the queue, not appear in the transcript as if it had been sent.
+      const stored = await app.repository.read(CONVERSATION_ID);
+      expect(stored.kind === 'present' ? stored.metadata.messages ?? [] : []).toHaveLength(0);
+      expect([...app.backend.sessions.values()].flatMap(session => session.steeredRefs))
+        .toHaveLength(0);
+      app.composition.dispose();
+    });
+  });
+
   describe('an interaction the provider opens', () => {
     /**
      * **The one thing a turn cannot do without.** A provider that stops to ask

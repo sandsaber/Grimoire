@@ -8488,15 +8488,19 @@ for something the product does, differing from it in one particular, and reporti
 a finding about the product. The content filter, the missing presenter, the truncated wire probe, and
 now a deleted directory.
 
-#### OpenCode is written, run, and **not flipped**
+#### OpenCode: written, run, held back, then flipped
 
-Its harness exists and its rows ran five times. Not once did all three pass together. Every failure
+Its harness exists and its rows ran six times. Not once did all three pass together. Every failure
 carried OpenCode's own words — `Upstream request failed: Endpoint is unavailable`,
 `Internal error: OpenCode service failure` — or a model that answered without touching the
 filesystem. **Nothing failed that belongs to this path**: it rendered the vendor's sentence correctly
-every time, which is row 14 passing repeatedly. But a row that cannot be run is not a certified row,
-and the branch's rule is that a failing row is a stop condition, so `opencode` is off the switch and
-the harness says so in a line that flips with it.
+every time, which is row 14 passing repeatedly.
+
+It was held off the switch on the rule that a failing row is a stop condition, and **then put back**,
+because three providers that have never passed a row went on under the standing override in the same
+session. That is not one rule applied consistently, it is two — and OpenCode's evidence is the
+strongest of the four account-bound ones. It is flipped, and the record says "intermittent" rather
+than "green".
 
 Two harness defects came out of those runs, and both are the shape this session keeps finding:
 
@@ -8510,6 +8514,53 @@ Two harness defects came out of those runs, and both are the shape this session 
 
 The rows refuse a vendor outage by name now, rather than reporting it as an assertion about the
 projection path.
+
+#### Steering came back, and it had gone without a failure
+
+**The flip took one feature away silently and nothing caught it.** Codex is the only provider that
+declares `steering: 'native'` — typing while a turn runs and pressing send injects the input into the
+running turn instead of queueing it. `ExecutionChatRuntimeAdapter.steer` acts on the run **it**
+started, and on this path the coordinator starts it, so `this.active` was always null: the steer
+answered `false`, and `InputController` reads `false` as "no turn to join" and quietly puts the
+message back in the queue. A feature loss shaped exactly like a provider that never supported
+steering — no error, no red test, nothing in a matrix row.
+
+Found by reading `steerQueuedMessage` while scoping the next step, not by a gate. **Every gate was
+green.**
+
+The fix is `ChatExecutionCoordinator.steerActive`, which the tab reaches through
+`ChatTabExecution.steer`, and it does two things rather than one:
+
+- sends the input to the run **the conversation** has going, through `lifecycle.steerRun`;
+- **writes the steered question to the conversation.** On the legacy path the provider echoes steered
+  input back as its own user message and that echo is what drew it; this path filters that echo out
+  as turn framing, so without this the question an answer refers to is one nobody can see. Written
+  only when the provider took the input — a message in the transcript that never reached the turn
+  reads as one that was sent and ignored.
+
+`encodeSteerRef` joined `ChatTurnEncoder`, which is how a surface reaches it without an adapter.
+Three unit tests red first, and **row D of the Codex matrix proves it live**: a `sleep 30` turn,
+steered mid-tool-call, `accepted: true`, and both questions in the vault. Its first version asked the
+model to count to twenty — it answered all twenty before the steer was sent, so the row reported the
+defect it was written to prove fixed.
+
+#### The review after the ninth flip
+
+No functional defect, and seven findings about the record — which on this branch is the deliverable,
+because the matrix *is* the certification and the journal *is* the handoff. All seven held:
+
+- this journal said OpenCode was **not flipped** three hundred lines below where it said it was;
+- the matrix's OpenCode row said `Rows passed: —` and `failed: A, B, C` beside a note saying every
+  row had passed at least three times;
+- `projectionChatProviders`'s comment still said "one provider per checkpoint" on a commit that added
+  six, and named Antigravity as the only certified provider;
+- the four derived harnesses carried Grok's justification for the reload directory verbatim, and for
+  Gemini it is actively wrong — Gemini persists no session directory, which the matrix says in the
+  same commit;
+- Kimi Code's and MiMoCode's headers claimed to be OpenCode's file "and must stay that way" while
+  being Grok's, an invariant false on the day it was written;
+- the adapter's own header still said it was in production for Antigravity alone;
+- the matrix-records gate's summary comment still described a one-provider flip.
 
 **Next: `InputController` and `StreamController` stop owning the turn.** That step was written as
 "only after a provider has been certified on the projection path"; all nine are on it now, so what

@@ -846,6 +846,7 @@ function eagerLifecycle(): ChatExecutionLifecyclePort & {
       return eagerRunId;
     },
     cancelRun: async () => undefined,
+    steerRun: async () => true,
     resolveInteraction: async () => undefined,
     observe: (_executionSessionId, observer) => {
       observers.add(observer);

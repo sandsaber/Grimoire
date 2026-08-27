@@ -59,8 +59,11 @@ import type {
  *   it had already had effects, is the run's answer to give — asynchronously,
  *   as `cancelled` or `indeterminate`.
  *
- * In production for Antigravity since the first provider flip; every other
- * provider still runs its legacy runtime until its own flip.
+ * In production for every provider. **Its generator is no longer what draws a
+ * chat**, though: every provider is on the chat projection path, where the
+ * coordinator owns the run and this serves the surface through `turnEncoder`
+ * and `surfacePorts` instead. What still consumes `query()` is the legacy
+ * branch in `InputController`, which is what the next step deletes.
  */
 
 /** What the adapter needs from its host to serve one conversation. */
@@ -520,6 +523,15 @@ export interface ChatTurnEncoder {
     history?: ChatMessage[],
     options?: ChatRuntimeQueryOptions,
   ): string;
+  /**
+   * The reference for input sent into a turn that is already running.
+   *
+   * Separate from `encodeRequestRef` because a steer carries the input and
+   * nothing else: the turn it joins was launched with the parameters and is not
+   * being started again. Absent for a provider that cannot take mid-turn input,
+   * which is every one but Codex today.
+   */
+  encodeSteerRef?(turn: PreparedChatTurn): string;
   resultExpectation?(turn: PreparedChatTurn): 'required' | 'optional' | 'none';
 }
 

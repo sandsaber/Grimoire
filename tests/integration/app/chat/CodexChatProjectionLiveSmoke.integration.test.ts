@@ -46,6 +46,8 @@ live('Codex chat projection live smoke', () => {
 
   const CONVERSATION_ID = 'conv-codex-projection';
   const running: Array<() => Promise<void>> = [];
+  /** Which runtime each harness's tab was built with. */
+  const runtimes = new WeakMap<object, ExecutionChatRuntimeAdapter>();
 
   afterEach(async () => {
     for (const release of running.splice(0)) {
@@ -63,6 +65,37 @@ live('Codex chat projection live smoke', () => {
   it('is about a provider that is on the projection path', () => {
     expect(usesProjectionChat('codex')).toBe(true);
   });
+
+  /** The runtime a harness was built with, for the encoder a steer needs. */
+  function runtimeOf(harness: { readonly tab: object }): ExecutionChatRuntimeAdapter {
+    const runtime = runtimes.get(harness.tab);
+    if (!runtime) {
+      throw new Error('This harness has no runtime recorded.');
+    }
+    return runtime;
+  }
+
+  function pause(delayMs: number): Promise<void> {
+    return new Promise(resolve => { setTimeout(resolve, delayMs); });
+  }
+
+  async function waitFor<T>(
+    label: string,
+    timeoutMs: number,
+    attempt: () => T | undefined,
+  ): Promise<T> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const value = attempt();
+      if (value !== undefined) {
+        return value;
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`${label} did not happen within ${timeoutMs}ms.`);
+      }
+      await pause(200);
+    }
+  }
 
   function report(...parts: readonly string[]): void {
     process.stdout.write(`${parts.join(' ')}\n`);
@@ -158,6 +191,7 @@ live('Codex chat projection live smoke', () => {
       rmSync(vault, { force: true, recursive: true });
     };
     running.push(release);
+    runtimes.set(harness.tab, runtime);
     return { harness, release, runtime, sent };
   }
 
@@ -239,6 +273,50 @@ live('Codex chat projection live smoke', () => {
       .map(chunk => chunk.id));
     expect(calls.size).toBeGreaterThan(0);
     expect(results.filter(chunk => !calls.has(chunk.id))).toHaveLength(0);
+  });
+
+  it('row D: sends steered input into a turn that is already running', async () => {
+    // **Codex is the only provider that declares steering**, and the flip took
+    // it away without saying so: the adapter's `steer` acts on the run *it*
+    // started, and on this path the coordinator starts it — so a steer answered
+    // `false` for every turn and the controller quietly put the message back in
+    // the queue, which is what a provider that never supported steering looks
+    // like.
+    const { harness } = await createHarness({ permissionMode: 'full_access' });
+    const { column, sessions, tab } = harness;
+
+    // A turn that is still running when the steer arrives, and deliberately: a
+    // steer is refused once the run is terminal, which is correct and is not
+    // what this row is about. The first version asked the model to count to
+    // twenty — it answered all twenty before the steer was sent, and the row
+    // read as the defect it was written to prove was fixed.
+    const first = 'Run the shell command `sleep 30`, then reply with exactly: slept';
+    const submitted = await tab.send({ text: first }, userMessage(first));
+    await waitFor('the turn to reach the provider', 60_000, () => (
+      column.chunks.some(chunk => chunk.type === 'tool_use') ? true : undefined
+    ));
+
+    const steered = 'Stop counting. Reply with exactly: steered';
+    const accepted = await tab.steer(
+      runtimeOf(harness).turnEncoder.prepareTurn({ text: steered }),
+      userMessage(steered),
+    );
+    const completed = await submitted.ticket.completion;
+    await tab.settled();
+
+    report('ROW D', String(accepted), completed.terminal.kind,
+      JSON.stringify(column.drawn.join('').slice(-160)));
+    expect(accepted).toBe(true);
+    // The steered question is in the transcript, not only in the provider's
+    // context: the legacy path drew it from the provider's echo, which this one
+    // filters out as turn framing.
+    const stored = await sessions.records.read(CONVERSATION_ID);
+    const questions = stored.kind === 'present'
+      ? (stored.metadata.messages ?? []).filter(message => message.role === 'user')
+      : [];
+    report('ROW D stored', JSON.stringify(questions.map(message => message.content.slice(0, 40))));
+    expect(questions).toHaveLength(2);
+    expect(questions[1]?.content).toContain('steered');
   });
 
   it('row C: resumes the thread after a reload, from what the vault kept', async () => {

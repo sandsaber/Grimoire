@@ -288,9 +288,10 @@ live('Gemini CLI chat projection live smoke', () => {
       ? afterFirst.metadata.sessionId ?? undefined
       : undefined;
     report('ROW C session', String(nativeSessionRef));
-    // Grok resumes from a session id **and the directory its transcript is in**
-    // — `GrokLiveSmoke` row 8 says so in as many words: "a session id hydrates
-    // nothing" without it. So the row reports what the vault actually kept.
+    // **Gemini persists no session directory**, unlike Grok — its
+    // `providerState` comes back empty — so what a reload has is the session id
+    // and the project it was opened in. The directory is handed over anyway,
+    // because the row must not differ between providers in what it gives them.
     report('ROW C providerState', JSON.stringify(
       afterFirst.kind === 'present' ? afterFirst.metadata.providerState : null,
     ));

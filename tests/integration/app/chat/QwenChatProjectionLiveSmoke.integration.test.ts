@@ -289,9 +289,8 @@ live('Qwen Code chat projection live smoke', () => {
       ? afterFirst.metadata.sessionId ?? undefined
       : undefined;
     report('ROW C session', String(nativeSessionRef));
-    // Grok resumes from a session id **and the directory its transcript is in**
-    // — `GrokLiveSmoke` row 8 says so in as many words: "a session id hydrates
-    // nothing" without it. So the row reports what the vault actually kept.
+    // Qwen's session, like every ACP one, belongs to the project it was opened
+    // in, so the directory is handed over and not only the record store.
     report('ROW C providerState', JSON.stringify(
       afterFirst.kind === 'present' ? afterFirst.metadata.providerState : null,
     ));

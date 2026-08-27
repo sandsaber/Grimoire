@@ -90,6 +90,7 @@ export interface ChatExecutionLifecyclePort {
     request: ExecutionRequest,
   ): Promise<RunId>;
   cancelRun(runId: RunId, reason?: CancellationReason): Promise<void>;
+  steerRun(runId: RunId, requestRef: string): Promise<boolean>;
   resolveInteraction(resolution: InteractionResolution): Promise<void>;
   observe(
     executionSessionId: ExecutionSessionId,
@@ -393,6 +394,53 @@ export class ChatExecutionCoordinator {
       return;
     }
     await this.lifecycle.cancelRun(activeRunId, reason);
+  }
+
+  /**
+   * Sends input into the turn this conversation already has running.
+   *
+   * **The controller reaches the kernel here rather than through the runtime**,
+   * and that is the whole reason this exists: the adapter's `steer` acts on the
+   * run *it* started, and on this path the run was started by the coordinator.
+   * Asked of the adapter, a steer answered `false` for every provider on this
+   * list — which the controller reads as "no turn to join" and puts the message
+   * back in the queue, so the feature disappeared without a failure.
+   *
+   * `false` when nothing is running, which is the same answer and the right one:
+   * a queued message belongs in the queue.
+   */
+  async steerActive(
+    conversationId: string,
+    requestRef: string,
+    userMessage: ChatMessage,
+  ): Promise<boolean> {
+    const entry = this.entries.get(conversationId);
+    const activeRunId = entry?.active?.runId;
+    if (!entry || !activeRunId) {
+      return false;
+    }
+    const accepted = await this.lifecycle.steerRun(activeRunId, requestRef);
+    if (!accepted) {
+      // Nothing is written for input the provider did not take. A message in
+      // the transcript that never reached the turn reads as one that was sent
+      // and ignored, and the caller is about to put it back in the queue.
+      return false;
+    }
+    // Written for the same reason a first message is, and it has to be written
+    // *here*: the provider echoes steered input back as its own user message,
+    // which is how the legacy path drew it — and this path filters that echo
+    // out as turn framing, so without this the question an answer refers to is
+    // one nobody can see.
+    const withUser = await this.conversations.apply(
+      conversationId,
+      current => appendUserMessage(current, userMessage, this.now()),
+    );
+    this.apply(entry, {
+      kind: 'conversation-loaded',
+      conversation: withUser.conversation,
+      revision: withUser.revision,
+    });
+    return true;
   }
 
   /**

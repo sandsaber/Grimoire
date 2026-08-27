@@ -1351,7 +1351,25 @@ export class InputController {
       const { displayContent, request } = this.toQueuedChatTurn(queuedMessage);
 
       const preparedTurn = agentService.prepareTurn(request);
-      const accepted = await agentService.steer(preparedTurn);
+      // The kernel owns the run on the projection path, so the steer goes there.
+      // Asked of the runtime instead, it answers `false` for every provider on
+      // that path — its `steer` acts on a run it started and it started none —
+      // and the controller reads that as "no turn to join" and quietly requeues
+      // the message. The feature disappeared without a failure.
+      const projection = this.deps.getProjectionExecution?.() ?? null;
+      const steeredAt = Date.now();
+      const accepted = projection
+        ? await projection.steer(preparedTurn, {
+          id: this.deps.generateId(),
+          role: 'user',
+          content: displayContent,
+          displayContent,
+          timestamp: steeredAt,
+          completedAt: steeredAt,
+          images: request.images,
+          vaultSearchContext: request.vaultSearchContext,
+        })
+        : await agentService.steer(preparedTurn);
       if (state.cancelRequested || !this.pendingSteerMessage) {
         return;
       }
@@ -1362,6 +1380,14 @@ export class InputController {
 
       this.deps.getFileContextManager()?.markCurrentNoteSent();
 
+      if (projection) {
+        // The projection carries it: the coordinator wrote it to the
+        // conversation and the surface draws what the projection says. The
+        // boundary state below is how the *legacy* path draws a steered
+        // message — by matching the provider's echo of it — and this path
+        // filters that echo out as turn framing.
+        return;
+      }
       this.pendingProviderUserMessages.push({
         displayContent,
         persistedContent: preparedTurn.persistedContent,

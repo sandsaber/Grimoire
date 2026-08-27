@@ -4,7 +4,11 @@ import type {
   ChatTurnEncoder,
   ExecutionInteractionPresenter,
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
-import type { ChatRuntimeQueryOptions, ChatTurnRequest } from '@/core/runtime/types';
+import type {
+  ChatRuntimeQueryOptions,
+  ChatTurnRequest,
+  PreparedChatTurn,
+} from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
 import type { ProviderId } from '@/core/types/provider';
 import type { ChatProjectionAttachment } from '@/features/chat/application/ChatProjectionAttachment';
@@ -147,6 +151,35 @@ export class ChatTabExecution {
    */
   settled(): Promise<void> {
     return this.attachment.settled();
+  }
+
+  /**
+   * Sends input into the turn this tab already has running.
+   *
+   * `false` when the provider cannot take it, when nothing is running, or when
+   * the turn refused it — all three mean the same thing to the caller, which is
+   * to put the message back in the queue.
+   *
+   * Routed through the coordinator rather than the runtime because the run is
+   * the coordinator's: the adapter's `steer` acts on a run it started, and on
+   * this path it started none, so it answered `false` for every provider and
+   * the feature disappeared without a failure.
+   */
+  async steer(turn: PreparedChatTurn, userMessage: ChatMessage): Promise<boolean> {
+    const encoder = this.options.turnEncoder();
+    if (!encoder?.encodeSteerRef || !this.bound) {
+      return false;
+    }
+    return this.options.composition.coordinator.steerActive(
+      this.bound,
+      // Called on the encoder rather than pulled off it: the reference the
+      // provider builds is a method on its own ports object.
+      encoder.encodeSteerRef(turn),
+      // What the provider composed, not what was typed — the same rule the
+      // first message of a turn follows, and for the same reason: the vault
+      // holds what was sent.
+      { ...userMessage, content: turn.persistedContent },
+    );
   }
 
   async cancel(reason?: CancellationReason): Promise<void> {

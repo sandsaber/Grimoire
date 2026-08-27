@@ -21,8 +21,12 @@ import { updateKimicodeProviderSettings } from '@/providers/kimicode/settings';
 /**
  * The Kimi Code chat projection flip, against a real `kimi acp` process.
  *
- * Kimi Code, MiMoCode and OpenCode are deliberate forks of one another, so this
- * file is OpenCode's with the name changed and must stay that way.
+ * **One file per ACP provider, all derived from Grok's**, differing only in the
+ * provider's name, its env gate and its CLI default. That is deliberate and it
+ * is not the fork rule: Kimi Code, MiMoCode and OpenCode are forks of one
+ * another in their *provider* code, and a change to one's launch, runtime,
+ * workspace, storage, history, settings or UI is a change to the others. These
+ * harnesses are all six providers' because the path is one path.
  *
  * **This CLI is not authenticated here.** `kimi` refuses `session/new` *and*
  * `session/load` with `-32000 "Authentication required"` — recorded on
@@ -287,9 +291,8 @@ live('Kimi Code chat projection live smoke', () => {
       ? afterFirst.metadata.sessionId ?? undefined
       : undefined;
     report('ROW C session', String(nativeSessionRef));
-    // Grok resumes from a session id **and the directory its transcript is in**
-    // — `GrokLiveSmoke` row 8 says so in as many words: "a session id hydrates
-    // nothing" without it. So the row reports what the vault actually kept.
+    // Kimi Code's session, like every ACP one, belongs to the project it was
+    // opened in, so the directory is handed over and not only the record store.
     report('ROW C providerState', JSON.stringify(
       afterFirst.kind === 'present' ? afterFirst.metadata.providerState : null,
     ));

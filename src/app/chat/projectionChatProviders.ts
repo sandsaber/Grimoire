@@ -12,15 +12,22 @@ import type { ProviderId } from '@/core/types/provider';
  *
  * A list rather than a boolean because the chat surface is provider-neutral
  * while the risk is not: a provider's content presenter, its interaction
- * presenter and its failure wording are its own, and the branch's rule is one
- * provider per checkpoint, proven before the pattern is repeated.
+ * presenter and its failure wording are its own.
  *
- * **Antigravity is first because it is the smallest whole turn.** Print mode
- * has no provider-native session to resume, no interaction channel — approval
- * is refused before a process exists — and one `output-delta` carrying the
- * whole answer, so it exercises submit, draw, barrier and terminal without any
- * of the couplings that would confound a first reading of them. It is also the
- * only provider certified end to end on the machine this branch is built on.
+ * **All nine are on it, and they arrived in that order for a reason.**
+ * Antigravity first, as the smallest whole turn — print mode has no session to
+ * resume and no interaction channel, so submit, draw, barrier and terminal are
+ * read without the couplings that would confound them. Then Codex, the first
+ * with content and a thread; then Claude, the first that stops to ask, whose
+ * row found that nothing on this path was listening for the question. Then Grok
+ * Build, the first over ACP — which is the transport the last five speak, so
+ * they went together once that held.
+ *
+ * **Certification is account-bound, and `chat-projection-flip-smoke-matrix.md`
+ * is where it is written down**, per provider: four fully certified, Gemini on
+ * the turns its quota allowed, OpenCode intermittently against a vendor that
+ * kept dropping, and three flipped under the owner's standing override with no
+ * row their accounts could run.
  */
 export const PROJECTION_CHAT_PROVIDERS: readonly ProviderId[] = [
   'antigravity',
