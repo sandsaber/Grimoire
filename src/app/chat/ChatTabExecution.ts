@@ -192,6 +192,19 @@ export class ChatTabExecution {
     );
   }
 
+  /**
+   * The execution session this tab's turns are running in.
+   *
+   * Handed to the provider runtime before anything keyed by that session — a
+   * rewind — because the runtime opens one of its own when a tab is primed and
+   * that one holds no runs.
+   */
+  get executionSessionId(): string | null {
+    return this.bound
+      ? this.options.composition.coordinator.executionSessionFor(this.bound)
+      : null;
+  }
+
   async cancel(reason?: CancellationReason): Promise<void> {
     if (!this.bound) {
       return;

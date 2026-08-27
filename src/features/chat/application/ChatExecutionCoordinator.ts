@@ -397,6 +397,17 @@ export class ChatExecutionCoordinator {
   }
 
   /**
+   * The execution session this conversation's turns run in, if it has one.
+   *
+   * Asked by anything keyed by that session rather than by a run — rewind, so
+   * far. The runtime opens a session of its own when a tab is primed and it
+   * holds no runs; this is the one that does.
+   */
+  executionSessionFor(conversationId: string): ExecutionSessionId | null {
+    return this.entries.get(conversationId)?.sessionId ?? null;
+  }
+
+  /**
    * Sends input into the turn this conversation already has running.
    *
    * **The controller reaches the kernel here rather than through the runtime**,

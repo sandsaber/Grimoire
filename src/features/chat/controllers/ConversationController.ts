@@ -71,7 +71,10 @@ export interface ConversationControllerDeps {
    * the runtime's own `cancel` acts on a run it never started and returns
    * having done nothing.
    */
-  getProjectionExecution?: () => { cancel(): Promise<void> } | null;
+  getProjectionExecution?: () => {
+    cancel(): Promise<void>;
+    readonly executionSessionId: string | null;
+  } | null;
   getActiveProviderSettings?: () => Record<string, unknown>;
   getOrchestratorMode?: () => boolean;
   ensureServiceForConversation?: (conversation: Conversation | null) => Promise<void>;
@@ -405,6 +408,15 @@ export class ConversationController {
       new Notice(t('chat.rewind.failed', { error: t('chat.ui.errors.agentServiceUnavailable') }));
       return;
     }
+
+    // **Rewind is keyed by execution session, and the runtime opens one of its
+    // own.** On the projection path the coordinator opens the session the turns
+    // actually run in; the runtime's own is the one a tab priming created, and
+    // it holds no runs — so a rewind against it found a session with nothing in
+    // it, on every provider, since the flip.
+    const projected = this.deps.getProjectionExecution?.() ?? null;
+    (agentService as { adoptExecutionSession?: (id: string | null) => void })
+      .adoptExecutionSession?.(projected?.executionSessionId ?? null);
 
     let result;
     try {

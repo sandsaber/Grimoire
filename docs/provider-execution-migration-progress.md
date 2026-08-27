@@ -8813,9 +8813,25 @@ active run of its own, which on this path it never does. **Starting a new conver
 streaming turn left that turn running**, writing into a conversation the tab had already left.
 
 `InputController.cancelStreaming` was fixed when the chat path was built and `ChatTabExecution.steer`
-when the review found steering; this was the third and last. The family has one shape: *anything that
-asks the runtime to act on the current turn is asking the wrong object now*, and the compiler cannot
-see it because the method exists and returns.
+when the review found steering; this was the third. The family has one shape: *anything that asks the
+runtime to act on the current turn is asking the wrong object now*, and the compiler cannot see it
+because the method exists and returns.
+
+**The fourth was rewind, and it is the worst of them, because the runtime answers with a session
+rather than nothing.** `rewind` is keyed by execution session, and the adapter passes the one *it*
+opened — which `maybePrimeProviderRuntime` creates whenever a tab is primed. On this path the
+coordinator opens the session the turns actually run in, so the adapter's holds no runs at all: a
+rewind found a session, walked it, and rewound nothing. Every provider, since the flip.
+
+The adapter gained `adoptExecutionSession`, which is **not** on `ChatRuntime` and deliberately so:
+the frozen interface is what a surface asks a runtime for, and this is something the surface *tells*
+it, because only the surface knows which session the coordinator opened. `ConversationController`
+hands it over before every rewind, from `ChatTabExecution.executionSessionId`, which asks the
+coordinator.
+
+**Reading a family's neighbours found two of the four.** The review found steering; reading what else
+called the runtime about the current turn found the forced-new-conversation cancel and then rewind.
+Worth doing again whenever a defect turns out to have a shape.
 
 #### What to pick up next, in order
 

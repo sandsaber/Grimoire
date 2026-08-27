@@ -551,6 +551,29 @@ describe('chat execution composition', () => {
     app.composition.dispose();
   });
 
+  it('names the session a conversation\'s turns are running in', async () => {
+    // **Anything keyed by a session rather than a run asks for this** — rewind,
+    // so far. The provider runtime opens a session of its own when a tab is
+    // primed, and that one holds no runs at all; rewinding against it found a
+    // session with nothing in it on every provider, since the flip.
+    const app = await createComposition();
+    expect(app.composition.coordinator.executionSessionFor(CONVERSATION_ID)).toBeNull();
+
+    const ticket = await app.composition.coordinator.submitTurn({
+      commandId: 'cmd-session',
+      conversationId: CONVERSATION_ID,
+      backendId: executionBackendId('internal-deterministic-fake'),
+      requestRef: 'req-session',
+      resultExpectation: 'optional',
+      userMessage: { id: 'msg-user-session', role: 'user', content: 'Hi', timestamp: 1 },
+    });
+    const started = await ticket.started;
+
+    expect(app.composition.coordinator.executionSessionFor(CONVERSATION_ID))
+      .toBe(started.executionSessionId);
+    app.composition.dispose();
+  });
+
   describe('steering a turn that is already running', () => {
     /**
      * **The one feature the flip took away without saying so.** Typing while a

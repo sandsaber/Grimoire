@@ -677,6 +677,7 @@ export class ExecutionChatRuntimeAdapter {
   private readonly session: ExecutionAdapterSession;
   private readonly readyListeners = new Set<(ready: boolean) => void>();
   private executionSessionId: ExecutionSessionId | null = null;
+  private adoptedExecutionSessionId: string | null = null;
   private boundSessionId: string | null | undefined;
   /** Which conversation this tab is showing, so a move to another is visible. */
   private boundConversationId: string | null | undefined;
@@ -739,6 +740,20 @@ export class ExecutionChatRuntimeAdapter {
    * for the same reason: the composition that built these ports is where they
    * belong once a surface asks for them directly.
    */
+  /**
+   * Names the session this conversation's turns are running in.
+   *
+   * Adapter-only, deliberately: `ChatRuntime` is frozen, and this is not
+   * something a chat surface asks a runtime for — it is something the surface
+   * *tells* it, because on the projection path the coordinator owns the session
+   * and this object cannot know its id. Everything keyed by execution session —
+   * rewind today — reads this in preference to the one this adapter opened for
+   * itself.
+   */
+  adoptExecutionSession(executionSessionId: string | null): void {
+    this.adoptedExecutionSessionId = executionSessionId;
+  }
+
   get surfacePorts(): ChatSurfacePorts {
     return this.ports;
   }
@@ -1145,7 +1160,12 @@ export class ExecutionChatRuntimeAdapter {
       return { canRewind: false, error: 'This provider cannot rewind a conversation.' };
     }
     const outcome = await port.rewind({
-      executionSessionId: this.executionSessionId ?? '',
+      // **The session the conversation's turns actually ran in.** This adapter
+      // opens one of its own when a tab is primed, and on the chat projection
+      // path that one holds no runs at all — the coordinator opens the session
+      // the turns go through. Rewinding against the adapter's own found a
+      // session with nothing in it, on every provider, since the flip.
+      executionSessionId: this.adoptedExecutionSessionId ?? this.executionSessionId ?? '',
       userMessageId,
       assistantMessageId,
       mode,

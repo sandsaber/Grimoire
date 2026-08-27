@@ -1808,7 +1808,7 @@ describe('ConversationController - Race Condition Guards', () => {
       // streaming turn left that turn running, writing into a conversation the
       // tab had already left.
       const cancel = jest.fn().mockResolvedValue(undefined);
-      deps.getProjectionExecution = () => ({ cancel });
+      deps.getProjectionExecution = () => ({ cancel, executionSessionId: null });
       deps.state.isStreaming = true;
 
       await controller.createNew({ force: true });

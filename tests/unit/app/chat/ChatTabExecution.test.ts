@@ -255,6 +255,24 @@ describe('chat tab execution', () => {
     app.composition.dispose();
   });
 
+  it('names the session its turns run in, and nothing while it is blank', async () => {
+    // **What a rewind is keyed by.** The provider runtime opens a session of
+    // its own when a tab is primed and it holds no runs; this is the one the
+    // turns actually went through, and a rewind against the other found a
+    // session with nothing in it on every provider since the flip.
+    const app = await createTab();
+    // Detached, so no conversation is bound: there is no session to name, and
+    // saying one anyway is how a rewind reaches a conversation nobody is in.
+    app.tab.detach();
+    expect(app.tab.executionSessionId).toBeNull();
+
+    const { ticket } = await app.tab.send({ text: 'Hi' }, userMessage('msg-1', 'Hi'));
+    const started = await ticket.started;
+
+    expect(app.tab.executionSessionId).toBe(started.executionSessionId);
+    app.composition.dispose();
+  });
+
   it('stops drawing when the tab closes, and the kernel keeps the turn', async () => {
     const app = await createTab();
     const { ticket: ticket } = await app.tab.send({ text: 'Hi' }, userMessage('msg-1', 'Hi'));
