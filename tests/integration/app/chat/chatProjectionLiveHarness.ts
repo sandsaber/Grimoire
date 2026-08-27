@@ -136,6 +136,7 @@ export function recordingColumn(
         finalizeCurrentTextBlock: () => Promise.resolve(),
         finalizeCurrentThinkingBlock: () => Promise.resolve(),
         flushPendingToolsForPermission: () => undefined,
+        noteTurnActivity: () => undefined,
         showThinkingIndicator: () => undefined,
         hideThinkingIndicator: () => undefined,
         startTurnSilenceIndicator: () => undefined,

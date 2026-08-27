@@ -64,6 +64,15 @@ export interface ChatStreamOperations {
   finalizeCurrentTextBlock(msg?: ChatMessage): Promise<void>;
   finalizeCurrentThinkingBlock(msg?: ChatMessage): Promise<void>;
   flushPendingToolsForPermission(): void;
+  /**
+   * Resets the "this provider has gone quiet" timer.
+   *
+   * `handleStreamChunk` does this itself, so only the two text paths need it
+   * asked for — and they are the ones a turn made entirely of prose takes.
+   * `InputController` used to call it once per chunk from the generator loop;
+   * that loop is gone, and this is where the same duty landed.
+   */
+  noteTurnActivity(): void;
   showThinkingIndicator(overrideText?: string, overrideCls?: string): void;
   hideThinkingIndicator(): void;
   startTurnSilenceIndicator(providerId: ProviderId): void;
@@ -231,6 +240,7 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
     this.enqueue(() => this.deps.stream.finalizeCurrentThinkingBlock(message));
     this.enqueue(() => this.deps.stream.finalizeCurrentTextBlock(message));
     this.open = { runId, index, kind: item.kind };
+    this.deps.stream.noteTurnActivity();
     switch (item.kind) {
       case 'assistant-text':
         message.content += item.text;
@@ -266,6 +276,7 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
     if (!message || this.open?.runId !== runId || this.open.index !== index) {
       return;
     }
+    this.deps.stream.noteTurnActivity();
     if (this.open.kind === 'reasoning-text') {
       this.enqueue(() => this.deps.stream.appendThinking(text));
       return;

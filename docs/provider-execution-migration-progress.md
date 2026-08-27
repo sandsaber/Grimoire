@@ -8562,7 +8562,52 @@ because the matrix *is* the certification and the journal *is* the handoff. All 
 - the adapter's own header still said it was in production for Antigravity alone;
 - the matrix-records gate's summary comment still described a one-provider flip.
 
-**Next: `InputController` and `StreamController` stop owning the turn.** That step was written as
+#### `InputController` stopped owning the turn
+
+**The generator branch is gone.** `agentService.query()` had exactly one call site in the feature
+layer and it was the `for await` loop in `InputController.send`; with every provider on the
+projection path that loop was unreachable except when a tab has no projection at all, which happens
+only before the kernel has started and resolves on the next attempt. So a tab without one is now
+**refused with a notice** rather than silently taking a path that no longer exists.
+
+What went with it: the turn-framing machinery. `handleProviderMessageBoundaryChunk`,
+`handleProviderUserMessageStart`, `handleProviderAssistantMessageStart`,
+`shouldDiscardPendingAssistantPlaceholder`, `discardStreamingAssistantMessage`,
+`activateStreamingAssistantMessage`, `resetProviderMessageBoundaryState`, and the three fields they
+shared. All of it existed to split a steered turn into separate messages by watching for the
+provider's echo of its own boundaries — which the projection states itself, and which
+`chatContentChunks.isChatContent` now filters out. `chatContentVocabulary`'s framing-readers gate is
+empty, with a guard so an empty expectation cannot be satisfied by a reader that finds nothing.
+
+**Two behaviours had to move rather than go**, and both were found by a red test rather than by
+reading:
+
+- **the silence timer.** `noteTurnActivity` was called once per chunk from that loop, and without it
+  a turn made entirely of prose would report itself as a provider that had gone quiet.
+  `handleStreamChunk` resets it itself, so only the two text paths needed asking — it is on
+  `ChatStreamOperations` and `ChatSurfaceRenderTarget` calls it, proven by a test and by breaking it;
+- **the steer indicator.** The chip saying "Steering: …" was cleared when the provider echoed the
+  steered message back. It clears on **acceptance** now, which is a better signal anyway: it is the
+  moment the input arrived, and the coordinator writes the steered question to the conversation
+  there, so the message appears in the transcript as the chip disappears.
+
+**`chatRuntimeCharacterization.test.ts` is deleted**, and the reason matters more than the file: it
+pinned what the legacy path did *including the defect the migration fixes*, as observed through the
+UI. The UI no longer observes it. Seven of its eight tests went on passing against the test double
+that replaced the path — which is the definition of a suite measuring itself. Its sibling
+`adapterContractTarget.test.ts` is the specification and stays.
+
+**65 tests went red on the deletion and 62 came back with one change**: the input-controller harness
+now supplies a projection double. It is a stub of the collaborator, not a stand-in for the renderer —
+it prepares the turn and calls `query` on the same mock agent each suite already configures, so what
+those tests assert about MCP options, workspace context, the model override and the persisted
+content keeps meaning what it meant. **It draws nothing**, deliberately: what a turn looks like is
+the render target's to prove over a real coordinator, and the live harnesses'. Three tests were about
+the deleted machinery and went with it.
+
+Live after the deletion: Antigravity 3/3, Codex 5/5, Grok 4/4.
+
+**Next: `StreamController` and the rest of M5.** That step was written as
 "only after a provider has been certified on the projection path"; all nine are on it now, so what
 comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and the branch in
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close

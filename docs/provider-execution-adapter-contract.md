@@ -55,7 +55,9 @@ footer, the conversation save, the queued-message pump
 ([InputController.ts:638-729](../src/features/chat/controllers/InputController.ts)). Nothing
 consults a terminal fact. `consumeTurnMetadata().wasSent` exists but only decides whether the resume
 checkpoint is cleared. **Iterator end is the completion signal.** That is the defect the migration
-fixes, and it is why the characterization suite and the target suite must be separate.
+fixes, and it is why the characterization suite and the target suite were separate. The
+characterization suite is deleted now that no chat surface consumes the generator: with the legacy
+branch gone from `InputController`, its assertions would have been measuring a test double.
 
 **The mapping.**
 

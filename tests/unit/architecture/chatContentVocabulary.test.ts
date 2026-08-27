@@ -38,14 +38,19 @@ const LIFECYCLE_VARIANTS = [
 ];
 
 /**
- * Where turn framing may still be read, and the reason it is exactly one file.
+ * Where turn framing may still be read, and it is **nowhere**.
  *
- * `InputController` splits a steered turn into separate messages by watching
- * these, and it is the module M5's flip deletes. A second reader appearing
- * while that flip is in flight is two opinions about where a turn begins, in
- * the same period when the projection is becoming the answer.
+ * `InputController` was the one reader: it split a steered turn into separate
+ * messages by watching for the provider's echo of them. Every provider is on
+ * the projection path now, where the projection states a turn's shape and the
+ * echo is filtered out as framing by `chatContentChunks.isChatContent` — so the
+ * reader went with the generator loop it lived in.
+ *
+ * Empty rather than deleted, because the rule is what matters: a reader
+ * appearing here again is a second opinion about where a turn begins, beside
+ * the projection that now owns the answer.
  */
-const FRAMING_READERS = ['src/features/chat/controllers/InputController.ts'];
+const FRAMING_READERS: readonly string[] = [];
 
 function read(module: string): string {
   return readFileSync(resolve(process.cwd(), module), 'utf8');
@@ -91,8 +96,16 @@ describe('chat content vocabulary', () => {
     expect(() => variantsOf('', 'Missing')).toThrow(/No declaration/);
   });
 
-  it('has one production reader of turn framing, and it is the one M5 deletes', () => {
-    const readers = listAllSourceModules()
+  it('has no production reader of turn framing left', () => {
+    const modules = listAllSourceModules();
+    // Guards the reader now that the expected list is empty: a scan that found
+    // no files at all would report "no readers" for the same reason a clean
+    // codebase does, and this rule would pass forever.
+    expect(modules.length).toBeGreaterThan(100);
+    expect(modules.filter(module => /\buser_message_start\b/.test(read(module))).length)
+      .toBeGreaterThan(0);
+
+    const readers = modules
       .filter(module => module !== CHAT_TYPES)
       .filter(module => /\buser_message_start\b|\bassistant_message_start\b/.test(read(module)))
       // A provider emitting framing is a producer; this rule is about readers.

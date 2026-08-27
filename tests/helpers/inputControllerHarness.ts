@@ -2,6 +2,7 @@ import { createMockEl } from '@test/helpers/mockElement';
 
 import type { InputControllerDeps } from '@/features/chat/controllers/InputController';
 import { ChatState } from '@/features/chat/state/ChatState';
+import { buildAssistantResponseMetadata } from '@/features/chat/utils/assistantResponseMetadata';
 import { encodeClaudeTurn } from '@/providers/claude/prompt/ClaudeTurnEncoder';
 
 /**
@@ -102,7 +103,86 @@ export function createMockInstructionModeManager() {
   return { clear: jest.fn() };
 }
 
-export function createMockDeps(overrides: Partial<InputControllerDeps> = {}): InputControllerDeps & { mockAgentService: ReturnType<typeof createMockAgentService> } {
+/**
+ * The tab's end of the projection path, as `InputController` needs it.
+ *
+ * **A stub of the collaborator, not a stand-in for the renderer.** Every
+ * provider is on the projection path, so a controller with no projection
+ * refuses to send at all — which would make every send test in this repository
+ * assert the refusal. What this gives back is the seam: it prepares the turn
+ * and calls `query` on the same mock agent the suite already configures, so the
+ * assertions those tests make — about MCP options, workspace context, the model
+ * override, the persisted content — keep meaning what they meant.
+ *
+ * It draws nothing. What a turn looks like on screen is the render target's to
+ * prove, over a real coordinator, and the live harnesses'; a double that also
+ * drew would be a test measuring itself.
+ */
+export function createMockProjectionExecution(
+  agentService: () => ReturnType<typeof createMockAgentService>,
+  state: { messages: any[]; addMessage(message: any): void },
+  streamController: { handleStreamChunk(chunk: any, message: any): Promise<void> },
+  settings: () => Record<string, unknown>,
+  providerId: () => string = () => 'claude',
+) {
+  let assistantOrdinal = 0;
+  return {
+    get providerId() {
+      return providerId();
+    },
+    conversationId: 'conv-1',
+    settled: jest.fn().mockResolvedValue(undefined),
+    cancel: jest.fn().mockResolvedValue(undefined),
+    detach: jest.fn(),
+    open: jest.fn().mockResolvedValue(undefined),
+    steer: jest.fn().mockResolvedValue(true),
+    send: jest.fn(async (request: any, userMessage: any, options: any = {}) => {
+      const service = agentService();
+      const prepared = service.prepareTurn(request);
+      const persisted = { ...userMessage, content: prepared.persistedContent,
+        ...(prepared.isCompact || !prepared.request?.currentNotePath
+          ? {}
+          : { currentNote: prepared.request.currentNotePath }) };
+      state.addMessage(persisted);
+      const assistantMessage = {
+        id: `assistant-${++assistantOrdinal}`,
+        role: 'assistant',
+        content: '',
+        timestamp: Date.now(),
+        toolCalls: [],
+        contentBlocks: [],
+        // The same helper `tabProjectionExecution` builds it with, because the
+        // metadata a surface attaches to an answer is production's, not this
+        // file's.
+        responseMetadata: buildAssistantResponseMetadata(providerId(), settings(), {
+          model: options.queryOptions?.model,
+        }),
+      };
+      state.addMessage(assistantMessage);
+      // The history a request is encoded from excludes the turn being sent,
+      // which is what the composition does by reading the conversation before
+      // the coordinator appends anything.
+      const history = state.messages.slice(0, -2);
+      for await (const chunk of service.query(prepared, history, options.queryOptions)) {
+        await streamController.handleStreamChunk(chunk, assistantMessage);
+      }
+      return {
+        userMessage: persisted,
+        ticket: {
+          started: Promise.resolve({ runId: `run-${assistantOrdinal}` }),
+          completion: Promise.resolve({
+            assistantMessageId: assistantMessage.id,
+            terminal: { kind: 'succeeded', reason: 'completed' },
+          }),
+        },
+      };
+    }),
+  };
+}
+
+export function createMockDeps(overrides: Partial<InputControllerDeps> = {}): InputControllerDeps
+  & { mockAgentService: ReturnType<typeof createMockAgentService> }
+  & { mockProjection: ReturnType<typeof createMockProjectionExecution> } {
   const state = new ChatState();
   const inputEl = createMockInputEl();
   const queueIndicatorEl = createMockEl();
@@ -112,8 +192,32 @@ export function createMockDeps(overrides: Partial<InputControllerDeps> = {}): In
 
   const imageContextManager = createMockImageContextManager();
   const mockAgentService = createMockAgentService();
+  const streamController = {
+    showThinkingIndicator: jest.fn(),
+    hideThinkingIndicator: jest.fn(),
+    flushPendingToolsForPermission: jest.fn(),
+    handleStreamChunk: jest.fn(),
+    finalizeProgressBlocks: jest.fn(),
+    finalizeCurrentTextBlock: jest.fn(),
+    finalizeCurrentThinkingBlock: jest.fn(),
+    appendText: jest.fn(),
+    startTurnSilenceIndicator: jest.fn(),
+    noteTurnActivity: jest.fn(),
+    pauseTurnSilenceIndicator: jest.fn(),
+    stopTurnSilenceIndicator: jest.fn(),
+  };
+  // Built after the deps exist, and reading through them: a suite that
+  // overrides `getAgentService` — several do, to watch a *different* mock —
+  // would otherwise be sending its turns to the one captured here.
+  const projection = createMockProjectionExecution(
+    () => (result.getAgentService?.() ?? mockAgentService) as ReturnType<typeof createMockAgentService>,
+    state,
+    streamController,
+    () => (result.getActiveProviderSettings?.() ?? result.plugin.settings) as Record<string, unknown>,
+    () => (result.getAgentService?.()?.providerId as string) ?? 'claude',
+  );
 
-  return {
+  const result: any = {
     plugin: {
       saveSettings: jest.fn(),
       settings: {
@@ -144,20 +248,7 @@ export function createMockDeps(overrides: Partial<InputControllerDeps> = {}): In
       updateLiveUserMessage: jest.fn(),
       updateMessageCompletionTime: jest.fn(),
     } as any,
-    streamController: {
-      showThinkingIndicator: jest.fn(),
-      hideThinkingIndicator: jest.fn(),
-      flushPendingToolsForPermission: jest.fn(),
-      handleStreamChunk: jest.fn(),
-      finalizeProgressBlocks: jest.fn(),
-      finalizeCurrentTextBlock: jest.fn(),
-      finalizeCurrentThinkingBlock: jest.fn(),
-      appendText: jest.fn(),
-      startTurnSilenceIndicator: jest.fn(),
-      noteTurnActivity: jest.fn(),
-      pauseTurnSilenceIndicator: jest.fn(),
-      stopTurnSilenceIndicator: jest.fn(),
-    } as any,
+    streamController: streamController as any,
     selectionController: {
       getContext: jest.fn().mockReturnValue(null),
     } as any,
@@ -192,10 +283,13 @@ export function createMockDeps(overrides: Partial<InputControllerDeps> = {}): In
     generateId: () => `msg-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
     resetInputHeight: jest.fn(),
     getAgentService: () => mockAgentService as any,
+    getProjectionExecution: () => projection as any,
     getSubagentManager: () => ({ resetSpawnedCount: jest.fn(), resetStreamingState: jest.fn() }) as any,
     mockAgentService,
+    mockProjection: projection,
     ...overrides,
   };
+  return result;
 }
 
 /**
@@ -206,7 +300,9 @@ export function createMockDeps(overrides: Partial<InputControllerDeps> = {}): In
 export function createSendableDeps(
   overrides: Partial<InputControllerDeps> = {},
   conversationId: string | null = 'conv-1',
-): InputControllerDeps & { mockAgentService: ReturnType<typeof createMockAgentService> } {
+): InputControllerDeps
+  & { mockAgentService: ReturnType<typeof createMockAgentService> }
+  & { mockProjection: ReturnType<typeof createMockProjectionExecution> } {
   const welcomeEl = createMockWelcomeEl();
   const fileContextManager = createMockFileContextManager();
   const result = createMockDeps({

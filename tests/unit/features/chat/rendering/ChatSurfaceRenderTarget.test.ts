@@ -62,6 +62,10 @@ function harness() {
     flushPendingToolsForPermission: () => {
       calls.push({ method: 'flushPendingToolsForPermission', args: [] });
     },
+    // Recorded but not asserted on in the ordering rows: it fires on every
+    // block, so listing it beside them would say more about this double than
+    // about the order the renderer asked for.
+    noteTurnActivity: () => undefined,
     showThinkingIndicator: () => {
       calls.push({ method: 'showThinkingIndicator', args: [] });
     },
@@ -214,6 +218,26 @@ describe('chat surface render target', () => {
       'hideThinkingIndicator',
       'stopTurnSilenceIndicator',
     ]);
+  });
+
+  it('keeps the silence timer awake while the provider is still producing', async () => {
+    // The timer says "this provider has gone quiet", and something has to tell
+    // it otherwise. `handleStreamChunk` resets it itself, so the two text paths
+    // are the ones that need asking — and a turn made entirely of prose takes
+    // only those. `InputController` did this once per chunk from the generator
+    // loop it no longer has.
+    const chat = harness();
+    const noted: string[] = [];
+    (chat.stream.noteTurnActivity as jest.Mock | undefined)?.mockImplementation?.(() => undefined);
+    chat.stream.noteTurnActivity = jest.fn(() => { noted.push('noted'); }) as never;
+    beginTurn(chat.target);
+
+    chat.target.openTurnBlock(RUN_ID, 0, { kind: 'assistant-text', text: 'one ' });
+    chat.target.extendTurnText(RUN_ID, 0, 'two ');
+    chat.target.extendTurnText(RUN_ID, 0, 'three');
+
+    await drained(chat.target);
+    expect(noted).toHaveLength(3);
   });
 
   it('finalizes the open block before opening the next one', async () => {

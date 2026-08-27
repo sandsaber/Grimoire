@@ -69,6 +69,7 @@ function surface() {
     finalizeCurrentTextBlock: record('finalizeCurrentTextBlock'),
     finalizeCurrentThinkingBlock: record('finalizeCurrentThinkingBlock'),
     flushPendingToolsForPermission: () => undefined,
+    noteTurnActivity: () => undefined,
     showThinkingIndicator: () => calls.push({ method: 'showThinkingIndicator', args: [] }),
     hideThinkingIndicator: () => calls.push({ method: 'hideThinkingIndicator', args: [] }),
     startTurnSilenceIndicator: () => undefined,

@@ -13,11 +13,13 @@ import type { StreamChunk } from '@/core/types/chat';
 /**
  * Executable specification of the presentation adapter's semantics.
  *
- * The sibling suite, `chatRuntimeCharacterization.test.ts`, pins what the
- * current runtime path does. This one pins what the adapter must do instead,
- * and the two disagree by design at the defect-fix points: today the generator
- * closes when the provider stops yielding, and here it closes only on a
- * terminal fact.
+ * It had a sibling, `chatRuntimeCharacterization.test.ts`, which pinned what
+ * the legacy runtime path did — including the defect this one fixes: the
+ * generator closed when the provider stopped yielding, where this closes only
+ * on a terminal fact. **That suite is deleted**, because its subject is: no
+ * chat surface consumes `ChatRuntime.query` any more, and its assertions would
+ * from then on have been measuring a test double. This one is what remains, and
+ * it is the specification rather than the record of a defect.
  *
  * It first ran against a spec-level double, which proved the specification in
  * `docs/provider-execution-adapter-contract.md` was coherent and executable but
