@@ -922,8 +922,10 @@ Work:
   `src/app/chat/projectionChatProviders.ts`, and each entry added to it is certified against a live
   CLI the way an M2 flip was: the chat surface is provider-neutral but the risk is not — a
   provider's content presenter, interaction presenter and failure wording are its own — and the
-  one-provider-per-checkpoint rule is what kept M2 honest. The list starts empty, with the whole
-  path built, composed end to end and in the bundle. Harvest the v1 Phase 7 reducers and coordinators as material for this rework, not as
+  one-provider-per-checkpoint rule is what kept M2 honest. The list started empty, with the whole
+  path built, composed end to end and in the bundle; **Antigravity joined it first**, as the
+  smallest whole turn — print mode has no session to resume and no interaction channel, so submit,
+  draw, barrier and terminal are read without the couplings that would confound them. Harvest the v1 Phase 7 reducers and coordinators as material for this rework, not as
   view replacements. **Projections and reducers stay presentation-agnostic**: no DOM types, CSS
   class names, element structure, or layout vocabulary in projection contracts — the renderer is a
   thin replaceable layer that maps projections onto the current DOM. This single rule is what makes

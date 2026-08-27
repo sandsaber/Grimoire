@@ -82,7 +82,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
-| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete** and **the chat path is built, reviewed, and switched off**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design, and all five runners are deleted; bang-bash runs on the local-shell backend. The chat projection, its coordinator, startup adoption, the renderer, the render target, the attachment, the composition, the tab handle and the conversation port all exist, are composed end to end in one test, are **in the bundle**, and are **switched off** by an empty `projectionChatProviders`: adding one provider to that list is that provider's flip, certified by `docs/chat-projection-flip-smoke-matrix.md`, which has never run. Still untouched: the flip itself, durable agents, tab-close ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as composition root, and the seam deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
+| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete** and **the chat path is built, reviewed, and carrying its first provider**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design, and all five runners are deleted; bang-bash runs on the local-shell backend. The chat projection, its coordinator, startup adoption, the renderer, the render target, the attachment, the composition, the tab handle and the conversation port all exist, are composed end to end in one test, are **in the bundle**, and **Antigravity's tabs are on it**: `projectionChatProviders` holds one provider, and adding the next is that provider's flip, certified by `docs/chat-projection-flip-smoke-matrix.md`, whose driven half ran against a real `agy` on 2026-08-27. Still untouched: the remaining eight flips, durable agents, tab-close ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as composition root, and the seam deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
@@ -8278,6 +8278,64 @@ Gates: unit 535 suites / 8,438 tests, integration 5 / 156, typecheck, `eslint`, 
 overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
+
+### Where the session of 2026-08-27 is
+
+**The chat projection path has its first provider on it.** `projectionChatProviders` holds
+`antigravity`, so an Antigravity tab now submits its turns to the chat execution coordinator, the
+kernel runs them, and the surface draws what the projection says. Every other provider is unchanged
+and still on `InputController`'s generator.
+
+**Antigravity is first because it is the smallest whole turn.** Print mode has no provider-native
+session to resume, no interaction channel — approval is refused before a process exists — and one
+`output-delta` carrying the whole answer. It exercises submit, draw, barrier and terminal without any
+of the couplings that would confound a first reading of them, and it is the only provider certified
+end to end on this machine.
+
+**The driven half of the smoke matrix was written and run against a real `agy` 1.1.19**, and it is
+what stands behind this entry rather than a checklist:
+`tests/integration/app/chat/AntigravityChatProjectionLiveSmoke.integration.test.ts`, off by default
+behind `GRIMOIRE_ANTIGRAVITY_LIVE=1`. Nothing below the composition is a fake — the production
+backend over the OS process runner, `SessionStorage` over a vault adapter so the barrier's write goes
+through the envelope a real vault holds — and the column is doubled by *recording* what it was asked
+to draw rather than by answering. Row A: `succeeded`, one `done`, one assistant bubble, `ok` drawn,
+and the vault holding a user message and an assistant message under the id the surface drew into. Row
+B: `cancelled`, one `done`, no failure wording, and no `agy` process left anywhere under this
+process. Matrix rows 2, 3, 5, 7 and the negative half of 14.
+
+**Three breaks, each red for its own reason**, because a green harness proves nothing until it has
+failed:
+
+- the switch reverted to `[]` — the harness builds the tab's end directly, so without its one
+  assertion on `usesProjectionChat('antigravity')` it would have gone on passing for a path nobody
+  takes. That is the exact shape of evidence this branch has been burned by, so the assertion is a
+  row of its own;
+- `endTurn` stopped enqueueing `{ type: 'done' }` — both rows red, `Received length: 0`;
+- the barrier minting its own answer id instead of the turn's — row A red with **two** assistant
+  messages in the vault, the drawn one and the stored one, which is precisely the defect the
+  `turn?.assistantMessageId ??` comment warns about.
+
+**The gate that pairs a harness with somewhere to record it could not see this harness at all.** It
+walked `tests/integration/app/execution/<provider>/` and matched a matrix by the directory's name,
+which made "has a live harness" and "is a provider" the same question. The chat projection flip is
+one surface across nine providers and its harness lives under `app/chat/`, so it was invisible —
+**the same finding as M3's, for the fifth time: a gate over a subset reads exactly like a gate over
+everything.** Widened to scan every `*LiveSmoke*` file under `tests/integration` and to require that
+some matrix names it, with its reader guard repointed and the widened rule broken to prove it.
+
+**Certification is overridden for the rows that need a person in a vault**, as it has been for every
+flip on this branch. Rows 1, 6 and 9 do not apply to print mode; rows 4, 8, 10, 11, 12 and 13 are
+outstanding. What carries that risk is that the flip is one commit and one list entry: removing
+`antigravity` from `projectionChatProviders` reverts it for everyone without touching code.
+
+Gate: unit 535 suites / 8438 tests green, integration 5 suites / 156 tests green (11 skipped —
+the live harnesses), typecheck clean, lint clean, `build:release` clean including `review:source`,
+`review:css` and `review:deps`.
+
+Next: the second provider. Claude is the natural one — it is wave 3, certified, has a content
+presenter this path has never exercised, and is the only provider whose auxiliary work is
+deliberately outside the kernel — but Codex is the cheaper read, because its content presenter is
+the one whose six unconsumed notifications are already pinned.
 
 ### Where the session of 2026-08-25 ended
 

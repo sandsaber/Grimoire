@@ -15,23 +15,30 @@ import { join, resolve } from 'node:path';
  * it requires an answer, and `never` is one.
  */
 const DOCS = resolve(process.cwd(), 'docs');
-const HARNESSES = resolve(process.cwd(), 'tests/integration/app/execution');
+const HARNESSES = resolve(process.cwd(), 'tests/integration');
 
 /**
- * The providers that have a live harness, by the directory it sits in.
+ * Every live harness in the repository, by file name.
  *
  * Read from the tests rather than listed, for the same reason the rows below
- * are: a provider whose harness exists and whose matrix does not is invisible
- * here, and looks exactly like a provider with nothing to record. Two were —
- * Antigravity for four days and Kimi Code from its flip — and neither absence
- * was noticeable in a list of files that were present.
+ * are: a harness whose matrix does not exist is invisible here, and looks
+ * exactly like a surface with nothing to record. Two were — Antigravity for
+ * four days and Kimi Code from its flip — and neither absence was noticeable in
+ * a list of files that were present.
+ *
+ * **Scanned by file rather than by provider directory, and that is the second
+ * version of this reader.** The first walked `app/execution/<provider>/` and
+ * matched a matrix by the directory's name, which made "has a live harness" and
+ * "is a provider" the same question. The chat projection flip is one surface
+ * across nine providers: its harness lives under `app/chat/`, and the first
+ * reader could not see it at all — a gate over a subset reads exactly like a
+ * gate over everything.
  */
-function harnessProviders(): string[] {
-  return readdirSync(HARNESSES, { withFileTypes: true })
-    .filter(entry => entry.isDirectory())
-    .filter(entry => readdirSync(join(HARNESSES, entry.name))
-      .some(file => file.includes('LiveSmoke')))
-    .map(entry => entry.name)
+function liveHarnesses(directory: string = HARNESSES): string[] {
+  return readdirSync(directory, { withFileTypes: true })
+    .flatMap(entry => (entry.isDirectory()
+      ? liveHarnesses(join(directory, entry.name))
+      : entry.name.includes('LiveSmoke') ? [entry.name] : []))
     .sort();
 }
 
@@ -89,19 +96,39 @@ describe('live smoke matrix records', () => {
     // that matched nothing left the pairing below asserting that an empty list
     // contains nothing, which it always does. The same shape as the D7 guard's
     // own first-run defect, caught the same way — by breaking it.
-    expect(harnessProviders()).toEqual([
-      'antigravity', 'claude', 'codex', 'gemini', 'grok',
-      'kimicode', 'mimocode', 'opencode', 'qwen',
+    expect(liveHarnesses()).toEqual([
+      // Not a provider's, and the reason this list is files rather than
+      // directories: the chat projection flip is one surface across nine
+      // providers, certified one at a time.
+      'AntigravityChatProjectionLiveSmoke.integration.test.ts',
+      'AntigravityLiveSmoke.integration.test.ts',
+      'ClaudeLiveSmoke.integration.test.ts',
+      'CodexLiveSmoke.integration.test.ts',
+      'GeminiLiveSmoke.integration.test.ts',
+      'GrokLiveSmoke.integration.test.ts',
+      'KimicodeLiveSmoke.integration.test.ts',
+      'MimocodeLiveSmoke.integration.test.ts',
+      'OpencodeLiveSmoke.integration.test.ts',
+      'QwenLiveSmoke.integration.test.ts',
     ]);
   });
 
-  it('gives every provider with a live harness a matrix to record it in', () => {
-    const documented = new Set(matrices.map(matrix => matrix.file.replace('-flip-smoke-matrix.md', '')));
+  it('gives every live harness a matrix that names it', () => {
+    const harnesses = liveHarnesses();
+    // Guards the reader, which walks a tree: one that found nothing would make
+    // the assertion below vacuous, and a wrong root is silent.
+    expect(harnesses.length).toBeGreaterThan(0);
+    const sources = matrices.map(matrix => readFileSync(join(DOCS, matrix.file), 'utf8')).join('\n');
 
-    // Not every matrix needs a harness — a provider can have rows only a person
+    // Not every matrix needs a harness — a surface can have rows only a person
     // can run — but a harness with nowhere to write down what it found is a run
-    // nobody outside the journal will ever see.
-    expect(harnessProviders().filter(provider => !documented.has(provider))).toEqual([]);
+    // nobody outside the journal will ever see. Matched by name rather than by
+    // directory, so a harness that is not a provider's still has to say where
+    // its results go.
+    // By the harness's own identifier rather than its whole file name: a matrix
+    // may cite it with or without the `.integration.test.ts` suffix, and which
+    // one it chose is not what this is asking about.
+    expect(harnesses.filter(harness => !sources.includes(harness.split('.')[0] ?? ''))).toEqual([]);
   });
 
   it.each(matrices.map(matrix => matrix.file))('%s records whether it has ever run', file => {
@@ -138,9 +165,9 @@ describe('live smoke matrix records', () => {
       // and the last to get a matrix: its rows lived in the journal for four
       // days, where the assertion above could not see them.
       'antigravity-flip-smoke-matrix.md: 2026-08-23',
-      // Never run, and it says so: the chat projection flip's switch is empty,
-      // so no provider is on that path to certify.
-      'chat-projection-flip-smoke-matrix.md: never',
+      // Antigravity's chat projection flip, driven half only: the rows a person
+      // has to watch in a vault are outstanding under the standing override.
+      'chat-projection-flip-smoke-matrix.md: 2026-08-27',
       'claude-flip-smoke-matrix.md: 2026-08-21',
       'codex-flip-smoke-matrix.md: 2026-08-21',
       // Run, and mostly blocked — by the account's daily quota rather than by
