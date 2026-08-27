@@ -98,7 +98,6 @@ export interface CodexWorkspaceContext {
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   readPlanUsage(): Promise<ProviderUsageSnapshot | null>;
-  shouldKeepWarm(): boolean;
   renderSettingsTab(host: unknown): void;
   hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
   deleteConversationSession(conversationId: string): Promise<void>;

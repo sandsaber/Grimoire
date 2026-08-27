@@ -32,7 +32,6 @@ describe('OpenCode provider module', () => {
       saveMcpServers: async () => undefined,
       startMcpServer: async () => undefined,
       stopMcpServer: async () => undefined,
-      shouldKeepWarm: () => true,
       renderSettingsTab: () => undefined,
       hydrateConversation: async () => ({ outcome: 'complete' as const }),
       deleteConversationSession: async () => undefined,

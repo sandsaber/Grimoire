@@ -9129,8 +9129,31 @@ they rest on are asserted — because a document that keeps saying `reshape` abo
 since fixed is worse than no document. Proven by growing the chat-UI slot by one member and watching
 it go red.
 
+#### And then none of them could move, for a reason no gate could see
+
+The table graded `modelCatalog` as the one row ready to move. It is not, and neither is any other
+workspace row: **eight of the nine providers fill their workspace slots from a module context whose
+workspace half throws.** `listModels`, `refreshModels`, `resolveCliPath`, `readPlanUsage`,
+`listCommands`, the agent-mention pair and all four MCP members are `notWired(...)` — ten to twelve
+stubs per provider, Codex alone at zero.
+
+So a slot exists, the module declares it, `workspace.initialize` fills it, and calling it raises.
+Every gate in the repository was satisfied by that: the parity manifest saw a module in the bundle,
+the inventory saw a row with a slot, the row-slot table saw two contracts of compatible shape. The
+only thing that says how far these rows are from moving is counting the stubs, so
+`moduleContextWiring.test.ts` counts them and they may only fall.
+
+**Codex is the proof that all of them are writable**, which is the part that decides what kind of
+work this is: a member stubbed in eight contexts and real in one is eight providers' work, not a
+contract problem. The remaining migration splits cleanly — write eight module contexts (mechanical,
+with a worked example), and reshape eleven slots (design, from the implementations).
+
+The dead `shouldKeepWarm` left behind by the warmup row went with this: fifteen declarations and
+stubs across nine modules, nine contexts and eight tests, with no reader since that row moved.
+
 **What this changes about sequencing.** The M1 slot count was never a measure of readiness. Twenty
-rows had a typed slot from the beginning and three of them could have received their row.
+rows had a typed slot from the beginning, one of them fits its row, and that one is blocked by a
+stub.
 
 #### The slot that was never deleted, and the gate that found eight more
 

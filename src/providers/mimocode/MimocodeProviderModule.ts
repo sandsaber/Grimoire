@@ -115,7 +115,6 @@ export interface MimocodeWorkspaceContext {
   saveMcpServers(servers: readonly ProviderMcpServer[]): Promise<void>;
   startMcpServer(serverId: string): Promise<void>;
   stopMcpServer(serverId: string): Promise<void>;
-  shouldKeepWarm(): boolean;
   renderSettingsTab(host: unknown): void;
   hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
   deleteConversationSession(conversationId: string): Promise<void>;

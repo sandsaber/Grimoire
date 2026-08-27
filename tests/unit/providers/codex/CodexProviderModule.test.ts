@@ -27,7 +27,6 @@ describe('Codex provider module', () => {
       listModels: async () => [{ id: 'gpt-5.5', label: 'GPT-5.5' }],
       refreshModels: async () => [{ id: 'gpt-5.5', label: 'GPT-5.5' }],
       readPlanUsage: async () => ({ label: 'Plus', usedFraction: 0.25 }),
-      shouldKeepWarm: () => true,
       renderSettingsTab: () => undefined,
       hydrateConversation: async () => ({ outcome: 'complete' as const }),
       deleteConversationSession: async () => undefined,

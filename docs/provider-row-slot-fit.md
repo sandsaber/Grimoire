@@ -57,11 +57,45 @@ asserted only so the table cannot drift away from the code.
 | `mcpServerManager` | class | 4 (shared) | reshape | Mention extraction and transformation, disallowed-tool computation (two forms), context-saving servers, and the enabled count — ten public members against a port describing storage and start/stop. **And the row is typed as a concrete class, not an interface**, so nothing else can satisfy it: a provider cannot contribute an MCP port without constructing Grimoire's own manager. That is the reshape, before any member is counted. |
 | `settingsTabRenderer` | 1 + a 7-member context | 1 | reshape | The contract is the context, not the method: the host supplies section builders, model-selector refresh, custom context limits, the advanced section, the hidden-command setting and a discovery suppression flag. `render(host)` types the host as `unknown`, which is honest about the DOM and silent about all seven. |
 
+## The workspace rows are further away than their slots suggest
+
+A slot that fits is not a slot that can receive its row. Eight of the nine providers fill their
+workspace slots from a module context whose **workspace half throws**: `listModels`,
+`refreshModels`, `resolveCliPath`, `readPlanUsage`, `listCommands`, the agent-mention pair and all
+four MCP members are `notWired(...)`. The slot exists, the module declares it, the initializer fills
+it, and calling it raises.
+
+| Provider | Unwired context members |
+|---|---|
+| Codex | 0 — the only real one, and the only provider whose workspace is initialized today |
+| Claude | 10 |
+| Gemini | 11 |
+| Qwen | 11 |
+| Grok | 12 |
+| Kimi Code | 12 |
+| MiMoCode | 12 |
+| OpenCode | 12 |
+| Antigravity | no module context at all; its two slots are built inline |
+
+This is invisible to every other gate: the parity manifest sees a module in the bundle, the
+inventory sees a row with a slot, and the table above sees two contracts of compatible shape. The
+counts are gated in `moduleContextWiring.test.ts` and may only fall.
+
+**Codex is the proof that all of them are writable.** A member stubbed in eight contexts and real in
+one is eight providers' work, not a contract problem — and that distinction is what decides whether
+a row moves or a slot changes.
+
 ## What this means for sequencing
 
-**One row of fourteen can move as a move**: `modelCatalog`. Every other remaining row needs its slot
-reshaped first, and the reshape has to be designed from the implementations — which is what the
-notes above are for.
+**No row can move today.** `modelCatalog` is the one whose slot fits — and it is blocked anyway, because eight of nine providers'
+`listModels` and `refreshModels` throw. Every other remaining row needs its slot reshaped first, and
+the reshape has to be designed from the implementations — which is what the notes above are for.
+
+So the work splits in two, and only one half is design:
+
+1. **Write the eight module contexts.** Mechanical, provider by provider, with Codex as the worked
+   example. It blocks every workspace row.
+2. **Reshape eleven slots.** Design, from the implementations, with the notes above as input.
 
 It also means the M1 slot count was never a measure of readiness. Twenty-odd rows had a typed slot
 from the beginning and one of them could have received its row.

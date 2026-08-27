@@ -82,7 +82,6 @@ export function createCodexModuleContext(
     // Codex keeps a daemon per tab, which is what its warmup policy reports
     // unconditionally; asking the policy here would need a tab and a
     // conversation this context has no business holding.
-    shouldKeepWarm: () => true,
     renderSettingsTab: host => {
       const rendered = host as {
         container: HTMLElement;

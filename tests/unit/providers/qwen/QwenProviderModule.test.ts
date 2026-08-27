@@ -35,7 +35,6 @@ describe('Qwen provider module', () => {
       saveMcpServers: async () => undefined,
       startMcpServer: async () => undefined,
       stopMcpServer: async () => undefined,
-      shouldKeepWarm: () => true,
       renderSettingsTab: () => undefined,
       hydrateConversation: async () => ({ outcome: 'absent' as const }),
       deleteConversationSession: async () => undefined,

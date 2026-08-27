@@ -87,7 +87,6 @@ export function createOpencodeModuleContext(
     saveMcpServers: () => notWired('saveMcpServers'),
     startMcpServer: () => notWired('startMcpServer'),
     stopMcpServer: () => notWired('stopMcpServer'),
-    shouldKeepWarm: () => false,
     renderSettingsTab: () => {
       void notWired('renderSettingsTab');
     },
