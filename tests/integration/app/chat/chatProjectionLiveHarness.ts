@@ -212,6 +212,11 @@ export async function openChatProjection(
     backendId: options.backendId,
     surface: column.binding,
     turnEncoder: () => options.runtime.turnEncoder,
+    // Read through the runtime, exactly as `tabProjectionExecution` does. A
+    // harness without this is a harness where every provider that stops to ask
+    // hangs — which is how the defect this seam exists for was first seen, and
+    // would be how a fixed one still looked.
+    interactionPresenter: () => options.runtime.surfacePorts.interactionPresenter ?? null,
     createConversation: async () => options.conversationId,
     nextCommandId: () => `turn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
   });

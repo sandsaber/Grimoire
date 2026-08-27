@@ -36,6 +36,10 @@ import type {
   ExecutionReconciliationObserver,
   LifecycleLease,
 } from '../../../core/execution/ExecutionLifecycleRegistry';
+import {
+  ExecutionInteractionBridge,
+  type ExecutionInteractionPresenter,
+} from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatMessage, Conversation, UsageInfo } from '../../../core/types';
 import {
   type ChatProjection,
@@ -264,6 +268,16 @@ export class ChatExecutionCoordinator {
   private readonly assistantMessageIdForRun: (runId: RunId) => string;
   private readonly now: () => number;
   private readonly entries = new Map<string, ConversationEntry>();
+  /**
+   * The bridge that answers a provider's question, one per conversation.
+   *
+   * Keyed by conversation and not by surface, for the reason the coordinator
+   * itself is: two tabs open on one chat must show one approval and race to
+   * answer nothing. Held outside `entries` because a tab attaches its presenter
+   * before the conversation has been read, and an entry that does not exist yet
+   * is not a reason to lose the first question of a turn.
+   */
+  private readonly interactionBridges = new Map<string, ExecutionInteractionBridge>();
   private readonly loads = new Map<string, Promise<ConversationEntry>>();
   private disposed = false;
 
@@ -368,6 +382,43 @@ export class ChatExecutionCoordinator {
       return;
     }
     await this.lifecycle.cancelRun(activeRunId, reason);
+  }
+
+  /**
+   * Registers who puts this conversation's questions on screen.
+   *
+   * **The turn stops without one.** A provider that asks before it writes waits
+   * for an answer, and on this path the thing that presents an interaction and
+   * sends the answer back is attached here rather than by the runtime: the
+   * adapter builds its bridge when *it* opens a session, and here the
+   * coordinator opened one. A Claude turn that asked to write a file hung for
+   * five minutes before this existed.
+   *
+   * **The first presenter wins, and the loser is not queued behind it.** Two
+   * tabs on one conversation are two runtimes with two presenters, and both
+   * presenting means one approval on screen twice with two answers racing to
+   * resolve it. The second attach is recorded and inert; it becomes the
+   * presenter only if the first is released while this conversation is still
+   * open, which is what closing a tab does.
+   *
+   * Releasing the last one leaves an open interaction open. That is deliberate:
+   * a dismissal is the provider's to time out, and answering for someone who is
+   * no longer there is the one thing an approval prompt must never do.
+   */
+  attachInteractionPresenter(
+    conversationId: string,
+    presenter: ExecutionInteractionPresenter,
+  ): () => void {
+    const bridge = new ExecutionInteractionBridge(this.lifecycle, presenter, this.now);
+    const previous = this.interactionBridges.get(conversationId);
+    if (!previous) {
+      this.interactionBridges.set(conversationId, bridge);
+    }
+    return () => {
+      if (this.interactionBridges.get(conversationId) === bridge) {
+        this.interactionBridges.delete(conversationId);
+      }
+    };
   }
 
   /**
@@ -768,6 +819,12 @@ export class ChatExecutionCoordinator {
   private acceptEnvelope(entry: ConversationEntry, envelope: ExecutionEventEnvelope): void {
     const targetRunId = scopedRunId(envelope.scope) ?? entry.projection.activeRunId;
     this.apply(entry, { kind: 'run-envelope', envelope });
+    // Beside the projection's own reading of it, not instead of it: the surface
+    // draws that an approval is open, and this is what puts it on screen and
+    // sends the answer back. Nothing else on this path does — the adapter's
+    // bridge is attached when the *adapter* opens a session, and here the
+    // coordinator opened it, so a provider that stopped to ask waited forever.
+    this.interactionBridges.get(entry.projection.conversationId)?.accept(envelope);
     this.trackInteraction(entry, envelope);
     if (targetRunId) {
       this.settleIfTerminal(entry, targetRunId);

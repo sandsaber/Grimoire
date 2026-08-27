@@ -102,6 +102,7 @@ describe('live smoke matrix records', () => {
       // providers, certified one at a time.
       'AntigravityChatProjectionLiveSmoke.integration.test.ts',
       'AntigravityLiveSmoke.integration.test.ts',
+      'ClaudeChatProjectionLiveSmoke.integration.test.ts',
       'ClaudeLiveSmoke.integration.test.ts',
       'CodexChatProjectionLiveSmoke.integration.test.ts',
       'CodexLiveSmoke.integration.test.ts',

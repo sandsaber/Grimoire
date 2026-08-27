@@ -6,7 +6,8 @@ and the surface draws what the projection says. Automated gates prove the wiring
 whole turns end to end over a fake provider; **this is the layer they cannot reach** — a live CLI, a
 real vault, and a person watching the column.
 
-The switch is `src/app/chat/projectionChatProviders.ts`. It holds **Antigravity** and **Codex**:
+The switch is `src/app/chat/projectionChatProviders.ts`. It holds **Antigravity**, **Claude** and
+**Codex**:
 adding one provider to that list is that provider's flip, and this matrix is what certifies it. Run
 it against a release build installed in a vault (`npm run build:release`, then the plugin folder
 copy). Record the date, the CLI version, and one line per row. A row that fails is a stop condition:
@@ -57,6 +58,10 @@ GRIMOIRE_ANTIGRAVITY_LIVE=1 npm run test -- --selectProjects integration \
   --testPathPatterns 'AntigravityChatProjectionLiveSmoke'
 GRIMOIRE_CODEX_LIVE=1 npm run test -- --selectProjects integration \
   --testPathPatterns 'CodexChatProjectionLiveSmoke'
+# Claude loads the real SDK by path, past the mock every other suite gets.
+GRIMOIRE_CLAUDE_LIVE=1 NODE_OPTIONS=--experimental-vm-modules \
+  node scripts/run-jest.js --selectProjects=integration \
+  --runTestsByPath tests/integration/app/chat/ClaudeChatProjectionLiveSmoke.integration.test.ts
 ```
 
 Nothing below the composition is a fake. The backend is the one production registers, over the OS
@@ -65,12 +70,12 @@ the barrier's write goes through the same envelope a vault in the field holds. W
 the column — the DOM — and it records what it was asked to draw rather than answering, so an
 assertion is about what the surface was told to do.
 
-It covers **rows 2, 3, 5, 7, 10 and the negative half of 14**, per provider and only where that
+It covers **rows 2, 3, 5, 7, 9, 10 and the negative half of 14**, per provider and only where that
 provider has the thing: one `done` and one assistant bubble per turn, the stored answer carrying the
 id the surface drew it into, text arriving on the column, a provider's own content items reaching it
 through the presenter, a cancelled turn ending as cancelled with its partial answer kept and no
-process left behind, a reloaded tab resuming the thread the vault kept, and no failure wording on a
-turn that did not fail. Each file also asserts the switch holds its provider, because a harness that
+process left behind, a permission prompt asked **once** and answered so the turn continues, a
+reloaded tab resuming the thread the vault kept, and no failure wording on a turn that did not fail. Each file also asserts the switch holds its provider, because a harness that
 builds the tab's end directly would otherwise keep passing after the flip was reverted.
 
 **Two things a row here must not do**, both learned by doing them:
@@ -80,7 +85,12 @@ builds the tab's end directly would otherwise keep passing after the flip was re
   request — so "it remembered the word" stayed true through three separate breaks. Assert the wire;
 - **stand in for the tab binding without copying it.** The first version of this harness left out
   `tabProjectionExecution`'s content filter, drew `user_message_start` into the column and reported
-  it as a finding. That filter is one exported function now, used by both.
+  it as a finding. That filter is one exported function now, used by both. The same gap swallowed
+  the interaction fix: the harness had no presenter either, so a fixed path still hung.
+
+**And a row that can hang must have its own bound.** Claude's permission row stopped dead for five
+minutes and was killed by the suite timeout, which reports "the test took too long" rather than
+"nobody answered the question". It races a 120s timer now and fails saying what was asked.
 
 What it cannot reach stays a person's: what the drawn text *looks like*, and every row that needs a
 plugin around it.
@@ -93,5 +103,6 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
+| 2026-08-27 | Claude Agent SDK (`haiku`) | 2, 3, 5, 9, 10, 14 (driven half) | — | Claude's flip, and **the row that found the defect this path shipped with**: a provider that stops to ask hung forever, because the bridge that presents an interaction and resolves it was built only when the *adapter* opened a session and here the coordinator opens one. The coordinator attaches it now, one per conversation. Rows 1, 4, 6, 8, 11, 12, 13 outstanding under the standing override |
 | 2026-08-27 | `codex` app-server | 2, 3, 5, 10, 14 (driven half) | — | Codex's flip, and the first provider content this path has drawn. Its answer renders **once** here, where `CodexLiveSmoke` row 1 records the legacy adapter path seeing it three times. Codex sends one tool call's result twice — at item completion and again from `flushPendingRawToolOutputs` — which `StreamController` merges by id on both paths, so it is an observation rather than a row. Rows 1, 4, 6, 8, 9, 11, 12, 13 outstanding under the standing override |
 | 2026-08-27 | `agy` 1.1.19 | 2, 3, 5, 7, 14 (driven half) | — | Antigravity's flip. The driven half only; rows 1, 6, 9 do not apply to print mode — it has no plan approval, no interaction channel, and refuses anything short of full access before a process exists — and rows 4, 8, 10, 11, 12, 13 are outstanding, in a vault, by the owner's standing override |

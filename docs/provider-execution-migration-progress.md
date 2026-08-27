@@ -82,7 +82,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
-| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete** and **the chat path is built, reviewed, and carrying its first provider**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design, and all five runners are deleted; bang-bash runs on the local-shell backend. The chat projection, its coordinator, startup adoption, the renderer, the render target, the attachment, the composition, the tab handle and the conversation port all exist, are composed end to end in one test, are **in the bundle**, and **Antigravity's tabs are on it**: `projectionChatProviders` holds one provider, and adding the next is that provider's flip, certified by `docs/chat-projection-flip-smoke-matrix.md`, whose driven half ran against a real `agy` on 2026-08-27. Still untouched: the remaining eight flips, durable agents, tab-close ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as composition root, and the seam deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
+| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete** and **the chat path is built, reviewed, and carrying its first provider**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design, and all five runners are deleted; bang-bash runs on the local-shell backend. The chat projection, its coordinator, startup adoption, the renderer, the render target, the attachment, the composition, the tab handle and the conversation port all exist, are composed end to end in one test, are **in the bundle**, and **Antigravity's, Claude's and Codex's tabs are on it**: `projectionChatProviders` holds three providers, and adding the next is that provider's flip, certified by `docs/chat-projection-flip-smoke-matrix.md`, whose driven half ran against a real `agy` on 2026-08-27. Still untouched: the remaining six flips, durable agents, tab-close ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as composition root, and the seam deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
@@ -8281,10 +8281,44 @@ Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`)
 
 ### Where the session of 2026-08-27 is
 
-**The chat projection path has its first two providers on it.** `projectionChatProviders` holds
-`antigravity` and `codex`, so those tabs now submit their turns to the chat execution coordinator,
-the kernel runs them, and the surface draws what the projection says. The other seven are unchanged
-and still on `InputController`'s generator.
+**The chat projection path has its first three providers on it.** `projectionChatProviders` holds
+`antigravity`, `claude` and `codex`, so those tabs now submit their turns to the chat execution
+coordinator, the kernel runs them, and the surface draws what the projection says. The other six are
+unchanged and still on `InputController`'s generator.
+
+**Claude's flip found the defect the path shipped with, and it is the one a turn cannot survive: a
+provider that stops to ask hung forever.** `ExecutionInteractionBridge` — the thing that puts an
+interaction on screen and sends the answer back to the kernel — was constructed in exactly one
+place, `ExecutionChatRuntimeAdapter.attachSideChannels`, which runs when *the adapter* opens a
+session or runs a query. On this path the **coordinator** opens the session and the adapter's
+`query` is never called, so no bridge existed, nothing presented the approval, and the run waited on
+an answer nobody was listening for. A Claude turn asked to write a file, stopped, and was killed by
+a 300-second suite timeout.
+
+It would have hit **every provider except Antigravity** — Antigravity has no interaction channel at
+all, print mode refuses anything short of full access before a process exists, which is exactly why
+the first flip could not have found this. Codex's rows did not either: its tool row runs at full
+access. **Only a provider that asks can find it**, and only live — a fake that never asks proves an
+answer nobody gives.
+
+The fix puts the bridge where the session is: `ChatExecutionCoordinator.attachInteractionPresenter`,
+one per conversation rather than one per surface, because two tabs on one chat are two runtimes with
+two presenters and both presenting is one approval on screen twice with two answers racing to
+resolve it. First presenter wins; releasing the last one **leaves an open interaction open**, which
+is deliberate — answering for someone who has closed the tab is the one thing an approval prompt
+must never do. `ExecutionInteractionBridge`'s kernel dependency narrowed from the registry to the
+one method it uses, and `interactionPresenter` joined `ChatSurfacePorts` so the tab binding can read
+it the way it reads the content presenter. Three unit tests written red first, and the live row
+proven by breaking the tab's attach: `waiting`, nothing asked, no `done` — the defect's own shape.
+
+**The harness swallowed the fix once.** It had no presenter either, so the first run after the fix
+looked exactly like the run before it. That is the second time this checkpoint that a harness
+standing in for `tabProjectionExecution` without copying it measured itself — the first was the
+content filter. Both are one shared definition now.
+
+**And a row that can hang must carry its own bound.** Five minutes of wall clock reported as "the
+test took too long" is not a finding; it races a 120-second timer now and fails saying what was
+asked and what came back.
 
 **Antigravity is first because it is the smallest whole turn.** Print mode has no provider-native
 session to resume, no interaction channel — approval is refused before a process exists — and one
@@ -8376,13 +8410,15 @@ the item completes and again from `flushPendingRawToolOutputs` at `turn.complete
 repeat lands on the same card on both paths. Row B asserts the shape — every result names a call the
 turn made — rather than a count.
 
-Gate after Codex: unit 535 suites / 8438 tests green, integration green, typecheck, lint and
-`build:release` clean. Codex live: 4 rows of 4.
+Gate after Claude: unit 535 suites / 8441 tests green, integration green, typecheck, lint and
+`build:release` clean. Live, all re-run after the interaction fix: Antigravity 3/3, Codex 4/4,
+Claude 4/4.
 
-Next: the third provider. Claude is the natural one — it is wave 3, certified, has a content
-presenter this path has never exercised, and is the only provider whose auxiliary work is
-deliberately outside the kernel — but Codex is the cheaper read, because its content presenter is
-the one whose six unconsumed notifications are already pinned.
+Next: the six ACP providers. Every one of them can ask, so the seam this checkpoint built is what
+they need and it is now proven; what each still brings of its own is its content presenter and its
+failure wording. OpenCode and Grok are certifiable on this machine; Gemini answers one turn per
+replenishment; MiMoCode, Kimi Code and Qwen cannot open a session here, and their harnesses are
+worth writing and running anyway — each of the last two found a shipped defect on its first run.
 
 ### Where the session of 2026-08-25 ended
 

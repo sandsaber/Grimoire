@@ -1,6 +1,9 @@
 import type { ExecutionBackendId } from '@/core/execution/ExecutionBackendDescriptor';
 import type { CancellationReason } from '@/core/execution/ExecutionContracts';
-import type { ChatTurnEncoder } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type {
+  ChatTurnEncoder,
+  ExecutionInteractionPresenter,
+} from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatRuntimeQueryOptions, ChatTurnRequest } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
 import type { ProviderId } from '@/core/types/provider';
@@ -43,6 +46,16 @@ export interface ChatTabExecutionOptions {
    * first sends, which is the same lifetime the encoder has.
    */
   turnEncoder(): ChatTurnEncoder | null;
+  /**
+   * The provider's own dialog for a question it stops to ask.
+   *
+   * Read late for the same reason as the encoder, and registered with the
+   * coordinator when this tab opens a conversation: the coordinator opens the
+   * session on this path, so the runtime's own bridge — which attaches when
+   * *it* opens one — never runs, and a turn that asked before writing waited
+   * forever.
+   */
+  interactionPresenter?(): ExecutionInteractionPresenter | null;
   /** Creates the conversation this tab writes into, on the first send. */
   createConversation(): Promise<string>;
   nextCommandId(): string;
@@ -51,6 +64,7 @@ export interface ChatTabExecutionOptions {
 export class ChatTabExecution {
   private readonly attachment: ChatProjectionAttachment;
   private bound: string | null = null;
+  private releasePresenter: (() => void) | null = null;
 
   constructor(private readonly options: ChatTabExecutionOptions) {
     this.attachment = options.composition.bindSurface(options.surface);
@@ -76,6 +90,13 @@ export class ChatTabExecution {
 
   async open(conversationId: string): Promise<void> {
     this.bound = conversationId;
+    this.releasePresenter?.();
+    this.releasePresenter = null;
+    const presenter = this.options.interactionPresenter?.() ?? null;
+    if (presenter) {
+      this.releasePresenter = this.options.composition.coordinator
+        .attachInteractionPresenter(conversationId, presenter);
+    }
     await this.attachment.open(conversationId, this.options.composition.coordinator);
   }
 
@@ -133,6 +154,12 @@ export class ChatTabExecution {
 
   detach(): void {
     this.attachment.detach();
+    // Released, not answered. A tab that closed while an approval was on screen
+    // has nobody to click it, and resolving on their behalf is the one thing an
+    // approval prompt must never do — so the interaction stays open for the
+    // provider to time out or for another surface on this conversation to take.
+    this.releasePresenter?.();
+    this.releasePresenter = null;
     this.bound = null;
   }
 

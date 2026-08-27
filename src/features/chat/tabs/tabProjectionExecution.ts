@@ -115,6 +115,11 @@ export function createTabProjectionExecution(
       setTitle: () => undefined,
     },
     turnEncoder: () => adapterOf(tab)?.turnEncoder ?? null,
+    // The provider's own dialog, read through the tab for the same reason as
+    // the encoder: a cold tab has no runtime until it first sends. Handed to
+    // the coordinator rather than driven here, because the question belongs to
+    // the conversation and two tabs on one chat must not both present it.
+    interactionPresenter: () => adapterOf(tab)?.surfacePorts.interactionPresenter ?? null,
     createConversation: async () => {
       // Whatever already bound this tab wins. Title generation creates the
       // conversation before the first turn is sent — that is where the fallback

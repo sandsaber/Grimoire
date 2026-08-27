@@ -39,8 +39,8 @@ import type {
  * already on screen — see `showInteraction` on the port — so this flushes what
  * a permission prompt needs to appear above and presents nothing.
  *
- * Built for every surface the chat composition binds, which today is none:
- * `projectionChatProviders` is empty, so no tab takes this path.
+ * Built for every surface the chat composition binds, which is every tab whose
+ * provider is listed in `projectionChatProviders`.
  */
 
 /**

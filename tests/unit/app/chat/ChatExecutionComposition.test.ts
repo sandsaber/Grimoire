@@ -9,7 +9,7 @@ import { executionBackendId } from '@/core/execution/ExecutionBackendDescriptor'
 import type { RunTerminal } from '@/core/execution/ExecutionContracts';
 import { ExecutionControlRepositories } from '@/core/execution/ExecutionControlRepositories';
 import { ExecutionControlTransactionCoordinator } from '@/core/execution/ExecutionControlTransactionCoordinator';
-import { sessionInstanceId } from '@/core/execution/ExecutionIds';
+import { interactionId, sessionInstanceId } from '@/core/execution/ExecutionIds';
 import { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
 import { DeterministicFakeBackend } from '@/core/execution/testing/DeterministicFakeBackend';
 import type { ChatTurnEncoder } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
@@ -549,4 +549,137 @@ describe('chat execution composition', () => {
     secondAttachment.detach();
     app.composition.dispose();
   });
+
+  describe('an interaction the provider opens', () => {
+    /**
+     * **The one thing a turn cannot do without.** A provider that stops to ask
+     * waits for an answer, and on this path nobody was listening: the bridge
+     * that presents an interaction and resolves it was built in
+     * `ExecutionChatRuntimeAdapter.attachSideChannels`, which only runs when
+     * the *adapter* opens the session or runs a query. The coordinator opens
+     * its own, so a Claude turn that asked before writing a file hung for five
+     * minutes and was killed by a suite timeout. Found by the flip's live row,
+     * which is the only thing that could have found it: a fake that never asks
+     * proves an answer nobody gives.
+     */
+    const INTERACTION_ID = interactionId(`ix-${'a'.repeat(32)}`);
+
+    async function openInteraction(app: Awaited<ReturnType<typeof createComposition>>) {
+      const ticket = await app.composition.coordinator.submitTurn({
+        commandId: 'cmd-ask',
+        conversationId: CONVERSATION_ID,
+        backendId: executionBackendId('internal-deterministic-fake'),
+        requestRef: 'req-ask',
+        resultExpectation: 'optional',
+        userMessage: { id: 'msg-user-ask', role: 'user', content: 'Write it', timestamp: 1 },
+      });
+      const started = await ticket.started;
+      app.backend.emit(started.runId, {
+        kind: 'interaction-opened',
+        interaction: {
+          interactionId: INTERACTION_ID,
+          runId: started.runId,
+          kind: 'approval',
+          presentationRef: 'approval-write',
+          responseIds: ['allow', 'deny'],
+        },
+      });
+      return { interactionId: INTERACTION_ID, started, ticket };
+    }
+
+    it('presents it through the provider and resolves what came back', async () => {
+      const app = await createComposition();
+      const presented: string[] = [];
+      const release = app.composition.coordinator.attachInteractionPresenter(CONVERSATION_ID, {
+        present: async request => {
+          presented.push(request.presentationRef);
+          return 'allow';
+        },
+      });
+
+      const started = await openInteraction(app);
+      await flush(app.registry);
+
+      expect(presented).toEqual(['approval-write']);
+      // Resolved through the kernel, not merely shown: the run is what has to
+      // stop waiting, and only the registry can tell it to.
+      // Resolved through the kernel and forwarded to the provider, not merely
+      // shown: the run is what has to stop waiting, and only the backend can
+      // let it. The record is `resolving` rather than `resolved` because the
+      // fake never confirms — which provider does is the provider's business,
+      // and the kernel's part ends at having told it.
+      expect(app.backend.resolutions.map(entry => entry.responseId)).toEqual(['allow']);
+      expect(app.registry.getInteraction(started.interactionId)).toMatchObject({
+        selectedResponseId: 'allow',
+        status: 'resolving',
+      });
+      release();
+      app.composition.dispose();
+    });
+
+    it('asks one presenter when two surfaces are open on the conversation', async () => {
+      // The bridge belongs to the conversation, like the turn does. Two tabs
+      // each presenting would put the same approval on screen twice and race
+      // to answer it.
+      const app = await createComposition();
+      const first: string[] = [];
+      const second: string[] = [];
+      const releaseFirst = app.composition.coordinator.attachInteractionPresenter(
+        CONVERSATION_ID,
+        { present: async () => { first.push('asked'); return 'allow'; } },
+      );
+      const releaseSecond = app.composition.coordinator.attachInteractionPresenter(
+        CONVERSATION_ID,
+        { present: async () => { second.push('asked'); return 'deny'; } },
+      );
+
+      await openInteraction(app);
+      await flush(app.registry);
+
+      expect(first).toEqual(['asked']);
+      expect(second).toEqual([]);
+      releaseFirst();
+      releaseSecond();
+      app.composition.dispose();
+    });
+
+    it('leaves it open when the presenter is released', async () => {
+      // A tab that closed answers nothing. Resolving it with an invented
+      // answer would be the UI deciding on the user's behalf, which is the one
+      // thing an approval prompt must never do.
+      const app = await createComposition();
+      const presented: string[] = [];
+      const release = app.composition.coordinator.attachInteractionPresenter(CONVERSATION_ID, {
+        present: async request => {
+          presented.push(request.presentationRef);
+          return 'allow';
+        },
+      });
+      release();
+
+      const started = await openInteraction(app);
+      await flush(app.registry);
+
+      expect(presented).toHaveLength(0);
+      expect(app.registry.getInteraction(started.interactionId)?.status).toBe('open');
+      expect(app.registry.getRun(started.started.runId)?.openInteractionIds).toHaveLength(1);
+      app.composition.dispose();
+    });
+  });
 });
+
+/**
+ * Lets the kernel record the interaction and the bridge answer it.
+ *
+ * `waitForIdle` is the kernel's own answer to "is there work outstanding"; the
+ * microtask turns on either side are the bridge's `await presenter.present` and
+ * its `await resolveInteraction`, neither of which the kernel knows about.
+ */
+async function flush(registry: ExecutionLifecycleRegistry): Promise<void> {
+  for (let round = 0; round < 4; round += 1) {
+    for (let index = 0; index < 8; index += 1) {
+      await Promise.resolve();
+    }
+    await registry.waitForIdle();
+  }
+}

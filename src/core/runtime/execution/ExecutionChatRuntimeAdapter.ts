@@ -3,6 +3,7 @@ import type {
   CancellationReason,
   ExecutionOwner,
   InteractionRequest,
+  InteractionResolution,
   RunTerminalReason,
 } from '../../execution/ExecutionContracts';
 import type {
@@ -546,6 +547,15 @@ export interface ChatSurfacePorts {
    * given reason, leaves the neutral sentence in place.
    */
   readonly describeFailure?: FailurePresenter;
+  /**
+   * The provider's own dialog for a question it stops to ask.
+   *
+   * Exposed to the surface because on the projection path the surface's
+   * coordinator opens the session, so the bridge this adapter attaches when
+   * *it* opens one never runs. Absent for a provider that cannot ask — print
+   * mode refuses anything short of full access before a process exists.
+   */
+  readonly interactionPresenter?: ExecutionInteractionPresenter;
 }
 
 export interface ExecutionChatRuntimeHostPorts extends ChatTurnEncoder, ChatSurfacePorts {
@@ -1401,6 +1411,11 @@ export interface ExecutionInteractionPresenter {
  * resolution; this only has to avoid presenting the same interaction twice
  * after a redelivery, which is why the seen set exists.
  */
+/** The one thing a bridge needs a kernel for. */
+export interface InteractionResolvingPort {
+  resolveInteraction(resolution: InteractionResolution): Promise<void>;
+}
+
 export class ExecutionInteractionBridge {
   /**
    * Bounded for the same reason the ingestor's delivery-id set is: this lives
@@ -1413,7 +1428,10 @@ export class ExecutionInteractionBridge {
   private readonly presentedOrder: string[] = [];
 
   constructor(
-    private readonly registry: ExecutionLifecycleRegistry,
+    // Structural rather than the registry itself: the projection path opens the
+    // session through `ChatExecutionLifecyclePort`, and the only thing a bridge
+    // does with a kernel is answer one interaction.
+    private readonly registry: InteractionResolvingPort,
     private readonly presenter: ExecutionInteractionPresenter,
     private readonly now: () => number = Date.now,
   ) {}
