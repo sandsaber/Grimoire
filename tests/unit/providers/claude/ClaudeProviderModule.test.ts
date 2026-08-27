@@ -235,20 +235,25 @@ describe('Claude provider module', () => {
 
   describe('model presentation', () => {
     it('uses the per-model context window Claude discovery reports', () => {
+      // The app settings record, which is what these members take: the
+      // contribution delegates to the config the chat surface already asks, and
+      // that config scopes the record itself.
       const settings = {
-        ...claudeSettingsCodec.defaults(),
-        discoveredModels: [{
-          id: 'claude-custom',
-          displayName: 'Custom',
-          maxInputTokens: 500_000,
-        }],
+        providerConfigs: {
+          claude: {
+            ...claudeSettingsCodec.encode(claudeSettingsCodec.defaults()),
+            discoveredModels: [{
+              id: 'claude-custom',
+              displayName: 'Custom',
+              maxInputTokens: 500_000,
+            }],
+          },
+        },
       };
-      const presentation = claudeProviderModule.declarations.chatUI.modelPresentation;
+      const presentation = claudeProviderModule.declarations.chatUI.models;
 
       expect(presentation.ownsModel('claude-custom', settings)).toBe(true);
       expect(presentation.contextWindow('claude-custom', settings)).toBe(500_000);
-      expect(presentation.label('claude-custom', settings)).toBe('Custom');
-      expect(presentation.label('opus', settings)).toBe('Opus 5');
       expect(presentation.ownsModel('gpt-5.5', settings)).toBe(false);
     });
   });

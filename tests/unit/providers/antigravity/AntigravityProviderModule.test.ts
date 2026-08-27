@@ -79,7 +79,10 @@ describe('Antigravity provider module', () => {
       expect(antigravityProviderModule.declarations.taskResults).toBeUndefined();
       expect(antigravityProviderModule.declarations.nativeAgents).toBeUndefined();
       // chatUI is not optional: every provider renders somewhere.
-      expect(antigravityProviderModule.declarations.chatUI.icon).toBe('antigravity');
+      // Asked rather than held: a module is built when its file is imported, and
+      // an icon resolved through anything the application composes would run at
+      // import time.
+      expect(typeof antigravityProviderModule.declarations.chatUI.icon).toBe('function');
     });
   });
 

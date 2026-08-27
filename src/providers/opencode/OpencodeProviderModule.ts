@@ -15,15 +15,12 @@ import type {
 import { parseEnvironmentVariables } from '@/utils/env';
 
 import { isRecord } from '../../utils/records';
+import { chatUiContributionFor } from '../shared/chatUiContribution';
 import {
   OPENCODE_EXECUTION_DESCRIPTOR,
   OpencodeExecutionBackend,
   type OpencodeExecutionBackendContext,
 } from './execution/OpencodeExecutionBackend';
-import {
-  decodeOpencodeModelId,
-  isOpencodeModelSelectionId,
-} from './models';
 import {
   DEFAULT_OPENCODE_PROVIDER_SETTINGS,
   normalizeOpencodeModelAliases,
@@ -32,6 +29,7 @@ import {
   type OpencodeProviderSettings,
   type PersistedOpencodeProviderSettings,
 } from './settings';
+import { opencodeChatUIConfig } from './ui/OpencodeChatUIConfig';
 
 /**
  * OpenCode's contribution to the provider catalog.
@@ -120,33 +118,18 @@ export interface OpencodeWorkspaceContext {
 
 export type OpencodeWorkspace = ProviderWorkspaceSlots;
 
-const opencodeChatUi: ProviderChatUiContribution<OpencodeProviderSettings> = {
-  modelPresentation: {
-    // **By the prefix, which is what `OpencodeChatUIConfig` actually does.** This
-    // said the opposite until Gemini's module was checked against its own live
-    // config and three siblings turned out to carry the same claim: that a
-    // provider-qualified raw id (`anthropic/claude-...`) makes ownership a
-    // settings question. It does not. The chat never sees a raw id — it sees
-    // `opencode:anthropic/claude-...`, which `models.ts` encodes — so a lookup in a
-    // list keyed by raw ids answers false for every model this provider has.
-    ownsModel: modelId => isOpencodeModelSelectionId(modelId),
-    // Decoded first, for the same reason: the alias map and the discovered
-    // catalogue are both keyed by the raw id.
-    label: (modelId, settings) => {
-      const rawId = decodeOpencodeModelId(modelId) ?? modelId;
-      return normalizeOpencodeModelAliases(settings.modelAliases)[rawId]
-        ?? settings.discoveredModels.find(model => model.rawId === rawId)?.label
-        ?? rawId;
-    },
-    contextWindow: () => undefined,
-  },
-  permissionToggles: [
-    { id: 'normal', label: 'Safe' },
-    { id: 'plan', label: 'Plan' },
-    { id: 'full_access', label: 'Auto-approve' },
-  ],
-  icon: 'opencode',
-};
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const opencodeChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  opencodeChatUIConfig,
+);
 
 const opencodeCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'opencode',

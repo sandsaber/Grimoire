@@ -14,6 +14,7 @@ import type {
 import { parseEnvironmentVariables } from '@/utils/env';
 
 import { isRecord } from '../../utils/records';
+import { chatUiContributionFor } from '../shared/chatUiContribution';
 import {
   CODEX_EXECUTION_DESCRIPTOR,
   CodexExecutionBackend,
@@ -27,7 +28,7 @@ import {
   type CodexReasoningSummary,
   DEFAULT_CODEX_PROVIDER_SETTINGS,
 } from './settings';
-import { DEFAULT_CODEX_MODEL_SET, formatCodexModelLabel } from './types/models';
+import { codexChatUIConfig } from './ui/CodexChatUIConfig';
 
 /**
  * Codex's contribution to the provider catalog.
@@ -89,7 +90,6 @@ const INSTALLATION_METHODS = new Set<CodexInstallationMethod>([
 /** Effort tiers as the chat UI offers them today. */
 const CODEX_EFFORT_TIERS = ['low', 'medium', 'high', 'xhigh'] as const;
 
-const CODEX_DEFAULT_CONTEXT_WINDOW = 200_000;
 
 export interface CodexWorkspaceContext {
   listSkills(): Promise<readonly ProviderCommandDescriptor[]>;
@@ -111,33 +111,18 @@ export interface CodexWorkspaceContext {
 
 export type CodexWorkspace = ProviderWorkspaceSlots;
 
-const codexChatUi: ProviderChatUiContribution<CodexProviderSettings> = {
-  modelPresentation: {
-    ownsModel: (modelId, settings) => DEFAULT_CODEX_MODEL_SET.has(modelId)
-      || normalizeCodexDiscoveredModels(settings.discoveredModels)
-        .some(model => model.id === modelId)
-      || parseCustomModelIds(settings.customModels).includes(modelId)
-      || looksLikeCodexModel(modelId),
-    label: modelId => formatCodexModelLabel(modelId),
-    // The app-server reports no per-model context window, so one figure covers
-    // every Codex model, as the chat UI already assumes. A model the provider
-    // does not own gets `undefined` rather than a borrowed number.
-    contextWindow: (modelId, settings) => (
-      codexChatUi.modelPresentation.ownsModel(modelId, settings)
-        ? CODEX_DEFAULT_CONTEXT_WINDOW
-        : undefined
-    ),
-  },
-  permissionToggles: [
-    { id: 'normal', label: 'Safe' },
-    { id: 'plan', label: 'Plan' },
-    { id: 'full_access', label: 'Auto-approve' },
-  ],
-  // Names the shared OpenAI mark rather than the provider id: Codex is one of
-  // several surfaces that use it, and collapsing the two would silently rebrand
-  // the tab.
-  icon: 'openai',
-};
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const codexChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  codexChatUIConfig,
+);
 
 const codexCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'codex',
@@ -518,18 +503,6 @@ function computeEnvironmentHash(environmentText: string): string {
     .map(key => `${key}=${variables[key]}`)
     .sort()
     .join('|');
-}
-
-/** Newline or comma separated, as the settings tab accepts them. */
-function parseCustomModelIds(value: string): string[] {
-  return value
-    .split(/[\n,]/)
-    .map(entry => entry.trim())
-    .filter(Boolean);
-}
-
-function looksLikeCodexModel(model: string): boolean {
-  return /^gpt-/i.test(model) || /^o\d/i.test(model);
 }
 
 /** Structural equality that ignores key order and treats arrays as ordered. */

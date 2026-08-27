@@ -258,7 +258,7 @@ describe('Gemini provider module', () => {
         visibleModels: ['gemini-2.5-pro'],
         modelAliases: { 'gemini-3.5-flash': 'Fast' },
       };
-      const presentation = geminiProviderModule.declarations.chatUI.modelPresentation;
+      const presentation = geminiProviderModule.declarations.chatUI.models;
 
       expect(presentation.ownsModel('gemini:gemini-2.5-pro', settings)).toBe(true);
       // The synthetic id a vault with no catalogue yet still selects.
@@ -269,19 +269,6 @@ describe('Gemini provider module', () => {
       expect(presentation.ownsModel('gemini-2.5-pro', settings)).toBe(false);
     });
 
-    it('labels an encoded model from the alias and the catalogue behind it', () => {
-      // Both are keyed by the raw id, so the label has to decode first.
-      const settings = {
-        ...geminiSettingsCodec.defaults(),
-        discoveredModels: [{ rawId: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' }],
-        modelAliases: { 'gemini-3.5-flash': 'Fast' },
-      };
-      const presentation = geminiProviderModule.declarations.chatUI.modelPresentation;
-
-      expect(presentation.label('gemini:gemini-3.5-flash', settings)).toBe('Fast');
-      expect(presentation.label('gemini:gemini-2.5-pro', settings)).toBe('Gemini 2.5 Pro');
-      expect(presentation.label('gemini:gemini-1.0-ultra', settings)).toBe('gemini-1.0-ultra');
-    });
   });
 
   describe('module context', () => {

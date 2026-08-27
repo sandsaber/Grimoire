@@ -15,15 +15,12 @@ import type {
 import { parseEnvironmentVariables } from '@/utils/env';
 
 import { isRecord } from '../../utils/records';
+import { chatUiContributionFor } from '../shared/chatUiContribution';
 import {
   MIMOCODE_EXECUTION_DESCRIPTOR,
   MimocodeExecutionBackend,
   type MimocodeExecutionBackendContext,
 } from './execution/MimocodeExecutionBackend';
-import {
-  decodeMimocodeModelId,
-  isMimocodeModelSelectionId,
-} from './models';
 import {
   DEFAULT_MIMOCODE_PROVIDER_SETTINGS,
   type MimocodeProviderSettings,
@@ -32,6 +29,7 @@ import {
   normalizeMimocodeVisibleModels,
   type PersistedMimocodeProviderSettings,
 } from './settings';
+import { mimocodeChatUIConfig } from './ui/MimocodeChatUIConfig';
 
 /**
  * MiMoCode's contribution to the provider catalog.
@@ -132,33 +130,18 @@ export interface MimocodeWorkspaceContext {
 
 export type MimocodeWorkspace = ProviderWorkspaceSlots;
 
-const mimocodeChatUi: ProviderChatUiContribution<MimocodeProviderSettings> = {
-  modelPresentation: {
-    // **By the prefix, which is what `MimocodeChatUIConfig` actually does.** This
-    // said the opposite until Gemini's module was checked against its own live
-    // config and three siblings turned out to carry the same claim: that a
-    // provider-qualified raw id (`anthropic/claude-...`) makes ownership a
-    // settings question. It does not. The chat never sees a raw id — it sees
-    // `mimocode:anthropic/claude-...`, which `models.ts` encodes — so a lookup in a
-    // list keyed by raw ids answers false for every model this provider has.
-    ownsModel: modelId => isMimocodeModelSelectionId(modelId),
-    // Decoded first, for the same reason: the alias map and the discovered
-    // catalogue are both keyed by the raw id.
-    label: (modelId, settings) => {
-      const rawId = decodeMimocodeModelId(modelId) ?? modelId;
-      return normalizeMimocodeModelAliases(settings.modelAliases)[rawId]
-        ?? settings.discoveredModels.find(model => model.rawId === rawId)?.label
-        ?? rawId;
-    },
-    contextWindow: () => undefined,
-  },
-  permissionToggles: [
-    { id: 'normal', label: 'Safe' },
-    { id: 'plan', label: 'Plan' },
-    { id: 'full_access', label: 'Auto-approve' },
-  ],
-  icon: 'mimocode',
-};
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const mimocodeChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  mimocodeChatUIConfig,
+);
 
 const mimocodeCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'mimocode',

@@ -224,7 +224,7 @@ describe('MiMoCode provider module', () => {
         visibleModels: ['anthropic/claude-sonnet'],
         modelAliases: { 'openai/gpt-5.5': 'Fast' },
       };
-      const presentation = mimocodeProviderModule.declarations.chatUI.modelPresentation;
+      const presentation = mimocodeProviderModule.declarations.chatUI.models;
 
       expect(presentation.ownsModel('mimocode:anthropic/claude-sonnet', settings)).toBe(true);
       // The synthetic id a vault with no catalogue yet still selects.
@@ -233,8 +233,6 @@ describe('MiMoCode provider module', () => {
       // Another provider's, encoded the same way.
       expect(presentation.ownsModel('gemini:gemini-2.5-pro', settings)).toBe(false);
       // The label decodes first: the alias map is keyed by the raw id.
-      expect(presentation.label('mimocode:openai/gpt-5.5', settings)).toBe('Fast');
-      expect(presentation.label('mimocode:anthropic/claude-opus', settings)).toBe('anthropic/claude-opus');
     });
   });
 });

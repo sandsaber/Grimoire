@@ -15,15 +15,12 @@ import type {
 import { parseEnvironmentVariables } from '@/utils/env';
 
 import { isRecord } from '../../utils/records';
+import { chatUiContributionFor } from '../shared/chatUiContribution';
 import {
   GEMINI_EXECUTION_DESCRIPTOR,
   GeminiExecutionBackend,
   type GeminiExecutionBackendContext,
 } from './execution/GeminiExecutionBackend';
-import {
-  decodeGeminiModelId,
-  isGeminiModelSelectionId,
-} from './models';
 import {
   DEFAULT_GEMINI_PROVIDER_SETTINGS,
   type GeminiProviderSettings,
@@ -31,6 +28,7 @@ import {
   normalizeGeminiVisibleModels,
   type PersistedGeminiProviderSettings,
 } from './settings';
+import { geminiChatUIConfig } from './ui/GeminiChatUIConfig';
 
 /**
  * Gemini CLI's contribution to the provider catalog.
@@ -125,35 +123,18 @@ export interface GeminiWorkspaceContext {
 
 export type GeminiWorkspace = ProviderWorkspaceSlots;
 
-const geminiChatUi: ProviderChatUiContribution<GeminiProviderSettings> = {
-  modelPresentation: {
-    // **By the prefix, which is what `GeminiChatUIConfig` actually does.** The
-    // OpenCode family owns a model by the user-curated list, and copying that
-    // here was wrong in a way nothing would have caught until M3: a chat model
-    // id is encoded (`gemini:gemini-2.5-pro`) while the settings hold the CLI's
-    // raw one, so a list lookup on the encoded id answers false for every model
-    // this provider has.
-    ownsModel: modelId => isGeminiModelSelectionId(modelId),
-    // Decoded first, for the same reason: the alias map and the discovered
-    // catalogue are both keyed by the raw id.
-    label: (modelId, settings) => {
-      const rawId = decodeGeminiModelId(modelId) ?? modelId;
-      return normalizeGeminiModelAliases(settings.modelAliases)[rawId]
-        ?? settings.discoveredModels.find(model => model.rawId === rawId)?.label
-        ?? rawId;
-    },
-    contextWindow: () => undefined,
-  },
-  // Not an omission and not an oversight: `capabilities.ts` declares
-  // `reasoningControl: 'none'`, and the recorded session offers no config
-  // option a level could be carried in.
-  permissionToggles: [
-    { id: 'normal', label: 'Safe' },
-    { id: 'plan', label: 'Plan' },
-    { id: 'full_access', label: 'Auto-approve' },
-  ],
-  icon: 'gemini',
-};
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const geminiChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  geminiChatUIConfig,
+);
 
 const geminiCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'gemini',

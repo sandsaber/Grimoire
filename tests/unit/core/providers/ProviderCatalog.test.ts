@@ -64,13 +64,17 @@ function testModule(
       warmup: 'none' as const,
       providerId,
       chatUI: {
-        modelPresentation: {
-          ownsModel: () => false,
-          label: (modelId: string) => modelId,
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
           contextWindow: () => undefined,
+          customModelIds: () => new Set<string>(),
+          defaultsFor: () => undefined,
+          isBuiltIn: () => false,
+          normalizeVariant: (modelId: string) => modelId,
+          options: () => [],
+          ownsModel: () => false,
         },
-        permissionToggles: [],
-        icon: providerId,
       },
     },
     runtimePorts: () => ({ providerId }),

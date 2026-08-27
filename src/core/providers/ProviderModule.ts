@@ -336,7 +336,12 @@ export interface ProviderSettingsPresentationPort<THost = unknown> {
  * Keeping them behind a factory made them unreachable without a plugin, which
  * is what stopped the UI-facing rows from moving off the legacy registration.
  */
-export interface ProviderDeclarations<TSettings extends object = Record<string, unknown>> {
+/**
+ * No longer generic over the provider's settings: the one member that was —
+ * the chat UI contribution — takes the app settings record now, because what it
+ * reads is not only the provider's own config.
+ */
+export interface ProviderDeclarations {
   readonly providerId: ProviderId;
   /** Provider-preloaded context file names. Inventory row 5. */
   readonly context?: ProviderContextPort;
@@ -344,7 +349,7 @@ export interface ProviderDeclarations<TSettings extends object = Record<string, 
    * Chat UI configuration. Inventory row 8 — one row, a wide object, split into
    * named members so a migrated config cannot quietly lose the model picker.
    */
-  readonly chatUI: ProviderChatUiContribution<TSettings>;
+  readonly chatUI: ProviderChatUiContribution;
   /** Provider task and tool result interpretation. Inventory row 15. */
   readonly taskResults?: ProviderTaskResultPort;
   /** Subagent tool-name recognition and display parsing. Inventory row 16. */
@@ -399,10 +404,147 @@ export interface ProviderContextPort {
   preloadedFileNames(): readonly string[];
 }
 
-export interface ProviderChatUiContribution<TSettings extends object = Record<string, unknown>> {
-  readonly modelPresentation: ProviderModelPresentation<TSettings>;
-  readonly permissionToggles: readonly ProviderPermissionToggle[];
-  readonly icon: string;
+/**
+ * Everything a provider decides about how its chat controls look and behave.
+ *
+ * **Twenty members, not three.** The first version had a model presentation, a
+ * static `{id,label}[]` of permission toggles and an icon string, against a row
+ * with twenty methods — so the entire reasoning group, the service-tier toggle,
+ * the mode selector and its apply hook, bang-bash enablement, model options,
+ * custom model ids, variant normalization and metadata preparation had nowhere
+ * to go. Twenty-three consumers read this row; the slot covered three of them.
+ *
+ * Grouped rather than flattened, because the toolbar reads them in groups: a
+ * provider either has a reasoning control or it does not, and a provider with
+ * none should say so by leaving the group out rather than by answering `[]` to
+ * four separate questions.
+ */
+/**
+ * The settings a presentation member is asked about.
+ *
+ * **The whole record, not the provider's own decoded settings.** The slot took
+ * `TSettings` and every one of the twenty members it faces takes the app
+ * settings and scopes them itself — because what they read is not only the
+ * provider's config. A model's ownership depends on environment variables, and
+ * the environment a provider runs under is the shared scope joined with its
+ * own; a settings-blind port disowns every environment model, and a
+ * provider-scoped one disowns every shared one.
+ *
+ * Three rows in a row have wanted this — the settings reconciler, the plan
+ * usage provider and this one — which is why it is named rather than repeated.
+ */
+export type ProviderScopedSettings = Record<string, unknown>;
+
+export interface ProviderChatUiContribution {
+  readonly models: ProviderModelPresentation;
+  /** The reasoning control, where the provider has one. */
+  readonly reasoning?: ProviderReasoningPresentation;
+  /** The permission-mode toggle, where the provider exposes one. */
+  readonly permissionMode?: ProviderPermissionModePresentation;
+  /** The fast/standard toggle, where the provider has service tiers. */
+  readonly serviceTier?: ProviderServiceTierPresentation;
+  /** A provider-owned selector beside the model picker, where there is one. */
+  readonly modeSelector?: ProviderModeSelectorPresentation;
+  /** Whether this provider offers the shared bang-bash input mode. */
+  bangBashEnabled(settings: ProviderScopedSettings): boolean;
+  /**
+   * The provider's icon, drawn beside its model names.
+   *
+   * Structured rather than a string: the row returns a viewBox and a small tree
+   * of paths, and a string could carry neither without the host parsing markup
+   * a provider handed it.
+   *
+   * **Asked, not held.** A module is built when its file is imported, and a
+   * provider that resolves its icon through anything the application composes
+   * would run that at import time — which is how this first went in, and what
+   * the two providers whose icons reach the catalog reported immediately.
+   */
+  icon(): ProviderChatIcon | null;
+}
+
+/**
+ * A provider's icon, as the provider draws it.
+ *
+ * Restated here rather than guessed: the first version of this had a composite
+ * icon as a flat list of paths, and what a provider returns is a small tree —
+ * groups with their own attributes, holding paths with theirs. A flattened
+ * version would have dropped the group transforms two providers rely on, and
+ * nothing would have failed until an icon rendered wrong.
+ */
+export type ProviderChatIcon =
+  | { readonly kind: 'path'; readonly viewBox: string; readonly path: string }
+  | { readonly kind: 'composite'; readonly viewBox: string; readonly children: readonly ProviderChatIconChild[] };
+
+export type ProviderChatIconChild =
+  | { readonly tag: 'path'; readonly attributes: Readonly<Record<string, string>> }
+  | {
+    readonly tag: 'g';
+    readonly attributes: Readonly<Record<string, string>>;
+    readonly children: readonly { readonly tag: 'path'; readonly attributes: Readonly<Record<string, string>> }[];
+  };
+
+export interface ProviderReasoningPresentation {
+  /**
+   * Whether this model's reasoning is chosen from named tiers rather than a
+   * token budget. The two render differently, which is why it is asked per
+   * model rather than declared once per provider.
+   */
+  isTiered(modelId: string, settings: ProviderScopedSettings): boolean;
+  options(modelId: string, settings: ProviderScopedSettings): readonly ProviderReasoningOption[];
+  defaultValue(modelId: string, settings: ProviderScopedSettings): string;
+  /** Applied when the toolbar changes the selection, where the provider cares. */
+  apply?(modelId: string, value: string, settings: ProviderScopedSettings): void;
+}
+
+export interface ProviderReasoningOption {
+  readonly value: string;
+  readonly label: string;
+  readonly description?: string;
+  /** Token budget, for the providers whose reasoning is bought rather than tiered. */
+  readonly tokens?: number;
+}
+
+export interface ProviderPermissionModePresentation {
+  toggle(): ProviderPermissionModeToggle | null;
+  /** This provider's current mode in the shared vocabulary, or nothing. */
+  resolve(settings: ProviderScopedSettings): string | null;
+  apply(value: string, settings: ProviderScopedSettings): void;
+}
+
+export interface ProviderPermissionModeToggle {
+  readonly inactiveValue: string;
+  readonly inactiveLabel: string;
+  readonly inactiveDescription?: string;
+  readonly activeValue: string;
+  readonly activeLabel: string;
+  readonly activeDescription?: string;
+  readonly planValue?: string;
+  readonly planLabel?: string;
+  readonly planDescription?: string;
+}
+
+export interface ProviderServiceTierPresentation {
+  toggle(settings: ProviderScopedSettings): ProviderServiceTierToggle | null;
+}
+
+export interface ProviderServiceTierToggle {
+  readonly inactiveValue: string;
+  readonly inactiveLabel: string;
+  readonly activeValue: string;
+  readonly activeLabel: string;
+  readonly description?: string;
+}
+
+export interface ProviderModeSelectorPresentation {
+  selector(settings: ProviderScopedSettings): ProviderModeSelector | null;
+  apply(value: string, settings: ProviderScopedSettings): void;
+}
+
+export interface ProviderModeSelector {
+  readonly label: string;
+  readonly value: string;
+  readonly activeValue?: string;
+  readonly options: readonly ProviderModelOption[];
 }
 
 /**
@@ -413,10 +555,65 @@ export interface ProviderChatUiContribution<TSettings extends object = Record<st
  * built-in one, and a settings-blind port would disown every custom model.
  * Providers that need no settings can ignore the argument.
  */
-export interface ProviderModelPresentation<TSettings extends object = Record<string, unknown>> {
-  ownsModel(modelId: string, settings: TSettings): boolean;
-  label(modelId: string, settings: TSettings): string;
-  contextWindow(modelId: string, settings: TSettings): number | undefined;
+export interface ProviderModelPresentation {
+  ownsModel(modelId: string, settings: ProviderScopedSettings): boolean;
+  /**
+   * The window this model has, honouring a per-model override the user set.
+   *
+   * The overrides are the host's — one map for every provider — so they are
+   * passed rather than read, and a provider that has no opinion answers
+   * nothing rather than a guess the meter would draw.
+   */
+  contextWindow(
+    modelId: string,
+    settings: ProviderScopedSettings,
+    customLimits?: Readonly<Record<string, number>>,
+  ): number | undefined;
+  /**
+   * What the picker lists for this provider, each option carrying its own label.
+   *
+   * There was a `label(modelId, settings)` beside this, and the row has no such
+   * member: the picker reads labels off the options it is drawing. Deriving one
+   * by searching the options answers the raw id for any model not currently
+   * listed — an alias-labelled model the user has hidden, for instance — which
+   * is worse than not offering the question.
+   */
+  options(settings: ProviderScopedSettings): readonly ProviderModelOption[];
+  /**
+   * Whether this is a model the provider ships, rather than one a user
+   * configured or an environment variable introduced. Read when two providers
+   * claim the same id, to prefer the one that owns it outright.
+   */
+  isBuiltIn(modelId: string): boolean;
+  /** The model id with any variant suffix the visibility settings disallow removed. */
+  normalizeVariant(modelId: string, settings: ProviderScopedSettings): string;
+  /** Model ids this provider recognizes in a set of environment variables. */
+  customModelIds(environment: Readonly<Record<string, string>>): ReadonlySet<string>;
+  /**
+   * The settings a model change implies, as a patch rather than a mutation.
+   *
+   * The row this replaces takes the settings object and writes into it, which
+   * is why a caller cannot tell what a model change touched — and why two
+   * providers writing the same field is invisible.
+   */
+  defaultsFor(modelId: string, settings: ProviderScopedSettings): void;
+  /**
+   * Provider-owned discovery after a model is selected, where there is any.
+   *
+   * The only member that takes a host handle, and the only asynchronous one:
+   * it reaches provider services to learn about a model the user just picked.
+   */
+  prepareMetadata?(modelId: string, settings: ProviderScopedSettings, host: unknown): Promise<void>;
+}
+
+export interface ProviderModelOption {
+  readonly value: string;
+  readonly label: string;
+  /** A shorter label, for controls too narrow for the full one. */
+  readonly buttonLabel?: string;
+  readonly description?: string;
+  /** A heading to group this option under, where a picker separates them. */
+  readonly group?: string;
 }
 
 /**
@@ -729,7 +926,7 @@ export interface ProviderModule<
   readonly execution: ExecutionBackendFactory<TExecutionContext>;
   readonly capabilities: ProviderCapabilityDescriptor;
   /** What the provider declares about itself, reachable without a plugin. */
-  readonly declarations: ProviderDeclarations<TSettings>;
+  readonly declarations: ProviderDeclarations;
   /**
    * A factory over the same context the workspace initializes from.
    *

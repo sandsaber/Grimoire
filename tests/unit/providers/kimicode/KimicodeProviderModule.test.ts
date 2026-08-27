@@ -224,7 +224,7 @@ describe('Kimi Code provider module', () => {
         visibleModels: ['anthropic/claude-sonnet'],
         modelAliases: { 'openai/gpt-5.5': 'Fast' },
       };
-      const presentation = kimicodeProviderModule.declarations.chatUI.modelPresentation;
+      const presentation = kimicodeProviderModule.declarations.chatUI.models;
 
       expect(presentation.ownsModel('kimicode:anthropic/claude-sonnet', settings)).toBe(true);
       // The synthetic id a vault with no catalogue yet still selects.
@@ -233,8 +233,6 @@ describe('Kimi Code provider module', () => {
       // Another provider's, encoded the same way.
       expect(presentation.ownsModel('gemini:gemini-2.5-pro', settings)).toBe(false);
       // The label decodes first: the alias map is keyed by the raw id.
-      expect(presentation.label('kimicode:openai/gpt-5.5', settings)).toBe('Fast');
-      expect(presentation.label('kimicode:anthropic/claude-opus', settings)).toBe('anthropic/claude-opus');
     });
   });
 });

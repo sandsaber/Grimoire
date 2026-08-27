@@ -233,14 +233,13 @@ describe('Qwen provider module', () => {
         visibleModels: ['qwen3-coder-plus'],
         modelAliases: { 'qwen3-max': 'Max' },
       };
-      const presentation = qwenProviderModule.declarations.chatUI.modelPresentation;
+      const presentation = qwenProviderModule.declarations.chatUI.models;
 
       expect(presentation.ownsModel('qwen:qwen3-coder-plus', settings)).toBe(true);
       expect(presentation.ownsModel('qwen', settings)).toBe(true);
       expect(presentation.ownsModel('qwen3-coder-plus', settings)).toBe(false);
       expect(presentation.ownsModel('gemini:gemini-2.5-pro', settings)).toBe(false);
       // The label decodes first: the alias map is keyed by the raw id.
-      expect(presentation.label('qwen:qwen3-max', settings)).toBe('Max');
     });
   });
 

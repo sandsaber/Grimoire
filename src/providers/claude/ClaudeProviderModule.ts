@@ -18,6 +18,7 @@ import { TOOL_SUBAGENT, TOOL_SUBAGENT_LEGACY } from '@/core/tools/toolNames';
 import { parseEnvironmentVariables } from '@/utils/env';
 
 import { isRecord } from '../../utils/records';
+import { chatUiContributionFor } from '../shared/chatUiContribution';
 import {
   CLAUDE_EXECUTION_DESCRIPTOR,
   ClaudeExecutionBackend,
@@ -32,7 +33,7 @@ import {
   normalizeClaudeCodeProjectSettingsSnapshot,
   normalizeClaudeDiscoveredModels,
 } from './settings';
-import { DEFAULT_CLAUDE_MODELS } from './types/models';
+import { claudeChatUIConfig } from './ui/ClaudeChatUIConfig';
 
 /**
  * Claude's contribution to the provider catalog.
@@ -84,7 +85,6 @@ const ENVIRONMENT_HASH_KEYS = [
   'ANTHROPIC_BASE_URL',
 ];
 
-const CLAUDE_MODEL_IDS = new Set(DEFAULT_CLAUDE_MODELS.map(model => model.value));
 
 export interface ClaudeWorkspaceContext {
   listCommands(): Promise<readonly ProviderCommandDescriptor[]>;
@@ -109,34 +109,18 @@ export interface ClaudeWorkspaceContext {
 
 export type ClaudeWorkspace = ProviderWorkspaceSlots;
 
-const claudeChatUi: ProviderChatUiContribution<ClaudeProviderSettings> = {
-  modelPresentation: {
-    ownsModel: (modelId, settings) => CLAUDE_MODEL_IDS.has(modelId)
-      || normalizeClaudeDiscoveredModels(settings.discoveredModels)
-        .some(model => model.id === modelId)
-      || parseCustomModelIds(settings.customModels).includes(modelId)
-      || looksLikeClaudeModel(modelId),
-    label: (modelId, settings) => DEFAULT_CLAUDE_MODELS
-      .find(model => model.value === modelId)
-      ?.label
-      ?? normalizeClaudeDiscoveredModels(settings.discoveredModels)
-        .find(model => model.id === modelId)
-        ?.displayName
-      ?? modelId,
-    // Unlike Codex, Claude's discovery reports a real per-model window, so the
-    // discovered value is used where it exists rather than one figure for all.
-    contextWindow: (modelId, settings) => normalizeClaudeDiscoveredModels(settings.discoveredModels)
-      .find(model => model.id === modelId)
-      ?.maxInputTokens,
-  },
-  permissionToggles: [
-    { id: 'normal', label: 'Safe' },
-    { id: 'plan', label: 'Plan' },
-    { id: 'acceptEdits', label: 'Accept edits' },
-    { id: 'bypassPermissions', label: 'Auto-approve' },
-  ],
-  icon: 'claude',
-};
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const claudeChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  claudeChatUIConfig,
+);
 
 /**
  * Reads a Claude tool payload for the two rows that describe it.
@@ -522,17 +506,6 @@ function normalizeStringMap(value: unknown): Record<string, string> {
       .filter(([host, entry]) => host.trim() !== '' && typeof entry === 'string')
       .map(([host, entry]) => [host, (entry as string).trim()]),
   );
-}
-
-function parseCustomModelIds(value: string): string[] {
-  return value
-    .split(/[\n,]/)
-    .map(entry => entry.trim())
-    .filter(Boolean);
-}
-
-function looksLikeClaudeModel(model: string): boolean {
-  return /^claude-/i.test(model);
 }
 
 /** The tool names a Claude subagent launch arrives under, current and legacy. */

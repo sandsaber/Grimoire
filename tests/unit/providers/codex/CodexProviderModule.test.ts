@@ -277,24 +277,43 @@ describe('Codex provider module', () => {
   });
 
   describe('model presentation', () => {
-    it('owns a model the user configured, which a settings-blind port would disown', () => {
-      const settings = {
-        ...codexSettingsCodec.defaults(),
-        customModels: 'internal-review-model\nsecond-model',
+    /**
+     * The app settings record, which is what these members take.
+     *
+     * The contribution used to take Codex's own decoded settings and answer
+     * from a hand-written presentation. It delegates to the config the chat
+     * surface already asks now, and that config scopes the app record itself —
+     * because what it reads is not only Codex's config: an environment model is
+     * owned too, and the environment is the shared scope joined with Codex's.
+     */
+    function appSettings(config: Record<string, unknown> = {}): Record<string, unknown> {
+      return {
+        providerConfigs: {
+          codex: { ...codexSettingsCodec.encode(codexSettingsCodec.defaults()), ...config },
+        },
       };
-      const presentation = codexProviderModule.declarations.chatUI.modelPresentation;
+    }
+
+    it('owns a model the user configured, which a settings-blind port would disown', () => {
+      const settings = appSettings({ customModels: 'internal-review-model\nsecond-model' });
+      const presentation = codexProviderModule.declarations.chatUI.models;
 
       expect(presentation.ownsModel('internal-review-model', settings)).toBe(true);
       expect(presentation.ownsModel('gpt-5.5', settings)).toBe(true);
       expect(presentation.ownsModel('claude-opus-5', settings)).toBe(false);
     });
 
-    it('gives no context window to a model it does not own', () => {
-      const settings = codexSettingsCodec.defaults();
-      const presentation = codexProviderModule.declarations.chatUI.modelPresentation;
+    it('reports one width for every model, which is what Codex actually does', () => {
+      const settings = appSettings();
+      const presentation = codexProviderModule.declarations.chatUI.models;
 
+      // **This assertion used to say `undefined` for a model Codex does not
+      // own**, and it was asserting the module's own hand-written presentation
+      // rather than the product: `codexChatUIConfig.getContextWindowSize()`
+      // takes no model and answers a constant. Two implementations of one
+      // question, disagreeing, with a test pinning the one nothing rendered.
       expect(presentation.contextWindow('gpt-5.5', settings)).toBe(200_000);
-      expect(presentation.contextWindow('claude-opus-5', settings)).toBeUndefined();
+      expect(presentation.contextWindow('claude-opus-5', settings)).toBe(200_000);
     });
   });
 

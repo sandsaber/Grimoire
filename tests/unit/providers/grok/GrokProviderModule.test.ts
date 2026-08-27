@@ -248,15 +248,13 @@ describe('Grok provider module', () => {
         modelAliases: { 'grok-4.6': 'Fast' },
         visibleModels: ['grok-4.6'],
       };
-      const presentation = grokProviderModule.declarations.chatUI.modelPresentation;
+      const presentation = grokProviderModule.declarations.chatUI.models;
 
       // Unlike OpenCode, a Grok selection carries its provider in the id, so a
       // model the vault has never discovered is still Grok's to label.
       expect(presentation.ownsModel('grok:grok-4.6', settings)).toBe(true);
       expect(presentation.ownsModel('grok:anthropic/claude-sonnet-4', settings)).toBe(true);
       expect(presentation.ownsModel('anthropic/claude-sonnet-4', settings)).toBe(false);
-      expect(presentation.label('grok:grok-4.6', settings)).toBe('Fast');
-      expect(presentation.label('grok:grok-4.5', settings)).toBe('grok-4.5');
     });
   });
 });

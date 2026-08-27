@@ -9129,6 +9129,47 @@ they rest on are asserted — because a document that keeps saying `reshape` abo
 since fixed is worse than no document. Proven by growing the chat-UI slot by one member and watching
 it go red.
 
+#### The biggest row, and the two inventories that disagreed
+
+`chatUIConfig` is the row twenty-three consumers read and the one whose slot covered three of its
+twenty members. It is reshaped: seven grouped members, because the toolbar reads them in groups — a
+provider either has a reasoning control or it does not, and one with none should say so by leaving
+the group out rather than by answering four questions emptily.
+
+**The parameter was wrong too, and that is the third row to say so.** The slot took the provider's
+decoded settings; every one of the row's twenty members takes the app record and scopes it itself,
+because what they read is not only the provider's config — a model can be owned by an environment
+variable, and a provider's environment is the shared scope joined with its own. The settings
+reconciler wanted this, the plan usage provider wanted this, and now the largest row does.
+
+**And the nine modules were a third inventory.** Each carried a hand-written model presentation
+answering three of those questions against decoded settings while the live config answered all
+twenty against the app's. The contribution *is* the live config now, grouped — nothing in it decides
+anything — which is what makes moving this row a move rather than a rewrite, and which deleted the
+per-module helpers that had accumulated behind it.
+
+**They disagreed, and nothing could see it.** Codex's module said a model it does not own has no
+context width; `codexChatUIConfig.getContextWindowSize()` takes no model at all and answers a
+constant, which is what the meter draws. A test pinned the module's answer — the one nothing
+rendered. There is a parity gate now that asks both, for every provider and every member, and it is
+proven by making the delegation decide one thing for itself.
+
+Two of my own defects, both caught by tests rather than by reading:
+
+- **`label(modelId, settings)` was a slot member with no row behind it.** I derived it by searching
+  the options, which answers the raw id for any model not currently listed — an alias-labelled model
+  the user has hidden, for instance. The picker reads labels off the options it is drawing; the
+  member is gone.
+- **The icon was resolved when the module was built**, which is when its file is imported — before
+  the application has composed anything. Two providers' icons reach the catalog, and both reported
+  it immediately. It is asked for now, not held.
+
+And one thing I broke with a script and had to restore: a bulk deletion of "unused" declarations, run
+by line number after the file had already shifted, took `GrokWorkspaceContext` with it. The nine
+modules were restored from git and redone with brace-matched edits. **A regex that deletes code is a
+regex that deletes the wrong code eventually**, and the only reason this was caught is that the next
+compile named an interface that should not have been missing.
+
 #### The workspace capability map answered a question nobody asked
 
 App-level inventory row 1 is on the descriptor. What it had there was

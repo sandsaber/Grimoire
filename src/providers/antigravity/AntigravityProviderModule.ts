@@ -9,6 +9,7 @@ import type {
 } from '@/core/providers/ProviderModule';
 
 import { isRecord } from '../../utils/records';
+import { chatUiContributionFor } from '../shared/chatUiContribution';
 import {
   ANTIGRAVITY_EXECUTION_DESCRIPTOR,
   AntigravityExecutionBackend,
@@ -22,6 +23,7 @@ import {
   normalizeAntigravityVisibleModels,
   normalizeHostnameCliPaths,
 } from './settings';
+import { antigravityChatUIConfig } from './ui/AntigravityChatUIConfig';
 
 /**
  * Antigravity's contribution to the provider catalog.
@@ -90,22 +92,18 @@ export interface AntigravityWorkspaceContext {
  */
 export type AntigravityWorkspace = ProviderWorkspaceSlots;
 
-const antigravityChatUi: ProviderChatUiContribution<AntigravityProviderSettings> = {
-  modelPresentation: {
-    // Antigravity's own models are prefixed; a model the user added by hand or
-    // discovered from `agy models` is owned too, which is why the settings are
-    // consulted rather than the prefix alone.
-    ownsModel: (modelId, settings) => modelId.startsWith('antigravity:')
-      || normalizeAntigravityVisibleModels(settings.visibleModels).includes(modelId)
-      || normalizeDiscoveredModels(settings.discoveredModels)
-        .some(model => model.rawId === modelId),
-    label: (modelId, settings) => normalizeAntigravityModelAliases(settings.modelAliases)[modelId]
-      ?? modelId.replace(/^antigravity:/, ''),
-    contextWindow: () => undefined,
-  },
-  permissionToggles: [],
-  icon: 'antigravity',
-};
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const antigravityChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  antigravityChatUIConfig,
+);
 
 const antigravityCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'antigravity',

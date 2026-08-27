@@ -15,15 +15,12 @@ import type {
 import { parseEnvironmentVariables } from '@/utils/env';
 
 import { isRecord } from '../../utils/records';
+import { chatUiContributionFor } from '../shared/chatUiContribution';
 import {
   QWEN_EXECUTION_DESCRIPTOR,
   QwenExecutionBackend,
   type QwenExecutionBackendContext,
 } from './execution/QwenExecutionBackend';
-import {
-  decodeQwenModelId,
-  isQwenModelSelectionId,
-} from './models';
 import {
   DEFAULT_QWEN_PROVIDER_SETTINGS,
   normalizeQwenEffortLevel,
@@ -33,6 +30,7 @@ import {
   QWEN_EFFORT_LEVELS,
   type QwenProviderSettings,
 } from './settings';
+import { qwenChatUIConfig } from './ui/QwenChatUIConfig';
 
 /**
  * Qwen Code's contribution to the provider catalog.
@@ -130,29 +128,18 @@ export interface QwenWorkspaceContext {
 
 export type QwenWorkspace = ProviderWorkspaceSlots;
 
-const qwenChatUi: ProviderChatUiContribution<QwenProviderSettings> = {
-  modelPresentation: {
-    // By the prefix, which is what `QwenChatUIConfig` does: the chat's ids are
-    // encoded (`qwen:<raw id>`) and the settings hold the CLI's raw ones.
-    ownsModel: modelId => isQwenModelSelectionId(modelId),
-    label: (modelId, settings) => {
-      const rawId = decodeQwenModelId(modelId) ?? modelId;
-      return normalizeQwenModelAliases(settings.modelAliases)[rawId]
-        ?? settings.discoveredModels.find(model => model.rawId === rawId)?.label
-        ?? rawId;
-    },
-    contextWindow: () => undefined,
-  },
-  // Five levels where the OpenCode family has three, and the mechanism behind
-  // them is this provider's own: a `/effort <level>` prompt rather than a config
-  // option or a dedicated method.
-  permissionToggles: [
-    { id: 'normal', label: 'Safe' },
-    { id: 'plan', label: 'Plan' },
-    { id: 'full_access', label: 'Auto-approve' },
-  ],
-  icon: 'qwen',
-};
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const qwenChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  qwenChatUIConfig,
+);
 
 const qwenCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'qwen',

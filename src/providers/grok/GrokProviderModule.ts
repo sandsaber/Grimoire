@@ -17,15 +17,12 @@ import { parseEnvironmentVariables } from '@/utils/env';
 
 import { GRIMOIRE_STORAGE_PATH } from '../../core/bootstrap/StoragePaths';
 import { isRecord } from '../../utils/records';
+import { chatUiContributionFor } from '../shared/chatUiContribution';
 import {
   GROK_EXECUTION_DESCRIPTOR,
   GrokExecutionBackend,
 } from './execution/GrokExecutionBackend';
-import {
-  decodeGrokModelId,
-  isGrokModelSelectionId,
-  normalizeGrokThinkingOptionsByModel,
-} from './models';
+import { normalizeGrokThinkingOptionsByModel } from './models';
 import { GROK_ARTIFACTS_SUBDIR } from './runtime/GrokPaths';
 import {
   DEFAULT_GROK_PROVIDER_SETTINGS,
@@ -35,6 +32,7 @@ import {
   normalizeGrokVisibleModels,
   type PersistedGrokProviderSettings,
 } from './settings';
+import { grokChatUIConfig } from './ui/GrokChatUIConfig';
 
 /**
  * Grok Build's contribution to the provider catalog.
@@ -89,9 +87,6 @@ const ENVIRONMENT_HASH_KEYS = [
   'XAI_API_KEY',
 ];
 
-/** What the chat tab shows for a model with no other stated width. */
-const DEFAULT_CONTEXT_WINDOW = 200_000;
-
 export interface GrokWorkspaceContext {
   listCommands(): Promise<readonly ProviderCommandDescriptor[]>;
   listSessionCommands(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
@@ -126,32 +121,18 @@ export interface GrokWorkspaceContext {
 
 export type GrokWorkspace = ProviderWorkspaceSlots;
 
-const grokChatUi: ProviderChatUiContribution<GrokProviderSettings> = {
-  modelPresentation: {
-    // Grok model ids are Grimoire-encoded (`grok:<raw id>`), so ownership is a
-    // question the encoding answers. It is the answer for every provider that
-    // encodes one — this module had it right while three siblings claimed their
-    // visible list was the only thing that could, which their own chat UI
-    // configs contradicted.
-    ownsModel: modelId => isGrokModelSelectionId(modelId),
-    label: (modelId, settings) => {
-      const rawId = decodeGrokModelId(modelId);
-      if (!rawId) {
-        return modelId;
-      }
-      return normalizeGrokModelAliases(settings.modelAliases)[rawId]
-        ?? settings.discoveredModels.find(model => model.rawId === rawId)?.label
-        ?? rawId;
-    },
-    contextWindow: () => DEFAULT_CONTEXT_WINDOW,
-  },
-  permissionToggles: [
-    { id: 'normal', label: 'Safe' },
-    { id: 'plan', label: 'Plan' },
-    { id: 'full_access', label: 'Auto-approve' },
-  ],
-  icon: 'grok',
-};
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const grokChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  grokChatUIConfig,
+);
 
 const grokCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'grok',
