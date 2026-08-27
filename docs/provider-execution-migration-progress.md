@@ -9421,11 +9421,11 @@ Open obligations, each with an owner:
   carrying plan indicators and raw response items, pinned in `wireVocabularyCoverage.test.ts` so the
   gap cannot grow. OpenCode's two are closed by wave 4's content surface, and that check now replays
   the recording through the presenter rather than grepping the backend for a wire name the
-  normalizer has already renamed. **The Claude row of this obligation was never pinned**: the
-  recording observes seven message types and that file asserts nothing about them, so the "four
-  Claude message types" this entry used to claim was an unmeasured number. Owner: each provider's
-  flip — and Claude's is owed a gate shaped like OpenCode's replay, since wave 3 has already
-  flipped;
+  normalizer has already renamed. **The Claude row is pinned now**, in the shape this entry asked for:
+  it replays the recording through the real `ClaudeContentPresenter` and its usage store, counting a
+  message as consumed only when something was actually produced or taken. What remains of this
+  obligation is Codex's six, and they are held rather than growing. Owner: whoever gives Codex's
+  plan indicators and raw response items a surface;
 - ~~**three providers still need wire recordings** — Kimi Code, Qwen, Gemini.~~ **All nine are taken.**
   Gemini's is `complete`; Kimi Code's and Qwen's are `partial` because neither machine is
   authenticated, and MiMoCode's because its account cannot generate — each says so in the file rather
@@ -9442,25 +9442,25 @@ Open obligations, each with an owner:
   theirs, and Grok's flip keeps the fallback with a test that goes red without it. Owner: the three
   forks, in one commit of their own — their auxiliary halves are byte-identical and must stay that
   way;
-- **a conversation created over an id that already exists replaces it.** Preserved from the legacy
-  path rather than changed inside a persistence milestone: a conversation may be created under a
-  provider's own session id, so refusing the collision could break resuming into one, and adopting
-  the existing record would change what `createConversation` returns. What it does today is write an
-  empty conversation over one that has history. Owner: whoever owns conversation creation, with the
-  product answer for what resuming into an existing conversation should do;
-- **`loadMetadata` answers a record this build cannot read as "no conversation".** A future or corrupt
-  record now has a name — D5's read-only, migration-required state — and nothing surfaces it: the
-  conversation disappears from the history list exactly as it did before. **Not closed by the typed
-  hydration commit**, and the reason is worth stating: a hydration outcome is shown *inside* a
-  conversation, and a conversation whose metadata cannot be read never reaches the list to be opened.
-  It needs a surface of its own. Owner: whoever builds the history list's own empty and error states;
+- ~~**a conversation created over an id that already exists replaces it.**~~ **Closed, and this entry
+  was stale when it was read on 2026-08-27** — worth saying, because the obligation list is what a
+  resuming reader trusts. `createConversation` writes through `SessionStorage.createMetadata`, which
+  refuses a collision; the caller catches `ConversationAlreadyExistsError`, retries under a fresh id
+  and keeps the provider's session in `sessionId`, so resume still works and the existing
+  conversation is left alone. Written as refuse-and-retry rather than look-then-write because the
+  store serializes per id and a check first can lose the race with another window;
+- ~~**`loadMetadata` answers a record this build cannot read as "no conversation".**~~ **Closed, and
+  also stale.** D5's read-only state has a surface of its own now: `getUnreadableConversations` feeds
+  a `grimoire-history-unreadable` block in the history list, so a record this build cannot parse is
+  shown as one rather than disappearing;
 - **awaiting an owner decision: redo.** Recorded as D9 in the persistence decisions. Re-running a
   request is free and needs no new state; undoing a rewind cannot be built on the control store,
   because D2 forbids a second copy of a provider transcript without exception, and the file backup
   is discarded after a successful rewind. Which of the two the product wants is the open question;
-- the provider backends that carry them must absorb the UTF-8 stream decoding (`utf8Stream`) and
-  Grok transcript recovery semantics that landed on `main` after the v1 baseline. Owner: the Grok
-  and ACP backends, at their harvest;
+- ~~the provider backends that carry them must absorb the UTF-8 stream decoding (`utf8Stream`) and
+  Grok transcript recovery semantics that landed on `main` after the v1 baseline.~~ **Closed, and
+  checked rather than assumed on 2026-08-27**: `utf8Stream` is in `AcpSubprocess` and Antigravity's
+  model discovery, and `GrokExecutionComposition` holds a `GrokNativeTranscriptRecovery`;
 - ~~**a vendor error on the prompt becomes "could not establish whether this run completed".**~~
   **Closed in the commit below this entry.** A `JsonRpcErrorResponse` is now the discriminator — the
   transport constructs one only when the peer sent an error response, and raises a plain `Error` for
@@ -9501,8 +9501,9 @@ Open obligations, each with an owner:
   provider that put a prompt into an error message would put it there. That is a review question about
   what providers raise, not a redaction question;
 - `ProviderModule` has no slot for `prepareTurn`, which the adapter contract maps as a module
-  contribution. The adapter routes it through a host port meanwhile. Owner: M3, when the four legacy
-  prompt encoders move;
+  contribution. The adapter routes it through a host port meanwhile — still true on 2026-08-27.
+  Owner: **M5**, with the provider rows; M3 closed at a revised scope that left the prompt encoders
+  where they were;
 - **three** `ChatRuntime` members are absent by contract, each with its reason in
   `adapterMemberCoverage.test.ts`: `getAuxiliaryModel` and the two subagent loaders. Two have left
   that list with a false reason attached: `resetSession`, and `reloadWorkspaceResources` — recorded as
@@ -9511,9 +9512,10 @@ Open obligations, each with an owner:
   Owner: whoever declares a call site for one of the four;
 - the kernel and adapter carry long explanatory comments where a sentence would do. Owner: a focused
   pass, so it does not ride along with behaviour changes;
-- three `src/core/**` modules import the plugin type, enumerated in
-  `executionCompositionBoundaries.test.ts`. Owner: M3, when the provider catalog replaces the split
-  registries. **The eight core→provider imports previously listed here did not exist** — they were an
+- three `src/core/**` modules import the plugin type — still exactly three on 2026-08-27, and two of
+  them are the registries themselves: `ProviderRegistry`, `ProviderWorkspaceRegistry` and
+  `providers/types.ts`. Owner: **M5**, with the registry deletion the provider rows lead to; M3
+  handed it over rather than closing it. **The eight core→provider imports previously listed here did not exist** — they were an
   artifact of a gate that matched specifiers as text; see the M2-adapter correction above.
 
 Standing rules that outlive any milestone:
