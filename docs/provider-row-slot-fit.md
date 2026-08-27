@@ -68,18 +68,27 @@ it, and calling it raises.
 | Provider | Unwired context members |
 |---|---|
 | Codex | 0 — the only real one, and the only provider whose workspace is initialized today |
-| Claude | 1 — wired; only the settings tab is left, and that is a slot reshape rather than wiring |
-| Gemini | 10 |
-| Qwen | 10 |
-| Grok | 11 |
-| Kimi Code | 11 |
-| MiMoCode | 11 |
-| OpenCode | 11 |
+| Claude | 1 |
+| Gemini | 1 |
+| Qwen | 1 |
+| Grok | 2 |
+| Kimi Code | 2 |
+| MiMoCode | 2 |
+| OpenCode | 2 |
 | Antigravity | no module context at all; its two slots are built inline |
 
 This is invisible to every other gate: the parity manifest sees a module in the bundle, the
 inventory sees a row with a slot, and the table above sees two contracts of compatible shape. The
 counts are gated in `moduleContextWiring.test.ts` and may only fall.
+
+**They have fallen.** The table above is the state after the eight contexts were wired: ten to
+twelve stubs each became at most two, and neither of the two is wiring. `renderSettingsTab` faces a
+slot that types the host as `unknown` against a seven-member context; `listSessionCommands` faces a
+slot taking a session id while the real loader takes a runtime. Both close with their row's reshape.
+
+The implementation is `src/providers/shared/workspaceContextSlots.ts` — one, not eight. What a
+provider supplies is its services accessor, its chat-UI config, and whether its command dropdown
+offers the CLI's built-ins beside the vault's.
 
 **Codex is the proof that all of them are writable.** A member stubbed in eight contexts and real in
 one is eight providers' work, not a contract problem — and that distinction is what decides whether

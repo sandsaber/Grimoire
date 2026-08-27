@@ -413,7 +413,7 @@ export class GeminiExecution {
     // *this tab's* conversation, so the context has to close over the same one
     // the ports above sync.
     const contributions = geminiProviderModule.runtimePorts(
-      createGeminiModuleContext(boundConversation),
+      createGeminiModuleContext(this.plugin, boundConversation),
     );
 
     const runtime = new GeminiRuntimeAdapter(

@@ -1,7 +1,11 @@
 import type { BoundConversation } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { Conversation } from '@/core/types';
+import type GrimoirePlugin from '@/main';
+import { maybeGetGeminiWorkspaceServices } from '@/providers/gemini/app/GeminiWorkspaceServices';
 import type { GeminiWorkspaceContext } from '@/providers/gemini/GeminiProviderModule';
 import { GeminiConversationHistoryService } from '@/providers/gemini/history/GeminiConversationHistoryService';
+import { geminiChatUIConfig } from '@/providers/gemini/ui/GeminiChatUIConfig';
+import { createWorkspaceContextSlots } from '@/providers/shared/workspaceContextSlots';
 
 /**
  * What one tab's conversation is, read when it is asked for.
@@ -29,9 +33,17 @@ export type GeminiBoundConversation = () => BoundConversation | null;
  * whole binding — so there is nothing for a port to answer.
  */
 export function createGeminiModuleContext(
+  plugin: GrimoirePlugin,
   conversation: GeminiBoundConversation,
 ): GeminiWorkspaceContext {
   const history = new GeminiConversationHistoryService();
+  const workspace = createWorkspaceContextSlots({
+    chatUI: geminiChatUIConfig,
+    includeBuiltInCommands: false,
+    plugin,
+    providerId: 'gemini',
+    services: () => maybeGetGeminiWorkspaceServices(),
+  });
 
   return {
     /**
@@ -62,15 +74,7 @@ export function createGeminiModuleContext(
       const bound = matching(conversation, conversationId);
       return bound ? history.isPendingForkConversation(bound) : false;
     },
-    listCommands: () => notWired('listCommands'),
-    listAgentMentions: () => notWired('listAgentMentions'),
-    refreshAgentMentions: () => notWired('refreshAgentMentions'),
-    resolveCliPath: () => notWired('resolveCliPath'),
-    listModels: () => notWired('listModels'),
-    refreshModels: () => notWired('refreshModels'),
-    readPlanUsage: () => notWired('readPlanUsage'),
-    loadMcpServers: () => notWired('loadMcpServers'),
-    saveMcpServers: () => notWired('saveMcpServers'),
+    ...workspace,
     renderSettingsTab: () => {
       void notWired('renderSettingsTab');
     },

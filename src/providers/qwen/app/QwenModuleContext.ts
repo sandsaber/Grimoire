@@ -1,8 +1,12 @@
 import type { ProviderCommandDescriptor } from '@/core/providers/ProviderModule';
 import type { BoundConversation } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { Conversation } from '@/core/types';
+import type GrimoirePlugin from '@/main';
+import { maybeGetQwenWorkspaceServices } from '@/providers/qwen/app/QwenWorkspaceServices';
 import { QwenConversationHistoryService } from '@/providers/qwen/history/QwenConversationHistoryService';
 import type { QwenWorkspaceContext } from '@/providers/qwen/QwenProviderModule';
+import { qwenChatUIConfig } from '@/providers/qwen/ui/QwenChatUIConfig';
+import { createWorkspaceContextSlots } from '@/providers/shared/workspaceContextSlots';
 
 /**
  * What one tab's conversation is, read when it is asked for.
@@ -36,10 +40,18 @@ export interface QwenModuleContextPorts {
  * one that fails where it was wired.
  */
 export function createQwenModuleContext(
+  plugin: GrimoirePlugin,
   conversation: QwenBoundConversation,
   ports: QwenModuleContextPorts,
 ): QwenWorkspaceContext {
   const history = new QwenConversationHistoryService();
+  const workspace = createWorkspaceContextSlots({
+    chatUI: qwenChatUIConfig,
+    includeBuiltInCommands: true,
+    plugin,
+    providerId: 'qwen',
+    services: () => maybeGetQwenWorkspaceServices(),
+  });
 
   return {
     /**
@@ -72,15 +84,7 @@ export function createQwenModuleContext(
     // The open session's own, which the catalog cannot know: they arrive as an
     // update rather than as an answer to anything.
     listSessionCommands: async () => ports.sessionCommands(),
-    listCommands: () => notWired('listCommands'),
-    listAgentMentions: () => notWired('listAgentMentions'),
-    refreshAgentMentions: () => notWired('refreshAgentMentions'),
-    resolveCliPath: () => notWired('resolveCliPath'),
-    listModels: () => notWired('listModels'),
-    refreshModels: () => notWired('refreshModels'),
-    readPlanUsage: () => notWired('readPlanUsage'),
-    loadMcpServers: () => notWired('loadMcpServers'),
-    saveMcpServers: () => notWired('saveMcpServers'),
+    ...workspace,
     renderSettingsTab: () => {
       void notWired('renderSettingsTab');
     },

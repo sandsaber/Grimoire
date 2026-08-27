@@ -23,6 +23,7 @@ Repository documentation and user-facing product copy should be in English unles
 - `src/providers/kimicode/` - Kimi Code ACP adapter and launch/workspace artifacts.
 - `src/providers/qwen/` - Qwen Code ACP adapter and Qwen-owned runtime, history, settings, and UI behavior.
 - `src/providers/acp/` - Shared ACP transport and normalization helpers.
+- `src/providers/shared/` - Provider-neutral helpers that need the plugin type, and so cannot live in `src/core/`. A helper belongs here only when at least two providers use it and its implementation is genuinely the same question asked twice.
 
 Read the nested `AGENTS.md` in a provider directory before changing provider-specific runtime, storage, history, settings, or UI behavior.
 OpenCode and MiMoCode intentionally mirror each other closely; when changing launch, ACP runtime, workspace, storage, history, settings, or UI behavior in one provider, check and usually apply the same change to the other provider unless the CLIs intentionally differ.

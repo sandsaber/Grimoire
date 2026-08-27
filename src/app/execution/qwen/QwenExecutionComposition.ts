@@ -530,7 +530,7 @@ export class QwenExecution {
     // *this tab's* conversation, so the context has to close over the same one
     // the ports above sync.
     const contributions = qwenProviderModule.runtimePorts(
-      createQwenModuleContext(boundConversation, { sessionCommands: () => sessionCommands }),
+      createQwenModuleContext(this.plugin, boundConversation, { sessionCommands: () => sessionCommands }),
     );
 
     const runtime = new QwenRuntimeAdapter(

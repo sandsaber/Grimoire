@@ -251,7 +251,7 @@ describe('Qwen provider module', () => {
     };
 
     it('answers only about the conversation its own tab is bound to', () => {
-      const context = createQwenModuleContext(() => conversation, { sessionCommands: () => [] });
+      const context = createQwenModuleContext(testPlugin(), () => conversation, { sessionCommands: () => [] });
 
       expect(context.resolveSessionId('conversation-1')).toBe('acp-session');
       expect(context.resolveSessionId('conversation-2')).toBeNull();
@@ -261,7 +261,7 @@ describe('Qwen provider module', () => {
     it('lists the commands the tab own session announced', async () => {
       // The port Gemini's context has no equivalent of: only the tab holding
       // the session knows what it said.
-      const context = createQwenModuleContext(() => conversation, {
+      const context = createQwenModuleContext(testPlugin(), () => conversation, {
         sessionCommands: () => [{ name: 'clear', source: 'session' as const }],
       });
 
@@ -270,17 +270,32 @@ describe('Qwen provider module', () => {
     });
 
     it('reports that there is nothing to hydrate rather than that it hydrated', async () => {
-      const context = createQwenModuleContext(() => conversation, { sessionCommands: () => [] });
+      const context = createQwenModuleContext(testPlugin(), () => conversation, { sessionCommands: () => [] });
 
       await expect(context.hydrateConversation('conversation-1'))
         .resolves.toEqual({ outcome: 'absent' });
     });
 
-    it('refuses a workspace slot it does not serve, by name', async () => {
-      const context = createQwenModuleContext(() => null, { sessionCommands: () => [] });
+    it('answers a workspace slot with nothing when no workspace is registered', async () => {
+      const context = createQwenModuleContext(testPlugin(), () => null, { sessionCommands: () => [] });
 
-      await expect(context.listModels()).rejects.toThrow(/listModels/);
-      await expect(context.loadMcpServers()).rejects.toThrow(/legacy workspace registration/);
+      // These threw by name until the context was wired. An unregistered
+      // workspace is a provider with nothing to offer, not one that fails: the
+      // settings surface renders empty rather than raising where nobody catches
+      // it, and the slot that still refuses does so because its row has not
+      // been reshaped yet.
+      await expect(context.listModels()).resolves.toEqual([]);
+      await expect(context.loadMcpServers()).resolves.toEqual([]);
+      await expect(context.listCommands()).resolves.toEqual([]);
+      await expect(context.readPlanUsage()).resolves.toBeNull();
     });
   });
 });
+
+/** Enough plugin for the workspace slots, which read settings and a CLI path. */
+function testPlugin(): never {
+  return {
+    getResolvedProviderCliPath: () => null,
+    settings: {},
+  } as never;
+}

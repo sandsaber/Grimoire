@@ -1,9 +1,12 @@
 import type { BoundConversation } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { Conversation } from '@/core/types';
 import type GrimoirePlugin from '@/main';
+import { maybeGetMimocodeWorkspaceServices } from '@/providers/mimocode/app/MimocodeWorkspaceServices';
 import { MimocodeConversationHistoryService } from '@/providers/mimocode/history/MimocodeConversationHistoryService';
 import type { MimocodeWorkspaceContext } from '@/providers/mimocode/MimocodeProviderModule';
 import { getMimocodeState } from '@/providers/mimocode/types';
+import { mimocodeChatUIConfig } from '@/providers/mimocode/ui/MimocodeChatUIConfig';
+import { createWorkspaceContextSlots } from '@/providers/shared/workspaceContextSlots';
 import { getVaultPath } from '@/utils/path';
 
 /**
@@ -40,6 +43,13 @@ export function createMimocodeModuleContext(
   ports: MimocodeModuleContextPorts,
 ): MimocodeWorkspaceContext {
   const history = new MimocodeConversationHistoryService();
+  const workspace = createWorkspaceContextSlots({
+    chatUI: mimocodeChatUIConfig,
+    includeBuiltInCommands: true,
+    plugin,
+    providerId: 'mimocode',
+    services: () => maybeGetMimocodeWorkspaceServices(),
+  });
 
   return {
     hydrateConversation: async conversationId => {
@@ -75,16 +85,11 @@ export function createMimocodeModuleContext(
       // own is what a tab that has not launched yet still knows.
       return ports.databasePath() ?? getMimocodeState(bound.providerState).databasePath ?? null;
     },
-    listCommands: () => notWired('listCommands'),
+    ...workspace,
+    // The commands a live session announces need that session, and this
+    // context is not bound to one. The row that owns them takes a runtime; its
+    // slot takes a session id, which is the reshape that closes this.
     listSessionCommands: () => notWired('listSessionCommands'),
-    listAgentMentions: () => notWired('listAgentMentions'),
-    refreshAgentMentions: () => notWired('refreshAgentMentions'),
-    resolveCliPath: () => notWired('resolveCliPath'),
-    listModels: () => notWired('listModels'),
-    refreshModels: () => notWired('refreshModels'),
-    readPlanUsage: () => notWired('readPlanUsage'),
-    loadMcpServers: () => notWired('loadMcpServers'),
-    saveMcpServers: () => notWired('saveMcpServers'),
     renderSettingsTab: () => {
       void notWired('renderSettingsTab');
     },

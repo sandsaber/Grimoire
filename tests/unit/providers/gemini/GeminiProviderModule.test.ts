@@ -291,7 +291,7 @@ describe('Gemini provider module', () => {
     };
 
     it('answers only about the conversation its own tab is bound to', () => {
-      const context = createGeminiModuleContext(() => conversation);
+      const context = createGeminiModuleContext(testPlugin(), () => conversation);
 
       expect(context.resolveSessionId('conversation-1')).toBe('acp-session');
       // Another tab's conversation is not this runtime's to answer for: a
@@ -301,7 +301,7 @@ describe('Gemini provider module', () => {
     });
 
     it('reports that there is nothing to hydrate rather than that it hydrated', async () => {
-      const context = createGeminiModuleContext(() => conversation);
+      const context = createGeminiModuleContext(testPlugin(), () => conversation);
 
       // `supportsNativeHistory: false`. Answering `complete` would tell the
       // surface a transcript was read back when none exists.
@@ -309,11 +309,26 @@ describe('Gemini provider module', () => {
         .resolves.toEqual({ outcome: 'absent' });
     });
 
-    it('refuses a workspace slot it does not serve, by name', async () => {
-      const context = createGeminiModuleContext(() => null);
+    it('answers a workspace slot with nothing when no workspace is registered', async () => {
+      const context = createGeminiModuleContext(testPlugin(), () => null);
 
-      await expect(context.listModels()).rejects.toThrow(/listModels/);
-      await expect(context.loadMcpServers()).rejects.toThrow(/legacy workspace registration/);
+      // These threw by name until the context was wired. An unregistered
+      // workspace is a provider with nothing to offer, not one that fails: the
+      // settings surface renders empty rather than raising where nobody catches
+      // it, and the slot that still refuses does so because its row has not
+      // been reshaped yet.
+      await expect(context.listModels()).resolves.toEqual([]);
+      await expect(context.loadMcpServers()).resolves.toEqual([]);
+      await expect(context.listCommands()).resolves.toEqual([]);
+      await expect(context.readPlanUsage()).resolves.toBeNull();
     });
   });
 });
+
+/** Enough plugin for the workspace slots, which read settings and a CLI path. */
+function testPlugin(): never {
+  return {
+    getResolvedProviderCliPath: () => null,
+    settings: {},
+  } as never;
+}

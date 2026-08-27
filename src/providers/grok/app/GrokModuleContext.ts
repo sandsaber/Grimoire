@@ -1,9 +1,12 @@
 import type { BoundConversation } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { Conversation } from '@/core/types';
 import type GrimoirePlugin from '@/main';
+import { maybeGetGrokWorkspaceServices } from '@/providers/grok/app/GrokWorkspaceServices';
 import type { GrokWorkspaceContext } from '@/providers/grok/GrokProviderModule';
 import { GrokConversationHistoryService } from '@/providers/grok/history/GrokConversationHistoryService';
 import { getGrokState } from '@/providers/grok/types';
+import { grokChatUIConfig } from '@/providers/grok/ui/GrokChatUIConfig';
+import { createWorkspaceContextSlots } from '@/providers/shared/workspaceContextSlots';
 import { getVaultPath } from '@/utils/path';
 
 /**
@@ -46,6 +49,13 @@ export function createGrokModuleContext(
   ports: GrokModuleContextPorts,
 ): GrokWorkspaceContext {
   const history = new GrokConversationHistoryService();
+  const workspace = createWorkspaceContextSlots({
+    chatUI: grokChatUIConfig,
+    includeBuiltInCommands: true,
+    plugin,
+    providerId: 'grok',
+    services: () => maybeGetGrokWorkspaceServices(),
+  });
 
   return {
     hydrateConversation: async conversationId => {
@@ -89,16 +99,11 @@ export function createGrokModuleContext(
         ...(workspacePath ? { workspacePath } : {}),
       };
     },
-    listCommands: () => notWired('listCommands'),
+    ...workspace,
+    // The commands a live session announces need that session, and this
+    // context is not bound to one. The row that owns them takes a runtime; its
+    // slot takes a session id, which is the reshape that closes this.
     listSessionCommands: () => notWired('listSessionCommands'),
-    listAgentMentions: () => notWired('listAgentMentions'),
-    refreshAgentMentions: () => notWired('refreshAgentMentions'),
-    resolveCliPath: () => notWired('resolveCliPath'),
-    listModels: () => notWired('listModels'),
-    refreshModels: () => notWired('refreshModels'),
-    readPlanUsage: () => notWired('readPlanUsage'),
-    loadMcpServers: () => notWired('loadMcpServers'),
-    saveMcpServers: () => notWired('saveMcpServers'),
     renderSettingsTab: () => {
       void notWired('renderSettingsTab');
     },

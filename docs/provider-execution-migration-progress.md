@@ -9129,6 +9129,37 @@ they rest on are asserted — because a document that keeps saying `reshape` abo
 since fixed is worse than no document. Proven by growing the chat-UI slot by one member and watching
 it go red.
 
+#### The eight contexts, written once
+
+All eight are wired: ten-to-twelve stubs each down to at most two, and neither of the two is wiring.
+`renderSettingsTab` faces a slot that types the host as `unknown` against a seven-member context,
+and `listSessionCommands` faces a slot taking a session id while the real loader takes a runtime.
+Both close with their row's reshape.
+
+**One implementation, not eight.** Codex was the worked example, and copying it eight times would
+have produced nine near-identical answers to nine questions — the exact shape this migration has
+spent four checkpoints deleting: the auxiliary services, the task-result interpreters, the warmup
+policies, the settings reconcilers waiting their turn. So the answers live in
+`src/providers/shared/workspaceContextSlots.ts`, and a provider supplies what genuinely differs: its
+services accessor, its chat-UI config, and whether its command dropdown offers the CLI's built-ins
+beside the vault's. Claude says yes, Codex says no — for Codex a provider command *is* a vault
+skill — and that is a real difference between two products rather than an accident of copying.
+
+**The risk a shared implementation creates is the opposite of the one it removes**, and it needed
+its own test: a provider wired to a *neighbour's* services accessor would list Kimi Code's MCP
+servers under Grok, and every assertion about the shape of that answer would still pass. So each
+provider registers a marker only it could return. Proven by pointing Grok at Kimi Code's accessor
+and watching one row go red while the other five stayed green.
+
+Two behaviours the wiring settles, both of which were previously a throw:
+
+- **An unregistered workspace answers with nothing, not with an exception.** A provider whose
+  workspace has not been registered — before registration, or in a test — has nothing to offer, and
+  a settings surface that renders empty is right where one that raises is not.
+- **A model list needs a workspace.** Without one, `listModels` answers `[]` rather than the
+  built-ins, because listing a built-in the user has had no chance to configure offers a model that
+  is not really there.
+
 #### Two operations the product does not have, and one it does
 
 Wiring Claude's module context — the first of the eight — found the MCP port describing a lifecycle

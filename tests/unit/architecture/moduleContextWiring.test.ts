@@ -4,6 +4,12 @@ import { resolve } from 'node:path';
 /**
  * How much of each provider's module context is real.
  *
+ * Down from ten-to-twelve stubs per provider to at most two, and the two that
+ * remain are not wiring. `renderSettingsTab` faces a slot that types the host
+ * as `unknown` against a seven-member context, and `listSessionCommands` faces
+ * a slot taking a session id while the real loader takes a runtime. Both close
+ * with their row's reshape.
+ *
  * `ProviderModule` says a provider's workspace slots are filled by
  * `workspace.initialize(context)`, and all nine modules fill them. What the
  * slot-fit audit missed on its first pass is that **eight of nine fill them
@@ -21,21 +27,16 @@ import { resolve } from 'node:path';
  */
 
 const CONTEXTS: ReadonlyArray<{ providerId: string; path: string; notWired: number }> = [
-  {
-    // One left: the settings tab, whose slot types the host as `unknown` and
-    // whose real contract is a seven-member context the host supplies. It
-    // closes with that row's reshape, not with wiring.
-    providerId: 'claude', path: 'src/providers/claude/app/ClaudeModuleContext.ts', notWired: 1,
-  },
+  { providerId: 'claude', path: 'src/providers/claude/app/ClaudeModuleContext.ts', notWired: 1 },
   // The only context that is entirely real, which is why Codex is the only
   // provider whose workspace is initialized today.
   { providerId: 'codex', path: 'src/providers/codex/app/CodexModuleContext.ts', notWired: 0 },
-  { providerId: 'gemini', path: 'src/providers/gemini/app/GeminiModuleContext.ts', notWired: 10 },
-  { providerId: 'grok', path: 'src/providers/grok/app/GrokModuleContext.ts', notWired: 11 },
-  { providerId: 'kimicode', path: 'src/providers/kimicode/app/KimicodeModuleContext.ts', notWired: 11 },
-  { providerId: 'mimocode', path: 'src/providers/mimocode/app/MimocodeModuleContext.ts', notWired: 11 },
-  { providerId: 'opencode', path: 'src/providers/opencode/app/OpencodeModuleContext.ts', notWired: 11 },
-  { providerId: 'qwen', path: 'src/providers/qwen/app/QwenModuleContext.ts', notWired: 10 },
+  { providerId: 'gemini', path: 'src/providers/gemini/app/GeminiModuleContext.ts', notWired: 1 },
+  { providerId: 'grok', path: 'src/providers/grok/app/GrokModuleContext.ts', notWired: 2 },
+  { providerId: 'kimicode', path: 'src/providers/kimicode/app/KimicodeModuleContext.ts', notWired: 2 },
+  { providerId: 'mimocode', path: 'src/providers/mimocode/app/MimocodeModuleContext.ts', notWired: 2 },
+  { providerId: 'opencode', path: 'src/providers/opencode/app/OpencodeModuleContext.ts', notWired: 2 },
+  { providerId: 'qwen', path: 'src/providers/qwen/app/QwenModuleContext.ts', notWired: 1 },
 ];
 
 /**
@@ -66,12 +67,12 @@ describe('provider module context wiring', () => {
     expect(CONTEXTS.map(context => `${context.providerId}: ${context.notWired}`)).toEqual([
       'claude: 1',
       'codex: 0',
-      'gemini: 10',
-      'grok: 11',
-      'kimicode: 11',
-      'mimocode: 11',
-      'opencode: 11',
-      'qwen: 10',
+      'gemini: 1',
+      'grok: 2',
+      'kimicode: 2',
+      'mimocode: 2',
+      'opencode: 2',
+      'qwen: 1',
     ]);
   });
 

@@ -1,0 +1,81 @@
+import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
+import { createGeminiModuleContext } from '@/providers/gemini/app/GeminiModuleContext';
+import { createGrokModuleContext } from '@/providers/grok/app/GrokModuleContext';
+import { createKimicodeModuleContext } from '@/providers/kimicode/app/KimicodeModuleContext';
+import { createMimocodeModuleContext } from '@/providers/mimocode/app/MimocodeModuleContext';
+import { createOpencodeModuleContext } from '@/providers/opencode/app/OpencodeModuleContext';
+import { createQwenModuleContext } from '@/providers/qwen/app/QwenModuleContext';
+
+/**
+ * Each provider's workspace slots, reaching each provider's own services.
+ *
+ * The implementation behind them is shared, which is the point — nine copies of
+ * nine questions is what this migration keeps deleting. The risk a shared
+ * implementation creates is the opposite one: a provider wired to *another*
+ * provider's services accessor, which would list Kimi Code's MCP servers under
+ * Grok and be invisible to any test that only checked the shape of the answer.
+ *
+ * So every provider is registered with a marker only it could return.
+ */
+describe('provider workspace context slots', () => {
+  interface Wiring {
+    readonly build: (plugin: never) => {
+      listCommands(): Promise<readonly unknown[]>;
+      listModels(): Promise<readonly unknown[]>;
+      loadMcpServers(): Promise<readonly { id: string }[]>;
+      readPlanUsage(): Promise<unknown>;
+    };
+    readonly providerId: string;
+  }
+
+  const ports = { sessionCommands: () => [], sessionPaths: () => ({}) } as never;
+
+  const WIRINGS: readonly Wiring[] = [
+    { build: p => createGeminiModuleContext(p, () => null), providerId: 'gemini' },
+    { build: p => createGrokModuleContext(p, () => null, ports), providerId: 'grok' },
+    { build: p => createKimicodeModuleContext(p, () => null, ports), providerId: 'kimicode' },
+    { build: p => createMimocodeModuleContext(p, () => null, ports), providerId: 'mimocode' },
+    { build: p => createOpencodeModuleContext(p, () => null, ports), providerId: 'opencode' },
+    { build: p => createQwenModuleContext(p, () => null, ports), providerId: 'qwen' },
+  ];
+
+  function plugin(): never {
+    return { getResolvedProviderCliPath: () => null, settings: {} } as never;
+  }
+
+  afterEach(() => {
+    ProviderWorkspaceRegistry.clear();
+  });
+
+  it.each(WIRINGS)('$providerId reads its own workspace services', async ({ build, providerId }) => {
+    for (const wiring of WIRINGS) {
+      ProviderWorkspaceRegistry.setServices(wiring.providerId, {
+        mcpStorage: {
+          load: async () => [{
+            config: { command: 'x' },
+            contextSaving: false,
+            enabled: true,
+            name: `${wiring.providerId}-server`,
+          }],
+          save: async () => undefined,
+        },
+      });
+    }
+
+    const servers = await build(plugin()).loadMcpServers();
+
+    // The marker is the provider's own id: a context wired to a neighbour's
+    // accessor returns the neighbour's server, and every other assertion about
+    // this answer would still pass.
+    expect(servers.map(server => server.id)).toEqual([`${providerId}-server`]);
+  });
+
+  it.each(WIRINGS)('$providerId offers nothing before its workspace is registered', async ({ build }) => {
+    const context = build(plugin());
+
+    expect(await context.listCommands()).toEqual([]);
+    expect(await context.listModels()).toEqual([]);
+    expect(await context.loadMcpServers()).toEqual([]);
+    expect(await context.readPlanUsage()).toBeNull();
+  });
+});
