@@ -14,7 +14,6 @@ import { getEnabledProviderForModel, getProviderForModel } from '../../../core/p
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderChatUIConfig,
   ProviderId,
@@ -535,15 +534,11 @@ function getModelCatalogProviderIds(
 async function refreshTabModelOptions(tab: TabData, plugin: GrimoirePlugin): Promise<void> {
   const providerIds = getModelCatalogProviderIds(tab, plugin);
   await Promise.all(providerIds.map(async (providerId) => {
-    const catalog = ProviderWorkspaceRegistry.getModelCatalog(providerId);
-    if (!catalog || catalog.isAvailable?.(plugin.settings) === false) {
-      return;
-    }
-
-    await catalog.refreshModels({
-      plugin,
-      settings: plugin.settings,
-    });
+    // `enabledIds` above is the gate the row's own `isAvailable` was: for the
+    // one provider that implemented it, it answered "is this provider enabled",
+    // which the catalog already decided before this loop started.
+    const models = (await plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId))?.models;
+    await models?.refresh();
   }).map((promise) => promise.catch(() => undefined)));
 
   tab.ui.modelSelector?.updateDisplay();

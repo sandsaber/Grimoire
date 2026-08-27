@@ -50,7 +50,7 @@ asserted only so the table cannot drift away from the code.
 | `commandCatalog` | 8 | 1 | reshape | The catalog also **writes**: vault entries are saved and deleted through it, it owns the dropdown config and the default vault storage path, and it takes runtime commands from the session loader. `list()` is one of eight. |
 | `agentMentionProvider` | 1 | 2 | reshape | `searchAgents(query)` becomes `list()`, so the matching moves from the provider to the host — the mention dropdown passes a real query today and the provider decides what matches it. And `ProviderAgentMention` has no `source`, which the row returns on every result and the settings UI reads. `refresh` arriving in the same port is right; the other half is not. |
 | `cliResolver` | 2 | 1 | reshape | **The slot is async and the row is not.** `resolveFromSettings(settings): string \| null` answers synchronously, `getResolvedProviderCliPath` has 33 call sites and none of them awaits, and several are inside paths the module contract requires to be synchronous — `createRuntime()` among them. `resolve(): Promise<ProviderCliResolution>` cannot serve any of them without the host owning a cache, and a host-owned cache needs the invalidation `reset()` is: the resolver re-reads settings on every call today, so a user who fixes a CLI path is served immediately. (`reset()` itself needs no slot — the five settings tabs that call it are provider-owned and reach their own resolver directly, never the registry.) |
-| `modelCatalog` | 2 | 2 | fits | `isAvailable` is absent by design — a provider that cannot discover models contributes no `models` port, which is the contract's own "absent means unsupported", and both call sites guard on it exactly that way. `refreshModels` returns a `Promise<boolean>` that **neither call site reads**, so the slot returning descriptors instead loses nothing. The slot adds `list`, which the row lacked. |
+| `modelCatalog` | 2 | 2 | **moved** | `isAvailable` is absent by design — a provider that cannot discover models contributes no `models` port, which is the contract's own "absent means unsupported", and both call sites guard on it exactly that way. `refreshModels` returns a `Promise<boolean>` that **neither call site reads**, so the slot returning descriptors instead loses nothing. The slot adds `list`, which the row lacked. |
 | `usageProvider` | 3 | 1 | reshape | `getCachedUsage` and `refreshUsage` are one `read()`. The plan indicator shows the cached snapshot immediately and refreshes behind it; one method makes every read either a network call or permanently stale. |
 | `runtimeCommandLoader` | 2 | 1 | reshape | `listForSession(sessionId)` presumes a session exists, and the row's context carries `allowSessionCreation` — command discovery may *start* a short-lived session, and the tab manager decides when that is allowed. The context also carries the conversation, the runtime and the external context paths. |
 | `mcpStorage` | 3 | 3 (shared) | fits | Reshaped in place. The port had `start(serverId)` and `stop(serverId)` — **operations the product does not have**: an MCP server is a record with an `enabled` flag that the provider's own CLI launches, and those two members existed only in this contract and the nine contexts that stubbed them. `tryParseClipboardConfig`, which the product does have and which had no slot, is on the port now. |
@@ -96,8 +96,10 @@ a row moves or a slot changes.
 
 ## What this means for sequencing
 
-**No row can move today.** `modelCatalog` is the one whose slot fits — and it is blocked anyway, because eight of nine providers'
-`listModels` and `refreshModels` throw. Every other remaining row needs its slot reshaped first, and
+**One row has moved.** `modelCatalog` was the one whose slot fits, and it was blocked twice over —
+by eight contexts whose `listModels`/`refreshModels` threw, and by nothing building a workspace at
+all. Both are fixed, and both of its consumers read `ApplicationRuntime.workspaceFor(providerId)`
+now. `ProviderWorkspaceRegistry.getModelCatalog` is deleted. Every other remaining row needs its slot reshaped first, and
 the reshape has to be designed from the implementations — which is what the notes above are for.
 
 So the work splits in two, and only one half is design:

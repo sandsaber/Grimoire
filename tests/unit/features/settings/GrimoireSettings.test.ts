@@ -284,9 +284,11 @@ describe('GrimoireSettingTab settings hub', () => {
     const refreshModels = jest.fn().mockRejectedValue(
       Object.assign(new Error('spawn qwen ENOENT'), { code: 'ENOENT' }),
     );
-    jest.spyOn(ProviderWorkspaceRegistry, 'getModelCatalog').mockReturnValue({
-      isAvailable: () => true,
-      refreshModels,
+    // The catalog is reached through the application's workspace lookup now,
+    // not a static registry: the row moved with the enablement gate stated at
+    // the call site, because this one does not iterate enabled providers.
+    plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceFor: async () => ({ models: { list: async () => [], refresh: refreshModels } }),
     });
 
     await (tab as any).updateProviderEnabled('qwen', true);

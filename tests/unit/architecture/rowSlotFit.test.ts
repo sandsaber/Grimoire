@@ -75,11 +75,6 @@ const ROWS: readonly RowFit[] = [
     slot: { name: 'ProviderCliResolutionPort', path: MODULE },
   },
   {
-    row: 'modelCatalog',
-    real: { name: 'ProviderModelCatalog', path: TYPES },
-    slot: { name: 'ProviderModelsPort', path: MODULE },
-  },
-  {
     row: 'usageProvider',
     real: { name: 'ProviderPlanUsageProvider', path: TYPES },
     slot: { name: 'ProviderUsagePort', path: MODULE },
@@ -122,7 +117,7 @@ function fitTable(): Map<string, { real: number; slot: string; verdict: string }
     rows.set(match[1], {
       real: Number.parseInt(match[2].trim(), 10),
       slot: match[3].trim(),
-      verdict: match[4].trim().split(/[,\s]/)[0],
+      verdict: match[4].trim().replace(/\*/g, '').split(/[,\s]/)[0],
     });
   }
   return rows;
@@ -132,6 +127,10 @@ describe('provider row slot fit', () => {
   const table = fitTable();
 
   it('records every row that has not moved', () => {
+    // `modelCatalog` is the first to leave: its consumers read
+    // `ApplicationRuntime.workspaceFor(providerId)` and the registry accessor
+    // is deleted. It stays in the document with a `moved` verdict, which is
+    // what keeps this list and that table from disagreeing about it.
     // A row missing from the table is a row nobody read before planning its
     // move, which is the whole failure this file exists to stop repeating.
     expect([...table.keys()].filter(row => table.get(row)?.verdict !== 'moved').sort())

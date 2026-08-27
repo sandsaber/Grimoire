@@ -2219,15 +2219,15 @@ export class GrimoireSettingTab extends PluginSettingTab {
   }
 
   private async refreshProviderModelCatalog(providerId: ProviderId): Promise<void> {
-    const catalog = ProviderWorkspaceRegistry.getModelCatalog(providerId);
-    if (!catalog || catalog.isAvailable?.(this.plugin.settings) === false) {
-      return;
-    }
-
-    await catalog.refreshModels({
-      plugin: this.plugin,
-      settings: this.plugin.settings,
-    });
+    // No enablement gate, and the row's `isAvailable` was not one either on this
+    // path: the only caller is `updateProviderEnabled`, which reaches here only
+    // with `enabled === true` and only after `setProviderEnabled` has written
+    // it — so the condition cannot be false. `ProviderSettingsCoordinator`
+    // normalizes the *selection* between them, never enablement. A guard that
+    // cannot fail is a guard nobody can test, which is how one survives long
+    // enough to be mistaken for a rule.
+    const workspace = await this.plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId);
+    await workspace?.models?.refresh();
   }
 
   private renderMaxTabsSetting(container: HTMLElement): void {

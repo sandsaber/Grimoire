@@ -4515,12 +4515,17 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 
   it('refreshes all enabled provider model catalogs for a blank tab', async () => {
     jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['claude', 'codex']);
-    const claudeCatalog = { refreshModels: jest.fn().mockResolvedValue(false) };
-    const codexCatalog = { refreshModels: jest.fn().mockResolvedValue(true) };
+    const claudeCatalog = { list: jest.fn(async () => []), refresh: jest.fn(async () => []) };
+    const codexCatalog = { list: jest.fn(async () => []), refresh: jest.fn(async () => []) };
     const plugin = createMockPlugin();
+    // The catalog comes from the application's workspace lookup now, and the
+    // enabled list above is the gate the row's own `isAvailable` used to be.
+    plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceFor: async (providerId: string) => ({
+        models: providerId === 'claude' ? claudeCatalog : codexCatalog,
+      }),
+    });
     const tab = createTab(createMockOptions({ plugin }));
-    ProviderWorkspaceRegistry.setServices('claude', { modelCatalog: claudeCatalog });
-    ProviderWorkspaceRegistry.setServices('codex', { modelCatalog: codexCatalog });
 
     initializeTabUI(tab, plugin);
 
@@ -4529,26 +4534,25 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 
     await toolbarCallbacks.refreshModelOptions();
 
-    expect(claudeCatalog.refreshModels).toHaveBeenCalledWith({
-      plugin,
-      settings: plugin.settings,
-    });
-    expect(codexCatalog.refreshModels).toHaveBeenCalledWith({
-      plugin,
-      settings: plugin.settings,
-    });
+    expect(claudeCatalog.refresh).toHaveBeenCalled();
+    expect(codexCatalog.refresh).toHaveBeenCalled();
     expect(mockModelSelector.updateDisplay).toHaveBeenCalled();
     expect(mockModelSelector.renderOptions).toHaveBeenCalled();
   });
 
   it('refreshes all enabled provider model catalogs for a bound tab', async () => {
     jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['claude', 'codex']);
-    const claudeCatalog = { refreshModels: jest.fn().mockResolvedValue(true) };
-    const codexCatalog = { refreshModels: jest.fn().mockResolvedValue(true) };
+    const claudeCatalog = { list: jest.fn(async () => []), refresh: jest.fn(async () => []) };
+    const codexCatalog = { list: jest.fn(async () => []), refresh: jest.fn(async () => []) };
     const plugin = createMockPlugin();
+    // The catalog comes from the application's workspace lookup now, and the
+    // enabled list above is the gate the row's own `isAvailable` used to be.
+    plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceFor: async (providerId: string) => ({
+        models: providerId === 'claude' ? claudeCatalog : codexCatalog,
+      }),
+    });
     const tab = createTab(createMockOptions({ plugin }));
-    ProviderWorkspaceRegistry.setServices('claude', { modelCatalog: claudeCatalog });
-    ProviderWorkspaceRegistry.setServices('codex', { modelCatalog: codexCatalog });
     tab.lifecycleState = 'bound_cold';
     tab.providerId = 'codex';
 
@@ -4559,14 +4563,8 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 
     await toolbarCallbacks.refreshModelOptions();
 
-    expect(claudeCatalog.refreshModels).toHaveBeenCalledWith({
-      plugin,
-      settings: plugin.settings,
-    });
-    expect(codexCatalog.refreshModels).toHaveBeenCalledWith({
-      plugin,
-      settings: plugin.settings,
-    });
+    expect(claudeCatalog.refresh).toHaveBeenCalled();
+    expect(codexCatalog.refresh).toHaveBeenCalled();
   });
 
   it('refreshes the service-tier toggle when the model changes on a blank tab', async () => {

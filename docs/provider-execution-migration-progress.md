@@ -9129,6 +9129,31 @@ they rest on are asserted — because a document that keeps saying `reshape` abo
 since fixed is worse than no document. Proven by growing the chat-UI slot by one member and watching
 it go red.
 
+#### The first workspace row moves, and a guard that could not fail goes with it
+
+`modelCatalog` is on the module. Both consumers — the tab's model refresh and the settings tab's —
+read `ApplicationRuntime.workspaceFor(providerId)`, and
+`ProviderWorkspaceRegistry.getModelCatalog` is deleted. It is the first of the fourteen, and the
+only one whose slot fitted without a reshape.
+
+The interesting part is what happened to its `isAvailable`. **Only one of the nine model catalogs
+implements it**, and what it answers is `settings.enabled` — "is this provider on", which the
+catalog already decides. So the module's slot is right to omit it, and the two call sites needed
+different treatment:
+
+- the tab's already iterates `providerCatalog().enabledIds(...)`, so the check was decided before
+  the loop began;
+- the settings tab's is reached only from `updateProviderEnabled` with `enabled === true`, **after**
+  `setProviderEnabled` has written it — so the condition cannot be false there either.
+
+I wrote the gate into the settings site anyway, to "preserve behaviour", and then tried to break it.
+The break stayed green, because nothing could make it red. **A guard that cannot fail is a guard
+nobody can test, which is how one survives long enough to be mistaken for a rule** — so it is gone,
+with the reason written where it was.
+
+That is the second break this session that failed to fire and taught more than the ones that did.
+The first was an assertion too weak to see the defect; this one was a defect that could not exist.
+
 #### The keystone: a workspace a consumer can actually reach
 
 The slot-fit audit found the workspace rows blocked by contexts that threw, and wiring them fixed
