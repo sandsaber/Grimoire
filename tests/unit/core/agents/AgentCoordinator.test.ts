@@ -300,14 +300,147 @@ describe('AgentCoordinator', () => {
     });
   });
 
+  it('does not strand a run when the provider answers half an execution identity', async () => {
+    // **The side effect has already happened by the time this is written.** The
+    // two identities were independent optionals on the port contract and a
+    // required pair in the record, so a provider that knew its run id and not a
+    // session id produced an outcome that was legal to return and impossible to
+    // write — the run stayed `dispatching`, and recovery funnelled the same
+    // evidence through the same refusal. The contract pairs them now, so this
+    // is the shape that remains: neither.
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+
+    const run = await coordinator.prepareAndDispatch(rootCommand(), {
+      dispatch: async () => ({ kind: 'accepted', nativeAgentRef: 'native-1' }),
+    });
+
+    expect(run).toMatchObject({ state: 'running' });
+    expect(run.executionRunId).toBeUndefined();
+    expect(run.executionSessionId).toBeUndefined();
+  });
+
+  it('files recovery that found no possible effect as interrupted, not rejected', async () => {
+    // Recovery answering "nothing could have happened" is **not** the provider
+    // saying it refused. It used to be written as a rejection with a fabricated
+    // `recovery-safe` code — a durable claim about a provider that nobody could
+    // support. `recoverActiveRuns` already had the honest pair for the same
+    // evidence, and this now uses it.
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+    await coordinator.prepareDispatch(rootCommand());
+    // Abandoned mid-dispatch, which is what leaves an intent at `dispatching`
+    // for recovery to find — the same shape the reconciliation row above sets
+    // up, and the one a crash actually produces.
+    let markStarted!: () => void;
+    const started = new Promise<void>(resolve => { markStarted = resolve; });
+    const abandoned = coordinator.dispatchPrepared(ROOT_RUN_ID, {
+      dispatch: async () => {
+        markStarted();
+        return new Promise(() => undefined);
+      },
+    });
+    void abandoned.catch(() => undefined);
+    await started;
+
+    const restarted = new AgentCoordinator(storage, {
+      now: monotonicClock(),
+      scheduler: inertScheduler(),
+    });
+    const recovered = await restarted.recoverPendingDispatches({
+      reconcile: async () => ({ kind: 'unknown', effectsPossible: false }),
+    });
+
+    expect(recovered).toHaveLength(1);
+    expect(recovered[0]).toMatchObject({
+      state: 'interrupted',
+      terminal: { kind: 'interrupted', reason: 'recovery-exhausted-safe' },
+    });
+    const intent = await restarted.repositories.dispatchIntents.read(
+      recovered[0].dispatchToken as string,
+    );
+    expect(intent.kind === 'current' && intent.record.payload.rejectionCode).toBeFalsy();
+  });
+
+  it('refuses a retry on an instance with no attempt to retry', async () => {
+    // The schema permits `runIds: []`, and a record in the field can have one —
+    // half-written, or hand-edited. It used to raise `Reduce of empty array
+    // with no initial value` and compute `-Infinity` for the attempt number.
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+    await coordinator.prepareAndDispatch(rootCommand(), {
+      dispatch: async () => ({ kind: 'accepted' }),
+    });
+    const instanceId = ROOT_INSTANCE_ID;
+    const read = await coordinator.repositories.instances.read(instanceId);
+    if (read.kind !== 'current') throw new Error('Expected the adopted instance.');
+    await coordinator.repositories.instances.update(
+      instanceId,
+      read.record.revision,
+      current => ({ ...current, runIds: [] }),
+    );
+
+    await expect(coordinator.prepareRetry({
+      prepareTransactionId: tx('8'),
+      dispatchStartTransactionId: tx('9'),
+      settlementTransactionId: tx('a'),
+      terminalTransactionId: tx('b'),
+      agentInstanceId: instanceId,
+      agentRunId: agentRunId(`agr-${'c'.repeat(32)}`),
+      dispatchToken: agentDispatchToken(`adt-${'d'.repeat(32)}`),
+      goalRef: 'retry-with-no-attempts',
+      policyInputs: POLICY_INPUTS,
+      idempotency: 'provider-key',
+    })).rejects.toThrow('requires a prior attempt');
+  });
+
+  it('recovers the runs it can when one of them answers badly', async () => {
+    // **`listRecordIds` is sorted**, so a record that throws throws first on
+    // every restart and nothing after it is ever recovered — one malformed
+    // answer stalls the whole domain, permanently. `recoverResultLinks` already
+    // collected per record; these two did not.
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+    await coordinator.prepareAndDispatch(rootCommand(), {
+      dispatch: async () => ({ kind: 'accepted' }),
+    });
+    const second = adoptionCommand('7', '8', 'child-native-1', '6');
+    await coordinator.adoptNativeAgent(second);
+
+    const restarted = new AgentCoordinator(storage, {
+      now: monotonicClock(),
+      scheduler: inertScheduler(),
+    });
+    let asked = 0;
+    const recovered = await restarted.recoverActiveRuns(
+      {
+        // The first is answered with a status and a reason the terminal policy
+        // refuses together — an ordinary port-contract slip, since the evidence
+        // type pairs them freely and only the write rejects it.
+        reconcile: async () => (++asked === 1
+          ? { kind: 'terminal' as const, status: 'succeeded' as const, reason: 'timeout' as const }
+          : { kind: 'terminal' as const, status: 'succeeded' as const, reason: 'completed' as const }),
+      },
+      { reconcileCancellation: async () => ({ kind: 'unknown' as const, effectsPossible: false }) },
+    );
+
+    expect(asked).toBe(2);
+    expect(recovered).toHaveLength(1);
+    expect(recovered[0]).toMatchObject({ state: 'succeeded' });
+  });
+
   it('validates result ownership and provenance before append-only persistence', async () => {
     const storage = new TestDurableStorage();
     const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
     await coordinator.prepareAndDispatch(rootCommand(), {
+      // The pair, together: a run identity without its session is a shape the
+      // record refuses, so the port cannot return one either.
       dispatch: async () => ({
         kind: 'accepted',
-        executionSessionId: `es-${'2'.repeat(32)}` as NonNullable<AgentResultRecord['provenance']['executionSessionId']>,
-        executionRunId: `run-${'2'.repeat(32)}` as NonNullable<AgentResultRecord['provenance']['executionRunId']>,
+        execution: {
+          executionSessionId: `es-${'2'.repeat(32)}` as NonNullable<AgentResultRecord['provenance']['executionSessionId']>,
+          executionRunId: `run-${'2'.repeat(32)}` as NonNullable<AgentResultRecord['provenance']['executionRunId']>,
+        },
       }),
     });
     const child = adoptionCommand('7', '8', 'child-native-1', '6');

@@ -115,7 +115,10 @@ export const agentRunRecordSchema: RecordSchema<AgentRunRecord> = {
     const attempt = requirePositiveInteger(record.attempt, 'agent attempt');
     const goalRef = requireIdentifier(record.goalRef, 'goal ref');
     const policy = decodeEffectivePolicy(record.policy);
-    const terminalTransactionId = requireOpaqueTransactionId(record.terminalTransactionId);
+    const terminalTransactionId = requireOpaqueTransactionId(
+      record.terminalTransactionId,
+      'Terminal transaction',
+    );
     const workGraphRef = optionalOpaqueRef(record.workGraphRef, 'wg', 'work graph ref');
     const workGraphExecutionRef = optionalOpaqueRef(record.workGraphExecutionRef, 'wge', 'work graph execution ref');
     const workNodeRef = optionalOpaqueRef(record.workNodeRef, 'wn', 'work node ref');
@@ -194,7 +197,10 @@ export const agentDispatchIntentRecordSchema: RecordSchema<AgentDispatchIntentRe
       'idempotency', 'status', 'nativeAgentRef', 'rejectionCode', 'createdAt', 'updatedAt',
     ], 'agent dispatch intent');
     const token = agentDispatchToken(requireString(record.dispatchToken, 'dispatch token'));
-    const dispatchStartTransactionId = requireOpaqueTransactionId(record.dispatchStartTransactionId);
+    const dispatchStartTransactionId = requireOpaqueTransactionId(
+      record.dispatchStartTransactionId,
+      'Dispatch start transaction',
+    );
     const settlementTransactionId = requireOpaqueTransactionId(record.settlementTransactionId);
     const run = agentRunId(requireString(record.agentRunId, 'agent run id'));
     const idempotency = oneOf(record.idempotency, ['provider-key', 'none'], 'dispatch idempotency');
@@ -466,9 +472,17 @@ function requireDigest(value: unknown, label: string): string {
   return value;
 }
 
-function requireOpaqueTransactionId(value: unknown): string {
+/**
+ * A transaction id, named by the field it came from.
+ *
+ * The label is why this takes one: it validated three different fields and
+ * always blamed the settlement id, so a malformed terminal id reported the
+ * wrong field — the kind of misdirection that costs an hour in a crash-recovery
+ * investigation. Every other validator in this file takes a label.
+ */
+function requireOpaqueTransactionId(value: unknown, label = 'Settlement transaction'): string {
   if (typeof value !== 'string' || !/^tx-[0-9a-f]{32}$/.test(value)) {
-    throw new Error('Settlement transaction id must be an opaque tx identifier.');
+    throw new Error(`${label} id must be an opaque tx identifier.`);
   }
   return value;
 }

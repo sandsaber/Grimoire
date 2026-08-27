@@ -8833,6 +8833,48 @@ coordinator.
 called the runtime about the current turn found the forced-new-conversation cancel and then rewind.
 Worth doing again whenever a defect turns out to have a shape.
 
+#### The review of the harvest, and what a harvest is for
+
+Ten findings in the agent domain, three of them HIGH, **every one verified by the reviewer with a
+probe test against the harvested code**. This is the argument for the plan's rule that a harvest is
+ported and re-gated rather than merged: the v1 branch's own suite passed on all of it.
+
+Three of them are one shape — **a contract that permits something the record refuses, discovered
+after the side effect**:
+
+- `AgentDispatchOutcome` declared the two execution identities as independent optionals and the
+  record requires the pair, so a provider that knew its run id and not a session id produced an
+  outcome legal to return and impossible to write. The run stayed `dispatching` and recovery
+  funnelled the same evidence through the same refusal, so it never got out. They travel together in
+  the contract now;
+- the rejection `code` was plain `string` while the record requires a constrained identifier, so
+  `quota exceeded` — with the space — wedged settlement the same way, side effect already made;
+- and one bad recovery answer stranded **every later agent**: `recoverPendingDispatches` and
+  `recoverActiveRuns` looped with no per-record isolation over a *sorted* id list, so the same record
+  failed first on every restart and nothing after it was ever recovered. `recoverResultLinks` already
+  collected per record; those two now match it.
+
+**And one that was a lie rather than a crash.** Recovery answering "no effect was possible" was
+written as a durable *rejection*, with a fabricated `recovery-safe` code — a claim that the provider
+refused, when nobody knew. `recoverActiveRuns` already had the honest pair for the identical
+evidence, `interrupted` / `recovery-exhausted-safe`, and settlement uses it now.
+
+The rest: the results store — the only one holding model text — was the only agent store without the
+prohibited-payload guard, so a result carrying a prompt or hidden reasoning would have reached
+`.grimoire/control/**` against the storage contract; the attached-tree walker had no cycle guard
+where `isDescendant` beside it does; `prepareRetry` raised `Reduce of empty array` on an instance the
+schema permits; and one validator blamed the settlement transaction for a malformed terminal id.
+
+Every fix has a test, and the four with behaviour were proven by breaking them — including the last,
+which raises exactly the message the review predicted.
+
+**Left as recorded rather than fixed**: a hung `port.dispatch()` holds its instance lock and, through
+`enqueueTopology`, every other instance's prepare, adopt and cancel with it. It is the one finding
+that needs a decision rather than a repair — the other external calls go through
+`resolveControlWithinDeadline`, and whether a dispatch may be bounded the same way is a question
+about what a provider is allowed to take. Owner: whoever gives the domain its producer, since that is
+who chooses the timeout.
+
 #### What to pick up next, in order
 
 This list supersedes the numbered one further down, which was written before the chat flip.

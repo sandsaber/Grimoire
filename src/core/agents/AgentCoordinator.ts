@@ -216,6 +216,13 @@ export class AgentCoordinator {
       const priorRuns = await Promise.all(currentInstance.payload.runIds.map(async id => (
         requireCurrent(this.repositories.runs.read(id))
       )));
+      if (priorRuns.length === 0) {
+        // The schema permits an instance with no runs, and a record in the
+        // field can have one — half-written, or hand-edited. Without this the
+        // reduce below raises `Reduce of empty array with no initial value` and
+        // the attempt number below it is `-Infinity`.
+        throw new Error('Agent retry requires a prior attempt to retry.');
+      }
       if (priorRuns.some(record => !record.payload.terminal)) {
         throw new Error('Agent retry requires every prior attempt to be terminal.');
       }
@@ -340,7 +347,13 @@ export class AgentCoordinator {
     this.requireControlScheduler();
     await this.transactions.recoverPending();
     const recovered: AgentRunRecord[] = [];
+    // **One bad record must not strand every later one.** `listRecordIds` is
+    // sorted, so a record that throws throws first on every restart and nothing
+    // after it is ever recovered — a permanent stall from one malformed answer.
+    // `recoverResultLinks` already collects per record; these two now match it.
+    const failures: unknown[] = [];
     for (const intentId of await this.repositories.dispatchIntents.listRecordIds()) {
+      try {
       const intentRecord = await requireCurrent(this.repositories.dispatchIntents.read(intentId));
       if (intentRecord.payload.status !== 'dispatching') continue;
       const runRecord = await requireCurrent(this.repositories.runs.read(intentRecord.payload.agentRunId));
@@ -381,17 +394,39 @@ export class AgentCoordinator {
             ? {
               kind: 'accepted',
               nativeAgentRef: evidence.nativeAgentRef,
-              executionSessionId: evidence.executionSessionId,
-              executionRunId: evidence.executionRunId,
+              // Paired or absent: the record refuses a run identity without its
+              // session, and evidence that carries only one of the two is
+              // evidence about neither.
+              ...(evidence.executionSessionId && evidence.executionRunId
+                ? {
+                  execution: {
+                    executionSessionId: evidence.executionSessionId,
+                    executionRunId: evidence.executionRunId,
+                  },
+                }
+                : {}),
             }
             : evidence.kind === 'rejected'
               ? { kind: 'rejected', code: evidence.code, sideEffectFree: true }
               : evidence.effectsPossible
                 ? { kind: 'unknown-effects' }
-                : { kind: 'rejected', code: 'recovery-safe', sideEffectFree: true },
+                // **Not a rejection.** Recovery answering "no effects were
+                // possible" is not the provider saying it refused, and writing
+                // `rejected` made a durable claim nobody could support.
+                // `recoverActiveRuns` already has the honest pair for exactly
+                // this evidence.
+                : { kind: 'recovered-safe' },
         );
       });
       if (settled) recovered.push(settled);
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (recovered.length === 0 && failures.length > 0) {
+      // Nothing came back and something threw: the caller learns why rather
+      // than being told there was nothing to recover.
+      throw failures[0];
     }
     return recovered;
   }
@@ -403,7 +438,12 @@ export class AgentCoordinator {
     this.requireControlScheduler();
     await this.transactions.recoverPending();
     const recovered: AgentRunRecord[] = [];
+    // Per record, for the reason `recoverPendingDispatches` is: `listRecordIds`
+    // is sorted, so one malformed answer stalls every later run on every
+    // restart.
+    const failures: unknown[] = [];
     for (const runId of await this.repositories.runs.listRecordIds()) {
+      try {
       const run = await requireCurrent(this.repositories.runs.read(runId));
       if (run.payload.state !== 'running'
         && run.payload.state !== 'waiting'
@@ -463,6 +503,12 @@ export class AgentCoordinator {
         );
       });
       recovered.push(settled);
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (recovered.length === 0 && failures.length > 0) {
+      throw failures[0];
     }
     return recovered;
   }
@@ -638,11 +684,16 @@ export class AgentCoordinator {
     intentRecord: VersionedRecord<AgentDispatchIntentRecord>,
     outcome:
       | Awaited<ReturnType<AgentDispatchPort['dispatch']>>
-      | { readonly kind: 'unknown-effects' },
+      | { readonly kind: 'unknown-effects' }
+      // Recovery establishing that no effect was possible. **Not a rejection**:
+      // the provider never said it refused, and writing `rejected` for it made
+      // a durable claim about the provider that nobody could support.
+      | { readonly kind: 'recovered-safe' },
   ): Promise<AgentRunRecord> {
     const timestamp = this.now();
     const accepted = outcome.kind === 'accepted';
     const rejected = outcome.kind === 'rejected';
+    const recoveredSafe = outcome.kind === 'recovered-safe';
     const cancellationPending = runRecord.payload.state === 'cancelling';
     const intent: AgentDispatchIntentRecord = {
       ...intentRecord.payload,
@@ -651,23 +702,33 @@ export class AgentCoordinator {
       ...(rejected ? { rejectionCode: outcome.code } : {}),
       updatedAt: timestamp,
     };
-    const terminal = rejected || !accepted
-      ? {
-        kind: rejected ? 'invalidated' as const : 'indeterminate' as const,
-        reason: rejected ? 'side-effect-free-rejection' as const : 'dispatch-unknown' as const,
+    // **Three endings, not two.** A rejection is the provider's own word and is
+    // `invalidated`; an unknown is `indeterminate`; and recovery establishing
+    // that nothing could have happened is `interrupted` with the reason the
+    // terminal policy already has for it — the same pair `recoverActiveRuns`
+    // writes for the identical evidence. It used to be filed as a rejection
+    // with a fabricated code.
+    const terminal = accepted
+      ? undefined
+      : {
+        kind: rejected
+          ? ('invalidated' as const)
+          : recoveredSafe ? ('interrupted' as const) : ('indeterminate' as const),
+        reason: rejected
+          ? ('side-effect-free-rejection' as const)
+          : recoveredSafe ? ('recovery-exhausted-safe' as const) : ('dispatch-unknown' as const),
         occurredAt: timestamp,
-      }
-      : undefined;
+      };
     const run: AgentRunRecord = {
       ...runRecord.payload,
-      ...(accepted && outcome.executionSessionId
-        ? { executionSessionId: outcome.executionSessionId }
-        : {}),
-      ...(accepted && outcome.executionRunId ? { executionRunId: outcome.executionRunId } : {}),
+      // One field or neither: the schema refuses a run identity without its
+      // session, and spreading the two independently made an outcome that is
+      // legal by the port contract unwritable — after the side effect.
+      ...(accepted && outcome.execution ? outcome.execution : {}),
       ...(accepted && outcome.nativeAgentRef ? { nativeAgentRef: outcome.nativeAgentRef } : {}),
       state: accepted
         ? cancellationPending ? 'cancelling' : 'running'
-        : rejected ? 'invalidated' : 'indeterminate',
+        : rejected ? 'invalidated' : recoveredSafe ? 'interrupted' : 'indeterminate',
       ...(terminal ? { terminal } : {}),
       updatedAt: timestamp,
     };
@@ -1148,6 +1209,14 @@ function requireMatchingAdoption(
   }
 }
 
+/**
+ * Cancels a tree deepest-first, and refuses to walk a cycle to do it.
+ *
+ * The instance schema forbids an instance parenting *itself* and nothing more,
+ * so a longer cycle among records in the field — hand-edited, or half-written —
+ * recursed until the stack gave out and took the cancellation with it.
+ * `isDescendant` already guards exactly this with a visited set.
+ */
 function collectAttachedPostOrder(
   rootId: AgentInstanceId,
   instances: ReadonlyMap<AgentInstanceId, AgentInstanceRecord>,
@@ -1160,7 +1229,10 @@ function collectAttachedPostOrder(
     children.set(instance.parentAgentInstanceId, entries);
   }
   const result: AgentInstanceRecord[] = [];
+  const seen = new Set<AgentInstanceId>();
   const visit = (id: AgentInstanceId, root: boolean): void => {
+    if (seen.has(id)) return;
+    seen.add(id);
     const instance = instances.get(id);
     if (!instance || (!root && instance.attachment === 'detached')) return;
     for (const child of children.get(id) ?? []) visit(child.agentInstanceId, false);

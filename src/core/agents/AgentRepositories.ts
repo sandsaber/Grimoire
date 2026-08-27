@@ -94,6 +94,12 @@ export class AgentRepositories {
       namespace: AGENT_RESULTS_PATH,
       schema: agentResultRecordSchema,
       now,
+      // **The one store that holds model text, and it was the one without the
+      // guard.** A result's own text is whitelisted — that is what a result is
+      // — but `.grimoire/control/**` still holds no prompt, no hidden
+      // reasoning, no raw payload and no secret, and a result carrying one of
+      // those is exactly how such a thing would arrive there.
+      validatePayload: validateControlRecordPayload,
     }));
   }
 }

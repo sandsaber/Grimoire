@@ -175,14 +175,46 @@ export interface AgentResultRecord {
   readonly completedAt: number;
 }
 
+/**
+ * What a provider says about a dispatch it was asked to make.
+ *
+ * **The two execution identities travel together or not at all.** They were two
+ * independent optionals, and the record schema requires the pair — so a port
+ * answering with a run id and no session id was legal by this contract and
+ * refused at the write, *after* the provider had already done the work. The run
+ * stayed `dispatching` and recovery funnelled the same evidence through the same
+ * refusal, so it never got out. A shape that cannot be written should not be a
+ * shape that can be returned.
+ */
 export type AgentDispatchOutcome =
   | {
     readonly kind: 'accepted';
     readonly nativeAgentRef?: string;
-    readonly executionSessionId?: ExecutionSessionId;
-    readonly executionRunId?: RunId;
+    readonly execution?: {
+      readonly executionSessionId: ExecutionSessionId;
+      readonly executionRunId: RunId;
+    };
   }
-  | { readonly kind: 'rejected'; readonly code: string; readonly sideEffectFree: true };
+  | {
+    readonly kind: 'rejected';
+    /**
+     * Why, as something a record can hold.
+     *
+     * Constrained here rather than at the write for the same reason: a provider
+     * answering `quota exceeded` — with the space — was legal by this contract
+     * and refused by the schema, which left the run stuck in `dispatching` with
+     * the side effect already made. A caller crossing a provider boundary
+     * normalizes before it answers.
+     */
+    readonly code: AgentDispatchRejectionCode;
+    readonly sideEffectFree: true;
+  };
+
+/**
+ * A rejection code as a record can hold it: no spaces, no punctuation beyond
+ * `. _ : -`, at most 128 characters.
+ */
+export type AgentDispatchRejectionCode = string & { readonly __rejectionCode?: never };
 
 export interface AgentDispatchRequest {
   readonly agentInstanceId: AgentInstanceId;
