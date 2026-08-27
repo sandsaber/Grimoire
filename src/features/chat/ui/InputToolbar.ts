@@ -5,13 +5,15 @@ import * as path from 'path';
 import type { ProjectWorkspace } from '../../../core/context/types';
 import type { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type {
+  ProviderUsageSnapshot,
+  ProviderUsageWindow,
+} from '../../../core/providers/ProviderModule';
+import type {
   ProviderCapabilities,
   ProviderChatUIConfig,
   ProviderId,
   ProviderModeSelectorConfig,
   ProviderPermissionModeToggleConfig,
-  ProviderPlanUsage,
-  ProviderPlanUsageWindow,
   ProviderReasoningOption,
   ProviderServiceTierToggleConfig,
   ProviderUIOption,
@@ -92,15 +94,15 @@ function clampUsagePct(pct: number): number {
   return Math.max(0, Math.min(100, Math.round(pct)));
 }
 
-function isQuotaUsage(usage: ProviderPlanUsage | null | undefined): usage is ProviderPlanUsage & { windows: ProviderPlanUsageWindow[] } {
+function isQuotaUsage(usage: ProviderUsageSnapshot | null | undefined): usage is ProviderUsageSnapshot & { windows: ProviderUsageWindow[] } {
   return Array.isArray(usage?.windows);
 }
 
-function isSpendUsage(usage: ProviderPlanUsage | null | undefined): usage is ProviderPlanUsage & { spend: string } {
+function isSpendUsage(usage: ProviderUsageSnapshot | null | undefined): usage is ProviderUsageSnapshot & { spend: string } {
   return typeof usage?.spend === 'string' && usage.spend.trim().length > 0;
 }
 
-function normalizeUsageWindow(window: ProviderPlanUsageWindow): ProviderPlanUsageWindow {
+function normalizeUsageWindow(window: ProviderUsageWindow): ProviderUsageWindow {
   return {
     label: window.label,
     pct: clampUsagePct(window.pct),
@@ -109,7 +111,7 @@ function normalizeUsageWindow(window: ProviderPlanUsageWindow): ProviderPlanUsag
   };
 }
 
-function findFiveHourWindow(usage: ProviderPlanUsage | null | undefined): ProviderPlanUsageWindow | null {
+function findFiveHourWindow(usage: ProviderUsageSnapshot | null | undefined): ProviderUsageWindow | null {
   if (!isQuotaUsage(usage)) {
     return null;
   }
@@ -121,7 +123,7 @@ function findFiveHourWindow(usage: ProviderPlanUsage | null | undefined): Provid
   return isUsagePctKnown(normalized) ? normalized : null;
 }
 
-function findPrimaryQuotaWindow(usage: ProviderPlanUsage | null | undefined): ProviderPlanUsageWindow | null {
+function findPrimaryQuotaWindow(usage: ProviderUsageSnapshot | null | undefined): ProviderUsageWindow | null {
   const fiveHourWindow = findFiveHourWindow(usage);
   if (fiveHourWindow) {
     return fiveHourWindow;
@@ -157,7 +159,7 @@ function formatQuotaBadgeLabel(label: string): string {
   return trimmed.length <= 4 ? trimmed.toUpperCase() : trimmed;
 }
 
-function formatQuotaLimitDescription(window: ProviderPlanUsageWindow): string {
+function formatQuotaLimitDescription(window: ProviderUsageWindow): string {
   if (FIVE_HOUR_WINDOW_PATTERN.test(window.label)) {
     return t('chat.ui.usage.fiveHourLimit');
   }
@@ -169,19 +171,19 @@ function stripThisMonth(spend: string): string {
   return spend.replace(/\s+this\s+month\s*$/i, '').trim() || spend.trim();
 }
 
-function isUsagePctKnown(window: ProviderPlanUsageWindow): boolean {
+function isUsagePctKnown(window: ProviderUsageWindow): boolean {
   return window.pctKnown !== false;
 }
 
-function formatUsagePct(window: ProviderPlanUsageWindow): string {
+function formatUsagePct(window: ProviderUsageWindow): string {
   return isUsagePctKnown(window) ? `${window.pct}%` : '—';
 }
 
-function isUsageWindowHot(window: ProviderPlanUsageWindow): boolean {
+function isUsageWindowHot(window: ProviderUsageWindow): boolean {
   return isUsagePctKnown(window) && window.pct >= PLAN_USAGE_WARN_THRESHOLD;
 }
 
-function formatQuotaAriaLabel(plan: string, window: ProviderPlanUsageWindow): string {
+function formatQuotaAriaLabel(plan: string, window: ProviderUsageWindow): string {
   const limitDescription = formatQuotaLimitDescription(window);
   return isUsagePctKnown(window)
     ? t('chat.ui.usage.ariaWithPercent', {
@@ -225,8 +227,8 @@ export interface ToolbarCallbacks {
   getCapabilities: () => ProviderCapabilities;
   refreshModelOptions?: () => Promise<void>;
   getProviderId?: () => ProviderId;
-  getProviderUsage?: (providerId: ProviderId) => ProviderPlanUsage | null;
-  refreshProviderUsage?: (providerId: ProviderId) => Promise<ProviderPlanUsage | null>;
+  getProviderUsage?: (providerId: ProviderId) => ProviderUsageSnapshot | null;
+  refreshProviderUsage?: (providerId: ProviderId) => Promise<ProviderUsageSnapshot | null>;
   onProviderUsageRefresh?: (providerId: ProviderId) => void;
   resolveProviderForModel?: (model: string) => ProviderId;
   getOrchestratorMode?: () => boolean;
@@ -245,7 +247,7 @@ export class ModelSelector {
   private modelCatalogRefreshPromise: Promise<void> | null = null;
   private modelCatalogRefreshFailed = false;
   private isRefreshingModelCatalog = false;
-  private providerUsageRefreshPromises = new Map<ProviderId, Promise<ProviderPlanUsage | null>>();
+  private providerUsageRefreshPromises = new Map<ProviderId, Promise<ProviderUsageSnapshot | null>>();
   private modelGroupOpenState = new Map<string, boolean>();
   private searchQuery = '';
   private callbacks: ToolbarCallbacks;
@@ -566,7 +568,7 @@ export class ModelSelector {
     return this.callbacks.resolveProviderForModel?.(model.value) ?? null;
   }
 
-  private renderPlanUsageReadout(parentEl: HTMLElement, usage: ProviderPlanUsage | null): void {
+  private renderPlanUsageReadout(parentEl: HTMLElement, usage: ProviderUsageSnapshot | null): void {
     if (!usage || !areUsageIndicatorsEnabled(this.callbacks.getSettings())) {
       return;
     }
@@ -579,7 +581,7 @@ export class ModelSelector {
     }
   }
 
-  private renderSpendPlanUsageReadout(parentEl: HTMLElement, usage: ProviderPlanUsage & { spend: string }): void {
+  private renderSpendPlanUsageReadout(parentEl: HTMLElement, usage: ProviderUsageSnapshot & { spend: string }): void {
     const readoutEl = parentEl.createDiv({
       cls: 'grimoire-plan-usage-readout grimoire-plan-usage-readout--spend',
     });
@@ -591,7 +593,7 @@ export class ModelSelector {
     }
   }
 
-  private renderQuotaPlanUsageReadout(parentEl: HTMLElement, usage: ProviderPlanUsage & { windows: ProviderPlanUsageWindow[] }): void {
+  private renderQuotaPlanUsageReadout(parentEl: HTMLElement, usage: ProviderUsageSnapshot & { windows: ProviderUsageWindow[] }): void {
     if (usage.windows.length === 0) {
       return;
     }
@@ -758,7 +760,7 @@ export class PlanUsageBadge {
   private meterEl: HTMLElement | null = null;
   private fillEl: HTMLElement | null = null;
   private valueEl: HTMLElement | null = null;
-  private refreshPromise: Promise<ProviderPlanUsage | null> | null = null;
+  private refreshPromise: Promise<ProviderUsageSnapshot | null> | null = null;
   private callbacks: ToolbarCallbacks;
 
   constructor(parentEl: HTMLElement, callbacks: ToolbarCallbacks) {
@@ -824,7 +826,7 @@ export class PlanUsageBadge {
     this.container.addClass('grimoire-hidden');
   }
 
-  private renderQuotaUsage(usage: ProviderPlanUsage, window: ProviderPlanUsageWindow): void {
+  private renderQuotaUsage(usage: ProviderUsageSnapshot, window: ProviderUsageWindow): void {
     this.container.removeClass('grimoire-hidden');
     this.container.toggleClass('is-hot', isUsageWindowHot(window));
     this.labelEl?.setText(formatQuotaBadgeLabel(window.label));
@@ -836,7 +838,7 @@ export class PlanUsageBadge {
     this.container.setAttribute('aria-label', formatQuotaAriaLabel(usage.plan, window));
   }
 
-  private renderSpendUsage(usage: ProviderPlanUsage & { spend: string }): void {
+  private renderSpendUsage(usage: ProviderUsageSnapshot & { spend: string }): void {
     this.container.removeClass('grimoire-hidden');
     this.container.addClass('grimoire-plan-usage-badge--spend');
     this.labelEl?.setText('API');

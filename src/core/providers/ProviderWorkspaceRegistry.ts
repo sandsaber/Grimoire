@@ -5,7 +5,6 @@ import type {
   AgentMentionProvider,
   ProviderCliResolver,
   ProviderId,
-  ProviderPlanUsageProvider,
   ProviderRuntimeCommandLoader,
   ProviderSettingsTabRenderer,
   ProviderWorkspaceCapabilities,
@@ -111,10 +110,6 @@ export class ProviderWorkspaceRegistry {
 
   static getCliResolver(providerId: ProviderId): ProviderCliResolver | null {
     return this.getServices(providerId)?.cliResolver ?? null;
-  }
-
-  static getUsageProvider(providerId: ProviderId): ProviderPlanUsageProvider | null {
-    return this.getServices(providerId)?.usageProvider ?? null;
   }
 
   static getRuntimeCommandLoader(providerId: ProviderId): ProviderRuntimeCommandLoader | null {

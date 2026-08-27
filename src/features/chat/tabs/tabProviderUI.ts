@@ -1,14 +1,16 @@
 import { AuxiliaryExecutionOwner } from '../../../app/auxiliary/AuxiliaryExecutionOwner';
 import { getEnabledProviderForModel } from '../../../core/providers/modelRouting';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
+import type {
+  ProviderUsageSnapshot,
+  ProviderUsageWindow,
+} from '../../../core/providers/ProviderModule';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderChatUIConfig,
   ProviderId,
-  ProviderPlanUsage,
-  ProviderPlanUsageWindow,
 } from '../../../core/providers/types';
 import { DEFAULT_CHAT_PROVIDER_ID } from '../../../core/providers/types';
 import type { Conversation } from '../../../core/types';
@@ -32,20 +34,23 @@ import {
 } from './tabSettings';
 import type { TabData } from './types';
 
-export function getProviderUsageSnapshot(plugin: GrimoirePlugin, providerId: ProviderId): ProviderPlanUsage | null {
-  const usageProvider = ProviderWorkspaceRegistry.getUsageProvider(providerId);
-  if (!usageProvider || usageProvider.isAvailable?.(plugin.settings) === false) {
-    return null;
-  }
-
-  return usageProvider.getCachedUsage({
-    plugin,
-    providerId,
-    settings: plugin.settings,
-  });
+/**
+ * The plan this provider last reported, read while a tab paints.
+ *
+ * Never builds a workspace: this is on the paint path, and the background
+ * refresh beside it is what builds one. So the first paint after a reload shows
+ * nothing and the paint after the refresh shows the plan — where the eager
+ * workspace this replaces could answer immediately.
+ */
+export function getProviderUsageSnapshot(
+  plugin: GrimoirePlugin,
+  providerId: ProviderId,
+): ProviderUsageSnapshot | null {
+  return plugin.getApplicationRuntimeOrNull()
+    ?.builtWorkspaceFor(providerId)?.usage?.cached() ?? null;
 }
 
-export function summarizeUsageWindow(window: ProviderPlanUsageWindow): Record<string, unknown> {
+export function summarizeUsageWindow(window: ProviderUsageWindow): Record<string, unknown> {
   return {
     label: window.label,
     pct: window.pct,
@@ -54,7 +59,7 @@ export function summarizeUsageWindow(window: ProviderPlanUsageWindow): Record<st
   };
 }
 
-export function summarizePlanUsage(usage: ProviderPlanUsage | null): Record<string, unknown> {
+export function summarizePlanUsage(usage: ProviderUsageSnapshot | null): Record<string, unknown> {
   if (!usage) {
     return { usageKind: 'none' };
   }
@@ -70,26 +75,16 @@ export function summarizePlanUsage(usage: ProviderPlanUsage | null): Record<stri
   };
 }
 
-export async function refreshProviderUsageSnapshot(plugin: GrimoirePlugin, providerId: ProviderId): Promise<ProviderPlanUsage | null> {
-  const usageProvider = ProviderWorkspaceRegistry.getUsageProvider(providerId);
-  if (!usageProvider) {
+export async function refreshProviderUsageSnapshot(
+  plugin: GrimoirePlugin,
+  providerId: ProviderId,
+): Promise<ProviderUsageSnapshot | null> {
+  const usage = (await plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId))?.usage;
+  if (!usage) {
     plugin.recordDebugLog?.({
       data: {
         providerId,
         reason: 'missing_usage_provider',
-      },
-      event: 'refresh.skipped',
-      level: 'debug',
-      scope: 'usage',
-    });
-    return getProviderUsageSnapshot(plugin, providerId);
-  }
-
-  if (usageProvider.isAvailable?.(plugin.settings) === false) {
-    plugin.recordDebugLog?.({
-      data: {
-        providerId,
-        reason: 'provider_unavailable',
       },
       event: 'refresh.skipped',
       level: 'debug',
@@ -106,21 +101,17 @@ export async function refreshProviderUsageSnapshot(plugin: GrimoirePlugin, provi
   });
 
   try {
-    const usage = await usageProvider.refreshUsage({
-      plugin,
-      providerId,
-      settings: plugin.settings,
-    });
+    const refreshed = await usage.refresh();
     plugin.recordDebugLog?.({
       data: {
         providerId,
-        ...summarizePlanUsage(usage),
+        ...summarizePlanUsage(refreshed),
       },
-      event: usage ? 'refresh.succeeded' : 'refresh.empty',
-      level: usage ? 'info' : 'debug',
+      event: refreshed ? 'refresh.succeeded' : 'refresh.empty',
+      level: refreshed ? 'info' : 'debug',
       scope: 'usage',
     });
-    return usage;
+    return refreshed;
   } catch (error) {
     plugin.recordDebugLog?.({
       data: { providerId },

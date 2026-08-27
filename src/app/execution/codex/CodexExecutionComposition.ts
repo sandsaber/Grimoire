@@ -477,6 +477,16 @@ export class CodexExecution {
     return this.workspaceHolder.resolve();
   }
 
+  /**
+   * The workspace if it has already been built, and nothing if it has not.
+   *
+   * For the callers that cannot wait: a plan indicator reads what it holds
+   * while a tab paints, and a promise on that path is a paint that waits.
+   */
+  builtWorkspace(): ProviderWorkspaceSlots | null {
+    return this.workspaceHolder.peek() ?? null;
+  }
+
   /** The store every tab runtime references its turns through. */
   get turnRequests(): CodexExecutionRequests {
     return this.requests;

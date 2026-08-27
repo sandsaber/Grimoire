@@ -232,9 +232,23 @@ export class ApplicationRuntime {
     return composition.workspace();
   }
 
+  /**
+   * A provider's workspace if it is already built, and nothing if it is not.
+   *
+   * For the callers that cannot wait — a plan indicator reads what it holds
+   * while a tab paints. Nothing is built on their behalf: the asynchronous
+   * refresh beside them is what builds it, and the paint after that has it.
+   */
+  builtWorkspaceFor(providerId: ProviderId): ProviderWorkspaceSlots | null {
+    return this.compositionFor(providerId)?.builtWorkspace() ?? null;
+  }
+
   private compositionFor(
     providerId: ProviderId,
-  ): { workspace(): Promise<ProviderWorkspaceSlots> } | null {
+  ): {
+    builtWorkspace(): ProviderWorkspaceSlots | null;
+    workspace(): Promise<ProviderWorkspaceSlots>;
+  } | null {
     switch (providerId) {
       case 'antigravity': return this.antigravity;
       case 'claude': return this.claude;

@@ -9150,9 +9150,18 @@ different things.
 `settings.enabled` — the question the catalog decides. A port that asked it again would be a second
 inventory of the same fact, and the two rows before this one had exactly that duplicate.
 
-The row is reshaped but not yet moved: the consumer's cached read is synchronous and
-`workspaceFor` is not, so moving it changes *when* a plan first appears on a badge after a reload.
-That is its own step rather than something to smuggle into this one.
+**Then it moved, and the synchronous read is why there are two lookups.** `workspaceFor` returns a
+promise and the cached read is on the paint path, so `builtWorkspaceFor` answers from what is
+already built and builds nothing. That is a real behaviour change stated rather than smuggled: the
+first paint after a reload shows no plan where the eager workspace could answer immediately, and the
+background refresh beside it — which the toolbar already runs on open — builds the workspace and
+repaints. A paint that waited on a provider's startup would be the worse trade.
+
+**The row moved with every test still green, which is the part worth recording.** Nothing covered
+either path: not the cached read, not the refresh, not the debug summary that distinguishes a quota
+plan from a spend plan. A row that can move without breaking a test is a row nobody was watching, so
+the tests written here are the ones that were missing rather than ones that needed adjusting — and
+the break that proves them is the paint path being made to build a workspace.
 
 **A gate of mine needed correcting twice in one sitting.** The slot-fit table's verdict column now
 carries emphasis and past tense — `**moved**`, `reshaped` — and my first fix stripped a trailing `d`
