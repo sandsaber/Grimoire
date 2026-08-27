@@ -431,15 +431,30 @@ export class ChatExecutionCoordinator {
     // which is how the legacy path drew it — and this path filters that echo
     // out as turn framing, so without this the question an answer refers to is
     // one nobody can see.
-    const withUser = await this.conversations.apply(
-      conversationId,
-      current => appendUserMessage(current, userMessage, this.now()),
-    );
-    this.apply(entry, {
-      kind: 'conversation-loaded',
-      conversation: withUser.conversation,
-      revision: withUser.revision,
-    });
+    //
+    // **A write that fails does not un-send the input.** The provider has it;
+    // reporting failure would have the caller put the message back in the queue
+    // and the person send it again, and the model would receive it twice mid
+    // turn. So the write is best-effort and the answer stays `true` — the turn
+    // is what it is, and a conversation missing one of its questions is the
+    // smaller wrong.
+    try {
+      const withUser = await this.conversations.apply(
+        conversationId,
+        current => appendUserMessage(current, userMessage, this.now()),
+      );
+      this.apply(entry, {
+        kind: 'conversation-loaded',
+        conversation: withUser.conversation,
+        revision: withUser.revision,
+      });
+    } catch {
+      this.apply(entry, {
+        kind: 'persistence-failed',
+        runId: activeRunId,
+        errorCode: 'steer-question-not-stored',
+      });
+    }
     return true;
   }
 

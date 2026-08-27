@@ -86,6 +86,10 @@ import {
   updateWriteEditWithDiff,
 } from '../rendering/WriteEditRenderer';
 import type { SubagentManager } from '../services/SubagentManager';
+import {
+  TurnFeedbackMetrics,
+  type TurnFeedbackMetricsSnapshot,
+} from '../services/TurnFeedbackMetrics';
 import type { ChatState } from '../state/ChatState';
 import type { FileContextManager } from '../ui/FileContext';
 
@@ -132,6 +136,7 @@ export class StreamController {
   private silentTurnTimeout: number | null = null;
   private silentTurnElapsedInterval: number | null = null;
   private silentTurnProviderId: ProviderId | null = null;
+  private turnFeedback: TurnFeedbackMetrics | null = null;
   private silentTurnPaused = false;
   private silentTurnStatusEl: HTMLElement | null = null;
   private silentTurnStartedAt: number | null = null;
@@ -172,6 +177,7 @@ export class StreamController {
 
   async handleStreamChunk(chunk: StreamChunk, msg: ChatMessage): Promise<void> {
     this.noteTurnActivity();
+    this.turnFeedback?.observe(chunk, performance.now());
     const { state } = this.deps;
 
     switch (chunk.type) {
@@ -915,6 +921,10 @@ export class StreamController {
   async appendText(text: string, phase?: AssistantTextPhase): Promise<void> {
     const { state } = this.deps;
     if (!state.currentContentEl) return;
+    // The projection path draws prose through here rather than through
+    // `handleStreamChunk`, so a turn made entirely of it is invisible to the
+    // metrics unless this says so.
+    this.turnFeedback?.observeText(text, performance.now());
 
     this.hideThinkingIndicator();
 
@@ -1758,6 +1768,11 @@ export class StreamController {
   /** Starts the per-tab heartbeat that acknowledges a provider's silent turn. */
   startTurnSilenceIndicator(providerId: ProviderId): void {
     this.stopTurnSilenceIndicator();
+    // **Started here because this is what sees the output.** The metrics used
+    // to be kept by `InputController` and fed from its generator loop; with
+    // that loop gone, every field but the duration was structurally empty and
+    // each turn logged a provider that had produced nothing.
+    this.turnFeedback = new TurnFeedbackMetrics(performance.now());
     this.silentTurnProviderId = providerId;
     this.silentTurnPaused = false;
     this.silentTurnStartedAt = Date.now();
@@ -1785,6 +1800,19 @@ export class StreamController {
   }
 
   /** Stops the heartbeat and removes any transient status. */
+  /**
+   * What the turn's output looked like, and clears it.
+   *
+   * Consumed rather than read, because a snapshot belongs to one turn and the
+   * next one starts its own. `null` when no turn has run since the last read,
+   * which is a truer answer than a row of zeros.
+   */
+  consumeTurnFeedback(): TurnFeedbackMetricsSnapshot | null {
+    const metrics = this.turnFeedback;
+    this.turnFeedback = null;
+    return metrics?.finish(performance.now()) ?? null;
+  }
+
   stopTurnSilenceIndicator(): void {
     this.clearSilenceTimeout();
     this.clearSilentTurnStatus();

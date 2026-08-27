@@ -211,7 +211,52 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
     // what a person sees. One without the other is a message that exists in
     // only half the places that look for it.
     this.deps.state.addMessage(message);
-    this.deps.renderer.addMessage(message);
+    const element = this.deps.renderer.addMessage(message);
+    this.placeBeforeOpenTurn(message, element);
+  }
+
+  /**
+   * Puts a message that arrived *during* a turn where the record has it.
+   *
+   * **Steered input is the only thing that does this**, and without it the
+   * surface and the vault disagree about the order of a conversation. The
+   * coordinator writes the steered question to the conversation while the turn
+   * runs, so the record reads question, question, answer — the answer is
+   * written last, by the barrier. The surface has already drawn the answer's
+   * bubble, so appending puts the question *after* it; and
+   * `ConversationController.save` then writes `state.messages` over the record,
+   * which leaves the vault holding a question that follows its own answer and
+   * hands the next turn a transcript in that order.
+   *
+   * So the message is moved to sit in front of the turn it joined, in the array
+   * and in the column. What it does not do is split the answer in two — the
+   * legacy path finalized the open bubble and started a new one on the
+   * provider's echo, and a turn here has one assistant message by contract.
+   * That is a difference in how it *looks*, not in what is stored.
+   */
+  private placeBeforeOpenTurn(message: ChatMessage, element: HTMLElement | null): void {
+    const openTurn = this.open ? this.turnMessages.get(this.open.runId) : undefined;
+    if (!openTurn || openTurn === message) {
+      return;
+    }
+    const messages = this.deps.state.messages;
+    const from = messages.lastIndexOf(message);
+    const to = messages.indexOf(openTurn);
+    if (from < 0 || to < 0 || to > from) {
+      return;
+    }
+    // Spliced in place rather than reassigned: whatever else is holding this
+    // array — the controller, the renderer's action buttons — is holding the
+    // same one.
+    messages.splice(from, 1);
+    messages.splice(to, 0, message);
+    // The bubble the turn is drawing into, from the content element the cursor
+    // is holding. Asked through `closest` because the cursor points at the
+    // content div inside the bubble, not the bubble.
+    const anchor = this.deps.state.currentContentEl?.closest?.('.grimoire-message');
+    if (element && anchor?.parentElement) {
+      anchor.parentElement.insertBefore(element, anchor);
+    }
   }
 
   beginTurn(turn: ChatTurnView): void {

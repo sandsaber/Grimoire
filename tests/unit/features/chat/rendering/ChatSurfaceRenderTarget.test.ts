@@ -220,6 +220,38 @@ describe('chat surface render target', () => {
     ]);
   });
 
+  it('puts a message that arrives mid-turn in front of the turn it joined', async () => {
+    // **Steered input is the only thing that does this.** The coordinator
+    // writes the steered question to the conversation while the turn runs, so
+    // the record reads question, question, answer — the answer is written last,
+    // by the barrier. Appended, the question lands *after* the answer's bubble,
+    // and `ConversationController.save` then writes `state.messages` over the
+    // record: the vault ends up holding a question that follows its own answer,
+    // and the next turn is handed that transcript.
+    const chat = harness();
+    chat.state.messages = [{ id: 'user-1', role: 'user', content: 'first', timestamp: 1 }];
+    beginTurn(chat.target);
+
+    chat.target.openTurnBlock(RUN_ID, 0, { kind: 'assistant-text', text: 'counting' });
+    chat.target.appendMessage({ id: 'user-steer', role: 'user', content: 'stop', timestamp: 2 });
+
+    await drained(chat.target);
+    expect(chat.state.messages.map(message => message.id))
+      .toEqual(['user-1', 'user-steer', `assistant-${RUN_ID}`]);
+  });
+
+  it('leaves a message that arrives between turns where it was appended', async () => {
+    // Nothing is open, so there is nothing to sit in front of: the ordinary
+    // case must not be reordered by the rule above.
+    const chat = harness();
+    chat.state.messages = [{ id: 'user-1', role: 'user', content: 'first', timestamp: 1 }];
+
+    chat.target.appendMessage({ id: 'user-2', role: 'user', content: 'second', timestamp: 2 });
+
+    await drained(chat.target);
+    expect(chat.state.messages.map(message => message.id)).toEqual(['user-1', 'user-2']);
+  });
+
   it('keeps the silence timer awake while the provider is still producing', async () => {
     // The timer says "this provider has gone quiet", and something has to tell
     // it otherwise. `handleStreamChunk` resets it itself, so the two text paths

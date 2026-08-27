@@ -8666,6 +8666,84 @@ the consumer that would be rewritten anyway — the settings tabs, the mention U
 and let the row follow it, widening the slot as part of that consumer's own rework. Picking rows
 first is how this list produced five separate discoveries of the same fact.
 
+#### What is left, as a number rather than a paragraph
+
+The plan's exit gate is that its eleven structural deletion searches are zero in production source.
+They have never been counted. Measured on 2026-08-27, in files rather than hits, so the next session
+watches a scoreboard instead of re-reading prose:
+
+| Deletion search | Files |
+|---|---|
+| generator consumption in `src/features` (`for await … .query`) | **0** |
+| `child_process` in `src/features` | **0** |
+| runtime interaction callbacks (`setApprovalCallback` and its two siblings) | 3 |
+| worker tab ownership (`createWorkerTab`, `orchestratorTabId`, `workerTabIds`) | 3 |
+| `src/core` importing the plugin type | 3 |
+| subagent hooks and loaders | 7 |
+| `SubagentManager` lifecycle | 18 |
+| `app` importing a concrete provider module | 20 |
+| turn metadata and session updates | 24 |
+| `StreamChunk` and the subagent chunk vocabulary | 25 |
+| the two registries | 44 |
+
+**Two are already zero, and both closed this session** — the generator branch went with
+`InputController`'s deletion, and `BangBashService` moved onto the local-shell backend before it. The
+rest group into three pieces of work rather than eleven: **durable agents** carries the subagent
+rows and the worker tabs, **the provider rows** carry the registries and the app's concrete-provider
+imports and the plugin type in core, and **the seam deletion** carries `StreamChunk`, the turn
+metadata and the interaction callbacks — and it is last because it is what the other two make
+possible.
+
+**Counted by a gate rather than by hand**, because a scoreboard nobody runs is prose again:
+`structuralDeletionProgress.test.ts` holds these numbers and goes red when one moves in *either*
+direction — up is a surface joining what the migration removes, down is progress that has to be
+written here in the same commit that earned it. Counted in files rather than hits, because a file is
+the unit of the work; a refactor inside one changes a hit count and says nothing about the gate.
+Proven by adding a `StreamChunk` import to a file that did not have one.
+
+A number that does not move says a checkpoint did something other than what the exit gate asks for,
+which is exactly the thing the v1 attempt could not see about itself.
+
+#### The review after the deletion, and six things it found
+
+No structural defect in the `ApplicationRuntime` move — the load/unload race, the failed-start
+behaviour and the dispose order all came across faithfully. **Every finding was in what the deletion
+left behind**, and that is worth naming: deleting a branch is not finished when the code compiles,
+because the branch was carrying things nobody had listed.
+
+- **the refusal destroyed the message.** A tab with no projection now shows a notice and returns —
+  but the composer was cleared and the images detached on the way there, and nothing put them back.
+  The one moment a person is told to try again is the moment their text is gone. The `catch` beside
+  it already had the shape; the refusal now uses it;
+- **a steered question was stored after its own answer.** The coordinator writes it to the
+  conversation mid-turn, so the record reads question, question, answer — the answer is written last,
+  by the barrier. The surface had already drawn the answer's bubble, so appending put the question
+  *after* it, and `ConversationController.save` then wrote `state.messages` over the record. The
+  vault ended up holding a question that follows its own answer, and the next turn was handed that
+  transcript. The render target moves a message that arrives mid-turn in front of the turn it joined,
+  in the array and in the column. **What it does not do is split the answer in two** — the legacy
+  path finalized the open bubble and opened a new one on the provider's echo, and a turn here has one
+  assistant message by contract. That is a difference in how it looks, not in what is stored;
+- **`wasInvalidated` was assigned only inside the deleted loop**, which made the recovery that reads
+  it unreachable: a steer that raced a conversation switch left `steerInFlight` set for the life of
+  the tab, refusing every future steer behind a disabled "Steering…" button, and a stale pending
+  message that a later turn would re-queue. The generation says the same thing and is now what says
+  it;
+- **every turn logged a provider that had produced nothing.** `TurnFeedbackMetrics.observe` was fed
+  from the loop, so six of its seven fields were structurally empty — first activity `null`, no text,
+  no tools, a silence as long as the turn. The metrics live on `StreamController` now, which is what
+  draws the output: chunks feed it where they arrive, and prose feeds it through `appendText`, which
+  is the only channel a projection-drawn turn of pure text takes;
+- **a steer the provider had taken could report failure.** The conversation write follows the
+  `steerRun`, and a rejection propagated out as "failed to steer" — so the person sends again and the
+  model receives it twice mid-turn. The write is best-effort now and the answer stays `true`: a
+  conversation missing one of its questions is the smaller wrong;
+- **a steered message lost its note.** The first message of a turn carries `currentNote` and this one
+  did not, while `markCurrentNoteSent` had already been told the note went out.
+
+Each fix has a test, and the two behavioural ones were proven by breaking them: an appended message
+left where it landed, and prose made invisible to the metrics.
+
 **Next: the rest of M5** — durable agents with tab-close ownership, the thirteen provider rows,
 registry deletion, and the seam deletion. That step was written as
 "only after a provider has been certified on the projection path"; all nine are on it now, so what

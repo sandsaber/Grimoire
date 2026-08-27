@@ -63,8 +63,10 @@ export function createTabProjectionExecution(
   const backendId = module.execution.descriptor.backendId;
   // A tab can be created before the kernel has started — a restored workspace
   // builds its tabs while `loadSettings` is still running — and asking for a
-  // composition that does not exist yet throws. A tab without one runs the
-  // legacy path, which is what it would have done anyway.
+  // composition that does not exist yet throws. **There is no legacy path to
+  // fall back to any more**: a tab without one refuses to send, with the
+  // message it was already typed into restored to the composer, and resolves on
+  // the next attempt because this is asked again every time.
   const composition = chatExecutionOrNull(plugin);
   if (!composition) {
     return null;

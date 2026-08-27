@@ -220,6 +220,51 @@ describe('StreamController - Text Content', () => {
     jest.useRealTimers();
   });
 
+  describe('Turn feedback metrics', () => {
+    /**
+     * **The controller that draws the turn is what sees the output.** These
+     * metrics were kept by `InputController` and fed from its generator loop;
+     * with that loop deleted, every field but the duration was structurally
+     * empty and each successful turn logged a provider that had produced
+     * nothing — a diagnostic that reads as a defect in the thing it measures.
+     */
+    it('counts what a turn actually drew, whichever channel it arrived on', async () => {
+      const msg = createTestMessage();
+      deps.state.currentTextEl = createMockEl();
+      controller.startTurnSilenceIndicator('claude');
+
+      // Prose reaches the column through `appendText` on the projection path,
+      // and tool calls through `handleStreamChunk`. Both are the turn's output.
+      await controller.appendText('an answer');
+      await controller.handleStreamChunk(
+        { type: 'tool_use', id: 'call-1', name: 'Bash', input: {} } as never,
+        msg,
+      );
+
+      const snapshot = controller.consumeTurnFeedback();
+      expect(snapshot).toMatchObject({ textUpdates: 1, toolUses: 1 });
+      expect(snapshot?.firstActivityMs).not.toBeNull();
+    });
+
+    it('answers nothing when no turn has run since the last read', () => {
+      // Truer than a row of zeros, which is what a turn that produced nothing
+      // would report and is the thing this replaced.
+      expect(controller.consumeTurnFeedback()).toBeNull();
+    });
+
+    it('gives each turn its own count', async () => {
+      deps.state.currentTextEl = createMockEl();
+      controller.startTurnSilenceIndicator('claude');
+      await controller.appendText('first');
+      controller.consumeTurnFeedback();
+
+      controller.startTurnSilenceIndicator('claude');
+      await controller.appendText('second');
+
+      expect(controller.consumeTurnFeedback()).toMatchObject({ textUpdates: 1 });
+    });
+  });
+
   describe('Text streaming', () => {
     it('should append text content to message', async () => {
       const msg = createTestMessage();

@@ -57,7 +57,6 @@ import { InlinePlanApproval,type PlanApprovalDecision } from '../rendering/Inlin
 import type { MessageRenderer } from '../rendering/MessageRenderer';
 import { getToolSummary } from '../rendering/ToolCallRenderer';
 import type { SubagentManager } from '../services/SubagentManager';
-import { TurnFeedbackMetrics } from '../services/TurnFeedbackMetrics';
 import type { ChatState } from '../state/ChatState';
 import type { QueuedMessage } from '../state/types';
 import type { FileContextManager } from '../ui/FileContext';
@@ -484,15 +483,25 @@ export class InputController {
     };
     // **Every provider is on this path**, so a tab without one cannot send. The
     // only way to be here is a tab whose provider left the catalog or one built
-    // before the kernel did — both of which resolve on the next attempt, since
-    // the tab asks again every time. Refused with something a person can act on
-    // rather than silently taking a path that no longer exists.
+    // before the kernel did — and the second resolves on the next attempt,
+    // because the tab asks again every time.
+    //
+    // **So the message has to survive the refusal.** The composer was cleared
+    // and the images detached on the way here; a refusal that kept them cleared
+    // would destroy what the person typed at the one moment they are told to
+    // try again. Restored the way the `catch` below restores them, which is the
+    // shape this was missing.
     const projection = this.deps.getProjectionExecution?.() ?? null;
     if (!projection) {
       new Notice(t('chat.ui.errors.agentUnavailable'));
       streamController.hideThinkingIndicator();
       streamController.stopTurnSilenceIndicator();
       state.isStreaming = false;
+      if (shouldUseInput) {
+        inputEl.value = content;
+        this.deps.resetInputHeight();
+        imageContextManager?.setImages(imagesForMessage ?? []);
+      }
       return;
     }
     state.hasPendingConversationSave = true;
@@ -511,10 +520,8 @@ export class InputController {
       isCompact ? 'grimoire-thinking--compact' : undefined,
     );
     state.responseStartTime = performance.now();
-    const feedbackMetrics = new TurnFeedbackMetrics(state.responseStartTime);
 
     let wasInterrupted = false;
-    let wasInvalidated = false;
     let didEnqueueToSdk = false;
     let planCompleted = false;
 
@@ -628,6 +635,12 @@ export class InputController {
       );
     } finally {
       streamController.stopTurnSilenceIndicator();
+      // **The generation is the whole of it now.** A `wasInvalidated` flag used
+      // to say the same thing, set inside the generator loop when the surface
+      // moved on mid-turn; with that loop gone it was never set, which left the
+      // recovery at the end of this block unreachable and a steer that raced a
+      // conversation switch stuck on "Steering…" for the life of the tab.
+      const invalidated = state.streamGeneration !== streamGeneration;
       const finalAssistantMsg = this.activeStreamingAssistantMessage ?? assistantMsg;
       const turnMetadata = agentService.consumeTurnMetadata();
       userMsg.userMessageId = turnMetadata.userMessageId ?? userMsg.userMessageId;
@@ -640,7 +653,7 @@ export class InputController {
           planCompleted,
           providerId: this.getActiveProviderId(),
           wasInterrupted,
-          wasInvalidated,
+          invalidated,
         },
         event: 'send.finished',
         level: 'debug',
@@ -649,7 +662,10 @@ export class InputController {
       plugin.recordDebugLog?.({
         data: {
           providerId: this.getActiveProviderId(),
-          ...feedbackMetrics.finish(performance.now()),
+          // Read from the controller that draws the turn: it is what sees the
+          // output now, and metrics kept here reported a provider that had
+          // produced nothing on every successful turn.
+          ...(streamController.consumeTurnFeedback?.() ?? {}),
         },
         event: 'turn.feedback_metrics',
         level: 'debug',
@@ -660,7 +676,7 @@ export class InputController {
       state.clearFlavorTimerInterval();
 
       // Skip remaining cleanup if stream was invalidated (tab closed or conversation switched)
-      if (!wasInvalidated && state.streamGeneration === streamGeneration) {
+      if (!invalidated) {
         const didCancelThisTurn = wasInterrupted || state.cancelRequested;
         if (didCancelThisTurn) {
           await streamController.appendText(
@@ -757,7 +773,10 @@ export class InputController {
         }
       }
 
-      if (wasInvalidated) {
+      if (invalidated) {
+        // The turn this steer belonged to is not the one on screen any more.
+        // Left set, `steerInFlight` refuses every future steer on this tab and
+        // the indicator renders a disabled button nobody can clear.
         this.clearPendingSteerState();
         this.updateQueueIndicator();
       }

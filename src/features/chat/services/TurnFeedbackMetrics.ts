@@ -28,6 +28,18 @@ export class TurnFeedbackMetrics {
     this.startedAt = startedAt;
   }
 
+  /**
+   * Records assistant text that reached the column without a chunk to carry it.
+   *
+   * The projection path draws prose through `appendText` rather than through
+   * `handleStreamChunk`, so a turn made entirely of it would otherwise report
+   * no activity, no feedback and a silence as long as the turn — a diagnostic
+   * saying the provider produced nothing, on every successful turn.
+   */
+  observeText(text: string, observedAt: number): void {
+    this.observe({ type: 'text', content: text }, observedAt);
+  }
+
   observe(chunk: StreamChunk, observedAt: number): void {
     if (this.isActivity(chunk) && this.firstActivityAt === null) {
       this.firstActivityAt = observedAt;

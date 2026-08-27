@@ -175,10 +175,20 @@ export class ChatTabExecution {
       // Called on the encoder rather than pulled off it: the reference the
       // provider builds is a method on its own ports object.
       encoder.encodeSteerRef(turn),
-      // What the provider composed, not what was typed — the same rule the
-      // first message of a turn follows, and for the same reason: the vault
-      // holds what was sent.
-      { ...userMessage, content: turn.persistedContent },
+      {
+        ...userMessage,
+        // What the provider composed, not what was typed — the same rule the
+        // first message of a turn follows, and for the same reason: the vault
+        // holds what was sent.
+        content: turn.persistedContent,
+        // And the note it was sent with, for the same reason again: a steered
+        // message rendered without its chip while the first message of the turn
+        // has one is a difference nobody can explain, and `markCurrentNoteSent`
+        // has already been told this note went out.
+        ...(turn.isCompact || !turn.request.currentNotePath
+          ? {}
+          : { currentNote: turn.request.currentNotePath }),
+      },
     );
   }
 
