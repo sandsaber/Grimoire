@@ -58,6 +58,8 @@ GRIMOIRE_ANTIGRAVITY_LIVE=1 npm run test -- --selectProjects integration \
   --testPathPatterns 'AntigravityChatProjectionLiveSmoke'
 GRIMOIRE_CODEX_LIVE=1 npm run test -- --selectProjects integration \
   --testPathPatterns 'CodexChatProjectionLiveSmoke'
+GRIMOIRE_OPENCODE_LIVE=1 npm run test -- --selectProjects integration \
+  --testPathPatterns 'OpencodeChatProjectionLiveSmoke'
 # Claude loads the real SDK by path, past the mock every other suite gets.
 GRIMOIRE_CLAUDE_LIVE=1 NODE_OPTIONS=--experimental-vm-modules \
   node scripts/run-jest.js --selectProjects=integration \
@@ -88,6 +90,10 @@ builds the tab's end directly would otherwise keep passing after the flip was re
   it as a finding. That filter is one exported function now, used by both. The same gap swallowed
   the interaction fix: the harness had no presenter either, so a fixed path still hung.
 
+- **read a live green as certification when the vendor is up and down.** OpenCode passed every row
+  at least three times over five runs and never all three in one, always failing on its own
+  `Endpoint is unavailable`. That is a stop condition, not a flip.
+
 **And a row that can hang must have its own bound.** Claude's permission row stopped dead for five
 minutes and was killed by the suite timeout, which reports "the test took too long" rather than
 "nobody answered the question". It races a 120s timer now and fails saying what was asked.
@@ -103,6 +109,7 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
+| 2026-08-27 | `opencode` acp | — | A, B, C across five runs | **Not flipped.** OpenCode stays off the switch: five runs could not produce one clean pass. Every failure carried the vendor's own `Upstream request failed: Endpoint is unavailable` / `OpenCode service failure`, or a model that answered without touching the filesystem — and the path rendered those sentences correctly each time, which is row 14 passing. Two harness defects were found and fixed on the way: an OpenCode session belongs to its project directory, so the reload row has to hand the directory over and not only the record store; and a row about a *permission* must name a shell command rather than an outcome, because a model that declines to use a tool proves nothing. The rows now refuse a vendor outage by name rather than reporting it as an assertion about this path. Flip it when the endpoint is up |
 | 2026-08-27 | Claude Agent SDK (`haiku`) | 2, 3, 5, 9, 10, 14 (driven half) | — | Claude's flip, and **the row that found the defect this path shipped with**: a provider that stops to ask hung forever, because the bridge that presents an interaction and resolves it was built only when the *adapter* opened a session and here the coordinator opens one. The coordinator attaches it now, one per conversation. Rows 1, 4, 6, 8, 11, 12, 13 outstanding under the standing override |
 | 2026-08-27 | `codex` app-server | 2, 3, 5, 10, 14 (driven half) | — | Codex's flip, and the first provider content this path has drawn. Its answer renders **once** here, where `CodexLiveSmoke` row 1 records the legacy adapter path seeing it three times. Codex sends one tool call's result twice — at item completion and again from `flushPendingRawToolOutputs` — which `StreamController` merges by id on both paths, so it is an observation rather than a row. Rows 1, 4, 6, 8, 9, 11, 12, 13 outstanding under the standing override |
 | 2026-08-27 | `agy` 1.1.19 | 2, 3, 5, 7, 14 (driven half) | — | Antigravity's flip. The driven half only; rows 1, 6, 9 do not apply to print mode — it has no plan approval, no interaction channel, and refuses anything short of full access before a process exists — and rows 4, 8, 10, 11, 12, 13 are outstanding, in a vault, by the owner's standing override |

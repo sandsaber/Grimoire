@@ -1404,6 +1404,11 @@ export interface ExecutionInteractionPresenter {
   present(request: InteractionRequest): Promise<string | ExecutionInteractionAnswer | null>;
 }
 
+/** The one thing a bridge needs a kernel for. */
+export interface InteractionResolvingPort {
+  resolveInteraction(resolution: InteractionResolution): Promise<void>;
+}
+
 /**
  * Routes opened interactions to the presenter and resolves them exactly once.
  *
@@ -1411,11 +1416,6 @@ export interface ExecutionInteractionPresenter {
  * resolution; this only has to avoid presenting the same interaction twice
  * after a redelivery, which is why the seen set exists.
  */
-/** The one thing a bridge needs a kernel for. */
-export interface InteractionResolvingPort {
-  resolveInteraction(resolution: InteractionResolution): Promise<void>;
-}
-
 export class ExecutionInteractionBridge {
   /**
    * Bounded for the same reason the ingestor's delivery-id set is: this lives

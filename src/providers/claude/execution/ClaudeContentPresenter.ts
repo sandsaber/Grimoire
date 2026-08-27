@@ -62,6 +62,7 @@ export class ClaudeContentPresenter {
   private bufferedUsage: Extract<StreamChunk, { type: 'usage' }> | undefined;
   private sawStreamText = false;
   private sawStreamThinking = false;
+  private failure: string | undefined;
 
   constructor(private readonly ports: ClaudeContentPresenterPorts) {}
 
@@ -91,6 +92,18 @@ export class ClaudeContentPresenter {
    * previous conversation's session as its own, or the new conversation is
    * saved pointing at the old session and silently continues it.
    */
+  /**
+   * The provider's own words for the last failure it reported.
+   *
+   * What `describeFailure` answers with, so a failing turn shows Claude's
+   * message instead of the neutral sentence. Kept rather than consumed: the
+   * terminal arrives after the chunk, and a turn that failed twice is still one
+   * turn.
+   */
+  lastFailure(): string | undefined {
+    return this.failure;
+  }
+
   forgetConversation(): void {
     this.sessionId = undefined;
     this.metadata = {};
@@ -102,6 +115,11 @@ export class ClaudeContentPresenter {
   beginTurn(): void {
     this.sawStreamText = false;
     this.sawStreamThinking = false;
+    // Cleared here rather than when it is read: a turn that succeeds after one
+    // that failed must not describe its own terminal with the last turn's
+    // words, and `describeFailure` is asked once per terminal whether or not
+    // anything failed.
+    this.failure = undefined;
     this.streamState.clearAll();
     this.usageState.clear();
   }
@@ -164,6 +182,24 @@ export class ClaudeContentPresenter {
       }
       if (event.type === 'usage') {
         chunks.push(this.rememberUsage(event));
+        continue;
+      }
+      if (event.type === 'error') {
+        // **Two different errors wear this type, and only one of them is how
+        // the turn ended.** A result-level error *is* the ending — the kernel
+        // owns that fact and `describeFailure` reads these words back for it,
+        // so letting the chunk through as well would put the failure on screen
+        // twice. An error on an *assistant* message is a rate limit or a
+        // billing warning on a turn that usually finishes anyway; it is
+        // something the provider is saying, not an ending, and it is a notice.
+        //
+        // Dropping both is what the projection path did before this: `error` is
+        // turn framing there and never reaches the column, so a rate limit
+        // vanished with nothing shown.
+        this.failure = event.content;
+        if (message.type !== 'result') {
+          chunks.push({ type: 'notice', level: 'warning', content: event.content });
+        }
         continue;
       }
       // `done` closes the surface's turn, and the kernel's terminal is what

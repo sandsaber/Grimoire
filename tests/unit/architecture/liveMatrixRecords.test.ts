@@ -110,6 +110,7 @@ describe('live smoke matrix records', () => {
       'GrokLiveSmoke.integration.test.ts',
       'KimicodeLiveSmoke.integration.test.ts',
       'MimocodeLiveSmoke.integration.test.ts',
+      'OpencodeChatProjectionLiveSmoke.integration.test.ts',
       'OpencodeLiveSmoke.integration.test.ts',
       'QwenLiveSmoke.integration.test.ts',
     ]);

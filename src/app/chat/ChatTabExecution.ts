@@ -91,12 +91,19 @@ export class ChatTabExecution {
   async open(conversationId: string): Promise<void> {
     this.bound = conversationId;
     this.releasePresenter?.();
-    this.releasePresenter = null;
-    const presenter = this.options.interactionPresenter?.() ?? null;
-    if (presenter) {
-      this.releasePresenter = this.options.composition.coordinator
-        .attachInteractionPresenter(conversationId, presenter);
-    }
+    // Registered whether or not the tab has a runtime yet, and as the reader
+    // rather than what it read. A restored tab opens its conversation before
+    // anything builds its service, and an eviction replaces the runtime — and
+    // its presenter — underneath a tab nobody re-opened. Both were tabs that
+    // silently could not answer a question.
+    this.releasePresenter = this.options.interactionPresenter
+      ? this.options.composition.coordinator.attachInteractionPresenter(
+        conversationId,
+        // Wrapped rather than handed over bare: the reader is a method on the
+        // options object, and passing it by reference would rebind `this`.
+        () => this.options.interactionPresenter?.() ?? null,
+      )
+      : null;
     await this.attachment.open(conversationId, this.options.composition.coordinator);
   }
 

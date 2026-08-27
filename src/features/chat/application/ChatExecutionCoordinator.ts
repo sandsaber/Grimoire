@@ -248,6 +248,11 @@ interface ActiveTurn {
   finalized: boolean;
 }
 
+/** One surface's offer to answer a conversation's questions. */
+interface InteractionSurface {
+  readonly bridge: ExecutionInteractionBridge;
+}
+
 interface ConversationEntry {
   projection: ChatProjection;
   backendId?: ExecutionBackendId;
@@ -269,15 +274,21 @@ export class ChatExecutionCoordinator {
   private readonly now: () => number;
   private readonly entries = new Map<string, ConversationEntry>();
   /**
-   * The bridge that answers a provider's question, one per conversation.
+   * Who answers a conversation's questions, in the order they offered to.
    *
    * Keyed by conversation and not by surface, for the reason the coordinator
-   * itself is: two tabs open on one chat must show one approval and race to
-   * answer nothing. Held outside `entries` because a tab attaches its presenter
-   * before the conversation has been read, and an entry that does not exist yet
-   * is not a reason to lose the first question of a turn.
+   * itself is: two tabs open on one chat must show one approval rather than two
+   * racing to resolve it. Held outside `entries` because a tab attaches before
+   * the conversation has been read, and an entry that does not exist yet is not
+   * a reason to lose the first question of a turn.
+   *
+   * A **list**, and the head presents. The first version kept one bridge and
+   * dropped every later attach on the floor, which made its own doc comment
+   * false in the way that matters: a split view whose *first* surface closed
+   * left the conversation with no presenter at all, and the second surface —
+   * still open, still visible — hung on its next approval.
    */
-  private readonly interactionBridges = new Map<string, ExecutionInteractionBridge>();
+  private readonly interactionSurfaces = new Map<string, InteractionSurface[]>();
   private readonly loads = new Map<string, Promise<ConversationEntry>>();
   private disposed = false;
 
@@ -394,12 +405,18 @@ export class ChatExecutionCoordinator {
    * coordinator opened one. A Claude turn that asked to write a file hung for
    * five minutes before this existed.
    *
-   * **The first presenter wins, and the loser is not queued behind it.** Two
-   * tabs on one conversation are two runtimes with two presenters, and both
+   * **The first presenter presents, and later ones queue behind it.** Two tabs
+   * on one conversation are two runtimes with two presenters, and both
    * presenting means one approval on screen twice with two answers racing to
-   * resolve it. The second attach is recorded and inert; it becomes the
-   * presenter only if the first is released while this conversation is still
-   * open, which is what closing a tab does.
+   * resolve it. Releasing the head promotes the next, which is what closing one
+   * of two split tabs does — an earlier version kept only the first and
+   * discarded the rest, so closing it left the surviving tab unable to answer
+   * anything.
+   *
+   * **The presenter is a function, read per question rather than captured.** A
+   * tab's runtime is rebuilt whenever the warm-runtime cap evicts it, and the
+   * presenter goes with it; a captured one answers `null` for every request the
+   * new runtime raised, which is indistinguishable from nobody being there.
    *
    * Releasing the last one leaves an open interaction open. That is deliberate:
    * a dismissal is the provider's to time out, and answering for someone who is
@@ -407,16 +424,35 @@ export class ChatExecutionCoordinator {
    */
   attachInteractionPresenter(
     conversationId: string,
-    presenter: ExecutionInteractionPresenter,
+    presenter: () => ExecutionInteractionPresenter | null,
   ): () => void {
-    const bridge = new ExecutionInteractionBridge(this.lifecycle, presenter, this.now);
-    const previous = this.interactionBridges.get(conversationId);
-    if (!previous) {
-      this.interactionBridges.set(conversationId, bridge);
-    }
+    const surface: InteractionSurface = {
+      bridge: new ExecutionInteractionBridge(
+        this.lifecycle,
+        // Read per question, not captured. A tab's runtime is rebuilt whenever
+        // the warm-runtime cap evicts it, and the presenter goes with it: a
+        // captured one then answers `null` for every request the *new* runtime
+        // raised, which the bridge correctly treats as "nobody answered" and
+        // the turn waits forever — the same hang this seam exists to fix,
+        // arriving a tab switch later.
+        { present: request => (presenter()?.present(request) ?? Promise.resolve(null)) },
+        this.now,
+      ),
+    };
+    const surfaces = this.interactionSurfaces.get(conversationId) ?? [];
+    surfaces.push(surface);
+    this.interactionSurfaces.set(conversationId, surfaces);
     return () => {
-      if (this.interactionBridges.get(conversationId) === bridge) {
-        this.interactionBridges.delete(conversationId);
+      const current = this.interactionSurfaces.get(conversationId);
+      if (!current) {
+        return;
+      }
+      const index = current.indexOf(surface);
+      if (index >= 0) {
+        current.splice(index, 1);
+      }
+      if (current.length === 0) {
+        this.interactionSurfaces.delete(conversationId);
       }
     };
   }
@@ -824,7 +860,7 @@ export class ChatExecutionCoordinator {
     // sends the answer back. Nothing else on this path does — the adapter's
     // bridge is attached when the *adapter* opens a session, and here the
     // coordinator opened it, so a provider that stopped to ask waited forever.
-    this.interactionBridges.get(entry.projection.conversationId)?.accept(envelope);
+    this.interactionSurfaces.get(entry.projection.conversationId)?.[0]?.bridge.accept(envelope);
     this.trackInteraction(entry, envelope);
     if (targetRunId) {
       this.settleIfTerminal(entry, targetRunId);

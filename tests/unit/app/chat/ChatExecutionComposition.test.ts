@@ -6,7 +6,7 @@ import { StoredChatConversations } from '@/app/chat/StoredChatConversations';
 import type { SessionStorage } from '@/core/bootstrap/SessionStorage';
 import { ConversationRepository } from '@/core/conversations/ConversationRepository';
 import { executionBackendId } from '@/core/execution/ExecutionBackendDescriptor';
-import type { RunTerminal } from '@/core/execution/ExecutionContracts';
+import type { InteractionRequest, RunTerminal } from '@/core/execution/ExecutionContracts';
 import { ExecutionControlRepositories } from '@/core/execution/ExecutionControlRepositories';
 import { ExecutionControlTransactionCoordinator } from '@/core/execution/ExecutionControlTransactionCoordinator';
 import { interactionId, sessionInstanceId } from '@/core/execution/ExecutionIds';
@@ -590,12 +590,15 @@ describe('chat execution composition', () => {
     it('presents it through the provider and resolves what came back', async () => {
       const app = await createComposition();
       const presented: string[] = [];
-      const release = app.composition.coordinator.attachInteractionPresenter(CONVERSATION_ID, {
-        present: async request => {
-          presented.push(request.presentationRef);
-          return 'allow';
-        },
-      });
+      const release = app.composition.coordinator.attachInteractionPresenter(
+        CONVERSATION_ID,
+        () => ({
+          present: async (request: InteractionRequest) => {
+            presented.push(request.presentationRef);
+            return 'allow';
+          },
+        }),
+      );
 
       const started = await openInteraction(app);
       await flush(app.registry);
@@ -626,11 +629,11 @@ describe('chat execution composition', () => {
       const second: string[] = [];
       const releaseFirst = app.composition.coordinator.attachInteractionPresenter(
         CONVERSATION_ID,
-        { present: async () => { first.push('asked'); return 'allow'; } },
+        () => ({ present: async () => { first.push('asked'); return 'allow'; } }),
       );
       const releaseSecond = app.composition.coordinator.attachInteractionPresenter(
         CONVERSATION_ID,
-        { present: async () => { second.push('asked'); return 'deny'; } },
+        () => ({ present: async () => { second.push('asked'); return 'deny'; } }),
       );
 
       await openInteraction(app);
@@ -643,18 +646,67 @@ describe('chat execution composition', () => {
       app.composition.dispose();
     });
 
+    it('promotes the next surface when the one presenting is released', async () => {
+      // A split view whose first tab closes. The surviving tab is still open
+      // and still visible, and before this it could not answer anything: the
+      // coordinator kept one bridge and discarded every later attach, so
+      // releasing the first left the conversation with no presenter at all.
+      const app = await createComposition();
+      const first: string[] = [];
+      const second: string[] = [];
+      const releaseFirst = app.composition.coordinator.attachInteractionPresenter(
+        CONVERSATION_ID,
+        () => ({ present: async () => { first.push('asked'); return 'allow'; } }),
+      );
+      app.composition.coordinator.attachInteractionPresenter(
+        CONVERSATION_ID,
+        () => ({ present: async () => { second.push('asked'); return 'deny'; } }),
+      );
+      releaseFirst();
+
+      await openInteraction(app);
+      await flush(app.registry);
+
+      expect(first).toHaveLength(0);
+      expect(second).toEqual(['asked']);
+      app.composition.dispose();
+    });
+
+    it('asks the presenter the tab has now, not the one it had when it opened', async () => {
+      // The warm-runtime cap evicts a background tab's runtime and its
+      // presenter with it, and nothing re-opens the conversation when the tab
+      // comes back — so a captured presenter answers `null` for every request
+      // the *new* runtime raised, which the bridge reads as nobody being there
+      // and the turn waits forever. The same hang, a tab switch later.
+      const app = await createComposition();
+      const answered: string[] = [];
+      let live: { present: () => Promise<string> } | null = null;
+      app.composition.coordinator.attachInteractionPresenter(CONVERSATION_ID, () => live);
+      live = { present: async () => { answered.push('rebuilt'); return 'allow'; } };
+
+      await openInteraction(app);
+      await flush(app.registry);
+
+      expect(answered).toEqual(['rebuilt']);
+      expect(app.backend.resolutions.map(entry => entry.responseId)).toEqual(['allow']);
+      app.composition.dispose();
+    });
+
     it('leaves it open when the presenter is released', async () => {
       // A tab that closed answers nothing. Resolving it with an invented
       // answer would be the UI deciding on the user's behalf, which is the one
       // thing an approval prompt must never do.
       const app = await createComposition();
       const presented: string[] = [];
-      const release = app.composition.coordinator.attachInteractionPresenter(CONVERSATION_ID, {
-        present: async request => {
-          presented.push(request.presentationRef);
-          return 'allow';
-        },
-      });
+      const release = app.composition.coordinator.attachInteractionPresenter(
+        CONVERSATION_ID,
+        () => ({
+          present: async (request: InteractionRequest) => {
+            presented.push(request.presentationRef);
+            return 'allow';
+          },
+        }),
+      );
       release();
 
       const started = await openInteraction(app);

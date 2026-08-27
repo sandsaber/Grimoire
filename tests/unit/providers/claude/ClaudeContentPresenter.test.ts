@@ -154,6 +154,49 @@ describe('Claude content presenter', () => {
     expect(entered).toHaveLength(1);
   });
 
+  it('keeps a non-fatal error as a notice and remembers the words', () => {
+    // The SDK attaches rate limits and billing errors to an *assistant*
+    // message, on a turn that often finishes anyway. On the projection path an
+    // `error` chunk is turn framing and is filtered out before the column sees
+    // it, so this used to vanish with nothing shown — a regression the legacy
+    // path did not have, because there `error` rendered inline.
+    const presenter = createPresenter();
+
+    const chunks = presenter.present({
+      type: 'assistant',
+      parent_tool_use_id: null,
+      error: 'rate_limit_error: slow down',
+      message: { role: 'assistant', content: [] },
+      uuid: 'assistant-err',
+      session_id: 'native-session',
+    });
+
+    expect(chunks).toEqual([
+      { type: 'notice', level: 'warning', content: 'rate_limit_error: slow down' },
+    ]);
+    expect(presenter.lastFailure()).toBe('rate_limit_error: slow down');
+  });
+
+  it('leaves a failed result to the terminal, and keeps its words for it', () => {
+    // The other half: a result-level error *is* how the turn ended, and the
+    // kernel owns that fact. Rendering it as content too would put the failure
+    // on screen twice — once from the provider and once from the terminal — so
+    // the chunk is dropped and `describeFailure` reads the words back.
+    const presenter = createPresenter();
+
+    const chunks = presenter.present({
+      type: 'result',
+      subtype: 'error_during_execution',
+      errors: ['Credit balance is too low'],
+      session_id: 'native-session',
+      uuid: 'result-err',
+    });
+
+    expect(chunks.filter(chunk => chunk.type === 'error')).toHaveLength(0);
+    expect(chunks.filter(chunk => chunk.type === 'notice')).toHaveLength(0);
+    expect(presenter.lastFailure()).toContain('Credit balance is too low');
+  });
+
   it('drops the session of a conversation the tab has left', () => {
     const presenter = createPresenter();
     presenter.present(assistantMessage([{ type: 'text', text: 'hi' }]));

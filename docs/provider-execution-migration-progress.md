@@ -8414,6 +8414,61 @@ Gate after Claude: unit 535 suites / 8441 tests green, integration green, typech
 `build:release` clean. Live, all re-run after the interaction fix: Antigravity 3/3, Codex 4/4,
 Claude 4/4.
 
+#### The review after three flips, and what it found
+
+A multi-agent review of the three flip commits returned five findings; **all five held** and all five
+are fixed in the commit carrying this entry. Two of them were the same defect as the one Claude's row
+found, arriving later:
+
+- **the presenter was captured at `open()` and never read again.** A tab's runtime is rebuilt
+  whenever `trimWarmRuntimes` evicts it, and nothing re-opens the conversation when that tab comes
+  back — so the coordinator held a presenter belonging to a runtime that no longer exists, which
+  answers `null` for every request the *new* one raises, which the bridge correctly reads as nobody
+  being there. **The same hang, a tab switch later.** And a restored bound tab registered nothing at
+  all, because `resolveTabProjectionExecution` opens the conversation while `tab.service` is still
+  null. The presenter is a **function** now, read per question, and it is registered whether or not
+  the tab has a runtime yet;
+- **the second surface's presenter was dropped on the floor** while the doc comment above it said it
+  was queued. A split view whose *first* tab closed left the survivor unable to answer anything. It
+  is an ordered list now, the head presents, and releasing the head promotes the next;
+- **flipping Claude onto a path that filters `error` chunks lost Claude's own failure text**, and
+  Claude had no `describeFailure` to replace it. Two different errors wear that type and only one is
+  an ending: a *result*-level error is how the turn ended and the kernel owns that fact, so it is
+  dropped and `describeFailure` reads its words back; an error on an *assistant* message is a rate
+  limit or a billing warning on a turn that usually finishes anyway, and it is a **notice** now
+  rather than nothing. Before this, a rate-limited Claude turn showed the neutral sentence and an
+  assistant-level warning showed nothing at all;
+- the working tree broke two matrix gates, which is the gate doing its job;
+- the new `InteractionResolvingPort` had been inserted between the bridge's doc comment and the
+  bridge, leaving the class undocumented and the interface over-documented.
+
+Every fix has a test written red first, and the two behavioural ones were proven by breaking them:
+discarding later attaches turns the promotion test red, capturing the presenter turns the rebuilt-
+runtime test red.
+
+#### OpenCode is written, run, and **not flipped**
+
+Its harness exists and its rows ran five times. Not once did all three pass together. Every failure
+carried OpenCode's own words — `Upstream request failed: Endpoint is unavailable`,
+`Internal error: OpenCode service failure` — or a model that answered without touching the
+filesystem. **Nothing failed that belongs to this path**: it rendered the vendor's sentence correctly
+every time, which is row 14 passing repeatedly. But a row that cannot be run is not a certified row,
+and the branch's rule is that a failing row is a stop condition, so `opencode` is off the switch and
+the harness says so in a line that flips with it.
+
+Two harness defects came out of those runs, and both are the shape this session keeps finding:
+
+- **an OpenCode session belongs to its project directory.** The reload row handed over the record
+  store and made a fresh temp directory, so the second half could not load the first half's session
+  and the agent answered with a generic service failure. It read as a resume defect twice before the
+  directory was the answer;
+- **a row about a permission must name a shell command, not an outcome.** Asked to "create a file",
+  the model replied `done` with no tool call at all on one run, and a permission row where nothing
+  asked for permission proves nothing.
+
+The rows refuse a vendor outage by name now, rather than reporting it as an assertion about the
+projection path.
+
 Next: the six ACP providers. Every one of them can ask, so the seam this checkpoint built is what
 they need and it is now proven; what each still brings of its own is its content presenter and its
 failure wording. OpenCode and Grok are certifiable on this machine; Gemini answers one turn per
