@@ -82,7 +82,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
-| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete** and **the chat path is built, reviewed, and carrying its first provider**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design, and all five runners are deleted; bang-bash runs on the local-shell backend. The chat projection, its coordinator, startup adoption, the renderer, the render target, the attachment, the composition, the tab handle and the conversation port all exist, are composed end to end in one test, are **in the bundle**, and **Antigravity's, Claude's and Codex's tabs are on it**: `projectionChatProviders` holds three providers, and adding the next is that provider's flip, certified by `docs/chat-projection-flip-smoke-matrix.md`, whose driven half ran against a real `agy` on 2026-08-27. Still untouched: the remaining six flips, durable agents, tab-close ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as composition root, and the seam deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
+| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete** and **the chat path is built, reviewed, and carrying its first provider**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design, and all five runners are deleted; bang-bash runs on the local-shell backend. The chat projection, its coordinator, startup adoption, the renderer, the render target, the attachment, the composition, the tab handle and the conversation port all exist, are composed end to end in one test, are **in the bundle**, and **Antigravity's, Claude's, Codex's and Grok's tabs are on it**: `projectionChatProviders` holds four providers, and adding the next is that provider's flip, certified by `docs/chat-projection-flip-smoke-matrix.md`, whose driven half ran against a real `agy` on 2026-08-27. Still untouched: the remaining five flips, durable agents, tab-close ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as composition root, and the seam deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
@@ -8281,10 +8281,10 @@ Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`)
 
 ### Where the session of 2026-08-27 is
 
-**The chat projection path has its first three providers on it.** `projectionChatProviders` holds
-`antigravity`, `claude` and `codex`, so those tabs now submit their turns to the chat execution
-coordinator, the kernel runs them, and the surface draws what the projection says. The other six are
-unchanged and still on `InputController`'s generator.
+**The chat projection path has four providers on it.** `projectionChatProviders` holds
+`antigravity`, `claude`, `codex` and `grok`, so those tabs now submit their turns to the chat
+execution coordinator, the kernel runs them, and the surface draws what the projection says. The
+other five are unchanged and still on `InputController`'s generator.
 
 **Claude's flip found the defect the path shipped with, and it is the one a turn cannot survive: a
 provider that stops to ask hung forever.** `ExecutionInteractionBridge` — the thing that puts an
@@ -8445,6 +8445,28 @@ found, arriving later:
 Every fix has a test written red first, and the two behavioural ones were proven by breaking them:
 discarding later attaches turns the promotion test red, capturing the presenter turns the rebuilt-
 runtime test red.
+
+#### Grok Build is the fourth provider, and the first ACP one
+
+Rows A, B and C green against a real `grok acp` on `grok-4.6`. What it adds that the first three did
+not: a permission request over **ACP's own channel** rather than an SDK callback, which is the
+transport five more providers speak, and a session that resumes from a directory rather than from a
+daemon's global store. Proven by breaking `nativeSessionRef`, which takes the reload onto a different
+session — and Grok is one carrier rather than Codex's two: with the conversation never synced it
+still resumed, with the kernel command's copy gone it did not.
+
+**Row C failed twice before it was worth anything, both times in the harness.** A harness deletes the
+directory it made when it is released, and the reload row released the first one before the second
+existed — so Grok's session directory, which lives *in the vault*, went with it, and the agent
+correctly reported the session as missing. It read as a resume defect until `GrokLiveSmoke` row 8's
+own comment gave it away: "a session id hydrates nothing" without the directory its transcript is in.
+The reload row owns that directory now, in both ACP harnesses — OpenCode's had the same defect and
+passed anyway, because its sessions live outside the vault.
+
+**That is the fourth harness defect this session and they all have one shape**: a harness standing in
+for something the product does, differing from it in one particular, and reporting the difference as
+a finding about the product. The content filter, the missing presenter, the truncated wire probe, and
+now a deleted directory.
 
 #### OpenCode is written, run, and **not flipped**
 

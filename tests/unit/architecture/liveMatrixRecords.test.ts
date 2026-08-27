@@ -107,6 +107,7 @@ describe('live smoke matrix records', () => {
       'CodexChatProjectionLiveSmoke.integration.test.ts',
       'CodexLiveSmoke.integration.test.ts',
       'GeminiLiveSmoke.integration.test.ts',
+      'GrokChatProjectionLiveSmoke.integration.test.ts',
       'GrokLiveSmoke.integration.test.ts',
       'KimicodeLiveSmoke.integration.test.ts',
       'MimocodeLiveSmoke.integration.test.ts',

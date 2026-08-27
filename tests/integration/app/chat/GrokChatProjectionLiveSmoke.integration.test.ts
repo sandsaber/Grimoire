@@ -12,32 +12,38 @@ import {
 
 import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { OpencodeExecution } from '@/app/execution/opencode/OpencodeExecutionComposition';
+import { GrokExecution } from '@/app/execution/grok/GrokExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
 import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
-import { opencodeProviderModule } from '@/providers/opencode/OpencodeProviderModule';
-import { updateOpencodeProviderSettings } from '@/providers/opencode/settings';
+import { grokProviderModule } from '@/providers/grok/GrokProviderModule';
+import { updateGrokProviderSettings } from '@/providers/grok/settings';
 
 /**
- * The OpenCode chat projection flip, against a real `opencode acp` process.
+ * The Grok Build chat projection flip, against a real `grok acp` process.
  *
- * The fourth provider on the path and the **first ACP one**, which is what this
- * file is for: the remaining five providers are ACP too, so what holds here is
- * what the shared transport gives all of them — a session the next turn loads,
- * a permission request over the protocol's own channel, and content that
- * arrives as session notifications rather than as one block of text.
+ * The fourth provider on the path and the **first ACP one** to be certified,
+ * which is what this file is for: five more providers speak the same protocol,
+ * so what holds here is what the shared transport gives all of them — a session
+ * the next turn loads, a permission request over the protocol's own channel,
+ * and content that arrives as session notifications rather than as one block of
+ * text.
+ *
+ * **Grok is not a fork of the others and says so.** It has no agent definition,
+ * so its permission mode rides on the command line, and a refused request is
+ * answered with the agent's own reject option rather than a cancellation — a
+ * cancellation ends the turn, which is not what saying no to one tool means.
  *
  * Nothing below the composition is a fake — see `chatProjectionLiveHarness`.
  *
  * Off by default — it starts a CLI and spends the account's tokens. Run it with
- * `GRIMOIRE_OPENCODE_LIVE=1`.
+ * `GRIMOIRE_GROK_LIVE=1`.
  */
-const live = process.env.GRIMOIRE_OPENCODE_LIVE === '1' ? describe : describe.skip;
+const live = process.env.GRIMOIRE_GROK_LIVE === '1' ? describe : describe.skip;
 
-live('OpenCode chat projection live smoke', () => {
+live('Grok Build chat projection live smoke', () => {
   jest.setTimeout(300_000);
 
-  const CONVERSATION_ID = 'conv-opencode-projection';
+  const CONVERSATION_ID = 'conv-grok-projection';
   const running: Array<() => Promise<void>> = [];
   /** Directories a reload row owns, since no single harness may delete them. */
   const reloadVaults: string[] = [];
@@ -52,22 +58,14 @@ live('OpenCode chat projection live smoke', () => {
   });
 
   /**
-   * The flip this file certifies, and it has **not landed**.
+   * The flip this file certifies, asserted rather than assumed.
    *
-   * Five live runs on 2026-08-27 could not produce one clean pass: every
-   * failure carried OpenCode's own "Upstream request failed: Endpoint is
-   * unavailable", or a model that answered without touching the filesystem.
-   * Nothing failed that belongs to the projection path — it rendered the
-   * vendor's sentence correctly every time, which is the matrix's row 14 — but
-   * a row that cannot be run is not a certified row, and the branch's rule is
-   * that a failing row is a stop condition.
-   *
-   * So the harness is ready and `opencode` is off the list. Adding it is the
-   * flip, and **this line flips with it**: written this way round so that a
-   * flip landed without a clean run goes red here rather than quietly.
+   * The harness builds the tab's end directly, so it would keep passing after
+   * the switch was reverted — and a green certification for a path nobody takes
+   * is the exact shape of evidence this branch has been burned by.
    */
-  it('is not on the projection path yet, and this line lands with the flip', () => {
-    expect(usesProjectionChat('opencode')).toBe(false);
+  it('is about a provider that is on the projection path', () => {
+    expect(usesProjectionChat('grok')).toBe(true);
   });
 
   function report(...parts: readonly string[]): void {
@@ -77,12 +75,12 @@ live('OpenCode chat projection live smoke', () => {
   /**
    * Fails with the vendor's name on it when the vendor is what failed.
    *
-   * This account's endpoint drops turns — "Upstream request failed: Endpoint is
-   * unavailable", in OpenCode's own words, on two of five runs on 2026-08-27 —
-   * and a row that reports that as an assertion about the projection path sends
-   * whoever reads it looking for a defect that is not there. The path did its
-   * job in exactly those runs: it rendered the provider's own sentence, which
-   * is the matrix's row 14.
+   * Written for OpenCode, whose endpoint dropped two of five runs on
+   * 2026-08-27, and kept here because the distinction is the same for every
+   * hosted agent: a row that reports an outage as an assertion about the
+   * projection path sends whoever reads it looking for a defect that is not
+   * there. The path did its job in exactly those runs — it rendered the
+   * provider's own sentence, which is the matrix's row 14.
    *
    * It still fails. An unavailable vendor is not a certified row.
    */
@@ -92,7 +90,7 @@ live('OpenCode chat projection live smoke', () => {
     ));
     if (failure && /unavailable|service failure|upstream/i.test(failure.content)) {
       throw new Error(
-        `OpenCode could not serve this row: ${failure.content} `
+        `Grok could not serve this row: ${failure.content} `
         + 'This is the vendor, not the projection path — rerun it.',
       );
     }
@@ -106,18 +104,25 @@ live('OpenCode chat projection live smoke', () => {
       userName: 'Michael',
       ...overrides,
     };
-    updateOpencodeProviderSettings(settings, { enabled: true });
-    if (process.env.GRIMOIRE_OPENCODE_MODEL) {
-      settings.model = process.env.GRIMOIRE_OPENCODE_MODEL;
+    updateGrokProviderSettings(settings, { enabled: true });
+    if (process.env.GRIMOIRE_GROK_MODEL) {
+      settings.model = process.env.GRIMOIRE_GROK_MODEL;
     }
     return {
       settings,
       manifest: { version: '0.0.0-live' },
       app: { vault: { adapter: { basePath: vault } } },
       getAllViews: () => [],
-      getResolvedProviderCliPath: () => process.env.GRIMOIRE_OPENCODE_CLI ?? 'opencode',
+      getResolvedProviderCliPath: () => process.env.GRIMOIRE_GROK_CLI ?? 'grok',
       getActiveEnvironmentVariables: () => '',
-      recordDebugLog: () => undefined,
+      recordDebugLog: (record: Record<string, unknown>) => {
+        // The protocol's own account of what happened, for a row that
+        // surprises. Row C did: it resumed onto a *different* session, and only
+        // the wire says whether this build asked to load the stored one.
+        if (process.env.GRIMOIRE_GROK_TRACE === '1') {
+          report('LOG', JSON.stringify(record).slice(0, 300));
+        }
+      },
       saveSettings: async () => undefined,
     };
   }
@@ -127,12 +132,12 @@ live('OpenCode chat projection live smoke', () => {
     vaultAdapter?: ReturnType<typeof createDurableInMemoryVaultAdapter>,
     reuseVault?: string,
   ) {
-    // **The directory, not only the record store.** An OpenCode session belongs
-    // to the project it was started in, so a reload that ran in a fresh temp
-    // directory could not load the session the first half created — the agent
-    // answers an unknown session with a generic service failure, and row C read
-    // as a resume defect twice before this was the answer.
-    const vault = reuseVault ?? mkdtempSync(join(tmpdir(), 'grimoire-opencode-projection-'));
+    // **The directory, not only the record store.** An ACP session belongs to
+    // the project it was started in, so a reload that ran in a fresh temp
+    // directory cannot load the session the first half created — the agent
+    // answers an unknown session with a generic service failure. OpenCode's row
+    // read as a resume defect twice before the directory was the answer.
+    const vault = reuseVault ?? mkdtempSync(join(tmpdir(), 'grimoire-grok-projection-'));
     mkdirSync(vault, { recursive: true });
     if (!existsSync(join(vault, 'Note.md'))) {
       writeFileSync(join(vault, 'Note.md'), '# Note\n\nThe vault has one note in it.\n');
@@ -144,16 +149,16 @@ live('OpenCode chat projection live smoke', () => {
         clearTimeout: handle => clearTimeout(handle as NodeJS.Timeout),
       },
     });
-    const execution = new OpencodeExecution(createPlugin(vault, overrides), host.registry);
+    const execution = new GrokExecution(createPlugin(vault, overrides), host.registry);
     host.registerBackend(execution.createBackendRegistration());
     await host.start();
 
     const runtime = execution.createRuntime() as unknown as ExecutionChatRuntimeAdapter;
     const harness = await openChatProjection({
-      backendId: opencodeProviderModule.execution.descriptor.backendId,
+      backendId: grokProviderModule.execution.descriptor.backendId,
       conversationId: CONVERSATION_ID,
       lifecycle: host.registry,
-      providerId: 'opencode',
+      providerId: 'grok',
       runtime,
       // What `ConversationController` does when a conversation is opened. The
       // ACP session this conversation is bound to belongs to the conversation
@@ -228,7 +233,7 @@ live('OpenCode chat projection live smoke', () => {
     // Named as a shell command rather than as an outcome, because the row is
     // about the *permission* and a model that answers without touching the
     // filesystem proves nothing. Asked as "create a file", OpenCode replied
-    // `done` with no tool call at all on one of three runs.
+    // `done` with no tool call at all on one of its runs.
     const text = 'Run the shell command `printf yes > allowed-projection.txt` in the working '
       + 'directory, then reply with exactly: done';
     const submitted = await tab.send({ text }, userMessage(text));
@@ -268,7 +273,7 @@ live('OpenCode chat projection live smoke', () => {
     // went with it. Grok's row read as a resume defect until this was the
     // answer: its session directory lives *in the vault*, and it correctly
     // reported the session as missing because it was.
-    const shared = mkdtempSync(join(tmpdir(), 'grimoire-opencode-projection-reload-'));
+    const shared = mkdtempSync(join(tmpdir(), 'grimoire-grok-projection-reload-'));
     reloadVaults.push(shared);
     const first = await createHarness({}, vaultAdapter, shared);
 
@@ -286,6 +291,12 @@ live('OpenCode chat projection live smoke', () => {
       ? afterFirst.metadata.sessionId ?? undefined
       : undefined;
     report('ROW C session', String(nativeSessionRef));
+    // Grok resumes from a session id **and the directory its transcript is in**
+    // — `GrokLiveSmoke` row 8 says so in as many words: "a session id hydrates
+    // nothing" without it. So the row reports what the vault actually kept.
+    report('ROW C providerState', JSON.stringify(
+      afterFirst.kind === 'present' ? afterFirst.metadata.providerState : null,
+    ));
     expect(nativeSessionRef).toBeTruthy();
 
     // Everything goes: the agent process, the kernel, the coordinator and the

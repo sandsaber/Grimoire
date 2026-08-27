@@ -6,8 +6,8 @@ and the surface draws what the projection says. Automated gates prove the wiring
 whole turns end to end over a fake provider; **this is the layer they cannot reach** — a live CLI, a
 real vault, and a person watching the column.
 
-The switch is `src/app/chat/projectionChatProviders.ts`. It holds **Antigravity**, **Claude** and
-**Codex**:
+The switch is `src/app/chat/projectionChatProviders.ts`. It holds **Antigravity**, **Claude**,
+**Codex** and **Grok Build**:
 adding one provider to that list is that provider's flip, and this matrix is what certifies it. Run
 it against a release build installed in a vault (`npm run build:release`, then the plugin folder
 copy). Record the date, the CLI version, and one line per row. A row that fails is a stop condition:
@@ -58,6 +58,8 @@ GRIMOIRE_ANTIGRAVITY_LIVE=1 npm run test -- --selectProjects integration \
   --testPathPatterns 'AntigravityChatProjectionLiveSmoke'
 GRIMOIRE_CODEX_LIVE=1 npm run test -- --selectProjects integration \
   --testPathPatterns 'CodexChatProjectionLiveSmoke'
+GRIMOIRE_GROK_LIVE=1 npm run test -- --selectProjects integration \
+  --testPathPatterns 'GrokChatProjectionLiveSmoke'
 GRIMOIRE_OPENCODE_LIVE=1 npm run test -- --selectProjects integration \
   --testPathPatterns 'OpencodeChatProjectionLiveSmoke'
 # Claude loads the real SDK by path, past the mock every other suite gets.
@@ -109,6 +111,7 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
+| 2026-08-27 | `grok` acp (`grok-4.6`) | 2, 3, 5, 9, 10, 14 (driven half) | — | Grok Build's flip, and **the first ACP provider certified on this path**. Row C failed twice before it was worth anything, both times in the harness rather than the product: a harness deletes the directory it made when it is released, and the reload row released the first one before the second existed — so Grok's session directory, which lives *in the vault*, went with it and the agent correctly reported the session as missing. The reload row owns that directory now. Proven by breaking `nativeSessionRef`, which takes the reload onto a different session. Rows 1, 4, 6, 8, 11, 12, 13 outstanding under the standing override |
 | 2026-08-27 | `opencode` acp | — | A, B, C across five runs | **Not flipped.** OpenCode stays off the switch: five runs could not produce one clean pass. Every failure carried the vendor's own `Upstream request failed: Endpoint is unavailable` / `OpenCode service failure`, or a model that answered without touching the filesystem — and the path rendered those sentences correctly each time, which is row 14 passing. Two harness defects were found and fixed on the way: an OpenCode session belongs to its project directory, so the reload row has to hand the directory over and not only the record store; and a row about a *permission* must name a shell command rather than an outcome, because a model that declines to use a tool proves nothing. The rows now refuse a vendor outage by name rather than reporting it as an assertion about this path. Flip it when the endpoint is up |
 | 2026-08-27 | Claude Agent SDK (`haiku`) | 2, 3, 5, 9, 10, 14 (driven half) | — | Claude's flip, and **the row that found the defect this path shipped with**: a provider that stops to ask hung forever, because the bridge that presents an interaction and resolves it was built only when the *adapter* opened a session and here the coordinator opens one. The coordinator attaches it now, one per conversation. Rows 1, 4, 6, 8, 11, 12, 13 outstanding under the standing override |
 | 2026-08-27 | `codex` app-server | 2, 3, 5, 10, 14 (driven half) | — | Codex's flip, and the first provider content this path has drawn. Its answer renders **once** here, where `CodexLiveSmoke` row 1 records the legacy adapter path seeing it three times. Codex sends one tool call's result twice — at item completion and again from `flushPendingRawToolOutputs` — which `StreamController` merges by id on both paths, so it is an observation rather than a row. Rows 1, 4, 6, 8, 9, 11, 12, 13 outstanding under the standing override |
