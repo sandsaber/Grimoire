@@ -106,13 +106,17 @@ describe('live smoke matrix records', () => {
       'ClaudeLiveSmoke.integration.test.ts',
       'CodexChatProjectionLiveSmoke.integration.test.ts',
       'CodexLiveSmoke.integration.test.ts',
+      'GeminiChatProjectionLiveSmoke.integration.test.ts',
       'GeminiLiveSmoke.integration.test.ts',
       'GrokChatProjectionLiveSmoke.integration.test.ts',
       'GrokLiveSmoke.integration.test.ts',
+      'KimicodeChatProjectionLiveSmoke.integration.test.ts',
       'KimicodeLiveSmoke.integration.test.ts',
+      'MimocodeChatProjectionLiveSmoke.integration.test.ts',
       'MimocodeLiveSmoke.integration.test.ts',
       'OpencodeChatProjectionLiveSmoke.integration.test.ts',
       'OpencodeLiveSmoke.integration.test.ts',
+      'QwenChatProjectionLiveSmoke.integration.test.ts',
       'QwenLiveSmoke.integration.test.ts',
     ]);
   });

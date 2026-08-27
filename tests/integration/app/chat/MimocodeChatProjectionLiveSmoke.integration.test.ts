@@ -12,32 +12,36 @@ import {
 
 import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { OpencodeExecution } from '@/app/execution/opencode/OpencodeExecutionComposition';
+import { MimocodeExecution } from '@/app/execution/mimocode/MimocodeExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
 import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
-import { opencodeProviderModule } from '@/providers/opencode/OpencodeProviderModule';
-import { updateOpencodeProviderSettings } from '@/providers/opencode/settings';
+import { mimocodeProviderModule } from '@/providers/mimocode/MimocodeProviderModule';
+import { updateMimocodeProviderSettings } from '@/providers/mimocode/settings';
 
 /**
- * The OpenCode chat projection flip, against a real `opencode acp` process.
+ * The MiMoCode chat projection flip, against a real `mimo acp` process.
  *
- * The fourth provider on the path and the **first ACP one**, which is what this
- * file is for: the remaining five providers are ACP too, so what holds here is
- * what the shared transport gives all of them — a session the next turn loads,
- * a permission request over the protocol's own channel, and content that
- * arrives as session notifications rather than as one block of text.
+ * MiMoCode and OpenCode are deliberate forks of one another, so this file is
+ * OpenCode's with the name changed and must stay that way: a change to one
+ * provider's launch, runtime, workspace, storage, history, settings or UI is a
+ * change to the other's unless the CLIs intentionally differ.
+ *
+ * **This account cannot generate.** Every turn returns `end_turn` with zero
+ * tokens, and `mimo acp` answers the same way when driven directly — recorded
+ * on 2026-08-22 and unchanged. The rows are written and run anyway: a harness
+ * that cannot pass a row still exercises the failure surface, which is where
+ * Kimi Code's found a shipped defect on its first run.
  *
  * Nothing below the composition is a fake — see `chatProjectionLiveHarness`.
  *
- * Off by default — it starts a CLI and spends the account's tokens. Run it with
- * `GRIMOIRE_OPENCODE_LIVE=1`.
+ * Off by default. Run it with `GRIMOIRE_MIMOCODE_LIVE=1`.
  */
-const live = process.env.GRIMOIRE_OPENCODE_LIVE === '1' ? describe : describe.skip;
+const live = process.env.GRIMOIRE_MIMOCODE_LIVE === '1' ? describe : describe.skip;
 
-live('OpenCode chat projection live smoke', () => {
+live('MiMoCode chat projection live smoke', () => {
   jest.setTimeout(300_000);
 
-  const CONVERSATION_ID = 'conv-opencode-projection';
+  const CONVERSATION_ID = 'conv-mimocode-projection';
   const running: Array<() => Promise<void>> = [];
   /** Directories a reload row owns, since no single harness may delete them. */
   const reloadVaults: string[] = [];
@@ -54,17 +58,12 @@ live('OpenCode chat projection live smoke', () => {
   /**
    * The flip this file certifies, asserted rather than assumed.
    *
-   * **Certified intermittently, and the record says so.** Every row here has
-   * passed live at least three times across six runs on 2026-08-27, and never
-   * all three in one: the failures carry OpenCode's own "Upstream request
-   * failed: Endpoint is unavailable", or a model that answered without touching
-   * the filesystem. Nothing failed that belongs to this path — it rendered the
-   * vendor's sentence correctly every time, which is the matrix's row 14. That
-   * is the same account-bound certification three other providers on this list
-   * have, and less blocked than any of them.
+   * The harness builds the tab's end directly, so it would keep passing after
+   * the switch was reverted — and a green certification for a path nobody takes
+   * is the exact shape of evidence this branch has been burned by.
    */
   it('is about a provider that is on the projection path', () => {
-    expect(usesProjectionChat('opencode')).toBe(true);
+    expect(usesProjectionChat('mimocode')).toBe(true);
   });
 
   function report(...parts: readonly string[]): void {
@@ -74,12 +73,12 @@ live('OpenCode chat projection live smoke', () => {
   /**
    * Fails with the vendor's name on it when the vendor is what failed.
    *
-   * This account's endpoint drops turns — "Upstream request failed: Endpoint is
-   * unavailable", in OpenCode's own words, on two of five runs on 2026-08-27 —
-   * and a row that reports that as an assertion about the projection path sends
-   * whoever reads it looking for a defect that is not there. The path did its
-   * job in exactly those runs: it rendered the provider's own sentence, which
-   * is the matrix's row 14.
+   * Written for OpenCode, whose endpoint dropped two of five runs on
+   * 2026-08-27, and kept here because the distinction is the same for every
+   * hosted agent: a row that reports an outage as an assertion about the
+   * projection path sends whoever reads it looking for a defect that is not
+   * there. The path did its job in exactly those runs — it rendered the
+   * provider's own sentence, which is the matrix's row 14.
    *
    * It still fails. An unavailable vendor is not a certified row.
    */
@@ -89,7 +88,7 @@ live('OpenCode chat projection live smoke', () => {
     ));
     if (failure && /unavailable|service failure|upstream/i.test(failure.content)) {
       throw new Error(
-        `OpenCode could not serve this row: ${failure.content} `
+        `MiMoCode could not serve this row: ${failure.content} `
         + 'This is the vendor, not the projection path — rerun it.',
       );
     }
@@ -103,18 +102,25 @@ live('OpenCode chat projection live smoke', () => {
       userName: 'Michael',
       ...overrides,
     };
-    updateOpencodeProviderSettings(settings, { enabled: true });
-    if (process.env.GRIMOIRE_OPENCODE_MODEL) {
-      settings.model = process.env.GRIMOIRE_OPENCODE_MODEL;
+    updateMimocodeProviderSettings(settings, { enabled: true });
+    if (process.env.GRIMOIRE_MIMOCODE_MODEL) {
+      settings.model = process.env.GRIMOIRE_MIMOCODE_MODEL;
     }
     return {
       settings,
       manifest: { version: '0.0.0-live' },
       app: { vault: { adapter: { basePath: vault } } },
       getAllViews: () => [],
-      getResolvedProviderCliPath: () => process.env.GRIMOIRE_OPENCODE_CLI ?? 'opencode',
+      getResolvedProviderCliPath: () => process.env.GRIMOIRE_MIMOCODE_CLI ?? 'mimo',
       getActiveEnvironmentVariables: () => '',
-      recordDebugLog: () => undefined,
+      recordDebugLog: (record: Record<string, unknown>) => {
+        // The protocol's own account of what happened, for a row that
+        // surprises. Row C did: it resumed onto a *different* session, and only
+        // the wire says whether this build asked to load the stored one.
+        if (process.env.GRIMOIRE_MIMOCODE_TRACE === '1') {
+          report('LOG', JSON.stringify(record).slice(0, 300));
+        }
+      },
       saveSettings: async () => undefined,
     };
   }
@@ -124,12 +130,12 @@ live('OpenCode chat projection live smoke', () => {
     vaultAdapter?: ReturnType<typeof createDurableInMemoryVaultAdapter>,
     reuseVault?: string,
   ) {
-    // **The directory, not only the record store.** An OpenCode session belongs
-    // to the project it was started in, so a reload that ran in a fresh temp
-    // directory could not load the session the first half created — the agent
-    // answers an unknown session with a generic service failure, and row C read
-    // as a resume defect twice before this was the answer.
-    const vault = reuseVault ?? mkdtempSync(join(tmpdir(), 'grimoire-opencode-projection-'));
+    // **The directory, not only the record store.** An ACP session belongs to
+    // the project it was started in, so a reload that ran in a fresh temp
+    // directory cannot load the session the first half created — the agent
+    // answers an unknown session with a generic service failure. OpenCode's row
+    // read as a resume defect twice before the directory was the answer.
+    const vault = reuseVault ?? mkdtempSync(join(tmpdir(), 'grimoire-mimocode-projection-'));
     mkdirSync(vault, { recursive: true });
     if (!existsSync(join(vault, 'Note.md'))) {
       writeFileSync(join(vault, 'Note.md'), '# Note\n\nThe vault has one note in it.\n');
@@ -141,16 +147,16 @@ live('OpenCode chat projection live smoke', () => {
         clearTimeout: handle => clearTimeout(handle as NodeJS.Timeout),
       },
     });
-    const execution = new OpencodeExecution(createPlugin(vault, overrides), host.registry);
+    const execution = new MimocodeExecution(createPlugin(vault, overrides), host.registry);
     host.registerBackend(execution.createBackendRegistration());
     await host.start();
 
     const runtime = execution.createRuntime() as unknown as ExecutionChatRuntimeAdapter;
     const harness = await openChatProjection({
-      backendId: opencodeProviderModule.execution.descriptor.backendId,
+      backendId: mimocodeProviderModule.execution.descriptor.backendId,
       conversationId: CONVERSATION_ID,
       lifecycle: host.registry,
-      providerId: 'opencode',
+      providerId: 'mimocode',
       runtime,
       // What `ConversationController` does when a conversation is opened. The
       // ACP session this conversation is bound to belongs to the conversation
@@ -225,7 +231,7 @@ live('OpenCode chat projection live smoke', () => {
     // Named as a shell command rather than as an outcome, because the row is
     // about the *permission* and a model that answers without touching the
     // filesystem proves nothing. Asked as "create a file", OpenCode replied
-    // `done` with no tool call at all on one of three runs.
+    // `done` with no tool call at all on one of its runs.
     const text = 'Run the shell command `printf yes > allowed-projection.txt` in the working '
       + 'directory, then reply with exactly: done';
     const submitted = await tab.send({ text }, userMessage(text));
@@ -265,7 +271,7 @@ live('OpenCode chat projection live smoke', () => {
     // went with it. Grok's row read as a resume defect until this was the
     // answer: its session directory lives *in the vault*, and it correctly
     // reported the session as missing because it was.
-    const shared = mkdtempSync(join(tmpdir(), 'grimoire-opencode-projection-reload-'));
+    const shared = mkdtempSync(join(tmpdir(), 'grimoire-mimocode-projection-reload-'));
     reloadVaults.push(shared);
     const first = await createHarness({}, vaultAdapter, shared);
 
@@ -283,6 +289,12 @@ live('OpenCode chat projection live smoke', () => {
       ? afterFirst.metadata.sessionId ?? undefined
       : undefined;
     report('ROW C session', String(nativeSessionRef));
+    // Grok resumes from a session id **and the directory its transcript is in**
+    // — `GrokLiveSmoke` row 8 says so in as many words: "a session id hydrates
+    // nothing" without it. So the row reports what the vault actually kept.
+    report('ROW C providerState', JSON.stringify(
+      afterFirst.kind === 'present' ? afterFirst.metadata.providerState : null,
+    ));
     expect(nativeSessionRef).toBeTruthy();
 
     // Everything goes: the agent process, the kernel, the coordinator and the

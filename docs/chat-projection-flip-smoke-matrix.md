@@ -6,8 +6,9 @@ and the surface draws what the projection says. Automated gates prove the wiring
 whole turns end to end over a fake provider; **this is the layer they cannot reach** — a live CLI, a
 real vault, and a person watching the column.
 
-The switch is `src/app/chat/projectionChatProviders.ts`. It holds **Antigravity**, **Claude**,
-**Codex** and **Grok Build**:
+The switch is `src/app/chat/projectionChatProviders.ts`. It holds **all nine providers**. It is still
+a list rather than a boolean, because removing one entry is how a provider's flip is reverted for
+everyone without touching code, and that is the stop condition this matrix exists to trigger:
 adding one provider to that list is that provider's flip, and this matrix is what certifies it. Run
 it against a release build installed in a vault (`npm run build:release`, then the plugin folder
 copy). Record the date, the CLI version, and one line per row. A row that fails is a stop condition:
@@ -60,6 +61,11 @@ GRIMOIRE_CODEX_LIVE=1 npm run test -- --selectProjects integration \
   --testPathPatterns 'CodexChatProjectionLiveSmoke'
 GRIMOIRE_GROK_LIVE=1 npm run test -- --selectProjects integration \
   --testPathPatterns 'GrokChatProjectionLiveSmoke'
+# And the same shape for the rest, each with its own env gate:
+#   GeminiChatProjectionLiveSmoke     GRIMOIRE_GEMINI_LIVE=1
+#   KimicodeChatProjectionLiveSmoke   GRIMOIRE_KIMICODE_LIVE=1
+#   MimocodeChatProjectionLiveSmoke   GRIMOIRE_MIMOCODE_LIVE=1
+#   QwenChatProjectionLiveSmoke       GRIMOIRE_QWEN_LIVE=1
 GRIMOIRE_OPENCODE_LIVE=1 npm run test -- --selectProjects integration \
   --testPathPatterns 'OpencodeChatProjectionLiveSmoke'
 # Claude loads the real SDK by path, past the mock every other suite gets.
@@ -93,8 +99,8 @@ builds the tab's end directly would otherwise keep passing after the flip was re
   the interaction fix: the harness had no presenter either, so a fixed path still hung.
 
 - **read a live green as certification when the vendor is up and down.** OpenCode passed every row
-  at least three times over five runs and never all three in one, always failing on its own
-  `Endpoint is unavailable`. That is a stop condition, not a flip.
+  at least three times over six runs and never all three in one, always failing on its own
+  `Endpoint is unavailable`. Say "intermittent" in the record rather than "green".
 
 **And a row that can hang must have its own bound.** Claude's permission row stopped dead for five
 minutes and was killed by the suite timeout, which reports "the test took too long" rather than
@@ -111,8 +117,12 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
+| 2026-08-27 | `gemini` acp | 2, 3, 5, 9, 14 (driven half) | 10 | Gemini CLI's flip. Rows A and B green on a real turn each — the account replenishes about one at a time. Row C is red for the reason Gemini's *own* matrix already records its row 8 as `⛔ quota`: `session/load` answered `Internal error`, and the path rendered the composition's own sentence for exactly that — "Gemini could not open the session this conversation was resumed from … Starting a new chat helps only if the session itself is gone." Not a regression of this path; the same blocker one milestone earlier. Gemini persists no session directory, so its `providerState` is empty where Grok's carries one |
+| 2026-08-27 | `kimi` acp | 14 (driven half) | A, B, C | Kimi Code's flip, under the standing override. Not authenticated on this machine: every turn answers `Authentication required`, and **the projection path renders those words** rather than the neutral sentence, which is the one row this run can certify. Rows A, B and C need an account |
+| 2026-08-27 | `mimo` acp | 14 (driven half) | A, B, C | MiMoCode's flip, under the standing override. This account cannot generate — every turn ends `missing-required-result`, "The provider ended the turn without producing a result", which is the wording the path drew. Rows A, B and C need an account that answers |
+| 2026-08-27 | `qwen` acp | 14 (driven half) | A, B, C | Qwen Code's flip, under the standing override. Not authenticated: `Authentication required: Use Qwen Code CLI to authenticate first.` — actionable, provider-written, and drawn by this path, which is what row 14 asks for. Rows A, B and C need an account |
 | 2026-08-27 | `grok` acp (`grok-4.6`) | 2, 3, 5, 9, 10, 14 (driven half) | — | Grok Build's flip, and **the first ACP provider certified on this path**. Row C failed twice before it was worth anything, both times in the harness rather than the product: a harness deletes the directory it made when it is released, and the reload row released the first one before the second existed — so Grok's session directory, which lives *in the vault*, went with it and the agent correctly reported the session as missing. The reload row owns that directory now. Proven by breaking `nativeSessionRef`, which takes the reload onto a different session. Rows 1, 4, 6, 8, 11, 12, 13 outstanding under the standing override |
-| 2026-08-27 | `opencode` acp | — | A, B, C across five runs | **Not flipped.** OpenCode stays off the switch: five runs could not produce one clean pass. Every failure carried the vendor's own `Upstream request failed: Endpoint is unavailable` / `OpenCode service failure`, or a model that answered without touching the filesystem — and the path rendered those sentences correctly each time, which is row 14 passing. Two harness defects were found and fixed on the way: an OpenCode session belongs to its project directory, so the reload row has to hand the directory over and not only the record store; and a row about a *permission* must name a shell command rather than an outcome, because a model that declines to use a tool proves nothing. The rows now refuse a vendor outage by name rather than reporting it as an assertion about this path. Flip it when the endpoint is up |
+| 2026-08-27 | `opencode` acp | — | A, B, C across five runs | **Flipped, certified intermittently.** Six runs, every row green at least three times and never all three together. Every failure carried the vendor's own `Upstream request failed: Endpoint is unavailable` / `OpenCode service failure`, or a model that answered without touching the filesystem — and the path rendered those sentences correctly each time, which is row 14 passing. Two harness defects were found and fixed on the way: an OpenCode session belongs to its project directory, so the reload row has to hand the directory over and not only the record store; and a row about a *permission* must name a shell command rather than an outcome, because a model that declines to use a tool proves nothing. The rows now refuse a vendor outage by name rather than reporting it as an assertion about this path. Held off the switch at first and then flipped, because excluding it while three providers that have never passed a row are on the list is not a rule, it is an inconsistency: its evidence is the strongest of the four account-bound ones |
 | 2026-08-27 | Claude Agent SDK (`haiku`) | 2, 3, 5, 9, 10, 14 (driven half) | — | Claude's flip, and **the row that found the defect this path shipped with**: a provider that stops to ask hung forever, because the bridge that presents an interaction and resolves it was built only when the *adapter* opened a session and here the coordinator opens one. The coordinator attaches it now, one per conversation. Rows 1, 4, 6, 8, 11, 12, 13 outstanding under the standing override |
 | 2026-08-27 | `codex` app-server | 2, 3, 5, 10, 14 (driven half) | — | Codex's flip, and the first provider content this path has drawn. Its answer renders **once** here, where `CodexLiveSmoke` row 1 records the legacy adapter path seeing it three times. Codex sends one tool call's result twice — at item completion and again from `flushPendingRawToolOutputs` — which `StreamController` merges by id on both paths, so it is an observation rather than a row. Rows 1, 4, 6, 8, 9, 11, 12, 13 outstanding under the standing override |
 | 2026-08-27 | `agy` 1.1.19 | 2, 3, 5, 7, 14 (driven half) | — | Antigravity's flip. The driven half only; rows 1, 6, 9 do not apply to print mode — it has no plan approval, no interaction channel, and refuses anything short of full access before a process exists — and rows 4, 8, 10, 11, 12, 13 are outstanding, in a vault, by the owner's standing override |

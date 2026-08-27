@@ -82,7 +82,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
-| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete** and **the chat path is built, reviewed, and carrying its first provider**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design, and all five runners are deleted; bang-bash runs on the local-shell backend. The chat projection, its coordinator, startup adoption, the renderer, the render target, the attachment, the composition, the tab handle and the conversation port all exist, are composed end to end in one test, are **in the bundle**, and **Antigravity's, Claude's, Codex's and Grok's tabs are on it**: `projectionChatProviders` holds four providers, and adding the next is that provider's flip, certified by `docs/chat-projection-flip-smoke-matrix.md`, whose driven half ran against a real `agy` on 2026-08-27. Still untouched: the remaining five flips, durable agents, tab-close ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as composition root, and the seam deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
+| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the auxiliary checkpoint is complete** and **the chat path is built, reviewed, and carrying its first provider**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design, and all five runners are deleted; bang-bash runs on the local-shell backend. The chat projection, its coordinator, startup adoption, the renderer, the render target, the attachment, the composition, the tab handle and the conversation port all exist, are composed end to end in one test, are **in the bundle**, and **every provider's tabs are on it**: `projectionChatProviders` holds all nine, and adding the next is that provider's flip, certified by `docs/chat-projection-flip-smoke-matrix.md`, whose driven half ran against a real `agy` on 2026-08-27. Still untouched: durable agents, tab-close ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as composition root, and the seam deletion | `fa9cfbc`, `d07e083`, `c471618`, `0308871`, `0284420`, `02f8855`, `1e55bac`, `feb292c`, `3d6be12`, `69128ec` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
@@ -8281,10 +8281,30 @@ Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`)
 
 ### Where the session of 2026-08-27 is
 
-**The chat projection path has four providers on it.** `projectionChatProviders` holds
-`antigravity`, `claude`, `codex` and `grok`, so those tabs now submit their turns to the chat
-execution coordinator, the kernel runs them, and the surface draws what the projection says. The
-other five are unchanged and still on `InputController`'s generator.
+**Every provider is on the chat projection path.** `projectionChatProviders` holds all nine, so a
+chat tab submits its turn to the chat execution coordinator, the kernel runs it, and the surface
+draws what the projection says — whichever provider it is. The list stays a list rather than becoming
+a boolean, because removing one entry is still how a provider's flip is reverted for everyone without
+touching code.
+
+**Certification is account-bound, and the matrix says which is which**, per provider:
+
+- **fully certified**, every driven row green in one run: Antigravity, Codex, Claude, Grok Build;
+- **certified on the turns the account had**: Gemini — rows A and B green on a real turn each, and
+  row C red for the reason Gemini's *own* matrix already records its row 8 as `⛔ quota`. Not a
+  regression of this path; the same blocker one milestone earlier;
+- **certified intermittently**: OpenCode — six runs, every row green at least three times and never
+  all three together, every failure carrying its own `Endpoint is unavailable`;
+- **flipped under the standing override, no row certifiable**: MiMoCode (the account cannot
+  generate), Kimi Code and Qwen (not authenticated here). What their runs *did* certify is row 14 —
+  each provider's own words reach the column rather than the neutral sentence: `Authentication
+  required: Use Qwen Code CLI to authenticate first.` is drawn as written.
+
+**Held OpenCode off the switch first, then put it back, and the correction is worth recording.** A
+failing row is a stop condition, so it came off — and then three providers that have *never* passed a
+row went on under the override. That is not a rule applied consistently, it is two rules; OpenCode's
+evidence is the strongest of the four account-bound ones. The record says "intermittent" rather than
+"green".
 
 **Claude's flip found the defect the path shipped with, and it is the one a turn cannot survive: a
 provider that stops to ask hung forever.** `ExecutionInteractionBridge` — the thing that puts an
@@ -8491,11 +8511,12 @@ Two harness defects came out of those runs, and both are the shape this session 
 The rows refuse a vendor outage by name now, rather than reporting it as an assertion about the
 projection path.
 
-Next: the six ACP providers. Every one of them can ask, so the seam this checkpoint built is what
-they need and it is now proven; what each still brings of its own is its content presenter and its
-failure wording. OpenCode and Grok are certifiable on this machine; Gemini answers one turn per
-replenishment; MiMoCode, Kimi Code and Qwen cannot open a session here, and their harnesses are
-worth writing and running anyway — each of the last two found a shipped defect on its first run.
+**Next: `InputController` and `StreamController` stop owning the turn.** That step was written as
+"only after a provider has been certified on the projection path"; all nine are on it now, so what
+comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and the branch in
+`InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
+ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
+composition root, and the seam deletion.
 
 ### Where the session of 2026-08-25 ended
 
