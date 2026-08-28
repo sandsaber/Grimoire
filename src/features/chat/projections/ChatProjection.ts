@@ -29,9 +29,9 @@ import type { ProviderId } from '../../../core/types/provider';
  * is the plan's stop condition, and it is what makes a later UI redesign a
  * renderer swap rather than another architecture event.
  *
- * In the bundle and switched off: the whole path this feeds is built, and
- * `projectionChatProviders` decides which providers' tabs take it. That list is
- * empty, so the chat surface still consumes the adapter's chunk stream.
+ * The path this feeds is what every tab takes. It was gated one provider at a
+ * time until all nine were on it; the list is deleted, because with the legacy
+ * chunk-stream path gone it could no longer revert a flip.
  *
  * **This projection does fold in transient content, and `RunProjection` does
  * not.** The rule those two obey is one rule read at two altitudes. A run

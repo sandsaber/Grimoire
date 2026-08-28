@@ -1,5 +1,4 @@
 import { ChatTabExecution } from '../../../app/chat/ChatTabExecution';
-import { usesProjectionChat } from '../../../app/chat/projectionChatProviders';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { describeRunFailure } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
@@ -38,11 +37,16 @@ export function resolveTabProjectionExecution(
 }
 
 /**
- * A tab's end of the projection path, where its provider is on that path.
+ * A tab's end of the projection path.
  *
- * `null` for every provider not listed in `projectionChatProviders`, which is
- * how the flip stays one provider at a time: the whole path is built and in the
- * bundle, and this is the only place that decides whether a given tab takes it.
+ * **There is no switch any more.** `projectionChatProviders` gated this one
+ * provider at a time until all nine were on it, and by then the list was a
+ * lever that could no longer do what it claimed: with the legacy send path
+ * gone, removing a provider from it did not revert that provider's flip, it
+ * stopped the provider from sending at all. A flag whose only remaining setting
+ * is `true` is deleted rather than left as a trap.
+ *
+ * `null` only where the kernel has not started yet — see below.
  *
  * What it assembles is what only a tab knows — its own column, its own
  * streaming cursor, and the provider ports its runtime was built with. Every
@@ -53,9 +57,6 @@ export function createTabProjectionExecution(
   tab: TabData,
   plugin: GrimoirePlugin,
 ): ChatTabExecution | null {
-  if (!usesProjectionChat(tab.providerId)) {
-    return null;
-  }
   const module = providerCatalog().get(tab.providerId);
   if (!module) {
     return null;

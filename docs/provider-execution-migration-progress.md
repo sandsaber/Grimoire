@@ -9748,6 +9748,32 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### The chat-projection switch is deleted, because it could no longer revert anything
+
+`PROJECTION_CHAT_PROVIDERS` was the lever that flipped chat rendering one provider at a time, and
+its own file described the safety it gave: *"removing a provider reverts that flip for everyone
+without touching code."* That stopped being true when the legacy path went.
+`tabProjectionExecution` says so in as many words — **"There is no legacy path to fall back to any
+more"** — and `InputController.sendMessage` has exactly one branch: no projection means
+`agentUnavailable`, not the adapter's chunk stream.
+
+So the list had one setting and a false promise attached. Removing a provider from it would not have
+reverted that provider's flip; it would have stopped that provider from sending. A flag whose only
+remaining value is `true`, and whose documented escape hatch has become a way to break a provider,
+is deleted rather than left as a trap.
+
+Six comments went with it, and they were the real cost of leaving it: five source files and
+`src/features/chat/AGENTS.md` still said the list was *empty* and that "every chat runs on the
+presentation adapter exactly as before". A reader arriving at this branch would have been told the
+replacement path is switched off, while every tab has been on it for four flips.
+
+**What this unblocks is the rest of the seam deletion.** The plan gates it on *"when the last UI
+consumer of `ChatRuntime` is gone"*, and the rendering migration that gates that is finished for all
+nine providers. What is left of the contract in the feature layer is three controllers'
+`getAgentService()` and two live members — `consumeTurnMetadata`, read by `InputController` after a
+turn, and `buildSessionUpdates`, read by `ConversationController` on save. Both are the last two
+searches' subject, and both are now the only thing between here and deleting the interface.
+
 #### The async-subagent retry ladder could never succeed, and is deleted
 
 `StreamController.tryHydrateAsyncSubagent` called two optional `ChatRuntime` members —

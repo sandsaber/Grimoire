@@ -776,7 +776,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
     description:
       'The chat projection reducer: what a conversation looks like, derived from what the kernel recorded — messages, turns, interactions, queued commands and persistence state.',
     state: 'wired',
-    // Constructed with the coordinator at plugin load. No tab binds a surface to one yet: the providers on the projection path are listed in projectionChatProviders.ts, which is empty.
+    // Constructed with the coordinator at plugin load, and every tab binds a surface to one: the per-provider switch that gated this is deleted, because all nine were on it and there was no legacy path left to revert to.
     modules: ['src/features/chat/projections/ChatProjection.ts'],
   },
   {
@@ -843,7 +843,6 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: [
       'src/app/chat/ChatTabExecution.ts',
       // The switch, beside the thing it switches, and the factory that asks it.
-      'src/app/chat/projectionChatProviders.ts',
       'src/features/chat/tabs/tabProjectionExecution.ts',
     ],
   },

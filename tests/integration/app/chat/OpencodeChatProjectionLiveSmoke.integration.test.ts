@@ -10,7 +10,6 @@ import {
   userMessage,
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
-import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { OpencodeExecution } from '@/app/execution/opencode/OpencodeExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
@@ -48,22 +47,6 @@ live('OpenCode chat projection live smoke', () => {
     for (const vault of reloadVaults.splice(0)) {
       rmSync(vault, { force: true, recursive: true });
     }
-  });
-
-  /**
-   * The flip this file certifies, asserted rather than assumed.
-   *
-   * **Certified intermittently, and the record says so.** Every row here has
-   * passed live at least three times across six runs on 2026-08-27, and never
-   * all three in one: the failures carry OpenCode's own "Upstream request
-   * failed: Endpoint is unavailable", or a model that answered without touching
-   * the filesystem. Nothing failed that belongs to this path — it rendered the
-   * vendor's sentence correctly every time, which is the matrix's row 14. That
-   * is the same account-bound certification three other providers on this list
-   * have, and less blocked than any of them.
-   */
-  it('is about a provider that is on the projection path', () => {
-    expect(usesProjectionChat('opencode')).toBe(true);
   });
 
   function report(...parts: readonly string[]): void {

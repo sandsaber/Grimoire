@@ -10,7 +10,6 @@ import {
   userMessage,
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
-import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { CodexExecution } from '@/app/execution/codex/CodexExecutionComposition';
 import {
   CodexActiveLaunchSpec,
@@ -53,17 +52,6 @@ live('Codex chat projection live smoke', () => {
     for (const release of running.splice(0)) {
       await release().catch(() => undefined);
     }
-  });
-
-  /**
-   * The flip this file certifies, asserted rather than assumed.
-   *
-   * The harness builds the tab's end directly, so it would keep passing after
-   * the switch was reverted — and a green certification for a path nobody takes
-   * is the exact shape of evidence this branch has been burned by.
-   */
-  it('is about a provider that is on the projection path', () => {
-    expect(usesProjectionChat('codex')).toBe(true);
   });
 
   /** The runtime a harness was built with, for the encoder a steer needs. */

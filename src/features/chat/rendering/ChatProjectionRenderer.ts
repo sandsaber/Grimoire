@@ -36,8 +36,9 @@ import type {
  * index says so, which is the same decision made where the ordering is already
  * known.
  *
- * Built by the chat composition for every surface it binds. Whether a tab
- * binds one is decided by `projectionChatProviders`, which is empty.
+ * Built by the chat composition for every surface it binds, which is every
+ * tab: the per-provider switch that decided this is deleted, because all nine
+ * providers were on it and there is no legacy path left to revert to.
  */
 
 export interface ChatConversationView {

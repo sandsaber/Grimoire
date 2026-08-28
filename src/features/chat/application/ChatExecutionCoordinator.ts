@@ -78,8 +78,8 @@ import {
  *   store settles the concurrent-writer problem the first attempt solved with a
  *   revision-conflict retry loop, so the barrier below has neither.
  *
- * Constructed once per plugin load, beside the kernel. Whether any tab submits
- * through it is decided by `projectionChatProviders`, which is empty.
+ * Constructed once per plugin load, beside the kernel. Every tab submits
+ * through it: the per-provider switch that gated this is deleted.
  */
 
 /** The kernel, as a chat turn needs it. `ExecutionLifecycleRegistry` satisfies it. */

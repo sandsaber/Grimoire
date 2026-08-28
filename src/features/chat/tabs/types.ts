@@ -278,10 +278,11 @@ export interface TabData {
   /**
    * This tab's end of the projection execution path.
    *
-   * `null` for every provider not on that path, which is every provider until
-   * one is added to `projectionChatProviders`. A tab that has one submits its
-   * turns through the coordinator and draws them from the projection; a tab
-   * that does not runs on the presentation adapter exactly as before.
+   * A tab submits its turns through the coordinator and draws them from the
+   * projection. `null` only before the kernel has started — a restored
+   * workspace builds its tabs while settings are still loading — and a tab
+   * without one refuses to send rather than falling back, because there is no
+   * longer anything to fall back to.
    */
   execution: ChatTabExecution | null;
 

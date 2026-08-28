@@ -1,6 +1,5 @@
 import '@/providers';
 
-import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import type { StreamChunk } from '@/core/types';
 import {
   createTabProjectionExecution,
@@ -8,21 +7,16 @@ import {
 } from '@/features/chat/tabs/tabProjectionExecution';
 import type { TabData } from '@/features/chat/tabs/types';
 
-jest.mock('@/app/chat/projectionChatProviders', () => ({
-  PROJECTION_CHAT_PROVIDERS: [],
-  usesProjectionChat: jest.fn().mockReturnValue(false),
-}));
-
 /**
- * Whether a tab takes the projection path, and what it brings if it does.
+ * What a tab brings to the projection path.
  *
- * The switch is the whole of the first question: every piece of the path is
- * built and in the bundle, and this is the only place that decides. The second
- * question is what a tab knows that nothing else does — its column, its
- * streaming cursor, and the provider ports its runtime was built with.
+ * **There is no switch left.** `projectionChatProviders` gated this one
+ * provider at a time until all nine were on it, and with the legacy send path
+ * gone the list could no longer revert a flip — removing a provider from it
+ * stopped that provider sending. What remains is the second question: what a
+ * tab knows that nothing else does — its column, its streaming cursor, and the
+ * provider ports its runtime was built with.
  */
-
-const asked = usesProjectionChat as jest.MockedFunction<typeof usesProjectionChat>;
 
 function tabOf(overrides: Partial<TabData> = {}): TabData {
   return {
@@ -44,19 +38,7 @@ const plugin = {
 } as never;
 
 describe('tab projection execution', () => {
-  beforeEach(() => {
-    asked.mockReturnValue(false);
-  });
-
-  it('builds nothing for a provider that is not on the path', () => {
-    // The switch, and the reason every tab still runs on the presentation
-    // adapter today.
-    expect(createTabProjectionExecution(tabOf(), plugin)).toBeNull();
-    expect(asked).toHaveBeenCalledWith('claude');
-  });
-
   it('builds nothing for a provider the catalog does not have', () => {
-    asked.mockReturnValue(true);
 
     expect(createTabProjectionExecution(tabOf({ providerId: 'not-a-provider' }), plugin)).toBeNull();
   });
@@ -65,7 +47,6 @@ describe('tab projection execution', () => {
     // A restored workspace builds its tabs while `loadSettings` is still
     // running, so the composition may not be there yet. A tab without one runs
     // the legacy path, which is what it would have done anyway.
-    asked.mockReturnValue(true);
     const beforeLoad = {
       settings: {},
       getChatExecution: () => {
@@ -76,9 +57,7 @@ describe('tab projection execution', () => {
     expect(createTabProjectionExecution(tabOf(), beforeLoad)).toBeNull();
   });
 
-  it('builds one for a provider on the path', () => {
-    asked.mockReturnValue(true);
-
+  it('builds one for a provider the catalog has', () => {
     expect(createTabProjectionExecution(tabOf(), plugin)).not.toBeNull();
   });
 
@@ -87,7 +66,6 @@ describe('tab projection execution', () => {
       // A blank tab derives its provider from the model that is picked, and a
       // bound one changes with the conversation. Built once, a tab that
       // switched *away* would keep submitting turns under the provider it left.
-      asked.mockImplementation(providerId => providerId === 'codex');
       const tab = tabOf({ providerId: 'codex' });
 
       const first = resolveTabProjectionExecution(tab, plugin);
@@ -95,29 +73,17 @@ describe('tab projection execution', () => {
       expect(resolveTabProjectionExecution(tab, plugin)).toBe(first);
 
       tab.providerId = 'claude';
-      expect(resolveTabProjectionExecution(tab, plugin)).toBeNull();
-      expect(tab.execution).toBeNull();
-    });
-
-    it('takes a tab onto the path when its provider joins it', () => {
-      asked.mockReturnValue(false);
-      const tab = tabOf({ providerId: 'claude' });
-      expect(resolveTabProjectionExecution(tab, plugin)).toBeNull();
-
-      asked.mockReturnValue(true);
-      tab.providerId = 'codex';
-
-      expect(resolveTabProjectionExecution(tab, plugin)).not.toBeNull();
+      const second = resolveTabProjectionExecution(tab, plugin);
+      expect(second).not.toBeNull();
+      expect(second).not.toBe(first);
     });
 
     it('detaches the one it replaces', () => {
-      asked.mockReturnValue(true);
       const tab = tabOf({ providerId: 'codex' });
       const first = resolveTabProjectionExecution(tab, plugin);
       const detach = jest.spyOn(first!, 'detach');
 
       tab.providerId = 'claude';
-      asked.mockReturnValue(false);
       resolveTabProjectionExecution(tab, plugin);
 
       // A binding left attached draws the old provider's projection into a
@@ -131,7 +97,6 @@ describe('tab projection execution', () => {
     // `InputController` reads framing off that channel on the legacy path. A
     // turn's shape is what the projection states here, so framing arriving as
     // content would be a second opinion about where this turn begins and ends.
-    asked.mockReturnValue(true);
     const presented: StreamChunk[] = [
       { type: 'user_message_start', content: 'typed' },
       { type: 'text', content: 'answer' },

@@ -12,7 +12,6 @@ import {
   userMessage,
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
-import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { ClaudeExecution } from '@/app/execution/claude/ClaudeExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
@@ -63,17 +62,6 @@ live('Claude chat projection live smoke', () => {
       await release().catch(() => undefined);
     }
     ProviderWorkspaceRegistry.clear();
-  });
-
-  /**
-   * The flip this file certifies, asserted rather than assumed.
-   *
-   * The harness builds the tab's end directly, so it would keep passing after
-   * the switch was reverted — and a green certification for a path nobody takes
-   * is the exact shape of evidence this branch has been burned by.
-   */
-  it('is about a provider that is on the projection path', () => {
-    expect(usesProjectionChat('claude')).toBe(true);
   });
 
   function report(...parts: readonly string[]): void {

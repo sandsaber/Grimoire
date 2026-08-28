@@ -10,7 +10,6 @@ import {
   userMessage,
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
-import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { QwenExecution } from '@/app/execution/qwen/QwenExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
@@ -52,17 +51,6 @@ live('Qwen Code chat projection live smoke', () => {
     for (const vault of reloadVaults.splice(0)) {
       rmSync(vault, { force: true, recursive: true });
     }
-  });
-
-  /**
-   * The flip this file certifies, asserted rather than assumed.
-   *
-   * The harness builds the tab's end directly, so it would keep passing after
-   * the switch was reverted — and a green certification for a path nobody takes
-   * is the exact shape of evidence this branch has been burned by.
-   */
-  it('is about a provider that is on the projection path', () => {
-    expect(usesProjectionChat('qwen')).toBe(true);
   });
 
   function report(...parts: readonly string[]): void {

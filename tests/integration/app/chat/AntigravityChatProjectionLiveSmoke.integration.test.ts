@@ -11,7 +11,6 @@ import {
   userMessage,
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
-import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { AntigravityExecution } from '@/app/execution/antigravity/AntigravityExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
@@ -49,18 +48,6 @@ live('Antigravity chat projection live smoke', () => {
     for (const release of running.splice(0)) {
       await release().catch(() => undefined);
     }
-  });
-
-  /**
-   * The flip this file certifies, asserted rather than assumed.
-   *
-   * The harness builds the tab's end directly, so it would keep passing after
-   * the switch was reverted — and a green certification for a path nobody takes
-   * is the exact shape of evidence this branch has been burned by. This is the
-   * one line that ties the two together.
-   */
-  it('is about a provider that is on the projection path', () => {
-    expect(usesProjectionChat('antigravity')).toBe(true);
   });
 
   /** The `agy` invocations this process is responsible for, right now. */
