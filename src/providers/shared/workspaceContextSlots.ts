@@ -79,11 +79,22 @@ export interface WorkspaceContextSlotOptions {
 
 export interface WorkspaceContextSlots {
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
-  /** The registered catalog, or nothing when this provider has none. */
-  commandsPort(): ProviderCommandsPort | undefined;
+  /**
+   * The provider's command catalog, read afresh on every call.
+   *
+   * **A forwarder, not the object.** A workspace is built once and its slots
+   * are cached for the life of the process, while workspace services are
+   * registered separately and may arrive later — so a slot that captured the
+   * catalog when the workspace happened to be built would be permanently empty
+   * for any provider that registered after the first question. Every member
+   * resolves the *current* registration, which keeps the identity that matters:
+   * the tab manager's `setRuntimeCommands` and the settings hub's
+   * `listVaultEntries` reach one catalog, whichever forwarder asked.
+   */
+  commandsPort(): ProviderCommandsPort;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
-  /** The registered MCP storage, or nothing where the provider owns its own config. */
-  mcpPort(): ProviderMcpPort | undefined;
+  /** The provider's MCP storage, read afresh on every call. See `commandsPort`. */
+  mcpPort(): ProviderMcpPort;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   refreshAgentMentions(): Promise<void>;
@@ -140,18 +151,41 @@ export function createWorkspaceContextSlots(
       }));
     },
 
-    // Handed through rather than wrapped: the port and the registered catalog
-    // are the same seven members, and the only thing a wrapper could add is a
-    // second object whose `setRuntimeCommands` writes somewhere the settings
-    // hub does not read.
-    commandsPort: () => services()?.commandCatalog ?? undefined,
+    commandsPort: () => ({
+      deleteVaultEntry: async entry => {
+        await services()?.commandCatalog?.deleteVaultEntry(entry);
+      },
+      listDropdownEntries: async options => (
+        await services()?.commandCatalog?.listDropdownEntries(options) ?? []
+      ),
+      listVaultEntries: async () => await services()?.commandCatalog?.listVaultEntries() ?? [],
+      refresh: async () => {
+        await services()?.commandCatalog?.refresh();
+      },
+      saveVaultEntry: async entry => {
+        await services()?.commandCatalog?.saveVaultEntry(entry);
+      },
+      setRuntimeCommands: commands => {
+        services()?.commandCatalog?.setRuntimeCommands(commands);
+      },
+      // Bridged rather than assumed: the row's own name for this was
+      // `getDefaultVaultStoragePath`, and a forwarder calling the port's name
+      // on the registered catalog would have answered `null` for every
+      // provider — a member that can never answer, which is the failure this
+      // contract's own rules forbid. The row is renamed to match.
+      defaultVaultStoragePath: () => (
+        services()?.commandCatalog?.defaultVaultStoragePath?.() ?? null
+      ),
+    }),
 
     listModels: async () => models(),
 
-    // Handed through, like the command catalog: the settings hub edits the
-    // same list the runtime reads, and a wrapper would be a second object
-    // whose writes land where nothing looks.
-    mcpPort: () => services()?.mcpStorage ?? undefined,
+    mcpPort: () => ({
+      load: async () => await services()?.mcpStorage?.load() ?? [],
+      save: async servers => {
+        await services()?.mcpStorage?.save([...servers]);
+      },
+    }),
 
     cachedPlanUsage: () => {
       const provider = availableUsageProvider();

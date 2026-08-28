@@ -276,8 +276,9 @@ describe('Qwen provider module', () => {
       // it, and the slot that still refuses does so because its row has not
       // been reshaped yet.
       await expect(context.listModels()).resolves.toEqual([]);
-      expect(context.mcpPort()).toBeUndefined();
-      expect(context.commandsPort()).toBeUndefined();
+      await expect(context.mcpPort().load()).resolves.toEqual([]);
+      await expect(context.commandsPort().listDropdownEntries({ includeBuiltIns: false }))
+        .resolves.toEqual([]);
       expect(context.cachedPlanUsage()).toBeNull();
     });
   });

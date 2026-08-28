@@ -20,9 +20,11 @@ import { createQwenModuleContext } from '@/providers/qwen/app/QwenModuleContext'
 describe('provider workspace context slots', () => {
   interface Wiring {
     readonly build: (plugin: never) => {
-      commandsPort(): unknown;
+      commandsPort(): {
+    listDropdownEntries(options: { includeBuiltIns: boolean }): Promise<readonly unknown[]>;
+  };
       listModels(): Promise<readonly unknown[]>;
-      mcpPort(): { load(): Promise<readonly { name: string }[]> } | undefined;
+      mcpPort(): { load(): Promise<readonly { name: string }[]> };
       cachedPlanUsage(): unknown;
     };
     readonly providerId: string;
@@ -62,7 +64,7 @@ describe('provider workspace context slots', () => {
       });
     }
 
-    const servers = await build(plugin()).mcpPort()?.load() ?? [];
+    const servers = await build(plugin()).mcpPort().load();
 
     // The marker is the provider's own id: a context wired to a neighbour's
     // accessor returns the neighbour's server, and every other assertion about
@@ -70,25 +72,40 @@ describe('provider workspace context slots', () => {
     expect(servers.map(server => server.name)).toEqual([`${providerId}-server`]);
   });
 
-  it('hands the registered catalog through, as the same object', async () => {
-    // **Identity, not shape.** The tab manager gives a live session's commands
-    // to this port and the settings hub lists them back; a wrapper here would
-    // be a second object whose `setRuntimeCommands` writes where nothing reads.
-    const catalog = { listDropdownEntries: jest.fn(async () => []) };
-    ProviderWorkspaceRegistry.setServices('grok', { commandCatalog: catalog } as never);
+  it('reaches a catalog registered after the workspace was built', async () => {
+    // **The property the slot exists to have.** A workspace is built once and
+    // its slots are cached for the life of the process; workspace services are
+    // registered separately and can arrive later. A slot that captured the
+    // catalog at build time would be permanently empty for any provider whose
+    // registration lost that race — so the port resolves the *current*
+    // registration on every call.
+    const port = createGrokModuleContext(plugin(), () => null, ports).commandsPort();
 
-    expect(createGrokModuleContext(plugin(), () => null, ports).commandsPort())
-      .toBe(catalog);
+    expect(await port.listDropdownEntries({ includeBuiltIns: false })).toEqual([]);
+
+    const listDropdownEntries = jest.fn(async () => [{ name: 'review' }]);
+    ProviderWorkspaceRegistry.setServices('grok', { commandCatalog: { listDropdownEntries } } as never);
+
+    expect(await port.listDropdownEntries({ includeBuiltIns: false })).toEqual([{ name: 'review' }]);
+    expect(listDropdownEntries).toHaveBeenCalledWith({ includeBuiltIns: false });
   });
 
-  it('offers no commands port at all where no catalog is registered', async () => {
-    // Absent rather than an empty catalog: the module leaves the `commands`
-    // slot out entirely for a provider with none, which is what the workspace
-    // capability record already says about it.
-    ProviderWorkspaceRegistry.setServices('grok', {});
+  it('writes runtime commands to the catalog the settings hub reads', async () => {
+    // Identity of the *target*, which is what matters: the tab manager hands a
+    // live session's commands to one port and the settings hub lists them back
+    // through another, and both must land on the registered catalog.
+    const catalog = {
+      listVaultEntries: jest.fn(async () => []),
+      setRuntimeCommands: jest.fn(),
+    };
+    ProviderWorkspaceRegistry.setServices('grok', { commandCatalog: catalog } as never);
 
-    expect(createGrokModuleContext(plugin(), () => null, ports).commandsPort())
-      .toBeUndefined();
+    const context = createGrokModuleContext(plugin(), () => null, ports);
+    context.commandsPort().setRuntimeCommands([{ id: 'g:x', name: 'x', content: '' }]);
+    await context.commandsPort().listVaultEntries();
+
+    expect(catalog.setRuntimeCommands).toHaveBeenCalledWith([{ id: 'g:x', name: 'x', content: '' }]);
+    expect(catalog.listVaultEntries).toHaveBeenCalledTimes(1);
   });
 
   it('reports no plan for a provider the user has switched off', async () => {
@@ -119,9 +136,9 @@ describe('provider workspace context slots', () => {
   it.each(WIRINGS)('$providerId offers nothing before its workspace is registered', async ({ build }) => {
     const context = build(plugin());
 
-    expect(context.commandsPort()).toBeUndefined();
+    expect(await context.commandsPort().listDropdownEntries({ includeBuiltIns: false })).toEqual([]);
+    expect(await context.mcpPort().load()).toEqual([]);
     expect(await context.listModels()).toEqual([]);
-    expect(context.mcpPort()).toBeUndefined();
     expect(context.cachedPlanUsage()).toBeNull();
   });
 });

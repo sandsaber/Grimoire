@@ -104,7 +104,7 @@ export class ProviderSkillModal extends Modal {
           return;
         }
         const targetStoragePath = existing?.storagePath
-          ?? this.options.catalog.getDefaultVaultStoragePath?.();
+          ?? this.options.catalog.defaultVaultStoragePath?.();
         const duplicate = hasProviderSkillNameConflict(
           this.options.entries,
           name,

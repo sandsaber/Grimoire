@@ -95,7 +95,7 @@ const KNOWN_SETTINGS_FIELDS = new Set([
 ]);
 
 export interface KimicodeWorkspaceContext {
-  commandsPort(): ProviderCommandsPort | undefined;
+  commandsPort(): ProviderCommandsPort;
   listSessionCommands(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
@@ -103,7 +103,7 @@ export interface KimicodeWorkspaceContext {
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
-  mcpPort(): ProviderMcpPort | undefined;
+  mcpPort(): ProviderMcpPort;
   renderSettingsTab(host: unknown): void;
   hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
   deleteConversationSession(conversationId: string): Promise<void>;
@@ -276,7 +276,7 @@ KimicodeProviderSettings
     providerId: 'kimicode',
     async initialize(context): Promise<KimicodeWorkspace> {
       return {
-        ...(context.commandsPort() ? { commands: context.commandsPort()! } : {}),
+        commands: context.commandsPort(),
         runtimeCommands: {
           listForSession: sessionId => context.listSessionCommands(sessionId),
         },
@@ -292,7 +292,7 @@ KimicodeProviderSettings
           cached: () => context.cachedPlanUsage(),
           refresh: () => context.refreshPlanUsage(),
         },
-        ...(context.mcpPort() ? { mcp: context.mcpPort()! } : {}),
+        mcp: context.mcpPort(),
         settingsPresentation: { render: host => context.renderSettingsTab(host) },
       };
     },

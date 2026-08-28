@@ -9729,6 +9729,33 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### Handing a workspace service through froze it at build time
+
+The command and MCP moves both wrote `...(context.port() ? { slot: context.port()! } : {})` in the
+module, and reported the identity that gave them as the point: one catalog, so the tab manager's
+`setRuntimeCommands` and the settings hub's `listVaultEntries` land on the same object.
+
+The identity was real and the shape was wrong. **`ProviderWorkspaceHolder` builds a workspace once
+and caches its slots for the life of the process**, while workspace services are registered
+separately, by a different startup path, and can arrive later — which the shared slot's own file
+said in as many words before this touched it: *"Read when a slot is called, never captured: a
+workspace can be registered later."* Capturing the port at `initialize()` meant that a provider
+whose registration lost that race would have had `commands` and `mcp` **permanently absent**, for
+the whole session, with no error anywhere.
+
+Found by asking what `workspaceFor` actually caches rather than by a test, because no test built a
+workspace before registering services — that ordering only happens at startup. There is one now, and
+it was checked by capturing the catalog inside the forwarder and watching it go red.
+
+The ports forward per call. Presence stays a **static fact about the provider** — eight modules
+declare `commands`, seven declare `mcp`, Antigravity and Codex declare what they have — rather than
+a fact about whether registration has happened yet, which is a question no consumer was asking.
+
+One thing the forwarder exposed on the way: the port names the storage-path member
+`defaultVaultStoragePath` and the row named it `getDefaultVaultStoragePath`, so a forwarder calling
+the port's name on the registered catalog would have answered `null` for every provider forever.
+The row is renamed to match, which is what "the row moved" should have meant.
+
 #### The MCP port was wrong three times, and each version was wrong differently
 
 `start(serverId)` and `stop(serverId)` came first — **operations the product does not have**. An MCP

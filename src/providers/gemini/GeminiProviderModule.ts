@@ -85,14 +85,14 @@ const KNOWN_SETTINGS_FIELDS = new Set([
 ]);
 
 export interface GeminiWorkspaceContext {
-  commandsPort(): ProviderCommandsPort | undefined;
+  commandsPort(): ProviderCommandsPort;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
-  mcpPort(): ProviderMcpPort | undefined;
+  mcpPort(): ProviderMcpPort;
   renderSettingsTab(host: unknown): void;
   hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
   deleteConversationSession(conversationId: string): Promise<void>;
@@ -274,7 +274,7 @@ GeminiProviderSettings
     providerId: 'gemini',
     async initialize(context): Promise<GeminiWorkspace> {
       return {
-        ...(context.commandsPort() ? { commands: context.commandsPort()! } : {}),
+        commands: context.commandsPort(),
         // No `runtimeCommands` slot, which is this provider's own absence: the
         // session's announced commands are dropped, so a tab asked for them
         // would be answered with a list nothing produced.
@@ -290,7 +290,7 @@ GeminiProviderSettings
           cached: () => context.cachedPlanUsage(),
           refresh: () => context.refreshPlanUsage(),
         },
-        ...(context.mcpPort() ? { mcp: context.mcpPort()! } : {}),
+        mcp: context.mcpPort(),
         settingsPresentation: { render: host => context.renderSettingsTab(host) },
       };
     },

@@ -73,7 +73,7 @@ const KNOWN_SETTINGS_FIELDS = new Set([
 
 
 export interface ClaudeWorkspaceContext {
-  commandsPort(): ProviderCommandsPort | undefined;
+  commandsPort(): ProviderCommandsPort;
   listSessionCommands(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
@@ -81,7 +81,7 @@ export interface ClaudeWorkspaceContext {
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
-  mcpPort(): ProviderMcpPort | undefined;
+  mcpPort(): ProviderMcpPort;
   renderSettingsTab(host: unknown): void;
   hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
   deleteConversationSession(conversationId: string): Promise<void>;
@@ -270,7 +270,7 @@ ClaudeProviderSettings
     providerId: 'claude',
     async initialize(context): Promise<ClaudeWorkspace> {
       return {
-        ...(context.commandsPort() ? { commands: context.commandsPort()! } : {}),
+        commands: context.commandsPort(),
         runtimeCommands: {
           listForSession: sessionId => context.listSessionCommands(sessionId),
         },
@@ -286,7 +286,7 @@ ClaudeProviderSettings
           cached: () => context.cachedPlanUsage(),
           refresh: () => context.refreshPlanUsage(),
         },
-        ...(context.mcpPort() ? { mcp: context.mcpPort()! } : {}),
+        mcp: context.mcpPort(),
         settingsPresentation: { render: host => context.renderSettingsTab(host) },
       };
     },

@@ -101,7 +101,7 @@ export class GeminiCommandCatalog implements ProviderCommandCatalog {
     await this.adapter.delete(locationPath(location));
   }
 
-  getDefaultVaultStoragePath(): string | null {
+  defaultVaultStoragePath(): string | null {
     return '.gemini/skills';
   }
 

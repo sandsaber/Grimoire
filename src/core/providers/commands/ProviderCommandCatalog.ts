@@ -20,6 +20,6 @@ export interface ProviderCommandCatalog {
   saveVaultEntry(entry: ProviderCommandEntry): Promise<void>;
   deleteVaultEntry(entry: ProviderCommandEntry): Promise<void>;
   setRuntimeCommands(commands: SlashCommand[]): void;
-  getDefaultVaultStoragePath?(): string | null;
+  defaultVaultStoragePath?(): string | null;
   refresh(): Promise<void>;
 }

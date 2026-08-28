@@ -55,7 +55,7 @@ describe('QwenCommandCatalog', () => {
 
     await expect(catalog.listDropdownEntries({ includeBuiltIns: false })).resolves.toEqual([]);
     await expect(catalog.listVaultEntries()).resolves.toEqual([]);
-    expect(catalog.getDefaultVaultStoragePath()).toBe('.qwen/skills');
+    expect(catalog.defaultVaultStoragePath()).toBe('.qwen/skills');
   });
 
   it('combines nested vault commands and skills with runtime commands, preferring runtime duplicates', async () => {

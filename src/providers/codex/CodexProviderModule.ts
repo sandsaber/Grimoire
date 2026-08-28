@@ -93,7 +93,7 @@ const CODEX_EFFORT_TIERS = ['low', 'medium', 'high', 'xhigh'] as const;
 
 
 export interface CodexWorkspaceContext {
-  commandsPort(): ProviderCommandsPort | undefined;
+  commandsPort(): ProviderCommandsPort;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
@@ -278,7 +278,7 @@ CodexProviderSettings
     providerId: 'codex',
     async initialize(context): Promise<CodexWorkspace> {
       return {
-        ...(context.commandsPort() ? { commands: context.commandsPort()! } : {}),
+        commands: context.commandsPort(),
         agentMentions: {
           list: () => context.listAgentMentions(),
           refresh: () => context.refreshAgentMentions(),

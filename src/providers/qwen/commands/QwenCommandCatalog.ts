@@ -64,7 +64,7 @@ export class QwenCommandCatalog implements ProviderCommandCatalog {
     await this.adapter.delete(filePath);
   }
 
-  getDefaultVaultStoragePath(): string { return '.qwen/skills'; }
+  defaultVaultStoragePath(): string { return '.qwen/skills'; }
   async refresh(): Promise<void> { await this.skills.refresh(); }
 
   private async loadCommands(): Promise<ProviderCommandEntry[]> {

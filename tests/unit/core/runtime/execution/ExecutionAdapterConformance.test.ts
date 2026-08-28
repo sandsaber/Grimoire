@@ -629,7 +629,14 @@ describe('the assembled ChatRuntime adapter', () => {
         ...ports,
       },
       codexProviderModule.runtimePorts({
-        commandsPort: () => undefined,
+        commandsPort: () => ({
+          deleteVaultEntry: async () => undefined,
+          listDropdownEntries: async () => [],
+          listVaultEntries: async () => [],
+          refresh: async () => undefined,
+          saveVaultEntry: async () => undefined,
+          setRuntimeCommands: () => undefined,
+        }),
         listAgentMentions: async () => [],
         refreshAgentMentions: async () => undefined,
         listModels: async () => [],
@@ -980,7 +987,14 @@ describe('the assembled ChatRuntime adapter', () => {
         delay: immediately,
       },
       codexProviderModule.runtimePorts({
-        commandsPort: () => undefined,
+        commandsPort: () => ({
+          deleteVaultEntry: async () => undefined,
+          listDropdownEntries: async () => [],
+          listVaultEntries: async () => [],
+          refresh: async () => undefined,
+          saveVaultEntry: async () => undefined,
+          setRuntimeCommands: () => undefined,
+        }),
         listAgentMentions: async () => [],
         refreshAgentMentions: async () => undefined,
         listModels: async () => [],

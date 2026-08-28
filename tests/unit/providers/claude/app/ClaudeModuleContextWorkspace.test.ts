@@ -42,20 +42,22 @@ describe('Claude module context workspace slots', () => {
     // An unregistered workspace is a provider with nothing to offer, not a
     // provider that fails: the settings surface renders empty rather than
     // throwing where nobody catches it.
-    expect(context.commandsPort()).toBeUndefined();
+    expect(await context.commandsPort().listDropdownEntries({ includeBuiltIns: false })).toEqual([]);
     expect(await context.listAgentMentions()).toEqual([]);
     expect(await context.listModels()).toEqual([]);
-    expect(context.mcpPort()).toBeUndefined();
+    expect(await context.mcpPort().load()).toEqual([]);
   });
 
-  it('hands the registered catalog through, as the same object', async () => {
+  it('reaches the registered catalog on every call', async () => {
     // Identity, not shape: the tab manager gives a live session's commands to
     // this port and the settings hub lists them back, so a wrapper here would
     // be a second object whose `setRuntimeCommands` writes where nothing reads.
     const commandCatalog = { listDropdownEntries: jest.fn(async () => []) };
     const context = createClaudeModuleContext(pluginWith({ commandCatalog }), () => null, ports);
 
-    expect(context.commandsPort()).toBe(commandCatalog);
+    await context.commandsPort().listDropdownEntries({ includeBuiltIns: false });
+
+    expect(commandCatalog.listDropdownEntries).toHaveBeenCalledWith({ includeBuiltIns: false });
   });
 
   it('asks the mention provider for everything it knows', async () => {
@@ -71,7 +73,7 @@ describe('Claude module context workspace slots', () => {
     expect(searchAgents).toHaveBeenCalledWith('');
   });
 
-  it('hands the registered MCP storage through, as the same object', async () => {
+  it('reaches the registered MCP storage on every call', async () => {
     // **The two tests this replaces existed because the port could not carry a
     // server.** It answered `{ id, label, enabled }`, so a save had to reload
     // the stored list and merge three fields back into it — reconstruction the
@@ -82,6 +84,8 @@ describe('Claude module context workspace slots', () => {
     const mcpStorage = { load: jest.fn(async () => []), save: jest.fn(async () => undefined) };
     const context = createClaudeModuleContext(pluginWith({ mcpStorage }), () => null, ports);
 
-    expect(context.mcpPort()).toBe(mcpStorage);
+    await context.mcpPort().save([]);
+
+    expect(mcpStorage.save).toHaveBeenCalledWith([]);
   });
 });

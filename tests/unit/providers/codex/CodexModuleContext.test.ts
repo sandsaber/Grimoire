@@ -62,7 +62,9 @@ describe('Codex module context', () => {
     // is not an error.
     const context = contextFor(null);
 
-    expect(context.commandsPort()).toBeUndefined();
+    await expect(context.commandsPort().listDropdownEntries({ includeBuiltIns: false }))
+
+      .resolves.toEqual([]);
     await expect(context.listAgentMentions()).resolves.toEqual([]);
     await expect(context.listModels()).resolves.toEqual([]);
     // Cached is synchronous now: the indicator reads it while a tab paints,
