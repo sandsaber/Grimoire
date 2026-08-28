@@ -10381,11 +10381,16 @@ This list supersedes the numbered one further down, which was written before the
 *Re-read against the source on 2026-08-28; three of its claims had gone stale and are corrected
 here rather than left to mislead the next session.*
 
-**Scoreboard at the end of that day's work**, after `ProviderRegistry` and the three lifecycle
-variants were deleted: worker tab ownership 3, core importing the plugin type 1, subagent hooks and
-loaders 3, `SubagentManager` lifecycle 7, provider-neutral application code importing a concrete
-provider 2, a provider composition living under `src/app` 18, turn metadata and session updates 2,
-`StreamChunk` and the subagent chunk vocabulary 5, the registries — one left 17.
+**Scoreboard after the day's work.** Four searches closed — `ProviderRegistry` deleted, the nine
+compositions relocated under their providers, the settings layer's concrete-provider imports
+replaced by contract additions, and the subagent hooks settled. What remains: worker tab ownership
+3, core importing the plugin type 1, `SubagentManager` lifecycle 2, turn metadata and session
+updates 2, `StreamChunk` and the subagent chunk vocabulary 5, the registries — one left 15.
+
+**Three of `ProviderWorkspaceRegistry`'s four accessors are gone** — agent mentions, the runtime
+command loader and the settings tab renderer all reach module slots now. `getMcpServerManager` is
+the last, with its design and its one open question recorded at the search. After it, the registry
+is a storage role: `register`, `setServices`, `getServices`, `requireServices`.
 
 **Every one of those was traced to a named blocker, and none of the blockers is "more of the same
 refactoring".** They fall into four kinds, and the kind is what decides who moves next:

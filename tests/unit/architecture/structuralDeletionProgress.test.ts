@@ -249,11 +249,26 @@ const SEARCHES: readonly DeletionSearch[] = [
     // is `undefined` and every suite importing Claude fails to load. The
     // registry's indirection is breaking that cycle, which is a reason to keep
     // it that no reading of the call site would have shown.
-    // **15.** `TabManager` left it: the runtime command row reaches
-    // `workspaceFor(providerId).runtimeCommands` now, which carries the loader's
-    // two members beside `listForSession`. What made that possible was the
-    // loader's context giving up its plugin — every input it has left is the
-    // host's own.
+    // **15, and three of the registry's four accessors are gone.**
+    // `refreshAgentMentions`, `getRuntimeCommandLoader` and
+    // `getSettingsTabRenderer` have all moved to module slots; `TabManager` left
+    // the count with the second.
+    //
+    // **`getMcpServerManager` is the one left, and the design that closes it is
+    // known.** Three chat surfaces hold the manager by identity and call it
+    // later — `MentionDropdownController` and `FileContext` want
+    // `getContextSavingServers()`, `InputToolbar` wants `getServers()` — so a
+    // snapshot taken when the tab is built is stale by the time it is read. The
+    // shape that works is a *live view* on the MCP port, two synchronous members
+    // over what the workspace currently holds, with `tabSettings` handing the
+    // widgets an object that resolves the workspace on each call rather than the
+    // manager itself. The catch to answer first: `setMcpManager(null)` clears
+    // the enabled-server set, and a view that always exists never says null, so
+    // what replaces that signal has to be decided before the swap.
+    //
+    // What is left after it is the storage role: `register`, `setServices`,
+    // `getServices` and `requireServices`, read by the nine provider accessors
+    // and `main.ts`.
     files: 15,
     closedBy: 'the provider rows, when the last consumer of each has moved',
   },
