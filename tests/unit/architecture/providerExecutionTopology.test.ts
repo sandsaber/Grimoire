@@ -18,7 +18,7 @@ describe('provider execution topology', () => {
   /** The providers the registration hub actually attaches, read from the hub itself. */
   const registeredProviderIds = [
     ...readFileSync(resolve(process.cwd(), 'src/providers/index.ts'), 'utf8').matchAll(
-      /ProviderRegistry\.register\('([^']+)'/g,
+      /ProviderWorkspaceRegistry\.register\('([^']+)'/g,
     ),
   ].map(match => match[1]);
 

@@ -10402,6 +10402,49 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — `ProviderRegistry` is deleted (`this commit`)
+
+- Gates: unit 8733 passed, 8733 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean, including `review:source`, `review:css` and
+  `review:deps`.
+- **Contribution inventory rows moved: the last two.** `taskResultInterpreter` is
+  `ProviderDeclarations.asyncTaskResults` and `subagentLifecycleAdapter` is
+  `ProviderDeclarations.subagentLifecycle`. Both are declarations for the reason the other rows
+  were: every member is a pure function of its argument, and every consumer is synchronous — a tab
+  hands the interpreter to its subagent manager while being built, and the lifecycle adapter is
+  resolved while a subagent block renders.
+- **Deleted:** `src/core/providers/ProviderRegistry.ts`, the `ProviderRegistration` interface, all
+  nine `src/providers/<id>/registration.ts` files, and the nine `ProviderRegistry.register` calls in
+  the hub. Six of those nine files were already `{}`. The deletion count goes **21 → 17**, and what
+  the search still finds is `ProviderWorkspaceRegistry` alone.
+- **A recorded gap closed on its recorded terms.** `grok:subagentLifecycleAdapter` was a `KNOWN_GAP`
+  in `providerContributionInventory.test.ts`, entered because the only slot available was
+  `nativeAgents`, whose two members cannot express an eight-member adapter:
+  `recognizesToolName` collapses four questions the live consumer asks separately, and
+  `parseDisplay` receives one payload while a Grok subagent's label comes from the spawn tool's
+  *input* and its id from the *result*. The entry said it closes "when the row moves and the slot is
+  reshaped to what the four providers actually do". `subagentLifecycle` is that reshape — the adapter
+  interface itself rather than a summary of it — so the gap is gone rather than waived, and the set
+  is now empty.
+- **The inventory gate was rebuilt on the side that still exists.** It compared registration objects
+  against declarations; the registrations are deleted, so half its input was gone. It now asserts
+  the two moved rows are declared by *exactly* the providers that registered them — both directions,
+  because a slot quietly filled by a tenth provider is the same drift as one quietly emptied — and
+  the `ProviderRegistration` table is asserted empty with no interface behind it. The
+  documented-plus-moved total stays **16**, which is the invariant that catches a row disappearing.
+- **Proved by breaking.** Grok's `subagentLifecycle` was removed and both new assertions failed;
+  the declaration was restored and they passed.
+- **One correction found while moving.** The old
+  `ProviderRegistry.getTaskResultInterpreter()` test read as "the default provider has an
+  interpreter". The default provider is **Codex**, which has none — what the test always exercised
+  was the absence being read as `NO_TASK_RESULT_INTERPRETATION`. The rewritten call site applies the
+  same fallback and the test now says which of the two it is checking.
+- Open, with owners: the remaining 17 are `ProviderWorkspaceRegistry` — the feature layer,
+  `main.ts`, and the nine provider files publishing its accessors. Its four remaining accessors are
+  `refreshAgentMentions` (one consumer), `getRuntimeCommandLoader` (four), `getMcpServerManager`
+  (one, handing the manager to three chat widgets by identity) and `getSettingsTabRenderer` (two).
+  Owner: **M5**, with the provider rows.
+
 ### M5 — the application layer stops asking a global for a provider's own service (`this commit`)
 
 - Gates: `npm run test -- --selectProjects unit` 8754 passed, 8754 total; `tsc --noEmit` clean;

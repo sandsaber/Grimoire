@@ -3,6 +3,10 @@ import type { Conversation, SlashCommand } from '../types';
 import type { ManagedMcpServer } from '../types/mcp';
 import type { ProviderId } from '../types/provider';
 import type { ProviderCommandEntry } from './commands/ProviderCommandEntry';
+import type {
+  ProviderSubagentLifecycleAdapter,
+  ProviderTaskResultInterpreter,
+} from './types';
 
 /**
  * The contract a built-in provider contributes to the application.
@@ -566,6 +570,30 @@ export interface ProviderDeclarations {
   readonly conversationState?: ProviderConversationStatePort;
   /** Provider task and tool result interpretation. Inventory row 15. */
   readonly taskResults?: ProviderTaskResultPort;
+  /**
+   * How this provider reads the result of an *asynchronous* task — a
+   * different question from `taskResults`, which reads a tool call that has
+   * already returned. Inventory row 15's other half.
+   *
+   * **A declaration, because the one implementation reads nothing but its
+   * argument**, and both consumers are synchronous: a tab hands it to the
+   * subagent manager while the tab is being built, and again when the tab
+   * changes provider. Absent means the provider has no async task protocol,
+   * which is the answer for eight of the nine — `run_in_background` is a
+   * parameter of Claude's Task tool.
+   */
+  readonly asyncTaskResults?: ProviderTaskResultInterpreter;
+  /**
+   * How this provider's subagent spawn, wait and close tools are recognized
+   * and read. Inventory row 16's lifecycle half — `nativeAgents` above is the
+   * naming half, and Codex fills both from the same adapter.
+   *
+   * A declaration for the same two reasons: every member is a pure function
+   * of the tool call it is handed, and its consumer resolves an adapter while
+   * a subagent block renders. Absent for the seven providers that surface no
+   * subagent lifecycle at all.
+   */
+  readonly subagentLifecycle?: ProviderSubagentLifecycleAdapter;
   /** Subagent tool-name recognition and display parsing. Inventory row 16. */
   readonly nativeAgents?: ProviderNativeAgentPort;
   /**

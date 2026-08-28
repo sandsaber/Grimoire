@@ -25,6 +25,7 @@ import {
 } from './execution/GrokExecutionBackend';
 import { GrokConversationHistoryService } from './history/GrokConversationHistoryService';
 import { normalizeGrokThinkingOptionsByModel } from './models';
+import { grokSubagentLifecycleAdapter } from './normalization/grokSubagentNormalization';
 import { grokCliResolver } from './runtime/GrokCliResolver';
 import { GROK_ARTIFACTS_SUBDIR } from './runtime/GrokPaths';
 import {
@@ -305,6 +306,7 @@ GrokProviderSettings
     warmup: 'commands',
     providerId: 'grok',
     chatUI: grokChatUi,
+    subagentLifecycle: grokSubagentLifecycleAdapter,
     // The only provider that preloads a file of its own: Grok has no agent
     // definition, so its system prompt is written to the vault and passed on
     // the command line, and the chat context surface shows what went in.

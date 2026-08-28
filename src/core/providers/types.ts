@@ -49,43 +49,6 @@ export interface CreateChatRuntimeOptions {
   providerId?: ProviderId;
 }
 
-/**
- * Chat-facing provider registration.
- *
- * This is intentionally limited to chat-facing services.
- * Shared bootstrap (defaults, storage) is in `src/core/bootstrap/`.
- * Provider-owned workspace services (CLI resolution, commands, agents,
- * MCP, settings tabs) live behind `src/providers/<id>/app/`.
- */
-/**
- * What a provider still registers outside the catalog.
- *
- * Shrinking rather than growing: identity and ordering moved to
- * `ProviderManifest` at M3 and are no longer declared here, so the two
- * inventories cannot disagree about a provider's name or its place in a list.
- */
-export interface ProviderRegistration {
-  // Two fields left here before this comment did. `chatUIConfig` is
-  // `ProviderDeclarations.chatUI` and `settingsReconciler` is the codec's
-  // reconciliation, both reached through the catalog — and in both cases the
-  // provider's own object is what the module delegates to, so what moved is
-  // where the host asks, not who answers.
-  // `createRuntime` was here. A tab asks the application for a runtime now —
-  // `ApplicationRuntime.createRuntimeFor(providerId)` reaches the same
-  // composition the registration's factory reached through a plugin, without a
-  // second inventory of providers in between.
-  /**
-   * How this provider reads a subagent task result.
-   *
-   * Optional, because absent means unsupported: eight providers filled it with
-   * an interpreter that answered nothing, which is a provider claiming to speak
-   * a protocol it does not. `NO_TASK_RESULT_INTERPRETATION` is what the host
-   * reads an absence as.
-   */
-  taskResultInterpreter?: ProviderTaskResultInterpreter;
-  subagentLifecycleAdapter?: ProviderSubagentLifecycleAdapter;
-}
-
 export interface ProviderSettingsReconciler {
   handleEnvironmentChange?(settings: Record<string, unknown>): boolean;
 

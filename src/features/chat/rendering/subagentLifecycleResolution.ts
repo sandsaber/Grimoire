@@ -1,4 +1,4 @@
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderId, ProviderSubagentLifecycleAdapter } from '../../../core/providers/types';
 
 /**
@@ -8,7 +8,7 @@ export function resolveSubagentLifecycleAdapter(
   activeProviderId: ProviderId,
   toolName?: string,
 ): ProviderSubagentLifecycleAdapter | null {
-  const activeAdapter = ProviderRegistry.getSubagentLifecycleAdapter(activeProviderId);
+  const activeAdapter = providerCatalog().declarations(activeProviderId).subagentLifecycle ?? null;
 
   if (!toolName) {
     return activeAdapter;

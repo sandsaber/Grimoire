@@ -1,13 +1,13 @@
 import { AuxiliaryExecutionOwner } from '../../../app/auxiliary/AuxiliaryExecutionOwner';
 import { ProviderAgentMentionService } from '../../../app/mentions/ProviderAgentMentionService';
 import { getEnabledProviderForModel } from '../../../core/providers/modelRouting';
+import { NO_TASK_RESULT_INTERPRETATION } from '../../../core/providers/noTaskResultInterpretation';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderChatUiContribution } from '../../../core/providers/ProviderModule';
 import type {
   ProviderUsageSnapshot,
   ProviderUsageWindow,
 } from '../../../core/providers/ProviderModule';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import type {
   ProviderId,
@@ -373,7 +373,8 @@ export function syncTabProviderServices(
   tab.services.instructionRefineService = auxiliaryExecution(plugin, tab.providerId)
     .instructionRefineService(tab.providerId);
   tab.services.subagentManager.setTaskResultInterpreter?.(
-    ProviderRegistry.getTaskResultInterpreter(tab.providerId)
+    providerCatalog().declarations(tab.providerId).asyncTaskResults
+    ?? NO_TASK_RESULT_INTERPRETATION
   );
 }
 

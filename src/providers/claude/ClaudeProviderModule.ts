@@ -320,6 +320,9 @@ ClaudeProviderSettings
     warmup: 'none',
     providerId: 'claude',
     chatUI: claudeChatUi,
+    // The one provider with a real interpreter: the async task protocol
+    // these read is Claude's own.
+    asyncTaskResults: taskResultInterpreter,
     taskResults: {
       interpret: (toolName, payload) => {
         if (!CLAUDE_SUBAGENT_TOOL_NAMES.includes(toolName)) {

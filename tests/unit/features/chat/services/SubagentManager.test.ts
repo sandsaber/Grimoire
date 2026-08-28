@@ -4,7 +4,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
+import { NO_TASK_RESULT_INTERPRETATION } from '@/core/providers/noTaskResultInterpretation';
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import type { SubagentInfo, ToolCallInfo } from '@/core/types';
 import { SubagentManager } from '@/features/chat/services/SubagentManager';
 import { createStopSubagentHook } from '@/providers/claude/hooks/SubagentHooks';
@@ -53,7 +54,8 @@ const createManager = () => {
   // for every tab was wrong quietly.
   const manager = new SubagentManager((subagent) => {
     updates.push({ ...subagent });
-  }, ProviderRegistry.getTaskResultInterpreter('claude'));
+  }, providerCatalog().declarations('claude').asyncTaskResults
+    ?? NO_TASK_RESULT_INTERPRETATION);
   return { manager, updates };
 };
 

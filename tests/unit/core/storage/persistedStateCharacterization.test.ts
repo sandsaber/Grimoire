@@ -239,7 +239,7 @@ describe('persisted state characterization', () => {
       const providerConfigs = parsed.providerConfigs as Record<string, unknown>;
       const registered = [
         ...readFileSync(resolve(process.cwd(), 'src/providers/index.ts'), 'utf8').matchAll(
-          /ProviderRegistry\.register\('([^']+)'/g,
+          /ProviderWorkspaceRegistry\.register\('([^']+)'/g,
         ),
       ].map(match => match[1]);
 

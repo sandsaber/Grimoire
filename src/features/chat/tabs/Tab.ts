@@ -13,7 +13,6 @@ import { getOpaqueProviderState } from '../../../core/providers/getOpaqueProvide
 import { getEnabledProviderForModel, getProviderForModel } from '../../../core/providers/modelRouting';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderChatUiContribution } from '../../../core/providers/ProviderModule';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import type {
   ProviderId,
@@ -101,6 +100,7 @@ export {
   resolveTabModel,
 } from './tabSettings';
 
+import { NO_TASK_RESULT_INTERPRETATION } from '../../../core/providers/noTaskResultInterpretation';
 import {
   initializeContextManagers,
   openRelevantVaultPath,
@@ -216,7 +216,8 @@ export function createTab(options: TabCreateOptions): TabData {
   // the StreamController it updates exists.
   const subagentManager = new SubagentManager(
     () => {},
-    ProviderRegistry.getTaskResultInterpreter(initialProviderId),
+    providerCatalog().declarations(initialProviderId).asyncTaskResults
+      ?? NO_TASK_RESULT_INTERPRETATION,
   );
 
   const tab: TabData = {

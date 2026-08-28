@@ -4,15 +4,15 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 
 import { CodexExecution } from '@/app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
+import { NO_TASK_RESULT_INTERPRETATION } from '@/core/providers/noTaskResultInterpretation';
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import {
   DEFAULT_CHAT_PROVIDER_ID,
 } from '@/core/providers/types';
 import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 
-describe('ProviderRegistry', () => {
+describe('reading a provider\'s contributions through the catalog', () => {
   beforeEach(() => {
     ProviderWorkspaceRegistry.clear();
     ProviderWorkspaceRegistry.setServices('claude', {
@@ -50,18 +50,25 @@ describe('ProviderRegistry', () => {
   });
 
   it('returns boundary services for the default provider', () => {
-    const taskInterpreter = ProviderRegistry.getTaskResultInterpreter();
+    // The default provider is Codex, which declares no async task interpreter,
+    // so what this has always exercised is the absence being read as
+    // `NO_TASK_RESULT_INTERPRETATION` — the registry accessor applied that
+    // fallback itself, and the call site does now.
+    const taskInterpreter = providerCatalog()
+      .declarations(DEFAULT_CHAT_PROVIDER_ID).asyncTaskResults
+      ?? NO_TASK_RESULT_INTERPRETATION;
     expect(taskInterpreter).toHaveProperty('resolveTerminalStatus');
   });
 
   it('throws when an unknown provider is requested', () => {
     // Asked of `getChatUIConfig`, then `getSettingsReconciler`, then
-    // `getConversationHistoryService`, each of which its row took with it. Any
-    // accessor proves the same thing — that an unregistered id is refused
-    // rather than answered — so it follows whichever is still here. Three left.
-    expect(() => ProviderRegistry.getTaskResultInterpreter(
-      'nonexistent' as any,
-    )).toThrow('Provider "nonexistent" is not registered.');
+    // `getConversationHistoryService`, then the registry's last accessor,
+    // each of which its row took with it. The registry is deleted, so it is
+    // the catalog that refuses now — which is the same guarantee, asked of
+    // the one inventory that is left.
+    expect(() => providerCatalog().declarations(
+      'nonexistent',
+    )).toThrow('nonexistent');
   });
 
   it('creates a Codex runtime, over the execution kernel', () => {
@@ -144,14 +151,6 @@ describe('ProviderRegistry', () => {
       'gemini',
       'qwen',
     ]);
-  });
-
-  it('refuses a registration for a provider the catalog does not hold', () => {
-    // The registry is no longer an inventory. A registration for an id the
-    // catalog never heard of used to create a tenth provider that appeared in
-    // nothing and answered for nothing.
-    expect(() => ProviderRegistry.register('ghost', {}))
-      .toThrow('Provider "ghost" is not in the catalog.');
   });
 
   it('routes enablement updates through every provider registration', () => {

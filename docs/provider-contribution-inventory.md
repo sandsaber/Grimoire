@@ -28,17 +28,15 @@ that is produced by `initialize(context)` and needs a live plugin. A provider th
 optional workspace member is caught only by the parity gate, and only if its module leaves the
 bundle.
 
-## `ProviderRegistration` fields (2) — [types.ts:56](../src/core/providers/types.ts)
+## `ProviderRegistration` fields (0) — the interface is deleted
 
 Rows that have already moved are not deleted; they are listed under
 [Moved to their target homes](#moved-to-their-target-homes-12) with where they live now. Row
 numbers are stable: a moved row leaves a gap rather than renumbering the rows below it, because the
 plan and this file both refer to rows by number.
 
-| # | Field | What it carries | Consumed by today | Target home | Moves at |
-|---|---|---|---|---|---|
-| 15 | `taskResultInterpreter?` | provider task/tool result interpretation | chat rendering | result-interpretation port | M5 |
-| 16 | `subagentLifecycleAdapter?` | subagent tool-name recognition and display parsing | `SubagentManager` | native-agent observation port | M5 |
+Every row has moved. `ProviderRegistration` no longer exists, and neither do the nine
+`registration.ts` files that filled it or the `ProviderRegistry` that held them.
 
 ## `ProviderWorkspaceServices` members (10) — [types.ts:436](../src/core/providers/types.ts)
 
@@ -64,7 +62,7 @@ fields of either service interface.
 |---|---|---|---|---|---|
 | 1 | `workspaceCapabilities` | `ProviderCapabilityDescriptor.workspace`, read through `ProviderCatalog.workspaceCapabilities()` | settings gating | **arrived**; the registration still carries the record because the registry validates it, and a parity gate compares the two until the registry goes | M5 |
 
-## Moved to their target homes (16)
+## Moved to their target homes (18)
 
 Rows that have reached the home the tables above name for them. They stay recorded here for the
 same reason those tables exist: a contribution that simply disappears from an inventory is
@@ -89,6 +87,8 @@ each table's total still adds up.
 | 14 | `historyService` | registration | split in two: `ProviderDeclarations.conversationState` for the four pure members, `ProviderWorkspaceSlots.transcripts` for the two that do I/O | `ProviderCatalog.declarations(id).conversationState`, `workspaceFor(id).transcripts` | M5 |
 | 2 | default provider configs | app-level | `ProviderSettingsCodec.defaults()` | `ProviderCatalog.defaultConfigs()` | M3 |
 | 3 | workspace initialize/dispose lifecycle | app-level | `ProviderWorkspaceContribution`, both halves required | `ProviderWorkspaceManager`, owned by the plugin instance | M3 |
+| 15 | `taskResultInterpreter?` | registration | `ProviderDeclarations.asyncTaskResults` | `ProviderCatalog.declarations().asyncTaskResults` | M5 |
+| 16 | `subagentLifecycleAdapter?` | registration | `ProviderDeclarations.subagentLifecycle` | `resolveSubagentLifecycleAdapter()` | M5 |
 
 Rows 11-13 moved together because they were one contribution wearing three names. Every provider
 supplied all three or none, five supplied the same wrapper around a runner three times, three

@@ -324,6 +324,7 @@ CodexProviderSettings
     warmup: 'runtime',
     providerId: 'codex',
     chatUI: codexChatUi,
+    subagentLifecycle: codexSubagentLifecycleAdapter,
     // Read straight off the normalization adapter. It used to arrive through
     // the module context, which needed a plugin for something that needs
     // nothing — and that indirection is what kept this row on the legacy

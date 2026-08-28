@@ -151,26 +151,18 @@ const SEARCHES: readonly DeletionSearch[] = [
     closedBy: 'the seam deletion — the lifecycle meaning goes, the content type keeps its own name',
   },
   {
-    what: 'the two registries',
+    what: 'the registries — one left',
     pattern: /\bProviderRegistry\b|\bProviderWorkspaceRegistry\b/,
-    // **21, and `src/app` is clear of both.** `createRuntime` has left, so
-    // `ProviderRegistry` is two members over two rows: `taskResultInterpreter?`
-    // and `subagentLifecycleAdapter?`. Three compositions left the count
-    // without losing a dependency they had: each carried a sentence saying its
-    // per-tab runtime matched how the registry built one, and the registry
-    // stopped building any. The other six asked
-    // `getMcpServerManager(<id>)` for a service their own provider owns, and
-    // now ask that provider for it — same object, same `getServices` call
-    // underneath, but the string-keyed global lookup is gone from the
-    // application layer. What is left is the feature layer and `main.ts`. The chat-UI row took its accessor and the
-    // four model-routing statics that only lived there to reach it; the
-    // settings reconciler took `getSettingsReconciler`; the command catalog
-    // took `getCommandCatalog`; and the history service took
-    // `getConversationHistoryService`, which is what `main.ts`, `TabManager`,
-    // `SessionStorage`, `tabSettings` and `ConversationController` held.
-    // `GrimoireSettings` still counts, because the pattern is both registries
-    // and it holds eight workspace-registry calls.
-    files: 21,
+    // **17, and `ProviderRegistry` is deleted.** Its last two rows —
+    // `taskResultInterpreter` and `subagentLifecycleAdapter` — are
+    // `ProviderDeclarations.asyncTaskResults` and
+    // `ProviderDeclarations.subagentLifecycle`, filled by the three providers
+    // that had them, so the class, the `ProviderRegistration` interface and all
+    // nine `registration.ts` files went with them. The pattern still names both
+    // because what it counts is the shape, not the class: what is left is
+    // `ProviderWorkspaceRegistry`, across the feature layer, `main.ts`, and the
+    // nine provider files that publish its accessors.
+    files: 17,
     closedBy: 'the provider rows, when the last consumer of each has moved',
   },
 ];
@@ -214,7 +206,7 @@ describe('structural deletion progress', () => {
       'the application importing a concrete provider module: 20',
       'turn metadata and session updates: 6',
       'StreamChunk and the subagent chunk vocabulary: 5',
-      'the two registries: 21',
+      'the registries — one left: 17',
     ]);
     // Three of eleven are zero: two closed in the 2026-08-27 session, and the
     // interaction callbacks closed with the first step of the seam deletion.

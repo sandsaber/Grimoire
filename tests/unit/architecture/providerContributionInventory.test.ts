@@ -7,24 +7,15 @@ import { readInterfaceMembers } from '@test/helpers/interfaceMembers';
 
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { antigravityWorkspaceRegistration } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
-import { antigravityProviderRegistration } from '@/providers/antigravity/registration';
 import { claudeWorkspaceRegistration } from '@/providers/claude/app/ClaudeWorkspaceServices';
-import { claudeProviderRegistration } from '@/providers/claude/registration';
 import { codexWorkspaceRegistration } from '@/providers/codex/app/CodexWorkspaceServices';
-import { codexProviderRegistration } from '@/providers/codex/registration';
 import { getBuiltInProviderDefaultConfigs } from '@/providers/defaultProviderConfigs';
 import { geminiWorkspaceRegistration } from '@/providers/gemini/app/GeminiWorkspaceServices';
-import { geminiProviderRegistration } from '@/providers/gemini/registration';
 import { grokWorkspaceRegistration } from '@/providers/grok/app/GrokWorkspaceServices';
-import { grokProviderRegistration } from '@/providers/grok/registration';
 import { kimicodeWorkspaceRegistration } from '@/providers/kimicode/app/KimicodeWorkspaceServices';
-import { kimicodeProviderRegistration } from '@/providers/kimicode/registration';
 import { mimocodeWorkspaceRegistration } from '@/providers/mimocode/app/MimocodeWorkspaceServices';
-import { mimocodeProviderRegistration } from '@/providers/mimocode/registration';
 import { opencodeWorkspaceRegistration } from '@/providers/opencode/app/OpencodeWorkspaceServices';
-import { opencodeProviderRegistration } from '@/providers/opencode/registration';
 import { qwenWorkspaceRegistration } from '@/providers/qwen/app/QwenWorkspaceServices';
-import { qwenProviderRegistration } from '@/providers/qwen/registration';
 
 import { PARITY_SURFACES } from './presentationParityManifest';
 
@@ -83,17 +74,6 @@ const WORKSPACE_REGISTRATIONS = {
   qwen: qwenWorkspaceRegistration,
 };
 
-const REGISTRATIONS = {
-  antigravity: antigravityProviderRegistration,
-  claude: claudeProviderRegistration,
-  codex: codexProviderRegistration,
-  gemini: geminiProviderRegistration,
-  grok: grokProviderRegistration,
-  kimicode: kimicodeProviderRegistration,
-  mimocode: mimocodeProviderRegistration,
-  opencode: opencodeProviderRegistration,
-  qwen: qwenProviderRegistration,
-};
 
 /** Second column of every row of the table under `headingPrefix`, unwrapped from backticks. */
 function readInventoryRows(headingPrefix: string): string[] {
@@ -131,23 +111,18 @@ function readInventoryRows(headingPrefix: string): string[] {
 describe('provider contribution inventory', () => {
   describe('ProviderRegistration table', () => {
     const documented = readInventoryRows('## `ProviderRegistration` fields');
-    const declared = readInterfaceMembers(TYPES_PATH, 'ProviderRegistration');
     const moved = readMovedRows()
       .filter(row => row.from === 'registration')
       .map(row => row.contribution);
 
-    it('documents exactly the declared fields', () => {
-      expect([...documented].sort()).toEqual([...declared].sort());
-    });
-
-    it('claims the count the heading advertises', () => {
-      // Two, and both optional: what is left of the registration is
-      // `taskResultInterpreter?` and `subagentLifecycleAdapter?`, which three
-      // providers fill and durable agents takes. Everything else is recorded in
-      // the moved table below — including `createRuntime`, whose flip was M2's
-      // and whose registration *hop* went at M5, when a tab started asking the
-      // application for a runtime instead of a registry for a factory.
-      expect(documented).toHaveLength(2);
+    it('has no rows left, and no interface behind them', () => {
+      // The last two are declarations now, so the interface, the nine
+      // `registration.ts` files and the registry that held them are deleted.
+      // The heading stays, empty: the moved table refers to rows by number and
+      // the totals below still have to add up.
+      expect(documented).toEqual([]);
+      expect(readFileSync(resolve(process.cwd(), TYPES_PATH), 'utf8'))
+        .not.toContain('interface ProviderRegistration');
     });
 
     it('accounts for every field the registration ever declared', () => {
@@ -177,27 +152,9 @@ describe('provider contribution inventory', () => {
         'settingsReconciler',
         'createRuntime',
         'historyService',
+        'taskResultInterpreter',
+        'subagentLifecycleAdapter',
       ]);
-    });
-
-    it.each(Object.entries(REGISTRATIONS))(
-      '%s supplies only documented contributions',
-      (_providerId, registration) => {
-        const undocumented = Object.keys(registration).filter(key => !documented.includes(key));
-
-        expect(undocumented).toEqual([]);
-      },
-    );
-
-    it.each(Object.entries(REGISTRATIONS))('%s supplies every required field', (_providerId, registration) => {
-      // `taskResultInterpreter` joined this list when eight of nine providers
-      // turned out to be filling it with an interpreter that answered nothing.
-      const optional = ['subagentLifecycleAdapter', 'taskResultInterpreter'];
-      const missing = documented.filter(
-        field => !optional.includes(field) && !(field in registration),
-      );
-
-      expect(missing).toEqual([]);
     });
   });
 
@@ -231,68 +188,48 @@ describe('provider contribution inventory', () => {
   });
 
 
-  describe('a registered row has a filled slot to move into', () => {
+  describe('a moved row is declared by the providers that registered it', () => {
     /**
-     * Rows whose module slot is a *declaration* — filled at module definition,
-     * not by the host — paired with the registration field they replace.
+     * The two rows that left `ProviderRegistration` at M5, with the providers
+     * that filled them.
      *
-     * A provider that registers the row and leaves the slot empty is a
-     * contribution that disappears at that row's flip with nothing failing,
-     * which is how the first attempt lost most of the product. The slot being
-     * dark is exactly why nothing else notices.
+     * A provider that registered a row and declares nothing for it is a
+     * contribution that disappears at the flip with nothing failing, which is
+     * how the first attempt lost most of the product. The registrations are
+     * gone, so what this holds is who *had* one — asserted both ways, because a
+     * slot quietly filled by a tenth provider is the same kind of drift as one
+     * quietly emptied.
      */
-    const DECLARED_ROW_SLOTS = [
-      { registration: 'taskResultInterpreter', slot: 'taskResults' },
-      { registration: 'subagentLifecycleAdapter', slot: 'nativeAgents' },
+    const MOVED_ROWS = [
+      { slot: 'asyncTaskResults', providers: ['claude'] },
+      { slot: 'subagentLifecycle', providers: ['codex', 'grok'] },
     ] as const;
 
-    /**
-     * Providers that register a row today and declare nothing for it.
-     *
-     * May shrink, never grow. Each entry is a contribution that would be lost
-     * if its row flipped right now.
-     */
-    const KNOWN_GAPS: ReadonlySet<string> = new Set([
-      // This gate found eight more the moment it was written, all on
-      // `taskResultInterpreter`: only Claude had a real one, and the other
-      // eight registered the same twenty-nine-line no-op. They are deleted —
-      // the row is optional now, and an absence is read as
-      // `NO_TASK_RESULT_INTERPRETATION`. One gap is left.
-      //
-      // Grok's eight-member lifecycle adapter against a two-member slot that
-      // cannot express it: `recognizesToolName` collapses four distinct
-      // questions the live consumer asks separately, and `parseDisplay` gets
-      // one payload while a Grok subagent's label comes from the spawn tool's
-      // *input* and its id from the *result*. Filling it would mean inventing a
-      // mapping no consumer matches. It closes when the row moves and the slot
-      // is reshaped to what the four providers actually do.
-      'grok:subagentLifecycleAdapter',
-    ]);
+    it.each(MOVED_ROWS.map(row => [row.slot, row] as const))(
+      '%s is declared by exactly the providers that registered it',
+      (_slot, row) => {
+        const filled = providerCatalog().ids().filter(providerId => (
+          providerCatalog().declarations(providerId) as unknown as Record<string, unknown>
+        )[row.slot] !== undefined);
 
-    it.each(
-      Object.entries(REGISTRATIONS).flatMap(([providerId, registration]) => (
-        DECLARED_ROW_SLOTS
-          .filter(row => row.registration in registration)
-          .map(row => [`${providerId}.${row.registration}`, providerId, registration, row] as const)
-      )),
-    )('%s has somewhere to land', (_label, providerId, _registration, row) => {
-      const declared = providerCatalog().declarations(providerId) as unknown as Record<string, unknown>;
-      const isKnownGap = KNOWN_GAPS.has(`${providerId}:${row.registration}`);
+        expect([...filled].sort()).toEqual([...row.providers].sort());
+      },
+    );
 
-      // A recorded gap is asserted to still *be* one, so an entry that has
-      // quietly been filled is caught the same way an unrecorded gap is.
-      expect(declared[row.slot] === undefined).toBe(isKnownGap);
-    });
+    it('closes the gap Grok carried, for the reason it was recorded under', () => {
+      // Recorded as a known gap while `nativeAgents` was the only slot: a
+      // two-member port cannot express an eight-member adapter, because
+      // `recognizesToolName` collapses four questions the consumer asks
+      // separately, and `parseDisplay` gets one payload while a Grok subagent's
+      // label comes from the spawn tool's *input* and its id from the *result*.
+      // The entry said it closes when the slot is reshaped to what the
+      // providers actually do, and `subagentLifecycle` is that shape — the
+      // adapter interface itself rather than a summary of it.
+      const declared = providerCatalog().declarations('grok').subagentLifecycle;
 
-    it('records every gap that exists, and no gap that does not', () => {
-      const actual = Object.entries(REGISTRATIONS).flatMap(([providerId, registration]) => {
-        const declared = providerCatalog().declarations(providerId) as unknown as Record<string, unknown>;
-        return DECLARED_ROW_SLOTS
-          .filter(row => row.registration in registration && declared[row.slot] === undefined)
-          .map(row => `${providerId}:${row.registration}`);
-      });
-
-      expect(actual.sort()).toEqual([...KNOWN_GAPS].sort());
+      expect(declared).toBeDefined();
+      expect(typeof declared?.isSpawnTool).toBe('function');
+      expect(typeof declared?.buildSubagentInfo).toBe('function');
     });
   });
 
@@ -364,7 +301,7 @@ describe('provider contribution inventory', () => {
       );
 
       expect(Object.keys(getBuiltInProviderDefaultConfigs())).toEqual(
-        expect.arrayContaining(Object.keys(REGISTRATIONS)),
+        expect.arrayContaining([...providerCatalog().ids()]),
       );
       expect(source).not.toMatch(/DEFAULT_\w+_PROVIDER_SETTINGS/);
     });

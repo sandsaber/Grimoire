@@ -21,7 +21,6 @@ const mockSetupServiceCallbacks = jest.fn();
 const mockWireTabInputEvents = jest.fn();
 const mockGetTabTitle = jest.fn().mockReturnValue('Test Tab');
 const mockGetTabSettingsSnapshot = jest.fn().mockImplementation((tab: any) => tab.draftSettings ?? {});
-const mockCreateChatRuntime = jest.fn();
 const mockGetProviderSettingsSnapshot = jest.fn().mockImplementation(() => ({}));
 
 jest.mock('@/features/chat/tabs/Tab', () => ({
@@ -44,11 +43,6 @@ jest.mock('@/shared/modals/ForkTargetModal', () => ({
   chooseForkTarget: (...args: any[]) => mockChooseForkTarget(...args),
 }));
 
-const mockBuildForkProviderState = jest.fn(
-  (sourceSessionId: string, resumeAt: string) => ({
-    forkSource: { sessionId: sourceSessionId, resumeAt },
-  }),
-);
 const mockGetCapabilities = jest.fn().mockReturnValue({
   providerId: 'claude',
   supportsPersistentRuntime: true,
@@ -65,14 +59,6 @@ const mockGetCapabilities = jest.fn().mockReturnValue({
 const mockCommandCatalogs: Record<string, any> = {};
 const mockRuntimeCommandLoaders: Record<string, any> = {};
 const mockTabWarmupPolicies: Record<string, any> = {};
-jest.mock('@/core/providers/ProviderRegistry', () => ({
-  ProviderRegistry: {
-    createChatRuntime: (...args: any[]) => mockCreateChatRuntime(...args),
-    getConversationHistoryService: () => ({
-      buildForkProviderState: mockBuildForkProviderState,
-    }),
-  },
-}));
 
 /**
  * Model routing, which left the registry with the chat-UI row.
