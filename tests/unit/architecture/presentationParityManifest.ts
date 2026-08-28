@@ -537,7 +537,6 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'Chat execution per provider. Row 10 of the contribution inventory — the only row an M2 flip moves.',
     state: 'wired',
     modules: [
-      'src/core/runtime/ChatRuntime.ts',
       // Claude chat execution, flipped: the composition, the backend it builds,
       // and everything a turn is composed, presented and answered from.
       'src/app/execution/claude/ClaudeExecutionComposition.ts',

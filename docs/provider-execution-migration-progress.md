@@ -9748,6 +9748,43 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### `ChatRuntime` is deleted
+
+The plan's condition is *"when the last UI consumer of `ChatRuntime` is gone: delete the
+interface"*. It is gone, and the interface is deleted. **No module in `src/` imports it.**
+
+It went member by member, in the order the surface stopped needing them:
+
+- six interaction setters became one `installInteractions` on the adapter — they were stored and
+  never acted on, which is what made them a seam rather than a capability;
+- two subagent loaders were implemented by nothing, and took a retry ladder that could never succeed
+  with them;
+- the turn-metadata member's three facts are on `CompletedChatTurn`, where the surface already read
+  the other half of the same turn;
+- `getAuxiliaryModel` was absent from the adapter by contract, so its two optional call sites had
+  been answering `undefined` for every flipped provider;
+- and the last step was **typing what the host holds as what it is**: the tab, the three chat
+  controllers, both tab contexts, the registration factory and the nine compositions all say
+  `ExecutionChatRuntimeAdapter` now, because that is what every composition has always built.
+
+`adapterMemberCoverage.test.ts` is deleted with it, and the reason is the point: it existed because
+the host was typed against an interface the adapter only *structurally* satisfied, so a lost member
+had to be caught by comparing names. The host is typed against the adapter now, and **the compiler is
+the coverage gate** — removing a member or a parameter anything uses is a `npm run typecheck`
+failure. What that file could not catch is on record: a method with fewer parameters is assignable to
+one with more, and two members had quietly dropped one.
+
+What replaces the freeze is a deletion gate. It asserts the file is gone, that no module imports it
+or declares its own under that name, and that the adapter specification — the only place that says
+what each of the thirty-two members became — survives. It catches **re-entry**, not the word: six
+modules name the deleted interface in prose, and that prose is the record. Proved by adding a module
+that imports a `ChatRuntime` and watching it go red.
+
+`ProviderRuntimePorts`, `ExecutionChatRuntimeAdapter` and the kernel are what a provider's runtime is
+now. The adapter itself outlives this step by design — the plan deletes the interface and the
+presentation adapter as separate acts, and what the adapter still holds is the tab-shaped view of a
+session that the durable-agents work is the next owner of.
+
 #### Turn metadata moved to the completion, where the surface already looked
 
 `ChatRuntime.consumeTurnMetadata` gave the surface three facts about a finished turn: whether it

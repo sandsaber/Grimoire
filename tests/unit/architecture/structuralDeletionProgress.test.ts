@@ -116,13 +116,16 @@ const SEARCHES: readonly DeletionSearch[] = [
     // content presenter and the composition that wires it — provider-internal,
     // not a seam. What is left of the seam is `buildSessionUpdates` in
     // `ConversationController` and `syncConversationState` in the tab layer.
-    files: 23,
+    files: 22,
     closedBy: 'the seam deletion',
   },
   {
     what: 'StreamChunk and the subagent chunk vocabulary',
     pattern: /\bStreamChunk\b|async_subagent_result|subagent_tool_(use|result)/,
-    files: 25,
+    // **24.** The contract that declared the lifecycle chunk vocabulary is
+    // deleted; what the pattern finds now is the content type, which keeps its
+    // own name, and the subagent chunk kinds the presenters still emit.
+    files: 24,
     closedBy: 'the seam deletion — the lifecycle meaning goes, the content type keeps its own name',
   },
   {
@@ -180,8 +183,8 @@ describe('structural deletion progress', () => {
       'subagent hooks and loaders: 3',
       'SubagentManager lifecycle: 20',
       'the application importing a concrete provider module: 20',
-      'turn metadata and session updates: 23',
-      'StreamChunk and the subagent chunk vocabulary: 25',
+      'turn metadata and session updates: 22',
+      'StreamChunk and the subagent chunk vocabulary: 24',
       'the two registries: 30',
     ]);
     // Three of eleven are zero: two closed in the 2026-08-27 session, and the

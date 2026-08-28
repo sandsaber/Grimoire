@@ -4,7 +4,7 @@ import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
 
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderId, TitleGenerationService } from '../../../core/providers/types';
-import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
+import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatRewindMode } from '../../../core/runtime/types';
 import type { ChatMessage, Conversation, ConversationMeta } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
@@ -62,7 +62,7 @@ export interface ConversationControllerDeps {
   clearQueuedMessage: () => void;
   getTitleGenerationService: () => TitleGenerationService | null;
   getStatusPanel: () => StatusPanel | null;
-  getAgentService?: () => ChatRuntime | null;
+  getAgentService?: () => ExecutionChatRuntimeAdapter | null;
   /**
    * This tab's end of the projection path, where it has one.
    *
@@ -105,7 +105,7 @@ export class ConversationController {
     this.callbacks = callbacks;
   }
 
-  private getAgentService(): ChatRuntime | null {
+  private getAgentService(): ExecutionChatRuntimeAdapter | null {
     return this.deps.getAgentService?.() ?? null;
   }
 

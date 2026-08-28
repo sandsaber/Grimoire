@@ -1,89 +1,99 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { readInterfaceMembers } from '@test/helpers/interfaceMembers';
+import { listAllSourceModules } from '@test/helpers/moduleReachability';
+
+import type {
+  ExecutionChatRuntimeAdapter,
+  ExecutionInteractionCallbacks,
+} from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 
 /**
- * Freezes the `ChatRuntime` contract and keeps its specification honest.
+ * The `ChatRuntime` contract is **deleted**, and this keeps it deleted.
  *
- * Two rules from the plan are enforced here. The old runtime path is frozen
- * for new product features from the M0a checkpoint, so a new member is a
- * deliberate act that has to be recorded. And the adapter specification must
- * cover every member with no "decide later" rows — a mapping discovered during
- * M2 instead of now is the v1 failure mode repeating at the seam.
+ * It began as a freeze: the old runtime path took no new members from the M0a
+ * checkpoint, and every member had to be mapped in the adapter specification
+ * before M2 could touch it. Thirty-two members went in, and the plan's seam
+ * deletion names what comes out — *"when the last UI consumer of `ChatRuntime`
+ * is gone: delete the interface"*.
+ *
+ * That happened. The six interaction setters became one installation on the
+ * adapter; the two subagent loaders were implemented by nothing and took a
+ * retry ladder with them; the turn-metadata member's three facts are on
+ * `CompletedChatTurn`, which the surface already read; and the tab, the three
+ * controllers and both tab contexts type their runtime as the adapter every
+ * composition builds. No module in `src/` imports the interface, so the file is
+ * gone.
+ *
+ * What this file asserts now is the shape of that deletion rather than the
+ * shape of the contract: nothing in production names it, and the specification
+ * that mapped it survives as the record of what each member became. A source
+ * module reintroducing it is a re-entry to the old path, which is what the
+ * freeze existed to stop and what this still stops.
  */
 
 const CONTRACT_PATH = 'src/core/runtime/ChatRuntime.ts';
 const SPECIFICATION_PATH = 'docs/provider-execution-adapter-contract.md';
+const SOURCE_ROOT = resolve(process.cwd(), 'src');
 
-const FROZEN_MEMBERS = [
-  'providerId',
-  'getCapabilities',
-  'prepareTurn',
-  'onReadyStateChange',
-  'setResumeCheckpoint',
-  'syncConversationState',
-  'reloadMcpServers',
-  'reloadWorkspaceResources',
-  'ensureReady',
-  'query',
-  'steer',
-  'cancel',
-  'resetSession',
-  'getSessionId',
-  'consumeSessionInvalidation',
-  'isReady',
-  'getSupportedCommands',
-  'getAuxiliaryModel',
-  'cleanup',
-  'rewind',
-  // The six interaction setters were frozen here and are **deleted**, which the
-  // freeze permits and a new member does not: the plan's seam deletion names
-  // "runtime approval/question/plan/subagent callbacks" among what goes. They
-  // were stored by the adapter and acted on by nothing, which is what made them
-  // a seam rather than a capability, and they are one `installInteractions` on
-  // the adapter now — off this contract entirely.
-  //
-  // `setAutoTurnCallback` stayed: the kernel starts turns of its own, and the
-  // surface has to be told about a turn nothing in it asked for.
-  'setAutoTurnCallback',
-  'buildSessionUpdates',
-  'resolveSessionIdForFork',
-];
+/**
+ * The interaction installation, which replaced six contract setters.
+ *
+ * Asserted here because `adapterMemberCoverage.test.ts` is deleted with the
+ * contract it compared against: with the host typed as the adapter rather than
+ * as an interface the adapter structurally satisfied, **the compiler is the
+ * coverage gate** — removing a member or a parameter the tab, the controllers
+ * or the compositions use is now a `npm run typecheck` failure rather than
+ * something a name comparison had to notice. What that file could not notice is
+ * on record in the entry that deleted it: a method with fewer parameters is
+ * assignable to one with more, and two members had quietly dropped one.
+ */
+type AdapterInstallsInteractions =
+  ExecutionChatRuntimeAdapter['installInteractions'] extends
+    (callbacks: ExecutionInteractionCallbacks) => void ? true : false;
 
-describe('ChatRuntime contract freeze', () => {
-  const declared = readInterfaceMembers(CONTRACT_PATH, 'ChatRuntime');
-  const specification = readFileSync(resolve(process.cwd(), SPECIFICATION_PATH), 'utf8');
+const ADAPTER_INSTALLS_INTERACTIONS: AdapterInstallsInteractions = true;
 
-  it('declares exactly the frozen member set', () => {
-    // A failure here means the seam widened. Adding a member is a stop
-    // condition against the migration plan, not a routine change: map it in
-    // the adapter specification first, or land the capability on the new
-    // platform instead.
-    expect([...declared].sort()).toEqual([...FROZEN_MEMBERS].sort());
+describe('ChatRuntime contract deletion', () => {
+  it('installs its interactions off the deleted contract', () => {
+    expect(ADAPTER_INSTALLS_INTERACTIONS).toBe(true);
   });
 
-  it('declares 23 members', () => {
-    // **32 until the seam deletion. Six interaction setters went first, then
-    // the two subagent loaders that nothing implemented.** The count is asserted separately
-    // from the set so a deletion has to be stated twice rather than sliding
-    // through as a list edit — the freeze forbids growth, and a shrink is a
-    // milestone step that should be visible in the diff.
-    expect(declared).toHaveLength(23);
+  it('has no contract file left', () => {
+    expect(existsSync(resolve(process.cwd(), CONTRACT_PATH))).toBe(false);
   });
 
-  it('maps every member in the adapter specification', () => {
-    const unmapped = declared.filter(member => !specification.includes(`\`${member}`));
+  it('is imported or redeclared by no module in production source', () => {
+    // **Imports and declarations, not the word.** Six modules name the deleted
+    // interface in prose, and that prose is the record of what replaced it — a
+    // gate that forbade describing a deletion would be a gate against
+    // explaining the codebase. What this catches is re-entry: something
+    // importing the contract back, or declaring its own under the same name.
+    const reentry = listAllSourceModules({ sourceRoot: SOURCE_ROOT, baseDir: SOURCE_ROOT })
+      .filter((module) => {
+        const source = readFileSync(resolve(SOURCE_ROOT, module), 'utf8');
+        return /^import[^\n]*(?<![A-Za-z])ChatRuntime(?![A-Za-z])/m.test(source)
+          || /^export (interface|type) ChatRuntime(?![A-Za-z])/m.test(source);
+      });
 
-    expect(unmapped).toEqual([]);
+    expect(reentry).toEqual([]);
+  });
+
+  it('keeps the specification that mapped every member', () => {
+    // Retained deliberately. It is the only place that says what each of the
+    // thirty-two became, and a deletion whose record is deleted with it is a
+    // deletion nobody can check afterwards.
+    const specification = readFileSync(resolve(process.cwd(), SPECIFICATION_PATH), 'utf8');
+
+    expect(specification).toContain('`prepareTurn');
+    expect(specification).toContain('`query');
   });
 
   it('leaves no mapping undecided', () => {
     // "unknown" is deliberately not a marker: an honest `indeterminate`
     // outcome is described as unknown, which is a decided verdict.
+    const specification = readFileSync(resolve(process.cwd(), SPECIFICATION_PATH), 'utf8');
     const markers = ['decide later', 'tbd', 'todo', 'to be determined'];
-    // Only table rows carry verdicts. Prose is allowed to name the markers —
-    // the specification says of itself that it has no "decide later" rows.
     const undecided = specification
       .split('\n')
       .filter(line => line.startsWith('|'))

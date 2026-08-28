@@ -22,7 +22,7 @@ import {
   type ProviderId,
   type TitleGenerationService,
 } from '../../../core/providers/types';
-import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
+import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { normalizeProviderError } from '../../../core/runtime/providerError';
 import {
   cloneChatTurnRequest,
@@ -111,7 +111,7 @@ export interface InputControllerDeps {
   generateId: () => string;
   resetInputHeight: () => void;
   getAuxiliaryModel?: () => string | null;
-  getAgentService?: () => ChatRuntime | null;
+  getAgentService?: () => ExecutionChatRuntimeAdapter | null;
   /**
    * This tab's end of the projection execution path, where it has one.
    *
@@ -221,14 +221,16 @@ export class InputController {
     this.deps = deps;
   }
 
-  private getAgentService(): ChatRuntime | null {
+  private getAgentService(): ExecutionChatRuntimeAdapter | null {
     return this.deps.getAgentService?.() ?? null;
   }
 
   private getAuxiliaryModel(): string | null {
-    return this.deps.getAuxiliaryModel?.()
-      ?? this.getAgentService()?.getAuxiliaryModel?.()
-      ?? null;
+    // The tab's answer, and only the tab's: the runtime fallback that used to
+    // sit here reached a member the adapter does not have — absent by contract,
+    // recorded in `adapterMemberCoverage.test.ts` — so it answered `undefined`
+    // for every flipped provider, which is all nine.
+    return this.deps.getAuxiliaryModel?.() ?? null;
   }
 
   private syncInstructionRefineModelOverride(
@@ -662,7 +664,7 @@ export class InputController {
       const finalAssistantMsg = this.activeStreamingAssistantMessage ?? assistantMsg;
       // **From the completion, not from the runtime.** The turn-metadata member
       // this replaces read the same three facts off the same envelopes, one
-      // object further out, and the surface had to ask a `ChatRuntime` for the
+      // object further out, and the surface had to ask a `ExecutionChatRuntimeAdapter` for the
       // half the projection did not bring. `wasSent` and `planCompleted` were
       // already taken from `completed` above; the identities are on it now too.
       userMsg.userMessageId = turnIdentities.userMessageId ?? userMsg.userMessageId;

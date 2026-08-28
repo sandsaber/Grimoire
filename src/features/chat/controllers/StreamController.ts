@@ -7,7 +7,7 @@ import {
   type ProviderId,
   type ProviderSubagentLifecycleAdapter,
 } from '../../../core/providers/types';
-import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
+import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { normalizeProviderError } from '../../../core/runtime/providerError';
 import { parseTodoInput } from '../../../core/tools/todo';
 import { extractResolvedAnswers, extractResolvedAnswersFromResultText } from '../../../core/tools/toolInput';
@@ -102,7 +102,7 @@ export interface StreamControllerDeps {
   getFileContextManager: () => FileContextManager | null;
   updateQueueIndicator: () => void;
   /** Get the agent service from the tab. */
-  getAgentService?: () => ChatRuntime | null;
+  getAgentService?: () => ExecutionChatRuntimeAdapter | null;
   /** Tab-local provider settings used when a usage event omits its model. */
   getActiveProviderSettings?: () => Record<string, unknown>;
   /** True when this tab should treat the final assistant response as an orchestrator plan. */
