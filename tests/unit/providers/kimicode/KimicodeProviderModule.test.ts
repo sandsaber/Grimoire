@@ -20,6 +20,7 @@ import {
 describe('Kimi Code provider module', () => {
   function createContext(): KimicodeWorkspaceContext {
     return {
+      runtimeCommandLoader: () => null,
       commandsPort: () => ({
         listDropdownEntries: async () => [],
         listVaultEntries: async () => [],

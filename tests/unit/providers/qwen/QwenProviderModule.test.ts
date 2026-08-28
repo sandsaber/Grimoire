@@ -23,6 +23,7 @@ import {
 describe('Qwen provider module', () => {
   function createContext(): QwenWorkspaceContext {
     return {
+      runtimeCommandLoader: () => null,
       commandsPort: () => ({
         listDropdownEntries: async () => [],
         listVaultEntries: async () => [],

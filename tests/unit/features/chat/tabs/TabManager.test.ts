@@ -197,6 +197,18 @@ function createMockPlugin(overrides: Record<string, any> = {}): any {
     getApplicationRuntimeOrNull: () => ({
       workspaceFor: async (providerId: string) => ({
         commands: mockCommandCatalogs[providerId] ?? undefined,
+        // The runtime-command row reaches the slot now rather than a registry
+        // accessor, and answers from the same map for the same reason.
+        runtimeCommands: mockRuntimeCommandLoaders[providerId]
+          ? {
+            isAvailable: (settings: unknown) => (
+              mockRuntimeCommandLoaders[providerId].isAvailable(settings)
+            ),
+            loadCommands: (context: unknown) => (
+              mockRuntimeCommandLoaders[providerId].loadCommands(context)
+            ),
+          }
+          : undefined,
       }),
     }),
     ...overrides,
@@ -226,6 +238,26 @@ async function flushMicrotasks(count = 6): Promise<void> {
   for (let i = 0; i < count; i++) {
     await Promise.resolve();
   }
+}
+
+/**
+ * Waits for the call rather than for a fixed number of ticks.
+ *
+ * These asserted after `flushMicrotasks(6)`, which is a guess about how many
+ * awaits the path takes — and it stopped being right the moment the runtime
+ * command row started reaching its provider through
+ * `ApplicationRuntime.workspaceFor`, which is one promise deeper than the
+ * registry accessor it replaced. A count that has to be re-guessed after every
+ * refactor is not a wait.
+ */
+async function waitForCall(mock: jest.Mock, label: string): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (mock.mock.calls.length > 0) {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`Timed out waiting for ${label}.`);
 }
 
 function createMockTabData(overrides: Record<string, any> = {}): any {
@@ -1822,12 +1854,55 @@ describe('TabManager - SDK Commands', () => {
     });
 
     const tab = await manager.createTab();
-    await flushMicrotasks();
+    await waitForCall(runtimeCommandLoader.loadCommands, 'the tab to prime its commands');
 
     expect(runtimeCommandLoader.loadCommands).toHaveBeenCalledTimes(1);
     expect(mockCatalog.setRuntimeCommands).toHaveBeenLastCalledWith(supportedCommands);
     expect(tab!.lifecycleState).toBe('blank');
     expect(tab!.serviceInitialized).toBe(false);
+  });
+
+  it('does not prime a provider whose command discovery says it is unavailable', async () => {
+    // **This was uncovered.** The availability check moved from a registry
+    // accessor to the workspace slot, and replacing it with `true` broke
+    // nothing — a check nothing asserts is a check that can be deleted by
+    // accident. A disabled provider must not have a session opened to list
+    // commands it cannot serve.
+    const mockCatalog = { setRuntimeCommands: jest.fn() };
+    const runtimeCommandLoader = {
+      isAvailable: jest.fn().mockReturnValue(false),
+      loadCommands: jest.fn().mockResolvedValue([]),
+    };
+    ProviderWorkspaceRegistry.setServices('opencode', {
+      commandCatalog: mockCatalog as any,
+      runtimeCommandLoader: runtimeCommandLoader,
+    });
+    mockGetCapabilities.mockImplementation((providerId: string) => ({
+      providerId,
+      supportsPersistentRuntime: true,
+      supportsNativeHistory: true,
+      supportsPlanMode: false,
+      supportsRewind: false,
+      supportsFork: false,
+      supportsProviderCommands: providerId === 'opencode',
+      reasoningControl: 'none',
+    }));
+    const manager = createManager({
+      plugin: createMockPlugin(),
+      tabFactory: () => createMockTabData({
+        id: 'tab-opencode',
+        providerId: 'opencode',
+        draftModel: 'opencode:openai/gpt-5',
+        lifecycleState: 'blank',
+        ui: { externalContextSelector: { getExternalContexts: jest.fn().mockReturnValue([]) } },
+      }),
+    });
+
+    await manager.createTab();
+    await flushMicrotasks(20);
+
+    expect(runtimeCommandLoader.isAvailable).toHaveBeenCalled();
+    expect(runtimeCommandLoader.loadCommands).not.toHaveBeenCalled();
   });
 
   it('should prime the active restored OpenCode conversation tab automatically', async () => {
@@ -1878,7 +1953,7 @@ describe('TabManager - SDK Commands', () => {
     });
 
     await manager.createTab('conv-opencode', 'tab-opencode-restored', { activate: false });
-    await flushMicrotasks();
+    await waitForCall(runtimeCommandLoader.loadCommands, 'the tab to prime its commands');
 
     expect(runtimeCommandLoader.loadCommands).toHaveBeenCalledTimes(1);
     expect(mockCatalog.setRuntimeCommands).toHaveBeenLastCalledWith(supportedCommands);
@@ -1932,7 +2007,7 @@ describe('TabManager - SDK Commands', () => {
     });
 
     await manager.createTab('conv-opencode', 'tab-opencode-pre-session', { activate: false });
-    await flushMicrotasks();
+    await waitForCall(runtimeCommandLoader.loadCommands, 'the tab to prime its commands');
 
     expect(runtimeCommandLoader.loadCommands).toHaveBeenCalledTimes(1);
     expect(mockCatalog.setRuntimeCommands).toHaveBeenLastCalledWith(supportedCommands);

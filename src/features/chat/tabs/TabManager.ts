@@ -5,7 +5,6 @@ import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderCommandsPort } from '../../../core/providers/ProviderModule';
 import type { ProviderWarmupMode } from '../../../core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderId,
 } from '../../../core/providers/types';
@@ -1050,7 +1049,8 @@ export class TabManager implements TabManagerInterface {
       return [];
     }
 
-    const runtimeCommandLoader = ProviderWorkspaceRegistry.getRuntimeCommandLoader(providerId);
+    const runtimeCommandsPort = await this.runtimeCommandsPortFor(providerId);
+    const runtimeCommandLoader = runtimeCommandsPort?.loadCommands ? runtimeCommandsPort : null;
     const context = await this.buildProviderWarmupContext(targetTab, providerId);
     // Read after the warm-up context, not before it: building the workspace is
     // asynchronous now, and an await placed ahead of the lifecycle checks lets
@@ -1098,7 +1098,7 @@ export class TabManager implements TabManagerInterface {
     providerId: ProviderId,
     warmupContext?: ProviderWarmupContext,
   ): Promise<SlashCommand[]> {
-    if (!this.isProviderCommandLoaderAvailable(providerId)) {
+    if (!await this.isProviderCommandLoaderAvailable(providerId)) {
       return [];
     }
 
@@ -1140,10 +1140,21 @@ export class TabManager implements TabManagerInterface {
     void this.prewarmProviderTab(tab).catch(() => {});
   }
 
-  private isProviderCommandLoaderAvailable(providerId: ProviderId): boolean {
-    const loader = ProviderWorkspaceRegistry.getRuntimeCommandLoader(providerId);
-    if (!loader) return false;
-    return loader.isAvailable(this.plugin.settings);
+  private async isProviderCommandLoaderAvailable(providerId: ProviderId): Promise<boolean> {
+    const port = await this.runtimeCommandsPortFor(providerId);
+    return port?.isAvailable?.(this.plugin.settings) ?? false;
+  }
+
+  /**
+   * This provider's runtime-command slot, through the application.
+   *
+   * The registry accessor this replaces was the host reaching into a provider's
+   * workspace services by id. The slot carries the same two members, and the
+   * policy they are called with is the host's — which is what let them move.
+   */
+  private async runtimeCommandsPortFor(providerId: ProviderId) {
+    return (await this.plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId))
+      ?.runtimeCommands;
   }
 
   private async prewarmProviderTab(tab: TabData): Promise<void> {
@@ -1272,8 +1283,8 @@ export class TabManager implements TabManagerInterface {
     context: ProviderCommandContext,
   ): Promise<SlashCommand[]> {
     const catalog = await this.commandsPortFor(providerId);
-    const loader = ProviderWorkspaceRegistry.getRuntimeCommandLoader(providerId);
-    if (!catalog || !loader) {
+    const loader = await this.runtimeCommandsPortFor(providerId);
+    if (!catalog || !loader?.loadCommands) {
       return [];
     }
     const commands = await loader.loadCommands({

@@ -13,6 +13,7 @@ import type {
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 
+import type { ProviderRuntimeCommandLoader } from '../../core/providers/types';
 import { isRecord } from '../../utils/records';
 import { chatUiContributionFor } from '../shared/chatUiContribution';
 import { settingsReconciliationFor } from '../shared/settingsReconciliation';
@@ -99,6 +100,7 @@ export interface QwenWorkspaceContext {
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   mcpPort(): ProviderMcpPort;
+  runtimeCommandLoader(): ProviderRuntimeCommandLoader | null;
   renderSettingsTab(host: unknown): void;
   hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
   deleteConversationSession(conversationId: string): Promise<void>;
@@ -276,6 +278,11 @@ QwenProviderSettings
         // session announces.
         runtimeCommands: {
           listForSession: sessionId => context.listSessionCommands(sessionId),
+          // Read afresh, so a workspace rebuilt behind the tab is the one asked.
+          isAvailable: settings => context.runtimeCommandLoader()?.isAvailable(settings) ?? false,
+          loadCommands: async loaderContext => (
+            await context.runtimeCommandLoader()?.loadCommands(loaderContext) ?? []
+          ),
         },
         agentMentions: {
           list: () => context.listAgentMentions(),

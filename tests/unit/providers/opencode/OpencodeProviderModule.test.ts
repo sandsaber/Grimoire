@@ -20,6 +20,7 @@ import {
 describe('OpenCode provider module', () => {
   function createContext(): OpencodeWorkspaceContext {
     return {
+      runtimeCommandLoader: () => null,
       commandsPort: () => ({
         listDropdownEntries: async () => [],
         listVaultEntries: async () => [],

@@ -4,6 +4,7 @@ import type { ManagedMcpServer } from '../types/mcp';
 import type { ProviderId } from '../types/provider';
 import type { ProviderCommandEntry } from './commands/ProviderCommandEntry';
 import type {
+  ProviderRuntimeCommandLoaderContext,
   ProviderSubagentLifecycleAdapter,
   ProviderTaskResultInterpreter,
 } from './types';
@@ -468,6 +469,25 @@ export interface ProviderUsageWindow {
 
 export interface ProviderRuntimeCommandsPort {
   listForSession(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
+  /**
+   * Whether this provider can be asked for commands at all.
+   *
+   * Absent where the provider has no discovery beyond the open session — five
+   * of the nine. The four that have one are the managed ACP CLIs, which
+   * announce their commands when a session opens and can be asked in an
+   * isolated process when there is no session to ask in.
+   */
+  isAvailable?(settings: Record<string, unknown>): boolean;
+  /**
+   * The commands a tab can offer, given what the *host* knows about it.
+   *
+   * **Every input is the host's**: whether opening a session is allowed, which
+   * conversation the tab is on, and the tab's runtime. That is what makes this
+   * a slot rather than something reachable only through a registry — the
+   * context named a plugin until the provider's metadata call moved into a
+   * closure its own workspace services build it with.
+   */
+  loadCommands?(context: ProviderRuntimeCommandLoaderContext): Promise<SlashCommand[]>;
 }
 
 

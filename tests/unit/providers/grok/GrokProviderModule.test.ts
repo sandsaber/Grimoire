@@ -20,6 +20,7 @@ import {
 describe('Grok provider module', () => {
   function createContext(): GrokWorkspaceContext {
     return {
+      runtimeCommandLoader: () => null,
       commandsPort: () => ({
         listDropdownEntries: async () => [],
         listVaultEntries: async () => [],

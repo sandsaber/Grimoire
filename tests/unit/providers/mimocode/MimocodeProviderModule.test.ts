@@ -20,6 +20,7 @@ import {
 describe('MiMoCode provider module', () => {
   function createContext(): MimocodeWorkspaceContext {
     return {
+      runtimeCommandLoader: () => null,
       commandsPort: () => ({
         listDropdownEntries: async () => [],
         listVaultEntries: async () => [],

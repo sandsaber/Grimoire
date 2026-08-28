@@ -20,6 +20,7 @@ import {
 describe('Claude provider module', () => {
   function createContext(): ClaudeWorkspaceContext {
     return {
+      runtimeCommandLoader: () => null,
       commandsPort: () => ({
         listDropdownEntries: async () => [],
         listVaultEntries: async () => [],

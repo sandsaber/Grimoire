@@ -10445,6 +10445,32 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the runtime command row reaches its provider through the module (`this commit`)
+
+- Gates: unit 8751 passed, 8751 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **`getRuntimeCommandLoader` leaves `TabManager`; the registries fall 16 → 15.**
+  `ProviderRuntimeCommandsPort` was `listForSession(sessionId)` alone — the narrow reshape that was
+  tried first and recorded as not fitting, because discovery may *start* a short-lived session and
+  the host decides when that is allowed. It carries the row's two members beside it now, both
+  optional: five of the nine providers have no discovery beyond the open session.
+- What made the reshape possible is the entry below — the loader's context giving up its plugin. It
+  named one so a provider could reach its own metadata session, and that call is a closure the
+  provider's workspace services capture. **Every input the context has left is the host's**, which is
+  what a slot can be called with.
+- `docs/provider-row-slot-fit.md` moves the row to `reshaped` with the slot's real member count, and
+  its "what blocks it" cell — *"The seam. Its context carries a `ChatRuntime` … and its fallback
+  reaches `plugin.getXExecution()`"* — is marked resolved rather than deleted.
+- **Two test problems found on the way, both worth keeping:**
+  - four priming tests asserted after `flushMicrotasks(6)`, a guess about how many awaits the path
+    takes — and reaching a provider through `workspaceFor` is one promise deeper than the registry
+    accessor was. They wait for the call now, with a stated timeout. A tick count that has to be
+    re-guessed after every refactor is not a wait;
+  - **the availability check was covered by nothing.** Replacing
+    `port?.isAvailable?.(settings)` with `true` left the suite green — so a disabled provider having
+    a session opened to list commands it cannot serve would have shipped silently. There is a test
+    for it now, and that replacement fails it.
+
 ### M5 — the command loader stops asking for a plugin (`this commit`)
 
 - Gates: unit 8750 passed, 8750 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;

@@ -13,6 +13,7 @@ import type {
   ProviderPlanUsage,
   ProviderPlanUsageContext,
   ProviderPlanUsageProvider,
+  ProviderRuntimeCommandLoader,
 } from '../../core/providers/types';
 import type { ProviderId } from '../../core/types/provider';
 import type GrimoirePlugin from '../../main';
@@ -64,6 +65,7 @@ export interface WorkspaceContextServices {
    */
   readonly commandCatalog?: ProviderCommandsPort | null;
   readonly mcpStorage?: AppMcpStorage | null;
+  readonly runtimeCommandLoader?: ProviderRuntimeCommandLoader | null;
   readonly modelCatalog?: ProviderModelCatalog | null;
   readonly refreshAgentMentions?: () => Promise<void>;
   readonly usageProvider?: ProviderPlanUsageProvider | null;
@@ -95,6 +97,12 @@ export interface WorkspaceContextSlots {
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   /** The provider's MCP storage, read afresh on every call. See `commandsPort`. */
   mcpPort(): ProviderMcpPort;
+  /**
+   * Listing commands for a tab that may have no session, or `null` where the
+   * provider has no such discovery. Read afresh, for the reason `commandsPort`
+   * gives.
+   */
+  runtimeCommandLoader(): ProviderRuntimeCommandLoader | null;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   refreshAgentMentions(): Promise<void>;
@@ -179,6 +187,8 @@ export function createWorkspaceContextSlots(
     }),
 
     listModels: async () => models(),
+
+    runtimeCommandLoader: () => services()?.runtimeCommandLoader ?? null,
 
     mcpPort: () => ({
       load: async () => await services()?.mcpStorage?.load() ?? [],

@@ -249,7 +249,12 @@ const SEARCHES: readonly DeletionSearch[] = [
     // is `undefined` and every suite importing Claude fails to load. The
     // registry's indirection is breaking that cycle, which is a reason to keep
     // it that no reading of the call site would have shown.
-    files: 16,
+    // **15.** `TabManager` left it: the runtime command row reaches
+    // `workspaceFor(providerId).runtimeCommands` now, which carries the loader's
+    // two members beside `listForSession`. What made that possible was the
+    // loader's context giving up its plugin — every input it has left is the
+    // host's own.
+    files: 15,
     closedBy: 'the provider rows, when the last consumer of each has moved',
   },
 ];
@@ -291,7 +296,7 @@ describe('structural deletion progress', () => {
       'SubagentManager lifecycle: 2',
       'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
-      'the registries — one left: 16',
+      'the registries — one left: 15',
     ]);
     // Six of twelve are zero: two closed in the 2026-08-27 session, the
     // interaction callbacks closed with the first step of the seam deletion,
