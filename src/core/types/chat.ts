@@ -218,7 +218,7 @@ export interface SessionMetadata {
  * Providers may keep provider-native turn metadata internally and expose it via
  * runtime methods instead of encoding it as stream-control chunks.
  */
-export type StreamChunk = ChatContentItem | ChatTurnLifecycleChunk;
+export type StreamChunk = ChatContentItem | ChatTurnFailureChunk;
 
 /**
  * What a provider is *saying*, as a surface draws it.
@@ -247,8 +247,32 @@ export type ChatContentItem =
     items?: ProgressItem[];
     append?: boolean;
   }
-  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'tool_result'; id: string; content: string; isError?: boolean; toolUseResult?: SDKToolUseResult }
+  | {
+    type: 'tool_use';
+    id: string;
+    name: string;
+    input: Record<string, unknown>;
+    /**
+     * The subagent whose work this is, when it is not the turn's own.
+     *
+     * **A field rather than a second variant.** There were two more members
+     * here, `subagent_tool_use` and `subagent_tool_result`, identical to these
+     * apart from this id — so a neutral union carried a provider's word for
+     * "subagent" twice, and every consumer had to know that a subagent's tool
+     * call is a different kind of thing from a tool call. It is the same thing,
+     * belonging to something else.
+     */
+    subagentId?: string;
+  }
+  | {
+    type: 'tool_result';
+    id: string;
+    content: string;
+    isError?: boolean;
+    toolUseResult?: SDKToolUseResult;
+    /** The subagent whose work this is, when it is not the turn's own. */
+    subagentId?: string;
+  }
   | { type: 'tool_output'; id: string; content: string }
   | { type: 'notice'; content: string; level?: 'info' | 'warning' }
   | {
@@ -259,28 +283,27 @@ export type ChatContentItem =
     usageScope?: 'parent' | 'aggregate';
   }
   | { type: 'context_compacted' }
-  | { type: 'async_subagent_result'; agentId: string; status: 'completed' | 'error'; result?: string }
-  | { type: 'subagent_tool_use'; subagentId: string; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'subagent_tool_result'; subagentId: string; id: string; content: string; isError?: boolean; toolUseResult?: SDKToolUseResult };
+  | { type: 'async_subagent_result'; agentId: string; status: 'completed' | 'error'; result?: string };
 
 /**
- * The turn's shape, as the legacy stream had to signal it inline.
+ * A turn's failure, said in the stream because one path has nowhere else to say it.
  *
- * Every one of these is something the execution projection now states as a
- * fact: a turn starts because a run started, it ends because the run reached a
- * terminal, a failure is that terminal's reason, and the thinking indicator
- * follows the run's state. They are the variants the M5 seam deletion removes,
- * which is why they are named apart from the content that stays.
+ * **What is left of the five variants the legacy stream used to signal a turn's
+ * shape with**, each of which the execution projection states as a fact
+ * instead: a turn starts because a run started, ends because the run reached a
+ * terminal, and the thinking indicator follows the run's state. Four are
+ * deleted — the two message boundaries with their last emitters, `status` with
+ * a `StreamController` case and two metrics arms, and the turn-ended variant,
+ * whose only emitter was Codex's router and whose only reader was Codex's own
+ * presenter filtering it back out.
  *
- * **One left.** The turn-ended variant is gone: the only emitter was Codex's
- * router and the only reader was Codex's own presenter, filtering it out again
- * before anything saw it. What remains is a failure, and it is not dead the way
- * that one was — the auto-turn path, which renders a turn the backend started
- * rather than one a surface asked for, has no projection to read a terminal off
- * and carries the failure in the stream. It goes when that path does.
+ * This one is not dead the same way. The auto-turn path renders a turn the
+ * *backend* started rather than one a surface asked for, so it has no
+ * projection to read a terminal off and carries the failure in the stream. It
+ * goes when that path does — and it is named for what it is rather than for the
+ * category it is the last of, because a one-member category is a leftover.
  */
-export type ChatTurnLifecycleChunk =
-  | { type: 'error'; content: string };
+export type ChatTurnFailureChunk = { type: 'error'; content: string };
 
 /**
  * Context window usage information.

@@ -254,7 +254,7 @@ describe('transformSDKMessage', () => {
 
       expect(results).toEqual([
         {
-          type: 'subagent_tool_use',
+          type: 'tool_use',
           subagentId: 'parent-tool-abc',
           id: 'child-tool-1',
           name: 'Read',
@@ -385,7 +385,7 @@ describe('transformSDKMessage', () => {
 
       expect(results).toEqual([
         {
-          type: 'subagent_tool_result',
+          type: 'tool_result',
           subagentId: 'tool-123',
           id: 'tool-123',
           content: 'File contents here',
@@ -405,7 +405,7 @@ describe('transformSDKMessage', () => {
       const results = [...transformSDKMessage(message)];
 
       expect(results.length).toBe(1);
-      expect(results[0].type).toBe('subagent_tool_result');
+      expect(results[0].type).toBe('tool_result');
       expect((results[0] as any).content).toContain('"status": "success"');
     });
 
@@ -424,7 +424,7 @@ describe('transformSDKMessage', () => {
 
       expect(results).toEqual([
         {
-          type: 'subagent_tool_result',
+          type: 'tool_result',
           subagentId: 'tool-123',
           id: 'tool-123',
           content: 'Agent completed successfully.\nSaved summary to notes.md',

@@ -271,47 +271,39 @@ const SEARCHES: readonly DeletionSearch[] = [
     closedBy: 'closed — the barrier writes the binding in the same write as the answer',
   },
   {
-    // **Narrowed to the half that goes**, which is what the split was for.
-    // `StreamChunk` is `ChatContentItem | ChatTurnLifecycleChunk`, and the
-    // content half was given its own name precisely so this search could stop
-    // finding it — the type's own comment says so, and this entry's `closedBy`
-    // has always said "the content type keeps its own name". Searching for the
-    // union alias counted every content consumer, and could never reach zero.
+    // **5 → 3, and the pattern's first term now finds nothing.**
+    // `ChatTurnLifecycleChunk` was a category with one member left, which is a
+    // leftover: the type is `ChatTurnFailureChunk`, named for what it is. That
+    // last variant is still live — the auto-turn path renders a turn the
+    // *backend* started, so it has no projection to read a terminal off and
+    // carries the failure in the stream — and it goes when that path does.
+    //
+    // **Two of the three subagent variants went too, and they were not
+    // content's to keep.** `subagent_tool_use` and `subagent_tool_result` were
+    // `tool_use` and `tool_result` with a `subagentId` — the same fields, the
+    // same rendering — so a neutral union carried a provider's word for
+    // "subagent" twice and every consumer had to know that a subagent's tool
+    // call is a different kind of thing from a tool call. It is the same thing
+    // belonging to something else, so the ownership is a field and the two
+    // variants are deleted.
+    //
+    // **What is left is `async_subagent_result` in three files, and it is a
+    // product question rather than a leftover.** It says a background agent
+    // finished, and Claude is the only provider that has one — the only
+    // `progressObservation: 'full'` in the catalog, and the only emitter. So a
+    // one-provider feature sits in a provider-neutral union, which the root
+    // instructions say belongs in core only when two providers need it. It
+    // cannot be replaced by the durable records, which are *downstream* of it:
+    // this chunk is what tells the manager an agent ended, and the recorder
+    // writes the record from that. What would move it is a provider port for an
+    // out-of-band agent terminal, and the slot Codex and Grok fill —
+    // `subagentLifecycle` — is not it: that adapter recognizes tool *names*,
+    // and a terminal notification is not one.
     what: 'StreamChunk and the subagent chunk vocabulary',
     pattern: /\bChatTurnLifecycleChunk\b|async_subagent_result|subagent_tool_(use|result)/,
-    // **Still 5, and the count is right — three of the union's five variants
-    // are gone and no file stopped naming it.** `user_message_start` and
-    // `assistant_message_start` were deleted with their last two emitters, the
-    // ACP normalizer and the Codex router; `status` had no emitter at all, only
-    // a `StreamController` case and two `TurnFeedbackMetrics` arms, which went
-    // with it.
-    //
-    // **`done` is the fourth, and the count still says 5 — which is the honest
-    // answer, because no file stopped naming the union.** It had been reaching
-    // nobody: the only emitter was Codex's notification router and the only
-    // reader was Codex's own presenter, filtering it back out before anything
-    // saw it, with Claude's presenter filtering a chunk its transform never
-    // emitted. The projection path says a turn ended by calling the column's
-    // `finishTurn`.
-    //
-    // **What that dead variant was hiding.** Nine live-smoke suites asserted
-    // one such chunk on the column as a matrix row, which that path cannot
-    // deliver, and their fake column implemented neither `finishTurn` nor
-    // `renderTurnFailure` — so the render target's call would have thrown.
-    // Both are fixed; the rows count what the column was actually told.
-    //
-    // **This search cannot reach zero as written, and that is a finding about
-    // the search.** Three of its four patterns name the subagent chunk
-    // vocabulary, which is `ChatContentItem` — Claude's transform emits those
-    // three and `StreamController` draws them. Durable agents cannot take them
-    // over for the reason the `subagent hooks and loaders` row already
-    // recorded: an `AgentResultRecord` carries no tool calls. The fifth
-    // variant, `error`, is live on the auto-turn path, which renders a turn the
-    // backend started rather than one a surface asked for and so has no
-    // projection to read a terminal off.
-    files: 5,
-    closedBy: 'the auto-turn path — the last lifecycle variant is its failure '
-      + 'channel; the three subagent variants are content and are not going',
+    files: 3,
+    closedBy: 'a provider port for an out-of-band agent terminal, or a second '
+      + 'provider growing background agents — the shape is unproven with one',
   },
   {
     what: 'the registries',
@@ -389,7 +381,7 @@ describe('structural deletion progress', () => {
     // Printed by being asserted, like the live-matrix summary: a reader who
     // wants "what is left" reads this line rather than eleven assertions.
     expect(remaining.map(search => `${search.what}: ${search.files}`)).toEqual([
-      'StreamChunk and the subagent chunk vocabulary: 5',
+      'StreamChunk and the subagent chunk vocabulary: 3',
     ]);
     // **Eleven of twelve are zero.** The one that is not is not blocked, and
     // its entry says why: three of its four patterns name the subagent chunk

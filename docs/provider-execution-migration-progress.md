@@ -10450,6 +10450,36 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the subagent chunk vocabulary, 5 → 3 (`this commit`)
+
+**Two of the three subagent variants were not content's to keep, and the lifecycle category had one
+member left.** Re-reading this row the way the one below it was re-read found both.
+
+- Gates: unit 8749 passed, 8749 total (554 suites); integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- **`subagent_tool_use` and `subagent_tool_result` are deleted.** They were `tool_use` and
+  `tool_result` with a `subagentId` — the same fields, the same rendering — so a provider-neutral
+  union carried a provider's word for "subagent" twice and every consumer had to know that a
+  subagent's tool call is a different kind of thing from a tool call. It is the same thing belonging
+  to something else. The ownership is an optional field on the two chunks that already existed, the
+  column asks whose work it is before what it is, and Claude's transform emits one type either way.
+  Proven by deleting the ownership branch: three `StreamController` tests fail.
+- **`ChatTurnLifecycleChunk` is `ChatTurnFailureChunk`.** A category with one member is a leftover;
+  the type is named for what it is. The variant itself is still live on the auto-turn path, which
+  renders a turn the *backend* started and so has no projection to read a terminal off.
+- **What is left is `async_subagent_result`, in three files, and it is a product question rather
+  than a leftover.** It says a background agent finished, and Claude is the only provider that has
+  one — the only `progressObservation: 'full'` in the catalog, and the only emitter. So a
+  one-provider feature sits in a neutral union, which the root instructions say belongs in core only
+  when two providers need it. It **cannot** be replaced by the durable records, which are downstream
+  of it: this chunk is what tells the manager an agent ended, and the recorder writes the record from
+  that. Nor does the slot Codex and Grok fill take it — `subagentLifecycle` recognizes tool *names*,
+  and a terminal notification is not one. What moves it is a provider port for an out-of-band agent
+  terminal, or a second provider growing background agents, because the shape is unproven with one.
+
+**Eleven of twelve searches are zero.** The twelfth is 3, with a `closedBy` that names a design
+question rather than a milestone.
+
 ### M5 — `SubagentManager lifecycle` closes, and the blocker was a type (`this commit`)
 
 **Eleven of twelve searches are zero.** This entry had said twice, at length, that the row could not

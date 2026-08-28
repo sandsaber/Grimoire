@@ -211,6 +211,17 @@ export class StreamController {
         break;
 
       case 'tool_use': {
+        // **Whose work it is, before what it is.** A tool call belonging to a
+        // subagent is drawn inside that subagent's block rather than in the
+        // turn, and it used to arrive as its own chunk type; it is the same
+        // chunk with an owner now, so the ownership question is asked first and
+        // everything below is about the turn's own calls.
+        const owner = chunk.subagentId;
+        if (owner !== undefined) {
+          this.deps.onSubagentActivityDetected?.();
+          await this.handleSubagentChunk({ ...chunk, subagentId: owner }, msg);
+          break;
+        }
         if (state.currentThinkingState) {
           await this.finalizeCurrentThinkingBlock(msg);
         }
@@ -245,15 +256,15 @@ export class StreamController {
       }
 
       case 'tool_result': {
+        const owner = chunk.subagentId;
+        if (owner !== undefined) {
+          this.deps.onSubagentActivityDetected?.();
+          await this.handleSubagentChunk({ ...chunk, subagentId: owner }, msg);
+          break;
+        }
         await this.handleToolResult(chunk, msg);
         break;
       }
-
-      case 'subagent_tool_use':
-      case 'subagent_tool_result':
-        this.deps.onSubagentActivityDetected?.();
-        await this.handleSubagentChunk(chunk, msg);
-        break;
 
       case 'async_subagent_result':
         await this.handleAsyncSubagentResult(chunk, msg);
@@ -1411,7 +1422,7 @@ export class StreamController {
   }
 
   private async handleSubagentChunk(
-    chunk: Extract<StreamChunk, { type: 'subagent_tool_use' | 'subagent_tool_result' }>,
+    chunk: Extract<StreamChunk, { type: 'tool_use' | 'tool_result' }> & { subagentId: string },
     msg: ChatMessage,
   ): Promise<void> {
     const parentToolUseId = chunk.subagentId;
@@ -1429,7 +1440,7 @@ export class StreamController {
     }
 
     switch (chunk.type) {
-      case 'subagent_tool_use': {
+      case 'tool_use': {
         const toolCall: ToolCallInfo = {
           id: chunk.id,
           name: chunk.name,
@@ -1442,7 +1453,7 @@ export class StreamController {
         break;
       }
 
-      case 'subagent_tool_result': {
+      case 'tool_result': {
         const toolCall = subagentState.info.toolCalls.find((tc: ToolCallInfo) => tc.id === chunk.id);
         if (toolCall) {
           const normalizedContent = this.normalizeToolResultContent(chunk.content);

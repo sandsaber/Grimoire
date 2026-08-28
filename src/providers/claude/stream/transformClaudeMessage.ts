@@ -20,18 +20,29 @@ function getToolInput(input: unknown): Record<string, unknown> {
   return input as Record<string, unknown>;
 }
 
+/**
+ * A tool call, and whose it is.
+ *
+ * **One chunk type either way now.** A subagent's call used to be its own
+ * variant of the neutral union — the same fields plus this id — so the column
+ * had to know that a subagent's tool call is a different kind of thing from a
+ * tool call. It is the same thing, belonging to something else, and the
+ * ownership is a field.
+ */
 function emitToolUse(parentToolUseId: string | null, fields: ToolUseFields): StreamChunk {
-  if (parentToolUseId === null) {
-    return { type: 'tool_use', ...fields };
-  }
-  return { type: 'subagent_tool_use', subagentId: parentToolUseId, ...fields };
+  return {
+    type: 'tool_use',
+    ...fields,
+    ...(parentToolUseId === null ? {} : { subagentId: parentToolUseId }),
+  };
 }
 
 function emitToolResult(parentToolUseId: string | null, fields: ToolResultFields): StreamChunk {
-  if (parentToolUseId === null) {
-    return { type: 'tool_result', ...fields };
-  }
-  return { type: 'subagent_tool_result', subagentId: parentToolUseId, ...fields };
+  return {
+    type: 'tool_result',
+    ...fields,
+    ...(parentToolUseId === null ? {} : { subagentId: parentToolUseId }),
+  };
 }
 
 function normalizeTaskNotificationStatus(status: unknown): AsyncSubagentResultStatus {

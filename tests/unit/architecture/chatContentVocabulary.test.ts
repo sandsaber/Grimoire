@@ -45,7 +45,9 @@ const CHAT_TYPES = 'src/core/types/chat.ts';
  *
  * `error` is the one left, and it is not dead the same way: the auto-turn path
  * renders a turn the backend started rather than one a surface asked for, and
- * it has no projection to read a terminal off.
+ * it has no projection to read a terminal off. With one variant remaining the
+ * union is named `ChatTurnFailureChunk` — for what it is, rather than for the
+ * category it is the last of, because a one-member category is a leftover.
  *
  * This list may shrink and never grow: a variant added back is a fact the
  * projection owns being restated on the content channel.
@@ -88,7 +90,7 @@ describe('chat content vocabulary', () => {
   const source = read(CHAT_TYPES);
 
   it('names the lifecycle half as exactly what the projection replaced', () => {
-    expect(variantsOf(source, 'ChatTurnLifecycleChunk').sort())
+    expect(variantsOf(source, 'ChatTurnFailureChunk').sort())
       .toEqual([...LIFECYCLE_VARIANTS].sort());
   });
 

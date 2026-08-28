@@ -4,7 +4,7 @@ export {
   type AssistantTextPhase,
   type ChatContentItem,
   type ChatMessage,
-  type ChatTurnLifecycleChunk,
+  type ChatTurnFailureChunk,
   type ContentBlock,
   type Conversation,
   type ConversationMeta,

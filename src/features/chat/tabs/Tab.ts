@@ -1942,13 +1942,14 @@ function isVisibleAutoTurnChunk(chunk: StreamChunk, hiddenToolIds: Set<string>):
     case 'error':
     case 'tool_output':
     case 'context_compacted':
-    case 'subagent_tool_use':
-    case 'subagent_tool_result':
       return true;
     case 'tool_use':
-      return chunk.name !== TOOL_AGENT_OUTPUT;
+      // A subagent's own call is visible whatever it is called: the hidden
+      // names below are the turn's own plumbing, and a subagent's block is
+      // drawn from its calls.
+      return chunk.subagentId !== undefined || chunk.name !== TOOL_AGENT_OUTPUT;
     case 'tool_result':
-      return !hiddenToolIds.has(chunk.id);
+      return chunk.subagentId !== undefined || !hiddenToolIds.has(chunk.id);
     default:
       return false;
   }

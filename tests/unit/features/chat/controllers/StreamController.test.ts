@@ -1398,7 +1398,7 @@ describe('StreamController - Text Content', () => {
       });
 
       await controller.handleStreamChunk(
-        { type: 'subagent_tool_result', id: 'read-1', subagentId: 'task-1', content: 'file content' },
+        { type: 'tool_result', id: 'read-1', subagentId: 'task-1', content: 'file content' },
         msg
       );
 
@@ -1418,7 +1418,7 @@ describe('StreamController - Text Content', () => {
       });
 
       await controller.handleStreamChunk(
-        { type: 'subagent_tool_use', id: 'grep-1', name: 'Grep', input: { pattern: 'test' }, subagentId: 'task-1' },
+        { type: 'tool_use', id: 'grep-1', name: 'Grep', input: { pattern: 'test' }, subagentId: 'task-1' },
         msg
       );
 
@@ -1435,7 +1435,7 @@ describe('StreamController - Text Content', () => {
       (deps.subagentManager.getSyncSubagent as jest.Mock).mockReturnValueOnce(undefined);
 
       await controller.handleStreamChunk(
-        { type: 'subagent_tool_use', id: 'orphan-read', name: 'Read', input: { file_path: 'test.md' }, subagentId: 'unknown-task' },
+        { type: 'tool_use', id: 'orphan-read', name: 'Read', input: { file_path: 'test.md' }, subagentId: 'unknown-task' },
         msg
       );
 
@@ -1710,7 +1710,7 @@ describe('StreamController - Text Content', () => {
 
       // Child chunk arrives with parentToolUseId - should trigger render
       await controller.handleStreamChunk(
-        { type: 'subagent_tool_use', id: 'read-1', name: 'Read', input: { file_path: 'test.md' }, subagentId: 'task-1' },
+        { type: 'tool_use', id: 'read-1', name: 'Read', input: { file_path: 'test.md' }, subagentId: 'task-1' },
         msg
       );
 
@@ -1741,7 +1741,7 @@ describe('StreamController - Text Content', () => {
 
       // Child chunk arrives - renderPendingTask returns null but shouldn't crash
       await controller.handleStreamChunk(
-        { type: 'subagent_tool_use', id: 'read-1', name: 'Read', input: { file_path: 'test.md' }, subagentId: 'task-1' },
+        { type: 'tool_use', id: 'read-1', name: 'Read', input: { file_path: 'test.md' }, subagentId: 'task-1' },
         msg
       );
 
