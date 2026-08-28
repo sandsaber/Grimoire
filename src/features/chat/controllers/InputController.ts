@@ -524,6 +524,8 @@ export class InputController {
     let wasInterrupted = false;
     let didEnqueueToSdk = false;
     let planCompleted = false;
+    /** What the provider addressed this turn by, as the completion reports it. */
+    let turnIdentities: { userMessageId?: string; assistantMessageId?: string } = {};
 
     // Lazy initialization: ensure service is ready before first query
     if (this.deps.ensureServiceInitialized) {
@@ -614,6 +616,10 @@ export class InputController {
       userMsg = findMessage(state.messages, userMsg.id) ?? userMsg;
       assistantMsg = findMessage(state.messages, completed.assistantMessageId) ?? assistantMsg;
       this.activeStreamingAssistantMessage = assistantMsg;
+      turnIdentities = {
+        ...(completed.userMessageId ? { userMessageId: completed.userMessageId } : {}),
+        ...(completed.assistantMessageId ? { assistantMessageId: completed.assistantMessageId } : {}),
+      };
     } catch (error) {
       plugin.recordDebugLog?.({
         data: {
@@ -654,11 +660,14 @@ export class InputController {
       // conversation switch stuck on "Steering…" for the life of the tab.
       const invalidated = state.streamGeneration !== streamGeneration;
       const finalAssistantMsg = this.activeStreamingAssistantMessage ?? assistantMsg;
-      const turnMetadata = agentService.consumeTurnMetadata();
-      userMsg.userMessageId = turnMetadata.userMessageId ?? userMsg.userMessageId;
-      finalAssistantMsg.assistantMessageId = turnMetadata.assistantMessageId ?? finalAssistantMsg.assistantMessageId;
-      didEnqueueToSdk = didEnqueueToSdk || turnMetadata.wasSent === true;
-      planCompleted = planCompleted || turnMetadata.planCompleted === true;
+      // **From the completion, not from the runtime.** The turn-metadata member
+      // this replaces read the same three facts off the same envelopes, one
+      // object further out, and the surface had to ask a `ChatRuntime` for the
+      // half the projection did not bring. `wasSent` and `planCompleted` were
+      // already taken from `completed` above; the identities are on it now too.
+      userMsg.userMessageId = turnIdentities.userMessageId ?? userMsg.userMessageId;
+      finalAssistantMsg.assistantMessageId = turnIdentities.assistantMessageId
+        ?? finalAssistantMsg.assistantMessageId;
       plugin.recordDebugLog?.({
         data: {
           didEnqueueToSdk,

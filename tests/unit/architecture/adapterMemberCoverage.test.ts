@@ -73,7 +73,6 @@ ChatRuntime,
 // checks it exists instead. `setAutoTurnCallback` stayed, because the kernel's
 // backend-initiated turns still reach the surface through it.
 | 'setAutoTurnCallback'
-| 'consumeTurnMetadata'
 | 'buildSessionUpdates'
 | 'resolveSessionIdForFork'
 > ? true : false;
@@ -149,7 +148,7 @@ describe('adapter member coverage', () => {
   it('reads a contract of the size the freeze test pins', () => {
     // Guards the guard: a reader that returned nothing would make every claim
     // below vacuous.
-    expect(contractMembers.length).toBe(24);
+    expect(contractMembers.length).toBe(23);
   });
 
   it('covers every member or declares why not', () => {

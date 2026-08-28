@@ -9748,6 +9748,41 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### Turn metadata moved to the completion, where the surface already looked
+
+`ChatRuntime.consumeTurnMetadata` gave the surface three facts about a finished turn: whether it
+reached the provider, whether a plan was answered, and the provider's own references for the two
+messages. `InputController` read all three **after** reading the same turn's completion — and two of
+the three were already on it, taken from `completed.terminal` and `completed.planCompleted` and then
+OR-ed with the runtime's answer.
+
+Only one fact was genuinely missing from the projection: `userMessageId`, the provider's reference
+for the message the turn answered. The adapter took it from `envelope.scope.nativeRunRef`, carried on
+every run-scoped envelope — **and the coordinator sees the same envelopes**. It tracks the reference
+per turn now and puts it on `CompletedChatTurn`, so a surface holding a completion holds everything
+the turn was addressed by. It is not decoration: rewind refuses to run without it, and the adapter's
+own comment said that omitting it "degrades rewind and resume silently, which is worse than failing,
+because the turn still looks complete".
+
+`consumeTurnMetadata` is off the contract, which is 23 members now — down from 32 when the seam
+deletion started.
+
+**The tests moved with the fact, not with the mock.** Seven plan-flow cases set
+`mockAgentService.consumeTurnMetadata` to report a completed plan; they set it on the projection
+double's completion now, through a `setCompletionOverrides` hook, which is where production reads it.
+One of them drives two turns and had `mockReturnValueOnce` twice — it clears the override between
+them instead, which says the same thing about the follow-up turn out loud.
+
+**And the deletion gate caught a comment naming the member, for the third time this session.** The
+count went *up* by one while a member was being deleted, because three explanatory comments named it.
+The rule is now written where it keeps being needed: the searches count files that mention a name,
+so a comment about a deleted member has to describe it without spelling it.
+
+What is left of this search is 23 files, and seventeen of them are a provider's own content presenter
+and the composition wiring it — provider-internal, not a seam. The seam itself is two members:
+`buildSessionUpdates`, read by `ConversationController` when it saves, and `syncConversationState`,
+read by the tab layer.
+
 #### The chat-projection switch is deleted, because it could no longer revert anything
 
 `PROJECTION_CHAT_PROVIDERS` was the lever that flipped chat rendering one provider at a time, and

@@ -7,7 +7,6 @@ import type {
   ChatRuntimeConversationState,
   ChatRuntimeEnsureReadyOptions,
   ChatRuntimeQueryOptions,
-  ChatTurnMetadata,
   ChatTurnRequest,
   PreparedChatTurn,
   SessionUpdateResult,
@@ -63,7 +62,14 @@ export interface ChatRuntime {
   // `ExecutionChatRuntimeAdapter.installInteractions`, in a single call the
   // surface makes once, off the frozen contract.
   setAutoTurnCallback(callback: AutoTurnCallback | null): void;
-  consumeTurnMetadata(): ChatTurnMetadata;
+  // The turn-metadata member was here and is deleted. It read three facts off
+  // the run's envelopes — whether the turn was sent, whether a plan was
+  // answered, and the provider's own references for the two messages — and the
+  // surface had to ask a runtime for them because the projection carried only
+  // two. The coordinator carries all of them on `CompletedChatTurn` now, which
+  // is where the surface already reads the other half of the same turn.
+  // (Named without its identifier: the deletion gate counts files that mention
+  // it, and a comment about one is not a caller.)
 
   buildSessionUpdates(params: {
     conversation: Conversation | null;

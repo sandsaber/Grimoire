@@ -118,6 +118,12 @@ export function createMockInstructionModeManager() {
  * prove, over a real coordinator, and the live harnesses'; a double that also
  * drew would be a test measuring itself.
  */
+/** What a case wants on top of the completion this harness resolves. */
+export interface MockCompletionOverrides {
+  planCompleted?: boolean;
+  userMessageId?: string;
+}
+
 export function createMockProjectionExecution(
   agentService: () => ReturnType<typeof createMockAgentService>,
   state: { messages: any[]; addMessage(message: any): void },
@@ -126,9 +132,14 @@ export function createMockProjectionExecution(
   providerId: () => string = () => 'claude',
 ) {
   let assistantOrdinal = 0;
+  let completionOverrides: MockCompletionOverrides = {};
   return {
     get providerId() {
       return providerId();
+    },
+    /** What the next turn's completion reports beyond its terminal. */
+    setCompletionOverrides(overrides: MockCompletionOverrides): void {
+      completionOverrides = overrides;
     },
     conversationId: 'conv-1',
     settled: jest.fn().mockResolvedValue(undefined),
@@ -173,6 +184,12 @@ export function createMockProjectionExecution(
           completion: Promise.resolve({
             assistantMessageId: assistantMessage.id,
             terminal: { kind: 'succeeded', reason: 'completed' },
+            // **Where a turn's facts come from now.** `planCompleted` and the
+            // provider's own message reference were read off
+            // `ChatRuntime.consumeTurnMetadata` until the seam deletion; the
+            // coordinator carries both on the completion, so a case that needs
+            // them sets them here rather than on a runtime double.
+            ...completionOverrides,
           }),
         },
       };

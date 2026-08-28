@@ -14,7 +14,7 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 
 import { AntigravityExecution } from '@/app/execution/antigravity/AntigravityExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
+import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { StreamChunk } from '@/core/types';
 import { updateAntigravityProviderSettings } from '@/providers/antigravity/settings';
 
@@ -91,7 +91,7 @@ live('Antigravity live smoke', () => {
   }
 
   async function createHarness(overrides: Record<string, unknown> = {}): Promise<{
-    runtime: ChatRuntime;
+    runtime: ExecutionChatRuntimeAdapter;
     vault: string;
     /** Shuts the kernel down, which is what a plugin unload does. */
     shutdown(): Promise<void>;

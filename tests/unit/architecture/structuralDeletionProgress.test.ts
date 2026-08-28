@@ -109,7 +109,14 @@ const SEARCHES: readonly DeletionSearch[] = [
   {
     what: 'turn metadata and session updates',
     pattern: /consumeTurnMetadata|buildSessionUpdates|syncConversationState/,
-    files: 24,
+    // **23, and the shape of what is left has changed.** The turn-metadata
+    // member is off `ChatRuntime`: the coordinator carries its three facts on
+    // `CompletedChatTurn`, which is where the surface already read the other
+    // half of the same turn. Seventeen of the twenty-three are a provider's own
+    // content presenter and the composition that wires it — provider-internal,
+    // not a seam. What is left of the seam is `buildSessionUpdates` in
+    // `ConversationController` and `syncConversationState` in the tab layer.
+    files: 23,
     closedBy: 'the seam deletion',
   },
   {
@@ -173,7 +180,7 @@ describe('structural deletion progress', () => {
       'subagent hooks and loaders: 3',
       'SubagentManager lifecycle: 20',
       'the application importing a concrete provider module: 20',
-      'turn metadata and session updates: 24',
+      'turn metadata and session updates: 23',
       'StreamChunk and the subagent chunk vocabulary: 25',
       'the two registries: 30',
     ]);

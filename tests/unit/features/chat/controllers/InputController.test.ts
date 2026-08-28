@@ -3386,7 +3386,7 @@ describe('InputController - Message Queue', () => {
       deps = createSendableDeps();
       const { mockAgentService } = deps as any;
       mockAgentService.setResumeCheckpoint = jest.fn();
-      mockAgentService.consumeTurnMetadata = jest.fn().mockReturnValue({ wasSent: true });
+      
       mockAgentService.query = jest.fn().mockReturnValue(
         createMockStream([
           { type: 'text', content: 'hi' },
@@ -3480,7 +3480,7 @@ describe('InputController - Message Queue', () => {
       });
       const mockAgentService = (deps as any).mockAgentService;
       mockAgentService.providerId = 'codex';
-      mockAgentService.consumeTurnMetadata = jest.fn().mockReturnValue({ planCompleted: true, wasSent: true });
+      deps.mockProjection.setCompletionOverrides({ planCompleted: true });
       mockAgentService.query = jest.fn().mockImplementation(() =>
         createMockStream([
           { type: 'text', content: 'Here is my plan...' },
@@ -3507,9 +3507,9 @@ describe('InputController - Message Queue', () => {
       });
       const mockAgentService = (deps as any).mockAgentService;
       mockAgentService.providerId = 'codex';
-      mockAgentService.consumeTurnMetadata = jest.fn()
-        .mockReturnValueOnce({ planCompleted: true, wasSent: true })
-        .mockReturnValueOnce({ wasSent: true });
+      // The plan turn reports a completed plan; the follow-up it triggers does
+      // not, so the overrides are cleared between them.
+      deps.mockProjection.setCompletionOverrides({ planCompleted: true });
 
       let callCount = 0;
       mockAgentService.query = jest.fn().mockImplementation(() => {
@@ -3520,6 +3520,7 @@ describe('InputController - Message Queue', () => {
             { type: 'done' },
           ]);
         }
+        deps.mockProjection.setCompletionOverrides({});
         return createMockStream([{ type: 'done' }]);
       });
 
@@ -3548,7 +3549,7 @@ describe('InputController - Message Queue', () => {
       });
       const mockAgentService = (deps as any).mockAgentService;
       mockAgentService.providerId = 'codex';
-      mockAgentService.consumeTurnMetadata = jest.fn().mockReturnValue({ planCompleted: true, wasSent: true });
+      deps.mockProjection.setCompletionOverrides({ planCompleted: true });
       mockAgentService.query = jest.fn().mockImplementation(() =>
         createMockStream([
           { type: 'text', content: 'Plan content' },
@@ -3587,7 +3588,7 @@ describe('InputController - Message Queue', () => {
 
       const mockAgentService = (deps as any).mockAgentService;
       mockAgentService.providerId = 'codex';
-      mockAgentService.consumeTurnMetadata = jest.fn().mockReturnValue({ planCompleted: true, wasSent: true });
+      deps.mockProjection.setCompletionOverrides({ planCompleted: true });
       mockAgentService.query = jest.fn().mockImplementation(() =>
         createMockStream([
           { type: 'text', content: 'Plan content' },
@@ -3623,7 +3624,7 @@ describe('InputController - Message Queue', () => {
       });
       const mockAgentService = (deps as any).mockAgentService;
       mockAgentService.providerId = 'codex';
-      mockAgentService.consumeTurnMetadata = jest.fn().mockReturnValue({ planCompleted: true, wasSent: true });
+      deps.mockProjection.setCompletionOverrides({ planCompleted: true });
       mockAgentService.query = jest.fn().mockImplementation(() =>
         createMockStream([
           { type: 'text', content: 'Plan content' },
@@ -3657,7 +3658,7 @@ describe('InputController - Message Queue', () => {
       });
       const mockAgentService = (deps as any).mockAgentService;
       mockAgentService.providerId = 'codex';
-      mockAgentService.consumeTurnMetadata = jest.fn().mockReturnValue({ planCompleted: true, wasSent: true });
+      deps.mockProjection.setCompletionOverrides({ planCompleted: true });
       mockAgentService.query = jest.fn().mockImplementation(() =>
         createMockStream([
           { type: 'text', content: 'Plan content' },
@@ -3689,7 +3690,7 @@ describe('InputController - Message Queue', () => {
       });
       const mockAgentService = (deps as any).mockAgentService;
       mockAgentService.providerId = 'codex';
-      mockAgentService.consumeTurnMetadata = jest.fn().mockReturnValue({ planCompleted: true, wasSent: true });
+      deps.mockProjection.setCompletionOverrides({ planCompleted: true });
       mockAgentService.query = jest.fn().mockImplementation(() =>
         createMockStream([
           { type: 'text', content: 'Plan content' },

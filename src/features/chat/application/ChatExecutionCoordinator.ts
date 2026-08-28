@@ -174,6 +174,17 @@ export interface CompletedChatTurn extends StartedChatTurn {
    * survives the surface that was watching going away mid-turn.
    */
   readonly planCompleted?: boolean;
+  /**
+   * The provider's own reference for the message this turn answered.
+   *
+   * **Rewind refuses to run without it.** It came off `ChatRuntime` until the
+   * seam deletion — the turn-metadata member read the same `nativeRunRef` this
+   * does, from the same envelopes, one object further out. Carried here so a
+   * surface that has the completion has everything the turn was addressed by,
+   * rather than having to ask a runtime for the half the projection did not
+   * bring.
+   */
+  readonly userMessageId?: string;
 }
 
 export interface ChatTurnTicket {
@@ -243,6 +254,14 @@ interface ActiveTurn {
    * a fast turn were silently gone.
    */
   readonly buffered: ExecutionEventEnvelope[];
+  /**
+   * The provider's reference for this run, from the envelope scope.
+   *
+   * Carried on every run-scoped envelope, so the identity survives a turn that
+   * ends on a path emitting nothing else — which is why it is read here rather
+   * than off the terminal.
+   */
+  nativeRunRef?: string;
   /** The turn's token usage, as the surface last reported it. */
   usage?: UsageInfo | null;
   finalization?: Promise<void>;
@@ -928,6 +947,9 @@ export class ChatExecutionCoordinator {
 
   private acceptEnvelope(entry: ConversationEntry, envelope: ExecutionEventEnvelope): void {
     const targetRunId = scopedRunId(envelope.scope) ?? entry.projection.activeRunId;
+    if (envelope.scope.kind === 'run' && envelope.scope.nativeRunRef && entry.active) {
+      entry.active.nativeRunRef = envelope.scope.nativeRunRef;
+    }
     this.apply(entry, { kind: 'run-envelope', envelope });
     // Beside the projection's own reading of it, not instead of it: the surface
     // draws that an approval is open, and this is what puts it on screen and
@@ -1064,6 +1086,7 @@ export class ChatExecutionCoordinator {
         ...(materialized ? { result: materialized } : {}),
         ...(assistantMessage ? { assistantMessageId: assistantMessage.id } : {}),
         ...(answeredAPlan(entry.projection, activeRunId) ? { planCompleted: true } : {}),
+        ...(active.nativeRunRef ? { userMessageId: active.nativeRunRef } : {}),
       });
       this.startNext(entry);
     } catch (error) {

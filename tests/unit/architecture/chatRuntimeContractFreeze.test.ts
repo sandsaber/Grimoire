@@ -47,7 +47,6 @@ const FROZEN_MEMBERS = [
   // `setAutoTurnCallback` stayed: the kernel starts turns of its own, and the
   // surface has to be told about a turn nothing in it asked for.
   'setAutoTurnCallback',
-  'consumeTurnMetadata',
   'buildSessionUpdates',
   'resolveSessionIdForFork',
 ];
@@ -64,13 +63,13 @@ describe('ChatRuntime contract freeze', () => {
     expect([...declared].sort()).toEqual([...FROZEN_MEMBERS].sort());
   });
 
-  it('declares 24 members', () => {
+  it('declares 23 members', () => {
     // **32 until the seam deletion. Six interaction setters went first, then
     // the two subagent loaders that nothing implemented.** The count is asserted separately
     // from the set so a deletion has to be stated twice rather than sliding
     // through as a list edit — the freeze forbids growth, and a shrink is a
     // milestone step that should be visible in the diff.
-    expect(declared).toHaveLength(24);
+    expect(declared).toHaveLength(23);
   });
 
   it('maps every member in the adapter specification', () => {
