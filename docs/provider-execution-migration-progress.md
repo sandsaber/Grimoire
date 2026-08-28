@@ -9646,9 +9646,7 @@ Two questions to settle before writing it, both recorded rather than guessed:
 
 #### Where to pick this up
 
-**Four rows moved in the 2026-08-28 session** — the chat UI, the settings reconciler, the command
-catalog and CLI resolution — and the entries below record each in turn, newest first. What is left,
-in the order it can be taken:
+The entries below record the 2026-08-28 session in turn, newest first.
 
 **Six rows moved: the chat UI, the settings reconciler, the command catalog, CLI resolution, MCP
 storage and the history service.** And the most useful thing the session found is where it stopped:
@@ -9670,11 +9668,22 @@ So the next milestone is not another row pass. It is the seam deletion or durabl
 rows follow them. `ProviderRegistry` is **three members over three rows** — `createRuntime`,
 `taskResultInterpreter?`, `subagentLifecycleAdapter?` — and all three are among the blocked.
 
-**Two rows in a row turned out not to be workspace services at all** — the command dropdown and CLI
-resolution — and both were found by the same question: *which of this row's consumers are
-synchronous, and why?* A workspace is built lazily and reached asynchronously, so any consumer that
-cannot wait is a consumer telling you the thing it needs is a declaration. Worth asking of every
-remaining row before designing its slot.
+**Three rows turned out not to be workspace services, or not entirely** — the command dropdown, CLI
+resolution and four of the history service's six members — and all three were found by the same
+question: *which of this row's consumers are synchronous, and why?* A workspace is built lazily and
+reached asynchronously, so a consumer that cannot wait is telling you the thing it needs is a
+declaration. It is the most productive question this milestone has had, and it is worth asking of
+every remaining row before designing its slot.
+
+**Two bugs were introduced and caught inside the session, both of the same kind:** a move that
+changed *when* or *where* something is read, with no test watching that axis. The first cleared
+Claude's `providerState` on an environment change, deleting subagent transcripts, because the
+justification recorded with it — that Claude writes no `providerState` — was false. The second froze
+the command and MCP ports at workspace-build time, so a provider registering late would have had
+them absent for the whole session. Neither was found by running the suite; both were found by asking
+one specific question about the seam that moved. That is the check worth repeating: **after moving a
+row, ask what its consumers assumed about timing, ordering, or identity — and write the test that
+watches that axis, because the existing ones do not.**
 
 **The chat-UI row is moved.** All twenty-three consumers read
 `providerCatalog().declarations(id).chatUI`, `chatUIConfig` is gone from `ProviderRegistration`,
