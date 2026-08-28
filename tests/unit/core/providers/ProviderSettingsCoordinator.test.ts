@@ -367,6 +367,30 @@ describe('ProviderSettingsCoordinator', () => {
         codex: 'normal',
       });
     });
+
+    // Gemini and Antigravity declare `reasoningControl: { kind: 'none' }` and
+    // contribute no reasoning group. Their chat-UI configs still answer the
+    // row's reasoning methods, and answer them differently from each other —
+    // Gemini says a model is not adaptive, Antigravity says it is — so before
+    // the coordinator read the contribution, Gemini kept a thinking budget and
+    // Antigravity kept none, from the same declaration.
+    it.each(['gemini', 'antigravity'])(
+      'keeps no thinking budget for %s, which contributes no reasoning group',
+      (providerId) => {
+        const settings: Record<string, unknown> = {
+          settingsProvider: providerId,
+          providerConfigs: { [providerId]: { enabled: true } },
+          model: '',
+          thinkingBudget: 'off',
+          savedProviderThinkingBudget: { [providerId]: 'off', claude: 'off' },
+        };
+
+        ProviderSettingsCoordinator.projectProviderState(settings, providerId);
+        ProviderSettingsCoordinator.persistProjectedProviderState(settings, providerId);
+
+        expect(settings.savedProviderThinkingBudget).toEqual({ claude: 'off' });
+      },
+    );
   });
 
   describe('projectProviderState', () => {

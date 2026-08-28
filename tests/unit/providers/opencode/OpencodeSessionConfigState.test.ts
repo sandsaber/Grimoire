@@ -1,6 +1,6 @@
 import '@/providers';
 
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
+import * as modelRouting from '@/core/providers/modelRouting';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import {
   type OpencodeSessionConfigPorts,
@@ -264,7 +264,7 @@ describe('OpenCode session configuration state', () => {
       },
     });
     const state = createState(plugin);
-    jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('opencode');
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('opencode');
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
     await state.syncSessionModelState({
@@ -308,7 +308,7 @@ describe('OpenCode session configuration state', () => {
       },
     });
     const state = createState(plugin);
-    jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('opencode');
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('opencode');
 
     await state.syncSessionModelState({
       configOptions: [{
@@ -349,7 +349,7 @@ describe('OpenCode session configuration state', () => {
       },
     });
     const state = createState(plugin);
-    jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('opencode');
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('opencode');
 
     await state.syncSessionModelState({
       configOptions: [
@@ -474,7 +474,7 @@ describe('OpenCode session configuration state', () => {
     });
     const state = createState(plugin);
 
-    jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('opencode');
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('opencode');
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
     expect(state.getActiveDisplayModel()).toBe('opencode:anthropic/claude-sonnet-4');

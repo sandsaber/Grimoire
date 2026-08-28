@@ -115,13 +115,13 @@ const SEARCHES: readonly DeletionSearch[] = [
   {
     what: 'the two registries',
     pattern: /\bProviderRegistry\b|\bProviderWorkspaceRegistry\b/,
-    // **40.** `StreamController` and `assistantResponseMetadata` lost their
-    // registry imports outright rather than one accessor among several, as the
-    // chat-UI row's consumers move; `tabContextUI` and `GrimoireView` are the
-    // next two. `GrimoireSettings` moved its chat-UI question too and stays
-    // counted, because it holds eight `ProviderWorkspaceRegistry` calls — the
-    // pattern is both registries, and only one of them has left that file.
-    files: 40,
+    // **34.** The chat-UI row is off the registry entirely: its accessor is
+    // deleted, and so are the four model-routing statics that only lived there
+    // to reach it — they are `modelRouting.ts` now, over the catalog. Six files
+    // lost the name outright with them, and `ProviderRegistry` is down to five
+    // members. `GrimoireSettings` still counts, because the pattern is both
+    // registries and it holds eight `ProviderWorkspaceRegistry` calls.
+    files: 34,
     closedBy: 'the provider rows, when the last consumer of each has moved',
   },
 ];
@@ -166,7 +166,7 @@ describe('structural deletion progress', () => {
       'the application importing a concrete provider module: 20',
       'turn metadata and session updates: 24',
       'StreamChunk and the subagent chunk vocabulary: 25',
-      'the two registries: 40',
+      'the two registries: 34',
     ]);
     // Two of eleven are zero, and both closed in the 2026-08-27 session.
     expect(SEARCHES).toHaveLength(remaining.length + 2);

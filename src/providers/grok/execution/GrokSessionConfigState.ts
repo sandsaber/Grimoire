@@ -1,4 +1,4 @@
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
+import { resolveSettingsProviderId } from '@/core/providers/modelRouting';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import type { ChatRuntimeQueryOptions } from '@/core/runtime/types';
 import {
@@ -440,7 +440,7 @@ export class GrokSessionConfigState {
       }
     }
 
-    if (ProviderRegistry.resolveSettingsProviderId(settingsBag) !== PROVIDER_ID) {
+    if (resolveSettingsProviderId(settingsBag) !== PROVIDER_ID) {
       return changed;
     }
 
@@ -534,7 +534,7 @@ export class GrokSessionConfigState {
 
     const nextModelId = encodeGrokModelId(defaultRawId);
     savedProviderModel.grok = nextModelId;
-    if (ProviderRegistry.resolveSettingsProviderId(settingsBag) === PROVIDER_ID) {
+    if (resolveSettingsProviderId(settingsBag) === PROVIDER_ID) {
       settingsBag.model = nextModelId;
     }
     return true;

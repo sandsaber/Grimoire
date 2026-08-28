@@ -1,6 +1,6 @@
 import '@/providers';
 
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
+import * as modelRouting from '@/core/providers/modelRouting';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import {
   type GrokSessionConfigPorts,
@@ -269,7 +269,7 @@ describe('Grok session configuration state', () => {
       },
     });
     const state = createState(plugin);
-    jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('grok');
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
     await state.syncSessionModelState({
@@ -313,7 +313,7 @@ describe('Grok session configuration state', () => {
       },
     });
     const state = createState(plugin);
-    jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('grok');
 
     await state.syncSessionModelState({
       configOptions: [{
@@ -366,7 +366,7 @@ describe('Grok session configuration state', () => {
       },
     });
     const state = createState(plugin);
-    jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('grok');
 
     await state.syncSessionModelState({
       models: {
@@ -414,7 +414,7 @@ describe('Grok session configuration state', () => {
         { label: 'Grok 4.5', rawId: 'grok-4.5' },
       ],
     });
-    jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('grok');
 
     await state.syncSessionModelState({
       models: {
@@ -454,7 +454,7 @@ describe('Grok session configuration state', () => {
       },
     });
     const state = createState(plugin);
-    jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('grok');
 
     await state.syncSessionModelState({
       configOptions: [
@@ -533,7 +533,7 @@ describe('Grok session configuration state', () => {
     });
     const state = createState(plugin);
 
-    jest.spyOn(ProviderRegistry, 'resolveSettingsProviderId').mockReturnValue('grok');
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('grok');
     jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(plugin.settings);
 
     // What an auxiliary Grok task is labelled with, which the runtime answered

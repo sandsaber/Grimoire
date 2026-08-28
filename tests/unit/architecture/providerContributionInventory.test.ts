@@ -141,9 +141,10 @@ describe('provider contribution inventory', () => {
     });
 
     it('claims the count the heading advertises', () => {
-      // Six, not nine: the three auxiliary factories left with the auxiliary
-      // owner, and are recorded in the moved table below.
-      expect(documented).toHaveLength(6);
+      // Five, not nine: the three auxiliary factories left with the auxiliary
+      // owner, and `chatUIConfig` left for `ProviderDeclarations.chatUI`. All
+      // four are recorded in the moved table below.
+      expect(documented).toHaveLength(5);
     });
 
     it('accounts for every field the registration ever declared', () => {
@@ -169,6 +170,7 @@ describe('provider contribution inventory', () => {
         'createTitleGenerationService',
         'createInstructionRefineService',
         'createInlineEditService',
+        'chatUIConfig',
       ]);
     });
 

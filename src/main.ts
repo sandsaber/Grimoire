@@ -43,6 +43,10 @@ import type { SharedAppStorage } from './core/bootstrap/storage';
 import { ConversationAlreadyExistsError } from './core/conversations/ConversationRepository';
 import { type DebugLogEvent, DebugLogService } from './core/debug/DebugLogService';
 import type { LocalShellInvocation } from './core/execution/local/LocalShellBackend';
+import {
+  resolveSettingsProviderId,
+  resolveTitleGenerationProviderId,
+} from './core/providers/modelRouting';
 import { providerCatalog } from './core/providers/ProviderCatalog';
 import {
   getEnvironmentVariablesForScope as getScopedEnvironmentVariables,
@@ -586,7 +590,7 @@ export default class GrimoirePlugin extends Plugin {
       // Read per title rather than captured: the model that decides which
       // provider writes a title is a setting the user can change with tabs
       // already open.
-      resolveTitleProviderId: () => ProviderRegistry.resolveTitleGenerationProviderId(this.settings),
+      resolveTitleProviderId: () => resolveTitleGenerationProviderId(this.settings),
     });
     await this.applicationRuntime.start();
   }
@@ -1005,7 +1009,7 @@ export default class GrimoirePlugin extends Plugin {
 
   /** Returns the runtime environment variables (fixed at plugin load). */
   getActiveEnvironmentVariables(
-    providerId: ProviderId = ProviderRegistry.resolveSettingsProviderId(
+    providerId: ProviderId = resolveSettingsProviderId(
       this.settings,
     ),
   ): string {

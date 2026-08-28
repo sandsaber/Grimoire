@@ -41,7 +41,7 @@ asserted only so the table cannot drift away from the code.
 
 | Row | Real | Slot | Verdict | What has nowhere to go |
 |---|---|---|---|---|
-| `chatUIConfig` | 20 | 7 | **reshaped** | It was three members against twenty: the whole reasoning group, the service-tier toggle, the mode selector and its apply hook, bang-bash enablement, model options, custom model ids, model defaults, variant normalization and metadata preparation had nowhere to go, and `permissionToggles` was a static `{id,label}[]` against a descriptor plus two settings-dependent behaviours. Seven grouped members now, and the parameter changed too: the row takes the **app** settings and scopes them itself, because ownership of a model depends on the environment and a provider's environment is the shared scope joined with its own. |
+| `chatUIConfig` | 20 | 7 | **moved** | It was three members against twenty: the whole reasoning group, the service-tier toggle, the mode selector and its apply hook, bang-bash enablement, model options, custom model ids, model defaults, variant normalization and metadata preparation had nowhere to go, and `permissionToggles` was a static `{id,label}[]` against a descriptor plus two settings-dependent behaviours. Seven grouped members now, and the parameter changed too: the row takes the **app** settings and scopes them itself, because ownership of a model depends on the environment and a provider's environment is the shared scope joined with its own. **Moved:** all twenty-three consumers read `providerCatalog().declarations(id).chatUI`, the field is gone from `ProviderRegistration`, and the four model-routing statics that reached it through `ProviderRegistry` are `modelRouting.ts`. |
 | `settingsReconciler` | 3 | 1 of 10 | reshape | `ProviderSettingsCodec.reconcile(TSettings, reason)` sees only the provider's own settings, and every reconciler computes its environment hash from `getRuntimeEnvironmentText`, which joins the **shared** environment scope with the provider's. A user who sets `XAI_API_KEY` in the shared scope would stop invalidating Grok's model cache. |
 | `createRuntime` | — | — | moved | `ExecutionBackendFactory`, flipped for all nine. |
 | `historyService` | 6 | 5 | reshape | Four members map cleanly under deliberate renames. The other two do not: `buildForkProviderState(sourceSessionId, resumeAt, sourceProviderState)` builds the state a **fork** starts from, and `buildPersistedProviderState(conversation)` is what `SessionStorage` writes on **save**. `buildSessionPatch` is neither — it is a third operation, already live in `ExecutionChatRuntimeAdapter`, producing the session binding a **finished turn** leaves behind. Three moments, three shapes, one slot. |
@@ -96,7 +96,7 @@ a row moves or a slot changes.
 
 ## What this means for sequencing
 
-**Four rows have moved**, counting the app-level workspace capability row. `modelCatalog` was the one whose slot fitted, and it was blocked twice over
+**Five rows have moved**, counting the app-level workspace capability row. `modelCatalog` was the one whose slot fitted, and it was blocked twice over
 — by eight contexts whose `listModels`/`refreshModels` threw, and by nothing building a workspace at
 all. `usageProvider` needed its slot reshaped first, and then moved the same way. Both read
 `ApplicationRuntime.workspaceFor(providerId)` — or `builtWorkspaceFor` on the paint path — and
@@ -110,9 +110,11 @@ So the work splits in two, and only one half is design:
    So did a second thing the first version of this file did not look for: **nothing built a
    workspace.** `module.workspace.initialize` had one caller. `ProviderWorkspaceHolder` and
    `ApplicationRuntime.workspaceFor(providerId)` are the path a consumer takes; both are done.
-2. **Reshape eleven slots.** Design, from the implementations, with the notes above as input.
+2. **Reshape ten slots.** Design, from the implementations, with the notes above as input.
+   `chatUIConfig` was the eleventh, and it is the one row whose reshape was designed and then
+   carried through in the same milestone.
 
-**Two of the eleven wait on their consumers rather than on design.** `taskResultInterpreter` and
+**Two of the ten wait on their consumers rather than on design.** `taskResultInterpreter` and
 `subagentLifecycleAdapter` are read by `SubagentManager` and `MessageRenderer`, both of which the
 durable-agents work is replacing. A slot shaped for a consumer that is being replaced is a slot
 shaped twice, so they are last, not first — even though they are the smallest.

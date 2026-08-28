@@ -9646,12 +9646,39 @@ Two questions to settle before writing it, both recorded rather than guessed:
 
 #### Where to pick this up
 
-The chat-UI row is **four call sites from done**, and all four are in core, in
-`ProviderSettingsCoordinator`. Two of them iterate every provider asking `isDefaultModel`; one is
-`resolveProviderForModel`'s neighbour. Moving them takes the registry's model-routing statics with
-it, which is the row's real end.
+**The chat-UI row is moved.** All twenty-three consumers read
+`providerCatalog().declarations(id).chatUI`, `chatUIConfig` is gone from `ProviderRegistration`,
+and the row's verdict in [`provider-row-slot-fit.md`](provider-row-slot-fit.md) is `moved` — the one
+row whose reshape was designed and carried through inside the same milestone.
 
-The seven the entry below listed are moved. The four single questions —
+Its end took the registry's model routing with it, which is what the entry below predicted.
+`resolveProviderForModel`, `resolveSettingsProviderId`, `resolveTitleGenerationProviderId` and
+`getCustomModelIds` were `ProviderRegistry` statics only because they reached a provider's chat UI
+through it; they are `modelRouting.ts` now, over `catalog.declarations(id).chatUI.models`. What is
+left of `ProviderRegistry` is five members over four rows — `createRuntime`, `settingsReconciler`,
+`historyService`, `taskResultInterpreter?`, `subagentLifecycleAdapter?` — and the two-registry count
+falls 42 -> 34.
+
+**One behaviour changed, deliberately, and it is the row's own contract deciding it.** The
+coordinator asked `isAdaptiveReasoningModel` and `getDefaultReasoningValue` of every provider,
+including the two that declare `reasoningControl: { kind: 'none' }` and contribute no reasoning
+group — and those two answer *differently from each other*: Gemini says a model is not adaptive, so
+it kept a thinking budget; Antigravity says it is, so it kept none. From the same declaration. The
+contribution's absent group is the answer now: a provider with no reasoning group projects neither
+an effort level nor a budget, and `savedProviderThinkingBudget` loses its Gemini entry. Nothing
+either provider ships reads either key — no runtime, no settings tab, and the toolbar hides the
+control on the same declaration — so this is dead projection state being dropped rather than a
+feature. `ProviderSettingsCoordinator.test.ts` pins it for both providers, and the pin was checked
+by restoring the old reading and watching both go red.
+
+Two smaller things the move settles. `ProviderRegistry.test.ts` asked `getChatUIConfig` to prove
+that an unregistered id is refused; that assertion moved to `getSettingsReconciler`, because what it
+tests is the refusal rather than the accessor. And six `Tab.test.ts` cases stubbed
+`ownsModel: () => false` on a declarations double while routing read the **real** config through the
+registry — a stub and a production path answering the same question differently, invisible until the
+two questions landed on one declaration. They share a `stubOwnsModel` helper now.
+
+The four single questions —
 `GrimoireView`, `GrimoireSettings`, `tabContextUI`, `main.ts` — went the way the first seven did,
 and `Tab.ts`'s three went with the toolbar, which is what the third of them supplies.
 
@@ -9682,11 +9709,7 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
-After the row: **`ProviderRegistry.resolveProviderForModel` and `getCustomModelIds`** are the last
-two statics that read `getChatUIConfig`, and both are model routing rather than presentation. They
-are what stands between the chat-UI row and deleting `ProviderRegistry` itself.
-
-Then the ten rows still marked `reshape` in
+After the row: the ten rows still marked `reshape` in
 [`provider-row-slot-fit.md`](provider-row-slot-fit.md), of which two —
 `taskResultInterpreter` and `subagentLifecycleAdapter` — are deliberately **last**, because their
 consumers are mid-replacement and a slot shaped for a consumer being replaced is a slot shaped

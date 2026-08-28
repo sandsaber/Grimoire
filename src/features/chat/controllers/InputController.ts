@@ -13,8 +13,8 @@ import {
 import { tokenizeSearchText } from '../../../core/context/text';
 import type { ProjectWorkspace } from '../../../core/context/types';
 import type { VaultSearchService } from '../../../core/context/VaultSearchService';
+import { resolveProviderForModel } from '../../../core/providers/modelRouting';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import {
   DEFAULT_CHAT_PROVIDER_ID,
   type InstructionRefineService,
@@ -1136,7 +1136,7 @@ export class InputController {
     }
 
     if (requestedModel) {
-      const modelProviderId = ProviderRegistry.resolveProviderForModel(requestedModel, settings, {
+      const modelProviderId = resolveProviderForModel(requestedModel, settings, {
         onlyEnabledProviders: true,
         fallbackProviderId: targetProviderId,
       });

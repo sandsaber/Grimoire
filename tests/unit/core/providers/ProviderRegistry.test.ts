@@ -71,14 +71,11 @@ describe('ProviderRegistry', () => {
     expect(reconciler).toHaveProperty('normalizeModelVariantSettings');
   });
 
-  it('returns a chat UI config for the default provider', () => {
-    const uiConfig = ProviderRegistry.getChatUIConfig();
-    expect(uiConfig).toHaveProperty('getModelOptions');
-    expect(uiConfig).toHaveProperty('getCustomModelIds');
-  });
-
   it('throws when an unknown provider is requested', () => {
-    expect(() => ProviderRegistry.getChatUIConfig(
+    // Was asked of `getChatUIConfig`, which the chat-UI row took with it. Any
+    // accessor proves the same thing — that an unregistered id is refused
+    // rather than answered — so it moved to one that is still here.
+    expect(() => ProviderRegistry.getSettingsReconciler(
       'nonexistent' as any,
     )).toThrow('Provider "nonexistent" is not registered.');
   });

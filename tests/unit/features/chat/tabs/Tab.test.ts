@@ -4013,6 +4013,31 @@ describe('Tab - Blank Tab Model Selector', () => {
   });
 });
 
+/**
+ * Which provider owns which model, for the declaration stubs below.
+ *
+ * These stubs answered `ownsModel: () => false`, and nothing noticed: model
+ * routing went through `ProviderRegistry.resolveProviderForModel`, which read
+ * the **real** config while the toolbar read the stub. The chat-UI row put both
+ * questions on the same declaration, so a stub that disowns every model now
+ * routes every model to the settings provider. This is what the real configs
+ * answer for the ids these cases use, and nothing more.
+ */
+function stubOwnsModel(providerId: string, model: string): boolean {
+  switch (providerId) {
+    case 'codex':
+      return model.startsWith('gpt-') || /^o\d/.test(model);
+    case 'claude':
+      return ['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-');
+    case 'opencode':
+      return model.startsWith('opencode:');
+    case 'antigravity':
+      return model === 'antigravity' || model.startsWith('antigravity');
+    default:
+      return false;
+  }
+}
+
 describe('Tab - Cross-Provider Model Rejection', () => {
   it('offers all enabled provider model groups on a bound tab', () => {
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
@@ -4100,7 +4125,7 @@ describe('Tab - Cross-Provider Model Rejection', () => {
           isBuiltIn: jest.fn().mockReturnValue(false),
           normalizeVariant: jest.fn((model: string) => model),
           options: jest.fn().mockReturnValue([]),
-          ownsModel: () => false,
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
         },
       },
     } as never));
@@ -4452,7 +4477,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
           isBuiltIn: jest.fn().mockReturnValue(false),
           normalizeVariant: jest.fn((model: string) => model),
           options: jest.fn().mockReturnValue([]),
-          ownsModel: () => false,
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
         },
       },
     } as never));
@@ -4589,7 +4614,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
           isBuiltIn: jest.fn().mockReturnValue(false),
           normalizeVariant: jest.fn((model: string) => model),
           options: jest.fn().mockReturnValue([]),
-          ownsModel: () => false,
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
         },
       },
     } as never));
@@ -4695,15 +4720,21 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 
   it('does not trigger provider warmup when a blank-tab model switch stays on OpenCode', async () => {
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'resolveProviderForModel').mockImplementation((model: string) => {
-      if (model.startsWith('opencode:')) {
-        return 'opencode';
-      }
-      if (model.startsWith('gpt-') || /^o\d/.test(model)) {
-        return 'codex';
-      }
-      return 'claude';
-    });
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
+        },
+      },
+    } as never));
 
     const plugin = createMockPlugin();
     plugin.settings.providerConfigs = {
@@ -4800,7 +4831,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
           isBuiltIn: jest.fn().mockReturnValue(false),
           normalizeVariant: jest.fn((model: string) => model),
           options: jest.fn().mockReturnValue([]),
-          ownsModel: () => false,
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
         },
       },
     } as never));
@@ -4872,18 +4903,21 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 
   it('updates hidden commands on blank tab model change', async () => {
     jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockReturnValue({
-      getModelOptions: jest.fn().mockReturnValue([]),
-      ownsModel: jest.fn((model: string) => model.startsWith('gpt-') || /^o\d/.test(model)),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    });
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
+        },
+      },
+    } as never));
 
     const codexCatalog = {
       listDropdownEntries: jest.fn().mockResolvedValue([]),
@@ -4965,7 +4999,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
           isBuiltIn: jest.fn().mockReturnValue(false),
           normalizeVariant: jest.fn((model: string) => model),
           options: jest.fn().mockReturnValue([]),
-          ownsModel: () => false,
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
         },
       },
     } as never));
@@ -5015,7 +5049,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
           isBuiltIn: jest.fn().mockReturnValue(false),
           normalizeVariant: jest.fn((model: string) => model),
           options: jest.fn().mockReturnValue(providerId === 'antigravity' ? antigravityModels : claudeModels),
-          ownsModel: () => false,
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
         },
       },
     } as never));

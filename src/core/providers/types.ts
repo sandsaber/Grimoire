@@ -65,7 +65,10 @@ export interface CreateChatRuntimeOptions {
  * inventories cannot disagree about a provider's name or its place in a list.
  */
 export interface ProviderRegistration {
-  chatUIConfig: ProviderChatUIConfig;
+  // `chatUIConfig` was the first field here. It is `ProviderDeclarations.chatUI`
+  // now, reached through the catalog, and the config object itself is what each
+  // module's `chatUiContributionFor` delegates to — so it is still a provider's
+  // own, and no longer a registration.
   settingsReconciler: ProviderSettingsReconciler;
   createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => ChatRuntime;
   historyService: ProviderConversationHistoryService;

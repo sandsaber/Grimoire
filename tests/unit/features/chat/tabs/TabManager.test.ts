@@ -71,12 +71,33 @@ jest.mock('@/core/providers/ProviderRegistry', () => ({
     getConversationHistoryService: () => ({
       buildForkProviderState: mockBuildForkProviderState,
     }),
-    resolveProviderForModel: (model: string) => (
-      model.startsWith('opencode:') ? 'opencode'
-        : model.startsWith('gpt-') || /^o\d/.test(model) ? 'codex' : 'claude'
-    ),
   },
 }));
+
+/**
+ * Model routing, which left the registry with the chat-UI row.
+ *
+ * Doubled as a module rather than reached through the real one: routing reads
+ * `providerCatalog().declarations(id).chatUI.models.ownsModel` now, and the
+ * catalog double above answers only the two questions these suites have an
+ * opinion about. Every export is given an answer, for the reason that double
+ * states: a stub carrying only the member the suite happened to need throws for
+ * the next caller rather than answering it.
+ */
+jest.mock('@/core/providers/modelRouting', () => {
+  const forModel = (model: string) => (
+    model.startsWith('opencode:') ? 'opencode'
+      : model.startsWith('gpt-') || /^o\d/.test(model) ? 'codex' : 'claude'
+  );
+  return {
+    getCustomModelIds: () => new Set<string>(),
+    getEnabledProviderForModel: forModel,
+    getProviderForModel: forModel,
+    resolveProviderForModel: forModel,
+    resolveSettingsProviderId: () => 'claude',
+    resolveTitleGenerationProviderId: () => 'claude',
+  };
+});
 
 jest.mock('@/core/providers/ProviderCatalog', () => ({
   providerCatalog: () => ({

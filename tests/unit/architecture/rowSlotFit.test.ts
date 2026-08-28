@@ -36,11 +36,6 @@ const MODULE = 'src/core/providers/ProviderModule.ts';
 
 const ROWS: readonly RowFit[] = [
   {
-    row: 'chatUIConfig',
-    real: { name: 'ProviderChatUIConfig', path: TYPES },
-    slot: { name: 'ProviderChatUiContribution', path: MODULE },
-  },
-  {
     row: 'settingsReconciler',
     real: { name: 'ProviderSettingsReconciler', path: TYPES },
   },

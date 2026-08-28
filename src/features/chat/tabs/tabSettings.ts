@@ -2,6 +2,7 @@ export { isRecord } from '../../../utils/records';
 import { getHiddenProviderCommandSet } from '../../../core/providers/commands/hiddenCommands';
 import type { ProviderCommandDropdownConfig } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
+import { resolveSettingsProviderId } from '../../../core/providers/modelRouting';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderChatUiContribution } from '../../../core/providers/ProviderModule';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
@@ -252,7 +253,7 @@ export function resolveBlankTabModel(
 
   const targetProviderId = providerCatalog().isEnabled(settings, providerId)
     ? providerId
-    : ProviderRegistry.resolveSettingsProviderId(settings);
+    : resolveSettingsProviderId(settings);
   const snapshot = ProviderSettingsCoordinator.getProviderSettingsSnapshot(settings, targetProviderId);
   return snapshot.model as string;
 }

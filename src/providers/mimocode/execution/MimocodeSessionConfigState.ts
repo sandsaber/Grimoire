@@ -1,4 +1,4 @@
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
+import { resolveSettingsProviderId } from '@/core/providers/modelRouting';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import type { ChatRuntimeQueryOptions } from '@/core/runtime/types';
 import {
@@ -429,7 +429,7 @@ export class MimocodeSessionConfigState {
       }
     }
 
-    if (ProviderRegistry.resolveSettingsProviderId(settingsBag) !== PROVIDER_ID) {
+    if (resolveSettingsProviderId(settingsBag) !== PROVIDER_ID) {
       return changed;
     }
 
