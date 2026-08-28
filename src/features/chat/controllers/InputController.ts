@@ -554,9 +554,9 @@ export class InputController {
 
     // Restore pendingResumeAt from persisted conversation state (survives plugin reload)
     const conversationIdForSend = state.currentConversationId;
-    // What this turn continues, for the path that has to pass it rather than
-    // leave it on the runtime's session. Read from the same conversation the
-    // legacy path reads, so the two cannot answer differently.
+    // What this turn continues, passed with the turn rather than left on the
+    // runtime's session: the kernel dispatches it, and a resume point held only
+    // by a runtime is one a reload or a tab switch loses.
     let resumeCheckpoint: string | undefined;
     let nativeSessionRef: string | undefined;
     if (conversationIdForSend) {
@@ -1441,16 +1441,17 @@ export class InputController {
    * Triggers AI title generation after first user message.
    * Handles setting fallback title, firing async generation, and updating UI.
    */
-  private async triggerTitleGeneration(pendingUserMessage?: ChatMessage): Promise<void> {
+  private async triggerTitleGeneration(pendingUserMessage: ChatMessage): Promise<void> {
     const { plugin, state, conversationController } = this.deps;
 
-    // The first turn of a conversation, whichever path is drawing it. On the
-    // legacy path the message is already in state by now; on the projection
-    // path it is not, because the projection draws it once the coordinator has
-    // made it durable — so the caller hands it over and the count that means
-    // "first turn" is one lower. Without this a conversation started on that
-    // path never gets a title at all.
-    if (state.messages.length !== (pendingUserMessage ? 0 : 1)) {
+    // The first turn of a conversation, which is an empty `state.messages`:
+    // the projection draws the user's message once the coordinator has made it
+    // durable, so at this point it is not in state yet and the caller hands it
+    // over instead. The parameter used to be optional, for a second path where
+    // the message *was* already in state and the count meaning "first turn" was
+    // one higher. That path is gone and its branch was unreachable — one call
+    // site, always passing the message.
+    if (state.messages.length !== 0) {
       return;
     }
 

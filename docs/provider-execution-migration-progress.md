@@ -10378,18 +10378,33 @@ callbacks) and M6 entirely.
 
 This list supersedes the numbered one further down, which was written before the chat flip.
 
-1. **Durable agents, continued.** The domain is harvested and dark; what it has no producer for is
-   an agent instance. The next slice is the thing that turns a provider's subagent into one —
-   `SubagentManager` is where that knowledge lives today, and it keeps its rendering and loses its
-   lifecycle authority. Then the work card that reads the records, and **only in that same
-   checkpoint** does tab close stop cancelling background work. Never before: the plan says so, and
-   the reason is that background work nobody can see or reattach to is worse than work that stops.
+*Re-read against the source on 2026-08-28; three of its claims had gone stale and are corrected
+here rather than left to mislead the next session.*
+
+1. **Durable agents, continued.** ~~The domain is harvested and dark~~ — **it has a producer now.**
+   `SubagentAgentRecorder` is built by `ApplicationRuntime` and observed from `Tab.ts` through
+   `recordDurableSubagent`, which records the *background* subagents — the ones with an async status
+   and a provider-assigned agent id — and `refreshBackgroundAgentCard` redraws the card by reading
+   every agent record in the vault, so an agent from a tab that has since closed appears at all.
+   What is left of this item is the half the plan names second: `SubagentManager` keeping its
+   rendering and losing its lifecycle authority. That is a 1,084-line class with twenty-two public
+   methods written against Claude's task-tool protocol, so the split is a real refactor and its
+   evidence is live transcripts, not reasoning. **Tab close still cancels**, which is correct until
+   that checkpoint: `destroyTab` detaches the projection and cancels only the tab's own in-flight
+   turn, leaving what happens to a run to the kernel.
 2. **The provider rows, by consumer.** Read *"The thirteen provider rows"* above first — eight of
    thirteen slots are the wrong shape, and picking a row before reading its consumer is how the same
-   fact got discovered five times. The registries are 44 files on the scoreboard and they empty as
-   their last consumers move.
-3. **The seam deletion**, last, because the two above are what make it possible: `StreamChunk`'s
-   lifecycle meaning, the turn metadata, the runtime interaction callbacks.
+   fact got discovered five times. ~~The registries are 44 files on the scoreboard~~ — **one registry
+   is left, at 17 files.** `ProviderRegistry` is deleted. Of `ProviderWorkspaceRegistry`'s four
+   remaining accessors, agent mentions has moved and the other three are each blocked on something
+   named: the command loader carries session-opening policy that needs a plugin and a runtime, the
+   MCP manager is held by three chat widgets by identity, and the settings renderer faces two
+   synchronous render paths against an asynchronous lookup. Its storage role — nine
+   `maybeGet<Provider>WorkspaceServices` reading `getServices` — is what remains after those.
+3. **The seam deletion**, last, because the two above are what make it possible. `ChatRuntime` and
+   the registry are gone; what the searches still hold is `StreamChunk`'s lifecycle meaning, whose
+   removal moves a coverage gate, and `buildSessionUpdates`, which waits on the coordinator taking
+   the persistence barrier.
 4. **The counts are the progress.** `structuralDeletionProgress.test.ts` holds them and goes red when
    one moves in either direction. Update it in the same commit that earns the move.
 
@@ -10401,6 +10416,38 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### M5 — a dead branch, and comments that outlived the path they describe (`this commit`)
+
+- Gates: unit 8742 passed, 8742 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **Deleted: the last unreachable branch of the legacy send path.**
+  `triggerTitleGeneration(pendingUserMessage?)` compared `state.messages.length` against *two*
+  values — `0` when the message was handed over, `1` when it was already in state — because the two
+  paths differed on when the user's message reached state. There is one path and one call site,
+  which always passes the message, so the second value was unreachable. The parameter is required
+  now and the comparison is `!== 0`. Proved by flipping it back to `1`: five `InputController` tests
+  fail.
+- **Corrected: three comments claiming a path that is gone still runs.** These matter more than
+  their size. The one at `isChatContent` said a content presenter returns the whole `StreamChunk`
+  union *because `InputController` reads framing off that channel on the legacy path* — a reason
+  that has not been true since the flip, and the reason a previous attempt in this session removed
+  the framing emission and had to be reverted against twenty-one suites. It now says what is
+  actually true: nothing receives framing, and what keeps the emission is that removing it moves
+  `wireVocabularyCoverage`'s unconsumed list. Also corrected: `tabProjectionExecution`'s reason for
+  resolving a tab's execution per use, and `ChatSurfaceRenderTarget.settled`'s description of the
+  work that follows a turn.
+- Past-tense comments describing what the old path *did*, as history for a design choice, are left
+  alone. What was corrected is the present tense.
+- **Three stale claims in this document's own "what to pick up next" are corrected in place**, since
+  a progress file that misdescribes the code is the same defect as a comment that does:
+  - durable agents' domain is **not** dark — `SubagentAgentRecorder` is built by `ApplicationRuntime`
+    and observed from `Tab.ts`, background records survive in the vault, and the card reads them
+    back, so an agent from a closed tab appears. What is left is `SubagentManager` losing lifecycle
+    authority;
+  - the registries are **not** 44 files — one registry is left, at 17;
+  - `ApplicationRuntime` is **already** the composition root: it owns `ExecutionKernelHost` and
+    `main.ts` reaches the kernel only through it.
 
 ### M5 — `src/core/providers` stops naming the plugin, except in the contracts (`this commit`)
 
@@ -10813,7 +10860,9 @@ replacing it.
    `ProviderWorkspaceCapabilities` is five resource kinds each carrying
    `{ inventory, manager, runtimeCommandDiscovery }`, and the descriptor's `workspace` map is one
    `CapabilitySupport` per key over a different key set.
-9. **The rest of M5**: durable agents, `ApplicationRuntime` as the composition root, seam deletion.
+9. **The rest of M5**: durable agents and the seam deletion. `ApplicationRuntime` is already the
+   composition root — it owns `ExecutionKernelHost`, and `main.ts` reaches the kernel only
+   through it.
    Auxiliary work and bang-bash are done.
 10. **M4's obligations are closed**, and one of them found a defect M4 had shipped on this branch:
    the conversation list was reading the versioned envelope as if it were the conversation.

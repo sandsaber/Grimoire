@@ -172,9 +172,9 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
   /**
    * Resolves when the column has done everything it has been asked for.
    *
-   * The work after a turn ends — the duration footer, the finalizations the
-   * legacy path does itself — runs against the same column, so it has to
-   * follow rather than interleave.
+   * The work after a turn ends — the duration footer, the finalizations that
+   * close an open bubble — runs against the same column, so it has to follow
+   * rather than interleave.
    */
   settled(): Promise<void> {
     return this.queue;

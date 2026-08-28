@@ -14,11 +14,10 @@ import type { TabData } from './types';
  *
  * Resolved on every use rather than built once, because a tab's provider is not
  * fixed: a blank tab derives it from the model that is picked, and a bound one
- * changes with the conversation. Built once, a tab that started on a provider
- * not on the path would stay on the legacy path after switching to one that is
- * — and worse, a tab that switched *away* would keep submitting turns under the
- * provider it left. Which provider a tab is on is the whole of what decides
- * whether it takes this path, so it is asked each time.
+ * changes with the conversation. Built once, a tab that switched provider would
+ * keep submitting turns under the provider it left — its composition, its
+ * ports, its backend. Which provider a tab is on is the whole of what this
+ * builds from, so it is asked each time.
  */
 export function resolveTabProjectionExecution(
   tab: TabData,
@@ -87,11 +86,11 @@ export function createTabProjectionExecution(
       get stream() {
         return requireStream(tab);
       },
-      // Content only. The presenter still returns the whole `StreamChunk` union
-      // because `InputController` reads turn framing off that channel on the
-      // legacy path — and a turn's shape is what the projection states here, so
-      // framing that arrived as content would be a second opinion about where
-      // this turn begins and ends.
+      // Content only. The presenter returns the whole `StreamChunk` union and
+      // two normalizers still put framing in it; a turn's shape is what the
+      // projection states here, so framing arriving as content would be a
+      // second opinion about where this turn begins and ends. Why the emission
+      // is still there rather than deleted is written at `isChatContent`.
       presentProviderContent: payload => (
         adapterOf(tab)?.surfacePorts.presentProviderContent?.(payload) ?? []
       ).filter(isChatContent),
