@@ -1890,14 +1890,15 @@ export function setupServiceCallbacks(tab: TabData, plugin: GrimoirePlugin): voi
     question: async (input, signal) =>
       await tab.controllers.inputController?.handleAskUserQuestion(input, signal) ?? null,
 
-    subagentState: () => ({
-      // The tab's own view, and the records'. The manager is per tab and is
-      // cleared on a conversation switch, so an agent started before one — or in
-      // a tab that has since closed — is in no live map here; the records are
-      // where it still exists. Either saying yes is enough, because what this
-      // decides is whether Claude may end a turn on top of running work.
-      hasRunning: tab.services.subagentManager.hasRunningSubagents()
-        || durableAgentsRunning(tab, plugin),
+    subagentState: async () => ({
+      // **The records, and only the records.** This used to union them with the
+      // tab's own live map of subagents, because a record write is asynchronous
+      // and the answer was typed as immediate — so between a subagent starting
+      // and its record landing the vault said nothing, and this decides whether
+      // Claude may end a turn on top of running work. The hook body was always
+      // `async`; once the type admitted it, the answer could wait for the
+      // recordings in flight and read one source instead of two.
+      hasRunning: await durableAgentsRunning(tab, plugin),
     }),
   });
 }

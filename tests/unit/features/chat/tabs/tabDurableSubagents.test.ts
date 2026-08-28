@@ -25,7 +25,13 @@ describe('recording a durable subagent', () => {
     };
     const plugin = {
       getApplicationRuntimeOrNull: () => ({
-        agentRecorder: { observe: (input: unknown) => { observed.push(input); } },
+        // Answers with a promise, because the real recorder does and the
+        // caller now waits for it: a stub returning nothing made the tab's
+        // "recordings in flight" set hold `undefined`, which is the shape the
+        // Stop hook's answer depends on.
+        agentRecorder: {
+          observe: async (input: unknown) => { observed.push(input); },
+        },
       }),
     };
     return { observed, plugin, tab };
@@ -102,10 +108,10 @@ describe('recording a durable subagent', () => {
       return { drawn, plugin, readCount: () => reads, tab };
     }
 
-    it('reports the records\' running agents for the conversation the tab is on', () => {
-      // Claude's `Stop` hook reads this to decide whether a turn may end. The
-      // live per-tab view cannot see an agent started before a conversation
-      // switch or in a tab that has closed; the records can.
+    it('reports the records\' running agents for the conversation the tab is on', async () => {
+      // Claude's `Stop` hook reads this to decide whether a turn may end, and
+      // it is the only thing it reads now. A live per-tab view cannot see an
+      // agent started before a conversation switch or in a tab that has closed.
       const asked: unknown[] = [];
       const tab = { state: { currentConversationId: 'conv-1' } };
       const plugin = {
@@ -119,31 +125,94 @@ describe('recording a durable subagent', () => {
         }),
       };
 
-      expect(durableAgentsRunning(tab as never, plugin as never)).toBe(true);
+      await expect(durableAgentsRunning(tab as never, plugin as never)).resolves.toBe(true);
       expect(asked).toEqual([{ kind: 'conversation', ownerId: 'conv-1' }]);
     });
 
-    it('claims nothing when the records have not been read yet', () => {
-      // `undefined` is the records saying they have not looked. It is unioned
-      // with the tab's own view, so an unknown here must not claim work the tab
-      // would not also claim — otherwise a turn blocks on nothing.
+    it('reads the records when nothing has listed this conversation yet', async () => {
+      // **`undefined` is the copy saying it has not looked, and it used to end
+      // the answer at `false`** — safe only because a live map was unioned with
+      // it. There is no live map, so an unknown has to be resolved rather than
+      // guessed: this lists the owner, which is what makes a negative answer
+      // sayable, and every write afterwards keeps the copy current.
       const tab = { state: { currentConversationId: 'conv-1' } };
+      const listed: unknown[] = [];
       const plugin = {
         getApplicationRuntimeOrNull: () => ({
-          agents: { runningOwnedAgents: () => undefined },
+          agents: {
+            runningOwnedAgents: () => undefined,
+            listOwnedAgents: async (owner: unknown) => {
+              listed.push(owner);
+              return [{ terminal: undefined }];
+            },
+          },
         }),
       };
 
-      expect(durableAgentsRunning(tab as never, plugin as never)).toBe(false);
+      await expect(durableAgentsRunning(tab as never, plugin as never)).resolves.toBe(true);
+      expect(listed).toEqual([{ kind: 'conversation', ownerId: 'conv-1' }]);
     });
 
-    it('claims nothing for a tab that owns no conversation', () => {
+    it('says a turn is unsafe to end when the records cannot be read', async () => {
+      // A vault that cannot be read cannot prove a turn is safe to end, and the
+      // hook reads a thrown answer the same way. Ending early loses an agent's
+      // work; blocking in error is undone by the agent finishing.
+      const tab = { state: { currentConversationId: 'conv-1' } };
+      const plugin = {
+        getApplicationRuntimeOrNull: () => ({
+          agents: {
+            runningOwnedAgents: () => undefined,
+            listOwnedAgents: async () => { throw new Error('vault is unreadable'); },
+          },
+        }),
+      };
+
+      await expect(durableAgentsRunning(tab as never, plugin as never)).resolves.toBe(true);
+    });
+
+    it('waits for a recording in flight before it answers', async () => {
+      // **The window the live map used to cover, and the reason there were two
+      // sources.** A subagent's state change fires a recording nobody waits
+      // for, so a question asked between the subagent starting and its record
+      // landing read the vault and found nothing — which is exactly when
+      // Claude's `Stop` hook asks, and exactly the answer that ends a turn on
+      // top of work that has just begun.
+      let land = (): void => undefined;
+      const landed = new Promise<void>(resolve => { land = resolve; });
+      let running = false;
+      const tab = {
+        providerId: 'claude' as const,
+        state: { currentConversationId: 'conv-1' },
+      };
+      const plugin = {
+        getApplicationRuntimeOrNull: () => ({
+          agentRecorder: {
+            observe: async () => {
+              await landed;
+              running = true;
+            },
+          },
+          agents: { runningOwnedAgents: () => running },
+        }),
+      };
+
+      const recording = recordDurableSubagent(tab as never, plugin as never, subagent());
+      const asked = durableAgentsRunning(tab as never, plugin as never);
+      land();
+      await recording;
+
+      // Without the wait this resolves `false` — the record had not landed —
+      // and the turn ends on top of a running agent.
+      await expect(asked).resolves.toBe(true);
+    });
+
+    it('claims nothing for a tab that owns no conversation', async () => {
       const plugin = { getApplicationRuntimeOrNull: () => ({ agents: {} }) };
 
-      expect(durableAgentsRunning(
+      await expect(durableAgentsRunning(
         { state: { currentConversationId: null } } as never,
         plugin as never,
-      )).toBe(false);
+      )).resolves.toBe(false);
     });
 
     it('clears the card for a tab that owns no conversation', async () => {

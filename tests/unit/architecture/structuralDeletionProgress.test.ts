@@ -162,40 +162,30 @@ const SEARCHES: readonly DeletionSearch[] = [
     //
     // `orphanAllActive` matched nothing when this search was written and still
     // does; it is kept because the plan names it.
-    // **The product question this named is already answered by the code, and
-    // the answer is no.** `hasRunningSubagents` reads the two *async* maps and
-    // never `syncSubagents`, so an in-turn subagent has never held a turn open;
-    // `recordDurableSubagent` says the same thing from the other side — a
-    // subagent that runs inside a turn is drawn and finished before the turn
-    // is, so there is nothing for a record to outlive. Both halves of the union
-    // in `Tab.ts` are about the same population: background subagents.
+    // **Zero, and the blocker written here twice was a type rather than a
+    // fact.** The entry used to say the live map could not go because a record
+    // write is asynchronous and Claude's `Stop` hook asks synchronously. The
+    // first half was true. The second was not: the hook's body was already
+    // `async` — only the parameter's type said the answer had to be immediate,
+    // and every layer between copied that shape from it.
     //
-    // **What actually holds it at 2 is that the union is deliberate, and both
-    // halves are load-bearing.** The records are the durable half — an agent
-    // started in a tab that has since closed is in no live map anywhere. The
-    // live map is the *synchronous* half, and Claude's `Stop` hook asks
-    // synchronously, while the record write is fire-and-forget. Deleting the
-    // live half would trade a correct two-line union for a race in the one
-    // place where losing means ending a turn on top of running work.
+    // Once the question could be awaited, the records became the single source.
+    // `durableAgentsRunning` waits for the recordings this tab has in flight —
+    // which is the window the live map existed to cover — then reads, listing
+    // the conversation's agents when nothing has listed them yet, because an
+    // unknown can no longer be softened by a second opinion. Every uncertainty
+    // answers "running": ending a turn early loses an agent's work, and a turn
+    // blocked in error is unblocked by the agent finishing.
     //
-    // The durable half got stronger on the way to writing this down, which is
-    // the useful part of having read it: `runningOwnedAgents` gated *both* its
-    // answers on the owner having been listed, so a subagent adopted a moment
-    // ago in a conversation nothing had listed read as "not running". Its copy
-    // is a subset of the store, and a subset settles a positive; only "nothing
-    // is running" needs the whole picture. It still cannot close this row —
-    // the write is asynchronous and the hook is not — but it is no longer
-    // discarding an answer it already had.
-    //
-    // Closing it needs the records to be authoritative the instant a background
-    // agent starts, which is an optimistic in-memory mark whose only purpose
-    // would be to delete this union. That is a worse codebase for a smaller
-    // number, so it is recorded rather than done.
+    // `SubagentManager` keeps its rendering, which is what M5 said it would.
+    // The sweep of terminal entries that this method did on the way past went
+    // with it: both terminal transitions delete their own entry, and `clear()`
+    // empties both maps on a conversation switch.
     what: 'SubagentManager lifecycle',
     pattern: /hasRunningSubagents|orphanAllActive/,
-    files: 2,
-    closedBy: 'not by durable agents — the live map is the synchronous half of a '
-      + 'deliberate union, and the hook that reads it cannot await a record',
+    files: 0,
+    closedBy: 'closed — the durable records are the single source, now that the '
+      + 'hook that reads them can be asked with a promise',
   },
   {
     // **Split from one search of 20, with the total preserved.** The single
@@ -399,19 +389,17 @@ describe('structural deletion progress', () => {
     // Printed by being asserted, like the live-matrix summary: a reader who
     // wants "what is left" reads this line rather than eleven assertions.
     expect(remaining.map(search => `${search.what}: ${search.files}`)).toEqual([
-      'SubagentManager lifecycle: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
     ]);
-    // **Ten of twelve are zero.** The two that are not are not blocked: each
-    // has a `closedBy` saying, in its own entry above, why what its pattern
-    // finds is correct where it is. The live subagent map is the synchronous
-    // half of a deliberate union that a synchronous hook needs; three of the
-    // four patterns in the other name content Claude's transform emits and the
-    // column draws, which durable agents cannot take over because an
-    // `AgentResultRecord` carries no tool calls.
+    // **Eleven of twelve are zero.** The one that is not is not blocked, and
+    // its entry says why: three of its four patterns name the subagent chunk
+    // vocabulary, which is `ChatContentItem` — Claude's transform emits those
+    // and `StreamController` draws them — and durable agents cannot take them
+    // over, because an `AgentResultRecord` carries no tool calls.
     //
-    // So this number stops being the milestone's score at ten, and the two
-    // entries are the reason rather than a backlog.
-    expect(SEARCHES).toHaveLength(remaining.length + 10);
+    // The row above it closed by re-reading its own recorded blocker and
+    // finding a type where it had written a fact, which is worth remembering
+    // the next time this list looks finished.
+    expect(SEARCHES).toHaveLength(remaining.length + 11);
   });
 });

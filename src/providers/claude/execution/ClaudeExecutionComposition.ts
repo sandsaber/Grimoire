@@ -380,7 +380,7 @@ export class ClaudeExecution {
         subagentState: () => {
           const provider = adapter?.interactionCallbacks().subagentState;
           return typeof provider === 'function'
-            ? (provider as () => { hasRunning: boolean })()
+            ? (provider as () => { hasRunning: boolean } | Promise<{ hasRunning: boolean }>)()
             : { hasRunning: false };
         },
         });

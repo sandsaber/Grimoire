@@ -40,7 +40,8 @@ export interface ClaudeExecutionRequest {
    * working must not end the turn under it. A turn that carries no answer keeps
    * the environment's, which blocks nothing.
    */
-  readonly subagentState?: () => { readonly hasRunning: boolean };
+  readonly subagentState?: () => { readonly hasRunning: boolean }
+    | Promise<{ readonly hasRunning: boolean }>;
 }
 
 /**

@@ -486,36 +486,19 @@ export class SubagentManager {
     this.onStateChange(subagent);
   }
 
-  // ============================================
-  // Hook State
-  // ============================================
-
-  public hasRunningSubagents(): boolean {
-    const isTerminal = (subagent: SubagentInfo | undefined): boolean =>
-      subagent?.asyncStatus === 'completed' ||
-      subagent?.asyncStatus === 'error' ||
-      subagent?.asyncStatus === 'orphaned';
-
-    let hasRunning = false;
-
-    for (const [taskToolId, subagent] of this.pendingAsyncSubagents) {
-      if (isTerminal(subagent)) {
-        this.pendingAsyncSubagents.delete(taskToolId);
-      } else {
-        hasRunning = true;
-      }
-    }
-
-    for (const [agentId, subagent] of this.activeAsyncSubagents) {
-      if (isTerminal(subagent)) {
-        this.activeAsyncSubagents.delete(agentId);
-      } else {
-        hasRunning = true;
-      }
-    }
-
-    return hasRunning;
-  }
+  // **This is where "does this tab have a subagent running" used to live**, and
+  // the answer is the durable records' now — `durableAgentsRunning` in
+  // `tabDurableSubagents.ts`. It was here because a record write is
+  // asynchronous while the question's answer was typed as immediate, so the tab
+  // had to keep its own live map and union the two; the hook body was always
+  // `async`, and once its type admitted that, the records could be waited for
+  // and read alone. This manager keeps its rendering, which is what M5 said it
+  // would.
+  //
+  // It also pruned terminal entries from the two async maps as it went. Both
+  // terminal paths above delete their own entry, and `clear()` empties both on
+  // a conversation switch, so the sweep was a second answer to a question the
+  // transitions already answer.
 
   // ============================================
   // Lifecycle

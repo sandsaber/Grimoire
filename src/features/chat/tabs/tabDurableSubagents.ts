@@ -29,41 +29,103 @@ export function recordDurableSubagent(
   if (!runtime) {
     return Promise.resolve();
   }
-  return runtime.agentRecorder.observe({
+  return track(tab, runtime.agentRecorder.observe({
     conversationId,
     goal: subagent.description,
     nativeAgentRef: subagent.agentId,
     providerId: tab.providerId,
     status,
     ...(subagent.result ? { resultText: subagent.result } : {}),
-  });
+  }));
 }
 
 /**
- * Whether this conversation has a background agent still going, from the records.
+ * The recordings this tab has started and not finished.
  *
- * **Why the tab's own view is not enough.** The live subagent tracking is per
- * tab and is cleared when the tab changes conversation, so a background agent
- * started before a switch — or in a tab that has since closed — is in no live
- * map here.
- * Claude's `Stop` hook reads this to decide whether a turn may end, and ending
- * one on top of running work is the failure the durable records exist to
- * prevent.
- *
- * `false` when the records have nothing to say, including when they have not
- * been read yet: the caller unions this with the live view, so an unknown here
- * must not claim work that the tab would not also claim.
+ * **The one thing that made the records unusable as the single source.** A
+ * subagent's state change fires a recording that nobody waits for, so a
+ * question asked in the moment between the subagent starting and its record
+ * landing read the vault and found nothing — which is the exact question
+ * Claude's `Stop` hook asks, and the exact answer that ends a turn on top of
+ * work that has just begun. Waiting for them closes that window, and it is a
+ * wait of one file write.
  */
-export function durableAgentsRunning(tab: TabData, plugin: GrimoirePlugin): boolean {
-  const conversationId = tab.state.currentConversationId;
+const inFlight = new WeakMap<TabData, Set<Promise<void>>>();
+
+function track(tab: TabData, recording: Promise<void>): Promise<void> {
+  const pending = inFlight.get(tab) ?? new Set<Promise<void>>();
+  inFlight.set(tab, pending);
+  pending.add(recording);
+  return recording.finally(() => {
+    pending.delete(recording);
+  });
+}
+
+/** Resolves once every recording this tab has started has landed. */
+export async function durableSubagentsSettled(tab: TabData): Promise<void> {
+  // Re-read after each pass: a recording can start another — a terminal
+  // observation appends a result — and settling has to mean settled.
+  for (let pass = 0; pass < 8; pass += 1) {
+    const pending = inFlight.get(tab);
+    if (!pending || pending.size === 0) {
+      return;
+    }
+    await Promise.allSettled([...pending]);
+  }
+}
+
+/**
+ * Whether this conversation has a background agent still going.
+ *
+ * **The single source, which it was not able to be until the question could be
+ * awaited.** Claude's `Stop` hook decides with this whether a turn may end, and
+ * ending one on top of running work is the failure the durable records exist to
+ * prevent. The tab used to union this with a live map of its own subagents,
+ * because two things were true at once: a record write is asynchronous, and the
+ * hook's answer was typed as immediate. The second is no longer true — the hook
+ * body was always `async` — so this waits for the recordings in flight and then
+ * reads, and the live map is deleted.
+ *
+ * What the records still give that no live map could: an agent started in a tab
+ * that has since closed, or before a conversation switch, is in no live map
+ * anywhere and is in the vault.
+ *
+ * Every uncertainty answers "running". A turn that ends early on top of a live
+ * subagent loses its work; a turn blocked in error is unblocked by the agent
+ * finishing.
+ */
+export async function durableAgentsRunning(
+  tab: TabData,
+  plugin: GrimoirePlugin,
+): Promise<boolean> {
   const runtime = plugin.getApplicationRuntimeOrNull?.();
-  if (!runtime || !conversationId) {
+  if (!runtime) {
+    // Nothing has been recorded because there is nothing to record with. A tab
+    // whose kernel has not started has run no subagents.
     return false;
   }
-  return runtime.agents.runningOwnedAgents({
-    kind: 'conversation',
-    ownerId: conversationId,
-  }) ?? false;
+  // **Before reading, not after.** The window this closes is the whole reason
+  // the tab used to keep a live map beside the records.
+  await durableSubagentsSettled(tab);
+  const conversationId = tab.state.currentConversationId;
+  if (!conversationId) {
+    return false;
+  }
+  const owner = { kind: 'conversation' as const, ownerId: conversationId };
+  const cached = runtime.agents.runningOwnedAgents(owner);
+  if (cached !== undefined) {
+    return cached;
+  }
+  // Unknown means this process has not read this owner's agents. Reading them
+  // is what makes the negative answer sayable, and it is asked once per
+  // conversation — every write afterwards keeps the copy current.
+  try {
+    return (await runtime.agents.listOwnedAgents(owner)).some(agent => !agent.terminal);
+  } catch {
+    // A vault that cannot be read cannot prove a turn is safe to end. The hook
+    // reads a thrown answer as "still running", and so does this.
+    return true;
+  }
 }
 
 /**

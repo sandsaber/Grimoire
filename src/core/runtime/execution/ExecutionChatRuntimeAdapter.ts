@@ -1458,8 +1458,14 @@ export interface ExecutionInteractionCallbacks {
    * composition can disagree about what a mode is.
    */
   readonly permissionModeSync?: (sdkMode: string) => void;
-  /** Whether the tab has a subagent running, which a stop hook must not cut off. */
-  readonly subagentState?: () => SubagentRuntimeState;
+  /**
+   * Whether the tab has a subagent running, which a stop hook must not cut off.
+   *
+   * May answer with a promise: the answer comes from durable records, and a
+   * conversation nothing has listed yet has to be read before it can be
+   * answered for.
+   */
+  readonly subagentState?: () => SubagentRuntimeState | Promise<SubagentRuntimeState>;
 }
 
 /** The same names, writable, for the one object that owns them. */

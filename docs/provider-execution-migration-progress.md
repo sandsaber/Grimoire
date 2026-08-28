@@ -10450,6 +10450,34 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — `SubagentManager lifecycle` closes, and the blocker was a type (`this commit`)
+
+**Eleven of twelve searches are zero.** This entry had said twice, at length, that the row could not
+close: a record write is asynchronous and Claude's `Stop` hook asks synchronously, so the tab had to
+keep a live map of its own subagents beside the durable records and union the two. The first half
+was true. **The second was not** — the hook's body was already `async`, and only the parameter's type
+said the answer had to be immediate. Every layer between had copied that shape from it.
+
+- Gates: unit 8749 passed, 8749 total (554 suites); integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- **What made the records sufficient, once the question could be awaited.** `durableAgentsRunning`
+  waits for the recordings this tab has in flight — the window the live map existed to cover, and a
+  wait of one file write — and then reads. Where nothing has listed the conversation it lists it,
+  because an unknown can no longer be softened by a second opinion, and every uncertainty answers
+  "running": a turn that ends early on top of a live subagent loses its work, while a turn blocked in
+  error is unblocked by the agent finishing.
+- **Proven by removing the wait**: the new test — a recording deliberately held mid-flight while the
+  hook asks — is the only one that fails, and it resolves `false`, which is the turn ending on top of
+  a running agent.
+- `SubagentManager` keeps its rendering, which is what M5 said it would. Its sweep of terminal
+  entries went with the query: both terminal transitions delete their own entry and `clear()` empties
+  both maps on a conversation switch, so the sweep was a second answer to a question the transitions
+  already answer. Nine tests characterising the deleted method went too, replaced by five over the
+  records.
+- **The lesson, because it cost two write-ups to find.** A recorded blocker is worth re-reading
+  against the code every time it is quoted. This one named a constraint that the code did not have,
+  and it survived two careful passes because each of them quoted the previous one.
+
 ### M5 — an unknown was erasing a known running agent (`this commit`)
 
 **Found by writing down why `SubagentManager lifecycle` cannot close.** `runningOwnedAgents` gated
