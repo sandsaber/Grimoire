@@ -214,7 +214,18 @@ const SEARCHES: readonly DeletionSearch[] = [
     // because what it counts is the shape, not the class: what is left is
     // `ProviderWorkspaceRegistry`, across the feature layer, `main.ts`, and the
     // nine provider files that publish its accessors.
-    files: 17,
+    // **16.** `modelRouting` left it by having a comment corrected: it named the
+    // chat registry as the class its two statics came off, and that class is
+    // deleted.
+    //
+    // `ClaudeConversationHistoryService` was tried and put back. Reaching
+    // `maybeGetClaudeWorkspaceServices()` instead of the registry — the same
+    // move the compositions took — introduces a **circular import**: the
+    // workspace services reach the history service, so at module init the class
+    // is `undefined` and every suite importing Claude fails to load. The
+    // registry's indirection is breaking that cycle, which is a reason to keep
+    // it that no reading of the call site would have shown.
+    files: 16,
     closedBy: 'the provider rows, when the last consumer of each has moved',
   },
 ];
@@ -257,7 +268,7 @@ describe('structural deletion progress', () => {
       'SubagentManager lifecycle: 7',
       'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
-      'the registries — one left: 17',
+      'the registries — one left: 16',
     ]);
     // Five of twelve are zero: two closed in the 2026-08-27 session, the
     // interaction callbacks closed with the first step of the seam deletion,

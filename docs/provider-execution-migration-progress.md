@@ -10445,6 +10445,24 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — one registry file leaves, and one turns out to be holding a cycle open (`this commit`)
+
+- Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean.
+- **17 → 16.** `modelRouting` left the count by having a comment corrected. It said its two statics
+  "were `ProviderRegistry` statics because they read `getChatUIConfig`" — a class that is deleted.
+- **`ClaudeConversationHistoryService` was tried and put back, and the reason is worth more than the
+  count.** It reads `getServices('claude')` to find Claude's config directory, so the obvious move
+  was the one the nine compositions took: ask `maybeGetClaudeWorkspaceServices()` instead. That
+  **introduces a circular import** — the workspace services reach the history service — and at module
+  init `ClaudeConversationHistoryService` is `undefined`, so every suite importing Claude fails to
+  load. The registry's indirection is breaking that cycle. Nothing about reading the call site says
+  so; it took running it.
+- **What caught it was the test *count*, not a failure.** The run reported "1 failed" — the count
+  gate — while quietly dropping from 8,742 tests to 6,636, because five suites never loaded. A red
+  suite is loud; a suite that does not run is silent, and the only visible symptom was a number
+  2,100 lower than the last one. Worth remembering: after a change to an import, read the totals,
+  not just the failures.
+
 ### M5 — four copies of the session-opening rule become one (`this commit`)
 
 - Gates: unit 8742 passed, 8742 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;

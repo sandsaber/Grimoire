@@ -4,12 +4,12 @@ import { DEFAULT_CHAT_PROVIDER_ID, type ProviderId } from './types';
 /**
  * Which provider owns a model, and which provider a settings record is on.
  *
- * **Routing, not presentation.** These were `ProviderRegistry` statics because
- * they read `getChatUIConfig` — but what they ask it is who owns a model id,
- * not how to draw one, and the registry was only ever the way to reach the
- * config. They read `providerCatalog().declarations(...).chatUI.models` now,
- * which is the same question asked of the module, and they are the last two
- * readers the chat-UI row had.
+ * **Routing, not presentation.** These were statics on the chat registry
+ * because they read its chat-UI config — but what they ask it is who owns a
+ * model id, not how to draw one, and the registry was only ever the way to
+ * reach the config. They read `providerCatalog().declarations(...).chatUI.models`
+ * now, which is the same question asked of the module; they were the last two
+ * readers the chat-UI row had, and the class they came off is deleted.
  */
 
 /**
