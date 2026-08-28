@@ -9646,6 +9646,26 @@ Two questions to settle before writing it, both recorded rather than guessed:
 
 #### Where to pick this up
 
+**Four rows moved in the 2026-08-28 session** — the chat UI, the settings reconciler, the command
+catalog and CLI resolution — and the entries below record each in turn, newest first. What is left,
+in the order it can be taken:
+
+| Next | Why it is next |
+|---|---|
+| **`mcpStorage` + `mcpServerManager`** | One consumer, `McpSettingsManager`, which every provider's settings tab constructs over the same `AppMcpStorage`. A toggle port facing a CRUD consumer, and a row typed as a **concrete class** so nothing else can satisfy it. Design both together or the second reshape undoes the first. |
+| **`settingsTabRenderer`** | The contract is the *context*, not the method: seven host-supplied members against a `render(host: unknown)`. It is also one of the two members still stubbed in every module context. |
+| **`historyService`** | Three unrelated operations sharing a name, and it needs a home decision first: `ProviderHistoryPort` hangs off `ProviderRuntimePorts`, which is bound to a conversation, while the row is workspace-global. |
+| *(waiting)* `runtimeCommandLoader`, `taskResultInterpreter`, `subagentLifecycleAdapter` | All three are shaped around something being deleted — a `ChatRuntime` for the first, `SubagentManager` and `MessageRenderer` for the other two. |
+
+Then: the registry deletion needs `historyService` plus the two durable-agents rows plus
+`createRuntime`; the seam deletion and M6 are untouched.
+
+**Two rows in a row turned out not to be workspace services at all** — the command dropdown and CLI
+resolution — and both were found by the same question: *which of this row's consumers are
+synchronous, and why?* A workspace is built lazily and reached asynchronously, so any consumer that
+cannot wait is a consumer telling you the thing it needs is a declaration. Worth asking of every
+remaining row before designing its slot.
+
 **The chat-UI row is moved.** All twenty-three consumers read
 `providerCatalog().declarations(id).chatUI`, `chatUIConfig` is gone from `ProviderRegistration`,
 and the row's verdict in [`provider-row-slot-fit.md`](provider-row-slot-fit.md) is `moved` — the one
