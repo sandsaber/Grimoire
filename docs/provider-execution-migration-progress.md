@@ -10445,6 +10445,30 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the invalidation signal, characterized rather than argued about (`this commit`)
+
+- Gates: unit 8744 passed, 8744 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- The entry below left one thing between `buildSessionUpdates` and the coordinator's barrier:
+  `sessionInvalidated`, a tab-scoped one-shot the kernel cannot see. Rather than reason about which
+  tab's should count, the behaviour is now **written down as tests**, because reasoning about this
+  file has already been wrong once in this session.
+- **Two tabs, one conversation, and they do not share an adapter.** An adapter that bound
+  `session-from-this-tab` and is then re-synced to `session-from-the-other-tab` reports
+  `consumeSessionInvalidation()` as **true** — so the second tab can be told to clear a session the
+  first one just established, because the save path writes the id or `null` on that one-shot. And it
+  is a one-shot: the second read is `false`, which is what makes *which tab saves next* decide the
+  outcome.
+- The guard that stops the obvious version of this is also pinned: a conversation arriving with an
+  id the adapter has not bound before is the tab learning where it is, not the session changing, so
+  a cold tab does not clear anything. Removing `boundSessionId !== undefined` fails that test.
+- **Not called a defect.** Whether the two-tab sequence is reachable in a running plugin depends on
+  save ordering that a live session would settle and reasoning would not — and the same reasoning
+  produced a wrong finding about the session record earlier today. What it is, definitely, is the
+  shape of the thing any relocation has to answer: **conversation-scoped facts (a provider refused
+  the resume) and tab-scoped ones (this adapter is stale) are both riding one boolean.** Owner: M5,
+  with whoever moves the write.
+
 ### M5 — the session binding gets coverage that runs, before anything moves it (`this commit`)
 
 - Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean.
