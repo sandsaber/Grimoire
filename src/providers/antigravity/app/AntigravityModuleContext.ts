@@ -1,3 +1,4 @@
+import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
 import type GrimoirePlugin from '../../../main';
 import { createWorkspaceContextSlots } from '../../shared/workspaceContextSlots';
 import type { AntigravityWorkspaceContext } from '../AntigravityProviderModule';
@@ -26,5 +27,13 @@ export function createAntigravityModuleContext(
   return {
     listModels: () => workspace.listModels(),
     refreshModels: () => workspace.refreshModels(),
+    renderSettingsTab: host => {
+      const rendered = host as {
+        container: HTMLElement;
+        context: Parameters<ProviderSettingsTabRenderer['render']>[1];
+      };
+      maybeGetAntigravityWorkspaceServices()?.settingsTabRenderer
+        ?.render(rendered.container, rendered.context);
+    },
   };
 }

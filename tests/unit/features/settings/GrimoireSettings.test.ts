@@ -600,8 +600,8 @@ describe('GrimoireSettingTab settings hub', () => {
     // so it asserts it of the path that carries it now.
     const refreshes = Object.fromEntries(providerIds.map(providerId => [providerId, jest.fn()]));
     (tab as any).plugin.getApplicationRuntimeOrNull = () => ({
-      builtWorkspaceFor: (providerId: string) => (
-        refreshes[providerId] ? { agentMentions: { refresh: refreshes[providerId] } } : null
+      workspaceFor: async (providerId: string) => (
+        refreshes[providerId] ? { agentMentions: { refresh: refreshes[providerId] } } : {}
       ),
     });
 

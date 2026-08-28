@@ -4,11 +4,19 @@ import { resolve } from 'node:path';
 /**
  * How much of each provider's module context is real.
  *
- * Down from ten-to-twelve stubs per provider to at most two, and the two that
- * remain are not wiring. `renderSettingsTab` faces a slot that types the host
- * as `unknown` against a seven-member context, and `listSessionCommands` faces
- * a slot taking a session id while the real loader takes a runtime. Both close
- * with their row's reshape.
+ * Down from ten-to-twelve stubs per provider to at most one, and the one that
+ * remains is not wiring: `listSessionCommands` faces a slot taking a session id
+ * while the real loader takes a runtime, and closes with that row's reshape.
+ *
+ * `renderSettingsTab` used to be counted beside it, recorded as blocked because
+ * the slot types its host as `unknown` while the real renderer takes a
+ * container *and* a context. Codex had already answered that: `unknown` is what
+ * lets a provider pass `{ container, context }` through a contract that must
+ * learn no DOM vocabulary, and unpack it on its own side. The other eight now
+ * do the same, and Antigravity — which had no such slot — declares one. What
+ * still blocks the *row* is its consumers: both are synchronous render paths
+ * and the workspace lookup is asynchronous, and one of them post-processes the
+ * DOM it just drew.
  *
  * `ProviderModule` says a provider's workspace slots are filled by
  * `workspace.initialize(context)`, and all nine modules fill them. What the
@@ -27,16 +35,16 @@ import { resolve } from 'node:path';
  */
 
 const CONTEXTS: ReadonlyArray<{ providerId: string; path: string; notWired: number }> = [
-  { providerId: 'claude', path: 'src/providers/claude/app/ClaudeModuleContext.ts', notWired: 1 },
-  // The only context that is entirely real, which is why Codex is the only
-  // provider whose workspace is initialized today.
+  { providerId: 'claude', path: 'src/providers/claude/app/ClaudeModuleContext.ts', notWired: 0 },
+  // The context every other one was measured against: it was the only entirely
+  // real one, and the pattern that made it so is what the other eight adopted.
   { providerId: 'codex', path: 'src/providers/codex/app/CodexModuleContext.ts', notWired: 0 },
-  { providerId: 'gemini', path: 'src/providers/gemini/app/GeminiModuleContext.ts', notWired: 1 },
-  { providerId: 'grok', path: 'src/providers/grok/app/GrokModuleContext.ts', notWired: 2 },
-  { providerId: 'kimicode', path: 'src/providers/kimicode/app/KimicodeModuleContext.ts', notWired: 2 },
-  { providerId: 'mimocode', path: 'src/providers/mimocode/app/MimocodeModuleContext.ts', notWired: 2 },
-  { providerId: 'opencode', path: 'src/providers/opencode/app/OpencodeModuleContext.ts', notWired: 2 },
-  { providerId: 'qwen', path: 'src/providers/qwen/app/QwenModuleContext.ts', notWired: 1 },
+  { providerId: 'gemini', path: 'src/providers/gemini/app/GeminiModuleContext.ts', notWired: 0 },
+  { providerId: 'grok', path: 'src/providers/grok/app/GrokModuleContext.ts', notWired: 1 },
+  { providerId: 'kimicode', path: 'src/providers/kimicode/app/KimicodeModuleContext.ts', notWired: 1 },
+  { providerId: 'mimocode', path: 'src/providers/mimocode/app/MimocodeModuleContext.ts', notWired: 1 },
+  { providerId: 'opencode', path: 'src/providers/opencode/app/OpencodeModuleContext.ts', notWired: 1 },
+  { providerId: 'qwen', path: 'src/providers/qwen/app/QwenModuleContext.ts', notWired: 0 },
 ];
 
 /**
@@ -48,6 +56,12 @@ const CONTEXTS: ReadonlyArray<{ providerId: string; path: string; notWired: numb
  * and in the direction that flatters the number. A counter that can only be
  * wrong downwards is worse than no counter.
  */
+/** Not in `CONTEXTS`: it stubs nothing, so it has no count to record there. */
+const ANTIGRAVITY_CONTEXT = {
+  providerId: 'antigravity',
+  path: 'src/providers/antigravity/app/AntigravityModuleContext.ts',
+};
+
 function stubbedMembers(path: string): string[] {
   const source = readFileSync(resolve(process.cwd(), path), 'utf8');
   return [
@@ -61,18 +75,37 @@ describe('provider module context wiring', () => {
     expect(stubbedMembers(path)).toHaveLength(notWired);
   });
 
+  /**
+   * Every context reaches its *own* provider's services.
+   *
+   * The nine `renderSettingsTab` bodies were written by one scripted pass over
+   * nine files, and the defect that pass produces is a provider forwarding to a
+   * neighbour's accessor: it typechecks, it runs, and it draws the wrong
+   * settings tab. Nothing else would catch it, because both sides are real.
+   */
+  it.each([...CONTEXTS, ANTIGRAVITY_CONTEXT].map(context => [context.providerId, context] as const))(
+    '%s forwards to its own workspace services',
+    (providerId, context) => {
+      const source = readFileSync(resolve(process.cwd(), context.path), 'utf8');
+      const accessors = [...source.matchAll(/maybeGet(\w+)WorkspaceServices/g)]
+        .map(match => match[1].toLowerCase());
+
+      expect([...new Set(accessors)]).toEqual([providerId]);
+    },
+  );
+
   it('says in one place how much of the module contract is real', () => {
-    // Antigravity has no module context at all: its workspace contribution is
-    // built inline and covers two slots, so there is nothing here to stub.
+    // Antigravity is absent because it is measured with the rest below: it has
+    // a context now, with nothing stubbed in it.
     expect(CONTEXTS.map(context => `${context.providerId}: ${context.notWired}`)).toEqual([
-      'claude: 1',
+      'claude: 0',
       'codex: 0',
-      'gemini: 1',
-      'grok: 2',
-      'kimicode: 2',
-      'mimocode: 2',
-      'opencode: 2',
-      'qwen: 1',
+      'gemini: 0',
+      'grok: 1',
+      'kimicode: 1',
+      'mimocode: 1',
+      'opencode: 1',
+      'qwen: 0',
     ]);
   });
 

@@ -9,6 +9,8 @@ import { kimicodeChatUIConfig } from '@/providers/kimicode/ui/KimicodeChatUIConf
 import { createWorkspaceContextSlots } from '@/providers/shared/workspaceContextSlots';
 import { getVaultPath } from '@/utils/path';
 
+import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
+
 /**
  * What one tab's conversation is, read when it is asked for.
  *
@@ -89,8 +91,13 @@ export function createKimicodeModuleContext(
     // context is not bound to one. The row that owns them takes a runtime; its
     // slot takes a session id, which is the reshape that closes this.
     listSessionCommands: () => notWired('listSessionCommands'),
-    renderSettingsTab: () => {
-      void notWired('renderSettingsTab');
+    renderSettingsTab: host => {
+      const rendered = host as {
+        container: HTMLElement;
+        context: Parameters<ProviderSettingsTabRenderer['render']>[1];
+      };
+      maybeGetKimicodeWorkspaceServices()?.settingsTabRenderer
+        ?.render(rendered.container, rendered.context);
     },
     dispose: async () => {
       // Nothing here outlives a turn: the history service is a stateless

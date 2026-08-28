@@ -82,6 +82,7 @@ const KNOWN_SETTINGS_FIELDS = new Set([
 export interface AntigravityWorkspaceContext {
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
+  renderSettingsTab(host: unknown): void;
 }
 
 /**
@@ -249,6 +250,7 @@ AntigravityProviderSettings
           list: () => context.listModels(),
           refresh: () => context.refreshModels(),
         },
+        settingsPresentation: { render: host => context.renderSettingsTab(host) },
       };
     },
     dispose: async () => {

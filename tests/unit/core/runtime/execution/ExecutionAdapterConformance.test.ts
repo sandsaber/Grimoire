@@ -1026,6 +1026,7 @@ describe('the assembled ChatRuntime adapter', () => {
       antigravityProviderModule.runtimePorts({
         listModels: async () => [],
         refreshModels: async () => [],
+        renderSettingsTab: () => undefined,
       }),
     ).steer).toBeUndefined();
   });
@@ -1372,6 +1373,7 @@ describe('concurrent readiness', () => {
       antigravityProviderModule.runtimePorts({
         listModels: async () => [],
         refreshModels: async () => [],
+        renderSettingsTab: () => undefined,
       }),
     );
 

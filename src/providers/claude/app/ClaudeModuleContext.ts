@@ -1,3 +1,4 @@
+import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
 import type { BoundConversation } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { Conversation } from '../../../core/types';
 import type GrimoirePlugin from '../../../main';
@@ -109,8 +110,13 @@ export function createClaudeModuleContext(
     // catalog above, which is what the `static` command-discovery capability
     // says.
     listSessionCommands: async () => [],
-    renderSettingsTab: () => {
-      void notWired('renderSettingsTab');
+    renderSettingsTab: host => {
+      const rendered = host as {
+        container: HTMLElement;
+        context: Parameters<ProviderSettingsTabRenderer['render']>[1];
+      };
+      maybeGetClaudeWorkspaceServices()?.settingsTabRenderer
+        ?.render(rendered.container, rendered.context);
     },
     dispose: async () => {
       // Nothing is created here that outlives a turn: the history service and
@@ -134,9 +140,3 @@ function matching(
   return bound as unknown as Conversation;
 }
 
-function notWired(slot: string): Promise<never> {
-  return Promise.reject(new Error(
-    `Claude workspace slot "${slot}" is served by the legacy workspace registration, `
-    + 'not by this context.',
-  ));
-}

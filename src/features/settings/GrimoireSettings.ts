@@ -1527,12 +1527,14 @@ export class GrimoireSettingTab extends PluginSettingTab {
         ? {
             deleteResource: async (): Promise<void> => {
               await storage.delete(definition);
-              // Asked of the workspace only if one is already built, which is
-              // what the registry accessor did: a mention refresh is not a
-              // reason to stand a provider's workspace up.
+              // `workspaceFor`, not `builtWorkspaceFor`: the registry this
+              // replaces was populated for every provider at load, so its
+              // accessor was never empty in a running plugin. Asking only for
+              // an already-built workspace would have skipped the refresh for
+              // any provider whose composition had not been used yet.
               await this.plugin.getApplicationRuntimeOrNull()
-                ?.builtWorkspaceFor(providerId)
-                ?.agentMentions?.refresh();
+                ?.workspaceFor(providerId)
+                .then(workspace => workspace.agentMentions?.refresh());
             },
           }
         : {}),

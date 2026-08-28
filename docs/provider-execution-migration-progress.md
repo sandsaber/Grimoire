@@ -10402,16 +10402,60 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the review pass: a wrong blocker, and a regression caught before it shipped (`this commit`)
+
+The 25-step review the owner asked for, run over the four commits above. It changed two of their
+conclusions, which is the reason to run it.
+
+- Gates: unit 8741 passed, 8741 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+
+**A regression, caught and fixed before it reached a user.** The commit above moved the agent-mention
+refresh to `builtWorkspaceFor`, reasoning that the registry accessor was a no-op when no workspace
+was up. `main.ts` calls `initializeAll` over every catalog id at load, so the registry's services
+existed for all nine providers in any running plugin — its accessor was *never* empty — while the
+composition's workspace holder is built lazily on first use. The refresh would have silently stopped
+for any provider whose composition had not been touched. It is `workspaceFor` now, and the test
+double moved with it. **The general shape of the mistake is worth keeping:** two lifecycles named
+almost the same thing, one eager and one lazy, and a "matches the old semantics" argument that
+compared the wrong pair.
+
+**A blocker that was not one.** `getSettingsTabRenderer` was recorded as blocked because the real
+renderer takes a container and a context while `ProviderSettingsPresentationPort.render(host)` takes
+one opaque argument. Codex had already solved that: `unknown` is exactly what lets a provider pass
+`{ container, context }` through a contract that must learn no DOM vocabulary and unpack it on its
+own side. The claim that "every one of them resolves to `notWired`" was also false — Codex was
+wired, and checking only Claude is how the claim was made.
+
+- **All nine contexts now render for real.** The seven remaining `notWired` stubs adopted Codex's
+  pattern, and Antigravity — which had no such slot — gained one, along with the
+  `settingsPresentation` slot in its workspace contribution. `moduleContextWiring.test.ts` records
+  the fall: claude 1→0, gemini 1→0, qwen 1→0, grok 2→1, kimicode 2→1, mimocode 2→1, opencode 2→1.
+  Every provider is now at most one stub from real, and the one left is `listSessionCommands`.
+- **A new gate for the defect a scripted nine-file pass actually produces.** Nine near-identical
+  bodies written in one scripted edit fail by forwarding to a *neighbour's* accessor: it typechecks,
+  it runs, and it draws the wrong provider's settings tab, with both sides real so nothing notices.
+  Each context is now asserted to name only its own `maybeGet<Provider>WorkspaceServices`. Proved by
+  pointing Qwen's at Grok's: one failure, the rest green.
+- **The row is still blocked, for a different reason than recorded.** Not shape — consumers. Both
+  `renderProvidersHub` and `renderWorkspaceProviderSection` are synchronous render paths while the
+  workspace lookup is asynchronous, and the second post-processes the DOM it has just drawn
+  (`extractWorkspaceProviderSection` over a staging div). Owner: the settings tab rework, as before,
+  but on the consumer side.
+
 ### M5 — the agent-mention row, and why the other three are not mechanical (`this commit`)
 
 - Gates: unit 8732 passed, 8732 total; `tsc --noEmit` clean; `npm run lint` clean.
 - **Row moved: agent mentions.** `GrimoireSettings` asked
   `ProviderWorkspaceRegistry.refreshAgentMentions(providerId)` when a stored agent was deleted; it
-  asks the built workspace's `agentMentions.refresh()` now. `builtWorkspaceFor` rather than
-  `workspaceFor` **on purpose**: the async one *builds* the workspace if none exists, and the
-  registry accessor was `getServices(id)?.refreshAgentMentions?.()` — a no-op when nothing was up.
-  A mention refresh is not a reason to stand a provider's workspace up, and the first version of
-  this change quietly made it one. The registry static is deleted.
+  asks `workspaceFor(providerId)`'s `agentMentions.refresh()` now. The registry static is deleted.
+  **Corrected in the commit below this entry:** this first shipped as `builtWorkspaceFor`, on the
+  reasoning that the registry accessor was a no-op when nothing was up, so a mention refresh should
+  not stand a workspace up. The reasoning was wrong. `main.ts` calls
+  `manager.initializeAll(providerCatalog().ids())` at load, so the registry held services for every
+  provider in any running plugin and its accessor was never empty — while the composition's
+  workspace holder is lazy. Asking only for an already-built workspace would have silently skipped
+  the refresh for any provider whose composition had not been used yet.
 - **A guarantee moved rather than being dropped.** The registry's own test asserted a refresh for
   one provider does not reach another. Its subject is gone, so the assertion is folded into the
   consumer test that already says *"keeps providers independent"* in its name — each provider's
@@ -10434,11 +10478,10 @@ composition root, and the seam deletion.
     dropdown opens, so it holds the manager by identity and a snapshot will not do.
     `ProviderMcpPort` is `load`/`save`, both async. Owner: whoever decides whether the port grows a
     synchronous snapshot or the widget takes an async provider;
-  - `getSettingsTabRenderer` (two consumers). `settingsPresentation` is declared and filled by eight
-    modules, and every one of them resolves to `notWired`. The real renderer also takes a second
-    argument — the settings renderer context — that the slot deliberately cannot carry, because a
-    contract that learns DOM vocabulary is a plan stop condition. Owner: the settings tab rework the
-    slot's own comment names.
+  - `getSettingsTabRenderer` (two consumers). **Half of this was wrong, and is corrected in the
+    commit below this entry.** Recorded here as blocked on shape — the real renderer takes a
+    container *and* a context, and the slot types its host as `unknown` — which the review found
+    Codex had already answered. Owner: the settings tab rework the slot's own comment names.
 
 ### M5 — `ProviderRegistry` is deleted (`this commit`)
 

@@ -71,6 +71,7 @@ describe('Antigravity provider module', () => {
       const ports = antigravityProviderModule.runtimePorts({
         listModels: async () => [],
         refreshModels: async () => [],
+        renderSettingsTab: () => undefined,
       });
 
       expect(ports.history).toBeUndefined();
@@ -156,6 +157,7 @@ describe('Antigravity provider module', () => {
     const context = {
       listModels: jest.fn().mockResolvedValue([{ id: 'a', label: 'A' }]),
       refreshModels: jest.fn().mockResolvedValue([{ id: 'b', label: 'B' }]),
+      renderSettingsTab: jest.fn(),
     };
 
     it('exposes only the slots this provider actually has', async () => {

@@ -7,6 +7,8 @@ import { GeminiConversationHistoryService } from '@/providers/gemini/history/Gem
 import { geminiChatUIConfig } from '@/providers/gemini/ui/GeminiChatUIConfig';
 import { createWorkspaceContextSlots } from '@/providers/shared/workspaceContextSlots';
 
+import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
+
 /**
  * What one tab's conversation is, read when it is asked for.
  *
@@ -74,8 +76,13 @@ export function createGeminiModuleContext(
       return bound ? history.isPendingForkConversation(bound) : false;
     },
     ...workspace,
-    renderSettingsTab: () => {
-      void notWired('renderSettingsTab');
+    renderSettingsTab: host => {
+      const rendered = host as {
+        container: HTMLElement;
+        context: Parameters<ProviderSettingsTabRenderer['render']>[1];
+      };
+      maybeGetGeminiWorkspaceServices()?.settingsTabRenderer
+        ?.render(rendered.container, rendered.context);
     },
     dispose: async () => {
       // Nothing here outlives a turn: the history service is a stateless
@@ -99,9 +106,3 @@ function matching(
   return bound as unknown as Conversation;
 }
 
-function notWired(slot: string): Promise<never> {
-  return Promise.reject(new Error(
-    `Gemini workspace slot "${slot}" is served by the legacy workspace registration, `
-    + 'not by this context.',
-  ));
-}

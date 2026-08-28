@@ -8,6 +8,8 @@ import type { QwenWorkspaceContext } from '@/providers/qwen/QwenProviderModule';
 import { qwenChatUIConfig } from '@/providers/qwen/ui/QwenChatUIConfig';
 import { createWorkspaceContextSlots } from '@/providers/shared/workspaceContextSlots';
 
+import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
+
 /**
  * What one tab's conversation is, read when it is asked for.
  *
@@ -84,8 +86,13 @@ export function createQwenModuleContext(
     // update rather than as an answer to anything.
     listSessionCommands: async () => ports.sessionCommands(),
     ...workspace,
-    renderSettingsTab: () => {
-      void notWired('renderSettingsTab');
+    renderSettingsTab: host => {
+      const rendered = host as {
+        container: HTMLElement;
+        context: Parameters<ProviderSettingsTabRenderer['render']>[1];
+      };
+      maybeGetQwenWorkspaceServices()?.settingsTabRenderer
+        ?.render(rendered.container, rendered.context);
     },
     dispose: async () => {
       // Nothing here outlives a turn: the history service is a stateless
@@ -109,9 +116,3 @@ function matching(
   return bound as unknown as Conversation;
 }
 
-function notWired(slot: string): Promise<never> {
-  return Promise.reject(new Error(
-    `Qwen workspace slot "${slot}" is served by the legacy workspace registration, `
-    + 'not by this context.',
-  ));
-}
