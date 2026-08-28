@@ -10445,6 +10445,40 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the session binding gets coverage that runs, before anything moves it (`this commit`)
+
+- Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean.
+- **The blocker on `buildSessionUpdates` was investigated properly, and half of it dissolved.** The
+  recorded reason was that the coordinator's barrier "does not carry the provider's native session
+  ref — only the execution session id". Reading the registry: `ExecutionSessionRecord` carries
+  `nativeSessionRef`, and it is **kept current** — every accepted envelope rewrites the session
+  record from `session.getSnapshot()`, so it picks up the ref the backend assigns mid-turn. The
+  barrier already calls `getSession`. That half is available.
+  - *I nearly filed a defect here that does not exist.* A case-sensitive grep for `snapshot` missed
+    `currentSnapshot`, and the reading in between said the record was written only at session
+    creation and recovery — which would have meant recovery querying without the provider's session
+    id on every first turn. It refreshes on every envelope. Checking the actual write is what caught
+    it.
+- **What is genuinely left is `sessionInvalidated`.** It is set in two places, both tab-scoped facts
+  the kernel cannot see: `syncConversationState` noticing the conversation's stored id changed under
+  the adapter, and `noteSessionUnusable()` when a provider refuses a resume. Two tabs share one
+  coordinator and one conversation, so *whose* invalidation counts is a design question, not a
+  relocation.
+- **So the coverage came first.** `buildSessionUpdates` appeared in tests **only** under
+  `*LiveSmoke` — skipped without credentials, and on the `query()` path nothing in `src/` calls. The
+  `ConversationController` tests that reach the save path stub it to `{}` and assert
+  `expect.any(Object)`. The most dangerous write in the milestone was pinned by nothing a CI run
+  executes. `sessionBindingRoundTrip.test.ts` pins the three invariants the move must preserve,
+  against Grok's real patch rule and a real reopen of the same bytes:
+  - the session a turn established comes back out of a vault opened again;
+  - a writer that changed something else does not take the binding with it;
+  - an invalidated session drops its id and **keeps** the state that outlives it.
+- **The third one was vacuous when first written, and the break-proof caught it.** It wrote a valid
+  patch, then the invalidated one, and asserted the paths survived — which they did because the
+  *earlier* write put them there. Deleting the rule from `GrokProviderModule` left it green. It now
+  starts from a conversation with no binding, so the state has to arrive *in* the invalidated patch;
+  the same deletion fails it, and so does a whole-record writer against the second.
+
 ### M5 — the projection stops saying "this turn ended" as a chunk (`this commit`)
 
 - Gates: unit 8739 passed, 8739 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
