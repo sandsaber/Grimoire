@@ -10450,6 +10450,29 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — review pass: the barrier asked the provider once too often (`this commit`)
+
+**A defect the barrier move introduced, found by reviewing it rather than by a test.** The turn's
+binding closure consumes the provider's refusal-to-resume flag, which is one-shot;
+`retryPersistence` runs the barrier again for a turn whose vault write failed. So the second attempt
+read the flag as unset, rebuilt the patch with the session id the provider had just refused, and put
+back exactly what the first attempt was clearing. The binding is asked once per turn now and boxed
+on the active turn, so "asked, and the answer was none" stays distinct from "not asked yet".
+
+- Gates: unit 8749 passed, 8749 total (553 suites); integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Proven by restoring the per-attempt read: the new test is the only one that fails.
+- **Three other things checked and found sound**, recorded so the next reader does not re-derive
+  them. *Ordering*: `acceptEnvelope` applies an envelope to the projection and notifies listeners
+  synchronously — and `ChatSurfaceRenderTarget` feeds the provider's content presenter synchronously
+  inside that notification, not on its queue — before `settleIfTerminal` runs, so every provider's
+  `currentSessionId()` has seen the whole run by the time the barrier reads it. *The `providerState`
+  narrowing*: only five providers set the field, and each either supplies an object or omits the
+  key, so refusing `null` changes no behaviour and removes a cast that was hiding one. *Retry
+  idempotence of the rest*: `conversations.apply` may run its change function again on a revision
+  conflict, and the binding is a fact about the provider rather than about the conversation being
+  read, so reusing one value across attempts is the correct shape as well as the safe one.
+
 ### M5 — the turn-ended chunk, and what it was hiding (`this commit`)
 
 **`ChatTurnLifecycleChunk` is down to one variant, and the search stays at 5 — which is the honest

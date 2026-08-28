@@ -227,6 +227,68 @@ describe('chat execution coordinator', () => {
       expect((await reloaded(harness))?.sessionId).toBeNull();
     });
 
+    it('asks for the binding once, however many attempts the write takes', async () => {
+      // **A refusal to resume is a one-shot flag.** The provider sets it, the
+      // turn's closure reads it, and reading it again answers "not refused" —
+      // so a barrier that asked once per *attempt* would, on the retry after a
+      // failed write, rebuild the patch with the session id the provider had
+      // just refused and put back exactly what the first attempt cleared.
+      const harness = await createHarness();
+      const failing = conversationPort(harness.conversations);
+      let failNext = false;
+      const coordinator = new ChatExecutionCoordinator({
+        lifecycle: harness.registry,
+        conversations: {
+          read: conversationId => failing.read(conversationId),
+          apply: async (conversationId, change) => {
+            if (failNext) {
+              failNext = false;
+              throw new Error('Vault is read-only.');
+            }
+            return failing.apply(conversationId, change);
+          },
+        },
+        nextExecutionSessionId: () => executionSessionId(opaque('es', 8)),
+        nextRunId: () => runId(opaque('run', 8)),
+        nextLeaseId: () => lifecycleLeaseId(opaque('lease', 8)),
+        assistantMessageIdForRun: forRunId => `assistant-${forRunId}`,
+      });
+      // The flag, spent on the first read exactly as a provider spends it.
+      let refusalUnread = true;
+      const sessionBinding = jest.fn(() => {
+        const invalidated = refusalUnread;
+        refusalUnread = false;
+        const patch = buildSessionPatch?.({
+          conversationId: CONVERSATION_ID,
+          sessionInvalidated: invalidated,
+          nativeSessionRef: 'grok-session-9',
+        });
+        return { sessionId: patch?.sessionId ?? null };
+      });
+
+      const ticket = await coordinator.submitTurn(turnCommand({ sessionBinding }));
+      const started = await ticket.started;
+      failNext = true;
+      harness.backend.emit(started.runId, {
+        kind: 'terminal',
+        terminal: 'succeeded',
+        reason: 'completed',
+      });
+      await harness.registry.waitForIdle();
+      await Promise.resolve();
+      expect(coordinator.getProjection(CONVERSATION_ID)?.turns[0]?.persistence).toBe('failed');
+
+      await coordinator.retryPersistence(CONVERSATION_ID);
+
+      expect(sessionBinding).toHaveBeenCalledTimes(1);
+      // The refused session stayed refused. Asking twice would have written
+      // `grok-session-9` back here.
+      const read = await new ConversationRepository({ storage: harness.storage })
+        .read(CONVERSATION_ID);
+      expect(read.kind === 'present' && read.metadata.sessionId).toBeNull();
+      coordinator.dispose();
+    });
+
     it('writes nothing for a turn that carries no binding', async () => {
       // An adopted run has no command and no adapter to ask, and a provider
       // with no history port answers `null`. Neither may clear a binding that

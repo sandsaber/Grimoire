@@ -268,6 +268,14 @@ interface ActiveTurn {
    * three fields that are not true.
    */
   readonly submitted?: SubmitChatTurnCommand;
+  /**
+   * The binding this turn ended on, once the barrier has asked for it.
+   *
+   * Boxed rather than stored bare, so "asked, and the answer was none" is a
+   * different state from "not asked yet" — the difference the retry above
+   * turns on.
+   */
+  binding?: { readonly value: ChatSessionBinding | null };
   executionSessionId?: ExecutionSessionId;
   runId?: RunId;
   dispatched: boolean;
@@ -1096,7 +1104,14 @@ export class ChatExecutionCoordinator {
       // barrier stored the message, then `save()` stored the binding, and a
       // plan turn whose approval was invalidated skipped that second write
       // entirely and left the conversation bound to a session it had left.
-      const binding = active.submitted?.sessionBinding?.();
+      //
+      // **Asked once per turn, not once per attempt.** A provider's refusal to
+      // resume is a one-shot flag, and this barrier runs again for a turn whose
+      // write failed: a second call reads the flag as unset and rebuilds the
+      // patch with the session id the provider had just refused, so the retry
+      // would put back exactly what the first attempt was clearing.
+      active.binding ??= { value: active.submitted?.sessionBinding?.() ?? null };
+      const binding = active.binding.value;
       const saved = await this.conversations.apply(
         active.conversationId,
         current => {
