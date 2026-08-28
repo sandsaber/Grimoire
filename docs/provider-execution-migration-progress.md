@@ -10417,6 +10417,31 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — why the turn framing cannot simply be deleted, established by probe (`this commit`)
+
+- Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean.
+- This closes a question this session opened three times: the framing two normalizers emit into the
+  content channel is dropped by `isChatContent`, so why is it still emitted? The reason recorded
+  earlier — that removing it moves `wireVocabularyCoverage`'s unconsumed list — was true but shallow.
+  The real one was found by **probing the presenter rather than reading it**.
+- **`GrokContentPresenter` given an `agent_message_chunk` returns `assistant_message_start` and
+  nothing else. Given the next chunk of the same message, it returns nothing at all.** The answer's
+  text never comes through the presenter for an ACP provider — the kernel carries it, which is what
+  the presenter tests mean by *"drops the copy of the answer the kernel already carries"*. So for
+  these providers the framing is the presenter's **only** response to a message chunk.
+- That changes what deleting it would do. `wireVocabularyCoverage` reads "the presenter returned a
+  chunk" as "this update was modelled", so without the framing, `agent_message_chunk` and
+  `user_message_chunk` would be filed under *nothing draws the surface from this* — for updates the
+  kernel demonstrably does consume. Not a gate that needs its number updated: a gate that would then
+  be **wrong**.
+- **An attempted fix, tried and reverted.** The gate's own authors met this class of bug on the
+  usage port and solved it by asking whether the store *took* something rather than whether the port
+  was called, so the same move was tried for chunks — count an update consumed only if its chunks
+  survive `isChatContent`. It makes the gate stricter than its own question: the presenter is a
+  proxy for the whole path, and the kernel's consumption is invisible to it. Reverted. Closing this
+  properly means giving that gate a way to see kernel consumption.
+- The reasoning is written at `isChatContent`, where the next person to ask will be.
+
 ### M5 — a dead branch, and comments that outlived the path they describe (`this commit`)
 
 - Gates: unit 8742 passed, 8742 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
