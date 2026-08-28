@@ -48,7 +48,12 @@ export function createClaudeModuleContext(
   conversation: ClaudeBoundConversation,
   ports: ClaudeModuleContextPorts,
 ): ClaudeWorkspaceContext {
-  const history = new ClaudeConversationHistoryService();
+  // The config dir comes from the plugin's configured Claude environment, which
+  // this has and the history service does not — so it is passed rather than
+  // looked up. See the constructor for what looking it up cost.
+  const history = new ClaudeConversationHistoryService(
+    () => maybeGetClaudeWorkspaceServices()?.getClaudeConfigDir?.(),
+  );
   const workspace = createWorkspaceContextSlots({
     chatUI: claudeChatUIConfig,
     plugin,
@@ -57,6 +62,7 @@ export function createClaudeModuleContext(
   });
 
   return {
+    claudeConfigDir: () => maybeGetClaudeWorkspaceServices()?.getClaudeConfigDir?.(),
     hydrateConversation: async conversationId => {
       const bound = matching(conversation, conversationId);
       if (!bound) {

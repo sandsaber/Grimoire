@@ -249,7 +249,7 @@ const SEARCHES: readonly DeletionSearch[] = [
     // is `undefined` and every suite importing Claude fails to load. The
     // registry's indirection is breaking that cycle, which is a reason to keep
     // it that no reading of the call site would have shown.
-    // **13, and the registry is a map with three methods on it.**
+    // **12, and the registry is a map with three methods on it.**
     // `refreshAgentMentions`, `getRuntimeCommandLoader` and
     // `getSettingsTabRenderer` have all moved to module slots; `TabManager` left
     // the count with the second.
@@ -276,10 +276,20 @@ const SEARCHES: readonly DeletionSearch[] = [
     // while a module context is built per tab. Something has to hold the one
     // instance between them, and today that is `setServices`/`getServices`, read
     // by nine `maybeGet<Provider>WorkspaceServices` accessors, `main.ts`, and
-    // two rows of the settings hub. Closing it means the composition owning that
+    // two rows of the settings hub.
+    //
+    // `ClaudeConversationHistoryService` left the count by being *told* where
+    // Claude's transcripts are instead of looking it up. That read was also the
+    // import cycle recorded earlier: the workspace services reach the history
+    // service, so reaching back left the class `undefined` at module init. The
+    // directory resolves from the plugin's configured environment, which the
+    // module context has, so the context passes an accessor — and the module's
+    // own workspace builds an instance with it, because the two transcript
+    // members read the SDK's session files and reading them in the wrong place
+    // finds nothing. Closing it means the composition owning that
     // singleton, which is one pass over two lifecycles rather than nine row
     // moves.
-    files: 13,
+    files: 12,
     closedBy: 'the provider rows, when the last consumer of each has moved',
   },
 ];
@@ -321,7 +331,7 @@ describe('structural deletion progress', () => {
       'SubagentManager lifecycle: 2',
       'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
-      'the registries — one left: 13',
+      'the registries — one left: 12',
     ]);
     // Six of twelve are zero: two closed in the 2026-08-27 session, the
     // interaction callbacks closed with the first step of the seam deletion,

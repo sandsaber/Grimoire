@@ -21,6 +21,7 @@ describe('Claude provider module', () => {
   function createContext(): ClaudeWorkspaceContext {
     return {
       runtimeCommandLoader: () => null,
+      claudeConfigDir: () => undefined,
       commandsPort: () => ({
         listDropdownEntries: async () => [],
         listVaultEntries: async () => [],
@@ -62,6 +63,25 @@ describe('Claude provider module', () => {
       new AbortController().signal,
     );
   }
+
+  it('reads the transcripts from the directory the context names', async () => {
+    // **Nothing caught this.** The history service used to look the directory
+    // up in the workspace registry; it is handed in now, and dropping the hand
+    // left every test green while `hydrate` and `deleteSession` read Claude's
+    // session files from the wrong place — which finds nothing, silently.
+    const claudeConfigDir = jest.fn().mockReturnValue('/configured/.claude');
+    const slots = await claudeProviderModule.workspace.initialize(
+      { ...createContext(), claudeConfigDir },
+      new AbortController().signal,
+    );
+
+    await slots.transcripts?.hydrate?.(
+      { id: 'conv-1', sessionId: 'sess-1', messages: [], providerState: {} } as never,
+      '/vault',
+    );
+
+    expect(claudeConfigDir).toHaveBeenCalled();
+  });
 
   it('declares its identity and ordering', () => {
     expect(claudeProviderModule.manifest).toEqual({

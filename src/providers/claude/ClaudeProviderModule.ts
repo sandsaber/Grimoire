@@ -85,6 +85,8 @@ export interface ClaudeWorkspaceContext {
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   mcpPort(): ProviderMcpPort;
+  /** Where Claude keeps its transcripts, from the configured environment. */
+  claudeConfigDir(): string | undefined;
   runtimeCommandLoader(): ProviderRuntimeCommandLoader | null;
   renderSettingsTab(host: unknown): void;
   hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
@@ -281,13 +283,17 @@ ClaudeProviderSettings
   workspace: {
     providerId: 'claude',
     async initialize(context): Promise<ClaudeWorkspace> {
+      // Its own instance, told where Claude's transcripts are. The module-scope
+      // one below answers questions that need no directory; these two read the
+      // SDK's session files, and reading them in the wrong place finds nothing.
+      const history = new ClaudeConversationHistoryService(() => context.claudeConfigDir());
       return {
         transcripts: {
           deleteSession: (conversation, vaultPath) => (
-            claudeHistory.deleteConversationSession(conversation, vaultPath)
+            history.deleteConversationSession(conversation, vaultPath)
           ),
           hydrate: (conversation, vaultPath) => (
-            claudeHistory.hydrateConversationHistory(conversation, vaultPath)
+            history.hydrateConversationHistory(conversation, vaultPath)
           ),
         },
         commands: context.commandsPort(),

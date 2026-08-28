@@ -10450,6 +10450,24 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — Claude's history is told where the transcripts are (`this commit`)
+
+- Gates: unit 8753 passed, 8753 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **`ClaudeConversationHistoryService` leaves the count: 13 → 12.** It read the workspace registry to
+  find where Claude keeps its session files. That read was also the **import cycle** recorded
+  earlier, when reaching the provider's own accessor instead left the class `undefined` at module
+  init and took five suites with it — the workspace services reach this service, so it cannot reach
+  them. The directory resolves from the plugin's configured Claude environment, which the module
+  context has and a history parser does not, so the context passes an accessor.
+- **The module's workspace builds its own instance with it**, because the two members that read the
+  SDK's session files live there — and reading them in the wrong place finds nothing rather than
+  failing. The module-scope instance keeps no accessor: what it answers needs no directory.
+- **That last part was covered by nothing.** Removing the hand-off left the whole suite green while
+  `hydrate` and `deleteSession` looked in the default location. There is a test now — the workspace
+  is initialized with a spy for the directory and `hydrate` is asked for a conversation with a
+  session — and the removal fails it.
+
 ### M5 — the registration table moves to the providers; the registry is a map (`this commit`)
 
 - Gates: unit 8752 passed, 8752 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
