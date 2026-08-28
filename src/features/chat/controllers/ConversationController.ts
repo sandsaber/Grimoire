@@ -3,7 +3,6 @@ import { Menu, Notice, setIcon, setTooltip } from 'obsidian';
 import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
 
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import type { ProviderId, TitleGenerationService } from '../../../core/providers/types';
 import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
 import type { ChatRewindMode } from '../../../core/runtime/types';
@@ -33,8 +32,8 @@ function hasStartedConversation(conversation: Conversation): boolean {
     return true;
   }
   try {
-    const historyService = ProviderRegistry.getConversationHistoryService(conversation.providerId);
-    return !!historyService.resolveSessionIdForConversation?.(conversation);
+    return !!providerCatalog().declarations(conversation.providerId)
+      .conversationState?.resolveSessionId(conversation);
   } catch {
     return !!conversation.sessionId;
   }

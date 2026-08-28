@@ -141,11 +141,12 @@ describe('provider contribution inventory', () => {
     });
 
     it('claims the count the heading advertises', () => {
-      // Four, not nine: the three auxiliary factories left with the auxiliary
-      // owner, `chatUIConfig` left for `ProviderDeclarations.chatUI`, and
-      // `settingsReconciler` for the codec's reconciliation half. All five are
-      // recorded in the moved table below.
-      expect(documented).toHaveLength(4);
+      // Three, not nine: the three auxiliary factories left with the auxiliary
+      // owner, `chatUIConfig` left for `ProviderDeclarations.chatUI`,
+      // `settingsReconciler` for the codec's reconciliation half, and
+      // `historyService` split across a declaration and a workspace slot. All
+      // six are recorded in the moved table below.
+      expect(documented).toHaveLength(3);
     });
 
     it('accounts for every field the registration ever declared', () => {
@@ -173,6 +174,7 @@ describe('provider contribution inventory', () => {
         'createInlineEditService',
         'chatUIConfig',
         'settingsReconciler',
+        'historyService',
       ]);
     });
 

@@ -21,6 +21,7 @@ import {
   GeminiExecutionBackend,
   type GeminiExecutionBackendContext,
 } from './execution/GeminiExecutionBackend';
+import { GeminiConversationHistoryService } from './history/GeminiConversationHistoryService';
 import { geminiCliResolver } from './runtime/GeminiCliResolver';
 import {
   DEFAULT_GEMINI_PROVIDER_SETTINGS,
@@ -203,6 +204,8 @@ const geminiChatUi: ProviderChatUiContribution = chatUiContributionFor(
   geminiCapabilities.reasoningControl,
 );
 
+const geminiHistory = new GeminiConversationHistoryService();
+
 export const geminiSettingsCodec: ProviderSettingsCodec<GeminiProviderSettings> = {
   providerId: 'gemini',
   schemaVersion: 1,
@@ -274,6 +277,14 @@ GeminiProviderSettings
     providerId: 'gemini',
     async initialize(context): Promise<GeminiWorkspace> {
       return {
+        transcripts: {
+          deleteSession: (conversation, vaultPath) => (
+            geminiHistory.deleteConversationSession(conversation, vaultPath)
+          ),
+          hydrate: (conversation, vaultPath) => (
+            geminiHistory.hydrateConversationHistory(conversation, vaultPath)
+          ),
+        },
         commands: context.commandsPort(),
         // No `runtimeCommands` slot, which is this provider's own absence: the
         // session's announced commands are dropped, so a tab asked for them
@@ -319,6 +330,16 @@ GeminiProviderSettings
       commandPrefix: '/',
     },
     cli: { resolve: settings => geminiCliResolver().resolveFromSettings(settings) },
+    conversationState: {
+      forkState: (sessionId, resumeAt, state) => (
+        geminiHistory.buildForkProviderState(sessionId, resumeAt, state)
+      ),
+      isPendingFork: conversation => geminiHistory.isPendingForkConversation(conversation),
+      resolveSessionId: conversation => geminiHistory.resolveSessionIdForConversation(conversation),
+      ...(geminiHistory.buildPersistedProviderState
+        ? { persistedState: conversation => geminiHistory.buildPersistedProviderState?.(conversation) }
+        : {}),
+    },
   },
 
   runtimePorts: context => ({

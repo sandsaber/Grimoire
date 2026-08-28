@@ -1,7 +1,6 @@
 import { ConversationRepository } from '../conversations/ConversationRepository';
 import type { DurableStorage } from '../persistence/DurableStorage';
 import { providerCatalog } from '../providers/ProviderCatalog';
-import { ProviderRegistry } from '../providers/ProviderRegistry';
 import { DEFAULT_CHAT_PROVIDER_ID } from '../providers/types';
 import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
 import type {
@@ -699,9 +698,9 @@ function projectConversationFields(
 function buildPersistedProviderState(
   conversation: Conversation,
 ): Record<string, unknown> | undefined {
-  const providerState = ProviderRegistry
-    .getConversationHistoryService(conversation.providerId)
-    .buildPersistedProviderState?.(conversation)
+  const providerState = providerCatalog()
+    .declarations(conversation.providerId)
+    .conversationState?.persistedState?.(conversation)
     ?? conversation.providerState;
   return providerState && Object.keys(providerState).length > 0 ? providerState : undefined;
 }

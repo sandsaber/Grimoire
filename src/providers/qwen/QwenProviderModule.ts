@@ -22,6 +22,7 @@ import {
   QwenExecutionBackend,
   type QwenExecutionBackendContext,
 } from './execution/QwenExecutionBackend';
+import { QwenConversationHistoryService } from './history/QwenConversationHistoryService';
 import { qwenCliResolver } from './runtime/QwenCliResolver';
 import {
   DEFAULT_QWEN_PROVIDER_SETTINGS,
@@ -192,6 +193,8 @@ const qwenChatUi: ProviderChatUiContribution = chatUiContributionFor(
   qwenCapabilities.reasoningControl,
 );
 
+const qwenHistory = new QwenConversationHistoryService();
+
 export const qwenSettingsCodec: ProviderSettingsCodec<QwenProviderSettings> = {
   providerId: 'qwen',
   schemaVersion: 1,
@@ -260,6 +263,14 @@ QwenProviderSettings
     providerId: 'qwen',
     async initialize(context): Promise<QwenWorkspace> {
       return {
+        transcripts: {
+          deleteSession: (conversation, vaultPath) => (
+            qwenHistory.deleteConversationSession(conversation, vaultPath)
+          ),
+          hydrate: (conversation, vaultPath) => (
+            qwenHistory.hydrateConversationHistory(conversation, vaultPath)
+          ),
+        },
         commands: context.commandsPort(),
         // Present, unlike Gemini's: this provider surfaces the commands its
         // session announces.
@@ -307,6 +318,16 @@ QwenProviderSettings
       commandPrefix: '/',
     },
     cli: { resolve: settings => qwenCliResolver().resolveFromSettings(settings) },
+    conversationState: {
+      forkState: (sessionId, resumeAt, state) => (
+        qwenHistory.buildForkProviderState(sessionId, resumeAt, state)
+      ),
+      isPendingFork: conversation => qwenHistory.isPendingForkConversation(conversation),
+      resolveSessionId: conversation => qwenHistory.resolveSessionIdForConversation(conversation),
+      ...(qwenHistory.buildPersistedProviderState
+        ? { persistedState: conversation => qwenHistory.buildPersistedProviderState?.(conversation) }
+        : {}),
+    },
   },
 
   runtimePorts: context => ({

@@ -1081,9 +1081,9 @@ function resolveForkSource(tab: TabData, plugin: GrimoirePlugin): ForkSource | n
   // fall back to persisted conversation metadata when no runtime is active.
   const sourceSessionId = tab.service
     ? tab.service.resolveSessionIdForFork(conversation ?? null)
-    : ProviderRegistry
-      .getConversationHistoryService(conversation?.providerId ?? tab.providerId)
-      .resolveSessionIdForConversation(conversation);
+    : providerCatalog()
+      .declarations(conversation?.providerId ?? tab.providerId)
+      .conversationState?.resolveSessionId(conversation) ?? null;
 
   if (!sourceSessionId) {
     new Notice(t('chat.fork.failed', { error: t('chat.fork.errorNoSession') }));

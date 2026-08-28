@@ -142,6 +142,7 @@ describe('Grok provider module', () => {
         'models',
           'runtimeCommands',
         'settingsPresentation',
+        'transcripts',
         'usage',
       ]);
       expect(await workspace.mcp?.load()).toEqual([

@@ -22,6 +22,7 @@ import {
   KimicodeExecutionBackend,
   type KimicodeExecutionBackendContext,
 } from './execution/KimicodeExecutionBackend';
+import { KimicodeConversationHistoryService } from './history/KimicodeConversationHistoryService';
 import { kimicodeCliResolver } from './runtime/KimicodeCliResolver';
 import {
   DEFAULT_KIMICODE_PROVIDER_SETTINGS,
@@ -204,6 +205,8 @@ const kimicodeChatUi: ProviderChatUiContribution = chatUiContributionFor(
   kimicodeCapabilities.reasoningControl,
 );
 
+const kimicodeHistory = new KimicodeConversationHistoryService();
+
 export const kimicodeSettingsCodec: ProviderSettingsCodec<KimicodeProviderSettings> = {
   providerId: 'kimicode',
   schemaVersion: 1,
@@ -276,6 +279,14 @@ KimicodeProviderSettings
     providerId: 'kimicode',
     async initialize(context): Promise<KimicodeWorkspace> {
       return {
+        transcripts: {
+          deleteSession: (conversation, vaultPath) => (
+            kimicodeHistory.deleteConversationSession(conversation, vaultPath)
+          ),
+          hydrate: (conversation, vaultPath) => (
+            kimicodeHistory.hydrateConversationHistory(conversation, vaultPath)
+          ),
+        },
         commands: context.commandsPort(),
         runtimeCommands: {
           listForSession: sessionId => context.listSessionCommands(sessionId),
@@ -321,6 +332,16 @@ KimicodeProviderSettings
       commandPrefix: '/',
     },
     cli: { resolve: settings => kimicodeCliResolver().resolveFromSettings(settings) },
+    conversationState: {
+      forkState: (sessionId, resumeAt, state) => (
+        kimicodeHistory.buildForkProviderState(sessionId, resumeAt, state)
+      ),
+      isPendingFork: conversation => kimicodeHistory.isPendingForkConversation(conversation),
+      resolveSessionId: conversation => kimicodeHistory.resolveSessionIdForConversation(conversation),
+      ...(kimicodeHistory.buildPersistedProviderState
+        ? { persistedState: conversation => kimicodeHistory.buildPersistedProviderState?.(conversation) }
+        : {}),
+    },
   },
 
   runtimePorts: context => ({

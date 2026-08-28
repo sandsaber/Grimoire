@@ -44,7 +44,7 @@ asserted only so the table cannot drift away from the code.
 | `chatUIConfig` | 20 | 7 | **moved** | It was three members against twenty: the whole reasoning group, the service-tier toggle, the mode selector and its apply hook, bang-bash enablement, model options, custom model ids, model defaults, variant normalization and metadata preparation had nowhere to go, and `permissionToggles` was a static `{id,label}[]` against a descriptor plus two settings-dependent behaviours. Seven grouped members now, and the parameter changed too: the row takes the **app** settings and scopes them itself, because ownership of a model depends on the environment and a provider's environment is the shared scope joined with its own. **Moved:** all twenty-three consumers read `providerCatalog().declarations(id).chatUI`, the field is gone from `ProviderRegistration`, and the four model-routing statics that reached it through `ProviderRegistry` are `modelRouting.ts`. |
 | `settingsReconciler` | 3 | 3 of 11 | **moved** | It was three operations against one method with a reason. `reconcile(TSettings, reason)` took `'load' \| 'environment-change' \| 'model-change'` — vocabulary invented while writing the contract, since the row has no reason parameter and no implementation reads one — while the row is three separate methods the host calls from three places, two of them **in sequence** on an environment change. Folding them would have merged two different repairs. The parameter was wrong too: every reconciler hashes `getRuntimeEnvironmentText`, which joins the **shared** environment scope with the provider's, and two read and write the top-level `model`, so a user who sets `XAI_API_KEY` in the shared scope would have stopped invalidating Grok's model cache. Three members now — `clearDiscoveryState?`, `reconcileEnvironment`, `normalizeModelVariants` — over `ProviderScopedSettings`, and the codec extends them so a provider still declares one object. |
 | `createRuntime` | — | — | moved | `ExecutionBackendFactory`, flipped for all nine. |
-| `historyService` | 6 | 5 | reshape | Four members map cleanly under deliberate renames. The other two do not: `buildForkProviderState(sourceSessionId, resumeAt, sourceProviderState)` builds the state a **fork** starts from, and `buildPersistedProviderState(conversation)` is what `SessionStorage` writes on **save**. `buildSessionPatch` is neither — it is a third operation, already live in `ExecutionChatRuntimeAdapter`, producing the session binding a **finished turn** leaves behind. Three moments, three shapes, one slot. |
+| `historyService` | 6 | 4 + 2 | **moved** | Three unrelated operations sharing a name, against a slot bound to one conversation. **The split that made it move was the same question the command dropdown and CLI resolution answered:** which of its consumers are synchronous, and why? Four members are pure functions of the conversation — session resolution, pending-fork, the fork's opaque state, and the state to persist — with synchronous consumers: `SessionStorage` derives what to save inside a save, and two `hasStartedConversation` predicates ask while a tab paints. They are `ProviderDeclarations.conversationState`. The other two read and delete the provider's stored transcript, which is I/O and, for Claude, reaches workspace services: they are `ProviderWorkspaceSlots.transcripts`. `ProviderRuntimePorts.history` is untouched — it answers for the one conversation a runtime is bound to, which is a different question with the same subject. |
 | `taskResultInterpreter?` | 5 | 1 | reshape, **but not yet** | All five questions: async launch marker, agent id, structured result, terminal status, tag value. Only Claude has a real implementation. Deliberately not designed yet: its consumer is `SubagentManager`, which the durable-agents work is taking lifecycle authority from, and a slot shaped for a consumer that is being replaced is shaped twice. |
 | `subagentLifecycleAdapter?` | 8 | 2 | reshape, **but not yet** | Four tool-name predicates the live consumer asks separately, spawn-id resolution, subagent-info building, and both result extractors. `parseDisplay(payload)` receives one payload while a Grok subagent's label comes from the spawn tool's **input** and its id from the **result**. Same reason to wait as the row above: `SubagentManager` and `MessageRenderer` are its consumers, and both are mid-replacement. |
 | `commandCatalog` | 7 | 7 | **moved** | The catalog also **writes**: vault entries are saved and deleted through it, it owns the default vault storage path, and it takes runtime commands from the session loader. `list()` is one of seven. **One of the eight has already left**, and it was not a service at all: `getDropdownConfig()` returned a frozen literal in all nine implementations, and three of its consumers are synchronous — so a tab had to build a provider's whole workspace to learn which character opens a command list, and drew no dropdown until it had. It is `ProviderDeclarations.commandDropdown` now, absent for the one provider with no command surface. **Moved:** the port carries the other seven, and it carries `ProviderCommandEntry` rather than `ProviderCommandDescriptor` — every consumer but one reads fields a descriptor does not have (which file an entry lives in, whether it can be edited, whether it can be deleted), and the one that did was already served by a mapping the shared slot performed over these same entries. `ProviderWorkspaceRegistry.getCommandCatalog` is deleted. |
@@ -96,7 +96,7 @@ a row moves or a slot changes.
 
 ## What this means for sequencing
 
-**Nine rows have moved**, counting the app-level workspace capability row. `modelCatalog` was the one whose slot fitted, and it was blocked twice over
+**Ten rows have moved**, counting the app-level workspace capability row. `modelCatalog` was the one whose slot fitted, and it was blocked twice over
 — by eight contexts whose `listModels`/`refreshModels` threw, and by nothing building a workspace at
 all. `usageProvider` needed its slot reshaped first, and then moved the same way. Both read
 `ApplicationRuntime.workspaceFor(providerId)` — or `builtWorkspaceFor` on the paint path — and
@@ -110,9 +110,10 @@ So the work splits in two, and only one half is design:
    So did a second thing the first version of this file did not look for: **nothing built a
    workspace.** `module.workspace.initialize` had one caller. `ProviderWorkspaceHolder` and
    `ApplicationRuntime.workspaceFor(providerId)` are the path a consumer takes; both are done.
-2. **Reshape six slots.** Design, from the implementations, with the notes above as input.
-   `chatUIConfig`, `settingsReconciler`, `commandCatalog`, `cliResolver` and `mcpStorage` were
-   five of the eleven, and all five were reshaped and carried through inside the same milestone.
+2. **Reshape five slots.** Design, from the implementations, with the notes above as input.
+   `chatUIConfig`, `settingsReconciler`, `commandCatalog`, `cliResolver`, `mcpStorage` and
+   `historyService` were six of the eleven, and all six were reshaped and carried through inside
+   the same milestone.
 
 ### Every remaining row is blocked on something structural, not on design
 
@@ -122,13 +123,12 @@ left divides into one row that needs a decision and five that need another miles
 
 | Row | What blocks it |
 |---|---|
-| `historyService` | **A decision, not a blocker.** Three unrelated operations sharing a name, and `ProviderHistoryPort` hangs off `ProviderRuntimePorts`, which is bound to one conversation, while the row is workspace-global — nine consumers hand it a `Conversation` and a vault path from anywhere. It needs a workspace-global home before it can move, and it is the last row that could move without another milestone. |
 | `settingsTabRenderer` | **A host contract.** `ProviderSettingsTabRendererContext.plugin` is the whole `GrimoirePlugin`, and the nine renderers use it as one — `settings`, `saveSettings`, `getView`, `getAllViews`, `app`. A module port cannot name it, so this row waits on the settings tabs having a host contract of their own. |
 | `runtimeCommandLoader` | **The seam.** Its context carries a `ChatRuntime`, which the seam deletion removes, and its fallback reaches `plugin.getXExecution().metadata.listCommands()`. |
 | `mcpServerManager` | **Not a row.** One concrete class, constructed identically over each provider's storage, whose ten members are all generic computation over `ManagedMcpServer[]`. It is a host service over `mcpStorage`; what it needs is host ownership, including who loads it and what its ~15 synchronous `getServers()` readers see before it has. |
 | `taskResultInterpreter`, `subagentLifecycleAdapter` | **Durable agents.** Their consumers are `SubagentManager` and `MessageRenderer`, both mid-replacement. |
 
-**Three of the six wait on their consumers rather than on design.** `taskResultInterpreter` and
+**Three of the five wait on their consumers rather than on design.** `taskResultInterpreter` and
 `subagentLifecycleAdapter` are read by `SubagentManager` and `MessageRenderer`, both of which the
 durable-agents work is replacing. A slot shaped for a consumer that is being replaced is a slot
 shaped twice, so they are last, not first — even though they are the smallest.

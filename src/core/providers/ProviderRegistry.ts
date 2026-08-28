@@ -4,7 +4,6 @@ import { providerCatalog } from './ProviderCatalog';
 import {
   type CreateChatRuntimeOptions,
   DEFAULT_CHAT_PROVIDER_ID,
-  type ProviderConversationHistoryService,
   type ProviderId,
   type ProviderRegistration,
   type ProviderSubagentLifecycleAdapter,
@@ -53,12 +52,6 @@ export class ProviderRegistry {
   static createChatRuntime(options: CreateChatRuntimeOptions): ChatRuntime {
     const providerId = options.providerId ?? DEFAULT_CHAT_PROVIDER_ID;
     return this.getProviderRegistration(providerId).createRuntime(options);
-  }
-
-  static getConversationHistoryService(
-    providerId: ProviderId = DEFAULT_CHAT_PROVIDER_ID,
-  ): ProviderConversationHistoryService {
-    return this.getProviderRegistration(providerId).historyService;
   }
 
   static getTaskResultInterpreter(

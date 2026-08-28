@@ -71,7 +71,6 @@ export interface ProviderRegistration {
   // provider's own object is what the module delegates to, so what moved is
   // where the host asks, not who answers.
   createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => ChatRuntime;
-  historyService: ProviderConversationHistoryService;
   /**
    * How this provider reads a subagent task result.
    *

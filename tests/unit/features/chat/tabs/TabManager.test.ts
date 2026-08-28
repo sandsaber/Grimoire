@@ -117,6 +117,18 @@ jest.mock('@/core/providers/ProviderCatalog', () => ({
       // rather than a method on the workspace catalog — so a suite that stubs
       // a catalog must say the provider has a dropdown as well.
       commandDropdown: mockCommandDropdowns[providerId],
+      // The fork's provider state is a declaration now, not a registered
+      // history service. The real one is a provider's own; this double is the
+      // shape every module contributes.
+      conversationState: {
+        forkState: (sessionId: string, resumeAt: string) => ({
+          forkSource: { sessionId, resumeAt },
+        }),
+        isPendingFork: () => false,
+        resolveSessionId: (conversation: { sessionId?: string | null } | null) => (
+          conversation?.sessionId ?? null
+        ),
+      },
     }),
   }),
 }));
@@ -3021,10 +3033,18 @@ describe('TabManager - switchToTab Session Sync', () => {
         persistentExternalContextPaths: ['/persistent/path'],
       },
     });
+    // **No session either.** The fallback is for a conversation that has not
+    // started, and a session id is one of the two ways a conversation can have
+    // started — the other being messages. This fixture carried `session-abc`
+    // and passed anyway, because the suite's registry double lacked the member
+    // that would have said so: `resolveSessionIdForConversation` was undefined,
+    // so the predicate answered `false` for every conversation in this file.
+    // The declaration answers it now, and the fixture has to mean what the
+    // case is named for.
     plugin.getConversationSync = jest.fn().mockReturnValue({
       id: 'conv-empty',
       messages: [],
-      sessionId: 'session-abc',
+      sessionId: null,
       externalContextPaths: [],
     });
 
@@ -3038,9 +3058,8 @@ describe('TabManager - switchToTab Session Sync', () => {
     await manager.createTab(); // tab-1
     await manager.createTab(); // tab-2, auto-switches and triggers session sync
 
-    // conversation.messages is empty, so should fall back to persistentExternalContextPaths
     expect(mockSyncConversationState).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'conv-empty', sessionId: 'session-abc' }),
+      expect.objectContaining({ id: 'conv-empty', sessionId: null }),
       ['/persistent/path'],
     );
   });

@@ -167,7 +167,8 @@ describe('Codex provider module', () => {
         'agentMentions',
         'commands',
         'models',
-          'settingsPresentation',
+        'settingsPresentation',
+        'transcripts',
         'usage',
       ]);
     });

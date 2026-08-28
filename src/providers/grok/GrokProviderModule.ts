@@ -23,6 +23,7 @@ import {
   GROK_EXECUTION_DESCRIPTOR,
   GrokExecutionBackend,
 } from './execution/GrokExecutionBackend';
+import { GrokConversationHistoryService } from './history/GrokConversationHistoryService';
 import { normalizeGrokThinkingOptionsByModel } from './models';
 import { grokCliResolver } from './runtime/GrokCliResolver';
 import { GROK_ARTIFACTS_SUBDIR } from './runtime/GrokPaths';
@@ -184,6 +185,8 @@ const grokChatUi: ProviderChatUiContribution = chatUiContributionFor(
   grokCapabilities.reasoningControl,
 );
 
+const grokHistory = new GrokConversationHistoryService();
+
 export const grokSettingsCodec: ProviderSettingsCodec<GrokProviderSettings> = {
   providerId: 'grok',
   schemaVersion: 1,
@@ -256,6 +259,14 @@ GrokProviderSettings
     providerId: 'grok',
     async initialize(context): Promise<GrokWorkspace> {
       return {
+        transcripts: {
+          deleteSession: (conversation, vaultPath) => (
+            grokHistory.deleteConversationSession(conversation, vaultPath)
+          ),
+          hydrate: (conversation, vaultPath) => (
+            grokHistory.hydrateConversationHistory(conversation, vaultPath)
+          ),
+        },
         commands: context.commandsPort(),
         runtimeCommands: {
           listForSession: sessionId => context.listSessionCommands(sessionId),
@@ -309,6 +320,16 @@ GrokProviderSettings
       commandPrefix: '/',
     },
     cli: { resolve: settings => grokCliResolver().resolveFromSettings(settings) },
+    conversationState: {
+      forkState: (sessionId, resumeAt, state) => (
+        grokHistory.buildForkProviderState(sessionId, resumeAt, state)
+      ),
+      isPendingFork: conversation => grokHistory.isPendingForkConversation(conversation),
+      resolveSessionId: conversation => grokHistory.resolveSessionIdForConversation(conversation),
+      ...(grokHistory.buildPersistedProviderState
+        ? { persistedState: conversation => grokHistory.buildPersistedProviderState?.(conversation) }
+        : {}),
+    },
   },
 
   runtimePorts: context => ({

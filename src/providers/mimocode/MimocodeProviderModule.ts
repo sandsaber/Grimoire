@@ -22,6 +22,7 @@ import {
   MimocodeExecutionBackend,
   type MimocodeExecutionBackendContext,
 } from './execution/MimocodeExecutionBackend';
+import { MimocodeConversationHistoryService } from './history/MimocodeConversationHistoryService';
 import { mimocodeCliResolver } from './runtime/MimocodeCliResolver';
 import {
   DEFAULT_MIMOCODE_PROVIDER_SETTINGS,
@@ -198,6 +199,8 @@ const mimocodeChatUi: ProviderChatUiContribution = chatUiContributionFor(
   mimocodeCapabilities.reasoningControl,
 );
 
+const mimocodeHistory = new MimocodeConversationHistoryService();
+
 export const mimocodeSettingsCodec: ProviderSettingsCodec<MimocodeProviderSettings> = {
   providerId: 'mimocode',
   schemaVersion: 1,
@@ -270,6 +273,14 @@ MimocodeProviderSettings
     providerId: 'mimocode',
     async initialize(context): Promise<MimocodeWorkspace> {
       return {
+        transcripts: {
+          deleteSession: (conversation, vaultPath) => (
+            mimocodeHistory.deleteConversationSession(conversation, vaultPath)
+          ),
+          hydrate: (conversation, vaultPath) => (
+            mimocodeHistory.hydrateConversationHistory(conversation, vaultPath)
+          ),
+        },
         commands: context.commandsPort(),
         runtimeCommands: {
           listForSession: sessionId => context.listSessionCommands(sessionId),
@@ -315,6 +326,16 @@ MimocodeProviderSettings
       commandPrefix: '/',
     },
     cli: { resolve: settings => mimocodeCliResolver().resolveFromSettings(settings) },
+    conversationState: {
+      forkState: (sessionId, resumeAt, state) => (
+        mimocodeHistory.buildForkProviderState(sessionId, resumeAt, state)
+      ),
+      isPendingFork: conversation => mimocodeHistory.isPendingForkConversation(conversation),
+      resolveSessionId: conversation => mimocodeHistory.resolveSessionIdForConversation(conversation),
+      ...(mimocodeHistory.buildPersistedProviderState
+        ? { persistedState: conversation => mimocodeHistory.buildPersistedProviderState?.(conversation) }
+        : {}),
+    },
   },
 
   runtimePorts: context => ({

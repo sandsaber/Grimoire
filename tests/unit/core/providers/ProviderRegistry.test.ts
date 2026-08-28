@@ -58,19 +58,16 @@ describe('ProviderRegistry', () => {
   });
 
   it('returns boundary services for the default provider', () => {
-    const historyService = ProviderRegistry.getConversationHistoryService();
-    expect(historyService).toHaveProperty('hydrateConversationHistory');
-
     const taskInterpreter = ProviderRegistry.getTaskResultInterpreter();
     expect(taskInterpreter).toHaveProperty('resolveTerminalStatus');
   });
 
   it('throws when an unknown provider is requested', () => {
-    // Was asked of `getChatUIConfig` and then of `getSettingsReconciler`, both
-    // of which their rows took with them. Any accessor proves the same thing —
-    // that an unregistered id is refused rather than answered — so it follows
-    // whichever one is still here.
-    expect(() => ProviderRegistry.getConversationHistoryService(
+    // Asked of `getChatUIConfig`, then `getSettingsReconciler`, then
+    // `getConversationHistoryService`, each of which its row took with it. Any
+    // accessor proves the same thing — that an unregistered id is refused
+    // rather than answered — so it follows whichever is still here. Three left.
+    expect(() => ProviderRegistry.getTaskResultInterpreter(
       'nonexistent' as any,
     )).toThrow('Provider "nonexistent" is not registered.');
   });

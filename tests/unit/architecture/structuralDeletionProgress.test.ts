@@ -115,15 +115,17 @@ const SEARCHES: readonly DeletionSearch[] = [
   {
     what: 'the two registries',
     pattern: /\bProviderRegistry\b|\bProviderWorkspaceRegistry\b/,
-    // **32.** Three rows have left. The chat-UI row took its accessor and the
-    // four model-routing statics that only lived there to reach it —
-    // `modelRouting.ts` now, over the catalog; the settings reconciler took
-    // `getSettingsReconciler`, leaving `ProviderSettingsCoordinator` with no
-    // registry import at all; and the command catalog took
-    // `getCommandCatalog`, which is what `InlineEditModal` held.
+    // **30.** Four rows have left, and `ProviderRegistry` is three members over
+    // three rows: `createRuntime`, `taskResultInterpreter?` and
+    // `subagentLifecycleAdapter?`. The chat-UI row took its accessor and the
+    // four model-routing statics that only lived there to reach it; the
+    // settings reconciler took `getSettingsReconciler`; the command catalog
+    // took `getCommandCatalog`; and the history service took
+    // `getConversationHistoryService`, which is what `main.ts`, `TabManager`,
+    // `SessionStorage`, `tabSettings` and `ConversationController` held.
     // `GrimoireSettings` still counts, because the pattern is both registries
     // and it holds eight workspace-registry calls.
-    files: 32,
+    files: 30,
     closedBy: 'the provider rows, when the last consumer of each has moved',
   },
 ];
@@ -168,7 +170,7 @@ describe('structural deletion progress', () => {
       'the application importing a concrete provider module: 20',
       'turn metadata and session updates: 24',
       'StreamChunk and the subagent chunk vocabulary: 25',
-      'the two registries: 32',
+      'the two registries: 30',
     ]);
     // Two of eleven are zero, and both closed in the 2026-08-27 session.
     expect(SEARCHES).toHaveLength(remaining.length + 2);

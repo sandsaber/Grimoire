@@ -1,7 +1,6 @@
 import { addIcon, setTooltip } from 'obsidian';
 
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { TOOL_SUBAGENT } from '@/core/tools/toolNames';
 import { VIEW_TYPE_GRIMOIRE } from '@/core/types';
@@ -1062,8 +1061,12 @@ describe('GrimoirePlugin', () => {
     it('reports what the provider said about its history', async () => {
       await plugin.onload();
       const conv = await plugin.createConversation({ providerId: 'claude' });
-      const service = ProviderRegistry.getConversationHistoryService('claude');
-      const hydrate = jest.spyOn(service, 'hydrateConversationHistory')
+      // Spied on the workspace port the plugin now asks, which is the seam
+      // that carries the outcome to the surface.
+      const transcripts = (
+        await plugin.getApplicationRuntimeOrNull()?.workspaceFor('claude')
+      )?.transcripts;
+      const hydrate = jest.spyOn(transcripts!, 'hydrate')
         .mockResolvedValue({ outcome: 'stale', reason: 'sessionsNotFound' });
 
       await plugin.getConversationById(conv.id);

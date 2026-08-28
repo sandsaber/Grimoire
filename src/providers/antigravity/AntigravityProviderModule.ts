@@ -16,6 +16,7 @@ import {
   AntigravityExecutionBackend,
   type AntigravityExecutionBackendContext,
 } from './execution/AntigravityExecutionBackend';
+import { AntigravityConversationHistoryService } from './history/AntigravityConversationHistoryService';
 import { antigravityCliResolver } from './runtime/AntigravityCliResolver';
 import {
   type AntigravityDiscoveredModel,
@@ -169,6 +170,8 @@ const antigravityChatUi: ProviderChatUiContribution = chatUiContributionFor(
   antigravityCapabilities.reasoningControl,
 );
 
+const antigravityHistory = new AntigravityConversationHistoryService();
+
 export const antigravitySettingsCodec: ProviderSettingsCodec<AntigravityProviderSettings> = {
   providerId: 'antigravity',
   schemaVersion: 1,
@@ -234,6 +237,14 @@ AntigravityProviderSettings
     providerId: 'antigravity',
     async initialize(context): Promise<AntigravityWorkspace> {
       return {
+        transcripts: {
+          deleteSession: (conversation, vaultPath) => (
+            antigravityHistory.deleteConversationSession(conversation, vaultPath)
+          ),
+          hydrate: (conversation, vaultPath) => (
+            antigravityHistory.hydrateConversationHistory(conversation, vaultPath)
+          ),
+        },
         models: {
           list: () => context.listModels(),
           refresh: () => context.refreshModels(),
@@ -262,6 +273,16 @@ AntigravityProviderSettings
     providerId: 'antigravity',
     chatUI: antigravityChatUi,
     cli: { resolve: settings => antigravityCliResolver().resolveFromSettings(settings) },
+    conversationState: {
+      forkState: (sessionId, resumeAt, state) => (
+        antigravityHistory.buildForkProviderState(sessionId, resumeAt, state)
+      ),
+      isPendingFork: conversation => antigravityHistory.isPendingForkConversation(conversation),
+      resolveSessionId: conversation => antigravityHistory.resolveSessionIdForConversation(conversation),
+      ...(antigravityHistory.buildPersistedProviderState
+        ? { persistedState: conversation => antigravityHistory.buildPersistedProviderState?.(conversation) }
+        : {}),
+    },
   },
 
   // No history and no rewind: print mode keeps no transcript Grimoire could

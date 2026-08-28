@@ -154,7 +154,8 @@ describe('Gemini provider module', () => {
         'commands',
         'mcp',
         'models',
-          'settingsPresentation',
+        'settingsPresentation',
+        'transcripts',
         'usage',
       ]);
       expect(await workspace.mcp?.load()).toEqual([

@@ -5,7 +5,6 @@ import type { ProviderCommandEntry } from '../../../core/providers/commands/Prov
 import { resolveSettingsProviderId } from '../../../core/providers/modelRouting';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderChatUiContribution } from '../../../core/providers/ProviderModule';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
@@ -128,8 +127,8 @@ export function hasStartedConversation(conversation: Conversation | null | undef
     return true;
   }
   try {
-    const historyService = ProviderRegistry.getConversationHistoryService(conversation.providerId);
-    return !!historyService.resolveSessionIdForConversation?.(conversation);
+    return !!providerCatalog().declarations(conversation.providerId)
+      .conversationState?.resolveSessionId(conversation);
   } catch {
     return !!conversation.sessionId;
   }

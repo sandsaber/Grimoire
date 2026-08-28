@@ -9650,16 +9650,14 @@ Two questions to settle before writing it, both recorded rather than guessed:
 catalog and CLI resolution — and the entries below record each in turn, newest first. What is left,
 in the order it can be taken:
 
-**Five rows moved: the chat UI, the settings reconciler, the command catalog, CLI resolution and MCP
-storage.** And the most useful thing the session found is where it stopped: **every remaining
-provider row is blocked on something structural, not on design effort.** The table in
+**Six rows moved: the chat UI, the settings reconciler, the command catalog, CLI resolution, MCP
+storage and the history service.** And the most useful thing the session found is where it stopped:
+**every remaining provider row is blocked on something structural, not on design effort.** The table
+in
 [`provider-row-slot-fit.md`](provider-row-slot-fit.md#every-remaining-row-is-blocked-on-something-structural-not-on-design)
 names each blocker; the short version is one row that needs a decision and five that need another
 milestone first:
 
-- **`historyService`** is the decision — a workspace-global home for a port that currently hangs off
-  the conversation-bound `ProviderRuntimePorts`. It is the last row that can move without another
-  milestone, and it is one of the four things standing between here and deleting `ProviderRegistry`;
 - **`settingsTabRenderer`** needs the settings tabs to have a host contract: its context is the whole
   `GrimoirePlugin`, and the nine renderers use it as one;
 - **`runtimeCommandLoader`** needs the seam deletion, because its context carries a `ChatRuntime`;
@@ -9669,7 +9667,8 @@ milestone first:
 - **`taskResultInterpreter`** and **`subagentLifecycleAdapter`** need durable agents.
 
 So the next milestone is not another row pass. It is the seam deletion or durable agents, and the
-rows follow them.
+rows follow them. `ProviderRegistry` is **three members over three rows** — `createRuntime`,
+`taskResultInterpreter?`, `subagentLifecycleAdapter?` — and all three are among the blocked.
 
 **Two rows in a row turned out not to be workspace services at all** — the command dropdown and CLI
 resolution — and both were found by the same question: *which of this row's consumers are
@@ -9739,6 +9738,40 @@ through the real `chatUiContributionFor`, so the mock cannot drift from the dele
 use. It adds exactly one group by hand — `modeSelector`, which the delegation deliberately omits
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
+
+#### The history row split four-two, on the same question as the two before it
+
+Six members, three unrelated operations, and a slot bound to one conversation. What made it movable
+was the question the command dropdown and CLI resolution had already answered: *which of this row's
+consumers are synchronous, and why?*
+
+**Four members are pure functions of the conversation** — session resolution, pending-fork, the
+opaque state a fork starts from, and the state to persist. None of the nine reads a plugin, touches
+a file or awaits anything, and their consumers cannot wait: `SessionStorage` derives what to save
+*inside* a save, and two `hasStartedConversation` predicates ask while a tab paints. They are
+`ProviderDeclarations.conversationState`.
+
+**Two do I/O** — reading and deleting the provider's stored transcript — and for Claude one of them
+reaches workspace services. They are `ProviderWorkspaceSlots.transcripts`.
+`ProviderRuntimePorts.history` is untouched: it answers for the one conversation a runtime is bound
+to, which is a different question with the same subject, and the slot-fit file said so before this.
+
+`ProviderRegistry` is three members over three rows now, and five files lost the name outright:
+`main.ts`, `TabManager`, `SessionStorage`, `tabSettings` and `ConversationController`. 32 -> 30.
+
+**A second test-only gap surfaced, the same shape as the `ownsModel` one.** `TabManager.test`'s
+registry double supplied `getConversationHistoryService` with only `buildForkProviderState` on it,
+so `resolveSessionIdForConversation` was `undefined` and `hasStartedConversation` answered `false`
+for every conversation in that file. One case rested on it: a conversation with `sessionId:
+'session-abc'` and no messages, asserting that the *persistent* external-context paths are seeded —
+which production would not do, because a session is a started conversation. The fixture now means
+what the case is named for.
+
+What the round-trip spec pins is the pair rather than the write: `forkState` builds an opaque record
+and `resolveSessionId` is asked, of a conversation carrying it, where the fork resumes from. Only
+Claude and Codex resume a fork's source session — the six ACP providers fork by copying the
+conversation, and Antigravity resumes nothing at all — so that is asserted of the two it is true of
+and the opposite is asserted of the seven, rather than blanket-asserted of nine.
 
 #### Handing a workspace service through froze it at build time
 

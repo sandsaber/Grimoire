@@ -54,7 +54,6 @@ import {
   setEnvironmentVariablesForScope,
 } from './core/providers/providerEnvironment';
 import type { ProviderHistoryHydration } from './core/providers/ProviderModule';
-import { ProviderRegistry } from './core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from './core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceManager } from './core/providers/ProviderWorkspaceManager';
 import { ProviderWorkspaceRegistry } from './core/providers/ProviderWorkspaceRegistry';
@@ -1111,9 +1110,14 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   private async loadSdkMessagesForConversation(conversation: Conversation): Promise<void> {
-    const hydration = await ProviderRegistry
-      .getConversationHistoryService(conversation.providerId)
-      .hydrateConversationHistory(conversation, getVaultPath(this.app));
+    const transcripts = (
+      await this.getApplicationRuntimeOrNull()?.workspaceFor(conversation.providerId)
+    )?.transcripts;
+    // `absent`, not an error: a provider whose workspace this build does not
+    // compose has no transcript to load, which reads the same as a conversation
+    // whose provider never stored one.
+    const hydration = await transcripts?.hydrate(conversation, getVaultPath(this.app))
+      ?? { outcome: 'absent' as const };
     // Kept per conversation rather than returned, because the callers that open
     // one — `switchConversation`, `getConversationById` — hand back the
     // conversation itself and the surface asks separately. What it is for is a
@@ -1198,9 +1202,10 @@ export default class GrimoirePlugin extends Plugin {
     const conversation = this.conversations[index];
     this.conversations.splice(index, 1);
 
-    await ProviderRegistry
-      .getConversationHistoryService(conversation.providerId)
-      .deleteConversationSession(conversation, getVaultPath(this.app));
+    const transcripts = (
+      await this.getApplicationRuntimeOrNull()?.workspaceFor(conversation.providerId)
+    )?.transcripts;
+    await transcripts?.deleteSession(conversation, getVaultPath(this.app));
 
     await this.storage.sessions.deleteMetadata(id);
     this.historyHydration.delete(id);
@@ -1308,7 +1313,9 @@ export default class GrimoirePlugin extends Plugin {
 
     // Clear image data from memory after save (data is persisted by SDK).
     // Skip for pending forks: their deep-cloned images aren't in SDK storage yet.
-    if (!ProviderRegistry.getConversationHistoryService(conversation.providerId).isPendingForkConversation(conversation)) {
+    const conversationState = providerCatalog()
+      .declarations(conversation.providerId).conversationState;
+    if (!conversationState?.isPendingFork(conversation)) {
       for (const msg of conversation.messages) {
         if (msg.images) {
           for (const img of msg.images) {

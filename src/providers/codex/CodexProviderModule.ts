@@ -20,6 +20,7 @@ import {
   CodexExecutionBackend,
   type CodexExecutionBackendContext,
 } from './execution/CodexExecutionBackend';
+import { CodexConversationHistoryService } from './history/CodexConversationHistoryService';
 import { normalizeCodexDiscoveredModels } from './modelDiscoveryState';
 import { codexSubagentLifecycleAdapter } from './normalization/codexSubagentNormalization';
 import { codexCliResolver } from './runtime/CodexCliResolver';
@@ -195,6 +196,8 @@ const codexChatUi: ProviderChatUiContribution = chatUiContributionFor(
   codexCapabilities.reasoningControl,
 );
 
+const codexHistory = new CodexConversationHistoryService();
+
 export const codexSettingsCodec: ProviderSettingsCodec<CodexProviderSettings> = {
   providerId: 'codex',
   schemaVersion: 1,
@@ -278,6 +281,14 @@ CodexProviderSettings
     providerId: 'codex',
     async initialize(context): Promise<CodexWorkspace> {
       return {
+        transcripts: {
+          deleteSession: (conversation, vaultPath) => (
+            codexHistory.deleteConversationSession(conversation, vaultPath)
+          ),
+          hydrate: (conversation, vaultPath) => (
+            codexHistory.hydrateConversationHistory(conversation, vaultPath)
+          ),
+        },
         commands: context.commandsPort(),
         agentMentions: {
           list: () => context.listAgentMentions(),
@@ -333,6 +344,16 @@ CodexProviderSettings
       commandPrefix: '/',
     },
     cli: { resolve: settings => codexCliResolver().resolveFromSettings(settings) },
+    conversationState: {
+      forkState: (sessionId, resumeAt, state) => (
+        codexHistory.buildForkProviderState(sessionId, resumeAt, state)
+      ),
+      isPendingFork: conversation => codexHistory.isPendingForkConversation(conversation),
+      resolveSessionId: conversation => codexHistory.resolveSessionIdForConversation(conversation),
+      ...(codexHistory.buildPersistedProviderState
+        ? { persistedState: conversation => codexHistory.buildPersistedProviderState?.(conversation) }
+        : {}),
+    },
   },
 
   runtimePorts: context => ({

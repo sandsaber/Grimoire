@@ -1,5 +1,5 @@
 import type { ExecutionBackendFactory } from '../execution/ExecutionBackendDescriptor';
-import type { SlashCommand } from '../types';
+import type { Conversation, SlashCommand } from '../types';
 import type { ManagedMcpServer } from '../types/mcp';
 import type { ProviderId } from '../types/provider';
 import type { ProviderCommandEntry } from './commands/ProviderCommandEntry';
@@ -212,6 +212,53 @@ export interface ProviderWorkspaceSlots {
   readonly mcp?: ProviderMcpPort;
   /** Provider settings tab. Workspace row 10. */
   readonly settingsPresentation?: ProviderSettingsPresentationPort;
+  /** Reading and deleting a provider's stored transcript. Half of inventory row 14. */
+  readonly transcripts?: ProviderTranscriptPort;
+}
+
+/**
+ * What a conversation's session binding means to this provider.
+ *
+ * Every member is a pure function of the conversation. `providerState` stays
+ * opaque to core, which is why the two that build one return a record rather
+ * than a `Partial<Conversation>`: the host writes it back to the field it came
+ * from without reading inside it.
+ */
+export interface ProviderConversationStatePort {
+  /**
+   * The provider-native session id this conversation resumes from, if any.
+   *
+   * Takes a nullable conversation because the fork path asks before one is
+   * bound, and all nine implementations already answer `null` for it.
+   */
+  resolveSessionId(conversation: Conversation | null): string | null;
+  /** Whether this conversation is a fork whose session has not been created yet. */
+  isPendingFork(conversation: Conversation): boolean;
+  /** The opaque state a forked conversation starts from. */
+  forkState(
+    sourceSessionId: string,
+    resumeAt: string,
+    sourceProviderState?: Record<string, unknown>,
+  ): Record<string, unknown>;
+  /**
+   * The opaque state to save with this conversation, where the provider adds
+   * any of its own. Absent means the conversation's existing state is written
+   * back unchanged, which is what eight of the nine do.
+   */
+  persistedState?(conversation: Conversation): Record<string, unknown> | undefined;
+}
+
+/**
+ * A provider's stored transcript, which is the half of history that is I/O.
+ *
+ * Distinct from `ProviderRuntimePorts.history`, which answers for the one
+ * conversation a runtime is bound to. This is asked about any conversation the
+ * workspace has, which is why it takes one.
+ */
+export interface ProviderTranscriptPort {
+  /** Loads a conversation's transcript from the provider, and says what happened. */
+  hydrate(conversation: Conversation, vaultPath: string | null): Promise<ProviderHistoryHydration>;
+  deleteSession(conversation: Conversation, vaultPath: string | null): Promise<void>;
 }
 
 /**
@@ -499,6 +546,24 @@ export interface ProviderDeclarations {
    * Absent where the provider has no CLI to find.
    */
   readonly cli?: ProviderCliResolutionPort;
+  /**
+   * What a conversation's session binding means to this provider. Half of
+   * inventory row 14.
+   *
+   * **A declaration, because all four members are pure functions of the
+   * conversation they are handed.** None of the nine reads a plugin, touches a
+   * file, or awaits anything: they read the session id and the opaque
+   * `providerState` off a conversation and answer, or build a record to put
+   * back. And their consumers are synchronous — `SessionStorage` derives the
+   * state to persist inside a save, and two `hasStartedConversation` predicates
+   * ask whether a conversation has a session while a tab paints.
+   *
+   * The other half of the row — reading and deleting the provider's stored
+   * transcript — is genuinely workspace work, and is `transcripts` there. Third
+   * row this milestone to split on the same question: *which of its consumers
+   * are synchronous, and why?*
+   */
+  readonly conversationState?: ProviderConversationStatePort;
   /** Provider task and tool result interpretation. Inventory row 15. */
   readonly taskResults?: ProviderTaskResultPort;
   /** Subagent tool-name recognition and display parsing. Inventory row 16. */

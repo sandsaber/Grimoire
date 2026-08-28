@@ -404,7 +404,7 @@ describe('execution composition boundaries', () => {
       { row: 'createTitleGenerationService', owner: 'ProviderAuxiliarySource', path: AUXILIARY_SOURCE_PATH, slot: 'createRunner' },
       { row: 'createInstructionRefineService', owner: 'ProviderAuxiliarySource', path: AUXILIARY_SOURCE_PATH, slot: 'createRunner' },
       { row: 'createInlineEditService', owner: 'ProviderAuxiliarySource', path: AUXILIARY_SOURCE_PATH, slot: 'createRunner' },
-      { row: 'historyService', owner: 'ProviderRuntimePorts', slot: 'history' },
+      { row: 'historyService', owner: 'ProviderDeclarations', slot: 'conversationState' },
       { row: 'taskResultInterpreter', owner: 'ProviderDeclarations', slot: 'taskResults' },
       { row: 'subagentLifecycleAdapter', owner: 'ProviderDeclarations', slot: 'nativeAgents' },
       { row: 'commandCatalog', owner: 'ProviderWorkspaceSlots', slot: 'commands' },

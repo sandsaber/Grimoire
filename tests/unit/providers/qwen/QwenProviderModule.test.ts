@@ -152,6 +152,7 @@ describe('Qwen provider module', () => {
         'models',
           'runtimeCommands',
         'settingsPresentation',
+        'transcripts',
         'usage',
       ]);
       expect(await workspace.runtimeCommands?.listForSession('acp-session'))

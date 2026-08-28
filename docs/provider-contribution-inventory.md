@@ -28,7 +28,7 @@ that is produced by `initialize(context)` and needs a live plugin. A provider th
 optional workspace member is caught only by the parity gate, and only if its module leaves the
 bundle.
 
-## `ProviderRegistration` fields (4) — [types.ts:56](../src/core/providers/types.ts)
+## `ProviderRegistration` fields (3) — [types.ts:56](../src/core/providers/types.ts)
 
 Rows that have already moved are not deleted; they are listed under
 [Moved to their target homes](#moved-to-their-target-homes-12) with where they live now. Row
@@ -38,7 +38,6 @@ plan and this file both refer to rows by number.
 | # | Field | What it carries | Consumed by today | Target home | Moves at |
 |---|---|---|---|---|---|
 | 10 | `createRuntime` | chat execution (`ChatRuntime`) | `TabManager` / `Tab` | `ExecutionBackendFactory` behind the presentation adapter | **M2 — this is the flip** |
-| 14 | `historyService` | hydration, fork state, session resolution, deletion | conversation controllers, history UI | history capability port | M5 |
 | 15 | `taskResultInterpreter?` | provider task/tool result interpretation | chat rendering | result-interpretation port | M5 |
 | 16 | `subagentLifecycleAdapter?` | subagent tool-name recognition and display parsing | `SubagentManager` | native-agent observation port | M5 |
 
@@ -66,7 +65,7 @@ fields of either service interface.
 |---|---|---|---|---|---|
 | 1 | `workspaceCapabilities` | `ProviderCapabilityDescriptor.workspace`, read through `ProviderCatalog.workspaceCapabilities()` | settings gating | **arrived**; the registration still carries the record because the registry validates it, and a parity gate compares the two until the registry goes | M5 |
 
-## Moved to their target homes (14)
+## Moved to their target homes (15)
 
 Rows that have reached the home the tables above name for them. They stay recorded here for the
 same reason those tables exist: a contribution that simply disappears from an inventory is
@@ -87,6 +86,7 @@ each table's total still adds up.
 | 13 | `createInlineEditService` | registration | the same source, purpose `inline-edit` | `AuxiliaryExecutionOwner.inlineEditService()` | M5 |
 | 8 | `chatUIConfig` | registration | `ProviderDeclarations.chatUI`, a `ProviderChatUiContribution` each module builds over its own config | `ProviderCatalog.declarations(id).chatUI` | M5 |
 | 9 | `settingsReconciler` | registration | `ProviderSettingsReconciliation`, which the codec extends and each module builds over its own reconciler | `ProviderCatalog.settingsReconciliation(id)` | M5 |
+| 14 | `historyService` | registration | split in two: `ProviderDeclarations.conversationState` for the four pure members, `ProviderWorkspaceSlots.transcripts` for the two that do I/O | `ProviderCatalog.declarations(id).conversationState`, `workspaceFor(id).transcripts` | M5 |
 | 2 | default provider configs | app-level | `ProviderSettingsCodec.defaults()` | `ProviderCatalog.defaultConfigs()` | M3 |
 | 3 | workspace initialize/dispose lifecycle | app-level | `ProviderWorkspaceContribution`, both halves required | `ProviderWorkspaceManager`, owned by the plugin instance | M3 |
 

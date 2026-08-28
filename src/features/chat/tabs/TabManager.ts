@@ -4,7 +4,6 @@ import { getOpaqueProviderState } from '../../../core/providers/getOpaqueProvide
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderCommandsPort } from '../../../core/providers/ProviderModule';
 import type { ProviderWarmupMode } from '../../../core/providers/ProviderModule';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
@@ -167,8 +166,8 @@ export class TabManager implements TabManagerInterface {
       return true;
     }
     try {
-      const historyService = ProviderRegistry.getConversationHistoryService(conversation.providerId);
-      return !!historyService.resolveSessionIdForConversation?.(conversation);
+      return !!providerCatalog().declarations(conversation.providerId)
+        .conversationState?.resolveSessionId(conversation);
     } catch {
       return !!conversation.sessionId;
     }
@@ -867,13 +866,13 @@ export class TabManager implements TabManagerInterface {
       ? this.buildForkTitle(context.sourceTitle, context.forkAtUserMessage)
       : undefined;
 
-    const forkProviderState = ProviderRegistry
-      .getConversationHistoryService(conversation.providerId)
-      .buildForkProviderState(
+    const forkProviderState = providerCatalog()
+      .declarations(conversation.providerId).conversationState
+      ?.forkState(
         context.sourceSessionId,
         context.resumeAt,
         context.sourceProviderState,
-      );
+      ) ?? {};
 
     await this.plugin.updateConversation(conversation.id, {
       messages: context.messages,
