@@ -105,7 +105,6 @@ describe('tab projection execution', () => {
       { type: 'text', content: 'answer' },
       { type: 'tool_use', id: 'tool-1', name: 'Read', input: {} },
       { type: 'error', content: 'boom' },
-      { type: 'done' },
       { type: 'usage', usage: { inputTokens: 1, contextWindow: 2, contextTokens: 1, percentage: 1 } },
     ];
     type BoundSurface = { presentProviderContent(payload: unknown): readonly { type: string }[] };

@@ -472,14 +472,14 @@ describe('StreamController - Text Content', () => {
   });
 
   describe('Done chunk handling', () => {
-    it('should handle done chunk without error', async () => {
+    it('ends a turn without error', async () => {
+      // Asked as the render target asks it. This used to send a `done` chunk,
+      // which was the legacy stream's way of saying a turn had ended; the
+      // projection path calls the method, and the chunk type is deleted.
       const msg = createTestMessage();
       deps.state.currentTextEl = createMockEl();
 
-      // Should not throw
-      await expect(
-        controller.handleStreamChunk({ type: 'done' }, msg)
-      ).resolves.not.toThrow();
+      await expect(controller.finishTurn(msg)).resolves.not.toThrow();
     });
 
     it('detects an orchestrator plan on done when orchestrator mode is active', async () => {
@@ -508,7 +508,7 @@ describe('StreamController - Text Content', () => {
       deps.isOrchestratorMode = jest.fn().mockReturnValue(true);
       deps.onOrchestratorPlanDetected = jest.fn();
 
-      await controller.handleStreamChunk({ type: 'done' }, msg);
+      await controller.finishTurn(msg);
 
       expect(deps.onOrchestratorPlanDetected).toHaveBeenCalledWith(
         contentEl,
@@ -540,7 +540,7 @@ describe('StreamController - Text Content', () => {
       deps.isOrchestratorMode = jest.fn().mockReturnValue(false);
       deps.onOrchestratorPlanDetected = jest.fn();
 
-      await controller.handleStreamChunk({ type: 'done' }, msg);
+      await controller.finishTurn(msg);
 
       expect(deps.onOrchestratorPlanDetected).not.toHaveBeenCalled();
     });
@@ -709,7 +709,7 @@ describe('StreamController - Text Content', () => {
       expect(deps.state.currentTodos).toEqual(mockTodos);
 
       // Flush pending tools by sending a different chunk type (text or done)
-      await controller.handleStreamChunk({ type: 'done' }, msg);
+      await controller.finishTurn(msg);
 
       // Now renderToolCall should have been called
       expect(renderToolCall).toHaveBeenCalled();
@@ -923,7 +923,7 @@ describe('StreamController - Text Content', () => {
       expect(createWriteEditBlock).not.toHaveBeenCalled();
       expect(renderToolCall).not.toHaveBeenCalled();
 
-      await controller.handleStreamChunk({ type: 'done' }, msg);
+      await controller.finishTurn(msg);
 
       expect(deps.state.pendingTools.size).toBe(0);
       expect(createWriteEditBlock).toHaveBeenCalledWith(
@@ -1228,7 +1228,7 @@ describe('StreamController - Text Content', () => {
       expect(deps.state.pendingTools.size).toBe(3);
       expect(renderToolCall).not.toHaveBeenCalled();
 
-      await controller.handleStreamChunk({ type: 'done' }, msg);
+      await controller.finishTurn(msg);
 
       expect(deps.state.pendingTools.size).toBe(0);
       expect(renderToolCall).toHaveBeenCalledTimes(3);
@@ -1988,7 +1988,7 @@ describe('StreamController - Text Content', () => {
       );
 
       // Flush the tool so it transitions from pending to rendered
-      await controller.handleStreamChunk({ type: 'done' }, msg);
+      await controller.finishTurn(msg);
 
       // Manually set up a rendered tool element with name + summary children
       // (the mock renderToolCall doesn't actually populate toolCallElements)

@@ -206,7 +206,7 @@ live('Codex chat projection live smoke', () => {
     // Matrix row 2. The legacy adapter path sees this answer three times —
     // recorded against `CodexLiveSmoke` row 1 — so this is the row that says
     // whether the projection carries that duplication or not.
-    expect(column.chunks.filter(chunk => chunk.type === 'done')).toHaveLength(1);
+    expect(column.finished).toHaveLength(1);
     const assistants = column.state.messages.filter(message => message.role === 'assistant');
     expect(assistants).toHaveLength(1);
 

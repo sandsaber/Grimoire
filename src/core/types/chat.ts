@@ -271,10 +271,16 @@ export type ChatContentItem =
  * terminal, a failure is that terminal's reason, and the thinking indicator
  * follows the run's state. They are the variants the M5 seam deletion removes,
  * which is why they are named apart from the content that stays.
+ *
+ * **One left.** The turn-ended variant is gone: the only emitter was Codex's
+ * router and the only reader was Codex's own presenter, filtering it out again
+ * before anything saw it. What remains is a failure, and it is not dead the way
+ * that one was — the auto-turn path, which renders a turn the backend started
+ * rather than one a surface asked for, has no projection to read a terminal off
+ * and carries the failure in the stream. It goes when that path does.
  */
 export type ChatTurnLifecycleChunk =
-  | { type: 'error'; content: string }
-  | { type: 'done' };
+  | { type: 'error'; content: string };
 
 /**
  * Context window usage information.

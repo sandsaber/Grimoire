@@ -274,10 +274,6 @@ export class StreamController {
         await this.renderTurnFailure(chunk.content);
         break;
 
-      case 'done':
-        await this.finishTurn(msg);
-        break;
-
       case 'context_compacted': {
         this.flushPendingTools();
         if (state.currentThinkingState) {

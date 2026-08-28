@@ -127,10 +127,11 @@ export class CodexContentPresenter {
         this.failure = chunk.content;
       }
     }
-    // `done` closes the surface's turn, and the kernel's terminal is what
-    // closes this one — a turn ended here would stop rendering before the
-    // result is committed.
-    const rendered = chunks.filter(chunk => chunk.type !== 'done' && chunk.type !== 'error');
+    // The error chunk is a carrier, not a rendering: its words become
+    // `lastFailure()` above and the kernel's terminal is what draws the ending.
+    // The turn-ended chunk this used to filter beside it is not emitted at all
+    // any more — the router was producing one for this line to discard.
+    const rendered = chunks.filter(chunk => chunk.type !== 'error');
     return MIRRORED_BY_THE_KERNEL.has(method)
       ? rendered.filter(chunk => chunk.type !== 'text' && chunk.type !== 'thinking')
       : rendered;

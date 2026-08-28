@@ -242,12 +242,34 @@ const SEARCHES: readonly DeletionSearch[] = [
     // `assistant_message_start` were deleted with their last two emitters, the
     // ACP normalizer and the Codex router; `status` had no emitter at all, only
     // a `StreamController` case and two `TurnFeedbackMetrics` arms, which went
-    // with it. `error` and `done` are still emitted and still filtered, so the
-    // union stays and so do the files naming it. What closes this now is the
-    // terminal pair, which the projection already states and the surface still
-    // reads off the content channel.
+    // with it.
+    //
+    // **`done` is the fourth, and the count still says 5 — which is the honest
+    // answer, because no file stopped naming the union.** It had been reaching
+    // nobody: the only emitter was Codex's notification router and the only
+    // reader was Codex's own presenter, filtering it back out before anything
+    // saw it, with Claude's presenter filtering a chunk its transform never
+    // emitted. The projection path says a turn ended by calling the column's
+    // `finishTurn`.
+    //
+    // **What that dead variant was hiding.** Nine live-smoke suites asserted
+    // one such chunk on the column as a matrix row, which that path cannot
+    // deliver, and their fake column implemented neither `finishTurn` nor
+    // `renderTurnFailure` — so the render target's call would have thrown.
+    // Both are fixed; the rows count what the column was actually told.
+    //
+    // **This search cannot reach zero as written, and that is a finding about
+    // the search.** Three of its four patterns name the subagent chunk
+    // vocabulary, which is `ChatContentItem` — Claude's transform emits those
+    // three and `StreamController` draws them. Durable agents cannot take them
+    // over for the reason the `subagent hooks and loaders` row already
+    // recorded: an `AgentResultRecord` carries no tool calls. The fifth
+    // variant, `error`, is live on the auto-turn path, which renders a turn the
+    // backend started rather than one a surface asked for and so has no
+    // projection to read a terminal off.
     files: 5,
-    closedBy: 'the seam deletion — the lifecycle meaning goes, the content type keeps its own name',
+    closedBy: 'the auto-turn path — the last lifecycle variant is its failure '
+      + 'channel; the three subagent variants are content and are not going',
   },
   {
     what: 'the registries',

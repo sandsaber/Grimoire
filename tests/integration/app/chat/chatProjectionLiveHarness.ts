@@ -39,6 +39,17 @@ import type {
 export interface RecordingColumn {
   /** Every chunk `StreamController` was handed, in order. */
   readonly chunks: StreamChunk[];
+  /**
+   * Every time the column was told a turn had ended, and every failure said.
+   *
+   * **These were missing, and their absence made a matrix row unfalsifiable.**
+   * The render target does not send a turn's ending as a chunk — it calls
+   * `finishTurn`, and a failure `renderTurnFailure`. The fake below implemented
+   * neither, so the target's call would have thrown, and the row that checked
+   * "one turn ended" was counting a chunk type that path never delivers.
+   */
+  readonly finished: string[];
+  readonly failures: string[];
   /** Every piece of assistant text appended to the column, in order. */
   readonly drawn: string[];
   /** Every piece of reasoning text appended to the column, in order. */
@@ -94,6 +105,8 @@ export function recordingColumn(
   providerId: ProviderId,
 ) {
   const chunks: StreamChunk[] = [];
+  const finished: string[] = [];
+  const failures: string[] = [];
   const drawn: string[] = [];
   const thought: string[] = [];
   const element = createMockEl();
@@ -111,6 +124,8 @@ export function recordingColumn(
   };
   return {
     chunks,
+    finished,
+    failures,
     drawn,
     state,
     thought,
@@ -123,6 +138,14 @@ export function recordingColumn(
       stream: {
         handleStreamChunk: (chunk: StreamChunk) => {
           chunks.push(chunk);
+          return Promise.resolve();
+        },
+        finishTurn: (message: { id: string }) => {
+          finished.push(message.id);
+          return Promise.resolve();
+        },
+        renderTurnFailure: (content: string) => {
+          failures.push(content);
           return Promise.resolve();
         },
         appendText: (text: string) => {

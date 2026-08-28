@@ -10450,6 +10450,40 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the turn-ended chunk, and what it was hiding (`this commit`)
+
+**`ChatTurnLifecycleChunk` is down to one variant, and the search stays at 5 — which is the honest
+number, because no file stopped naming the union.** What went is `done`, and it had been reaching
+nobody: the only emitter was Codex's notification router, the only reader was Codex's own presenter
+filtering it back out before anything saw it, and Claude's presenter filtered a chunk its transform
+never emitted. The projection path says a turn ended by calling the column's `finishTurn`.
+
+- Gates: unit 8748 passed, 8748 total (553 suites); integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- **The dead variant was hiding a live defect in nine suites.** Every `*ChatProjectionLiveSmoke`
+  asserted `column.chunks.filter(type === 'done')).toHaveLength(1)` as matrix row 2. That path
+  cannot deliver such a chunk, and the harness's fake column implemented neither `finishTurn` nor
+  `renderTurnFailure` — so the render target's own call would have thrown. The fake records both
+  now, and the nine rows count what the column was told. This is the surface half of the harness
+  rewrite the owner approved: verifiable without a CLI, because the type system and the target's
+  call sites prove it.
+- **`tsc` found four more readers a grep had not.** Claude's presenter, `tabProjectionExecution`'s
+  fixture, and two Claude type-guard suites. Typechecking before running is what turns a deletion
+  into a list.
+- **This search cannot reach zero as written, and that is a finding about the search.** Three of its
+  four patterns name the subagent chunk vocabulary — `async_subagent_result`, `subagent_tool_use`,
+  `subagent_tool_result` — which are `ChatContentItem`: Claude's transform emits them and
+  `StreamController` draws them. Durable agents cannot take them over, for the reason the
+  `subagent hooks and loaders` row already recorded and this one had not absorbed: an
+  `AgentResultRecord` carries no tool calls. The fifth, `error`, is live on the auto-turn path,
+  which renders a turn the backend started rather than one a surface asked for, and so has no
+  projection to read a terminal off. The `closedBy` says that now instead of promising the seam
+  deletion would take all five.
+- **Also established while reading it, and not acted on:** `ExecutionChatRuntimeAdapter.query()` —
+  the legacy chunk generator — has **no caller in `src/`**. The four `.query(` hits are the
+  auxiliary runner's unrelated method. Deleting it is a real removal on the frozen path and it
+  closes no search, so it is recorded here rather than folded into this commit.
+
 ### M5 — the persistence barrier writes the session binding (`this commit`)
 
 **`turn metadata and session updates` closes: 2 → 0.** The two were the adapter that built a

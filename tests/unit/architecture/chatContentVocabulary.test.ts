@@ -26,18 +26,32 @@ const CHAT_TYPES = 'src/core/types/chat.ts';
  *
  * `error` — the terminal's own reason; `done` — the terminal itself.
  *
- * **Three of the five are deleted.** `user_message_start` and
+ * **Four of the five are deleted.** `user_message_start` and
  * `assistant_message_start` were a turn's boundaries, which a run's start and
  * terminal state are; their last two emitters are gone, and what a turn's
  * assistant message is called comes from its run. `status` was the thinking
  * indicator's text, which the run's state drives — it had no emitter at all,
  * only a `StreamController` case and two `TurnFeedbackMetrics` arms, and those
- * went with it. This list may shrink and never grow: a variant added back is a
- * fact the projection owns being restated on the content channel.
+ * went with it.
+ *
+ * `done` was the fourth, and it had been reaching nobody for a while: the only
+ * emitter was Codex's notification router and the only reader was Codex's own
+ * presenter, filtering it back out before anything saw it. Claude's presenter
+ * filtered it too, for a chunk its transform never emitted. The projection path
+ * says a turn ended by calling the column's `finishTurn`, not by sending it a
+ * chunk — which is why nine live-smoke suites were counting a `done` on the
+ * column that path cannot deliver, and why their fake column had no
+ * `finishTurn` for the render target to call.
+ *
+ * `error` is the one left, and it is not dead the same way: the auto-turn path
+ * renders a turn the backend started rather than one a surface asked for, and
+ * it has no projection to read a terminal off.
+ *
+ * This list may shrink and never grow: a variant added back is a fact the
+ * projection owns being restated on the content channel.
  */
 const LIFECYCLE_VARIANTS = [
   'error',
-  'done',
 ];
 
 /**

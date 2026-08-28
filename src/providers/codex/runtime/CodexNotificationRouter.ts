@@ -866,7 +866,6 @@ export class CodexNotificationRouter {
     }
 
     this.flushPendingRawToolOutputs();
-    this.emit({ type: 'done' });
   }
 
   private onError(params: ErrorNotification): void {

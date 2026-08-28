@@ -101,7 +101,7 @@ describe('Codex content presenter', () => {
       },
     });
 
-    expect(completed.filter((chunk: any) => chunk.type === 'error' || chunk.type === 'done'))
+    expect(completed.filter((chunk: any) => chunk.type === 'error'))
       .toEqual([]);
     // Kept, so the terminal can be rendered in the daemon's own words instead
     // of the neutral sentence.

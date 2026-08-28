@@ -153,8 +153,9 @@ live('Antigravity chat projection live smoke', () => {
     expect(column.chunks.filter(chunk => chunk.type === 'error')).toHaveLength(0);
     // Matrix row 5: the answer arrived as text on the column.
     expect(column.drawn.join('').trim()).not.toBe('');
-    // Matrix row 2: one `done`, one assistant bubble, no trailing empty one.
-    expect(column.chunks.filter(chunk => chunk.type === 'done')).toHaveLength(1);
+    // Matrix row 2: the column was told once that the turn ended — which the
+    // render target says by calling `finishTurn`, not by sending a chunk.
+    expect(column.finished).toHaveLength(1);
     const assistants = column.state.messages.filter(message => message.role === 'assistant');
     expect(assistants).toHaveLength(1);
     expect(assistants[0]?.content.trim()).not.toBe('');
@@ -200,7 +201,7 @@ live('Antigravity chat projection live smoke', () => {
     // the partial answer stays where it was drawn rather than being replaced by
     // a failure.
     expect(completed.terminal.kind).toBe('cancelled');
-    expect(column.chunks.filter(chunk => chunk.type === 'done')).toHaveLength(1);
+    expect(column.finished).toHaveLength(1);
     expect(column.chunks.filter(chunk => chunk.type === 'error')).toHaveLength(0);
 
     const survivors = await waitFor('the agy tree to disappear', 20_000, () => (

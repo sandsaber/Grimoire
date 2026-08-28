@@ -187,7 +187,7 @@ live('Grok Build chat projection live smoke', () => {
     expect(column.chunks.filter(chunk => chunk.type === 'error')).toHaveLength(0);
     expect(column.drawn.join('').trim()).not.toBe('');
     // Matrix row 2.
-    expect(column.chunks.filter(chunk => chunk.type === 'done')).toHaveLength(1);
+    expect(column.finished).toHaveLength(1);
     const assistants = column.state.messages.filter(message => message.role === 'assistant');
     expect(assistants).toHaveLength(1);
 

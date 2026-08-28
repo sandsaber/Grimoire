@@ -434,7 +434,6 @@ describe('CodexNotificationRouter', () => {
         content: 'file.txt',
         isError: false,
       });
-      expect(chunks[chunks.length - 1]).toEqual({ type: 'done' });
     });
 
     it('suppresses the raw exec wrapper while preserving typed nested tool events', () => {
@@ -665,7 +664,10 @@ describe('CodexNotificationRouter', () => {
         turn: { id: 'turn1', items: [], status: 'completed', error: null },
       });
 
-      expect(chunks).toEqual([{ type: 'done' }]);
+      // Nothing on completion: the surface learns a turn ended from the run's
+      // terminal, and the chunk this used to emit was filtered back out by this
+      // router's own presenter before anything saw it.
+      expect(chunks).toEqual([]);
     });
 
     it('maps fileChange item/started to tool_use chunk', () => {
@@ -1036,17 +1038,20 @@ describe('CodexNotificationRouter', () => {
   });
 
   describe('turn completion', () => {
-    it('records assistant turn metadata then emits done on completion', () => {
+    it('records assistant turn metadata on completion', () => {
       router.handleNotification('turn/completed', {
         threadId: 't1',
         turn: { id: 'turn1', items: [], status: 'completed', error: null },
       });
 
       expect(turnMetadata).toContainEqual({ assistantMessageId: 'turn1' });
-      expect(chunks).toEqual([{ type: 'done' }]);
+      // Nothing on completion: the surface learns a turn ended from the run's
+      // terminal, and the chunk this used to emit was filtered back out by this
+      // router's own presenter before anything saw it.
+      expect(chunks).toEqual([]);
     });
 
-    it('emits error then done on turn/completed with status failed', () => {
+    it('emits the error on turn/completed with status failed', () => {
       router.handleNotification('turn/completed', {
         threadId: 't1',
         turn: {
@@ -1057,19 +1062,19 @@ describe('CodexNotificationRouter', () => {
         },
       });
 
-      expect(chunks).toEqual([
-        { type: 'error', content: 'Model error' },
-        { type: 'done' },
-      ]);
+      expect(chunks).toEqual([{ type: 'error', content: 'Model error' }]);
     });
 
-    it('emits done on turn/completed with status interrupted', () => {
+    it('emits nothing on turn/completed with status interrupted', () => {
       router.handleNotification('turn/completed', {
         threadId: 't1',
         turn: { id: 'turn1', items: [], status: 'interrupted', error: null },
       });
 
-      expect(chunks).toEqual([{ type: 'done' }]);
+      // Nothing on completion: the surface learns a turn ended from the run's
+      // terminal, and the chunk this used to emit was filtered back out by this
+      // router's own presenter before anything saw it.
+      expect(chunks).toEqual([]);
     });
   });
 
@@ -1188,7 +1193,7 @@ describe('CodexNotificationRouter', () => {
   });
 
   describe('plan_completed emission', () => {
-    it('records plan completion metadata before done on successful plan turn with plan deltas', () => {
+    it('records plan completion metadata on a successful plan turn with plan deltas', () => {
       router.beginTurn({ isPlanTurn: true });
 
       router.handleNotification('item/plan/delta', {
@@ -1200,7 +1205,6 @@ describe('CodexNotificationRouter', () => {
       });
 
       expect(turnMetadata).toContainEqual(expect.objectContaining({ planCompleted: true }));
-      expect(chunks.map(c => c.type)).toContain('done');
     });
 
     it('does not emit plan_completed when no plan delta was seen', () => {
@@ -1212,7 +1216,6 @@ describe('CodexNotificationRouter', () => {
       });
 
       expect(chunks.map(c => c.type)).not.toContain('plan_completed');
-      expect(chunks.map(c => c.type)).toContain('done');
     });
 
     it('does not emit plan_completed when turn failed', () => {
@@ -1429,14 +1432,12 @@ describe('CodexNotificationRouter', () => {
   });
 
   describe('assistant metadata emission', () => {
-    it('records assistant metadata before done on completed turn', () => {
+    it('records assistant metadata on a completed turn', () => {
       router.handleNotification('turn/completed', {
         threadId: 't1',
         turn: { id: 'turn-uuid-123', items: [], status: 'completed', error: null },
       });
 
-      const types = chunks.map(c => c.type);
-      expect(types).toContain('done');
       expect(turnMetadata).toContainEqual({ assistantMessageId: 'turn-uuid-123' });
     });
 

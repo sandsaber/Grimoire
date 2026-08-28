@@ -202,12 +202,7 @@ export class ClaudeContentPresenter {
         }
         continue;
       }
-      // `done` closes the surface's turn, and the kernel's terminal is what
-      // closes this one — a turn ended here would stop rendering before the
-      // result is committed.
-      if (event.type !== 'done') {
-        chunks.push(event);
-      }
+      chunks.push(event);
     }
     return chunks;
   }
