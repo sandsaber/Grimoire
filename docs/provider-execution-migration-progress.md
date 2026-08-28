@@ -10450,6 +10450,34 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — what the last three searches actually need (`this commit`)
+
+**No code changed here. Three rows are recorded with the reason they are not moving, because two of
+them carried a `closedBy` that was wrong and a reader would have spent the same hours rediscovering
+it.**
+
+- **`SubagentManager lifecycle: 2`.** Its `closedBy` named a product question — "whether an in-turn
+  subagent should hold a turn open" — that the code already answers, and the answer is no:
+  `hasRunningSubagents` reads only the two *async* maps and never `syncSubagents`, and
+  `recordDurableSubagent` says the same from the other side. Both halves of the union in `Tab.ts` are
+  about the same population. What actually holds it at 2 is that the union is deliberate: the records
+  are the durable half, and the live map is the *synchronous* half, which Claude's `Stop` hook needs
+  because `runningOwnedAgents` answers `undefined` for an unlisted owner and the record write is
+  fire-and-forget. Closing it needs an optimistic in-memory mark whose only purpose is to delete a
+  two-line union — a worse codebase for a smaller number.
+- **`StreamChunk and the subagent chunk vocabulary: 5`.** Three of its four patterns name content
+  that is not going, for the reason the `subagent hooks and loaders` row recorded and this one had
+  not absorbed. Written up in the entry two below this one.
+- **`worker tab ownership: 3`.** The one row that is genuinely feature work. `GrimoireView` spawns a
+  chat tab per task in an approved orchestrator plan; for those to be durable attempts a worker has
+  to run without a tab and its result has to surface somewhere that is not one. The plan gates that
+  behind the durable-ownership UI, and it changes what a person sees.
+
+**So the structural scoreboard is at its floor for moves.** Ten of thirteen searches are zero. The
+three that are not need, in order: a product decision about orchestrator workers, a UI that shows
+durable work, and — for the two smaller ones — nothing, because they are correct as they stand and
+their entries now say so instead of promising a milestone would take them.
+
 ### M5 — review pass: the barrier asked the provider once too often (`this commit`)
 
 **A defect the barrier move introduced, found by reviewing it rather than by a test.** The turn's
@@ -10502,10 +10530,15 @@ never emitted. The projection path says a turn ended by calling the column's `fi
   which renders a turn the backend started rather than one a surface asked for, and so has no
   projection to read a terminal off. The `closedBy` says that now instead of promising the seam
   deletion would take all five.
-- **Also established while reading it, and not acted on:** `ExecutionChatRuntimeAdapter.query()` —
-  the legacy chunk generator — has **no caller in `src/`**. The four `.query(` hits are the
-  auxiliary runner's unrelated method. Deleting it is a real removal on the frozen path and it
-  closes no search, so it is recorded here rather than folded into this commit.
+- **Also established while reading it, and the first half of this was written too fast:**
+  `ExecutionChatRuntimeAdapter.query()` — the legacy chunk generator — has **no caller in `src/`**;
+  the four `.query(` hits are the auxiliary runner's unrelated method. That much holds. Calling it
+  therefore deletable does not: it has **308 call sites in `tests/`**, and it is the seam every
+  provider's execution-composition suite drives to assert normalization. So the finding is not
+  "dead code" but something sharper — those suites drive a path no user takes, which is the
+  harness-fidelity rule pointing at itself. The unit half of that is rewritable and verifiable; the
+  nine `*LiveSmoke` suites are `describe.skip` behind per-provider credentials and cannot be watched
+  passing here.
 
 ### M5 — the persistence barrier writes the session binding (`this commit`)
 

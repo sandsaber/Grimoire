@@ -59,10 +59,21 @@ const SEARCHES: readonly DeletionSearch[] = [
       + '`installInteractions` on the adapter, which is not a contract member',
   },
   {
+    // **Three, and they are one feature: `GrimoireView` spawns a chat tab per
+    // task in an approved orchestrator plan and sends the task prompt into
+    // it.** For these to become durable attempts, an orchestrator worker has to
+    // run without a tab — a dispatched agent rather than an observed one — and
+    // its result has to be surfaced somewhere that is not a tab. The plan gates
+    // that behind the durable-ownership UI, and says so where it says tab close
+    // keeps cancelling until the surface that shows durable work ships.
+    //
+    // So this is the one remaining row that is genuinely feature work rather
+    // than a move, and it changes what a person sees: workers stop being tabs.
     what: 'worker tab ownership',
     pattern: /createWorkerTab|orchestratorTabId|workerTabIds/,
     files: 3,
-    closedBy: 'durable agents — worker tabs become optional focused views',
+    closedBy: 'durable agents plus the ownership surface — a worker has to be '
+      + 'dispatchable without a tab before a tab can be optional',
   },
   {
     what: 'core importing the plugin type',
@@ -140,10 +151,33 @@ const SEARCHES: readonly DeletionSearch[] = [
     //
     // `orphanAllActive` matched nothing when this search was written and still
     // does; it is kept because the plan names it.
+    // **The product question this named is already answered by the code, and
+    // the answer is no.** `hasRunningSubagents` reads the two *async* maps and
+    // never `syncSubagents`, so an in-turn subagent has never held a turn open;
+    // `recordDurableSubagent` says the same thing from the other side — a
+    // subagent that runs inside a turn is drawn and finished before the turn
+    // is, so there is nothing for a record to outlive. Both halves of the union
+    // in `Tab.ts` are about the same population: background subagents.
+    //
+    // **What actually holds it at 2 is that the union is deliberate, and both
+    // halves are load-bearing.** The records are the durable half — an agent
+    // started in a tab that has since closed is in no live map anywhere. The
+    // live map is the *synchronous* half, and Claude's `Stop` hook asks
+    // synchronously: `runningOwnedAgents` answers `undefined` for an owner
+    // nothing has listed, the caller reads that as "not running", and the
+    // record write is fire-and-forget. Deleting the live half would trade a
+    // correct two-line union for a race in the one place where losing means
+    // ending a turn on top of running work.
+    //
+    // Closing it needs the records to be authoritative the instant a background
+    // agent starts, which is an optimistic in-memory mark whose only purpose
+    // would be to delete this union. That is a worse codebase for a smaller
+    // number, so it is recorded rather than done.
     what: 'SubagentManager lifecycle',
     pattern: /hasRunningSubagents|orphanAllActive/,
     files: 2,
-    closedBy: 'durable agents — whether an in-turn subagent should hold a turn open',
+    closedBy: 'not by durable agents — the live map is the synchronous half of a '
+      + 'deliberate union, and the hook that reads it cannot await a record',
   },
   {
     // **Split from one search of 20, with the total preserved.** The single
