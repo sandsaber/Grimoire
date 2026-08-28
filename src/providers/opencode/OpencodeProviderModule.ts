@@ -239,7 +239,7 @@ export const opencodeSettingsCodec: ProviderSettingsCodec<OpencodeProviderSettin
 
   environmentKeyPrefixes: ['OPENCODE_'],
 
-  ...settingsReconciliationFor(opencodeSettingsReconciler),
+  ...settingsReconciliationFor(opencodeSettingsReconciler, 'session-and-state'),
 };
 
 export const opencodeProviderModule: ProviderModule<

@@ -89,6 +89,29 @@ describe('provider settings reconciliation', () => {
       .toEqual({ changed: false, invalidatesSessions: false });
   });
 
+  it('declares an invalidation scope exactly where it invalidates', () => {
+    const declared = catalog.ids()
+      .filter(providerId => catalog.settingsReconciliation(providerId).invalidates);
+
+    // The three that reconcile nothing declare no scope: a scope on a provider
+    // that never invalidates is a claim nothing can check, and an absent one on
+    // a provider that does is a conversation the host would leave bound.
+    expect(declared.sort()).toEqual(RECONCILING.map(([id]) => id).sort());
+  });
+
+  it('keeps Claude opaque state, and takes it from the providers that hold a session handle', () => {
+    // **The one difference no delegation could read off the reconcilers.**
+    // Claude's `providerState` holds subagent transcripts and a fork source,
+    // and its reconciler clears the session id alone. Codex, OpenCode, Grok,
+    // Kimi Code and MiMoCode keep a native handle there to a session the old
+    // environment created, and clear both. A single rule loses one or strands
+    // the other.
+    expect(catalog.settingsReconciliation('claude').invalidates).toBe('session');
+    for (const providerId of ['codex', 'opencode', 'grok', 'kimicode', 'mimocode']) {
+      expect(catalog.settingsReconciliation(providerId).invalidates).toBe('session-and-state');
+    }
+  });
+
   it('offers a discovery-state clear only where the provider caches one', () => {
     const clearing = catalog.ids()
       .filter(providerId => catalog.settingsReconciliation(providerId).clearDiscoveryState);

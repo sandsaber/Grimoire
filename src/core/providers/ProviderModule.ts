@@ -129,6 +129,24 @@ export interface ProviderSettingsCodec<TSettings extends object = Record<string,
  */
 export interface ProviderSettingsReconciliation {
   /**
+   * What an invalidation clears, for the providers that have one.
+   *
+   * **Not the same answer for all nine, and the difference is data loss.**
+   * Claude's `providerState` holds subagent transcripts and a fork source, and
+   * its reconciler clears the session id alone — so `session` keeps the opaque
+   * state. Every other provider that invalidates keeps a native handle to a
+   * session the *old environment* created there — a Codex thread id, an
+   * OpenCode database path, a Grok session directory — so `session-and-state`
+   * clears both. Clearing both for everyone loses Claude's subagent data;
+   * clearing neither strands the other five on handles that resolve to nothing.
+   *
+   * Absent where the provider invalidates nothing at all, which is three of the
+   * nine: Gemini and Qwen have no reconciliation written, and Antigravity
+   * starts a fresh process per run and has no session to lose.
+   */
+  readonly invalidates?: ProviderSessionInvalidationScope;
+
+  /**
    * Discovery state this provider must drop when its environment changes.
    *
    * Optional, and absent means there is none: four providers cache a model
@@ -157,6 +175,9 @@ export interface ProviderSettingsReconcileOutcome {
   /** Whether the reconciliation makes this provider's existing sessions unusable. */
   readonly invalidatesSessions: boolean;
 }
+
+/** What an environment change takes with the session, for one provider. */
+export type ProviderSessionInvalidationScope = 'session' | 'session-and-state';
 
 // ---------------------------------------------------------------------------
 // Workspace — inventory workspace rows 1-11 and app-level rows 1 and 3

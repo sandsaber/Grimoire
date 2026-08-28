@@ -258,7 +258,7 @@ export const codexSettingsCodec: ProviderSettingsCodec<CodexProviderSettings> = 
 
   environmentKeyPrefixes: ['OPENAI_', 'CODEX_'],
 
-  ...settingsReconciliationFor(codexSettingsReconciler),
+  ...settingsReconciliationFor(codexSettingsReconciler, 'session-and-state'),
 };
 
 export const codexProviderModule: ProviderModule<

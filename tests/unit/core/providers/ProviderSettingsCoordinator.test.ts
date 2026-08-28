@@ -112,6 +112,48 @@ describe('ProviderSettingsCoordinator', () => {
       expect(otherConv.sessionId).toBe('codex-thread');
     });
 
+    it('keeps Claude provider state through an invalidation, and clears Codex thread state', () => {
+      // **What comes off with the session is the provider's answer.** Claude's
+      // `providerState` holds subagent transcripts and a fork source; its
+      // reconciler has always cleared the session id alone. Codex's holds a
+      // thread id belonging to a daemon the old environment launched.
+      const claudeConv = {
+        providerId: 'claude',
+        messages: [],
+        sessionId: 'claude-session',
+        providerState: { subagentData: { 'agent-1': [] } },
+      } as unknown as Conversation;
+      const settings: Record<string, unknown> = {
+        model: 'haiku',
+        settingsProvider: 'claude',
+        sharedEnvironmentVariables: 'ANTHROPIC_BASE_URL=https://example.invalid\n',
+        providerConfigs: { claude: { enabled: true } },
+      };
+
+      ProviderSettingsCoordinator.reconcileAllProviders(settings, [claudeConv]);
+
+      expect(claudeConv.sessionId).toBeNull();
+      expect(claudeConv.providerState).toEqual({ subagentData: { 'agent-1': [] } });
+
+      const codexConv = {
+        providerId: 'codex',
+        messages: [],
+        sessionId: 'codex-thread',
+        providerState: { threadId: 'thread-1' },
+      } as unknown as Conversation;
+      const codexSettings: Record<string, unknown> = {
+        model: 'gpt-5.5',
+        settingsProvider: 'codex',
+        sharedEnvironmentVariables: 'OPENAI_BASE_URL=https://example.invalid\n',
+        providerConfigs: { codex: { enabled: true } },
+      };
+
+      ProviderSettingsCoordinator.reconcileAllProviders(codexSettings, [codexConv]);
+
+      expect(codexConv.sessionId).toBeNull();
+      expect(codexConv.providerState).toBeUndefined();
+    });
+
     it('leaves a conversation that has no session binding out of the invalidated list', () => {
       // The caller writes one metadata file per entry, so a conversation with
       // nothing to clear must not appear: it would be a write per conversation

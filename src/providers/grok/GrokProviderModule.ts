@@ -237,7 +237,7 @@ export const grokSettingsCodec: ProviderSettingsCodec<GrokProviderSettings> = {
 
   environmentKeyPrefixes: ['GROK_', 'XAI_'],
 
-  ...settingsReconciliationFor(grokSettingsReconciler),
+  ...settingsReconciliationFor(grokSettingsReconciler, 'session-and-state'),
 };
 
 export const grokProviderModule: ProviderModule<

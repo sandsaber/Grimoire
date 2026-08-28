@@ -251,7 +251,7 @@ export const claudeSettingsCodec: ProviderSettingsCodec<ClaudeProviderSettings> 
 
   environmentKeyPrefixes: ['ANTHROPIC_', 'CLAUDE_'],
 
-  ...settingsReconciliationFor(claudeSettingsReconciler),
+  ...settingsReconciliationFor(claudeSettingsReconciler, 'session'),
 };
 
 export const claudeProviderModule: ProviderModule<

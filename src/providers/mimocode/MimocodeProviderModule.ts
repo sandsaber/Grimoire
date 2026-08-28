@@ -251,7 +251,7 @@ export const mimocodeSettingsCodec: ProviderSettingsCodec<MimocodeProviderSettin
 
   environmentKeyPrefixes: ['MIMOCODE_'],
 
-  ...settingsReconciliationFor(mimocodeSettingsReconciler),
+  ...settingsReconciliationFor(mimocodeSettingsReconciler, 'session-and-state'),
 };
 
 export const mimocodeProviderModule: ProviderModule<

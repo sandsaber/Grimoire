@@ -9709,6 +9709,38 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### A review caught the reconciler row clearing state Claude keeps
+
+The settings-reconciler row moved session invalidation to the host, over one provider-neutral rule:
+clear `sessionId` and `providerState` for every conversation of the provider that has either. The
+justification recorded with it was that **Claude writes no `providerState`** — and Claude does.
+`ClaudeConversationHistoryService.buildPersistedProviderState` writes `subagentData`,
+`buildForkProviderState` writes a `forkSource`, and `resolveSessionIdForConversation` reads a
+`providerSessionId` out of the same record. Claude's reconciler has always cleared the session id
+alone and left all three alone.
+
+So the rule would have deleted a conversation's subagent transcripts on any environment change — a
+data loss with no test on it, in a commit whose whole claim was behaviour preservation. It was found
+by a review asked one specific question: *is that guard really equivalent, per provider?*
+
+The fix makes the difference a declaration. `ProviderSettingsReconciliation.invalidates` is
+`'session'` for Claude and `'session-and-state'` for the five that keep a native handle to a session
+the old environment created — a Codex thread id, an OpenCode database path, a Grok session
+directory — and is **absent for the three that invalidate nothing**, which is checkable and
+therefore checked. The coordinator clears only what the scope names, and a provider reporting an
+invalidation with no scope declared clears nothing rather than guessing.
+
+Two tests pin it: one asserts the scope is declared exactly where a provider invalidates, and one
+drives a real reconciliation and reads the conversation afterwards — Claude keeps `subagentData`,
+Codex loses `threadId`. The second was proved by making the host clear state for everyone again and
+watching it go red.
+
+What this says about the row: the delegation could carry the six methods, and could not carry this.
+It is the one fact about the nine reconcilers that lives in the *shape of the loop* rather than in a
+value any of them returns, which is exactly the kind of thing a slot designed from a row's name
+cannot hold — the failure `provider-row-slot-fit.md` exists to stop, arriving one level below where
+that file looks.
+
 #### The command catalog moved, and its port was one member against seven
 
 `ProviderCommandsPort` was `list(): Promise<descriptor[]>` against a row that also **writes**: the

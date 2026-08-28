@@ -5,6 +5,7 @@ import { providerCatalog } from './ProviderCatalog';
 import type {
   ProviderChatUiContribution,
   ProviderReasoningPresentation,
+  ProviderSessionInvalidationScope,
 } from './ProviderModule';
 import type { ProviderId } from './types';
 
@@ -111,25 +112,39 @@ function normalizeReasoningValue(
  *
  * **The host's job, and the reason the module answers a boolean.** Each
  * provider's reconciler used to walk the conversation list itself and clear
- * `sessionId` and `providerState` on the ones whose own state field was set —
+ * the binding on the ones whose own state field was set —
  * a thread id for Codex, a database path for OpenCode, a session directory for
  * Grok. Those are three spellings of one question: does this conversation have
  * a session to lose. `providerState` is opaque here, which is exactly what
- * makes "set at all" the provider-neutral form of it, and Claude — the one
- * provider that checked `sessionId` alone — writes no `providerState`, so the
- * two readings agree for every provider that ships.
+ * makes "set at all" the provider-neutral form of it.
+ *
+ * **What comes off with the session is the provider's answer, not one rule.**
+ * Claude keeps its `providerState` — subagent transcripts and a fork source live
+ * there, and neither depends on the environment — while the five that hold a
+ * native handle to a session the old environment created lose it with the
+ * session it points at. The scope says which, and a provider that invalidates
+ * nothing declares none.
  *
  * The conversations that had nothing are left out of the returned list, because
  * the caller writes one metadata file per entry.
  */
-function clearSessionBindings(conversations: readonly Conversation[]): Conversation[] {
+function clearSessionBindings(
+  conversations: readonly Conversation[],
+  scope: ProviderSessionInvalidationScope,
+): Conversation[] {
+  const clearsState = scope === 'session-and-state';
   const invalidated: Conversation[] = [];
   for (const conversation of conversations) {
-    if (!conversation.sessionId && conversation.providerState === undefined) {
+    const bound = clearsState
+      ? Boolean(conversation.sessionId) || conversation.providerState !== undefined
+      : Boolean(conversation.sessionId);
+    if (!bound) {
       continue;
     }
     conversation.sessionId = null;
-    conversation.providerState = undefined;
+    if (clearsState) {
+      conversation.providerState = undefined;
+    }
     invalidated.push(conversation);
   }
   return invalidated;
@@ -419,11 +434,13 @@ export class ProviderSettingsCoordinator {
         this.projectProviderState(targetSettings, providerId);
       }
 
-      const { changed, invalidatesSessions } = providerCatalog()
-        .settingsReconciliation(providerId)
-        .reconcileEnvironment(targetSettings);
-      const invalidatedConversations = invalidatesSessions
-        ? clearSessionBindings(providerConversations)
+      const reconciliation = providerCatalog().settingsReconciliation(providerId);
+      const { changed, invalidatesSessions } = reconciliation.reconcileEnvironment(targetSettings);
+      // A provider that reports an invalidation without declaring what it takes
+      // is a contract error rather than a conversation to clear: the scope is
+      // absent exactly for the providers that never invalidate.
+      const invalidatedConversations = invalidatesSessions && reconciliation.invalidates
+        ? clearSessionBindings(providerConversations, reconciliation.invalidates)
         : [];
 
       if (changed) {

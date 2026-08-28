@@ -1,4 +1,5 @@
 import type {
+  ProviderSessionInvalidationScope,
   ProviderSettingsReconcileOutcome,
   ProviderSettingsReconciliation,
 } from '../../core/providers/ProviderModule';
@@ -28,8 +29,20 @@ import type { ProviderSettingsReconciler } from '../../core/providers/types';
  */
 export function settingsReconciliationFor(
   reconciler: ProviderSettingsReconciler,
+  /**
+   * What this provider's invalidation clears, where it has one.
+   *
+   * Passed rather than derived: it is the one thing the nine reconcilers do
+   * differently that no delegation could read off them, and getting it wrong is
+   * silent. Claude clears the session id and keeps its `providerState` —
+   * subagent transcripts and a fork source live there — while the five that
+   * keep a native session handle clear both.
+   */
+  invalidates?: ProviderSessionInvalidationScope,
 ): ProviderSettingsReconciliation {
   return {
+    ...(invalidates ? { invalidates } : {}),
+
     // Offered only where the provider has one: five providers cache no
     // environment-keyed discovery state, and a required member delegating to an
     // absent hook would report "nothing to clear" and "no such state" with the

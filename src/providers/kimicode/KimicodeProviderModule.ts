@@ -257,7 +257,7 @@ export const kimicodeSettingsCodec: ProviderSettingsCodec<KimicodeProviderSettin
 
   environmentKeyPrefixes: ['KIMICODE_'],
 
-  ...settingsReconciliationFor(kimicodeSettingsReconciler),
+  ...settingsReconciliationFor(kimicodeSettingsReconciler, 'session-and-state'),
 };
 
 export const kimicodeProviderModule: ProviderModule<
