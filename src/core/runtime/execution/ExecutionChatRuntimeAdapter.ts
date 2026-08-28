@@ -31,6 +31,7 @@ import type {
   AutoTurnCallback,
   ChatRewindMode,
   ChatRewindResult,
+  ChatRuntimeEnsureReadyOptions,
   ChatRuntimeQueryOptions,
   ChatTurnMetadata,
   ChatTurnRequest,
@@ -775,7 +776,27 @@ export class ExecutionChatRuntimeAdapter {
     this.session.setResumeCheckpoint(checkpointId);
   }
 
-  async ensureReady(): Promise<boolean> {
+  /**
+   * Opens this tab's execution session if it has none.
+   *
+   * **Takes the contract's options and reads one of them.** It took none, which
+   * type-checked because a method with fewer parameters is assignable to one
+   * with more — so `ensureReady({ force: true })` at two live call sites was
+   * dropped silently, and the member-coverage gate could not see it: names
+   * matched and the `Pick` assertion is satisfied by the narrower signature.
+   *
+   * `force` re-establishes: the environment changed under a tab that already
+   * has a session, and the session it has was opened against the old one. That
+   * is what the two callers mean by it, and answering `true` because a session
+   * exists is answering the wrong question. `allowSessionCreation` and
+   * `orchestratorMode` are read by nobody on this path and are ignored rather
+   * than implemented — a parameter honoured by guesswork is worse than one
+   * recorded as unread.
+   */
+  async ensureReady(options?: ChatRuntimeEnsureReadyOptions): Promise<boolean> {
+    if (options?.force) {
+      this.resetSession();
+    }
     if (this.executionSessionId) {
       return true;
     }

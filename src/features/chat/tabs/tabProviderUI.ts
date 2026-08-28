@@ -451,7 +451,7 @@ export function onProviderAvailabilityChanged(tab: TabData, plugin: GrimoirePlug
     tab.service
     && tab.service.providerId !== nextProviderId
   ) {
-    tab.service.cleanup();
+    void tab.service.cleanup();
     tab.service = null;
     tab.serviceInitialized = false;
   }

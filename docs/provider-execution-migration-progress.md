@@ -9748,6 +9748,48 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### Typing the tab's runtime as the adapter found three silent narrowings
+
+`TabData.service` was typed as the frozen `ChatRuntime` while every one of the nine compositions
+builds an `ExecutionChatRuntimeAdapter`. Typing it as what it is — along with the registration's
+factory and the two contexts that carry a runtime — turned three quiet mismatches into compile
+errors:
+
+- **`syncConversationState(state, paths)` took only the state.** Four call sites computed external
+  context paths and passed them, and the adapter's one-parameter method accepted the call because
+  **a method with fewer parameters is assignable to one with more**. The paths went nowhere. They
+  are not missing from the product: the turn reads them from the external-context selector, which
+  is seeded with `persistentExternalContextPaths` and is the same object those call sites were
+  reading. The parameter is deleted, along with the four computations feeding it;
+- **`ensureReady(options)` took none**, so `{ force: true }` at two live call sites was discarded —
+  including `main.ts`'s environment-change path, where forcing is the whole point: the session a tab
+  holds was opened against the environment that just changed. The adapter reads `force` now and
+  re-establishes. `allowSessionCreation` and `orchestratorMode` are read by nobody and are recorded
+  as ignored rather than implemented by guesswork;
+- **`cleanup(): void` was `async cleanup(): Promise<void>`.** Six of eight call sites had already
+  written `void` deliberately; the two that had not were doing the same thing without saying so. The
+  contract says `Promise<void>` now.
+
+**None of these were catchable by the gate that exists for exactly this.** `adapterMemberCoverage`
+compares member names and asserts assignability through `Pick<ChatRuntime, ...>` — and assignability
+is what let a narrower signature through. There is an arity assertion now, over the three members
+whose parameters the host actually passes, and it was checked by giving `ensureReady` its old
+signature back and watching `npm run typecheck` fail.
+
+Two dead calls went with it. `getAuxiliaryModel` is absent from the adapter by contract, so
+`tab.service?.getAuxiliaryModel?.()` answered `undefined` for every flipped provider — which is all
+nine — and the fallback beside it is what has been running. `tabProjectionExecution.adapterOf` no
+longer sniffs for two members to recognize the adapter behind a `ChatRuntime`; it returns the field.
+
+**And a larger one is now visible rather than fixed.** `StreamController`'s async-subagent hydration
+calls `loadSubagentToolCalls` and `loadSubagentFinalResult`, both absent from the adapter, so
+`tryHydrateAsyncSubagent` always answers `{ hasHydrated: false, finalResultHydrated: false }` — which
+makes `hydrateAsyncSubagentToolCalls` schedule a retry chain that can never succeed, burning the
+whole `ASYNC_SUBAGENT_RESULT_RETRY_DELAYS_MS` ladder for every completed async subagent. The
+member-coverage gate records both as having "no production call site", and that is false: this is
+one. Left for its own commit, because deleting a retry ladder is a behaviour change and this one is
+a type change.
+
 #### The seam deletion started: the interaction callbacks are off `ChatRuntime`
 
 **The first of the plan's three seam-deletion searches is closed.** `setApprovalCallback`,

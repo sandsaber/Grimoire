@@ -182,10 +182,7 @@ export class ConversationController {
 
       // Reset agent service session (no session ID for entry point)
       // Pass persistent paths to prevent stale external contexts
-      this.getAgentService()?.syncConversationState(
-        null,
-        plugin.settings.persistentExternalContextPaths || []
-      );
+      this.getAgentService()?.syncConversationState(null);
 
       const messagesEl = this.deps.getMessagesEl();
       messagesEl.empty();
@@ -243,10 +240,7 @@ export class ConversationController {
       state.hasPendingConversationSave = false;
 
       // Pass persistent paths to prevent stale external contexts
-      this.getAgentService()?.syncConversationState(
-        null,
-        plugin.settings.persistentExternalContextPaths || []
-      );
+      this.getAgentService()?.syncConversationState(null);
 
       const fileCtx = this.deps.getFileContextManager();
       fileCtx?.resetForNewConversation();
@@ -565,11 +559,8 @@ export class ConversationController {
 
     // Determine external context paths for this session.
     // Brand-new sessions use persistent paths; restored provider sessions use saved paths.
-    const externalContextPaths = hasStartedSession
-      ? conversation.externalContextPaths || []
-      : plugin.settings.persistentExternalContextPaths || [];
 
-    this.getAgentService()?.syncConversationState(conversation, externalContextPaths);
+    this.getAgentService()?.syncConversationState(conversation);
 
     const fileCtx = this.deps.getFileContextManager();
     fileCtx?.resetForLoadedConversation(hasStartedSession);

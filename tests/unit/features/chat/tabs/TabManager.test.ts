@@ -2999,7 +2999,6 @@ describe('TabManager - switchToTab Session Sync', () => {
     // Should have synced the service session during auto-switch to tab-2
     expect(mockSyncConversationState).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'conv-loaded', sessionId: 'session-xyz' }),
-      ['/some/path'],
     );
   });
 
@@ -3058,9 +3057,14 @@ describe('TabManager - switchToTab Session Sync', () => {
     await manager.createTab(); // tab-1
     await manager.createTab(); // tab-2, auto-switches and triggers session sync
 
+    // **The paths are no longer asserted here.** They were a second argument
+    // to `syncConversationState` that the adapter never took, so what this
+    // pinned was the caller computing them rather than anything receiving them.
+    // The fallback is alive where the turn reads it: the external-context
+    // selector is seeded with `persistentExternalContextPaths`, and
+    // `buildProviderCommandContext` computes the same fallback.
     expect(mockSyncConversationState).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'conv-empty', sessionId: null }),
-      ['/persistent/path'],
     );
   });
 

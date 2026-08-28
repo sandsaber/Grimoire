@@ -21,8 +21,10 @@ import type {
 import {
   DEFAULT_CHAT_PROVIDER_ID,
 } from '../../../core/providers/types';
-import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
-import type { ExecutionInteractionCallbacks } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type {
+  ExecutionChatRuntimeAdapter,
+  ExecutionInteractionCallbacks,
+} from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { AutoTurnResult } from '../../../core/runtime/types';
 import { TOOL_AGENT_OUTPUT } from '../../../core/tools/toolNames';
 import {
@@ -83,7 +85,6 @@ import {
   getTabHiddenCommands,
   getTabPermissionMode,
   getTabSettingsSnapshot,
-  hasStartedConversation,
   type ProviderCatalogInfo,
   resolveBlankTabModel,
   resolveTabModel,
@@ -358,7 +359,7 @@ export async function initializeTabService(
     return;
   }
 
-  let service: ChatRuntime | null = null;
+  let service: ExecutionChatRuntimeAdapter | null = null;
   let unsubscribeReadyState: (() => void) | null = null;
   const previousService = tab.service;
 
@@ -381,12 +382,8 @@ export async function initializeTabService(
     // Passive sync: set session state without starting the runtime process.
     // The runtime starts on demand when query() is called.
     if (conversation) {
-      const hasStartedSession = hasStartedConversation(conversation);
-      const externalContextPaths = hasStartedSession
-        ? conversation.externalContextPaths || []
-        : (plugin.settings.persistentExternalContextPaths || []);
 
-      runtime.syncConversationState(conversation, externalContextPaths);
+      runtime.syncConversationState(conversation);
     }
 
     // Re-check after async operations — tab may have been closed during init
@@ -414,7 +411,7 @@ export async function initializeTabService(
   } catch (error) {
     // Clean up partial state on failure
     unsubscribeReadyState?.();
-    service?.cleanup();
+    void service?.cleanup();
     tab.service = null;
     tab.serviceInitialized = false;
 
@@ -1346,17 +1343,13 @@ export function initializeTabControllers(
         tab.orchestratorMode = conversation?.orchestratorMode === true;
         tab.draftModel = null;
         tab.draftSettings = null;
-        const hasStartedSession = hasStartedConversation(conversation);
         tab.conversationId = conversation?.id ?? null;
         tab.lifecycleState = conversation ? 'bound_cold' : 'blank';
         syncSlashCommandDropdownForProvider(tab, plugin, getProviderCatalogConfig, conversation);
 
         // If the runtime already exists for the right provider, sync it passively
         if (tab.service && tab.service.providerId === nextProviderId && conversation) {
-          const externalContextPaths = hasStartedSession
-            ? conversation.externalContextPaths || []
-            : (plugin.settings.persistentExternalContextPaths || []);
-          tab.service.syncConversationState(conversation, externalContextPaths);
+          tab.service.syncConversationState(conversation);
         }
 
         refreshTabProviderUI(tab, plugin);
@@ -1433,7 +1426,12 @@ export function initializeTabControllers(
     resetInputHeight: () => {
       // Per-tab input height is managed by CSS, no dynamic adjustment needed
     },
-    getAuxiliaryModel: () => tab.service?.getAuxiliaryModel?.() ?? tab.draftModel ?? null,
+    // The tab's draft, not the runtime's: `getAuxiliaryModel` is absent from
+    // the adapter by contract — recorded in `adapterMemberCoverage.test.ts` —
+    // so the optional call answered `undefined` for every flipped provider and
+    // this fallback is what has been running. Typing the field as the adapter
+    // is what made that visible.
+    getAuxiliaryModel: () => tab.draftModel ?? null,
     getAgentService: () => tab.service,
     getSubagentManager: () => services.subagentManager,
     getActiveProviderSettings: () => getTabSettingsSnapshot(tab, plugin),

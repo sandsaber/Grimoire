@@ -144,16 +144,16 @@ export function createTabProjectionExecution(
 }
 
 /**
- * The tab's runtime as the adapter it is, or `null` while the tab is cold.
+ * The tab's runtime, or `null` while the tab is cold.
  *
- * Asked by shape rather than by class: the runtime a tab holds is typed as the
- * legacy `ChatRuntime`, which does not carry these — and must not, because it
- * is frozen. A provider on this path always has an adapter behind that type;
- * one that somehow does not is refused rather than guessed at.
+ * **It used to ask by shape.** The field was typed as the frozen `ChatRuntime`,
+ * which carries none of what this path needs, so a provider's adapter had to be
+ * recognized by two members it happens to have. The seam deletion typed the
+ * field as the adapter — all nine compositions build one — so the question is
+ * just whether the tab has a runtime.
  */
 function adapterOf(tab: TabData): ExecutionChatRuntimeAdapter | null {
-  const service = tab.service as ExecutionChatRuntimeAdapter | null;
-  return service && 'turnEncoder' in service && 'surfacePorts' in service ? service : null;
+  return tab.service;
 }
 
 function chatExecutionOrNull(plugin: GrimoirePlugin) {

@@ -6,7 +6,7 @@ import type { RelevantNotesService } from '../../../core/context/RelevantNotesSe
 import type { VaultSearchService } from '../../../core/context/VaultSearchService';
 import type { VaultTextIndex } from '../../../core/context/VaultTextIndex';
 import type { InstructionRefineService, ProviderId, TitleGenerationService } from '../../../core/providers/types';
-import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
+import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { UsageInfo } from '../../../core/types';
 import type { SlashCommandDropdown } from '../../../shared/components/SlashCommandDropdown';
 import type { BrowserSelectionController } from '../controllers/BrowserSelectionController';
@@ -252,7 +252,7 @@ export interface TabData {
   titleOverride?: string | null;
 
   /** Per-tab chat runtime instance for independent streaming. */
-  service: ChatRuntime | null;
+  service: ExecutionChatRuntimeAdapter | null;
 
   /** Whether the service has been initialized (lazy start). */
   serviceInitialized: boolean;

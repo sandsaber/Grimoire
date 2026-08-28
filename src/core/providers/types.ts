@@ -5,7 +5,7 @@ import type { ConversationMetadataField } from '../bootstrap/SessionStorage';
 import type { SharedAppStorage } from '../bootstrap/storage';
 import type { ConversationRepository } from '../conversations/ConversationRepository';
 import type { McpServerManager } from '../mcp/McpServerManager';
-import type { ChatRuntime } from '../runtime/ChatRuntime';
+import type { ExecutionChatRuntimeAdapter } from '../runtime/execution/ExecutionChatRuntimeAdapter';
 import type { HomeFileAdapter } from '../storage/HomeFileAdapter';
 import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
 import type {
@@ -70,7 +70,7 @@ export interface ProviderRegistration {
   // reconciliation, both reached through the catalog — and in both cases the
   // provider's own object is what the module delegates to, so what moved is
   // where the host asks, not who answers.
-  createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => ChatRuntime;
+  createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => ExecutionChatRuntimeAdapter;
   /**
    * How this provider reads a subagent task result.
    *
@@ -394,7 +394,7 @@ export interface ProviderRuntimeCommandLoaderContext {
   conversation: Conversation | null;
   externalContextPaths: string[];
   plugin: GrimoirePlugin;
-  runtime: ChatRuntime | null;
+  runtime: ExecutionChatRuntimeAdapter | null;
 }
 
 export interface ProviderRuntimeCommandLoader {

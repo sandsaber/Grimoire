@@ -969,7 +969,13 @@ describe('Tab - Service Initialization', () => {
 
       await initializeTabService(tab, options.plugin, options.mcpManager);
 
-      expect(mockSyncConversationState).toHaveBeenCalledWith(conversation, ['/saved/path']);
+      // The conversation, and only the conversation: the saved paths were a
+      // second argument the adapter never took, and the turn reads them off the
+      // external-context selector. The conversation still carries them, which
+      // is what this asserts.
+      expect(mockSyncConversationState).toHaveBeenCalledWith(
+        expect.objectContaining({ externalContextPaths: ['/saved/path'] }),
+      );
     });
 
     it('should initialize toolbar config for the tab provider', () => {

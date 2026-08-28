@@ -325,9 +325,10 @@ class InlineEditController {
     const auxiliary = plugin.getApplicationRuntimeOrNull()?.auxiliary
       ?? AuxiliaryExecutionOwner.unavailable(providerId);
     this.inlineEditService = auxiliary.inlineEditService(providerId);
-    const auxiliaryModel = activeTab?.service?.providerId === providerId
-      ? activeTab.service.getAuxiliaryModel?.()
-      : activeTab?.providerId === providerId
+    // Was two branches, and the first could never answer: `getAuxiliaryModel`
+    // is absent from the adapter by contract, so a bound tab fell through to
+    // `undefined` while an unbound one on the same provider answered its draft.
+    const auxiliaryModel = activeTab?.providerId === providerId
       ? activeTab?.draftModel
       : null;
     this.inlineEditService.setModelOverride?.(auxiliaryModel ?? undefined);

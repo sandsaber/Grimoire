@@ -93,12 +93,49 @@ type AdapterInstallsInteractions =
 
 const ADAPTER_INSTALLS_INTERACTIONS: AdapterInstallsInteractions = true;
 
+/**
+ * Every contract member's **parameters**, which the `Pick` above cannot see.
+ *
+ * **A method with fewer parameters is assignable to one with more**, so an
+ * adapter that quietly dropped an argument satisfied both the name comparison
+ * and the assignability assertion. Two had:
+ * `syncConversationState(state, paths)` took only the state, so three call
+ * sites passed external context paths that went nowhere; and
+ * `ensureReady(options)` took none, so `{ force: true }` at two call sites was
+ * discarded. Both were found by typing the tab's runtime as the adapter — not
+ * by any gate — which is why this one exists.
+ *
+ * Compares parameter *counts* rather than types: what goes wrong here is an
+ * argument silently disappearing, and a count is what catches that.
+ */
+type SameArity<A extends unknown[], B extends unknown[]> =
+  A['length'] extends B['length'] ? (B['length'] extends A['length'] ? true : false) : false;
+
+type AdapterTakesEveryParameter =
+  SameArity<
+    Parameters<ChatRuntime['syncConversationState']>,
+    Parameters<ExecutionChatRuntimeAdapter['syncConversationState']>
+  > extends true
+    ? SameArity<
+      Parameters<ChatRuntime['ensureReady']>,
+      Parameters<ExecutionChatRuntimeAdapter['ensureReady']>
+    > extends true
+      ? SameArity<
+        Parameters<ChatRuntime['query']>,
+        Parameters<ExecutionChatRuntimeAdapter['query']>
+      >
+      : false
+    : false;
+
+const ADAPTER_TAKES_EVERY_PARAMETER: AdapterTakesEveryParameter = true;
+
 describe('adapter member coverage', () => {
   it('is assignable to the contract, which the compiler decides', () => {
     // The assertion above is the real check; this only keeps the constant used
     // so the file cannot drift into being type-only and stop being compiled.
     expect(ADAPTER_IS_ASSIGNABLE).toBe(true);
     expect(ADAPTER_INSTALLS_INTERACTIONS).toBe(true);
+    expect(ADAPTER_TAKES_EVERY_PARAMETER).toBe(true);
   });
 
   const contractMembers = readInterfaceMembers('src/core/runtime/ChatRuntime.ts', 'ChatRuntime');

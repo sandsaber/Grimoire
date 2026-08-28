@@ -724,7 +724,12 @@ describe('GrimoirePlugin', () => {
       // Change env but not in a way that affects model
       await plugin.applyEnvironmentVariables('shared', 'SOME_VAR=value');
 
-      expect(mockSyncConversationState).toHaveBeenCalledWith(null, []);
+      expect(mockSyncConversationState).toHaveBeenCalledWith(null);
+      // `force` is read now: the adapter took no options at all, so a method
+      // with fewer parameters satisfied one with more and this option was
+      // dropped for every flipped provider. It re-establishes the session,
+      // which is what an environment change means for a tab that already has
+      // one opened against the old environment.
       expect(mockEnsureReady).toHaveBeenCalledWith({ force: true });
     });
 
@@ -772,9 +777,13 @@ describe('GrimoirePlugin', () => {
 
       await plugin.applyEnvironmentVariables('provider:claude', 'ANTHROPIC_MODEL=claude-sonnet-4-5');
 
+      // The live paths are no longer passed here and were never received: the
+      // adapter's `syncConversationState` takes only the conversation. They
+      // reach the turn from the same selector this used to read — the input
+      // controller asks it when a turn is built — so what moved is where the
+      // question is asked, not whether it is.
       expect(mockSyncConversationState).toHaveBeenCalledWith(
         expect.objectContaining({ id: conversation.id }),
-        ['/live/context'],
       );
       expect(mockResetSession).toHaveBeenCalledTimes(1);
       expect(mockEnsureReady).toHaveBeenCalledWith();

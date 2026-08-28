@@ -2416,10 +2416,9 @@ describe('ConversationController - switchTo fork path', () => {
 
     await controller.switchTo('fork-conv');
 
-    expect(mockAgentService.syncConversationState).toHaveBeenCalledWith(
-      forkConversation,
-      expect.any(Array),
-    );
+    // One argument: the external context paths were a second parameter the
+    // adapter never took, and the turn reads them off the context selector.
+    expect(mockAgentService.syncConversationState).toHaveBeenCalledWith(forkConversation);
   });
 
   it('should resolve to own sessionId when fork already has its own session', async () => {
@@ -2436,10 +2435,9 @@ describe('ConversationController - switchTo fork path', () => {
 
     await controller.switchTo('fork-conv');
 
-    expect(mockAgentService.syncConversationState).toHaveBeenCalledWith(
-      forkConversation,
-      expect.any(Array),
-    );
+    // One argument: the external context paths were a second parameter the
+    // adapter never took, and the turn reads them off the context selector.
+    expect(mockAgentService.syncConversationState).toHaveBeenCalledWith(forkConversation);
   });
 });
 

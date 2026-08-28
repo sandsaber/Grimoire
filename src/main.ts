@@ -948,13 +948,8 @@ export default class GrimoirePlugin extends Plugin {
         const conversation = tab.conversationId
           ? this.getConversationSync(tab.conversationId)
           : null;
-        const hasConversationContext = (conversation?.messages.length ?? 0) > 0;
-        const externalContextPaths = tab.ui.externalContextSelector?.getExternalContexts()
-          ?? (hasConversationContext
-            ? conversation?.externalContextPaths ?? []
-            : this.settings.persistentExternalContextPaths ?? []);
 
-        tab.service.syncConversationState(conversation, externalContextPaths);
+        tab.service.syncConversationState(conversation);
       };
 
       for (const tab of affectedTabs) {

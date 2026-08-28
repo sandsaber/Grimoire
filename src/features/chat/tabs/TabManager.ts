@@ -9,7 +9,7 @@ import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorks
 import type {
   ProviderId,
 } from '../../../core/providers/types';
-import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
+import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatMessage, Conversation, SlashCommand } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
@@ -82,7 +82,7 @@ type ProviderCommandCacheEntry = {
 type ProviderWarmupContext = {
   conversation: Conversation | null;
   externalContextPaths: string[];
-  runtime: ChatRuntime | null;
+  runtime: ExecutionChatRuntimeAdapter | null;
   /**
    * The tab, as the warm-up path reads it.
    *
@@ -123,7 +123,7 @@ export class TabManager implements TabManagerInterface {
   private callbacks: TabManagerCallbacks;
   private providerCommandWarmups = new Map<TabId, ProviderCommandWarmupEntry>();
   private providerCommandCache = new Map<TabId, ProviderCommandCacheEntry>();
-  private warmRuntimes = new WarmRuntimeLru<ChatRuntime>(MAX_WARM_PROVIDER_RUNTIMES);
+  private warmRuntimes = new WarmRuntimeLru<ExecutionChatRuntimeAdapter>(MAX_WARM_PROVIDER_RUNTIMES);
   private isRestoringState = false;
 
   /** Guard to prevent concurrent tab switches. */
@@ -412,12 +412,8 @@ export class TabManager implements TabManagerInterface {
         // Passive sync is only safe once local tab state has been persisted.
         const conversation = this.plugin.getConversationSync(tab.conversationId);
         if (conversation) {
-          const hasStartedSession = this.hasStartedConversation(conversation);
-          const externalContextPaths = hasStartedSession
-            ? conversation.externalContextPaths || []
-            : (this.plugin.settings.persistentExternalContextPaths || []);
 
-          tab.service.syncConversationState(conversation, externalContextPaths);
+          tab.service.syncConversationState(conversation);
         }
       } else if (!tab.conversationId && tab.state.messages.length === 0) {
         // New tab with no conversation - initialize welcome greeting
@@ -1188,7 +1184,7 @@ export class TabManager implements TabManagerInterface {
       return;
     }
 
-    runtime.syncConversationState(context.conversation, context.externalContextPaths);
+    runtime.syncConversationState(context.conversation);
     await runtime.ensureReady();
     this.touchWarmRuntime(tab);
     if (tab.lifecycleState === 'blank') {
@@ -1332,7 +1328,7 @@ export class TabManager implements TabManagerInterface {
           return;
         }
 
-        runtime.cleanup();
+        void runtime.cleanup();
         tab.service = null;
         tab.serviceInitialized = false;
         if (tab.lifecycleState === 'bound_active') {
@@ -1392,13 +1388,13 @@ export class TabManager implements TabManagerInterface {
    * Used by settings managers to apply configuration changes to all tabs.
    * @param fn Function to call on each runtime.
    */
-  async broadcastToAllTabs(fn: (service: ChatRuntime) => Promise<void>): Promise<void> {
+  async broadcastToAllTabs(fn: (service: ExecutionChatRuntimeAdapter) => Promise<void>): Promise<void> {
     await this.broadcastToTabs(this.tabs.values(), fn);
   }
 
   async broadcastToProviderTabs(
     providerIds: ProviderId | ProviderId[],
-    fn: (service: ChatRuntime) => Promise<void>,
+    fn: (service: ExecutionChatRuntimeAdapter) => Promise<void>,
   ): Promise<void> {
     await this.broadcastToTabs(
       this.filterTabsByProvider(providerIds, (tab) => tab.service?.providerId ?? tab.providerId),
@@ -1408,7 +1404,7 @@ export class TabManager implements TabManagerInterface {
 
   private async broadcastToTabs(
     tabs: Iterable<TabData>,
-    fn: (service: ChatRuntime) => Promise<void>,
+    fn: (service: ExecutionChatRuntimeAdapter) => Promise<void>,
   ): Promise<void> {
     const promises: Promise<void>[] = [];
 
