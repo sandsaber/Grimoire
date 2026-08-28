@@ -951,6 +951,26 @@ export interface ProviderSessionPatchInput {
   readonly nativeSessionRef: string | null;
 }
 
+/**
+ * **Why this is still built from a tab and not at the persistence barrier.**
+ *
+ * Every implementation takes its `conversationId` from the input rather than
+ * from a bound conversation, which reads as though a conversation-scoped caller
+ * could build one. Three cannot. OpenCode, MiMoCode and Kimi Code resolve a
+ * database path, and Grok a session directory, through a context that reads
+ * *the tab's last launch first* and the conversation's stored state only as a
+ * fallback — so a caller without the tab writes the previous turn's path over
+ * the one this turn established, silently, for exactly the providers whose
+ * resume depends on it.
+ *
+ * The shape that closes it is the one `nativeSessionRef` already has:
+ * `ExecutionSessionSnapshot` grows the provider's own state, the backend
+ * reports it as it learns it, and the registry copies it into the session
+ * record on every accepted envelope the way it copies the session ref today.
+ * That is a control-record schema change plus three backends learning to report
+ * what they resolve, which is a milestone rather than a move.
+ */
+
 export interface ProviderSessionPatch {
   readonly sessionId: string | null;
   /** Opaque provider state; core stores and returns it without reading it. */

@@ -10445,6 +10445,30 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — why `buildSessionUpdates` stops one step short of the barrier (`this commit`)
+
+- Gates: unit 8745 passed, 8745 total; `tsc --noEmit` clean; `npm run lint` clean.
+- With invalidation conversation-scoped and the native session ref already on the session record,
+  the move looked like plumbing. It is not, and the reason is worth writing at the contract rather
+  than in a journal nobody reads at the call site.
+- **Every `buildSessionPatch` takes its `conversationId` from the input**, which reads as though any
+  conversation-scoped caller could build one. Three cannot. OpenCode, MiMoCode and Kimi Code resolve
+  a database path, and Grok a session directory, through a context whose lookup reads **the tab's
+  last launch first** and the conversation's stored state only as a fallback:
+  `ports.databasePath() ?? getOpencodeState(bound.providerState).databasePath ?? null`. A caller
+  without the tab gets the fallback — the *previous* turn's path — and writes it over the one this
+  turn established. Silently, and for exactly the providers whose resume depends on it.
+- Checked before concluding: the conversation-less context the workspace holder already builds
+  (`create<Provider>ModuleContext(plugin, () => null, …)`) returns `null` from that lookup, so it
+  does not merely lose freshness — it drops the state.
+- **The shape that closes it is the one `nativeSessionRef` already has.**
+  `ExecutionSessionSnapshot` grows the provider's own state, each backend reports it as it learns it,
+  and the registry copies it into the session record on every accepted envelope exactly as it copies
+  the session ref today. Then the barrier has everything and the patch builder needs no tab.
+- That is a control-record schema change plus three backends learning to report what they resolve —
+  `.grimoire/control/**` versioning has decisions attached to it — so it is a milestone, not a move.
+  Owner: **M5**, and it is now the only thing left in the `turn metadata and session updates` search.
+
 ### M5 — session invalidation becomes conversation-scoped (`this commit`)
 
 **The owner chose the conversation-scoped reading** of the question the entry below records, so the
