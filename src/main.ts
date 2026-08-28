@@ -9,25 +9,26 @@ import { randomUUID } from 'node:crypto';
 import type { Command, Editor, WorkspaceLeaf } from 'obsidian';
 import { addIcon, MarkdownView, Notice, Plugin, setTooltip } from 'obsidian';
 
+import type { AntigravityExecution } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
+import type { ClaudeExecution } from '@/providers/claude/execution/ClaudeExecutionComposition';
+import type { CodexExecution } from '@/providers/codex/execution/CodexExecutionComposition';
+import type { GeminiExecution } from '@/providers/gemini/execution/GeminiExecutionComposition';
+import type { GrokExecution } from '@/providers/grok/execution/GrokExecutionComposition';
+import type { KimicodeExecution } from '@/providers/kimicode/execution/KimicodeExecutionComposition';
+import type { MimocodeExecution } from '@/providers/mimocode/execution/MimocodeExecutionComposition';
+import type { OpencodeExecution } from '@/providers/opencode/execution/OpencodeExecutionComposition';
+import type { QwenExecution } from '@/providers/qwen/execution/QwenExecutionComposition';
+
 import { ApplicationRuntime } from './app/ApplicationRuntime';
 import { shouldShowWhatsNew } from './app/changelog/display';
 import { parseChangelogRelease } from './app/changelog/parser';
 import { readBundledChangelog } from './app/changelog/source';
 import type { ChangelogRelease } from './app/changelog/types';
 import type { ChatExecutionComposition } from './app/chat/ChatExecutionComposition';
-import type { AntigravityExecution } from './app/execution/antigravity/AntigravityExecutionComposition';
-import type { ClaudeExecution } from './app/execution/claude/ClaudeExecutionComposition';
-import type { CodexExecution } from './app/execution/codex/CodexExecutionComposition';
 import type { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
-import type { GeminiExecution } from './app/execution/gemini/GeminiExecutionComposition';
-import type { GrokExecution } from './app/execution/grok/GrokExecutionComposition';
-import type { KimicodeExecution } from './app/execution/kimicode/KimicodeExecutionComposition';
 import {
   type LocalShellCommandOutcome,
 } from './app/execution/local/LocalShellExecution';
-import type { MimocodeExecution } from './app/execution/mimocode/MimocodeExecutionComposition';
-import type { OpencodeExecution } from './app/execution/opencode/OpencodeExecutionComposition';
-import type { QwenExecution } from './app/execution/qwen/QwenExecutionComposition';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
 import type { UnreadableConversation } from './core/bootstrap/SessionStorage';

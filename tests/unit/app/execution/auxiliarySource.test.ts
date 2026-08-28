@@ -1,13 +1,13 @@
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { auxiliaryPurposeKey } from '@/app/execution/auxiliaryPurpose';
-import { CodexExecution } from '@/app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { GrokExecution } from '@/app/execution/grok/GrokExecutionComposition';
-import { KimicodeExecution } from '@/app/execution/kimicode/KimicodeExecutionComposition';
-import { MimocodeExecution } from '@/app/execution/mimocode/MimocodeExecutionComposition';
-import { OpencodeExecution } from '@/app/execution/opencode/OpencodeExecutionComposition';
 import type { AuxiliaryPurpose } from '@/core/auxiliary/ProviderAuxiliarySource';
+import { CodexExecution } from '@/providers/codex/execution/CodexExecutionComposition';
+import { GrokExecution } from '@/providers/grok/execution/GrokExecutionComposition';
+import { KimicodeExecution } from '@/providers/kimicode/execution/KimicodeExecutionComposition';
+import { MimocodeExecution } from '@/providers/mimocode/execution/MimocodeExecutionComposition';
+import { OpencodeExecution } from '@/providers/opencode/execution/OpencodeExecutionComposition';
 
 /**
  * What each composition contributes to auxiliary work.

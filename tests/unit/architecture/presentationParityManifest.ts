@@ -538,7 +538,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: [
       // Claude chat execution, flipped: the composition, the backend it builds,
       // and everything a turn is composed, presented and answered from.
-      'src/app/execution/claude/ClaudeExecutionComposition.ts',
+      'src/providers/claude/execution/ClaudeExecutionComposition.ts',
       'src/providers/claude/ClaudeProviderModule.ts',
       'src/providers/claude/app/ClaudeModuleContext.ts',
       'src/providers/claude/execution/ClaudeAuxiliaryQuery.ts',
@@ -553,9 +553,9 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/claude/execution/ClaudeTaskOutputLoader.ts',
       // Codex chat execution, flipped: the composition, the backend it builds,
       // and everything the turn is composed from.
-      'src/app/execution/codex/CodexExecutionComposition.ts',
-      'src/app/execution/codex/NodeCodexExecutionConnectionFactory.ts',
-      'src/app/execution/codex/NodeCodexExecutionProcess.ts',
+      'src/providers/codex/execution/CodexExecutionComposition.ts',
+      'src/providers/codex/execution/NodeCodexExecutionConnectionFactory.ts',
+      'src/providers/codex/execution/NodeCodexExecutionProcess.ts',
       'src/providers/codex/CodexProviderModule.ts',
       'src/providers/codex/app/CodexModuleContext.ts',
       'src/providers/codex/execution/CodexContentPresenter.ts',
@@ -575,8 +575,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // without one. What is its own: a `--acp` flag rather than a subcommand,
       // dedicated `session/set_model` and `session/set_mode`, no launch
       // artifacts, and no native transcript to read a result back from.
-      'src/app/execution/gemini/GeminiExecutionComposition.ts',
-      'src/app/execution/gemini/GeminiMetadataSession.ts',
+      'src/providers/gemini/execution/GeminiExecutionComposition.ts',
+      'src/providers/gemini/execution/GeminiMetadataSession.ts',
       'src/providers/gemini/GeminiProviderModule.ts',
       'src/providers/gemini/app/GeminiModuleContext.ts',
       'src/providers/gemini/execution/GeminiAcpDynamicConfig.ts',
@@ -595,8 +595,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // a reasoning level applied by talking to the session, the session's own
       // commands, the first `kind: 'question'` interaction the kernel has ever
       // carried, and a context window this CLI answers only when asked.
-      'src/app/execution/qwen/QwenExecutionComposition.ts',
-      'src/app/execution/qwen/QwenMetadataSession.ts',
+      'src/providers/qwen/execution/QwenExecutionComposition.ts',
+      'src/providers/qwen/execution/QwenMetadataSession.ts',
       'src/providers/qwen/QwenProviderModule.ts',
       'src/providers/qwen/app/QwenModuleContext.ts',
       'src/providers/qwen/execution/QwenAcpDynamicConfig.ts',
@@ -612,8 +612,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/qwen/execution/QwenSessionConfigState.ts',
       // Grok chat execution, flipped: the second ACP provider on the kernel,
       // and the isolated session its five metadata surfaces now share.
-      'src/app/execution/grok/GrokExecutionComposition.ts',
-      'src/app/execution/grok/GrokMetadataSession.ts',
+      'src/providers/grok/execution/GrokExecutionComposition.ts',
+      'src/providers/grok/execution/GrokMetadataSession.ts',
       'src/providers/grok/GrokProviderModule.ts',
       'src/providers/grok/app/GrokModuleContext.ts',
       'src/providers/grok/execution/GrokAcpDynamicConfig.ts',
@@ -628,8 +628,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // kernel, and the third in a row to add nothing to the shared platform.
       // What is its own is the launch and its mode ids, which the CLI names
       // itself where its two siblings use Grimoire-minted ones.
-      'src/app/execution/kimicode/KimicodeExecutionComposition.ts',
-      'src/app/execution/kimicode/KimicodeMetadataSession.ts',
+      'src/providers/kimicode/execution/KimicodeExecutionComposition.ts',
+      'src/providers/kimicode/execution/KimicodeMetadataSession.ts',
       'src/providers/kimicode/KimicodeProviderModule.ts',
       'src/providers/kimicode/app/KimicodeModuleContext.ts',
       'src/providers/kimicode/execution/KimicodeAcpDynamicConfig.ts',
@@ -647,8 +647,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
       // nothing to the shared platform below — the only file here that is not a
       // name-and-launch difference is the session config state, and that is
       // MiMoCode's own settings rather than its protocol.
-      'src/app/execution/mimocode/MimocodeExecutionComposition.ts',
-      'src/app/execution/mimocode/MimocodeMetadataSession.ts',
+      'src/providers/mimocode/execution/MimocodeExecutionComposition.ts',
+      'src/providers/mimocode/execution/MimocodeMetadataSession.ts',
       'src/providers/mimocode/MimocodeProviderModule.ts',
       'src/providers/mimocode/app/MimocodeModuleContext.ts',
       'src/providers/mimocode/execution/MimocodeAcpDynamicConfig.ts',
@@ -675,8 +675,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/acp/execution/ManagedAcpExecutionBackend.ts',
       // OpenCode chat execution, flipped: the first ACP provider on the kernel,
       // and the isolated session the four metadata surfaces now share.
-      'src/app/execution/opencode/OpencodeExecutionComposition.ts',
-      'src/app/execution/opencode/OpencodeMetadataSession.ts',
+      'src/providers/opencode/execution/OpencodeExecutionComposition.ts',
+      'src/providers/opencode/execution/OpencodeMetadataSession.ts',
       'src/providers/opencode/OpencodeProviderModule.ts',
       'src/providers/opencode/app/OpencodeModuleContext.ts',
       'src/providers/opencode/execution/OpencodeAcpDynamicConfig.ts',
@@ -748,8 +748,8 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'Antigravity chat execution over the kernel: the backend, its process transport, and the composition that resolves a request reference back into an `agy --print` invocation.',
     state: 'wired',
     modules: [
-      'src/app/execution/antigravity/AntigravityExecutionComposition.ts',
-      'src/app/execution/antigravity/NodeAntigravityProcessTransport.ts',
+      'src/providers/antigravity/execution/AntigravityExecutionComposition.ts',
+      'src/providers/antigravity/execution/NodeAntigravityProcessTransport.ts',
       'src/providers/antigravity/AntigravityProviderModule.ts',
       'src/providers/antigravity/execution/AntigravityExecutionBackend.ts',
       'src/providers/antigravity/execution/AntigravityProjectionResultSink.ts',

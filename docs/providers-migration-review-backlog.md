@@ -229,7 +229,7 @@ The Minor list is long but ordinary: dead exports the flips were supposed to tak
 Carried over in full, because the report they came from is a temporary file. `✅` is closed.
 
 Kernel/persistence:
-- KER-5 ✅ [M][bug] Codex + Claude compositions never release per-tab `onSettled` subscriptions at tab close (only at plugin dispose); Grok/OpenCode do release — parity drift. `src/app/execution/codex/CodexExecutionComposition.ts:327-331,307-310`; `src/app/execution/claude/ClaudeExecutionComposition.ts:252,345-350`.
+- KER-5 ✅ [M][bug] Codex + Claude compositions never release per-tab `onSettled` subscriptions at tab close (only at plugin dispose); Grok/OpenCode do release — parity drift. `src/providers/codex/execution/CodexExecutionComposition.ts:327-331,307-310`; `src/providers/claude/execution/ClaudeExecutionComposition.ts:252,345-350`.
 - KER-6 ✅ [M][bug] `startRun` adds runId to `session.knownRunIds` before `commitWrites`; failed commit leaves phantom id. `ExecutionLifecycleRegistry.ts:412-416`.
 - KER-7 ✅ [M][parity] Tab-scope-owned session (created before conversation binds) never matches D4 conversation-owner deletion; owner immutable in schema. `ClaudeExecutionComposition.ts:334` (same fallback in all compositions).
 - KER-8 ✅ [M][hygiene] `LocalShellBackend.ts:472-515` duplicates `ExecutionEventQueue.ts` verbatim as `AsyncEventQueue`.

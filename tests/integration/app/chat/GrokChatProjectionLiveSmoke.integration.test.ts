@@ -11,8 +11,8 @@ import {
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { GrokExecution } from '@/app/execution/grok/GrokExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
+import { GrokExecution } from '@/providers/grok/execution/GrokExecutionComposition';
 import { grokProviderModule } from '@/providers/grok/GrokProviderModule';
 import { updateGrokProviderSettings } from '@/providers/grok/settings';
 

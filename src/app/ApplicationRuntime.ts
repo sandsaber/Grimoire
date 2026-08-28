@@ -6,22 +6,22 @@ import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/Execu
 import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 import type { ProviderId } from '@/core/types/provider';
 import type GrimoirePlugin from '@/main';
+import { AntigravityExecution } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
+import { ClaudeExecution } from '@/providers/claude/execution/ClaudeExecutionComposition';
+import { CodexExecution } from '@/providers/codex/execution/CodexExecutionComposition';
+import { GeminiExecution } from '@/providers/gemini/execution/GeminiExecutionComposition';
+import { GrokExecution } from '@/providers/grok/execution/GrokExecutionComposition';
+import { KimicodeExecution } from '@/providers/kimicode/execution/KimicodeExecutionComposition';
+import { MimocodeExecution } from '@/providers/mimocode/execution/MimocodeExecutionComposition';
+import { OpencodeExecution } from '@/providers/opencode/execution/OpencodeExecutionComposition';
+import { QwenExecution } from '@/providers/qwen/execution/QwenExecutionComposition';
 
 import { SubagentAgentRecorder } from './agents/SubagentAgentRecorder';
 import { AuxiliaryExecutionOwner } from './auxiliary/AuxiliaryExecutionOwner';
 import { ChatExecutionComposition } from './chat/ChatExecutionComposition';
 import { StoredChatConversations } from './chat/StoredChatConversations';
-import { AntigravityExecution } from './execution/antigravity/AntigravityExecutionComposition';
-import { ClaudeExecution } from './execution/claude/ClaudeExecutionComposition';
-import { CodexExecution } from './execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from './execution/ExecutionKernelHost';
-import { GeminiExecution } from './execution/gemini/GeminiExecutionComposition';
-import { GrokExecution } from './execution/grok/GrokExecutionComposition';
-import { KimicodeExecution } from './execution/kimicode/KimicodeExecutionComposition';
 import { LocalShellExecution } from './execution/local/LocalShellExecution';
-import { MimocodeExecution } from './execution/mimocode/MimocodeExecutionComposition';
-import { OpencodeExecution } from './execution/opencode/OpencodeExecutionComposition';
-import { QwenExecution } from './execution/qwen/QwenExecutionComposition';
 import { VaultDurableStorage } from './storage/VaultDurableStorage';
 
 /**

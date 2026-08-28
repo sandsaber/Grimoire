@@ -55,7 +55,7 @@ window.ResizeObserver = MockResizeObserver;
 // flip that is the composition over the kernel, which a tab test has no plugin
 // to construct — so the composition is the mock rather than the deleted
 // `ClaudeChatRuntime` it replaced.
-jest.mock('@/app/execution/claude/ClaudeExecutionComposition', () => ({
+jest.mock('@/providers/claude/execution/ClaudeExecutionComposition', () => ({
   ClaudeExecution: jest.fn().mockImplementation(() => ({
     createRuntime: () => ({
       ensureReady: jest.fn().mockResolvedValue(true),

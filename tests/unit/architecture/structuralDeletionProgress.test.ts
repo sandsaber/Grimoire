@@ -118,7 +118,7 @@ const SEARCHES: readonly DeletionSearch[] = [
   {
     // **Split from one search of 20, with the total preserved.** The single
     // count could not fall, because eighteen of the twenty were a *provider's
-    // own composition* — `src/app/execution/codex/` naming
+    // own composition* — `src/providers/codex/execution/` naming
     // `src/providers/codex/` is a directory choosing where it lives, not
     // neutral code reaching into a provider. Reporting those beside the two
     // real violations meant neither number could be acted on: fixing both
@@ -151,14 +151,18 @@ const SEARCHES: readonly DeletionSearch[] = [
     closedBy: 'a default-model declaration, and a legacy migration on the settings codec',
   },
   {
-    // The other eighteen. Every one is under `src/app/execution/<provider>/`
-    // and names only its own provider, which the composition boundary test
-    // already holds them to. What is open is not an import but a location.
+    // **Closed.** The eighteen were each provider's execution composition and
+    // its transport, living under `src/app/execution/<provider>/` and naming
+    // only their own provider. The owner's answer was that provider-specific
+    // code belongs under the provider, so they are `src/providers/<id>/execution/`
+    // now, beside the presenters and backends they were already importing.
+    // What stays in `src/app/execution` is what is provider-neutral: the kernel
+    // host, the workspace holder, the aux runner, the host timers.
     what: 'a provider composition living under src/app',
     pattern: /providers\/(claude|codex|antigravity|opencode|mimocode|kimicode|grok|qwen|gemini)\//,
     within: 'src/app/execution',
-    files: 18,
-    closedBy: 'the `app/execution/<id>` relocation decision, which is the owner\'s',
+    files: 0,
+    closedBy: 'closed — the compositions moved under the providers they compose',
   },
   {
     // **Narrowed again, to the one member whose home is still open.**
@@ -255,13 +259,13 @@ describe('structural deletion progress', () => {
       'subagent hooks and loaders: 3',
       'SubagentManager lifecycle: 7',
       'provider-neutral application code importing a concrete provider: 2',
-      'a provider composition living under src/app: 18',
       'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
       'the registries — one left: 17',
     ]);
-    // Three of eleven are zero: two closed in the 2026-08-27 session, and the
-    // interaction callbacks closed with the first step of the seam deletion.
-    expect(SEARCHES).toHaveLength(remaining.length + 3);
+    // Four of twelve are zero: two closed in the 2026-08-27 session, the
+    // interaction callbacks closed with the first step of the seam deletion,
+    // and the compositions closed by moving under the providers they compose.
+    expect(SEARCHES).toHaveLength(remaining.length + 4);
   });
 });

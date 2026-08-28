@@ -11,8 +11,8 @@ import {
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { KimicodeExecution } from '@/app/execution/kimicode/KimicodeExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
+import { KimicodeExecution } from '@/providers/kimicode/execution/KimicodeExecutionComposition';
 import { kimicodeProviderModule } from '@/providers/kimicode/KimicodeProviderModule';
 import { updateKimicodeProviderSettings } from '@/providers/kimicode/settings';
 

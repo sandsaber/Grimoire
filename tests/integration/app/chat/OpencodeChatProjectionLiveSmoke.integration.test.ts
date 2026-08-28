@@ -11,8 +11,8 @@ import {
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { OpencodeExecution } from '@/app/execution/opencode/OpencodeExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
+import { OpencodeExecution } from '@/providers/opencode/execution/OpencodeExecutionComposition';
 import { opencodeProviderModule } from '@/providers/opencode/OpencodeProviderModule';
 import { updateOpencodeProviderSettings } from '@/providers/opencode/settings';
 

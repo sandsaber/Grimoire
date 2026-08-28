@@ -11,8 +11,8 @@ import {
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { MimocodeExecution } from '@/app/execution/mimocode/MimocodeExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
+import { MimocodeExecution } from '@/providers/mimocode/execution/MimocodeExecutionComposition';
 import { mimocodeProviderModule } from '@/providers/mimocode/MimocodeProviderModule';
 import { updateMimocodeProviderSettings } from '@/providers/mimocode/settings';
 

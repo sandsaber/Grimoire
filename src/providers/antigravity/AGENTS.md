@@ -5,7 +5,7 @@
 ## Current Scope
 
 - Antigravity is opt-in and disabled by default.
-- Chat execution runs through the execution kernel: `AntigravityExecutionBackend` over `agy --print`, presented by `ExecutionChatRuntimeAdapter`. `AntigravityExecution` in `src/app/execution/antigravity/` composes the two and owns the request store they share. Single-turn print requests, cancellation, and model selection through `agy --model`.
+- Chat execution runs through the execution kernel: `AntigravityExecutionBackend` over `agy --print`, presented by `ExecutionChatRuntimeAdapter`. `AntigravityExecution` in `src/providers/antigravity/execution/` composes the two and owns the request store they share. Single-turn print requests, cancellation, and model selection through `agy --model`.
 - `agy --print` does not expose Grimoire file-edit approval hooks. Keep shared `normal` permission mode fail-closed for Antigravity; only launch AGY in explicit auto-approve/full-access mode unless a real approval-capable runtime is confirmed.
 - Read the permission mode from the provider's own projection, not from top-level `settings.permissionMode`. That key holds whichever provider the settings tab is showing, so reading it means obeying another provider's toggle — observed as Antigravity refusing every turn while its own toggle read Auto-approve.
 - The CLI is launched through the user's login shell so profile environment applies, and the argument-forwarding expression is shell-specific: fish has no `$0` or `$@`. An unknown shell launches directly rather than guessing its syntax.

@@ -2,7 +2,6 @@ import '@/providers';
 
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
-import { CodexExecution } from '@/app/execution/codex/CodexExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { NO_TASK_RESULT_INTERPRETATION } from '@/core/providers/noTaskResultInterpretation';
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
@@ -11,6 +10,7 @@ import {
   DEFAULT_CHAT_PROVIDER_ID,
 } from '@/core/providers/types';
 import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
+import { CodexExecution } from '@/providers/codex/execution/CodexExecutionComposition';
 
 describe('reading a provider\'s contributions through the catalog', () => {
   beforeEach(() => {

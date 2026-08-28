@@ -10,15 +10,15 @@ import {
   userMessage,
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
-import { CodexExecution } from '@/app/execution/codex/CodexExecutionComposition';
-import {
-  CodexActiveLaunchSpec,
-  NodeCodexExecutionConnectionFactory,
-} from '@/app/execution/codex/NodeCodexExecutionConnectionFactory';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
 import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
+import { CodexExecution } from '@/providers/codex/execution/CodexExecutionComposition';
+import {
+  CodexActiveLaunchSpec,
+  NodeCodexExecutionConnectionFactory,
+} from '@/providers/codex/execution/NodeCodexExecutionConnectionFactory';
 import { resolveCodexAppServerLaunchSpec } from '@/providers/codex/runtime/codexAppServerSupport';
 import { updateCodexProviderSettings } from '@/providers/codex/settings';
 import { DEFAULT_CODEX_MINI_MODEL } from '@/providers/codex/types/models';

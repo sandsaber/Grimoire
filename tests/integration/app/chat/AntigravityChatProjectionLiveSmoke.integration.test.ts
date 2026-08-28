@@ -11,10 +11,10 @@ import {
   userMessage,
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
-import { AntigravityExecution } from '@/app/execution/antigravity/AntigravityExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
+import { AntigravityExecution } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
 import { updateAntigravityProviderSettings } from '@/providers/antigravity/settings';
 
 /**

@@ -2,11 +2,11 @@ import '@/providers';
 
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
-import { AntigravityExecution } from '@/app/execution/antigravity/AntigravityExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { antigravityWorkspaceRegistration } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
+import { AntigravityExecution } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
 import { discoverAntigravityModels } from '@/providers/antigravity/runtime/AntigravityModelDiscovery';
 import {
   getAntigravityProviderSettings,

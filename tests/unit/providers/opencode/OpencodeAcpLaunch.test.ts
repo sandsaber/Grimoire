@@ -2,8 +2,8 @@ import '@/providers';
 
 import { createAcpLaunchMockPlugin, WINDOWS_UNICODE_VAULT } from '@test/helpers/acpLaunchMocks';
 
-import { OpencodeExecution } from '@/app/execution/opencode/OpencodeExecutionComposition';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
+import { OpencodeExecution } from '@/providers/opencode/execution/OpencodeExecutionComposition';
 import { prepareOpencodeLaunchArtifacts } from '@/providers/opencode/runtime/OpencodeLaunchArtifacts';
 
 jest.mock('@/providers/opencode/runtime/OpencodeLaunchArtifacts', () => {

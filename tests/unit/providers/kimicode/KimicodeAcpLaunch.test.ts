@@ -2,8 +2,8 @@ import '@/providers';
 
 import { createAcpLaunchMockPlugin, WINDOWS_UNICODE_VAULT } from '@test/helpers/acpLaunchMocks';
 
-import { KimicodeExecution } from '@/app/execution/kimicode/KimicodeExecutionComposition';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
+import { KimicodeExecution } from '@/providers/kimicode/execution/KimicodeExecutionComposition';
 import { prepareKimicodeLaunchArtifacts } from '@/providers/kimicode/runtime/KimicodeLaunchArtifacts';
 
 jest.mock('@/providers/kimicode/runtime/KimicodeLaunchArtifacts', () => {

@@ -11,8 +11,8 @@ import {
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { QwenExecution } from '@/app/execution/qwen/QwenExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
+import { QwenExecution } from '@/providers/qwen/execution/QwenExecutionComposition';
 import { qwenProviderModule } from '@/providers/qwen/QwenProviderModule';
 import { updateQwenProviderSettings } from '@/providers/qwen/settings';
 

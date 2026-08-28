@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 import { DebugLogService, sanitizeDebugLogData } from '@/core/debug/DebugLogService';
@@ -23,11 +23,25 @@ import { DebugLogService, sanitizeDebugLogData } from '@/core/debug/DebugLogServ
  * each one logs, and runs a value through each key that would be a D7 violation
  * if it survived.
  */
+/**
+ * Every directory the execution path logs from.
+ *
+ * **The provider list is derived, not typed out.** These were four fixed roots,
+ * one of them `src/app/execution`, and when each provider's composition moved
+ * under `src/providers/<id>/execution` the gate went on passing while reading
+ * *nothing* — a rule over a subset reads exactly like a rule over everything.
+ * It now walks `src/providers` for the same directory name, so a provider added
+ * later is covered by existing, and the count assertion below refuses a run
+ * that found no call sites at all.
+ */
 const ROOTS = [
   'src/app/execution',
   'src/core/execution',
   'src/core/runtime/execution',
-  'src/providers/acp/execution',
+  ...readdirSync(resolve(process.cwd(), 'src/providers'), { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map(entry => `src/providers/${entry.name}/execution`)
+    .filter(root => existsSync(resolve(process.cwd(), root))),
 ];
 
 /**

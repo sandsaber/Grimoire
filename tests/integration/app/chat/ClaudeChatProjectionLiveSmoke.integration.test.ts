@@ -12,13 +12,13 @@ import {
   userMessage,
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
-import { ClaudeExecution } from '@/app/execution/claude/ClaudeExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 import { createClaudeWorkspaceServices } from '@/providers/claude/app/ClaudeWorkspaceServices';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
+import { ClaudeExecution } from '@/providers/claude/execution/ClaudeExecutionComposition';
 import { updateClaudeProviderSettings } from '@/providers/claude/settings';
 
 /**

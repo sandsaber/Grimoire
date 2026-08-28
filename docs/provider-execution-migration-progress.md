@@ -10445,6 +10445,27 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the compositions move under the providers they compose (`this commit`)
+
+**The owner's answer to the relocation question: provider-specific code belongs under the provider.**
+
+- Gates: unit 8745 passed, 8745 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **`a provider composition living under src/app` closes: 18 → 0.** Each provider's execution
+  composition and its transport moved from `src/app/execution/<id>/` into
+  `src/providers/<id>/execution/`, beside the presenters and backends they were already importing.
+  Their tests moved with them, mirroring `src/` as the testing rule requires. What stays in
+  `src/app/execution` is what is provider-neutral: the kernel host, the workspace holder, the aux
+  runner, the host timers, and the shared ACP and local-shell pieces.
+- The move was flat — same depth under `src/`, so every `../../../core/…` still resolves — and the
+  only rewrites were the four sibling imports into the neutral modules, now `@/app/execution/…`.
+- **A gate went quietly blind, and its own guard caught it.** `diagnosticRedaction` scanned four
+  fixed roots, one of them `src/app/execution`, so the moment the compositions left it read
+  *nothing* — and a rule over a subset reads exactly like a rule over everything. It failed rather
+  than passing because it asserts it found call sites at all. Its provider roots are derived from
+  the `src/providers` tree now, so a provider added later is covered by existing rather than by
+  somebody remembering to type it out.
+
 ### M5 — why `buildSessionUpdates` stops one step short of the barrier (`this commit`)
 
 - Gates: unit 8745 passed, 8745 total; `tsc --noEmit` clean; `npm run lint` clean.
@@ -10777,7 +10798,7 @@ tab-scoped half is deleted.
 - Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean.
 - **`the application importing a concrete provider module: 20` is split, total preserved.** It was
   the second-largest search and the only one carrying no evidence at all. Reading it: **eighteen of
-  the twenty are a provider's own composition.** `src/app/execution/codex/` naming
+  the twenty are a provider's own composition.** `src/providers/codex/execution/` naming
   `src/providers/codex/` is a directory choosing where it lives, not neutral application code
   reaching into a provider — and the composition boundary test already holds each to its own
   provider. Reported together, neither half could be acted on: fixing both real violations would
@@ -11532,7 +11553,7 @@ one provider of this wave that can be certified live here, which is why it was b
 though the plan lists Qwen before it.
 
 **What is left for Gemini, in order:** `GeminiExecutionComposition` and `GeminiMetadataSession` under
-`src/app/execution/gemini/` with `GeminiModuleContext` beside them — derive from **Grok's**, not from
+`src/providers/gemini/execution/` with `GeminiModuleContext` beside them — derive from **Grok's**, not from
 the OpenCode family's, because that is the shape this provider matches; then the flip as one
 revertible commit; then the live harness and matrix, which for once will have something to say.
 Watch for the parts Gemini does *not* have: no launch artifacts, no config options, no tool stream

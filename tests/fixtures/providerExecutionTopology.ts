@@ -218,7 +218,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     // built like the ACP compositions: there is no client factory to separate
     // and no filesystem to contain, so the isolation is on the thread.
     auxiliary: 'kernel-isolated',
-    auxiliaryOwner: 'src/app/execution/codex/CodexExecutionComposition.ts',
+    auxiliaryOwner: 'src/providers/codex/execution/CodexExecutionComposition.ts',
     sharedResources: [
       {
         resource: 'Codex app-server process',
@@ -283,7 +283,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     // built the way they are: there is no managed agent to run as here, so the
     // launch carries the policy and the client carries what may be read.
     auxiliary: 'kernel-isolated',
-    auxiliaryOwner: 'src/app/execution/grok/GrokExecutionComposition.ts',
+    auxiliaryOwner: 'src/providers/grok/execution/GrokExecutionComposition.ts',
     sharedResources: [
       ...MANAGED_ACP_SHARED_RESOURCES('grok'),
       {
@@ -319,7 +319,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     // The third fork of the same CLI, and the third auxiliary path on the
     // kernel: these three do not diverge.
     auxiliary: 'kernel-isolated',
-    auxiliaryOwner: 'src/app/execution/kimicode/KimicodeExecutionComposition.ts',
+    auxiliaryOwner: 'src/providers/kimicode/execution/KimicodeExecutionComposition.ts',
     sharedResources: MANAGED_ACP_SHARED_RESOURCES('kimicode'),
     capabilities: KIMICODE_PROVIDER_CAPABILITIES,
     isolationEvidence: 'kimicode/auxiliary/',
@@ -349,7 +349,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     // these two do not diverge. The owner is the composition, which decides the
     // launch — its own artifacts per purpose, its own agent, its own factory.
     auxiliary: 'kernel-isolated',
-    auxiliaryOwner: 'src/app/execution/mimocode/MimocodeExecutionComposition.ts',
+    auxiliaryOwner: 'src/providers/mimocode/execution/MimocodeExecutionComposition.ts',
     sharedResources: MANAGED_ACP_SHARED_RESOURCES('mimocode'),
     capabilities: MIMOCODE_PROVIDER_CAPABILITIES,
     isolationEvidence: 'mimocode/auxiliary/',
@@ -381,7 +381,7 @@ export const PROVIDER_EXECUTION_TOPOLOGY: ProviderExecutionTopology[] = [
     // factory — the one an auxiliary turn is contained by whatever the chat is
     // set to.
     auxiliary: 'kernel-isolated',
-    auxiliaryOwner: 'src/app/execution/opencode/OpencodeExecutionComposition.ts',
+    auxiliaryOwner: 'src/providers/opencode/execution/OpencodeExecutionComposition.ts',
     sharedResources: MANAGED_ACP_SHARED_RESOURCES('opencode'),
     capabilities: OPENCODE_PROVIDER_CAPABILITIES,
     isolationEvidence: 'opencode/auxiliary/',

@@ -1,8 +1,8 @@
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { AuxiliaryExecutionOwner } from '@/app/auxiliary/AuxiliaryExecutionOwner';
-import { ClaudeExecution } from '@/app/execution/claude/ClaudeExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
+import { ClaudeExecution } from '@/providers/claude/execution/ClaudeExecutionComposition';
 
 /**
  * Claude's auxiliary services, built the way the application builds them.

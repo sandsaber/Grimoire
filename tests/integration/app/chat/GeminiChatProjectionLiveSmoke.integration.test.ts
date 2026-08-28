@@ -11,8 +11,8 @@ import {
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { GeminiExecution } from '@/app/execution/gemini/GeminiExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
+import { GeminiExecution } from '@/providers/gemini/execution/GeminiExecutionComposition';
 import { geminiProviderModule } from '@/providers/gemini/GeminiProviderModule';
 import { updateGeminiProviderSettings } from '@/providers/gemini/settings';
 

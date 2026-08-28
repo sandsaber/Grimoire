@@ -2,8 +2,8 @@ import '@/providers';
 
 import { createAcpLaunchMockPlugin, WINDOWS_UNICODE_VAULT } from '@test/helpers/acpLaunchMocks';
 
-import { MimocodeExecution } from '@/app/execution/mimocode/MimocodeExecutionComposition';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
+import { MimocodeExecution } from '@/providers/mimocode/execution/MimocodeExecutionComposition';
 import { prepareMimocodeLaunchArtifacts } from '@/providers/mimocode/runtime/MimocodeLaunchArtifacts';
 
 jest.mock('@/providers/mimocode/runtime/MimocodeLaunchArtifacts', () => {
