@@ -19,6 +19,7 @@ import {
 } from '../../core/providers/commands/hiddenCommands';
 import type { ProviderCommandEntry } from '../../core/providers/commands/ProviderCommandEntry';
 import { providerCatalog } from '../../core/providers/ProviderCatalog';
+import type { ProviderSettingsPresentationPort } from '../../core/providers/ProviderModule';
 import type { ProviderCommandsPort } from '../../core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../core/providers/ProviderWorkspaceRegistry';
@@ -394,6 +395,10 @@ export class GrimoireSettingTab extends PluginSettingTab {
   private activeTab: SettingsTabId = 'general';
   private activeProviderId: ProviderId | null = null;
   private activeWorkspaceProviderId: string | null = null;
+  /** Which provider-section draw is the current one; see the draw below. */
+  private workspaceRenderGeneration = 0;
+  /** The same, for the provider details pane. */
+  private providerDetailsRenderGeneration = 0;
   private activeWorkspaceSection: AdvancedSettingsSection = 'general';
   private tabScroller: SettingsTabScroller | null = null;
   private workspaceLoadToken: symbol | null = null;
@@ -731,14 +736,28 @@ export class GrimoireSettingTab extends PluginSettingTab {
         this.getProviderDisplayName(this.activeProviderId),
       ))
       .setHeading();
-    const renderer = ProviderWorkspaceRegistry.getSettingsTabRenderer(this.activeProviderId);
-    if (!renderer) {
-      details.createDiv({ cls: 'grimoire-settings-hub-empty', text: this.getHubText('none') });
-      return;
-    }
-
-    renderer.render(details, this.createSettingsRendererContext(this.activeProviderId));
-    this.extractProviderAdvancedOptions(details, this.activeProviderId);
+    // Drawn when the provider's slot answers, guarded by generation for the
+    // reason the workspace section below gives: a second provider selected
+    // while the first is resolving must not fill the pane it left.
+    const providerId = this.activeProviderId;
+    const generation = ++this.providerDetailsRenderGeneration;
+    void this.plugin.getApplicationRuntimeOrNull?.()
+      ?.workspaceFor(providerId)
+      .then(workspace => {
+        if (generation !== this.providerDetailsRenderGeneration) {
+          return;
+        }
+        const presentation = workspace.settingsPresentation;
+        if (!presentation) {
+          details.createDiv({ cls: 'grimoire-settings-hub-empty', text: this.getHubText('none') });
+          return;
+        }
+        presentation.render({
+          container: details,
+          context: this.createSettingsRendererContext(providerId),
+        });
+        this.extractProviderAdvancedOptions(details, providerId);
+      });
   }
 
   private renderWorkspaceHub(container: HTMLElement, providerIds: ProviderId[]): void {
@@ -1034,8 +1053,36 @@ export class GrimoireSettingTab extends PluginSettingTab {
       });
       return;
     }
-    const renderer = ProviderWorkspaceRegistry.getSettingsTabRenderer(providerId);
-    if (!renderer) {
+    // **The provider's own tab, drawn a tick later.** Obsidian's declarative
+    // settings API is synchronous all the way down and a provider's workspace
+    // is built on first use, so the section is filled when the slot answers
+    // rather than in the call that asked for it. The generation is what makes
+    // that safe: a second provider clicked while the first was resolving would
+    // otherwise draw into a pane the reader has already left.
+    const generation = ++this.workspaceRenderGeneration;
+    void this.plugin.getApplicationRuntimeOrNull?.()
+      ?.workspaceFor(providerId)
+      .then(workspace => {
+        if (generation !== this.workspaceRenderGeneration) {
+          return;
+        }
+        this.drawWorkspaceProviderSection(
+          container,
+          providerId,
+          section,
+          workspace.settingsPresentation,
+        );
+      });
+  }
+
+  /** One provider's settings tab, once its slot is there to ask. */
+  private drawWorkspaceProviderSection(
+    container: HTMLElement,
+    providerId: string,
+    section: WorkspaceSection,
+    presentation: ProviderSettingsPresentationPort | undefined,
+  ): void {
+    if (!presentation) {
       container.createDiv({
         cls: 'grimoire-settings-hub-empty',
         text: this.getHubText('unsupported'),
@@ -1044,8 +1091,11 @@ export class GrimoireSettingTab extends PluginSettingTab {
     }
 
     const staging = container.createDiv({ cls: 'grimoire-workspace-render-staging' });
-    renderer.render(staging, this.createSettingsRendererContext(providerId, true));
-    let extracted = this.extractWorkspaceProviderSection(
+    presentation.render({
+      container: staging,
+      context: this.createSettingsRendererContext(providerId, true),
+    });
+    const extracted = this.extractWorkspaceProviderSection(
       staging,
       container,
       section,
@@ -1241,7 +1291,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
         const capability = providerCatalog().workspaceCapabilities(providerId)[section];
         if (!capability || capability.inventory === 'none') continue;
         const catalog = (
-          await this.plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId)
+          await this.plugin.getApplicationRuntimeOrNull?.()?.workspaceFor(providerId)
         )?.commands;
         if (!catalog) continue;
         try {
@@ -1261,7 +1311,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
             // The module's slot rather than a registry accessor keyed by an id
             // string: the loader's context is entirely host-owned now, which is
             // what let the row move.
-            const loader = (await this.plugin.getApplicationRuntimeOrNull()
+            const loader = (await this.plugin.getApplicationRuntimeOrNull?.()
               ?.workspaceFor(providerId))?.runtimeCommands;
             if (discovery === 'ephemeral'
               && loader?.loadCommands
@@ -1536,7 +1586,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
               // accessor was never empty in a running plugin. Asking only for
               // an already-built workspace would have skipped the refresh for
               // any provider whose composition had not been used yet.
-              await this.plugin.getApplicationRuntimeOrNull()
+              await this.plugin.getApplicationRuntimeOrNull?.()
                 ?.workspaceFor(providerId)
                 .then(workspace => workspace.agentMentions?.refresh());
             },
@@ -2239,7 +2289,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
     // normalizes the *selection* between them, never enablement. A guard that
     // cannot fail is a guard nobody can test, which is how one survives long
     // enough to be mistaken for a rule.
-    const workspace = await this.plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId);
+    const workspace = await this.plugin.getApplicationRuntimeOrNull?.()?.workspaceFor(providerId);
     await workspace?.models?.refresh();
   }
 

@@ -1,6 +1,5 @@
 import type {
   ProviderId,
-  ProviderSettingsTabRenderer,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from './types';
@@ -87,7 +86,4 @@ export class ProviderWorkspaceRegistry {
     return this.getServices(providerId)?.mcpServerManager ?? null;
   }
 
-  static getSettingsTabRenderer(providerId: ProviderId): ProviderSettingsTabRenderer | null {
-    return this.getServices(providerId)?.settingsTabRenderer ?? null;
-  }
 }

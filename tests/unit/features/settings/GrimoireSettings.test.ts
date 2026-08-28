@@ -623,6 +623,41 @@ describe('GrimoireSettingTab settings hub', () => {
     }
   });
 
+  it('draws a provider section when its slot answers, and drops a superseded one', async () => {
+    // **The provider's settings tab is drawn a tick late now.** Obsidian's
+    // declarative settings API is synchronous and a provider's workspace is
+    // built on first use, so the section fills when the slot answers. The
+    // hazard that introduces is a reader clicking a second provider while the
+    // first is still resolving — the late draw would land in a pane they left.
+    const tab = new GrimoireSettingTab(createSettingsApp(), createSettingsPlugin());
+    const drawn: string[] = [];
+    const gates: Record<string, () => void> = {};
+    (tab as any).plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceFor: (providerId: string) => new Promise(resolve => {
+        gates[providerId] = () => resolve({
+          settingsPresentation: {
+            render: (host: { container: HTMLElement }) => {
+              drawn.push(providerId);
+              host.container.createDiv({ attr: { 'data-workspace-sections': 'commands' } });
+            },
+          },
+        });
+      }),
+    });
+
+    const container = createMockEl('div');
+    (tab as any).renderWorkspaceProviderSection(container, 'opencode', 'commands');
+    (tab as any).renderWorkspaceProviderSection(container, 'grok', 'commands');
+
+    // The first provider answers *after* the reader moved on.
+    gates.grok?.();
+    await Promise.resolve();
+    gates.opencode?.();
+    await Promise.resolve();
+
+    expect(drawn).toEqual(['grok']);
+  });
+
   it('keeps Codex MCP guidance in the inventory without advertising it as managed', async () => {
     const tab = new GrimoireSettingTab(createSettingsApp(), createSettingsPlugin());
     jest.spyOn(ProviderWorkspaceRegistry, 'getServices').mockImplementation((providerId: any) => {

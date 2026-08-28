@@ -10445,6 +10445,29 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the settings tab draws its provider a tick later, and the third accessor goes (`this commit`)
+
+- Gates: unit 8752 passed, 8752 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **`getSettingsTabRenderer` is deleted. Three of the registry's four accessors are gone**; only
+  `getMcpServerManager` remains, on the blocker already recorded — three chat widgets hold the
+  manager by identity and call it later.
+- The blocker here was real and is now paid rather than waited on: Obsidian's declarative settings
+  API is synchronous all the way down, a provider's workspace is built on first use, and the two
+  render paths could not await. **They draw when the slot answers instead** — the pane is created
+  synchronously and filled a tick later, which is what a settings panel can do and a chat column
+  cannot.
+- **The hazard that introduces is guarded, and the guard is asserted.** A reader clicking a second
+  provider while the first is still resolving would have had the late draw land in the pane they
+  left. Each path carries a render generation, and the test that says so drives two providers
+  concurrently and releases them out of order: only the second draws. Removing the check fails it.
+- **The path had no test at all before this** — `renderWorkspaceProviderSection` appeared in no
+  suite — which is worth saying plainly, because "it was blocked on the settings tab rework" had
+  been standing in for "nobody had written down what it does".
+- One robustness fix found by the tests: the runtime lookup is an optional *call*
+  (`getApplicationRuntimeOrNull?.()`), matching what the rest of the codebase does. Several settings
+  doubles have no such method, and neither does a plugin before its runtime starts.
+
 ### M5 — `getRuntimeCommandLoader` is deleted (`this commit`)
 
 - Gates: unit 8751 passed, 8751 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
