@@ -10402,6 +10402,37 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the twenty that could not fall, split into two that can (`this commit`)
+
+- Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean.
+- **`the application importing a concrete provider module: 20` is split, total preserved.** It was
+  the second-largest search and the only one carrying no evidence at all. Reading it: **eighteen of
+  the twenty are a provider's own composition.** `src/app/execution/codex/` naming
+  `src/providers/codex/` is a directory choosing where it lives, not neutral application code
+  reaching into a provider — and the composition boundary test already holds each to its own
+  provider. Reported together, neither half could be acted on: fixing both real violations would
+  have moved 20 to 18 and looked like nothing happened.
+  - `provider-neutral application code importing a concrete provider` — **2**, within
+    `src/app/settings`;
+  - `a provider composition living under src/app` — **18**, within `src/app/execution`, closed by
+    the relocation decision, which is the owner's.
+- **Both of the two were read before the count was written, and the first `closedBy` I wrote for
+  them was wrong.** It said the settings codecs already answer both. They do not:
+  - `defaultSettings` takes Codex's default model constant for the app-level `model` field.
+    `defaultConfigs()` cannot supply it — that map is `encode(defaults())` per provider and holds
+    `cliPath`, `enabled`, `reasoningSummary` and the rest; `model` is a host field, and the default
+    provider being Codex is the whole reason Codex's constant is the shipped value. Verified by
+    probe, not by reading: the encoded Codex config has no `model` key. Closing it means a provider
+    declaring its default model — a new contract row for one value;
+  - `GrimoireSettingsStorage` takes three providers' settings accessors for the legacy top-level
+    field migration, and the three are frozen because only those three were ever written in the old
+    stored shape. `ProviderSettingsCoordinator.getProviderSettingsSnapshot` cannot stand in: these
+    accessors read the *legacy* fields — `config.cliPathsByHost ?? settings.claudeCliPathsByHost` —
+    which is provider-specific knowledge of an on-disk format that no longer exists. Closing it
+    means the codec carrying its own legacy migration.
+  Neither is drift. Both are a real coupling with a named cost, which is what the single count of 20
+  could not say.
+
 ### M5 — `syncConversationState` leaves a search by being settled, not by moving (`this commit`)
 
 - Gates: unit 8741 passed, 8741 total; `tsc --noEmit` clean; `npm run lint` clean.

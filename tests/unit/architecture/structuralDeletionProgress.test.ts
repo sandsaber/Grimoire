@@ -110,11 +110,49 @@ const SEARCHES: readonly DeletionSearch[] = [
     closedBy: 'durable agents — it loses lifecycle authority and keeps its rendering',
   },
   {
-    what: 'the application importing a concrete provider module',
+    // **Split from one search of 20, with the total preserved.** The single
+    // count could not fall, because eighteen of the twenty were a *provider's
+    // own composition* — `src/app/execution/codex/` naming
+    // `src/providers/codex/` is a directory choosing where it lives, not
+    // neutral code reaching into a provider. Reporting those beside the two
+    // real violations meant neither number could be acted on: fixing both
+    // violations would have moved 20 to 18 and looked like nothing happened.
+    what: 'provider-neutral application code importing a concrete provider',
     pattern: /providers\/(claude|codex|antigravity|opencode|mimocode|kimicode|grok|qwen|gemini)\//,
-    within: 'src/app',
-    files: 20,
-    closedBy: 'the provider rows',
+    within: 'src/app/settings',
+    // **2, and both were read before this count was written down.**
+    //
+    // `defaultSettings` takes Codex's default model constant for the app-level
+    // `model` field. It is *not* in `defaultConfigs()`: that map is
+    // `encode(defaults())` per provider and holds `cliPath`, `enabled`,
+    // `reasoningSummary` and the rest — `model` is a host field, and the
+    // default provider being Codex is why Codex's constant is the shipped
+    // value. Closing it means a provider declaring its default model, which is
+    // a new contract row for one value.
+    //
+    // `GrimoireSettingsStorage` takes the Claude, Codex and OpenCode settings
+    // accessors for the legacy top-level field migration, and the three are
+    // frozen: only those three were ever written in the old stored shape.
+    // `ProviderSettingsCoordinator.getProviderSettingsSnapshot` cannot stand in,
+    // because these accessors read the *legacy* fields —
+    // `config.cliPathsByHost ?? settings.claudeCliPathsByHost` — which is
+    // provider-specific knowledge of an on-disk format that no longer exists.
+    // Closing it means the codec carrying its own legacy migration.
+    //
+    // Neither is drift. Both are a real coupling with a named cost, which is
+    // the thing the single count of 20 could not say.
+    files: 2,
+    closedBy: 'a default-model declaration, and a legacy migration on the settings codec',
+  },
+  {
+    // The other eighteen. Every one is under `src/app/execution/<provider>/`
+    // and names only its own provider, which the composition boundary test
+    // already holds them to. What is open is not an import but a location.
+    what: 'a provider composition living under src/app',
+    pattern: /providers\/(claude|codex|antigravity|opencode|mimocode|kimicode|grok|qwen|gemini)\//,
+    within: 'src/app/execution',
+    files: 18,
+    closedBy: 'the `app/execution/<id>` relocation decision, which is the owner\'s',
   },
   {
     // **Narrowed again, to the one member whose home is still open.**
@@ -206,7 +244,8 @@ describe('structural deletion progress', () => {
       'core importing the plugin type: 2',
       'subagent hooks and loaders: 3',
       'SubagentManager lifecycle: 7',
-      'the application importing a concrete provider module: 20',
+      'provider-neutral application code importing a concrete provider: 2',
+      'a provider composition living under src/app: 18',
       'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
       'the registries — one left: 17',
