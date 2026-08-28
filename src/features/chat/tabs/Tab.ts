@@ -63,7 +63,11 @@ import { buildAssistantResponseMetadata } from '../utils/assistantResponseMetada
 import { recalculateUsageForModel } from '../utils/usageInfo';
 import { getTabProviderId } from './providerResolution';
 import { attachInputResizeHandle, buildTabDOM } from './tabDOM';
-import { recordDurableSubagent, refreshBackgroundAgentCard } from './tabDurableSubagents';
+import {
+  durableAgentsRunning,
+  recordDurableSubagent,
+  refreshBackgroundAgentCard,
+} from './tabDurableSubagents';
 import { resolveTabProjectionExecution } from './tabProjectionExecution';
 import {
   AUTO_SCROLL_REENABLE_DELAY_MS,
@@ -1887,7 +1891,13 @@ export function setupServiceCallbacks(tab: TabData, plugin: GrimoirePlugin): voi
       await tab.controllers.inputController?.handleAskUserQuestion(input, signal) ?? null,
 
     subagentState: () => ({
-      hasRunning: tab.services.subagentManager.hasRunningSubagents(),
+      // The tab's own view, and the records'. The manager is per tab and is
+      // cleared on a conversation switch, so an agent started before one — or in
+      // a tab that has since closed — is in no live map here; the records are
+      // where it still exists. Either saying yes is enough, because what this
+      // decides is whether Claude may end a turn on top of running work.
+      hasRunning: tab.services.subagentManager.hasRunningSubagents()
+        || durableAgentsRunning(tab, plugin),
     }),
   });
 }

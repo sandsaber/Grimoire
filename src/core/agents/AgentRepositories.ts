@@ -21,22 +21,32 @@ import {
   agentRunRecordSchema,
 } from './AgentSchemas';
 
+/** What a write says about itself: the record's id, and what it now holds. */
+export type AgentRecordChangeListener<TRecord>
+  = (recordId: string, record: TRecord | undefined) => void;
+
 export class MutableAgentRepository<TRecord> {
-  private readonly changeListeners = new Set<(recordId: string) => void>();
+  private readonly changeListeners = new Set<AgentRecordChangeListener<TRecord>>();
 
   constructor(private readonly records: VersionedRepository<TRecord>) {}
 
   /**
-   * Says which record changed, after it has changed.
+   * Says which record changed, after it has changed, **and what it changed to**.
    *
    * **The point is that it cannot be bypassed.** Agent records are written from
    * two directions — the coordinator writing one directly, and the transaction
    * coordinator applying a batch — and both reach the store through the three
-   * mutating methods below. A reader that caches records can evict from here and
-   * be right by construction, rather than by every write path remembering to
-   * say so.
+   * mutating methods below. A reader that caches records can update from here
+   * and be right by construction, rather than by every write path remembering
+   * to say so.
+   *
+   * The new record is carried rather than left to be re-read, because a reader
+   * that only learns *that* something changed has to go and look, and the window
+   * between the write and that look is one where it can only answer "I do not
+   * know yet". Carrying the record closes the window: the write itself brings
+   * the reader up to date. `undefined` means the record is gone.
    */
-  onChanged(listener: (recordId: string) => void): () => void {
+  onChanged(listener: AgentRecordChangeListener<TRecord>): () => void {
     this.changeListeners.add(listener);
     return () => {
       this.changeListeners.delete(listener);
@@ -53,7 +63,7 @@ export class MutableAgentRepository<TRecord> {
 
   async create(recordId: string, record: TRecord): Promise<VersionedRecord<TRecord>> {
     const saved = await this.records.save(recordId, record, null);
-    this.announce(recordId);
+    this.announce(recordId, saved.payload);
     return saved;
   }
 
@@ -66,7 +76,7 @@ export class MutableAgentRepository<TRecord> {
    */
   async removeIfPresent(recordId: string): Promise<void> {
     await this.records.removeIfPresent(recordId);
-    this.announce(recordId);
+    this.announce(recordId, undefined);
   }
 
   async update(
@@ -75,7 +85,7 @@ export class MutableAgentRepository<TRecord> {
     mutation: (record: TRecord) => TRecord,
   ): Promise<VersionedRecord<TRecord>> {
     const updated = await this.records.mutate(recordId, expectedRevision, mutation);
-    this.announce(recordId);
+    this.announce(recordId, updated.payload);
     return updated;
   }
 
@@ -86,9 +96,9 @@ export class MutableAgentRepository<TRecord> {
    * write is about to replace, which is worse than not caching at all. A
    * throwing write announces nothing, because nothing changed.
    */
-  private announce(recordId: string): void {
+  private announce(recordId: string, record: TRecord | undefined): void {
     for (const listener of this.changeListeners) {
-      listener(recordId);
+      listener(recordId, record);
     }
   }
 }

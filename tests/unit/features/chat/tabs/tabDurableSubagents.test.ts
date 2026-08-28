@@ -1,5 +1,6 @@
 import type { SubagentInfo } from '@/core/types';
 import {
+  durableAgentsRunning,
   recordDurableSubagent,
   refreshBackgroundAgentCard,
 } from '@/features/chat/tabs/tabDurableSubagents';
@@ -100,6 +101,50 @@ describe('recording a durable subagent', () => {
       };
       return { drawn, plugin, readCount: () => reads, tab };
     }
+
+    it('reports the records\' running agents for the conversation the tab is on', () => {
+      // Claude's `Stop` hook reads this to decide whether a turn may end. The
+      // live per-tab view cannot see an agent started before a conversation
+      // switch or in a tab that has closed; the records can.
+      const asked: unknown[] = [];
+      const tab = { state: { currentConversationId: 'conv-1' } };
+      const plugin = {
+        getApplicationRuntimeOrNull: () => ({
+          agents: {
+            runningOwnedAgents: (owner: unknown) => {
+              asked.push(owner);
+              return true;
+            },
+          },
+        }),
+      };
+
+      expect(durableAgentsRunning(tab as never, plugin as never)).toBe(true);
+      expect(asked).toEqual([{ kind: 'conversation', ownerId: 'conv-1' }]);
+    });
+
+    it('claims nothing when the records have not been read yet', () => {
+      // `undefined` is the records saying they have not looked. It is unioned
+      // with the tab's own view, so an unknown here must not claim work the tab
+      // would not also claim — otherwise a turn blocks on nothing.
+      const tab = { state: { currentConversationId: 'conv-1' } };
+      const plugin = {
+        getApplicationRuntimeOrNull: () => ({
+          agents: { runningOwnedAgents: () => undefined },
+        }),
+      };
+
+      expect(durableAgentsRunning(tab as never, plugin as never)).toBe(false);
+    });
+
+    it('claims nothing for a tab that owns no conversation', () => {
+      const plugin = { getApplicationRuntimeOrNull: () => ({ agents: {} }) };
+
+      expect(durableAgentsRunning(
+        { state: { currentConversationId: null } } as never,
+        plugin as never,
+      )).toBe(false);
+    });
 
     it('clears the card for a tab that owns no conversation', async () => {
       // A blank tab shows no background work; without this the cards of the

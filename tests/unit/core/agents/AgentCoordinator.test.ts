@@ -459,6 +459,86 @@ describe('AgentCoordinator', () => {
     expect(reads).toBe(0);
   });
 
+  it('says nothing about an owner it has never listed', () => {
+    // The `Stop` hook's caller must be able to tell "no agents running" from "I
+    // have not looked", because it decides whether a turn may end.
+    const coordinator = new AgentCoordinator(new TestDurableStorage(), { now: monotonicClock() });
+
+    expect(coordinator.runningOwnedAgents({ kind: 'conversation', ownerId: 'conversation-1' }))
+      .toBeUndefined();
+  });
+
+  it('answers whether an agent is running without waiting, once it has listed', async () => {
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+    await coordinator.prepareAndDispatch(rootCommand(), {
+      dispatch: async () => ({ kind: 'accepted' }),
+    });
+    const owner = { kind: 'conversation' as const, ownerId: 'conversation-1' };
+    await coordinator.listOwnedAgents(owner);
+
+    expect(coordinator.runningOwnedAgents(owner)).toBe(true);
+
+    // Settled through the same write funnel that keeps the copy current, so the
+    // answer changes without anything going back to the store.
+    await coordinator.appendResult(resultRecord({
+      agentResultId: agentResultId(`ares-${'7'.repeat(32)}`),
+      status: 'succeeded',
+      finalText: 'done',
+    }));
+    let reads = 0;
+    const underlying = storage.read.bind(storage);
+    storage.read = async (path: string) => {
+      reads += 1;
+      return await underlying(path);
+    };
+
+    expect(coordinator.runningOwnedAgents(owner)).toBe(false);
+    expect(reads).toBe(0);
+  });
+
+  it('is up to date the moment a write finishes, without going back to the store', async () => {
+    // **The window this closes.** A cache told only *that* something changed has
+    // to go and look, and until it does the honest answer is "I do not know" —
+    // which is the answer that cannot be given to the `Stop` hook, because both
+    // ways of guessing are wrong: assume running and turns that should have
+    // ended block, assume idle and a turn ends on top of an agent that has just
+    // started. So the write carries the record and the reader is current when it
+    // returns.
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+    await coordinator.prepareAndDispatch(rootCommand(), {
+      dispatch: async () => ({ kind: 'rejected', code: 'refused', sideEffectFree: true }),
+    });
+    const owner = { kind: 'conversation' as const, ownerId: 'conversation-1' };
+    await coordinator.listOwnedAgents(owner);
+
+    await coordinator.retry({
+      prepareTransactionId: tx('8'),
+      dispatchStartTransactionId: tx('9'),
+      settlementTransactionId: tx('a'),
+      terminalTransactionId: tx('b'),
+      agentInstanceId: ROOT_INSTANCE_ID,
+      agentRunId: agentRunId(`agr-${'c'.repeat(32)}`),
+      dispatchToken: agentDispatchToken(`adt-${'d'.repeat(32)}`),
+      goalRef: 'second-attempt',
+      policyInputs: POLICY_INPUTS,
+      idempotency: 'provider-key',
+    }, { dispatch: async () => ({ kind: 'accepted' }) });
+
+    let reads = 0;
+    const underlying = storage.read.bind(storage);
+    storage.read = async (path: string) => {
+      reads += 1;
+      return await underlying(path);
+    };
+    const listed = await coordinator.listOwnedAgents(owner);
+
+    // The new attempt, from what the write left behind rather than from a file.
+    expect(listed).toMatchObject([{ attempt: 2, goalRef: 'second-attempt' }]);
+    expect(reads).toBe(0);
+  });
+
   it('sees a record that changed after it was last read', async () => {
     // **The cache behind `listOwnedAgents` has to be evicted, and this is what
     // says so.** Reading the whole store on every call was the previous

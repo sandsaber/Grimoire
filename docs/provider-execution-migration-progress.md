@@ -10445,6 +10445,36 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — an agent from a closed tab now keeps a turn open (`this commit`)
+
+The projection below made the synchronous answer possible. This is it, and its first consumer.
+
+- Gates: unit 8750 passed, 8750 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **The write now carries the record, not just its id.** `MutableAgentRepository.onChanged` reports
+  what a record changed *to*, so a reader is brought up to date **by** the write rather than marked
+  unknown and left to go looking. That closes the window the entry below said blocked a synchronous
+  answer: there is no interval where the copy is behind the store. Asserted directly — after a
+  retry, a listing returns the new attempt with **zero** `storage.read` calls, and reverting to
+  evict-and-refetch fails it.
+- **`AgentCoordinator.runningOwnedAgents(owner)` answers without waiting**, and answers `undefined`
+  when it genuinely does not know: before an owner has ever been listed, or if a run a listing
+  cached has since gone. The caller is forbidden from guessing, because both guesses are wrong —
+  assume running and turns that should have ended block; assume idle and a turn ends on top of an
+  agent that has just started.
+- **Wired, and it fixes something real.** Claude's `Stop` hook asks the tab whether a background
+  subagent is going. The live view is per tab and is cleared on a conversation switch, so an agent
+  started before one — or in a tab that has since closed — was in no live map and the turn ended on
+  top of it. The tab now unions its own view with the records'. `undefined` is read as `false`, on
+  purpose: it is unioned with the live view, so an unknown must not claim work the tab would not
+  also claim. Flipping that default to `true` fails the test that says so.
+- **The deletion count went *up* to 8 while this was written**, because the new helper's comment
+  named the class the search counts. Reworded without the identifier — third time this session, and
+  the gate caught it every time.
+- What is left of `SubagentManager`'s lifecycle authority after this: the manager is still asked
+  first, and still the only thing that knows about a subagent inside the current turn. The records
+  now cover the half it structurally cannot.
+
 ### M5 — the agent-record projection durable agents was waiting on (`this commit`)
 
 The entry below named the missing piece. This is it.

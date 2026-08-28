@@ -171,10 +171,15 @@ export class AgentCoordinator {
       throw new Error('Agent control timeout must be a positive safe integer.');
     }
     this.scheduler = options.scheduler;
-    // Evicted from the write funnel rather than from each call site, so a cached
-    // record cannot outlive the write that replaced it — see `onChanged`.
-    this.repositories.instances.onChanged(id => this.instanceRecords.delete(id));
-    this.repositories.runs.onChanged(id => this.runRecords.delete(id));
+    // Updated *by* the write rather than invalidated after it, so there is no
+    // window in which this process has to answer "I do not know yet" — see
+    // `onChanged`. A removal carries no record and drops the entry.
+    this.repositories.instances.onChanged((id, record) => {
+      applyRecordChange(this.instanceRecords, id, record);
+    });
+    this.repositories.runs.onChanged((id, record) => {
+      applyRecordChange(this.runRecords, id, record);
+    });
   }
 
   /**
@@ -186,14 +191,53 @@ export class AgentCoordinator {
    * owns, then a run record for each. During a burst — a sidecar hydration
    * retry produces one — that is the store walked once per event.
    *
-   * Process-local on purpose, and correct because the eviction is wired to the
-   * only funnel writes pass through. It is not a cross-process cache: another
-   * window writing these records would not invalidate it. Nothing does that —
-   * a vault is opened once and these records are Grimoire's own — and the
-   * alternative, re-reading everything forever, is what this replaces.
+   * Process-local on purpose, and correct because it is maintained by the only
+   * funnel writes pass through — the write brings it up to date rather than
+   * marking it unknown. It is not a cross-process cache: another window writing
+   * these records would not update it. Nothing does that — a vault is opened
+   * once and these records are Grimoire's own — and the alternative, re-reading
+   * everything forever, is what this replaces.
    */
   private readonly instanceRecords = new Map<string, AgentInstanceRecord>();
   private readonly runRecords = new Map<string, AgentRunRecord>();
+  /** Owners this process has listed at least once, so its copy of them is whole. */
+  private readonly listedOwners = new Set<string>();
+
+  /**
+   * Whether this owner has an agent still running, answered without waiting.
+   *
+   * **`undefined` means unknown, and the caller must not guess.** The one thing
+   * that asks is Claude's `Stop` hook, which decides whether a turn may end
+   * while a background subagent is going, and both guesses are wrong there:
+   * assume running and turns that should have ended block, assume idle and a
+   * turn ends on top of an agent that has just started.
+   *
+   * It is answerable at all because the records this process has read are kept
+   * current *by* each write rather than invalidated after it, so there is no
+   * window where the copy is behind the store. Unknown is honest in exactly two
+   * cases: before this owner has ever been listed, and if the run a listing
+   * cached has since been dropped.
+   */
+  runningOwnedAgents(owner: ExecutionOwner): boolean | undefined {
+    const ownerKey = stableSerialize(owner);
+    if (!this.listedOwners.has(ownerKey)) {
+      return undefined;
+    }
+    let running = false;
+    for (const instance of this.instanceRecords.values()) {
+      if (stableSerialize(instance.rootOwner) !== ownerKey) continue;
+      const latestRunId = instance.runIds.at(-1);
+      if (!latestRunId) continue;
+      const run = this.runRecords.get(latestRunId);
+      if (!run) {
+        return undefined;
+      }
+      if (!run.terminal) {
+        running = true;
+      }
+    }
+    return running;
+  }
 
   /** One instance record, from this process's copy when it has a current one. */
   private async readInstanceRecord(instanceId: string): Promise<AgentInstanceRecord | null> {
@@ -678,6 +722,9 @@ export class AgentCoordinator {
         updatedAt: run.updatedAt,
       });
     }
+    // Listed, so `runningOwnedAgents` may answer for this owner: every instance
+    // it owns is in the copy above, and every write keeps it there.
+    this.listedOwners.add(ownerKey);
     return summaries.sort((left, right) => right.startedAt - left.startedAt);
   }
 
@@ -1473,4 +1520,17 @@ function requireDistinctTransactionIds(ids: readonly string[]): void {
   if (new Set(ids).size !== ids.length) {
     throw new Error('Agent lifecycle transaction ids must be distinct.');
   }
+}
+
+/** A write's effect on a cache of records: the new one, or gone. */
+function applyRecordChange<TRecord>(
+  cache: Map<string, TRecord>,
+  recordId: string,
+  record: TRecord | undefined,
+): void {
+  if (record === undefined) {
+    cache.delete(recordId);
+    return;
+  }
+  cache.set(recordId, record);
 }

@@ -40,6 +40,33 @@ export function recordDurableSubagent(
 }
 
 /**
+ * Whether this conversation has a background agent still going, from the records.
+ *
+ * **Why the tab's own view is not enough.** The live subagent tracking is per
+ * tab and is cleared when the tab changes conversation, so a background agent
+ * started before a switch — or in a tab that has since closed — is in no live
+ * map here.
+ * Claude's `Stop` hook reads this to decide whether a turn may end, and ending
+ * one on top of running work is the failure the durable records exist to
+ * prevent.
+ *
+ * `false` when the records have nothing to say, including when they have not
+ * been read yet: the caller unions this with the live view, so an unknown here
+ * must not claim work that the tab would not also claim.
+ */
+export function durableAgentsRunning(tab: TabData, plugin: GrimoirePlugin): boolean {
+  const conversationId = tab.state.currentConversationId;
+  const runtime = plugin.getApplicationRuntimeOrNull?.();
+  if (!runtime || !conversationId) {
+    return false;
+  }
+  return runtime.agents.runningOwnedAgents({
+    kind: 'conversation',
+    ownerId: conversationId,
+  }) ?? false;
+}
+
+/**
  * Redraws the card from what the vault holds for this conversation.
  *
  * **Read every time rather than kept**, because the point is the records: an
