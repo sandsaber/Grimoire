@@ -122,10 +122,19 @@ const SEARCHES: readonly DeletionSearch[] = [
     // an `OwnedAgentSummary` without a `terminal` is running — but
     // `listOwnedAgents` is **async and reads every agent record in the vault**,
     // and the hook needs an answer synchronously at the end of every turn.
-    // Making the hook await it would put several file reads on that path, which
-    // is the cost `refreshBackgroundAgentCard` already warns about. So the
-    // transfer waits on an in-memory projection over the records — which is
-    // durable agents' own missing piece, not this row's.
+    // **Half of that is now built**: the coordinator keeps the instance and run
+    // records it has read, evicted from the write funnel, so a listing no
+    // longer walks the store. What it does not yet give is a *synchronous*
+    // answer, and the reason is worth writing down rather than rediscovering.
+    //
+    // A sync answer needs an owner-keyed index, and an index has to say
+    // something during the window between a write and the read that refreshes
+    // it. Answering "unknown" there and letting the hook fall back to its safe
+    // default blocks turns that should have ended. Answering from a stale index
+    // is worse in the other direction: an agent that has just *started* is
+    // written while the turn is still going, and a stale "none running" ends the
+    // turn on top of it. So the index has to be maintained through the write,
+    // not refreshed after it — which is the piece still missing.
     files: 7,
     closedBy: 'durable agents — it loses lifecycle authority and keeps its rendering',
   },
