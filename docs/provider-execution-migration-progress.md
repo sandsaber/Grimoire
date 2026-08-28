@@ -9748,6 +9748,32 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### The async-subagent retry ladder could never succeed, and is deleted
+
+`StreamController.tryHydrateAsyncSubagent` called two optional `ChatRuntime` members —
+`loadSubagentToolCalls` and `loadSubagentFinalResult` — that **no runtime implements**. With `?.`,
+both answered `undefined`, so it always reported `{ hasHydrated: false, finalResultHydrated: false }`,
+and `hydrateAsyncSubagentToolCalls` responded to "nothing hydrated" by scheduling a retry — through
+the whole `[200, 600, 1500]` ladder, for every completed async subagent, each attempt calling the
+same two absent members.
+
+**Five tests covered it, and all five drove a double that had the members.** That is the failure the
+recordings rule exists for, arriving from the other direction: a fake with a member no real object
+carries, and five assertions resting on it. They are deleted with the code.
+
+Nothing is lost. Claude's history service loads a subagent's tool calls while **hydrating a
+conversation**, which is where that data reaches the transcript; the deleted path was a second,
+live-turn attempt at the same recovery through a member that was never wired.
+
+The member-coverage gate recorded both as "optional; no provider declares…" with the note that they
+have *no production call site*. They had one. That is the third false absence reason this milestone
+has found — after `resetSession` and `reloadWorkspaceResources` — and the pattern is the same each
+time: a member absent from the adapter, a caller reaching it optionally, and a reason written from
+the contract rather than from a search.
+
+`ChatRuntime` is 24 members, down from 32 at the start of the seam deletion. The subagent-hooks
+search is 3 files, all of them Claude reading its own sidecar — provider-internal, not a seam.
+
 #### Typing the tab's runtime as the adapter found three silent narrowings
 
 `TabData.service` was typed as the frozen `ChatRuntime` while every one of the nine compositions

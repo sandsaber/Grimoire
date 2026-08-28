@@ -30,10 +30,10 @@ const DECLARED_ABSENCES: Readonly<Record<string, string>> = {
   // Row 18: model routing is a workspace port, and the adapter has no
   // auxiliary execution of its own until M5.
   getAuxiliaryModel: 'auxiliary model routing belongs to the workspace port at M5',
-  // Rows 31 and 32: optional, no production call site, and no provider
-  // declares the capability. Present-but-empty is the shape the contract bans.
-  loadSubagentToolCalls: 'optional; no provider declares subagent tool loading',
-  loadSubagentFinalResult: 'optional; no provider declares subagent result loading',
+  // Rows 31 and 32 were here and are **deleted from the contract**. Their
+  // recorded reason said "no production call site", and that was false:
+  // `StreamController` called both, with `?.`, so they answered nothing and its
+  // async-subagent hydration scheduled a retry ladder that could never succeed.
 };
 
 /**
@@ -149,7 +149,7 @@ describe('adapter member coverage', () => {
   it('reads a contract of the size the freeze test pins', () => {
     // Guards the guard: a reader that returned nothing would make every claim
     // below vacuous.
-    expect(contractMembers.length).toBe(26);
+    expect(contractMembers.length).toBe(24);
   });
 
   it('covers every member or declares why not', () => {

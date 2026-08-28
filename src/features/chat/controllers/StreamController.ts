@@ -116,7 +116,6 @@ export interface StreamControllerDeps {
 }
 
 export class StreamController {
-  private static readonly ASYNC_SUBAGENT_RESULT_RETRY_DELAYS_MS = [200, 600, 1500] as const;
 
   private deps: StreamControllerDeps;
   private pendingTextRenderFrame: ScheduledAnimationFrame | null = null;
@@ -140,7 +139,6 @@ export class StreamController {
   private silentTurnStatusEl: HTMLElement | null = null;
   private silentTurnStartedAt: number | null = null;
   private silentTurnTimerWindow: Window | null = null;
-  private asyncSubagentRetryTimeouts = new Set<number>();
 
   // Provider lifecycle agent tracking (spawn → wait/close lifecycle)
   private lifecycleSubagentStates = new Map<string, SubagentState>(); // spawn callId → SubagentState
@@ -1530,8 +1528,6 @@ export class StreamController {
       chunk.toolUseResult
     );
 
-    await this.hydrateAsyncSubagentToolCalls(handled);
-
     return isLinked || handled !== undefined;
   }
 
@@ -1544,8 +1540,6 @@ export class StreamController {
       chunk.status,
       chunk.result
     );
-
-    await this.hydrateAsyncSubagentToolCalls(handled);
     const lifecycleHandled = handled
       ? false
       : this.handleProviderLifecycleAsyncSubagentResult(chunk, msg);
@@ -1582,117 +1576,6 @@ export class StreamController {
     finalizeSubagentBlock(subagentState, result, chunk.status === 'error');
     this.deps.recordRuntimeToolCall?.(spawnToolCall);
     return true;
-  }
-
-  private async hydrateAsyncSubagentToolCalls(subagent: SubagentInfo | undefined): Promise<void> {
-    if (!subagent) return;
-    if (subagent.mode !== 'async') return;
-    if (!subagent.agentId) return;
-
-    const asyncStatus = subagent.asyncStatus ?? subagent.status;
-    if (asyncStatus !== 'completed' && asyncStatus !== 'error') return;
-
-    const runtime = this.deps.getAgentService?.();
-    if (!runtime) return;
-
-    const { hasHydrated, finalResultHydrated } = await this.tryHydrateAsyncSubagent(
-      subagent,
-      runtime,
-      true
-    );
-
-    if (hasHydrated) {
-      this.deps.subagentManager.refreshAsyncSubagent(subagent);
-    }
-
-    if (!finalResultHydrated) {
-      this.scheduleAsyncSubagentResultRetry(subagent, runtime, 0);
-    }
-  }
-
-  private async tryHydrateAsyncSubagent(
-    subagent: SubagentInfo,
-    runtime: ChatRuntime,
-    hydrateToolCalls: boolean
-  ): Promise<{ hasHydrated: boolean; finalResultHydrated: boolean }> {
-    let hasHydrated = false;
-    let finalResultHydrated = false;
-
-    if (hydrateToolCalls && !subagent.toolCalls?.length) {
-      const recoveredToolCalls = await runtime.loadSubagentToolCalls?.(
-        subagent.agentId || ''
-      ) ?? [];
-      if (recoveredToolCalls.length > 0) {
-        subagent.toolCalls = recoveredToolCalls.map((toolCall) => ({
-          ...toolCall,
-          input: { ...toolCall.input },
-        }));
-        hasHydrated = true;
-      }
-    }
-
-    const recoveredFinalResult = await runtime.loadSubagentFinalResult?.(
-      subagent.agentId || ''
-    ) ?? null;
-    if (recoveredFinalResult && recoveredFinalResult.trim().length > 0) {
-      finalResultHydrated = true;
-      if (recoveredFinalResult !== subagent.result) {
-        subagent.result = recoveredFinalResult;
-        hasHydrated = true;
-      }
-    }
-
-    return { hasHydrated, finalResultHydrated };
-  }
-
-  private scheduleAsyncSubagentResultRetry(
-    subagent: SubagentInfo,
-    runtime: ChatRuntime,
-    attempt: number
-  ): void {
-    if (!subagent.agentId) return;
-    if (attempt >= StreamController.ASYNC_SUBAGENT_RESULT_RETRY_DELAYS_MS.length) return;
-
-    const delay = StreamController.ASYNC_SUBAGENT_RESULT_RETRY_DELAYS_MS[attempt];
-    const streamGeneration = this.deps.state.streamGeneration;
-    const timeoutId = window.setTimeout(() => {
-      this.asyncSubagentRetryTimeouts.delete(timeoutId);
-      if (this.deps.state.streamGeneration !== streamGeneration) {
-        return;
-      }
-      void this.retryAsyncSubagentResult(subagent, runtime, attempt);
-    }, delay);
-    this.asyncSubagentRetryTimeouts.add(timeoutId);
-  }
-
-  private clearAsyncSubagentResultRetries(): void {
-    for (const timeoutId of this.asyncSubagentRetryTimeouts) {
-      window.clearTimeout(timeoutId);
-    }
-    this.asyncSubagentRetryTimeouts.clear();
-  }
-
-  private async retryAsyncSubagentResult(
-    subagent: SubagentInfo,
-    runtime: ChatRuntime,
-    attempt: number
-  ): Promise<void> {
-    if (!subagent.agentId) return;
-    const asyncStatus = subagent.asyncStatus ?? subagent.status;
-    if (asyncStatus !== 'completed' && asyncStatus !== 'error') return;
-
-    const { hasHydrated, finalResultHydrated } = await this.tryHydrateAsyncSubagent(
-      subagent,
-      runtime,
-      false
-    );
-    if (hasHydrated) {
-      this.deps.subagentManager.refreshAsyncSubagent(subagent);
-    }
-
-    if (!finalResultHydrated) {
-      this.scheduleAsyncSubagentResultRetry(subagent, runtime, attempt + 1);
-    }
   }
 
   /** Callback from SubagentManager when async state changes. Updates messages only (DOM handled by manager). */
@@ -2118,7 +2001,6 @@ export class StreamController {
     this.cancelPendingThinkingRender();
     this.cancelPendingToolOutputRenders();
     this.cancelPendingScroll();
-    this.clearAsyncSubagentResultRetries();
     this.hideThinkingIndicator();
     this.stopTurnSilenceIndicator();
     for (const progress of this.progressBlocks.values()) {

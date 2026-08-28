@@ -79,11 +79,13 @@ const SEARCHES: readonly DeletionSearch[] = [
   {
     what: 'subagent hooks and loaders',
     pattern: /setSubagentHookProvider|loadSubagent(ToolCalls|FinalResult)/,
-    // **5.** `setSubagentHookProvider` left with the other five interaction
-    // setters; what remains is the two subagent loaders, which are durable
-    // agents' to take.
-    files: 5,
-    closedBy: 'durable agents',
+    // **3, and all three are Claude's own history.** `setSubagentHookProvider`
+    // left with the other five interaction setters, and the two loaders left
+    // the contract with the retry ladder that was their only caller. What the
+    // pattern still finds is the live recovery path — `ClaudeHistoryStore` and
+    // its sidecar reader — which is provider-internal rather than a seam.
+    files: 3,
+    closedBy: 'durable agents — what is left is Claude reading its own sidecar',
   },
   {
     what: 'SubagentManager lifecycle',
@@ -168,7 +170,7 @@ describe('structural deletion progress', () => {
     expect(remaining.map(search => `${search.what}: ${search.files}`)).toEqual([
       'worker tab ownership: 3',
       'core importing the plugin type: 2',
-      'subagent hooks and loaders: 5',
+      'subagent hooks and loaders: 3',
       'SubagentManager lifecycle: 20',
       'the application importing a concrete provider module: 20',
       'turn metadata and session updates: 24',

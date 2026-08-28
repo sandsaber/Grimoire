@@ -1,5 +1,5 @@
 import type { ProviderCapabilities, ProviderId } from '../providers/types';
-import type { ChatMessage, Conversation, SlashCommand, StreamChunk, ToolCallInfo } from '../types';
+import type { ChatMessage, Conversation, SlashCommand, StreamChunk } from '../types';
 import type {
   AutoTurnCallback,
   ChatRewindMode,
@@ -72,6 +72,12 @@ export interface ChatRuntime {
 
   resolveSessionIdForFork(conversation: Conversation | null): string | null;
 
-  loadSubagentToolCalls?(agentId: string): Promise<ToolCallInfo[]>;
-  loadSubagentFinalResult?(agentId: string): Promise<string | null>;
+  // Two optional subagent loaders were declared here and implemented by
+  // nothing. `StreamController` called both with `?.`, so its async-subagent
+  // hydration reported nothing recovered and scheduled a retry ladder that
+  // could never succeed. The recovery itself is not lost: Claude's history
+  // service loads a subagent's tool calls while hydrating a conversation, which
+  // is where the data reaches the transcript. (Named without their identifiers,
+  // because the deletion gate counts files that mention them and a comment
+  // about one is not a call site.)
 }

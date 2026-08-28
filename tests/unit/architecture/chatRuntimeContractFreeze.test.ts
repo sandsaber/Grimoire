@@ -50,8 +50,6 @@ const FROZEN_MEMBERS = [
   'consumeTurnMetadata',
   'buildSessionUpdates',
   'resolveSessionIdForFork',
-  'loadSubagentToolCalls',
-  'loadSubagentFinalResult',
 ];
 
 describe('ChatRuntime contract freeze', () => {
@@ -66,12 +64,13 @@ describe('ChatRuntime contract freeze', () => {
     expect([...declared].sort()).toEqual([...FROZEN_MEMBERS].sort());
   });
 
-  it('declares 26 members', () => {
-    // **32 until the seam deletion took six.** The count is asserted separately
+  it('declares 24 members', () => {
+    // **32 until the seam deletion. Six interaction setters went first, then
+    // the two subagent loaders that nothing implemented.** The count is asserted separately
     // from the set so a deletion has to be stated twice rather than sliding
     // through as a list edit — the freeze forbids growth, and a shrink is a
     // milestone step that should be visible in the diff.
-    expect(declared).toHaveLength(26);
+    expect(declared).toHaveLength(24);
   });
 
   it('maps every member in the adapter specification', () => {
