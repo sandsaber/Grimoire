@@ -33,7 +33,7 @@ OpenCode and MiMoCode intentionally mirror each other closely; when changing lau
 - Keep `src/core/` provider-neutral. Shared chat/runtime/settings contracts belong there only when at least two providers need the behavior.
 - Keep provider-specific protocol, storage, CLI resolution, history parsing, model discovery, settings UI, and launch artifacts inside `src/providers/<provider>/`.
 - Declare every built-in provider once, in `src/providers/BuiltInProviderCatalog.ts`. The catalog owns provider identity, display name, ordering, and the inventory itself; it validates the modules at construction and refuses a duplicate id, order, or execution backend.
-- Register provider runtime and auxiliary services through `ProviderRegistry`, and provider workspace services through `ProviderWorkspaceRegistry`. Both hold only the contributions that have not moved to the catalog yet, and both are deleted when the last one moves.
+- Register provider workspace services through `ProviderWorkspaceRegistry`, which holds only the contributions that have not moved to the catalog yet and is deleted when the last one moves. The chat registry it was paired with is **already deleted**: a provider's runtime comes from `ApplicationRuntime.createRuntimeFor(providerId)`, and everything else it held is a `ProviderModule` declaration reached through `ProviderCatalog`.
 - Feature code must consume provider-neutral contracts. Do not read provider-specific `Conversation.providerState` fields directly from `src/features/`.
 - Preserve provider-native behavior first. Prefer adapting official CLI/runtime semantics over reimplementing provider features inside Grimoire.
 - Use `.grimoire/` for Grimoire-owned vault data. Do not add legacy storage migration behavior unless a migration milestone explicitly asks for it.
@@ -147,7 +147,7 @@ The `_grimoire` MCP metadata key and `grimoire-*` internal OpenCode IDs are impl
 - When work is tied to an issue or ticket, include its identifier in the branch name or commit message. Prefer the commit message when committing directly to an existing branch.
 - Local test Obsidian vault: set `OBSIDIAN_VAULT` in `.env.local` (gitignored) to your vault path so `npm run build` / `npm run build:release` copy artifacts there automatically. When copying a local build for manual testing, install Grimoire into `<vault>/.obsidian/plugins/grimoire`.
 - For provider integrations, inspect real runtime output before normalizing event shapes. Real transcripts and wire traces beat guessed schemas.
-- For future provider work and implementation sequencing, read `docs/provider-execution-migration-plan.md` first — it is the canonical execution architecture and defines when the old runtime path is frozen — then `docs/provider-roadmap.md` for the current integration path. Check `docs/provider-execution-migration-progress.md` for the active milestone before adding new provider directories or extending `ChatRuntime`.
+- For future provider work and implementation sequencing, read `docs/provider-execution-migration-plan.md` first — it is the canonical execution architecture and defines when the old runtime path is frozen — then `docs/provider-roadmap.md` for the current integration path. Check `docs/provider-execution-migration-progress.md` for the active milestone before adding new provider directories. The `ChatRuntime` seam is deleted; a provider's presentation contract is `ExecutionChatRuntimeAdapter`.
 
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands

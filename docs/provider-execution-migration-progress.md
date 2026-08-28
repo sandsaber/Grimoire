@@ -10445,6 +10445,37 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the review pass: the instructions still described the deleted architecture (`this commit`)
+
+The second 25-step review. It found nothing wrong with the code and one thing badly wrong beside it.
+
+- Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean;
+  `npm run build:release` clean. No stale path references survive the composition relocation, and
+  no source file names `CreateChatRuntimeOptions`, `ProviderRegistration`, `claimMessageStart` or
+  `boundSessionId`.
+- **Eleven agent instructions described classes this milestone deleted.** These are the files the
+  next session reads *before* it reads any code, so a stale one is worse than a stale comment:
+  - the root `AGENTS.md` told an agent to "register provider runtime and auxiliary services through
+    `ProviderRegistry`" — deleted — and to check the progress file "before adding new provider
+    directories or extending `ChatRuntime`" — also deleted;
+  - `src/core/AGENTS.md` listed `ChatRuntime` as a contract `runtime/` defines, named
+    `ProviderRegistry` as the owner of runtime and auxiliary factories, and required
+    `ChatRuntime.cleanup()` on tab disposal;
+  - `src/features/chat/AGENTS.md` required provider-owned services to be resolved through a class
+    that no longer exists;
+  - `src/providers/AGENTS.md` told an agent to add or update a provider's `registration.ts`, one of
+    nine files deleted this milestone, and to register runtimes through "the provider registry
+    modules";
+  - Claude's said the provider sits "behind Grimoire's `ChatRuntime` boundary"; Gemini's and Qwen's
+    said `registration.ts` points `createRuntime` at their executions.
+- All eleven now say what is true, and each names what replaced the thing it used to name —
+  `ProviderModule` and the catalog for declarations, `ApplicationRuntime.createRuntimeFor` for a
+  runtime, `ExecutionChatRuntimeAdapter` for the presentation contract, and
+  `ProviderWorkspaceRegistry` for the rows that genuinely have not moved.
+- Worth stating as a habit rather than a fix: **deleting a class means grepping the instructions for
+  its name**, not only the source. The deletion gate counts `.ts` files, so none of this was visible
+  to it.
+
 ### M5 — one registry file leaves, and one turns out to be holding a cycle open (`this commit`)
 
 - Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean.

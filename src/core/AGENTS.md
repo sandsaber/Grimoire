@@ -4,7 +4,7 @@
 
 ## Boundaries
 
-- `runtime/` defines neutral chat runtime contracts such as `ChatRuntime`, prepared turns, query options, approvals, and session updates.
+- `runtime/` defines neutral chat runtime contracts — prepared turns, query options, approvals, session updates — and `runtime/execution/` the presentation adapter over the kernel. The `ChatRuntime` interface itself is deleted.
 - `providers/` defines registries, capabilities, model routing, environment, settings projection, and workspace-service contracts.
 - `bootstrap/` owns provider-neutral session metadata storage and shared app-storage contracts.
 - `debug/` owns sanitized file logging. Debug logs must be opt-in and must not include prompts, answers, note content, paths, environment values, or secrets.
@@ -24,7 +24,6 @@
 
 ## Gotchas
 
-- `ProviderRegistry` owns runtime and auxiliary-service factories.
 - `ProviderWorkspaceRegistry` owns workspace services such as command catalogs, agent mentions, MCP managers, CLI resolvers, usage providers, and settings tabs.
-- `ChatRuntime.cleanup()` must run when a tab is disposed.
+- A tab's `ExecutionChatRuntimeAdapter` must be cleaned up when the tab is disposed.
 - Plan mode is capability-driven. Claude and Codex surface it through different provider-native mechanisms, so shared code should not hard-code provider event names.
