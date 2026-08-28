@@ -88,11 +88,6 @@ export class ProviderWorkspaceRegistry {
     return services;
   }
 
-  static async refreshAgentMentions(providerId: ProviderId): Promise<void> {
-    await this.getServices(providerId)?.refreshAgentMentions?.();
-  }
-
-
   static getRuntimeCommandLoader(providerId: ProviderId): ProviderRuntimeCommandLoader | null {
     return this.getServices(providerId)?.runtimeCommandLoader ?? null;
   }

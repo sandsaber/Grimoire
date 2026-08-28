@@ -10402,6 +10402,44 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the agent-mention row, and why the other three are not mechanical (`this commit`)
+
+- Gates: unit 8732 passed, 8732 total; `tsc --noEmit` clean; `npm run lint` clean.
+- **Row moved: agent mentions.** `GrimoireSettings` asked
+  `ProviderWorkspaceRegistry.refreshAgentMentions(providerId)` when a stored agent was deleted; it
+  asks the built workspace's `agentMentions.refresh()` now. `builtWorkspaceFor` rather than
+  `workspaceFor` **on purpose**: the async one *builds* the workspace if none exists, and the
+  registry accessor was `getServices(id)?.refreshAgentMentions?.()` — a no-op when nothing was up.
+  A mention refresh is not a reason to stand a provider's workspace up, and the first version of
+  this change quietly made it one. The registry static is deleted.
+- **A guarantee moved rather than being dropped.** The registry's own test asserted a refresh for
+  one provider does not reach another. Its subject is gone, so the assertion is folded into the
+  consumer test that already says *"keeps providers independent"* in its name — each provider's
+  refresh is now asserted called exactly once, through the path that carries it. Proved by removing
+  the refresh from the call site: that test fails.
+- **The other three accessors are blocked, each for a different verified reason.** Recorded rather
+  than forced:
+  - `getRuntimeCommandLoader` (four consumers). The slot is
+    `ProviderRuntimeCommandsPort.listForSession(sessionId)`; the loader is
+    `isAvailable(settings)` plus `loadCommands(context)` over a context carrying the **plugin and the
+    tab's runtime**. They are not the same question: `listForSession` asks what an open session
+    announced, while the loader decides *whether to open a session at all* — reading the
+    conversation's session id, its message count and the warm-up mode, because a conversation with
+    history and no session must stay cold or the session opened to list commands is the one the next
+    turn resumes. Moving it means either the slot's context grows a plugin, which the architecture
+    rule forbids, or that session-opening policy leaves the provider for the tab manager. Owner: an
+    architecture decision, not a row;
+  - `getMcpServerManager` (one consumer, three widgets). `MentionDropdownController` takes
+    `McpMentionProvider` — `getContextSavingServers()` — and calls it **later**, whenever the mention
+    dropdown opens, so it holds the manager by identity and a snapshot will not do.
+    `ProviderMcpPort` is `load`/`save`, both async. Owner: whoever decides whether the port grows a
+    synchronous snapshot or the widget takes an async provider;
+  - `getSettingsTabRenderer` (two consumers). `settingsPresentation` is declared and filled by eight
+    modules, and every one of them resolves to `notWired`. The real renderer also takes a second
+    argument — the settings renderer context — that the slot deliberately cannot carry, because a
+    contract that learns DOM vocabulary is a plan stop condition. Owner: the settings tab rework the
+    slot's own comment names.
+
 ### M5 — `ProviderRegistry` is deleted (`this commit`)
 
 - Gates: unit 8733 passed, 8733 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;

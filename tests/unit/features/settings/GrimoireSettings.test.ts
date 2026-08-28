@@ -594,6 +594,17 @@ describe('GrimoireSettingTab settings hub', () => {
       } as any;
     });
 
+    // The mention refresh a delete triggers is routed per provider through the
+    // built workspace, which is where the deleted registry accessor's own
+    // routing test moved: this one already says "keeps providers independent",
+    // so it asserts it of the path that carries it now.
+    const refreshes = Object.fromEntries(providerIds.map(providerId => [providerId, jest.fn()]));
+    (tab as any).plugin.getApplicationRuntimeOrNull = () => ({
+      builtWorkspaceFor: (providerId: string) => (
+        refreshes[providerId] ? { agentMentions: { refresh: refreshes[providerId] } } : null
+      ),
+    });
+
     const rows = await (tab as any).loadWorkspaceHubRows([...providerIds], 'agents');
 
     expect(rows).toHaveLength(3);
@@ -608,6 +619,8 @@ describe('GrimoireSettingTab settings hub', () => {
         description: `${providerId} hidden reviewer`,
         name: 'review',
       }));
+      // Once, and only for the provider whose agent was deleted.
+      expect(refreshes[providerId]).toHaveBeenCalledTimes(1);
     }
   });
 

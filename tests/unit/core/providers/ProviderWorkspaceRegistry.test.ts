@@ -7,23 +7,6 @@ describe('ProviderWorkspaceRegistry', () => {
     ProviderWorkspaceRegistry.clear();
   });
 
-  it('refreshes agent mention state through the workspace registry', async () => {
-    const refreshClaude = jest.fn().mockResolvedValue(undefined);
-    const refreshCodex = jest.fn().mockResolvedValue(undefined);
-
-    ProviderWorkspaceRegistry.setServices('claude', {
-      refreshAgentMentions: refreshClaude,
-    });
-    ProviderWorkspaceRegistry.setServices('codex', {
-      refreshAgentMentions: refreshCodex,
-    });
-
-    await ProviderWorkspaceRegistry.refreshAgentMentions('codex');
-
-    expect(refreshClaude).not.toHaveBeenCalled();
-    expect(refreshCodex).toHaveBeenCalled();
-  });
-
   it('returns the runtime command loader for a provider', () => {
     const runtimeCommandLoader = {
       isAvailable: jest.fn().mockReturnValue(true),
