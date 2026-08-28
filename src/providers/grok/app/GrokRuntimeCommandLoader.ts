@@ -1,78 +1,18 @@
-import type {
-  ProviderRuntimeCommandLoader,
-  ProviderRuntimeCommandLoaderContext,
-} from '../../../core/providers/types';
-import type { SlashCommand } from '../../../core/types';
+import { AcpRuntimeCommandLoader } from '../../acp/commands/AcpRuntimeCommandLoader';
 import { getGrokProviderSettings } from '../settings';
 
-export class GrokRuntimeCommandLoader implements ProviderRuntimeCommandLoader {
-  isAvailable(settings: Record<string, unknown>): boolean {
-    return getGrokProviderSettings(settings).enabled;
-  }
-
-  /**
-   * The commands the tab can offer, from the session it is on or from one
-   * opened to ask.
-   *
-   * A live tab runtime answers from the session it already holds — Grok
-   * announces them when that session opens. Anything else is a question with no
-   * session behind it, and it is asked in an isolated process rather than on the
-   * tab's own: a conversation with history and no session id must stay cold
-   * until its first send, or the session created to list commands is the one
-   * that turn resumes, and the history is never bootstrapped into it.
-   */
-  async loadCommands(context: ProviderRuntimeCommandLoaderContext): Promise<SlashCommand[]> {
-    const shouldWarmBlankSession = context.allowSessionCreation === true
-      && !context.conversation?.sessionId;
-    const shouldWarmPreSessionConversation = !!context.conversation
-      && !context.conversation.sessionId
-      && context.conversation.messages.length > 0;
-
-    if (
-      !context.runtime
-      && !context.conversation?.sessionId
-      && !shouldWarmBlankSession
-      && !shouldWarmPreSessionConversation
-    ) {
-      return [];
-    }
-
-    // A live tab answers from the session it already holds — and only then. A
-    // blank tab has a runtime and no session, and asking it returns nothing at
-    // all, which is how a fresh tab ends up with an empty slash-command menu
-    // until the first message is sent.
-    const boundRuntime = context.runtime?.providerId === 'grok'
-      && !shouldWarmPreSessionConversation
-      && Boolean(context.runtime.getSessionId?.())
-      ? context.runtime
-      : null;
-    if (boundRuntime) {
-      return await boundRuntime.getSupportedCommands();
-    }
-
-    // Opportunistic, like every other question asked without a conversation: a
-    // plugin whose kernel has not started yet has no session to ask in, and a
-    // tab that cannot list commands must still open.
-    const announced = await this.announcedCommands(context);
-    return announced.map(command => ({
-      // The id the ACP normalizer mints for the same command, so a command
-      // listed here and one announced to a live tab are the same command.
-      id: `acp:${command.name}`,
-      name: command.name,
-      // The provider owns the expansion; an empty template is the honest value.
-      content: '',
-      source: 'sdk' as const,
-      ...(command.description === undefined ? {} : { description: command.description }),
-    }));
-  }
-
-  private async announcedCommands(
-    context: ProviderRuntimeCommandLoaderContext,
-  ): Promise<readonly { readonly name: string; readonly description?: string }[]> {
-    try {
-      return await context.plugin.getGrokExecution().metadata.listCommands();
-    } catch {
-      return [];
-    }
-  }
-}
+/**
+ * Grok's slash-command listing, which is the shared ACP one.
+ *
+ * Four providers had four byte-similar copies of the rule about when it is safe
+ * to open a session to ask. What is grok's own is named here: its settings
+ * flag, its metadata session, and the id it mints — see the shared file for why
+ * that last one still differs between the four.
+ */
+export const grokRuntimeCommandLoader = new AcpRuntimeCommandLoader({
+  providerId: 'grok',
+  isEnabled: settings => getGrokProviderSettings(settings).enabled,
+  listAnnounced: context => context.plugin.getGrokExecution().metadata.listCommands(),
+  commandId: name => `acp:${name}`,
+  source: 'sdk',
+});

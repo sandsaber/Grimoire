@@ -10445,6 +10445,32 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — four copies of the session-opening rule become one (`this commit`)
+
+- Gates: unit 8742 passed, 8742 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- `getRuntimeCommandLoader` is one of the three registry accessors still blocked, because the loader
+  carries *session-opening policy* — whether it is safe to open a session just to list commands —
+  and that needs a plugin and the tab's runtime. Before moving that rule, it turned out there were
+  **four copies of it**.
+- **OpenCode's, MiMoCode's and Kimi Code's loaders were byte-identical** once their own names were
+  normalized away, 75 lines each. Grok's differed in a comment, the command id, and one field. They
+  are now one `AcpRuntimeCommandLoader` in `src/providers/acp/commands/`, parameterized by the four
+  things that are genuinely a provider's own: its settings flag, its metadata session, the id it
+  mints, and the source it tags. 303 lines become 187, and the delicate part — the rule that a
+  conversation with history and no session must stay cold, or the session opened to list commands is
+  the one the next turn resumes — exists once.
+- **The two differences were checked, not assumed, and are preserved rather than settled.** Grok
+  mints `acp:<name>` to match what the normalizer mints for a live session; the other three mint
+  `<provider>:<name>`. Neither is a defect: the catalog dedupes runtime commands **by name**, so the
+  two paths cannot produce a pair. The `source: 'sdk'` Grok sets is what the catalog reads an absent
+  one as. Unifying either is a behaviour change no test would notice, which is the wrong kind to
+  make while consolidating.
+- Proved shared by breaking it: deleting one clause of the session-opening rule fails
+  *"asks an isolated session for a blank tab warmup"* for **all four** providers at once.
+- The row is still blocked on the same thing, but there is now one implementation to move rather
+  than four to keep in step.
+
 ### M5 — the application layer stops importing a provider entirely (`this commit`)
 
 - Gates: unit 8742 passed, 8742 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;

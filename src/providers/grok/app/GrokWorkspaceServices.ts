@@ -24,7 +24,7 @@ import { getGrokProviderSettings } from '../settings';
 import { GrokAgentStorage } from '../storage/GrokAgentStorage';
 import { grokSettingsTabRenderer } from '../ui/GrokSettingsTab';
 import { grokPlanUsageStore } from './GrokPlanUsageStore';
-import { GrokRuntimeCommandLoader } from './GrokRuntimeCommandLoader';
+import { grokRuntimeCommandLoader } from './GrokRuntimeCommandLoader';
 
 export interface GrokWorkspaceServices extends ProviderWorkspaceServices {
   agentStorage: GrokAgentStorage;
@@ -143,7 +143,7 @@ export async function createGrokWorkspaceServices(
     mcpStorage,
     mcpServerManager,
     usageProvider: grokPlanUsageStore,
-    runtimeCommandLoader: new GrokRuntimeCommandLoader(),
+    runtimeCommandLoader: grokRuntimeCommandLoader,
     settingsTabRenderer: grokSettingsTabRenderer,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();

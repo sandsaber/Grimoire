@@ -1,4 +1,4 @@
-import { GrokRuntimeCommandLoader } from '@/providers/grok/app/GrokRuntimeCommandLoader';
+import { grokRuntimeCommandLoader } from '@/providers/grok/app/GrokRuntimeCommandLoader';
 
 const ANNOUNCED = [{ name: 'review', description: 'Review the diff' }];
 
@@ -42,7 +42,7 @@ describe('GrokRuntimeCommandLoader', () => {
 
   it('asks an isolated session for a blank tab warmup', async () => {
     const { plugin, listCommands } = createMockPlugin();
-    const loader = new GrokRuntimeCommandLoader();
+    const loader = grokRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       allowSessionCreation: true,
@@ -57,7 +57,7 @@ describe('GrokRuntimeCommandLoader', () => {
 
   it('keeps blank tabs cold unless warmup is explicitly requested', async () => {
     const { plugin, listCommands } = createMockPlugin();
-    const loader = new GrokRuntimeCommandLoader();
+    const loader = grokRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       conversation: null,
@@ -75,7 +75,7 @@ describe('GrokRuntimeCommandLoader', () => {
       providerId: 'grok',
       getSupportedCommands: jest.fn(),
     };
-    const loader = new GrokRuntimeCommandLoader();
+    const loader = grokRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       conversation: {
@@ -100,7 +100,7 @@ describe('GrokRuntimeCommandLoader', () => {
     plugin.getGrokExecution = () => {
       throw new Error('Grok execution is not available before plugin load.');
     };
-    const loader = new GrokRuntimeCommandLoader();
+    const loader = grokRuntimeCommandLoader;
 
     // A tab that cannot list its commands still has to open.
     await expect(loader.loadCommands({
@@ -120,7 +120,7 @@ describe('GrokRuntimeCommandLoader', () => {
       getSessionId: () => null,
       getSupportedCommands: jest.fn().mockResolvedValue([]),
     };
-    const loader = new GrokRuntimeCommandLoader();
+    const loader = grokRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       allowSessionCreation: true,
@@ -144,7 +144,7 @@ describe('GrokRuntimeCommandLoader', () => {
       getSessionId: () => 'grok-session',
       getSupportedCommands: jest.fn().mockResolvedValue(bound),
     };
-    const loader = new GrokRuntimeCommandLoader();
+    const loader = grokRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       conversation: {

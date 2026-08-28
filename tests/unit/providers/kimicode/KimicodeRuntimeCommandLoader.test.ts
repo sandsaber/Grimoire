@@ -1,4 +1,4 @@
-import { KimicodeRuntimeCommandLoader } from '@/providers/kimicode/app/KimicodeRuntimeCommandLoader';
+import { kimicodeRuntimeCommandLoader } from '@/providers/kimicode/app/KimicodeRuntimeCommandLoader';
 
 const ANNOUNCED = [{ name: 'review', description: 'Review the diff' }];
 
@@ -34,7 +34,7 @@ describe('KimicodeRuntimeCommandLoader', () => {
 
   it('asks an isolated session for a blank tab warmup', async () => {
     const { plugin, listCommands } = createMockPlugin();
-    const loader = new KimicodeRuntimeCommandLoader();
+    const loader = kimicodeRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       allowSessionCreation: true,
@@ -51,7 +51,7 @@ describe('KimicodeRuntimeCommandLoader', () => {
 
   it('keeps blank tabs cold unless warmup is explicitly requested', async () => {
     const { plugin, listCommands } = createMockPlugin();
-    const loader = new KimicodeRuntimeCommandLoader();
+    const loader = kimicodeRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       conversation: null,
@@ -69,7 +69,7 @@ describe('KimicodeRuntimeCommandLoader', () => {
       providerId: 'kimicode',
       getSupportedCommands: jest.fn(),
     };
-    const loader = new KimicodeRuntimeCommandLoader();
+    const loader = kimicodeRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       conversation: {
@@ -96,7 +96,7 @@ describe('KimicodeRuntimeCommandLoader', () => {
     plugin.getKimicodeExecution = () => {
       throw new Error('Kimi Code execution is not available before plugin load.');
     };
-    const loader = new KimicodeRuntimeCommandLoader();
+    const loader = kimicodeRuntimeCommandLoader;
 
     // A tab that cannot list its commands still has to open.
     await expect(loader.loadCommands({
@@ -116,7 +116,7 @@ describe('KimicodeRuntimeCommandLoader', () => {
       getSessionId: () => null,
       getSupportedCommands: jest.fn().mockResolvedValue([]),
     };
-    const loader = new KimicodeRuntimeCommandLoader();
+    const loader = kimicodeRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       allowSessionCreation: true,
@@ -142,7 +142,7 @@ describe('KimicodeRuntimeCommandLoader', () => {
       getSessionId: () => 'acp-session-1',
       getSupportedCommands: jest.fn().mockResolvedValue(bound),
     };
-    const loader = new KimicodeRuntimeCommandLoader();
+    const loader = kimicodeRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       conversation: {

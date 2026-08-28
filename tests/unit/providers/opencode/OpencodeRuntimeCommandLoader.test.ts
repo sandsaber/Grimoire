@@ -1,4 +1,4 @@
-import { OpencodeRuntimeCommandLoader } from '@/providers/opencode/app/OpencodeRuntimeCommandLoader';
+import { opencodeRuntimeCommandLoader } from '@/providers/opencode/app/OpencodeRuntimeCommandLoader';
 
 const ANNOUNCED = [{ name: 'review', description: 'Review the diff' }];
 
@@ -34,7 +34,7 @@ describe('OpencodeRuntimeCommandLoader', () => {
 
   it('asks an isolated session for a blank tab warmup', async () => {
     const { plugin, listCommands } = createMockPlugin();
-    const loader = new OpencodeRuntimeCommandLoader();
+    const loader = opencodeRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       allowSessionCreation: true,
@@ -51,7 +51,7 @@ describe('OpencodeRuntimeCommandLoader', () => {
 
   it('keeps blank tabs cold unless warmup is explicitly requested', async () => {
     const { plugin, listCommands } = createMockPlugin();
-    const loader = new OpencodeRuntimeCommandLoader();
+    const loader = opencodeRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       conversation: null,
@@ -69,7 +69,7 @@ describe('OpencodeRuntimeCommandLoader', () => {
       providerId: 'opencode',
       getSupportedCommands: jest.fn(),
     };
-    const loader = new OpencodeRuntimeCommandLoader();
+    const loader = opencodeRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       conversation: {
@@ -96,7 +96,7 @@ describe('OpencodeRuntimeCommandLoader', () => {
     plugin.getOpencodeExecution = () => {
       throw new Error('OpenCode execution is not available before plugin load.');
     };
-    const loader = new OpencodeRuntimeCommandLoader();
+    const loader = opencodeRuntimeCommandLoader;
 
     // A tab that cannot list its commands still has to open.
     await expect(loader.loadCommands({
@@ -116,7 +116,7 @@ describe('OpencodeRuntimeCommandLoader', () => {
       getSessionId: () => null,
       getSupportedCommands: jest.fn().mockResolvedValue([]),
     };
-    const loader = new OpencodeRuntimeCommandLoader();
+    const loader = opencodeRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       allowSessionCreation: true,
@@ -142,7 +142,7 @@ describe('OpencodeRuntimeCommandLoader', () => {
       getSessionId: () => 'acp-session-1',
       getSupportedCommands: jest.fn().mockResolvedValue(bound),
     };
-    const loader = new OpencodeRuntimeCommandLoader();
+    const loader = opencodeRuntimeCommandLoader;
 
     await expect(loader.loadCommands({
       conversation: {
