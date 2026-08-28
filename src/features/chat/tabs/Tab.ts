@@ -919,7 +919,7 @@ function initializeInputToolbar(
   );
   tab.ui.runtimeContextActivity = new RuntimeContextActivityView(dom.contextRuntimeEl);
 
-  tab.ui.mcpServerSelector.setMcpManager(getProviderMcpManager(getTabProviderId(tab, plugin)));
+  tab.ui.mcpServerSelector.setMcpManager(getProviderMcpManager(getTabProviderId(tab, plugin), plugin));
 
   // Sync @-mentions to UI selector
   tab.ui.fileContextManager?.setOnMcpMentionChange((servers) => {

@@ -3,7 +3,6 @@ import * as os from 'os';
 import * as path from 'path';
 
 import type { ProjectWorkspace } from '../../../core/context/types';
-import type { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type {
   ProviderChatUiContribution,
   ProviderModelOption,
@@ -26,6 +25,7 @@ import { t } from '../../../i18n/i18n';
 import { appendCheckIcon, appendMcpIcon, createProviderIconSvg } from '../../../shared/icons';
 import { filterValidPaths, findConflictingPath, isDuplicatePath, isValidContextPath, validateContextPath } from '../../../utils/externalContext';
 import { expandHomePath, normalizePathForFilesystem } from '../../../utils/path';
+import type { ProviderMcpServerView } from '../tabs/tabSettings';
 import { localizeReasoningLevel } from '../utils/reasoningDisplay';
 
 interface ElectronOpenDialogResult {
@@ -1865,7 +1865,7 @@ export class McpServerSelector {
   private iconEl: HTMLElement | null = null;
   private badgeEl: HTMLElement | null = null;
   private dropdownEl: HTMLElement | null = null;
-  private mcpManager: McpServerManager | null = null;
+  private mcpManager: ProviderMcpServerView | null = null;
   private enabledServers: Set<string> = new Set();
   private onChangeCallback: ((enabled: Set<string>) => void) | null = null;
   private visible = true;
@@ -1884,7 +1884,7 @@ export class McpServerSelector {
     }
   }
 
-  setMcpManager(manager: McpServerManager | null): void {
+  setMcpManager(manager: ProviderMcpServerView | null): void {
     this.mcpManager = manager;
     if (!manager && this.enabledServers.size > 0) {
       this.enabledServers.clear();

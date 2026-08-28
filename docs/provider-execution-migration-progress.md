@@ -10450,6 +10450,28 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the last registry accessor goes; what is left is storage (`this commit`)
+
+- Gates: unit 8752 passed, 8752 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **`getMcpServerManager` is deleted. All four of `ProviderWorkspaceRegistry`'s accessors are gone**,
+  and what remains is holding: `register`, `setServices`, `getServices`, `requireServices` and
+  `contributionFor`. The registries fall **15 → 14**.
+- The recorded blocker was that three chat surfaces hold the manager by identity and call it later —
+  which is true, and is why neither the manager nor a snapshot would do. `ProviderMcpPort` grew two
+  **synchronous** members over what the workspace holds *now*, and `tabSettings` hands the widgets a
+  view that resolves the provider's workspace on each call. Caching that resolution instead fails
+  three blank-tab tests, because a workspace built after the tab was is the one that has to answer.
+- **The question this row was recorded as turning on answered itself.** `setMcpManager(null)` clears
+  the composer's enabled-server set, and a view that always exists never says null — so what
+  replaces the signal? Nothing: the selector already prunes every enabled server no longer listed,
+  and for an empty list that is all of them. Same end state, same callback, by the path already
+  there. Worth keeping as a shape: a blocker phrased as "what replaces X" is sometimes answered by
+  reading what X's neighbour already does.
+- Two wiring tests asserted the widget had been handed `plugin.mcpManager` — the object. They assert
+  the property that replaced it: the view reads the workspace when asked, and sees a server added
+  after it was handed over.
+
 ### M5 — the settings tab draws its provider a tick later, and the third accessor goes (`this commit`)
 
 - Gates: unit 8752 passed, 8752 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;

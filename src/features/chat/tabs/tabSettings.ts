@@ -1,3 +1,4 @@
+import type { ManagedMcpServer } from '../../../core/types/mcp';
 export { isRecord } from '../../../utils/records';
 import { getHiddenProviderCommandSet } from '../../../core/providers/commands/hiddenCommands';
 import type { ProviderCommandDropdownConfig } from '../../../core/providers/commands/ProviderCommandCatalog';
@@ -6,7 +7,6 @@ import { resolveSettingsProviderId } from '../../../core/providers/modelRouting'
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderChatUiContribution } from '../../../core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderCapabilities,
   ProviderId,
@@ -416,6 +416,35 @@ export function getRegistryProviderCatalogInfo(
   };
 }
 
-export function getProviderMcpManager(providerId: ProviderId) {
-  return ProviderWorkspaceRegistry.getMcpServerManager(providerId);
+/**
+ * A live view of a provider's MCP servers, for the widgets that read them late.
+ *
+ * **Not the manager, and not a snapshot.** The composer's server selector and
+ * the mention dropdown are handed this once, when the tab is built, and ask it
+ * whenever they draw — so a snapshot is stale and the manager itself is a
+ * provider service the feature layer should not be holding. Each call resolves
+ * the provider's workspace, which is how a workspace built after the tab was,
+ * or rebuilt behind it, is the one that answers.
+ *
+ * Empty where the provider has no Grimoire-owned MCP, or has no workspace yet.
+ * That is the same answer the widgets used to get from a `null` manager: the
+ * selector prunes every enabled server that is no longer listed, which for an
+ * empty list is all of them.
+ */
+export function getProviderMcpManager(
+  providerId: ProviderId,
+  plugin: GrimoirePlugin,
+): ProviderMcpServerView {
+  const port = () => plugin.getApplicationRuntimeOrNull?.()
+    ?.builtWorkspaceFor(providerId)?.mcp;
+  return {
+    getServers: () => port()?.servers?.() ?? [],
+    getContextSavingServers: () => port()?.contextSavingServers?.() ?? [],
+  };
+}
+
+/** What the composer and the mention dropdown need of a provider's MCP servers. */
+export interface ProviderMcpServerView {
+  getServers(): readonly ManagedMcpServer[];
+  getContextSavingServers(): readonly ManagedMcpServer[];
 }

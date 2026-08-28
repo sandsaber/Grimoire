@@ -249,27 +249,26 @@ const SEARCHES: readonly DeletionSearch[] = [
     // is `undefined` and every suite importing Claude fails to load. The
     // registry's indirection is breaking that cycle, which is a reason to keep
     // it that no reading of the call site would have shown.
-    // **15, and three of the registry's four accessors are gone.**
+    // **14, and every one of the registry's four accessors is gone.**
     // `refreshAgentMentions`, `getRuntimeCommandLoader` and
     // `getSettingsTabRenderer` have all moved to module slots; `TabManager` left
     // the count with the second.
     //
-    // **`getMcpServerManager` is the one left, and the design that closes it is
-    // known.** Three chat surfaces hold the manager by identity and call it
-    // later — `MentionDropdownController` and `FileContext` want
-    // `getContextSavingServers()`, `InputToolbar` wants `getServers()` — so a
-    // snapshot taken when the tab is built is stale by the time it is read. The
-    // shape that works is a *live view* on the MCP port, two synchronous members
-    // over what the workspace currently holds, with `tabSettings` handing the
-    // widgets an object that resolves the workspace on each call rather than the
-    // manager itself. The catch to answer first: `setMcpManager(null)` clears
-    // the enabled-server set, and a view that always exists never says null, so
-    // what replaces that signal has to be decided before the swap.
+    // `getMcpServerManager` went last. Three chat surfaces held the manager by
+    // identity and called it later, so neither the manager nor a snapshot would
+    // do: the mention dropdown and the file context want the context-saving
+    // servers, the composer's selector wants the enabled ones, and both ask
+    // while drawing. `ProviderMcpPort` grew two **synchronous** members over
+    // what the workspace holds now, and `tabSettings` hands the widgets a view
+    // that resolves the workspace on each call. The `setMcpManager(null)` signal
+    // that used to clear the enabled set needed no replacement after all: the
+    // selector prunes every enabled server no longer listed, and for an empty
+    // list that is all of them — the same end state, by the path already there.
     //
     // What is left after it is the storage role: `register`, `setServices`,
     // `getServices` and `requireServices`, read by the nine provider accessors
     // and `main.ts`.
-    files: 15,
+    files: 14,
     closedBy: 'the provider rows, when the last consumer of each has moved',
   },
 ];
@@ -311,7 +310,7 @@ describe('structural deletion progress', () => {
       'SubagentManager lifecycle: 2',
       'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
-      'the registries — one left: 15',
+      'the registries — one left: 14',
     ]);
     // Six of twelve are zero: two closed in the 2026-08-27 session, the
     // interaction callbacks closed with the first step of the seam deletion,

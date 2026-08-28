@@ -312,7 +312,7 @@ export function applyProviderUIGating(tab: TabData, plugin: GrimoirePlugin): voi
   const capabilities = getTabCapabilities(tab, plugin);
   const chatUI = getTabChatUIConfig(tab, plugin);
   const mcpManager = capabilities.supportsMcpTools
-    ? getProviderMcpManager(capabilities.providerId)
+    ? getProviderMcpManager(capabilities.providerId, plugin)
     : null;
   const hasPermissionToggle = Boolean(chatUI.permissionMode?.toggle());
 

@@ -519,6 +519,22 @@ export interface ProviderRuntimeCommandsPort {
 export interface ProviderMcpPort {
   load(): Promise<readonly ManagedMcpServer[]>;
   save(servers: readonly ManagedMcpServer[]): Promise<void>;
+  /**
+   * What the workspace holds right now, without going to disk.
+   *
+   * **Synchronous because its readers are.** The mention dropdown asks which
+   * servers save to context as it builds its candidates, and the composer's
+   * server selector asks which are enabled as it prunes — both while drawing,
+   * and both *later* than whenever they were handed this port. A snapshot taken
+   * when a tab was built is stale by the time either reads it, which is why
+   * these are members rather than a value.
+   *
+   * Absent where the provider has no Grimoire-owned MCP at all: Codex and
+   * Antigravity, whose configuration is the CLI's own.
+   */
+  servers?(): readonly ManagedMcpServer[];
+  /** Of those, the ones whose output is saved into the conversation's context. */
+  contextSavingServers?(): readonly ManagedMcpServer[];
 }
 
 

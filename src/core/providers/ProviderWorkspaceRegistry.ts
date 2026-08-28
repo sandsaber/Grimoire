@@ -82,8 +82,5 @@ export class ProviderWorkspaceRegistry {
   }
 
 
-  static getMcpServerManager(providerId: ProviderId) {
-    return this.getServices(providerId)?.mcpServerManager ?? null;
-  }
 
 }

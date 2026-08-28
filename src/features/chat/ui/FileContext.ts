@@ -2,7 +2,6 @@ import type { App, EventRef } from 'obsidian';
 import { Notice, TFile } from 'obsidian';
 
 import { isPathInExcludedFolder } from '../../../core/context/exclusions';
-import type { McpServerManager } from '../../../core/mcp/McpServerManager';
 import { t } from '../../../i18n/i18n';
 import type { AgentMentionProvider } from '../../../shared/mention/MentionDropdownController';
 import { MentionDropdownController } from '../../../shared/mention/MentionDropdownController';
@@ -16,6 +15,7 @@ import { createDetachedEl } from '../../../utils/dom';
 import { buildExternalContextDisplayEntries } from '../../../utils/externalContext';
 import { externalContextScanner } from '../../../utils/externalContextScanner';
 import { getVaultPath, normalizePathForVault as normalizePathForVaultUtil } from '../../../utils/path';
+import type { ProviderMcpServerView } from '../tabs/tabSettings';
 import { FileContextState } from './file-context/state/FileContextState';
 import { FileChipsView } from './file-context/view/FileChipsView';
 
@@ -429,7 +429,7 @@ export class FileContextManager {
   // MCP Server Support
   // ========================================
 
-  setMcpManager(manager: McpServerManager | null): void {
+  setMcpManager(manager: ProviderMcpServerView | null): void {
     this.mentionDropdown.setMcpManager(manager);
   }
 

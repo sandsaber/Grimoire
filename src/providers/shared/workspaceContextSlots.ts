@@ -1,3 +1,4 @@
+import type { McpServerManager } from '../../core/mcp/McpServerManager';
 import type {
   ProviderAgentMention,
   ProviderAgentMentionSource,
@@ -65,6 +66,7 @@ export interface WorkspaceContextServices {
    */
   readonly commandCatalog?: ProviderCommandsPort | null;
   readonly mcpStorage?: AppMcpStorage | null;
+  readonly mcpServerManager?: McpServerManager | null;
   readonly runtimeCommandLoader?: ProviderRuntimeCommandLoader | null;
   readonly modelCatalog?: ProviderModelCatalog | null;
   readonly refreshAgentMentions?: () => Promise<void>;
@@ -191,6 +193,10 @@ export function createWorkspaceContextSlots(
     runtimeCommandLoader: () => services()?.runtimeCommandLoader ?? null,
 
     mcpPort: () => ({
+      // Read through `services()` on every call, like every other slot here: a
+      // workspace rebuilt behind a tab is the one the tab's widgets then ask.
+      servers: () => services()?.mcpServerManager?.getServers() ?? [],
+      contextSavingServers: () => services()?.mcpServerManager?.getContextSavingServers() ?? [],
       load: async () => await services()?.mcpStorage?.load() ?? [],
       save: async servers => {
         await services()?.mcpStorage?.save([...servers]);

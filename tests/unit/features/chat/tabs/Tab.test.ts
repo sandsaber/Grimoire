@@ -1917,7 +1917,9 @@ describe('Tab - UI Initialization', () => {
 
       initializeTabUI(tab, options.plugin);
 
-      expect(mockFileContextManager.setMcpManager).toHaveBeenCalledWith((options.plugin as any).mcpManager);
+      // The same live view, for the mention dropdown behind the file context.
+      const view = mockFileContextManager.setMcpManager.mock.calls[0][0];
+      expect(typeof view.getContextSavingServers).toBe('function');
     });
 
     it('should create ImageContextManager', () => {
@@ -2184,13 +2186,25 @@ describe('Tab - UI Initialization', () => {
       getEnhancedPathSpy.mockRestore();
     });
 
-    it('should wire MCP server selector to MCP service', () => {
+    it('wires the MCP server selector to a view that reads the workspace when asked', () => {
+      // **It used to be handed the manager itself.** The widget keeps whatever
+      // it is given and asks it while drawing, so what it needs is something
+      // that resolves the provider's workspace on each call — a snapshot taken
+      // here is stale by the time the composer prunes against it, and the
+      // manager is a provider service the feature layer should not hold.
       const options = createMockOptions();
+      const servers = [{ name: 'docs', enabled: true }];
+      (options.plugin as any).getApplicationRuntimeOrNull = () => ({
+        builtWorkspaceFor: () => ({ mcp: { servers: () => servers } }),
+      });
       const tab = createTab(options);
 
       initializeTabUI(tab, options.plugin);
 
-      expect(mockMcpServerSelector.setMcpManager).toHaveBeenCalledWith((options.plugin as any).mcpManager);
+      const view = mockMcpServerSelector.setMcpManager.mock.calls[0][0];
+      expect(view.getServers()).toEqual(servers);
+      servers.push({ name: 'later', enabled: true });
+      expect(view.getServers()).toHaveLength(2);
     });
 
     it('should wire external context selector onChange', () => {

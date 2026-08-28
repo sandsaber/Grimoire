@@ -307,7 +307,7 @@ export function initializeContextManagers(tab: TabData, plugin: GrimoirePlugin):
     dom.inputContainerEl,
     dom.contextMemoryEl
   );
-  tab.ui.fileContextManager.setMcpManager(getProviderMcpManager(getTabProviderId(tab, plugin)));
+  tab.ui.fileContextManager.setMcpManager(getProviderMcpManager(getTabProviderId(tab, plugin), plugin));
 
   const markVaultSearchDirty = (file: unknown): void => {
     if (file instanceof TFile) {
