@@ -311,6 +311,12 @@ QwenProviderSettings
     warmup: 'runtime',
     providerId: 'qwen',
     chatUI: qwenChatUi,
+    commandDropdown: {
+      triggerChars: ['/'],
+      builtInPrefix: '/',
+      skillPrefix: '/',
+      commandPrefix: '/',
+    },
   },
 
   runtimePorts: context => ({

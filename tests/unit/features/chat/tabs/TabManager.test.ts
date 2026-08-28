@@ -113,6 +113,10 @@ jest.mock('@/core/providers/ProviderCatalog', () => ({
     // rather than a workspace service. These suites set it per case.
     declarations: (providerId: string) => ({
       warmup: mockWarmupModes[providerId] ?? 'none',
+      // Read for the composer's command dropdown, which is a declaration now
+      // rather than a method on the workspace catalog — so a suite that stubs
+      // a catalog must say the provider has a dropdown as well.
+      commandDropdown: mockCommandDropdowns[providerId],
     }),
   }),
 }));
@@ -127,6 +131,18 @@ jest.mock('@/core/providers/ProviderCatalog', () => ({
  */
 const mockWarmupModes: Record<string, 'none' | 'commands' | 'runtime'> = {
   opencode: 'commands',
+};
+
+/** The providers these suites open a command dropdown for. */
+const mockCommandDropdowns: Record<string, {
+  triggerChars: string[];
+  builtInPrefix: string;
+  skillPrefix: string;
+  commandPrefix: string;
+} | undefined> = {
+  claude: { triggerChars: ['/'], builtInPrefix: '/', skillPrefix: '/', commandPrefix: '/' },
+  codex: { triggerChars: ['/', '$'], builtInPrefix: '/', skillPrefix: '$', commandPrefix: '/' },
+  opencode: { triggerChars: ['/'], builtInPrefix: '/', skillPrefix: '/', commandPrefix: '/' },
 };
 
 jest.mock('@/core/providers/ProviderWorkspaceRegistry', () => ({

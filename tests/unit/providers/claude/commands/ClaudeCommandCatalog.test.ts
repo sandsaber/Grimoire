@@ -378,19 +378,4 @@ Deploy`,
     });
   });
 
-  describe('getDropdownConfig', () => {
-    it('returns Claude-specific config', () => {
-      const adapter = createMockAdapter({});
-      const commands = new SlashCommandStorage(adapter);
-      const skills = new SkillStorage(adapter);
-      const catalog = new ClaudeCommandCatalog(commands, skills);
-
-      const config = catalog.getDropdownConfig();
-
-      expect(config.triggerChars).toEqual(['/']);
-      expect(config.builtInPrefix).toBe('/');
-      expect(config.skillPrefix).toBe('/');
-      expect(config.commandPrefix).toBe('/');
-    });
-  });
 });

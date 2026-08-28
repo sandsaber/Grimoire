@@ -324,6 +324,12 @@ GeminiProviderSettings
     warmup: 'runtime',
     providerId: 'gemini',
     chatUI: geminiChatUi,
+    commandDropdown: {
+      triggerChars: ['/'],
+      builtInPrefix: '/',
+      skillPrefix: '/',
+      commandPrefix: '/',
+    },
   },
 
   runtimePorts: context => ({

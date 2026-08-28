@@ -1,6 +1,5 @@
 import type {
   ProviderCommandCatalog,
-  ProviderCommandDropdownConfig,
 } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
 import type { SlashCommand } from '../../../core/types';
@@ -166,16 +165,6 @@ export class CodexSkillCatalog implements ProviderCommandCatalog {
       rootId: persistenceState?.rootId ?? 'vault-codex',
     });
     this.listProvider.invalidate();
-  }
-
-  getDropdownConfig(): ProviderCommandDropdownConfig {
-    return {
-      providerId: 'codex',
-      triggerChars: ['/', '$'],
-      builtInPrefix: '/',
-      skillPrefix: '$',
-      commandPrefix: '/',
-    };
   }
 
   async refresh(): Promise<void> {

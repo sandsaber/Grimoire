@@ -393,12 +393,13 @@ export type ProviderCatalogInfo = {
 
 export function getRegistryProviderCatalogInfo(providerId: ProviderId): ProviderCatalogInfo {
   const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
-  if (!catalog) {
+  const dropdown = providerCatalog().declarations(providerId).commandDropdown;
+  if (!catalog || !dropdown) {
     return null;
   }
 
   return {
-    config: catalog.getDropdownConfig(),
+    config: { providerId, ...dropdown },
     getEntries: () => catalog.listDropdownEntries({ includeBuiltIns: false }),
   };
 }

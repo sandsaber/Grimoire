@@ -196,6 +196,22 @@ export interface ProviderCommandsPort {
   list(): Promise<readonly ProviderCommandDescriptor[]>;
 }
 
+/**
+ * The characters that open a command list, and the prefixes that classify it.
+ *
+ * Restated here rather than imported from
+ * `core/providers/commands/ProviderCommandCatalog`: that type carries the
+ * provider id, which a declaration reached *by* provider id does not need to
+ * repeat, and a field a module can set to a different value than the id it is
+ * registered under is a field that will eventually disagree with it.
+ */
+export interface ProviderCommandDropdown {
+  readonly triggerChars: readonly string[];
+  readonly builtInPrefix: string;
+  readonly skillPrefix: string;
+  readonly commandPrefix: string;
+}
+
 export interface ProviderCommandDescriptor {
   readonly name: string;
   readonly description?: string;
@@ -384,6 +400,22 @@ export interface ProviderDeclarations {
    * named members so a migrated config cannot quietly lose the model picker.
    */
   readonly chatUI: ProviderChatUiContribution;
+  /**
+   * How this provider's slash commands are typed. Half of workspace row 1.
+   *
+   * **A declaration, because all nine implementations are constants.**
+   * `getDropdownConfig()` is a method on the command catalog — a *workspace*
+   * service, built lazily and reached asynchronously — and every one of the
+   * nine returns a frozen literal that reads nothing. Three of its consumers
+   * are synchronous (the composer's dropdown in `TabManager` and `tabSettings`,
+   * and the inline-edit modal), so leaving it there would have made a tab
+   * build a provider's whole workspace to learn which character opens a
+   * command list, and show no commands at all until it had.
+   *
+   * Absent means the provider surfaces no command dropdown. Antigravity is the
+   * one: it contributes no command catalog either.
+   */
+  readonly commandDropdown?: ProviderCommandDropdown;
   /** Provider task and tool result interpretation. Inventory row 15. */
   readonly taskResults?: ProviderTaskResultPort;
   /** Subagent tool-name recognition and display parsing. Inventory row 16. */

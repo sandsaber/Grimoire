@@ -319,6 +319,12 @@ MimocodeProviderSettings
     warmup: 'commands',
     providerId: 'mimocode',
     chatUI: mimocodeChatUi,
+    commandDropdown: {
+      triggerChars: ['/'],
+      builtInPrefix: '/',
+      skillPrefix: '/',
+      commandPrefix: '/',
+    },
   },
 
   runtimePorts: context => ({

@@ -61,15 +61,4 @@ describe('GrokCommandCatalog', () => {
     ]);
   });
 
-  it('uses slash triggers for the shared dropdown', () => {
-    const catalog = new GrokCommandCatalog();
-
-    expect(catalog.getDropdownConfig()).toEqual({
-      providerId: 'grok',
-      triggerChars: ['/'],
-      builtInPrefix: '/',
-      skillPrefix: '/',
-      commandPrefix: '/',
-    });
-  });
 });

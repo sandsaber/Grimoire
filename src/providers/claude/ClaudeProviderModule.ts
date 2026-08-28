@@ -343,6 +343,12 @@ ClaudeProviderSettings
         return agentId ? { agentId, label: agentId } : null;
       },
     },
+    commandDropdown: {
+      triggerChars: ['/'],
+      builtInPrefix: '/',
+      skillPrefix: '/',
+      commandPrefix: '/',
+    },
   },
 
   runtimePorts: context => ({

@@ -313,6 +313,12 @@ GrokProviderSettings
         `${GRIMOIRE_STORAGE_PATH}/${GROK_ARTIFACTS_SUBDIR}/system.md`,
       ],
     },
+    commandDropdown: {
+      triggerChars: ['/'],
+      builtInPrefix: '/',
+      skillPrefix: '/',
+      commandPrefix: '/',
+    },
   },
 
   runtimePorts: context => ({

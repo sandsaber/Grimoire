@@ -9709,6 +9709,27 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### The command dropdown was never a workspace service
+
+The command catalog's `getDropdownConfig()` returns a **frozen literal in all nine
+implementations** — trigger characters and three prefixes, reading nothing. It sat on a workspace
+service, which is built lazily and reached asynchronously, and three of its four consumers are
+synchronous: the composer's dropdown in `TabManager` and in `tabSettings`, and the inline-edit
+modal. So a tab had to build a provider's entire workspace to learn which character opens a command
+list, and drew no dropdown at all until it had.
+
+It is `ProviderDeclarations.commandDropdown` now — read through the catalog, synchronously, with no
+workspace involved — and the row's member is deleted rather than kept beside it, so the values live
+in one place. Absent for Antigravity, which contributes no command catalog either: an absent
+declaration and an absent catalog say the same thing, which is why the slot is optional rather than
+filled with empty strings.
+
+The six per-provider tests that asserted each literal are one table over all nine, which is where
+the fact worth keeping is — that the characters a user types are the ones the provider's own CLI
+takes, and that Codex is the only provider separating skills (`$`) from commands (`/`). The row is
+7 members now, and what remains of it is genuinely workspace work: listing, writing and deleting
+vault entries, and taking runtime commands from the session loader.
+
 #### The settings reconciler moved, and the module's own version was wrong three ways
 
 **Nine modules carried a `reconcile` no production caller ever reached**, and every one of them

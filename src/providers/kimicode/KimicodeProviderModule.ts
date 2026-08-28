@@ -325,6 +325,12 @@ KimicodeProviderSettings
     warmup: 'commands',
     providerId: 'kimicode',
     chatUI: kimicodeChatUi,
+    commandDropdown: {
+      triggerChars: ['/'],
+      builtInPrefix: '/',
+      skillPrefix: '/skill:',
+      commandPrefix: '/',
+    },
   },
 
   runtimePorts: context => ({

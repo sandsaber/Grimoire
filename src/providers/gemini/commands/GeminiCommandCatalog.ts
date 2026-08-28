@@ -2,7 +2,7 @@ import * as path from 'node:path';
 
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 
-import type { ProviderCommandCatalog, ProviderCommandDropdownConfig } from '../../../core/providers/commands/ProviderCommandCatalog';
+import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
 import {
   VaultSkillCommandCatalog,
@@ -20,14 +20,6 @@ type GeminiCommandAdapter = VaultSkillStorageAdapter & Pick<VaultFileAdapter, 'l
 interface GeminiCommandLocation {
   relativePath: string;
 }
-
-const DROPDOWN_CONFIG: ProviderCommandDropdownConfig = {
-  providerId: 'gemini',
-  triggerChars: ['/'],
-  builtInPrefix: '/',
-  skillPrefix: '/',
-  commandPrefix: '/',
-};
 
 export class GeminiCommandCatalog implements ProviderCommandCatalog {
   private readonly skills: VaultSkillCommandCatalog;
@@ -107,10 +99,6 @@ export class GeminiCommandCatalog implements ProviderCommandCatalog {
     const location = parseGeminiCommandPersistenceKey(entry.persistenceKey);
     if (!location) throw new Error('Gemini command location is unavailable.');
     await this.adapter.delete(locationPath(location));
-  }
-
-  getDropdownConfig(): ProviderCommandDropdownConfig {
-    return DROPDOWN_CONFIG;
   }
 
   getDefaultVaultStoragePath(): string | null {

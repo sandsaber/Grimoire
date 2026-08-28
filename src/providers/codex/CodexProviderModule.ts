@@ -334,6 +334,12 @@ CodexProviderSettings
       // Codex names no agent in its tool payloads, so there is no card to draw.
       parseDisplay: () => null,
     },
+    commandDropdown: {
+      triggerChars: ['/', '$'],
+      builtInPrefix: '/',
+      skillPrefix: '$',
+      commandPrefix: '/',
+    },
   },
 
   runtimePorts: context => ({

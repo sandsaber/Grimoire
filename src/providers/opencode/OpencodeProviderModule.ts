@@ -307,6 +307,12 @@ OpencodeProviderSettings
     warmup: 'commands',
     providerId: 'opencode',
     chatUI: opencodeChatUi,
+    commandDropdown: {
+      triggerChars: ['/'],
+      builtInPrefix: '/',
+      skillPrefix: '/',
+      commandPrefix: '/',
+    },
   },
 
   runtimePorts: context => ({

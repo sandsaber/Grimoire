@@ -1,4 +1,4 @@
-import type { ProviderCommandCatalog, ProviderCommandDropdownConfig } from '../../../core/providers/commands/ProviderCommandCatalog';
+import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
 import { VaultSkillCommandCatalog, type VaultSkillStorageAdapter } from '../../../core/providers/commands/VaultSkillCommandCatalog';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
@@ -64,7 +64,6 @@ export class QwenCommandCatalog implements ProviderCommandCatalog {
     await this.adapter.delete(filePath);
   }
 
-  getDropdownConfig(): ProviderCommandDropdownConfig { return { providerId: 'qwen', ...dropdownConfig }; }
   getDefaultVaultStoragePath(): string { return '.qwen/skills'; }
   async refresh(): Promise<void> { await this.skills.refresh(); }
 

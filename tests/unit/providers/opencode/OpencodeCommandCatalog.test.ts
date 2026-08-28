@@ -61,15 +61,4 @@ describe('OpencodeCommandCatalog', () => {
     ]);
   });
 
-  it('uses slash triggers for the shared dropdown', () => {
-    const catalog = new OpencodeCommandCatalog();
-
-    expect(catalog.getDropdownConfig()).toEqual({
-      providerId: 'opencode',
-      triggerChars: ['/'],
-      builtInPrefix: '/',
-      skillPrefix: '/',
-      commandPrefix: '/',
-    });
-  });
 });

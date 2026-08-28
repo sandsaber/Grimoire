@@ -266,10 +266,6 @@ export class VaultSkillCommandCatalog implements ProviderCommandCatalog {
     await this.deleteLocation(root, location);
   }
 
-  getDropdownConfig(): ProviderCommandDropdownConfig {
-    return { providerId: this.options.providerId, ...this.options.dropdown };
-  }
-
   getDefaultVaultStoragePath(): string | null {
     return this.options.roots.find((root) => root.editable !== false)?.path ?? null;
   }

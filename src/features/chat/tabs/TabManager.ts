@@ -1356,10 +1356,11 @@ export class TabManager implements TabManagerInterface {
   private getProviderCatalogConfig(tab: TabData) {
     const providerId = getTabProviderId(tab, this.plugin);
     const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
-    if (!catalog) return null;
+    const dropdown = providerCatalog().declarations(providerId).commandDropdown;
+    if (!catalog || !dropdown) return null;
 
     return {
-      config: catalog.getDropdownConfig(),
+      config: { providerId, ...dropdown },
       getEntries: async () => {
         await this.getSdkCommands(tab.id);
         return catalog.listDropdownEntries({ includeBuiltIns: false });
