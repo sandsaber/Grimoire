@@ -22,6 +22,7 @@ import {
   OpencodeExecutionBackend,
   type OpencodeExecutionBackendContext,
 } from './execution/OpencodeExecutionBackend';
+import { opencodeCliResolver } from './runtime/OpencodeCliResolver';
 import {
   DEFAULT_OPENCODE_PROVIDER_SETTINGS,
   normalizeOpencodeModelAliases,
@@ -80,7 +81,6 @@ export interface OpencodeWorkspaceContext {
   listSessionCommands(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
-  resolveCliPath(): Promise<string | null>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
@@ -267,14 +267,6 @@ OpencodeProviderSettings
           list: () => context.listAgentMentions(),
           refresh: () => context.refreshAgentMentions(),
         },
-        cliResolution: {
-          resolve: async () => {
-            const executable = await context.resolveCliPath();
-            return executable
-              ? { executable, source: 'configured' as const }
-              : { executable: null, source: 'unavailable' as const };
-          },
-        },
         models: {
           list: () => context.listModels(),
           refresh: () => context.refreshModels(),
@@ -314,6 +306,7 @@ OpencodeProviderSettings
       skillPrefix: '/',
       commandPrefix: '/',
     },
+    cli: { resolve: settings => opencodeCliResolver().resolveFromSettings(settings) },
   },
 
   runtimePorts: context => ({

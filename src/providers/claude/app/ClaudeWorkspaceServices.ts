@@ -20,7 +20,7 @@ import { ClaudeCommandCatalog } from '../commands/ClaudeCommandCatalog';
 import { probeRuntimeCommands } from '../commands/probeRuntimeCommands';
 import { resolveClaudeConfigDir } from '../config/ClaudeConfigDir';
 import { PluginManager } from '../plugins/PluginManager';
-import { ClaudeCliResolver } from '../runtime/ClaudeCliResolver';
+import { claudeCliResolver } from '../runtime/ClaudeCliResolver';
 import { StorageService } from '../storage/StorageService';
 import { claudeSettingsTabRenderer } from '../ui/ClaudeSettingsTab';
 import { createClaudeModelCatalog } from './ClaudeModelCatalog';
@@ -56,7 +56,7 @@ export async function createClaudeWorkspaceServices(
     hostPlatform: process.platform,
     vaultPath,
   });
-  const cliResolver = new ClaudeCliResolver();
+  const cliResolver = claudeCliResolver();
   const mcpStorage = claudeStorage.mcp;
   const mcpManager = new McpServerManager(mcpStorage);
   await mcpManager.loadServers();

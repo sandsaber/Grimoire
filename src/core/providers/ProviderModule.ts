@@ -201,8 +201,6 @@ export interface ProviderWorkspaceSlots {
   readonly commands?: ProviderCommandsPort;
   /** Agent mention inventory and its refresh hook. Workspace rows 2 and 11. */
   readonly agentMentions?: ProviderAgentMentionsPort;
-  /** CLI binary resolution. Workspace row 3. */
-  readonly cliResolution?: ProviderCliResolutionPort;
   /** Model discovery and listing. Workspace row 4. */
   readonly models?: ProviderModelsPort;
   /** Plan and usage indicators. Workspace row 5. */
@@ -308,14 +306,32 @@ export interface ProviderAgentMention {
 /** Matches `AgentDefinition['source']`, which every provider already reports. */
 export type ProviderAgentMentionSource = 'builtin' | 'global' | 'plugin' | 'vault';
 
+/**
+ * Where this provider's CLI is, given the settings it should be found under.
+ *
+ * **Synchronous, and it takes the settings** — the slot this replaces was
+ * `resolve(): Promise<ProviderCliResolution>`, taking nothing and answering
+ * later, and neither half fits. All nine implementations answer synchronously
+ * from a memo keyed on what they read; `getResolvedProviderCliPath` has 33 call
+ * sites and not one awaits, several of them in paths the module contract
+ * requires to be synchronous. And every one reads
+ * `getRuntimeEnvironmentText`, which joins the shared environment scope with
+ * the provider's — so a settings-less port would have to hold a plugin to find
+ * out where to look.
+ *
+ * **A declaration, not a workspace service.** A CLI path is what a workspace is
+ * *created* with: the process the workspace wraps is launched with it, so a
+ * port only reachable once the workspace exists is a port nothing can use at
+ * launch. This is the second row to turn out that way; the command dropdown was
+ * the first.
+ *
+ * The record it answered — `{ executable, source, diagnostics }` — is gone with
+ * it. No implementation produced a source or a diagnostic; all nine answer a
+ * path or nothing, and `unavailable` and `null` were the same answer written
+ * twice.
+ */
 export interface ProviderCliResolutionPort {
-  resolve(): Promise<ProviderCliResolution>;
-}
-
-export interface ProviderCliResolution {
-  readonly executable: string | null;
-  readonly source: 'configured' | 'discovered' | 'unavailable';
-  readonly diagnostics?: readonly string[];
+  resolve(settings: ProviderScopedSettings): string | null;
 }
 
 export interface ProviderModelsPort {
@@ -472,6 +488,12 @@ export interface ProviderDeclarations {
    * one: it contributes no command catalog either.
    */
   readonly commandDropdown?: ProviderCommandDropdown;
+  /**
+   * Where this provider's CLI is. Workspace row 3, which is not workspace work.
+   *
+   * Absent where the provider has no CLI to find.
+   */
+  readonly cli?: ProviderCliResolutionPort;
   /** Provider task and tool result interpretation. Inventory row 15. */
   readonly taskResults?: ProviderTaskResultPort;
   /** Subagent tool-name recognition and display parsing. Inventory row 16. */

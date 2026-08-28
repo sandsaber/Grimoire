@@ -22,6 +22,7 @@ import {
   MimocodeExecutionBackend,
   type MimocodeExecutionBackendContext,
 } from './execution/MimocodeExecutionBackend';
+import { mimocodeCliResolver } from './runtime/MimocodeCliResolver';
 import {
   DEFAULT_MIMOCODE_PROVIDER_SETTINGS,
   type MimocodeProviderSettings,
@@ -92,7 +93,6 @@ export interface MimocodeWorkspaceContext {
   listSessionCommands(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
-  resolveCliPath(): Promise<string | null>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
@@ -279,14 +279,6 @@ MimocodeProviderSettings
           list: () => context.listAgentMentions(),
           refresh: () => context.refreshAgentMentions(),
         },
-        cliResolution: {
-          resolve: async () => {
-            const executable = await context.resolveCliPath();
-            return executable
-              ? { executable, source: 'configured' as const }
-              : { executable: null, source: 'unavailable' as const };
-          },
-        },
         models: {
           list: () => context.listModels(),
           refresh: () => context.refreshModels(),
@@ -326,6 +318,7 @@ MimocodeProviderSettings
       skillPrefix: '/',
       commandPrefix: '/',
     },
+    cli: { resolve: settings => mimocodeCliResolver().resolveFromSettings(settings) },
   },
 
   runtimePorts: context => ({

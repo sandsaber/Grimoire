@@ -12,7 +12,7 @@ import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { MimocodeAgentMentionProvider } from '../agents/MimocodeAgentMentionProvider';
 import { MimocodeCommandCatalog } from '../commands/MimocodeCommandCatalog';
-import { MimocodeCliResolver } from '../runtime/MimocodeCliResolver';
+import { mimocodeCliResolver } from '../runtime/MimocodeCliResolver';
 import { getMimocodeProviderSettings } from '../settings';
 import { MimocodeAgentStorage } from '../storage/MimocodeAgentStorage';
 import { mimocodeSettingsTabRenderer } from '../ui/MimocodeSettingsTab';
@@ -100,7 +100,7 @@ export async function createMimocodeWorkspaceServices(
     agentStorage,
     agentMentionProvider,
     commandCatalog: new MimocodeCommandCatalog(vaultAdapter),
-    cliResolver: new MimocodeCliResolver(),
+    cliResolver: mimocodeCliResolver(),
     modelCatalog: createMimocodeModelCatalog(plugin),
     mcpStorage,
     mcpServerManager,

@@ -211,7 +211,6 @@ export class AntigravityExecution {
       },
       ports,
       antigravityProviderModule.runtimePorts({
-        resolveCliPath: async () => plugin.getResolvedProviderCliPath('antigravity'),
         listModels: async () => [],
         refreshModels: async () => [],
       }),

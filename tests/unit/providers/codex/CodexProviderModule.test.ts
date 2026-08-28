@@ -30,7 +30,6 @@ describe('Codex provider module', () => {
       }),
       listAgentMentions: async () => [{ id: 'planner', label: 'Planner' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
-      resolveCliPath: async () => '/usr/local/bin/codex',
       listModels: async () => [{ id: 'gpt-5.5', label: 'GPT-5.5' }],
       refreshModels: async () => [{ id: 'gpt-5.5', label: 'GPT-5.5' }],
       cachedPlanUsage: () => ({ plan: 'Pro' }),
@@ -166,7 +165,6 @@ describe('Codex provider module', () => {
 
       expect(Object.keys(workspace).sort()).toEqual([
         'agentMentions',
-        'cliResolution',
         'commands',
         'models',
           'settingsPresentation',
@@ -174,18 +172,6 @@ describe('Codex provider module', () => {
       ]);
     });
 
-    it('reports an unresolved CLI as unavailable rather than as an empty path', async () => {
-      const context = createContext();
-      const workspace = await codexProviderModule.workspace.initialize(
-        { ...context, resolveCliPath: async () => null },
-        new AbortController().signal,
-      );
-
-      expect(await workspace.cliResolution?.resolve()).toEqual({
-        executable: null,
-        source: 'unavailable',
-      });
-    });
 
     it('declares a dispose half for the initialize half', async () => {
       await expect(

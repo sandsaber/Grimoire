@@ -34,7 +34,6 @@ describe('Qwen provider module', () => {
       listSessionCommands: async () => [{ name: 'clear', source: 'session' as const }],
       listAgentMentions: async () => [{ id: 'planner', label: 'Planner' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
-      resolveCliPath: async () => '/usr/local/bin/qwen',
       listModels: async () => [{ id: 'qwen3-coder-plus', label: 'qwen3-coder-plus' }],
       refreshModels: async () => [{ id: 'qwen3-coder-plus', label: 'qwen3-coder-plus' }],
       cachedPlanUsage: () => null,
@@ -144,7 +143,6 @@ describe('Qwen provider module', () => {
 
       expect(Object.keys(workspace).sort()).toEqual([
         'agentMentions',
-        'cliResolution',
         'commands',
         'mcp',
         'models',

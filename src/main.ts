@@ -1048,12 +1048,10 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   getResolvedProviderCliPath(providerId: ProviderId): string | null {
-    const cliResolver = ProviderWorkspaceRegistry.getCliResolver(providerId);
-    if (!cliResolver) {
-      return null;
-    }
-
-    return cliResolver.resolveFromSettings(this.settings);
+    // A declaration, not a workspace service: the CLI path is what a workspace
+    // is created *with*, so it has to be answerable before one exists — which
+    // is exactly when this is asked, at launch.
+    return providerCatalog().declarations(providerId).cli?.resolve(this.settings) ?? null;
   }
 
   private reconcileModelWithEnvironment(

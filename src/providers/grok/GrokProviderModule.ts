@@ -24,6 +24,7 @@ import {
   GrokExecutionBackend,
 } from './execution/GrokExecutionBackend';
 import { normalizeGrokThinkingOptionsByModel } from './models';
+import { grokCliResolver } from './runtime/GrokCliResolver';
 import { GROK_ARTIFACTS_SUBDIR } from './runtime/GrokPaths';
 import {
   DEFAULT_GROK_PROVIDER_SETTINGS,
@@ -79,7 +80,6 @@ export interface GrokWorkspaceContext {
   listSessionCommands(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
-  resolveCliPath(): Promise<string | null>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
@@ -265,14 +265,6 @@ GrokProviderSettings
           list: () => context.listAgentMentions(),
           refresh: () => context.refreshAgentMentions(),
         },
-        cliResolution: {
-          resolve: async () => {
-            const executable = await context.resolveCliPath();
-            return executable
-              ? { executable, source: 'configured' as const }
-              : { executable: null, source: 'unavailable' as const };
-          },
-        },
         models: {
           list: () => context.listModels(),
           refresh: () => context.refreshModels(),
@@ -320,6 +312,7 @@ GrokProviderSettings
       skillPrefix: '/',
       commandPrefix: '/',
     },
+    cli: { resolve: settings => grokCliResolver().resolveFromSettings(settings) },
   },
 
   runtimePorts: context => ({

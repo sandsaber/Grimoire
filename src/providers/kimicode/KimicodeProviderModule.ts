@@ -22,6 +22,7 @@ import {
   KimicodeExecutionBackend,
   type KimicodeExecutionBackendContext,
 } from './execution/KimicodeExecutionBackend';
+import { kimicodeCliResolver } from './runtime/KimicodeCliResolver';
 import {
   DEFAULT_KIMICODE_PROVIDER_SETTINGS,
   type KimicodeProviderSettings,
@@ -98,7 +99,6 @@ export interface KimicodeWorkspaceContext {
   listSessionCommands(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
-  resolveCliPath(): Promise<string | null>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
@@ -285,14 +285,6 @@ KimicodeProviderSettings
           list: () => context.listAgentMentions(),
           refresh: () => context.refreshAgentMentions(),
         },
-        cliResolution: {
-          resolve: async () => {
-            const executable = await context.resolveCliPath();
-            return executable
-              ? { executable, source: 'configured' as const }
-              : { executable: null, source: 'unavailable' as const };
-          },
-        },
         models: {
           list: () => context.listModels(),
           refresh: () => context.refreshModels(),
@@ -332,6 +324,7 @@ KimicodeProviderSettings
       skillPrefix: '/skill:',
       commandPrefix: '/',
     },
+    cli: { resolve: settings => kimicodeCliResolver().resolveFromSettings(settings) },
   },
 
   runtimePorts: context => ({

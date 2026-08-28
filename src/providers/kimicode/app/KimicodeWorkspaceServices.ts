@@ -12,7 +12,7 @@ import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { KimicodeAgentMentionProvider } from '../agents/KimicodeAgentMentionProvider';
 import { KimicodeCommandCatalog } from '../commands/KimicodeCommandCatalog';
-import { KimicodeCliResolver } from '../runtime/KimicodeCliResolver';
+import { kimicodeCliResolver } from '../runtime/KimicodeCliResolver';
 import { getKimicodeProviderSettings } from '../settings';
 import { KimicodeAgentStorage } from '../storage/KimicodeAgentStorage';
 import { kimicodeSettingsTabRenderer } from '../ui/KimicodeSettingsTab';
@@ -100,7 +100,7 @@ export async function createKimicodeWorkspaceServices(
     agentStorage,
     agentMentionProvider,
     commandCatalog: new KimicodeCommandCatalog(vaultAdapter),
-    cliResolver: new KimicodeCliResolver(),
+    cliResolver: kimicodeCliResolver(),
     modelCatalog: createKimicodeModelCatalog(plugin),
     mcpStorage,
     mcpServerManager,

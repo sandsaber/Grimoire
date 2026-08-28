@@ -52,3 +52,23 @@ export class QwenCliResolver {
     this.resolvedPath = null;
   }
 }
+
+/**
+ * The one instance, shared by the module declaration and the workspace.
+ *
+ * A CLI path is needed to *create* a workspace — the process the workspace
+ * wraps is launched with it — so the module declares its resolution, and the
+ * workspace borrows the same object rather than building a second one. Two
+ * instances would mean the settings tab's `reset()` clearing a cache nothing
+ * reads, and a stale path surviving the user fixing it.
+ *
+ * Built on first use rather than at import: a module is constructed when its
+ * file is loaded, and this constructor reads the machine's hostname — work no
+ * provider the user has switched off should be doing, and work a test that
+ * mocks `getHostnameKey` cannot have happening before its own mock exists.
+ */
+let sharedResolver: QwenCliResolver | null = null;
+
+export function qwenCliResolver(): QwenCliResolver {
+  return sharedResolver ??= new QwenCliResolver();
+}

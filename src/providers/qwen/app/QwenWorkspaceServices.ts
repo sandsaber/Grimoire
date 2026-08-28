@@ -11,7 +11,7 @@ import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { QwenCommandCatalog } from '../commands/QwenCommandCatalog';
-import { QwenCliResolver } from '../runtime/QwenCliResolver';
+import { qwenCliResolver } from '../runtime/QwenCliResolver';
 import { getQwenProviderSettings } from '../settings';
 import { QwenAgentStorage } from '../storage/QwenAgentStorage';
 import { qwenSettingsTabRenderer } from '../ui/QwenSettingsTab';
@@ -27,7 +27,7 @@ export interface QwenWorkspaceServices extends ProviderWorkspaceServices {
 }
 
 function createQwenCliResolver(): ProviderCliResolver {
-  return new QwenCliResolver();
+  return qwenCliResolver();
 }
 
 function createQwenModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {

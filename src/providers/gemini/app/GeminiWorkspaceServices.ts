@@ -11,7 +11,7 @@ import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { GeminiCommandCatalog } from '../commands/GeminiCommandCatalog';
-import { GeminiCliResolver } from '../runtime/GeminiCliResolver';
+import { geminiCliResolver } from '../runtime/GeminiCliResolver';
 import { getGeminiProviderSettings } from '../settings';
 import { GeminiAgentStorage } from '../storage/GeminiAgentStorage';
 import { geminiSettingsTabRenderer } from '../ui/GeminiSettingsTab';
@@ -27,7 +27,7 @@ export interface GeminiWorkspaceServices extends ProviderWorkspaceServices {
 }
 
 function createGeminiCliResolver(): ProviderCliResolver {
-  return new GeminiCliResolver();
+  return geminiCliResolver();
 }
 
 function createGeminiModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {

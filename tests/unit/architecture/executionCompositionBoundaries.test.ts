@@ -409,7 +409,7 @@ describe('execution composition boundaries', () => {
       { row: 'subagentLifecycleAdapter', owner: 'ProviderDeclarations', slot: 'nativeAgents' },
       { row: 'commandCatalog', owner: 'ProviderWorkspaceSlots', slot: 'commands' },
       { row: 'agentMentionProvider', owner: 'ProviderWorkspaceSlots', slot: 'agentMentions' },
-      { row: 'cliResolver', owner: 'ProviderWorkspaceSlots', slot: 'cliResolution' },
+      { row: 'cliResolver', owner: 'ProviderDeclarations', slot: 'cli' },
       { row: 'modelCatalog', owner: 'ProviderWorkspaceSlots', slot: 'models' },
       { row: 'usageProvider', owner: 'ProviderWorkspaceSlots', slot: 'usage' },
       { row: 'runtimeCommandLoader', owner: 'ProviderWorkspaceSlots', slot: 'runtimeCommands' },

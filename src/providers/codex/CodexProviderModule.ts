@@ -22,6 +22,7 @@ import {
 } from './execution/CodexExecutionBackend';
 import { normalizeCodexDiscoveredModels } from './modelDiscoveryState';
 import { codexSubagentLifecycleAdapter } from './normalization/codexSubagentNormalization';
+import { codexCliResolver } from './runtime/CodexCliResolver';
 import {
   type CodexInstallationMethod,
   type CodexProviderSettings,
@@ -95,7 +96,6 @@ export interface CodexWorkspaceContext {
   commandsPort(): ProviderCommandsPort | undefined;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
-  resolveCliPath(): Promise<string | null>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
@@ -283,14 +283,6 @@ CodexProviderSettings
           list: () => context.listAgentMentions(),
           refresh: () => context.refreshAgentMentions(),
         },
-        cliResolution: {
-          resolve: async () => {
-            const executable = await context.resolveCliPath();
-            return executable
-              ? { executable, source: 'configured' as const }
-              : { executable: null, source: 'unavailable' as const };
-          },
-        },
         models: {
           list: () => context.listModels(),
           refresh: () => context.refreshModels(),
@@ -340,6 +332,7 @@ CodexProviderSettings
       skillPrefix: '$',
       commandPrefix: '/',
     },
+    cli: { resolve: settings => codexCliResolver().resolveFromSettings(settings) },
   },
 
   runtimePorts: context => ({

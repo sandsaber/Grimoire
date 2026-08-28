@@ -69,7 +69,6 @@ describe('Antigravity provider module', () => {
 
     it('omits the ports it has nothing to put in', () => {
       const ports = antigravityProviderModule.runtimePorts({
-        resolveCliPath: async () => null,
         listModels: async () => [],
         refreshModels: async () => [],
       });
@@ -155,7 +154,6 @@ describe('Antigravity provider module', () => {
 
   describe('workspace contribution', () => {
     const context = {
-      resolveCliPath: jest.fn().mockResolvedValue('/usr/local/bin/agy'),
       listModels: jest.fn().mockResolvedValue([{ id: 'a', label: 'A' }]),
       refreshModels: jest.fn().mockResolvedValue([{ id: 'b', label: 'B' }]),
     };
@@ -166,24 +164,12 @@ describe('Antigravity provider module', () => {
         new AbortController().signal,
       );
 
-      expect(workspace.cliResolution).toBeDefined();
       expect(workspace.models).toBeDefined();
       expect(workspace.commands).toBeUndefined();
       expect(workspace.mcp).toBeUndefined();
       expect(workspace.agentMentions).toBeUndefined();
     });
 
-    it('reports an unavailable CLI as a typed resolution rather than null', async () => {
-      const workspace = await antigravityProviderModule.workspace.initialize(
-        { ...context, resolveCliPath: jest.fn().mockResolvedValue(null) },
-        new AbortController().signal,
-      );
-
-      await expect(workspace.cliResolution?.resolve()).resolves.toEqual({
-        executable: null,
-        source: 'unavailable',
-      });
-    });
 
     it('declares the dispose half of the lifecycle', async () => {
       const workspace = await antigravityProviderModule.workspace.initialize(

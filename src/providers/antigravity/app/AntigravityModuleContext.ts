@@ -26,6 +26,5 @@ export function createAntigravityModuleContext(
   return {
     listModels: () => workspace.listModels(),
     refreshModels: () => workspace.refreshModels(),
-    resolveCliPath: () => workspace.resolveCliPath(),
   };
 }

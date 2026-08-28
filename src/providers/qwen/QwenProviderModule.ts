@@ -22,6 +22,7 @@ import {
   QwenExecutionBackend,
   type QwenExecutionBackendContext,
 } from './execution/QwenExecutionBackend';
+import { qwenCliResolver } from './runtime/QwenCliResolver';
 import {
   DEFAULT_QWEN_PROVIDER_SETTINGS,
   normalizeQwenEffortLevel,
@@ -92,7 +93,6 @@ export interface QwenWorkspaceContext {
   listSessionCommands(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
-  resolveCliPath(): Promise<string | null>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
@@ -271,14 +271,6 @@ QwenProviderSettings
           list: () => context.listAgentMentions(),
           refresh: () => context.refreshAgentMentions(),
         },
-        cliResolution: {
-          resolve: async () => {
-            const executable = await context.resolveCliPath();
-            return executable
-              ? { executable, source: 'configured' as const }
-              : { executable: null, source: 'unavailable' as const };
-          },
-        },
         models: {
           list: () => context.listModels(),
           refresh: () => context.refreshModels(),
@@ -318,6 +310,7 @@ QwenProviderSettings
       skillPrefix: '/',
       commandPrefix: '/',
     },
+    cli: { resolve: settings => qwenCliResolver().resolveFromSettings(settings) },
   },
 
   runtimePorts: context => ({

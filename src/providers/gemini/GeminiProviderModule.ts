@@ -21,6 +21,7 @@ import {
   GeminiExecutionBackend,
   type GeminiExecutionBackendContext,
 } from './execution/GeminiExecutionBackend';
+import { geminiCliResolver } from './runtime/GeminiCliResolver';
 import {
   DEFAULT_GEMINI_PROVIDER_SETTINGS,
   type GeminiProviderSettings,
@@ -87,7 +88,6 @@ export interface GeminiWorkspaceContext {
   commandsPort(): ProviderCommandsPort | undefined;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
-  resolveCliPath(): Promise<string | null>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
@@ -283,14 +283,6 @@ GeminiProviderSettings
           list: () => context.listAgentMentions(),
           refresh: () => context.refreshAgentMentions(),
         },
-        cliResolution: {
-          resolve: async () => {
-            const executable = await context.resolveCliPath();
-            return executable
-              ? { executable, source: 'configured' as const }
-              : { executable: null, source: 'unavailable' as const };
-          },
-        },
         models: {
           list: () => context.listModels(),
           refresh: () => context.refreshModels(),
@@ -330,6 +322,7 @@ GeminiProviderSettings
       skillPrefix: '/',
       commandPrefix: '/',
     },
+    cli: { resolve: settings => geminiCliResolver().resolveFromSettings(settings) },
   },
 
   runtimePorts: context => ({

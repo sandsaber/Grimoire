@@ -14,7 +14,7 @@ import { getVaultPath } from '../../../utils/path';
 import { CodexAgentMentionProvider } from '../agents/CodexAgentMentionProvider';
 import { CodexSkillCatalog } from '../commands/CodexSkillCatalog';
 import { updateCodexModelDiscoveryState } from '../modelDiscoveryState';
-import { CodexCliResolver } from '../runtime/CodexCliResolver';
+import { codexCliResolver } from '../runtime/CodexCliResolver';
 import { CodexModelListingService } from '../runtime/CodexModelListingService';
 import { getCodexProviderSettings } from '../settings';
 import { CodexSkillListingService } from '../skills/CodexSkillListingService';
@@ -32,7 +32,7 @@ export interface CodexWorkspaceServices extends ProviderWorkspaceServices {
 }
 
 function createCodexCliResolver(): ProviderCliResolver {
-  return new CodexCliResolver();
+  return codexCliResolver();
 }
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;

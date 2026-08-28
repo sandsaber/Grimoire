@@ -1,7 +1,6 @@
 import type GrimoirePlugin from '../../main';
 import { HomeFileAdapter } from '../storage/HomeFileAdapter';
 import type {
-  ProviderCliResolver,
   ProviderId,
   ProviderRuntimeCommandLoader,
   ProviderSettingsTabRenderer,
@@ -93,9 +92,6 @@ export class ProviderWorkspaceRegistry {
     await this.getServices(providerId)?.refreshAgentMentions?.();
   }
 
-  static getCliResolver(providerId: ProviderId): ProviderCliResolver | null {
-    return this.getServices(providerId)?.cliResolver ?? null;
-  }
 
   static getRuntimeCommandLoader(providerId: ProviderId): ProviderRuntimeCommandLoader | null {
     return this.getServices(providerId)?.runtimeCommandLoader ?? null;

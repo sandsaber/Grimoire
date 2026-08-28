@@ -31,7 +31,6 @@ describe('OpenCode provider module', () => {
       listSessionCommands: async () => [{ name: 'undo', source: 'session' as const }],
       listAgentMentions: async () => [{ id: 'build', label: 'Build' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
-      resolveCliPath: async () => '/usr/local/bin/opencode',
       listModels: async () => [{ id: 'anthropic/claude-sonnet', label: 'Sonnet' }],
       refreshModels: async () => [{ id: 'anthropic/claude-sonnet', label: 'Sonnet' }],
       cachedPlanUsage: () => null,
@@ -120,7 +119,6 @@ describe('OpenCode provider module', () => {
 
       expect(Object.keys(workspace).sort()).toEqual([
         'agentMentions',
-        'cliResolution',
         'commands',
         'mcp',
         'models',

@@ -31,7 +31,6 @@ describe('Claude provider module', () => {
       listSessionCommands: async () => [{ name: 'compact', source: 'session' as const }],
       listAgentMentions: async () => [{ id: 'planner', label: 'Planner' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
-      resolveCliPath: async () => '/usr/local/bin/claude',
       listModels: async () => [{ id: 'opus', label: 'Opus 5' }],
       refreshModels: async () => [{ id: 'opus', label: 'Opus 5' }],
       cachedPlanUsage: () => ({ plan: 'Max', windows: [{ label: '5h', pct: 50, reset: '2h' }] }),

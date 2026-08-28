@@ -12,7 +12,7 @@ import type GrimoirePlugin from '../../../main';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { OpencodeAgentMentionProvider } from '../agents/OpencodeAgentMentionProvider';
 import { OpencodeCommandCatalog } from '../commands/OpencodeCommandCatalog';
-import { OpencodeCliResolver } from '../runtime/OpencodeCliResolver';
+import { opencodeCliResolver } from '../runtime/OpencodeCliResolver';
 import { getOpencodeProviderSettings } from '../settings';
 import { OpencodeAgentStorage } from '../storage/OpencodeAgentStorage';
 import { opencodeSettingsTabRenderer } from '../ui/OpencodeSettingsTab';
@@ -99,7 +99,7 @@ export async function createOpencodeWorkspaceServices(
     agentStorage,
     agentMentionProvider,
     commandCatalog: new OpencodeCommandCatalog(vaultAdapter),
-    cliResolver: new OpencodeCliResolver(),
+    cliResolver: opencodeCliResolver(),
     modelCatalog: createOpencodeModelCatalog(plugin),
     mcpStorage,
     mcpServerManager,

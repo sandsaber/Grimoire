@@ -31,7 +31,6 @@ describe('Grok provider module', () => {
       listSessionCommands: async () => [{ name: 'compact', source: 'session' as const }],
       listAgentMentions: async () => [{ id: 'build', label: 'Build' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
-      resolveCliPath: async () => '/usr/local/bin/grok',
       listModels: async () => [{ id: 'grok-4.6', label: 'Grok 4.6' }],
       refreshModels: async () => [{ id: 'grok-4.6', label: 'Grok 4.6' }],
       cachedPlanUsage: () => null,
@@ -134,7 +133,6 @@ describe('Grok provider module', () => {
 
       expect(Object.keys(workspace).sort()).toEqual([
         'agentMentions',
-        'cliResolution',
         'commands',
         'mcp',
         'models',

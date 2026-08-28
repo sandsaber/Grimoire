@@ -632,7 +632,6 @@ describe('the assembled ChatRuntime adapter', () => {
         commandsPort: () => undefined,
         listAgentMentions: async () => [],
         refreshAgentMentions: async () => undefined,
-        resolveCliPath: async () => null,
         listModels: async () => [],
         refreshModels: async () => [],
         cachedPlanUsage: () => null,
@@ -984,7 +983,6 @@ describe('the assembled ChatRuntime adapter', () => {
         commandsPort: () => undefined,
         listAgentMentions: async () => [],
         refreshAgentMentions: async () => undefined,
-        resolveCliPath: async () => null,
         listModels: async () => [],
         refreshModels: async () => [],
         cachedPlanUsage: () => null,
@@ -1012,7 +1010,6 @@ describe('the assembled ChatRuntime adapter', () => {
         delay: immediately,
       },
       antigravityProviderModule.runtimePorts({
-        resolveCliPath: async () => null,
         listModels: async () => [],
         refreshModels: async () => [],
       }),
@@ -1359,7 +1356,6 @@ describe('concurrent readiness', () => {
         delay: immediately,
       },
       antigravityProviderModule.runtimePorts({
-        resolveCliPath: async () => null,
         listModels: async () => [],
         refreshModels: async () => [],
       }),

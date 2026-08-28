@@ -16,6 +16,7 @@ import {
   AntigravityExecutionBackend,
   type AntigravityExecutionBackendContext,
 } from './execution/AntigravityExecutionBackend';
+import { antigravityCliResolver } from './runtime/AntigravityCliResolver';
 import {
   type AntigravityDiscoveredModel,
   type AntigravityProviderSettings,
@@ -78,7 +79,6 @@ const KNOWN_SETTINGS_FIELDS = new Set([
 ]);
 
 export interface AntigravityWorkspaceContext {
-  resolveCliPath(): Promise<string | null>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
 }
@@ -234,14 +234,6 @@ AntigravityProviderSettings
     providerId: 'antigravity',
     async initialize(context): Promise<AntigravityWorkspace> {
       return {
-        cliResolution: {
-          resolve: async () => {
-            const executable = await context.resolveCliPath();
-            return executable
-              ? { executable, source: 'configured' as const }
-              : { executable: null, source: 'unavailable' as const };
-          },
-        },
         models: {
           list: () => context.listModels(),
           refresh: () => context.refreshModels(),
@@ -269,6 +261,7 @@ AntigravityProviderSettings
     warmup: 'none',
     providerId: 'antigravity',
     chatUI: antigravityChatUi,
+    cli: { resolve: settings => antigravityCliResolver().resolveFromSettings(settings) },
   },
 
   // No history and no rewind: print mode keeps no transcript Grimoire could

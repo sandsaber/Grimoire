@@ -12,7 +12,7 @@ import { getVaultPath } from '../../../utils/path';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { GrokAgentMentionProvider } from '../agents/GrokAgentMentionProvider';
 import { GrokCommandCatalog } from '../commands/GrokCommandCatalog';
-import { GrokCliResolver } from '../runtime/GrokCliResolver';
+import { grokCliResolver } from '../runtime/GrokCliResolver';
 import { discoverGrokModelsFromCli } from '../runtime/GrokModelDiscovery';
 import {
   applyGrokNativeModelCatalog,
@@ -138,7 +138,7 @@ export async function createGrokWorkspaceServices(
     agentStorage,
     agentMentionProvider,
     commandCatalog: new GrokCommandCatalog(vaultAdapter),
-    cliResolver: new GrokCliResolver(),
+    cliResolver: grokCliResolver(),
     modelCatalog: createGrokModelCatalog(plugin),
     mcpStorage,
     mcpServerManager,

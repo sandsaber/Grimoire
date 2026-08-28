@@ -88,7 +88,6 @@ export interface WorkspaceContextSlots {
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   refreshAgentMentions(): Promise<void>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
-  resolveCliPath(): Promise<string | null>;
   saveMcpServers(servers: readonly ProviderMcpServer[]): Promise<void>;
 }
 
@@ -185,7 +184,6 @@ export function createWorkspaceContextSlots(
       return models();
     },
 
-    resolveCliPath: async () => plugin.getResolvedProviderCliPath(providerId),
 
     saveMcpServers: async servers => {
       const storage = services()?.mcpStorage;

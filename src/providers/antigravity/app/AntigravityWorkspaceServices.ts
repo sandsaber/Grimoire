@@ -7,7 +7,7 @@ import type {
 } from '../../../core/providers/types';
 import type GrimoirePlugin from '../../../main';
 import { ANTIGRAVITY_FALLBACK_DISCOVERED_MODELS } from '../models';
-import { AntigravityCliResolver } from '../runtime/AntigravityCliResolver';
+import { antigravityCliResolver } from '../runtime/AntigravityCliResolver';
 import { discoverAntigravityModels } from '../runtime/AntigravityModelDiscovery';
 import { getAntigravityProviderSettings, updateAntigravityProviderSettings } from '../settings';
 import { antigravitySettingsTabRenderer } from '../ui/AntigravitySettingsTab';
@@ -19,7 +19,7 @@ export interface AntigravityWorkspaceServices extends ProviderWorkspaceServices 
 }
 
 function createAntigravityCliResolver(): ProviderCliResolver {
-  return new AntigravityCliResolver();
+  return antigravityCliResolver();
 }
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;

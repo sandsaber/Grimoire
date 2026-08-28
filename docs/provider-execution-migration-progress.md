@@ -9709,6 +9709,40 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### CLI resolution was never a workspace service either
+
+`ProviderWorkspaceSlots.cliResolution` was declared, wired for all nine, and **read by nobody**.
+Everything asks `plugin.getResolvedProviderCliPath(providerId)`, which had 33 call sites and one
+registry lookup behind it. The slot could not have served them if they had tried: it was
+`resolve(): Promise<ProviderCliResolution>`, and every consumer is synchronous — several inside
+paths the module contract *requires* to be synchronous, `createRuntime()` among them.
+
+The deeper mismatch is where it lived. **A CLI path is what a workspace is created with** — the
+process the workspace wraps is launched with it — so a port reachable only once the workspace exists
+cannot answer at launch, which is exactly when it is asked. That is the second row this milestone to
+turn out to be a declaration rather than a service; the command dropdown was the first, and the two
+were found the same way: by asking which consumers are synchronous and why.
+
+So it is `ProviderDeclarations.cli`, `resolve(settings): string | null`. Synchronous, because all
+nine implementations are, each memoizing on what it read. Taking the app record, because every one
+of them resolves through `getRuntimeEnvironmentText` — the shared environment scope joined with the
+provider's — so a settings-less port would have had to hold a plugin to know where to look. And the
+`{executable, source, diagnostics}` record went with the slot: no implementation ever produced a
+source or a diagnostic, and `unavailable` and `null` were one answer written twice.
+
+**The resolver is one lazily-built instance per provider**, shared by the declaration and the
+workspace. Two instances would mean a settings tab's `reset()` clearing a cache nothing reads, and a
+stale path surviving the user fixing it. Lazily, because the first version built it at module scope
+and a test that mocks `getHostnameKey` went red immediately: a module is constructed when its file
+is imported, and its constructor was reading the machine's hostname before the test's own mock
+existed — the same import-time hazard the chat-icon contribution records, arriving from a different
+direction.
+
+`ProviderWorkspaceRegistry.getCliResolver` and the nine `resolveCliPath` context members are
+deleted. The two members still stubbed in the module contexts are unchanged and are the two the
+slot-fit table already names — `renderSettingsTab` and `listSessionCommands` — because `cliResolve`
+was never one of them: it was wired everywhere, and simply had no reader.
+
 #### A review caught the reconciler row clearing state Claude keeps
 
 The settings-reconciler row moved session invalidation to the host, over one provider-neutral rule:

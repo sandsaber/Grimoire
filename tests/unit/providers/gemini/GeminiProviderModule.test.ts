@@ -31,7 +31,6 @@ describe('Gemini provider module', () => {
       }),
       listAgentMentions: async () => [{ id: 'planner', label: 'Planner' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
-      resolveCliPath: async () => '/usr/local/bin/gemini',
       listModels: async () => [{ id: 'gemini-2.5-pro', label: 'gemini-2.5-pro' }],
       refreshModels: async () => [{ id: 'gemini-2.5-pro', label: 'gemini-2.5-pro' }],
       cachedPlanUsage: () => null,
@@ -148,7 +147,6 @@ describe('Gemini provider module', () => {
       // session's announced commands, and this provider drops those.
       expect(Object.keys(workspace).sort()).toEqual([
         'agentMentions',
-        'cliResolution',
         'commands',
         'mcp',
         'models',
