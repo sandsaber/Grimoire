@@ -555,11 +555,13 @@ describe('GrimoireSettingTab settings hub', () => {
 
     const rows = await (tab as any).loadWorkspaceHubRows(['opencode'], 'commands');
 
+    // No plugin: the loader's context stopped carrying one when the provider's
+    // metadata session moved into the closure its workspace services build it
+    // with. What the host still decides is on this object.
     expect(loader.loadCommands).toHaveBeenCalledWith({
       allowSessionCreation: true,
       conversation: null,
       externalContextPaths: [],
-      plugin,
       runtime: null,
     });
     expect(catalog.setRuntimeCommands).toHaveBeenCalledWith([

@@ -17,7 +17,7 @@ import { getOpencodeProviderSettings } from '../settings';
 import { OpencodeAgentStorage } from '../storage/OpencodeAgentStorage';
 import { opencodeSettingsTabRenderer } from '../ui/OpencodeSettingsTab';
 import { opencodePlanUsageStore } from './OpencodePlanUsageStore';
-import { opencodeRuntimeCommandLoader } from './OpencodeRuntimeCommandLoader';
+import { createOpencodeRuntimeCommandLoader } from './OpencodeRuntimeCommandLoader';
 
 export interface OpencodeWorkspaceServices extends ProviderWorkspaceServices {
   agentStorage: OpencodeAgentStorage;
@@ -104,7 +104,7 @@ export async function createOpencodeWorkspaceServices(
     mcpStorage,
     mcpServerManager,
     usageProvider: opencodePlanUsageStore,
-    runtimeCommandLoader: opencodeRuntimeCommandLoader,
+    runtimeCommandLoader: createOpencodeRuntimeCommandLoader(plugin),
     settingsTabRenderer: opencodeSettingsTabRenderer,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();

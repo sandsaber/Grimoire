@@ -10445,6 +10445,30 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the command loader stops asking for a plugin (`this commit`)
+
+- Gates: unit 8750 passed, 8750 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- `getRuntimeCommandLoader` is blocked because the loader carries session-opening policy that needs
+  a plugin and the tab's runtime. Reading it after the four loaders became one: **every input to
+  that policy is host-owned** — `allowSessionCreation`, the conversation, the tab's runtime. The
+  only provider-specific thing in the whole context was `plugin`, and it was there for one reason:
+  reaching `plugin.get<Provider>Execution().metadata.listCommands()`.
+- **A provider's workspace services are built *with* a plugin**, so the metadata call is now a
+  closure captured at construction — `create<Provider>RuntimeCommandLoader(plugin)` — and
+  `ProviderRuntimeCommandLoaderContext` no longer names the type. `src/core/providers/types.ts`
+  names `GrimoirePlugin` once less; five contexts still do, and they are the legacy contracts the
+  search's `closedBy` already points at.
+- What this leaves is the shape the row needs: a loader whose context is entirely host-owned, which
+  is what makes it placeable in the module's workspace slots rather than reachable only through the
+  registry. The slot it would go in — `ProviderRuntimeCommandsPort`, currently
+  `listForSession(sessionId)` alone — is the narrow reshape that was tried first and does not fit,
+  so putting it there is a contract change rather than a move, and it is the next step for this row.
+- One test expectation moved with it, asserting the context the host still decides: no plugin on it.
+- **This entry is a commit late.** Its insert failed on a mistyped anchor and the commit went out
+  without it, which is the one thing the journal discipline exists to prevent. Amended rather than
+  appended, so the entry and the change it describes are still one commit.
+
 ### M5 — two searches that were counting things the plan keeps (`this commit`)
 
 Re-reading the remaining searches against the plan, the way the `StreamChunk` one was re-read.

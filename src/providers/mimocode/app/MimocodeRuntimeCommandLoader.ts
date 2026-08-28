@@ -1,3 +1,4 @@
+import type GrimoirePlugin from '../../../main';
 import { AcpRuntimeCommandLoader } from '../../acp/commands/AcpRuntimeCommandLoader';
 import { getMimocodeProviderSettings } from '../settings';
 
@@ -9,9 +10,13 @@ import { getMimocodeProviderSettings } from '../settings';
  * flag, its metadata session, and the id it mints — see the shared file for why
  * that last one still differs between the four.
  */
-export const mimocodeRuntimeCommandLoader = new AcpRuntimeCommandLoader({
-  providerId: 'mimocode',
-  isEnabled: settings => getMimocodeProviderSettings(settings).enabled,
-  listAnnounced: context => context.plugin.getMimocodeExecution().metadata.listCommands(),
-  commandId: name => `mimocode:${name}`,
-});
+export function createMimocodeRuntimeCommandLoader(
+  plugin: GrimoirePlugin,
+): AcpRuntimeCommandLoader {
+  return new AcpRuntimeCommandLoader({
+    providerId: 'mimocode',
+    isEnabled: settings => getMimocodeProviderSettings(settings).enabled,
+    listAnnounced: () => plugin.getMimocodeExecution().metadata.listCommands(),
+    commandId: name => `mimocode:${name}`,
+  });
+}

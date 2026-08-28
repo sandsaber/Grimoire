@@ -1,3 +1,4 @@
+import type GrimoirePlugin from '../../../main';
 import { AcpRuntimeCommandLoader } from '../../acp/commands/AcpRuntimeCommandLoader';
 import { getKimicodeProviderSettings } from '../settings';
 
@@ -9,9 +10,13 @@ import { getKimicodeProviderSettings } from '../settings';
  * flag, its metadata session, and the id it mints — see the shared file for why
  * that last one still differs between the four.
  */
-export const kimicodeRuntimeCommandLoader = new AcpRuntimeCommandLoader({
-  providerId: 'kimicode',
-  isEnabled: settings => getKimicodeProviderSettings(settings).enabled,
-  listAnnounced: context => context.plugin.getKimicodeExecution().metadata.listCommands(),
-  commandId: name => `kimicode:${name}`,
-});
+export function createKimicodeRuntimeCommandLoader(
+  plugin: GrimoirePlugin,
+): AcpRuntimeCommandLoader {
+  return new AcpRuntimeCommandLoader({
+    providerId: 'kimicode',
+    isEnabled: settings => getKimicodeProviderSettings(settings).enabled,
+    listAnnounced: () => plugin.getKimicodeExecution().metadata.listCommands(),
+    commandId: name => `kimicode:${name}`,
+  });
+}

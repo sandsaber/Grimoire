@@ -1,4 +1,4 @@
-import { mimocodeRuntimeCommandLoader } from '@/providers/mimocode/app/MimocodeRuntimeCommandLoader';
+import { createMimocodeRuntimeCommandLoader } from '@/providers/mimocode/app/MimocodeRuntimeCommandLoader';
 
 const ANNOUNCED = [{ name: 'review', description: 'Review the diff' }];
 
@@ -34,13 +34,12 @@ describe('MimocodeRuntimeCommandLoader', () => {
 
   it('asks an isolated session for a blank tab warmup', async () => {
     const { plugin, listCommands } = createMockPlugin();
-    const loader = mimocodeRuntimeCommandLoader;
+    const loader = createMimocodeRuntimeCommandLoader(plugin);
 
     await expect(loader.loadCommands({
       allowSessionCreation: true,
       conversation: null,
       externalContextPaths: [],
-      plugin,
       runtime: null,
     })).resolves.toEqual([
       { id: 'mimocode:review', name: 'review', content: '', description: 'Review the diff' },
@@ -51,12 +50,11 @@ describe('MimocodeRuntimeCommandLoader', () => {
 
   it('keeps blank tabs cold unless warmup is explicitly requested', async () => {
     const { plugin, listCommands } = createMockPlugin();
-    const loader = mimocodeRuntimeCommandLoader;
+    const loader = createMimocodeRuntimeCommandLoader(plugin);
 
     await expect(loader.loadCommands({
       conversation: null,
       externalContextPaths: [],
-      plugin,
       runtime: null,
     })).resolves.toEqual([]);
 
@@ -69,7 +67,7 @@ describe('MimocodeRuntimeCommandLoader', () => {
       providerId: 'mimocode',
       getSupportedCommands: jest.fn(),
     };
-    const loader = mimocodeRuntimeCommandLoader;
+    const loader = createMimocodeRuntimeCommandLoader(plugin);
 
     await expect(loader.loadCommands({
       conversation: {
@@ -79,7 +77,6 @@ describe('MimocodeRuntimeCommandLoader', () => {
         sessionId: null,
       } as any,
       externalContextPaths: [],
-      plugin,
       runtime: boundRuntime as any,
     })).resolves.toEqual([
       { id: 'mimocode:review', name: 'review', content: '', description: 'Review the diff' },
@@ -96,14 +93,13 @@ describe('MimocodeRuntimeCommandLoader', () => {
     plugin.getMimocodeExecution = () => {
       throw new Error('MiMoCode execution is not available before plugin load.');
     };
-    const loader = mimocodeRuntimeCommandLoader;
+    const loader = createMimocodeRuntimeCommandLoader(plugin);
 
     // A tab that cannot list its commands still has to open.
     await expect(loader.loadCommands({
       allowSessionCreation: true,
       conversation: null,
       externalContextPaths: [],
-      plugin,
       runtime: null,
     })).resolves.toEqual([]);
   });
@@ -116,13 +112,12 @@ describe('MimocodeRuntimeCommandLoader', () => {
       getSessionId: () => null,
       getSupportedCommands: jest.fn().mockResolvedValue([]),
     };
-    const loader = mimocodeRuntimeCommandLoader;
+    const loader = createMimocodeRuntimeCommandLoader(plugin);
 
     await expect(loader.loadCommands({
       allowSessionCreation: true,
       conversation: null,
       externalContextPaths: [],
-      plugin,
       runtime: boundRuntime as any,
     })).resolves.toEqual([
       { id: 'mimocode:review', name: 'review', content: '', description: 'Review the diff' },
@@ -142,7 +137,7 @@ describe('MimocodeRuntimeCommandLoader', () => {
       getSessionId: () => 'acp-session-1',
       getSupportedCommands: jest.fn().mockResolvedValue(bound),
     };
-    const loader = mimocodeRuntimeCommandLoader;
+    const loader = createMimocodeRuntimeCommandLoader(plugin);
 
     await expect(loader.loadCommands({
       conversation: {
@@ -152,7 +147,6 @@ describe('MimocodeRuntimeCommandLoader', () => {
         sessionId: 'acp-session-1',
       } as any,
       externalContextPaths: [],
-      plugin,
       runtime: boundRuntime as any,
     })).resolves.toEqual(bound);
 

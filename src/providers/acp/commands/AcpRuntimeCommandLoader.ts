@@ -15,10 +15,16 @@ export interface AnnouncedAcpCommand {
 export interface AcpRuntimeCommandLoaderOptions {
   readonly providerId: ProviderId;
   readonly isEnabled: (settings: Record<string, unknown>) => boolean;
-  /** The provider's own metadata session, asked without a conversation. */
-  readonly listAnnounced: (
-    context: ProviderRuntimeCommandLoaderContext,
-  ) => Promise<readonly AnnouncedAcpCommand[]>;
+  /**
+   * The provider's own metadata session, asked without a conversation.
+   *
+   * Takes nothing: it used to be handed the loader's context so it could reach
+   * `context.plugin.get<Provider>Execution()`, which was the only reason that
+   * context carried a plugin at all. A provider's workspace services are built
+   * *with* a plugin, so the closure captures one and the contract stops naming
+   * the type.
+   */
+  readonly listAnnounced: () => Promise<readonly AnnouncedAcpCommand[]>;
   /**
    * The id this provider mints for a command it listed cold.
    *
@@ -95,7 +101,7 @@ export class AcpRuntimeCommandLoader implements ProviderRuntimeCommandLoader {
     // Opportunistic, like every other question asked without a conversation: a
     // plugin whose kernel has not started yet has no session to ask in, and a
     // tab that cannot list commands must still open.
-    const announced = await this.announcedCommands(context);
+    const announced = await this.announcedCommands();
     return announced.map(command => ({
       id: this.options.commandId(command.name),
       name: command.name,
@@ -106,11 +112,9 @@ export class AcpRuntimeCommandLoader implements ProviderRuntimeCommandLoader {
     }));
   }
 
-  private async announcedCommands(
-    context: ProviderRuntimeCommandLoaderContext,
-  ): Promise<readonly AnnouncedAcpCommand[]> {
+  private async announcedCommands(): Promise<readonly AnnouncedAcpCommand[]> {
     try {
-      return await this.options.listAnnounced(context);
+      return await this.options.listAnnounced();
     } catch {
       return [];
     }

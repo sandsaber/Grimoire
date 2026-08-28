@@ -17,7 +17,7 @@ import { getMimocodeProviderSettings } from '../settings';
 import { MimocodeAgentStorage } from '../storage/MimocodeAgentStorage';
 import { mimocodeSettingsTabRenderer } from '../ui/MimocodeSettingsTab';
 import { mimocodePlanUsageStore } from './MimocodePlanUsageStore';
-import { mimocodeRuntimeCommandLoader } from './MimocodeRuntimeCommandLoader';
+import { createMimocodeRuntimeCommandLoader } from './MimocodeRuntimeCommandLoader';
 
 export interface MimocodeWorkspaceServices extends ProviderWorkspaceServices {
   agentStorage: MimocodeAgentStorage;
@@ -105,7 +105,7 @@ export async function createMimocodeWorkspaceServices(
     mcpStorage,
     mcpServerManager,
     usageProvider: mimocodePlanUsageStore,
-    runtimeCommandLoader: mimocodeRuntimeCommandLoader,
+    runtimeCommandLoader: createMimocodeRuntimeCommandLoader(plugin),
     settingsTabRenderer: mimocodeSettingsTabRenderer,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();

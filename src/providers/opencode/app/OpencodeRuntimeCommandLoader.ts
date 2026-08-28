@@ -1,3 +1,4 @@
+import type GrimoirePlugin from '../../../main';
 import { AcpRuntimeCommandLoader } from '../../acp/commands/AcpRuntimeCommandLoader';
 import { getOpencodeProviderSettings } from '../settings';
 
@@ -9,9 +10,13 @@ import { getOpencodeProviderSettings } from '../settings';
  * flag, its metadata session, and the id it mints — see the shared file for why
  * that last one still differs between the four.
  */
-export const opencodeRuntimeCommandLoader = new AcpRuntimeCommandLoader({
-  providerId: 'opencode',
-  isEnabled: settings => getOpencodeProviderSettings(settings).enabled,
-  listAnnounced: context => context.plugin.getOpencodeExecution().metadata.listCommands(),
-  commandId: name => `opencode:${name}`,
-});
+export function createOpencodeRuntimeCommandLoader(
+  plugin: GrimoirePlugin,
+): AcpRuntimeCommandLoader {
+  return new AcpRuntimeCommandLoader({
+    providerId: 'opencode',
+    isEnabled: settings => getOpencodeProviderSettings(settings).enabled,
+    listAnnounced: () => plugin.getOpencodeExecution().metadata.listCommands(),
+    commandId: name => `opencode:${name}`,
+  });
+}

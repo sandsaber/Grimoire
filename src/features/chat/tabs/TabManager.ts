@@ -1282,7 +1282,6 @@ export class TabManager implements TabManagerInterface {
         && tab.id === this.activeTabId,
       conversation: context.conversation,
       externalContextPaths: context.externalContextPaths,
-      plugin: this.plugin,
       runtime: context.runtime,
     });
 

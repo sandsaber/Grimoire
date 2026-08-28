@@ -1265,7 +1265,6 @@ export class GrimoireSettingTab extends PluginSettingTab {
                 allowSessionCreation: true,
                 conversation: null,
                 externalContextPaths: [],
-                plugin: this.plugin,
                 runtime: null,
               });
               catalog.setRuntimeCommands(commands);

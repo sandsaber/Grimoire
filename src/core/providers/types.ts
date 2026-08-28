@@ -367,7 +367,6 @@ export interface ProviderRuntimeCommandLoaderContext {
   allowSessionCreation?: boolean;
   conversation: Conversation | null;
   externalContextPaths: string[];
-  plugin: GrimoirePlugin;
   runtime: ExecutionChatRuntimeAdapter | null;
 }
 

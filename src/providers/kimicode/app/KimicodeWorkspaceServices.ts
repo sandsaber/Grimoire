@@ -17,7 +17,7 @@ import { getKimicodeProviderSettings } from '../settings';
 import { KimicodeAgentStorage } from '../storage/KimicodeAgentStorage';
 import { kimicodeSettingsTabRenderer } from '../ui/KimicodeSettingsTab';
 import { kimicodePlanUsageStore } from './KimicodePlanUsageStore';
-import { kimicodeRuntimeCommandLoader } from './KimicodeRuntimeCommandLoader';
+import { createKimicodeRuntimeCommandLoader } from './KimicodeRuntimeCommandLoader';
 
 export interface KimicodeWorkspaceServices extends ProviderWorkspaceServices {
   agentStorage: KimicodeAgentStorage;
@@ -105,7 +105,7 @@ export async function createKimicodeWorkspaceServices(
     mcpStorage,
     mcpServerManager,
     usageProvider: kimicodePlanUsageStore,
-    runtimeCommandLoader: kimicodeRuntimeCommandLoader,
+    runtimeCommandLoader: createKimicodeRuntimeCommandLoader(plugin),
     settingsTabRenderer: kimicodeSettingsTabRenderer,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();
