@@ -375,13 +375,20 @@ describe('GrimoirePlugin', () => {
       // `try`, so a single throw cost every provider after it in the iteration
       // order its command catalog, model list, CLI resolution and settings tab
       // — and which ones those were depended on object key order.
-      const real = ProviderWorkspaceRegistry.createServices.bind(ProviderWorkspaceRegistry);
-      jest.spyOn(ProviderWorkspaceRegistry, 'createServices')
-        .mockImplementation(async (providerId, host) => {
-          if (providerId === 'claude') {
-            throw new Error('no Claude CLI on this machine');
+      // Failed through the contribution rather than a registry build step:
+      // assembling the context moved to the plugin, so the initializer this
+      // has to make throw is the contribution's own.
+      const real = ProviderWorkspaceRegistry.contributionFor.bind(ProviderWorkspaceRegistry);
+      jest.spyOn(ProviderWorkspaceRegistry, 'contributionFor')
+        .mockImplementation(providerId => {
+          const contribution = real(providerId);
+          if (providerId !== 'claude') {
+            return contribution;
           }
-          return real(providerId, host);
+          return {
+            ...contribution,
+            initialize: () => Promise.reject(new Error('no Claude CLI on this machine')),
+          };
         });
 
       await plugin.onload();

@@ -64,11 +64,12 @@ const STRICT_MODULES = [
  * list may shrink but never grow.
  */
 const LEGACY_CORE_PLUGIN_IMPORTS = [
-  // The chat registry left this list before the class did: its three auxiliary
-  // factories were the only members that took a plugin, and they went with the
-  // auxiliary owner. The class itself is deleted now — its last two rows are
-  // declarations — so what is left here is the workspace half and the types.
-  'src/core/providers/ProviderWorkspaceRegistry.ts',
+  // Both registries have left this list. The chat one went first — its three
+  // auxiliary factories were the only members that took a plugin, and they went
+  // with the auxiliary owner — and the class itself is deleted now. The
+  // workspace one took a plugin for exactly one method, to assemble the
+  // plugin-shaped context a contribution's `initialize` wants; the plugin
+  // assembles it. What is left is the types the contracts are written in.
   'src/core/providers/types.ts',
 ];
 

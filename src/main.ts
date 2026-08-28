@@ -550,7 +550,15 @@ export default class GrimoirePlugin extends Plugin {
     }
     const manager = new ProviderWorkspaceManager<ProviderWorkspaceServices>({
       contribution: providerId => ({
-        initialize: () => ProviderWorkspaceRegistry.createServices(providerId, this),
+        // The context is assembled here rather than inside the registry: it
+        // is plugin-shaped, and a registry that had to take a plugin to build
+        // it was the last thing in `src/core/providers` naming the type.
+        initialize: () => ProviderWorkspaceRegistry.contributionFor(providerId).initialize({
+          plugin: this,
+          storage: this.storage,
+          vaultAdapter: this.storage.getAdapter(),
+          homeAdapter: new HomeFileAdapter(),
+        }),
         // Legacy workspace services hold no process, watcher or timer — the
         // half is declared because a provider that grows one needs somewhere to
         // release it, and because init without dispose is what the first

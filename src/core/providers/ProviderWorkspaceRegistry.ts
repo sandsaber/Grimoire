@@ -1,5 +1,3 @@
-import type GrimoirePlugin from '../../main';
-import { HomeFileAdapter } from '../storage/HomeFileAdapter';
 import type {
   ProviderId,
   ProviderRuntimeCommandLoader,
@@ -35,26 +33,23 @@ export class ProviderWorkspaceRegistry {
   }
 
   /**
-   * Builds one provider's services, without publishing them.
+   * This provider's workspace contribution.
+   *
+   * The registry used to *build* the services too, which meant taking a plugin
+   * to assemble the context the contribution's `initialize` wants — the last
+   * reason anything in `src/core/providers` named the plugin type. Building it
+   * is the application's job and its one caller already holds a plugin, so what
+   * is left here is the holding.
    *
    * Lifecycle belongs to `ProviderWorkspaceManager`, which decides when to
-   * start, what a failure means, and what to release. This registry used to
-   * bring every provider up in one loop that awaited each in turn with no
-   * `try`: one throw and every provider after it in the iteration order was
-   * never built. The fitness test reads this file for the name that loop had,
-   * so it is described rather than written.
+   * start, what a failure means, and what to release. An earlier version brought
+   * every provider up in one loop that awaited each in turn with no `try`: one
+   * throw and every provider after it in the iteration order was never built.
+   * The fitness test reads this file for the name that loop had, so it is
+   * described rather than written.
    */
-  static createServices(
-    providerId: ProviderId,
-    plugin: GrimoirePlugin,
-  ): Promise<ProviderWorkspaceServices> {
-    const storage = plugin.storage;
-    return this.getWorkspaceRegistration(providerId).initialize({
-      plugin,
-      storage,
-      vaultAdapter: storage.getAdapter(),
-      homeAdapter: new HomeFileAdapter(),
-    });
+  static contributionFor(providerId: ProviderId): ProviderWorkspaceRegistration {
+    return this.getWorkspaceRegistration(providerId);
   }
 
   static setServices(

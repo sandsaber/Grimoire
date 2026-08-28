@@ -68,13 +68,19 @@ const SEARCHES: readonly DeletionSearch[] = [
     what: 'core importing the plugin type',
     pattern: /GrimoirePlugin/,
     within: 'src/core',
-    // **Three until the auxiliary row.** `ProviderRegistry` took a plugin for
+    // **One.** Both registries have left it. The chat one took a plugin for
     // exactly three members — the title, refine and inline-edit factories — and
-    // handing them a plugin was the whole reason a provider's auxiliary
-    // services could not be reached without one. They are the application's
-    // now, and the registry names no plugin type at all.
-    files: 2,
-    closedBy: 'the provider rows — one of the two is the workspace registry itself',
+    // handing them a plugin was the whole reason a provider's auxiliary services
+    // could not be reached without one; they are the application's now, and the
+    // class is deleted. The workspace one took a plugin for exactly one method,
+    // to assemble the plugin-shaped context a contribution's `initialize` wants,
+    // which its one caller was already holding a plugin to supply.
+    //
+    // What is left is `providers/types.ts`, where the contracts themselves are
+    // written: `ProviderWorkspaceInitContext` names a plugin because that is
+    // what a workspace contribution is handed. It goes when the contracts do.
+    files: 1,
+    closedBy: 'the provider rows — the legacy contracts are the last thing naming it',
   },
   {
     what: 'subagent hooks and loaders',
@@ -241,7 +247,7 @@ describe('structural deletion progress', () => {
     // wants "what is left" reads this line rather than eleven assertions.
     expect(remaining.map(search => `${search.what}: ${search.files}`)).toEqual([
       'worker tab ownership: 3',
-      'core importing the plugin type: 2',
+      'core importing the plugin type: 1',
       'subagent hooks and loaders: 3',
       'SubagentManager lifecycle: 7',
       'provider-neutral application code importing a concrete provider: 2',

@@ -10402,6 +10402,30 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — `src/core/providers` stops naming the plugin, except in the contracts (`this commit`)
+
+- Gates: unit 8742 passed, 8742 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **`core importing the plugin type` falls 2 → 1.** `ProviderWorkspaceRegistry.createServices` was
+  the last method in `src/core/providers` to name `GrimoirePlugin`, and it took one only to
+  *assemble* the context a workspace contribution's `initialize` wants — plugin, storage, vault
+  adapter, home adapter. Its single caller is `main.ts`, which was already passing `this`. The
+  registry now answers `contributionFor(providerId)` and the plugin assembles the context, which is
+  the same split the chat registry's three auxiliary factories took: the thing that knows the
+  plugin's shape is the plugin.
+- What is left is `providers/types.ts`, where the contracts are written —
+  `ProviderWorkspaceInitContext` names a plugin because that is what a workspace contribution is
+  handed. It goes when the contracts do, so the `closedBy` says that rather than naming a registry
+  that no longer qualifies.
+- **Both gates caught the move**, which is worth stating because they overlap on purpose: the
+  deletion count and `executionCompositionBoundaries`' `LEGACY_CORE_PLUGIN_IMPORTS`, a list that may
+  shrink but never grow. Both are updated.
+- **The failure-isolation test moved with it.** `main.test.ts` made Claude's workspace throw by
+  spying on the registry's build step to prove one provider's failure does not cost every provider
+  after it in the iteration order. There is no build step now, so it fails the *contribution's* own
+  `initialize`. Proved by pointing the spy at a provider id that does not exist: nothing throws,
+  nothing is missing services, and the test fails.
+
 ### M5 — the twenty that could not fall, split into two that can (`this commit`)
 
 - Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean.
