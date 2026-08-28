@@ -20,7 +20,14 @@ import {
 describe('Kimi Code provider module', () => {
   function createContext(): KimicodeWorkspaceContext {
     return {
-      listCommands: async () => [{ name: 'init', source: 'project' as const }],
+      commandsPort: () => ({
+        listDropdownEntries: async () => [],
+        listVaultEntries: async () => [],
+        saveVaultEntry: async () => undefined,
+        deleteVaultEntry: async () => undefined,
+        setRuntimeCommands: () => undefined,
+        refresh: async () => undefined,
+      }),
       listSessionCommands: async () => [{ name: 'undo', source: 'session' as const }],
       listAgentMentions: async () => [{ id: 'build', label: 'Build' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,

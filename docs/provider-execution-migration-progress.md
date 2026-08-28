@@ -9709,6 +9709,44 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### The command catalog moved, and its port was one member against seven
+
+`ProviderCommandsPort` was `list(): Promise<descriptor[]>` against a row that also **writes**: the
+settings hub saves and deletes vault entries through it, the tab manager hands it the commands a
+live session reported, and it knows where a new entry goes when the user names none. Seven members
+now, and they carry `ProviderCommandEntry` rather than `ProviderCommandDescriptor` — every consumer
+but one reads fields a descriptor does not have (which file an entry lives in, whether it is
+editable, whether it is deletable), and the one that did — `getSupportedCommands` on the adapter —
+was already being served by a mapping the shared slot performed over these same entries. That
+mapping is deleted rather than moved.
+
+The port is the registered catalog itself, handed through, **as the same object**. That identity is
+load-bearing and is asserted: the tab manager gives a live session's commands to `setRuntimeCommands`
+and the settings hub lists them back, so a wrapper here would be a second object writing where
+nothing reads. `ProviderWorkspaceRegistry.getCommandCatalog` is deleted, and `InlineEditModal` loses
+its registry import outright.
+
+**Two behaviours changed, both in the direction the split was for.** A composer whose provider
+declares a dropdown now offers one before the workspace has built a catalog — the entries are empty
+until it has, which is a different answer from "this provider has no commands", and it is the reason
+the two questions are now asked of two different things. And `getProviderCatalogConfig` answers
+`null` only for a provider that declares no command surface, rather than for any provider whose
+workspace is not yet built.
+
+**Three test failures were the harness, not the product, and each says something.** Reaching the
+catalog through the workspace is one await longer than the registry lookup it replaces, so a
+`flushMicrotasks(4)` tuned to the old path reported fire-and-forget priming as never having happened;
+a case counting a borrow was counting the previous tab's priming, which now lands after its
+`mockClear`; and a case asserting the slash-command cache is reset on every conversation event was
+counting one of the two paths that reset it — `setProviderCatalog` empties the same three fields
+`resetSdkSkillsCache` does. All three were assertions about *when*, written when the answer was
+synchronous.
+
+Also caught by a gate doing its job: a comment in `workspaceContextSlots.ts` naming the workspace
+registry made the structural-deletion count stay flat while a file had actually left it. The count
+is over files that mention either registry, and a comment about one is not a consumer — so the
+comment is worded without the identifier, and says why.
+
 #### The command dropdown was never a workspace service
 
 The command catalog's `getDropdownConfig()` returns a **frozen literal in all nine

@@ -24,23 +24,6 @@ describe('ProviderWorkspaceRegistry', () => {
     expect(refreshCodex).toHaveBeenCalled();
   });
 
-  it('returns the assigned catalog for a provider', () => {
-    const mockCatalog = {
-      listDropdownEntries: jest.fn(),
-      listVaultEntries: jest.fn(),
-      saveVaultEntry: jest.fn(),
-      deleteVaultEntry: jest.fn(),
-      setRuntimeCommands: jest.fn(),
-      refresh: jest.fn(),
-    };
-
-    ProviderWorkspaceRegistry.setServices('claude', {
-      commandCatalog: mockCatalog,
-    });
-
-    expect(ProviderWorkspaceRegistry.getCommandCatalog('claude')).toBe(mockCatalog);
-  });
-
   it('returns the runtime command loader for a provider', () => {
     const runtimeCommandLoader = {
       isAvailable: jest.fn().mockReturnValue(true),

@@ -229,7 +229,18 @@ describe('adapter members that were missing until the coverage gate found them',
     // never requests them. Mapping from discovery instead would have turned
     // that on at its flip.
     const adapter = createBareAdapter(codexProviderModule.capabilities, {
-      commands: { list: async () => [{ name: 'review', source: 'project' as const }] },
+      commands: {
+        listDropdownEntries: async () => [{
+          id: 'claude-review',
+          providerId: 'claude',
+          kind: 'command' as const,
+          name: 'review',
+          scope: 'vault' as const,
+          source: 'user' as const,
+          isEditable: true,
+          isDeletable: true,
+        }],
+      } as never,
     });
 
     expect(await adapter.getSupportedCommands()).toEqual([]);
@@ -237,7 +248,18 @@ describe('adapter members that were missing until the coverage gate found them',
 
   it('surfaces the catalog where the chat input does ask', async () => {
     const adapter = createBareAdapter(claudeProviderModule.capabilities, {
-      commands: { list: async () => [{ name: 'review', source: 'project' as const }] },
+      commands: {
+        listDropdownEntries: async () => [{
+          id: 'claude-review',
+          providerId: 'claude',
+          kind: 'command' as const,
+          name: 'review',
+          scope: 'vault' as const,
+          source: 'user' as const,
+          isEditable: true,
+          isDeletable: true,
+        }],
+      } as never,
     });
 
     // Slash commands, not port descriptors: the caller needs an id and a

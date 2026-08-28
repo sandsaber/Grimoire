@@ -3,6 +3,7 @@ import type {
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandDescriptor,
+  ProviderCommandsPort,
   ProviderHistoryHydration,
   ProviderMcpServer,
   ProviderModelDescriptor,
@@ -93,7 +94,7 @@ const KNOWN_SETTINGS_FIELDS = new Set([
 ]);
 
 export interface KimicodeWorkspaceContext {
-  listCommands(): Promise<readonly ProviderCommandDescriptor[]>;
+  commandsPort(): ProviderCommandsPort | undefined;
   listSessionCommands(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
@@ -276,7 +277,7 @@ KimicodeProviderSettings
     providerId: 'kimicode',
     async initialize(context): Promise<KimicodeWorkspace> {
       return {
-        commands: { list: () => context.listCommands() },
+        ...(context.commandsPort() ? { commands: context.commandsPort()! } : {}),
         runtimeCommands: {
           listForSession: sessionId => context.listSessionCommands(sessionId),
         },

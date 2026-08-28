@@ -1,6 +1,5 @@
 import type GrimoirePlugin from '../../main';
 import { HomeFileAdapter } from '../storage/HomeFileAdapter';
-import type { ProviderCommandCatalog } from './commands/ProviderCommandCatalog';
 import type {
   ProviderCliResolver,
   ProviderId,
@@ -88,10 +87,6 @@ export class ProviderWorkspaceRegistry {
       throw new Error(`Provider workspace "${providerId}" is not initialized.`);
     }
     return services;
-  }
-
-  static getCommandCatalog(providerId: ProviderId): ProviderCommandCatalog | null {
-    return this.getServices(providerId)?.commandCatalog ?? null;
   }
 
   static async refreshAgentMentions(providerId: ProviderId): Promise<void> {

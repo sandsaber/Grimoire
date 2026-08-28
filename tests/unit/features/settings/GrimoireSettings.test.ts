@@ -542,8 +542,14 @@ describe('GrimoireSettingTab settings hub', () => {
       isAvailable: jest.fn().mockReturnValue(true),
       loadCommands: jest.fn().mockResolvedValue([{ name: 'review', description: 'Review the current workspace' }]),
     };
-    jest.spyOn(ProviderWorkspaceRegistry, 'getCommandCatalog')
-      .mockImplementation((providerId: any) => providerId === 'opencode' ? catalog as any : null);
+    // The catalog is a workspace port now; the runtime command loader is still
+    // a registry row, so the two are stubbed in the two different places they
+    // are actually read from.
+    plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceFor: async (providerId: string) => (
+        providerId === 'opencode' ? { commands: catalog } : {}
+      ),
+    });
     jest.spyOn(ProviderWorkspaceRegistry, 'getRuntimeCommandLoader')
       .mockImplementation((providerId: any) => providerId === 'opencode' ? loader : null);
 

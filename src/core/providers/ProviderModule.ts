@@ -1,5 +1,7 @@
 import type { ExecutionBackendFactory } from '../execution/ExecutionBackendDescriptor';
+import type { SlashCommand } from '../types';
 import type { ProviderId } from '../types/provider';
+import type { ProviderCommandEntry } from './commands/ProviderCommandEntry';
 
 /**
  * The contract a built-in provider contributes to the application.
@@ -192,8 +194,41 @@ export interface ProviderWorkspaceSlots {
   readonly settingsPresentation?: ProviderSettingsPresentationPort;
 }
 
+/**
+ * A provider's slash commands and skills, as the vault holds them.
+ *
+ * **Seven operations, not one.** The slot was `list()` against a row that also
+ * *writes*: the settings hub saves and deletes vault entries through it, the
+ * tab manager hands it the commands a live session reported, and it knows where
+ * a new entry goes when the user names no path. An eighth — the dropdown's
+ * trigger characters — was never a service at all and is
+ * `ProviderDeclarations.commandDropdown` now.
+ *
+ * Entries rather than descriptors, because every consumer but one reads fields
+ * a descriptor does not have: which file an entry lives in, whether it can be
+ * edited, whether it can be deleted. The one that did read descriptors —
+ * `getSupportedCommands` on the adapter — was already served by a mapping the
+ * shared slot performed over these same entries.
+ */
 export interface ProviderCommandsPort {
-  list(): Promise<readonly ProviderCommandDescriptor[]>;
+  /** What the composer's dropdown lists: vault entries and runtime ones together. */
+  listDropdownEntries(
+    options: { readonly includeBuiltIns: boolean },
+  ): Promise<readonly ProviderCommandEntry[]>;
+  /** Only what lives in the vault, which is the half the settings hub can edit. */
+  listVaultEntries(): Promise<readonly ProviderCommandEntry[]>;
+  saveVaultEntry(entry: ProviderCommandEntry): Promise<void>;
+  deleteVaultEntry(entry: ProviderCommandEntry): Promise<void>;
+  /**
+   * Where a new vault entry is written when the user names no path.
+   *
+   * Optional: a provider whose entries all live in one root has nowhere else to
+   * put one, and answering a path it does not own would write there.
+   */
+  defaultVaultStoragePath?(): string | null;
+  /** Hands the catalog the commands a live session has just reported. */
+  setRuntimeCommands(commands: SlashCommand[]): void;
+  refresh(): Promise<void>;
 }
 
 /**

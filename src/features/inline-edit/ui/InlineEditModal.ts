@@ -7,7 +7,6 @@ import { Notice } from 'obsidian';
 import { AuxiliaryExecutionOwner } from '../../../app/auxiliary/AuxiliaryExecutionOwner';
 import { getHiddenProviderCommandSet } from '../../../core/providers/commands/hiddenCommands';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import { DEFAULT_CHAT_PROVIDER_ID, type InlineEditMode, type InlineEditService, type ProviderId } from '../../../core/providers/types';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
@@ -459,8 +458,8 @@ class InlineEditController {
     this.inputEl.spellcheck = false;
     this.spinnerEl = inputWrap.createDiv({ cls: 'grimoire-inline-spinner grimoire-hidden' });
 
-    const inlineCatalog = ProviderWorkspaceRegistry.getCommandCatalog(this.resolvedProviderId);
     const inlineDropdown = providerCatalog().declarations(this.resolvedProviderId).commandDropdown;
+    const providerId = this.resolvedProviderId;
     this.slashCommandDropdown = new SlashCommandDropdown(
       ownerDocument.body,
       this.inputEl,
@@ -471,9 +470,12 @@ class InlineEditController {
       {
         fixed: true,
         hiddenCommands: getHiddenProviderCommandSet(this.plugin.settings, this.resolvedProviderId),
-        ...(inlineCatalog && inlineDropdown ? {
-          providerConfig: { providerId: this.resolvedProviderId, ...inlineDropdown },
-          getProviderEntries: () => inlineCatalog.listDropdownEntries({ includeBuiltIns: false }),
+        ...(inlineDropdown ? {
+          providerConfig: { providerId, ...inlineDropdown },
+          getProviderEntries: async () => (
+            (await this.plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId))
+              ?.commands?.listDropdownEntries({ includeBuiltIns: false }) ?? []
+          ),
         } : {}),
       }
     );

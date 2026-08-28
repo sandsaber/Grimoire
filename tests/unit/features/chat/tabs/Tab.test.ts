@@ -99,6 +99,7 @@ const createMockSlashCommandDropdown = () => ({
   isVisible: jest.fn().mockReturnValue(false),
   hide: jest.fn(),
   resetSdkSkillsCache: jest.fn(),
+  setProviderCatalog: jest.fn(),
   setHiddenCommands: jest.fn(),
   setEnabled: jest.fn(),
   destroy: jest.fn(),
@@ -3446,7 +3447,15 @@ describe('Tab - Controller Configuration', () => {
       callbacks.onConversationLoaded();
       callbacks.onConversationSwitched();
 
-      expect(mockSlashCommandDropdown.resetSdkSkillsCache).toHaveBeenCalledTimes(3);
+      // Either branch clears it, and which one runs is now a question about the
+      // provider's declaration rather than about whether its workspace has been
+      // built: `setProviderCatalog` empties the same three fields
+      // `resetSdkSkillsCache` does, before installing the new entry source. So
+      // the assertion counts the clearing, not the path.
+      const cleared = mockSlashCommandDropdown.resetSdkSkillsCache.mock.calls.length
+        + mockSlashCommandDropdown.setProviderCatalog.mock.calls.length;
+
+      expect(cleared).toBe(3);
     });
   });
 });

@@ -1,7 +1,7 @@
 import type {
   ProviderAgentMention,
   ProviderAgentMentionSource,
-  ProviderCommandDescriptor,
+  ProviderCommandsPort,
   ProviderMcpServer,
   ProviderModelDescriptor,
   ProviderUsageSnapshot,
@@ -52,14 +52,18 @@ export interface WorkspaceContextServices {
       source: ProviderAgentMentionSource;
     }>;
   } | null;
-  readonly commandCatalog?: {
-    listDropdownEntries(context: { includeBuiltIns: boolean }): Promise<ReadonlyArray<{
-      name: string;
-      description?: string;
-      /** Where the entry came from. See `commandSource` for why not `source`. */
-      scope?: string;
-    }>>;
-  } | null;
+  /**
+   * The registered command catalog, whole.
+   *
+   * Structurally the module's own `ProviderCommandsPort`, which is what it is
+   * handed through as. It was narrowed to `listDropdownEntries` here while the
+   * slot answered one question; the row's other six — the writes, the runtime
+   * hand-off, the refresh — reached the feature layer through
+   * the workspace registry instead, which is what kept the row registered.
+   * (Spelled out rather than named: the deletion gate counts files that mention
+   * either registry, and a comment about one is not a consumer of it.)
+   */
+  readonly commandCatalog?: ProviderCommandsPort | null;
   readonly mcpStorage?: AppMcpStorage | null;
   readonly modelCatalog?: ProviderModelCatalog | null;
   readonly refreshAgentMentions?: () => Promise<void>;
@@ -76,7 +80,8 @@ export interface WorkspaceContextSlotOptions {
 
 export interface WorkspaceContextSlots {
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
-  listCommands(): Promise<readonly ProviderCommandDescriptor[]>;
+  /** The registered catalog, or nothing when this provider has none. */
+  commandsPort(): ProviderCommandsPort | undefined;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   loadMcpServers(): Promise<readonly ProviderMcpServer[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
@@ -137,22 +142,11 @@ export function createWorkspaceContextSlots(
       }));
     },
 
-    listCommands: async () => {
-      // `false`, like every caller in the product: `TabManager`, `tabSettings`,
-      // `InlineEditModal` and the settings tab all ask for the dropdown without
-      // built-ins, and this slot reports the list the dropdown shows. Only one
-      // of the nine catalogs reads the flag at all — Codex's, which would
-      // prepend its compact command — and Codex asks for `false` too. It was
-      // briefly `true` for seven providers here: inert, because their catalogs
-      // ignore it, and a statement about the product that was not true.
-      const entries = await services()?.commandCatalog
-        ?.listDropdownEntries({ includeBuiltIns: false }) ?? [];
-      return entries.map((entry): ProviderCommandDescriptor => ({
-        name: entry.name,
-        ...(entry.description ? { description: entry.description } : {}),
-        source: commandSource(entry.scope),
-      }));
-    },
+    // Handed through rather than wrapped: the port and the registered catalog
+    // are the same seven members, and the only thing a wrapper could add is a
+    // second object whose `setRuntimeCommands` writes somewhere the settings
+    // hub does not read.
+    commandsPort: () => services()?.commandCatalog ?? undefined,
 
     listModels: async () => models(),
 
@@ -212,32 +206,6 @@ export function createWorkspaceContextSlots(
       )));
     },
   };
-}
-
-/**
- * Where a command came from, in the slot's vocabulary.
- *
- * Read from the entry's `scope`, not its `source`. `source` is
- * `'builtin' | 'user' | 'plugin' | 'sdk'` — a *provenance* — while the slot asks
- * where the user would go to change it, which is what `scope` answers. The
- * first version of this mapped `source`, sent everything that was not
- * `'builtin'` to `'project'`, and collapsed two of the slot's four values: a
- * command the user wrote in their own directory and one the live session
- * announced both came back as a project command. Codex's hand-written version
- * had the same shape with `'project'` hard-coded.
- */
-function commandSource(scope: string | undefined): ProviderCommandDescriptor['source'] {
-  switch (scope) {
-    case 'builtin':
-    case 'system':
-      return 'built-in';
-    case 'user':
-      return 'user';
-    case 'runtime':
-      return 'session';
-    default:
-      return 'project';
-  }
 }
 
 /**

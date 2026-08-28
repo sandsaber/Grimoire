@@ -1130,7 +1130,13 @@ export class ExecutionChatRuntimeAdapter {
     const sessionId = this.ports.currentSessionId();
     const runtime = sessionId ? this.workspace?.runtimeCommands : undefined;
     const fromSession = runtime ? await runtime.listForSession(sessionId as string) : [];
-    const fromCatalog = this.workspace?.commands ? await this.workspace.commands.list() : [];
+    // `false`, like every caller in the product: the composer, the settings
+    // hub and the inline-edit modal all ask for the dropdown without built-ins,
+    // and this is the same list they show. Only Codex's catalog reads the flag
+    // at all, and Codex asks for `false` too.
+    const fromCatalog = this.workspace?.commands
+      ? await this.workspace.commands.listDropdownEntries({ includeBuiltIns: false })
+      : [];
     // Translated at the boundary: the caller wants slash commands, which carry
     // an id and a prompt template the port's descriptor does not have. An empty
     // template is the honest value — the provider owns the expansion.

@@ -44,9 +44,6 @@ export function createCodexModuleContext(
 
   return {
     ...workspace,
-    // The dropdown is the same list the composer offers, which is what a
-    // provider command *is* for Codex: a vault skill, not a built-in.
-    listSkills: () => workspace.listCommands(),
     renderSettingsTab: host => {
       const rendered = host as {
         container: HTMLElement;

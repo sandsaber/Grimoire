@@ -629,7 +629,7 @@ describe('the assembled ChatRuntime adapter', () => {
         ...ports,
       },
       codexProviderModule.runtimePorts({
-        listSkills: async () => [],
+        commandsPort: () => undefined,
         listAgentMentions: async () => [],
         refreshAgentMentions: async () => undefined,
         resolveCliPath: async () => null,
@@ -981,7 +981,7 @@ describe('the assembled ChatRuntime adapter', () => {
         delay: immediately,
       },
       codexProviderModule.runtimePorts({
-        listSkills: async () => [],
+        commandsPort: () => undefined,
         listAgentMentions: async () => [],
         refreshAgentMentions: async () => undefined,
         resolveCliPath: async () => null,

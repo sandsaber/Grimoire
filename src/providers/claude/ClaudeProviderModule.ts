@@ -3,6 +3,7 @@ import type {
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandDescriptor,
+  ProviderCommandsPort,
   ProviderHistoryHydration,
   ProviderMcpServer,
   ProviderModelDescriptor,
@@ -71,7 +72,7 @@ const KNOWN_SETTINGS_FIELDS = new Set([
 
 
 export interface ClaudeWorkspaceContext {
-  listCommands(): Promise<readonly ProviderCommandDescriptor[]>;
+  commandsPort(): ProviderCommandsPort | undefined;
   listSessionCommands(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
@@ -270,7 +271,7 @@ ClaudeProviderSettings
     providerId: 'claude',
     async initialize(context): Promise<ClaudeWorkspace> {
       return {
-        commands: { list: () => context.listCommands() },
+        ...(context.commandsPort() ? { commands: context.commandsPort()! } : {}),
         runtimeCommands: {
           listForSession: sessionId => context.listSessionCommands(sessionId),
         },

@@ -26,7 +26,7 @@ export interface SlashCommandDropdownOptions {
   fixed?: boolean;
   hiddenCommands?: Set<string>;
   providerConfig?: ProviderCommandDropdownConfig;
-  getProviderEntries?: () => Promise<ProviderCommandEntry[]>;
+  getProviderEntries?: () => Promise<readonly ProviderCommandEntry[]>;
 }
 
 export class SlashCommandDropdown {
@@ -44,7 +44,7 @@ export class SlashCommandDropdown {
   private hiddenCommands: Set<string>;
 
   private providerConfig: ProviderCommandDropdownConfig | null;
-  private getProviderEntries: (() => Promise<ProviderCommandEntry[]>) | null;
+  private getProviderEntries: (() => Promise<readonly ProviderCommandEntry[]>) | null;
   private cachedProviderEntries: ProviderCommandEntry[] = [];
   private providerEntriesFetched = false;
 
@@ -81,7 +81,7 @@ export class SlashCommandDropdown {
 
   setProviderCatalog(
     config: ProviderCommandDropdownConfig,
-    getEntries: () => Promise<ProviderCommandEntry[]>,
+    getEntries: () => Promise<readonly ProviderCommandEntry[]>,
   ): void {
     this.providerConfig = config;
     this.getProviderEntries = getEntries;
@@ -240,7 +240,7 @@ export class SlashCommandDropdown {
       const entries = await this.getProviderEntries();
       if (currentRequest !== this.requestId) return;
       if (entries.length > 0) {
-        this.cachedProviderEntries = entries;
+        this.cachedProviderEntries = [...entries];
         this.providerEntriesFetched = true;
       }
     } catch {

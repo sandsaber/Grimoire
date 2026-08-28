@@ -19,6 +19,7 @@ import {
 } from '../../core/providers/commands/hiddenCommands';
 import type { ProviderCommandEntry } from '../../core/providers/commands/ProviderCommandEntry';
 import { providerCatalog } from '../../core/providers/ProviderCatalog';
+import type { ProviderCommandsPort } from '../../core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../core/providers/ProviderWorkspaceRegistry';
 import type {
@@ -1239,7 +1240,9 @@ export class GrimoireSettingTab extends PluginSettingTab {
       for (const providerId of providerIds) {
         const capability = providerCatalog().workspaceCapabilities(providerId)[section];
         if (!capability || capability.inventory === 'none') continue;
-        const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
+        const catalog = (
+          await this.plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId)
+        )?.commands;
         if (!catalog) continue;
         try {
           const vaultEntries = await catalog.listVaultEntries();
@@ -1451,7 +1454,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
     providerId: ProviderId,
     section: Extract<WorkspaceSection, 'skills' | 'commands'>,
     forceReadonly: boolean,
-    catalog: ReturnType<typeof ProviderWorkspaceRegistry.getCommandCatalog> & object,
+    catalog: ProviderCommandsPort,
   ): WorkspaceResourceRow {
     const readonly = forceReadonly
       || !entry.isEditable

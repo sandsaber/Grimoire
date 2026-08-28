@@ -159,7 +159,7 @@ export function syncSlashCommandDropdownForProvider(
   }
 
   const catalogInfo = getProviderCatalogConfig?.()
-    ?? getRegistryProviderCatalogInfo(getTabProviderId(tab, plugin, conversation));
+    ?? getRegistryProviderCatalogInfo(getTabProviderId(tab, plugin, conversation), plugin);
 
   if (catalogInfo) {
     dropdown.setProviderCatalog?.(catalogInfo.config, catalogInfo.getEntries);

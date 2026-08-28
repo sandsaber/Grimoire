@@ -42,33 +42,21 @@ describe('Claude module context workspace slots', () => {
     // An unregistered workspace is a provider with nothing to offer, not a
     // provider that fails: the settings surface renders empty rather than
     // throwing where nobody catches it.
-    expect(await context.listCommands()).toEqual([]);
+    expect(context.commandsPort()).toBeUndefined();
     expect(await context.listAgentMentions()).toEqual([]);
     expect(await context.listModels()).toEqual([]);
     expect(await context.loadMcpServers()).toEqual([]);
     await expect(context.saveMcpServers([])).resolves.toBeUndefined();
   });
 
-  it('reads the command catalog the dropdown reads', async () => {
-    const plugin = pluginWith({
-      commandCatalog: {
-        listDropdownEntries: jest.fn(async () => [
-          { name: 'compact', description: 'Compact the transcript', scope: 'builtin' },
-          { name: 'review', scope: 'vault' },
-        ]),
-      },
-    });
-    const context = createClaudeModuleContext(plugin, () => null, ports);
+  it('hands the registered catalog through, as the same object', async () => {
+    // Identity, not shape: the tab manager gives a live session's commands to
+    // this port and the settings hub lists them back, so a wrapper here would
+    // be a second object whose `setRuntimeCommands` writes where nothing reads.
+    const commandCatalog = { listDropdownEntries: jest.fn(async () => []) };
+    const context = createClaudeModuleContext(pluginWith({ commandCatalog }), () => null, ports);
 
-    const commands = await context.listCommands();
-
-    // The same list the composer offers: every caller in the product asks the
-    // catalog for the dropdown without built-ins, and this slot reports what
-    // the dropdown shows.
-    expect(commands).toEqual([
-      { name: 'compact', description: 'Compact the transcript', source: 'built-in' },
-      { name: 'review', source: 'project' },
-    ]);
+    expect(context.commandsPort()).toBe(commandCatalog);
   });
 
   it('asks the mention provider for everything it knows', async () => {

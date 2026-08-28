@@ -20,7 +20,14 @@ import {
 describe('Claude provider module', () => {
   function createContext(): ClaudeWorkspaceContext {
     return {
-      listCommands: async () => [{ name: 'review', source: 'project' as const }],
+      commandsPort: () => ({
+        listDropdownEntries: async () => [],
+        listVaultEntries: async () => [],
+        saveVaultEntry: async () => undefined,
+        deleteVaultEntry: async () => undefined,
+        setRuntimeCommands: () => undefined,
+        refresh: async () => undefined,
+      }),
       listSessionCommands: async () => [{ name: 'compact', source: 'session' as const }],
       listAgentMentions: async () => [{ id: 'planner', label: 'Planner' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
@@ -132,9 +139,8 @@ describe('Claude provider module', () => {
     it('discovers commands both statically and from the live session', async () => {
       const workspace = await workspaceSlots();
 
-      expect(await workspace.commands?.list()).toEqual([
-        { name: 'review', source: 'project' },
-      ]);
+      expect(await workspace.commands?.listDropdownEntries({ includeBuiltIns: false }))
+        .toEqual([]);
       expect(await workspace.runtimeCommands?.listForSession('claude-session')).toEqual([
         { name: 'compact', source: 'session' },
       ]);

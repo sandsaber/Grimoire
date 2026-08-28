@@ -20,7 +20,7 @@ import { createQwenModuleContext } from '@/providers/qwen/app/QwenModuleContext'
 describe('provider workspace context slots', () => {
   interface Wiring {
     readonly build: (plugin: never) => {
-      listCommands(): Promise<readonly unknown[]>;
+      commandsPort(): unknown;
       listModels(): Promise<readonly unknown[]>;
       loadMcpServers(): Promise<readonly { id: string }[]>;
       cachedPlanUsage(): unknown;
@@ -70,46 +70,25 @@ describe('provider workspace context slots', () => {
     expect(servers.map(server => server.id)).toEqual([`${providerId}-server`]);
   });
 
-  it('asks the catalog for the dropdown list, without built-ins', async () => {
-    const listDropdownEntries = jest.fn(async () => []);
-    ProviderWorkspaceRegistry.setServices('grok', {
-      commandCatalog: { listDropdownEntries },
-    } as never);
+  it('hands the registered catalog through, as the same object', async () => {
+    // **Identity, not shape.** The tab manager gives a live session's commands
+    // to this port and the settings hub lists them back; a wrapper here would
+    // be a second object whose `setRuntimeCommands` writes where nothing reads.
+    const catalog = { listDropdownEntries: jest.fn(async () => []) };
+    ProviderWorkspaceRegistry.setServices('grok', { commandCatalog: catalog } as never);
 
-    await createGrokModuleContext(plugin(), () => null, ports).listCommands();
-
-    // Every caller in the product asks for `false`, and only one of the nine
-    // catalogs reads the flag at all. Asking for `true` here would have made
-    // this slot report a list no dropdown shows.
-    expect(listDropdownEntries).toHaveBeenCalledWith({ includeBuiltIns: false });
+    expect(createGrokModuleContext(plugin(), () => null, ports).commandsPort())
+      .toBe(catalog);
   });
 
-  it('names where a command came from, in all four of the slot\'s words', async () => {
-    ProviderWorkspaceRegistry.setServices('grok', {
-      commandCatalog: {
-        listDropdownEntries: async () => [
-          { name: 'compact', scope: 'builtin', source: 'builtin' },
-          { name: 'review', scope: 'vault', source: 'plugin' },
-          { name: 'mine', scope: 'user', source: 'user' },
-          { name: 'announced', scope: 'runtime', source: 'sdk' },
-          { name: 'internal', scope: 'system', source: 'builtin' },
-        ],
-      },
-    } as never);
+  it('offers no commands port at all where no catalog is registered', async () => {
+    // Absent rather than an empty catalog: the module leaves the `commands`
+    // slot out entirely for a provider with none, which is what the workspace
+    // capability record already says about it.
+    ProviderWorkspaceRegistry.setServices('grok', {});
 
-    const commands = await createGrokModuleContext(plugin(), () => null, ports).listCommands();
-
-    // The slot has four words and the first version of this mapping used two:
-    // it read the entry's *provenance* and sent everything that was not
-    // `builtin` to `project`, so a command the user wrote and one the live
-    // session announced were reported as the same kind of thing.
-    expect(commands).toEqual([
-      { name: 'compact', source: 'built-in' },
-      { name: 'review', source: 'project' },
-      { name: 'mine', source: 'user' },
-      { name: 'announced', source: 'session' },
-      { name: 'internal', source: 'built-in' },
-    ]);
+    expect(createGrokModuleContext(plugin(), () => null, ports).commandsPort())
+      .toBeUndefined();
   });
 
   it('reports no plan for a provider the user has switched off', async () => {
@@ -140,7 +119,7 @@ describe('provider workspace context slots', () => {
   it.each(WIRINGS)('$providerId offers nothing before its workspace is registered', async ({ build }) => {
     const context = build(plugin());
 
-    expect(await context.listCommands()).toEqual([]);
+    expect(context.commandsPort()).toBeUndefined();
     expect(await context.listModels()).toEqual([]);
     expect(await context.loadMcpServers()).toEqual([]);
     expect(context.cachedPlanUsage()).toBeNull();

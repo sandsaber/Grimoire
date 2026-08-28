@@ -2,7 +2,7 @@ import type {
   ProviderAgentMention,
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
-  ProviderCommandDescriptor,
+  ProviderCommandsPort,
   ProviderHistoryHydration,
   ProviderMcpServer,
   ProviderModelDescriptor,
@@ -84,7 +84,7 @@ const KNOWN_SETTINGS_FIELDS = new Set([
 ]);
 
 export interface GeminiWorkspaceContext {
-  listCommands(): Promise<readonly ProviderCommandDescriptor[]>;
+  commandsPort(): ProviderCommandsPort | undefined;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
   resolveCliPath(): Promise<string | null>;
@@ -275,7 +275,7 @@ GeminiProviderSettings
     providerId: 'gemini',
     async initialize(context): Promise<GeminiWorkspace> {
       return {
-        commands: { list: () => context.listCommands() },
+        ...(context.commandsPort() ? { commands: context.commandsPort()! } : {}),
         // No `runtimeCommands` slot, which is this provider's own absence: the
         // session's announced commands are dropped, so a tab asked for them
         // would be answered with a list nothing produced.

@@ -440,7 +440,10 @@ function isConversationLike(value: unknown): value is Conversation {
 function initializeSlashCommands(
   tab: TabData,
   getHiddenCommands?: () => Set<string>,
-  catalogInfo?: { config: ProviderCommandDropdownConfig; getEntries: () => Promise<ProviderCommandEntry[]> } | null,
+  catalogInfo?: {
+    config: ProviderCommandDropdownConfig;
+    getEntries: () => Promise<readonly ProviderCommandEntry[]>;
+  } | null,
 ): void {
   const { dom } = tab;
 

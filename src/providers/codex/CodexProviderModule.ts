@@ -2,7 +2,7 @@ import type {
   ProviderAgentMention,
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
-  ProviderCommandDescriptor,
+  ProviderCommandsPort,
   ProviderHistoryHydration,
   ProviderModelDescriptor,
   ProviderModule,
@@ -92,7 +92,7 @@ const CODEX_EFFORT_TIERS = ['low', 'medium', 'high', 'xhigh'] as const;
 
 
 export interface CodexWorkspaceContext {
-  listSkills(): Promise<readonly ProviderCommandDescriptor[]>;
+  commandsPort(): ProviderCommandsPort | undefined;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
   resolveCliPath(): Promise<string | null>;
@@ -278,7 +278,7 @@ CodexProviderSettings
     providerId: 'codex',
     async initialize(context): Promise<CodexWorkspace> {
       return {
-        commands: { list: () => context.listSkills() },
+        ...(context.commandsPort() ? { commands: context.commandsPort()! } : {}),
         agentMentions: {
           list: () => context.listAgentMentions(),
           refresh: () => context.refreshAgentMentions(),

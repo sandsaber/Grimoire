@@ -192,6 +192,15 @@ function createMockPlugin(overrides: Record<string, any> = {}): any {
     getConversationSync: jest.fn().mockReturnValue(null),
     getConversationList: jest.fn().mockReturnValue([]),
     findConversationAcrossViews: jest.fn().mockReturnValue(null),
+    // The command catalog is a workspace port now, not a registry lookup. These
+    // suites still register their catalogs through the workspace-registry
+    // double above, so the workspace answers from the same map — which keeps
+    // `setRuntimeCommands` and the entries the dropdown lists on one object.
+    getApplicationRuntimeOrNull: () => ({
+      workspaceFor: async (providerId: string) => ({
+        commands: mockCommandCatalogs[providerId] ?? undefined,
+      }),
+    }),
     ...overrides,
   };
 }
@@ -207,7 +216,15 @@ function createMockView(): any {
   };
 }
 
-async function flushMicrotasks(count = 4): Promise<void> {
+/**
+ * Drains the fire-and-forget priming these cases wait on.
+ *
+ * Six, not four: the command catalog is reached by building the provider's
+ * workspace now, which is one more await than the registry lookup it replaces,
+ * and a count tuned to the old path reports the priming as never having
+ * happened rather than as not yet finished.
+ */
+async function flushMicrotasks(count = 6): Promise<void> {
   for (let i = 0; i < count; i++) {
     await Promise.resolve();
   }
@@ -2035,6 +2052,11 @@ describe('TabManager - SDK Commands', () => {
     });
 
     await manager.createTab();
+    // The first tab's own priming is fire-and-forget, and reaching the command
+    // catalog through the workspace takes a turn longer than the registry
+    // lookup it replaces — so it is drained before the counter is cleared,
+    // rather than counted as the borrow this case forbids.
+    await flushMicrotasks();
     readyService.getSupportedCommands.mockClear();
     const coldTab = await manager.createTab('conv-opencode');
 
@@ -2397,9 +2419,24 @@ describe('TabManager - Provider Command Catalog', () => {
     }));
   });
 
-  it('should return null catalog config when provider has no catalog', async () => {
-    // No catalog assigned to registry for 'claude'
+  it('returns no catalog config for a provider that declares no command dropdown', async () => {
+    // **The declaration decides this now, not whether a catalog is registered.**
+    // It used to be the registry lookup, which made the answer depend on
+    // whether the workspace had been built — so a provider that does offer
+    // commands drew no dropdown at all until it had. Antigravity declares no
+    // dropdown and contributes no catalog, which is the one honest `null`.
+    const manager = createManager({
+      tabFactory: () => createMockTabData({ id: 'tab-1', providerId: 'antigravity' }),
+    });
 
+    await manager.createTab();
+
+    const options = mockInitializeTabUI.mock.calls[0][2];
+
+    expect(options.getProviderCatalogConfig()).toBeNull();
+  });
+
+  it('offers the dropdown before the provider has built a catalog', async () => {
     const manager = createManager({
       tabFactory: () => createMockTabData({ id: 'tab-1', providerId: 'claude' }),
     });
@@ -2409,7 +2446,11 @@ describe('TabManager - Provider Command Catalog', () => {
     const options = mockInitializeTabUI.mock.calls[0][2];
     const catalogConfig = options.getProviderCatalogConfig();
 
-    expect(catalogConfig).toBeNull();
+    expect(catalogConfig?.config.triggerChars).toEqual(['/']);
+    // No catalog is registered, so there is nothing to list yet — which is a
+    // different answer from "this provider has no commands", and the reason
+    // the two questions are asked of two different things.
+    await expect(catalogConfig?.getEntries()).resolves.toEqual([]);
   });
 });
 

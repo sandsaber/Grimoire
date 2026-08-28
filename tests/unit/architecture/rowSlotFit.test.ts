@@ -51,11 +51,6 @@ const ROWS: readonly RowFit[] = [
     slot: { name: 'ProviderNativeAgentPort', path: MODULE },
   },
   {
-    row: 'commandCatalog',
-    real: { name: 'ProviderCommandCatalog', path: 'src/core/providers/commands/ProviderCommandCatalog.ts' },
-    slot: { name: 'ProviderCommandsPort', path: MODULE },
-  },
-  {
     row: 'cliResolver',
     real: { name: 'ProviderCliResolver', path: TYPES },
     slot: { name: 'ProviderCliResolutionPort', path: MODULE },

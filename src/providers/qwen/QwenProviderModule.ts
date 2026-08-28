@@ -3,6 +3,7 @@ import type {
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandDescriptor,
+  ProviderCommandsPort,
   ProviderHistoryHydration,
   ProviderMcpServer,
   ProviderModelDescriptor,
@@ -87,7 +88,7 @@ const KNOWN_SETTINGS_FIELDS = new Set([
 ]);
 
 export interface QwenWorkspaceContext {
-  listCommands(): Promise<readonly ProviderCommandDescriptor[]>;
+  commandsPort(): ProviderCommandsPort | undefined;
   listSessionCommands(sessionId: string): Promise<readonly ProviderCommandDescriptor[]>;
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
@@ -260,7 +261,7 @@ QwenProviderSettings
     providerId: 'qwen',
     async initialize(context): Promise<QwenWorkspace> {
       return {
-        commands: { list: () => context.listCommands() },
+        ...(context.commandsPort() ? { commands: context.commandsPort()! } : {}),
         // Present, unlike Gemini's: this provider surfaces the commands its
         // session announces.
         runtimeCommands: {

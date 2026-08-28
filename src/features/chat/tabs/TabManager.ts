@@ -2,6 +2,7 @@ import { Notice } from 'obsidian';
 
 import { getOpaqueProviderState } from '../../../core/providers/getOpaqueProviderState';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
+import type { ProviderCommandsPort } from '../../../core/providers/ProviderModule';
 import type { ProviderWarmupMode } from '../../../core/providers/ProviderModule';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
@@ -1054,9 +1055,13 @@ export class TabManager implements TabManagerInterface {
       return [];
     }
 
-    const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
     const runtimeCommandLoader = ProviderWorkspaceRegistry.getRuntimeCommandLoader(providerId);
     const context = await this.buildProviderWarmupContext(targetTab, providerId);
+    // Read after the warm-up context, not before it: building the workspace is
+    // asynchronous now, and an await placed ahead of the lifecycle checks lets
+    // another tab's runtime finish becoming ready in between — which is a
+    // different answer, not a slower one.
+    const catalog = await this.commandsPortFor(providerId);
     if (
       targetTab.lifecycleState === 'blank'
       && runtimeCommandLoader
@@ -1271,7 +1276,7 @@ export class TabManager implements TabManagerInterface {
     providerId: ProviderId,
     context: ProviderCommandContext,
   ): Promise<SlashCommand[]> {
-    const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
+    const catalog = await this.commandsPortFor(providerId);
     const loader = ProviderWorkspaceRegistry.getRuntimeCommandLoader(providerId);
     if (!catalog || !loader) {
       return [];
@@ -1353,17 +1358,28 @@ export class TabManager implements TabManagerInterface {
   // Provider Command Catalog
   // ============================================
 
+  /**
+   * The provider's command catalog, built on demand.
+   *
+   * Every caller is already asynchronous. The one that was not —
+   * `getProviderCatalogConfig` — needed only the dropdown's trigger characters
+   * synchronously, and those are a declaration now.
+   */
+  private async commandsPortFor(providerId: ProviderId): Promise<ProviderCommandsPort | undefined> {
+    return (await this.plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId))?.commands;
+  }
+
   private getProviderCatalogConfig(tab: TabData) {
     const providerId = getTabProviderId(tab, this.plugin);
-    const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
     const dropdown = providerCatalog().declarations(providerId).commandDropdown;
-    if (!catalog || !dropdown) return null;
+    if (!dropdown) return null;
 
     return {
       config: { providerId, ...dropdown },
       getEntries: async () => {
         await this.getSdkCommands(tab.id);
-        return catalog.listDropdownEntries({ includeBuiltIns: false });
+        return (await this.commandsPortFor(providerId))
+          ?.listDropdownEntries({ includeBuiltIns: false }) ?? [];
       },
     };
   }

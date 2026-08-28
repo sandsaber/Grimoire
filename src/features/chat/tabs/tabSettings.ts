@@ -388,19 +388,32 @@ export function shouldSendMessageFromEnterKey(
 
 export type ProviderCatalogInfo = {
   config: ProviderCommandDropdownConfig;
-  getEntries: () => Promise<ProviderCommandEntry[]>;
+  getEntries: () => Promise<readonly ProviderCommandEntry[]>;
 } | null;
 
-export function getRegistryProviderCatalogInfo(providerId: ProviderId): ProviderCatalogInfo {
-  const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
+/**
+ * The dropdown a provider offers, without building its workspace to ask.
+ *
+ * Existence is decided by the declaration, not by whether a catalog happens to
+ * be registered: the two say the same thing, and only one of them can be
+ * answered before a workspace exists. The entries are still the catalog's, and
+ * are fetched when the dropdown opens.
+ */
+export function getRegistryProviderCatalogInfo(
+  providerId: ProviderId,
+  plugin: GrimoirePlugin,
+): ProviderCatalogInfo {
   const dropdown = providerCatalog().declarations(providerId).commandDropdown;
-  if (!catalog || !dropdown) {
+  if (!dropdown) {
     return null;
   }
 
   return {
     config: { providerId, ...dropdown },
-    getEntries: () => catalog.listDropdownEntries({ includeBuiltIns: false }),
+    getEntries: async () => (
+      (await plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId))
+        ?.commands?.listDropdownEntries({ includeBuiltIns: false }) ?? []
+    ),
   };
 }
 

@@ -20,7 +20,14 @@ import {
 describe('Codex provider module', () => {
   function createContext(): CodexWorkspaceContext {
     return {
-      listSkills: async () => [{ name: 'review', source: 'project' as const }],
+      commandsPort: () => ({
+        listDropdownEntries: async () => [],
+        listVaultEntries: async () => [],
+        saveVaultEntry: async () => undefined,
+        deleteVaultEntry: async () => undefined,
+        setRuntimeCommands: () => undefined,
+        refresh: async () => undefined,
+      }),
       listAgentMentions: async () => [{ id: 'planner', label: 'Planner' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
       resolveCliPath: async () => '/usr/local/bin/codex',

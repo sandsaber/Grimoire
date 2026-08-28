@@ -21,7 +21,14 @@ import {
 describe('Gemini provider module', () => {
   function createContext(): GeminiWorkspaceContext {
     return {
-      listCommands: async () => [{ name: 'init', source: 'project' as const }],
+      commandsPort: () => ({
+        listDropdownEntries: async () => [],
+        listVaultEntries: async () => [],
+        saveVaultEntry: async () => undefined,
+        deleteVaultEntry: async () => undefined,
+        setRuntimeCommands: () => undefined,
+        refresh: async () => undefined,
+      }),
       listAgentMentions: async () => [{ id: 'planner', label: 'Planner' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,
       resolveCliPath: async () => '/usr/local/bin/gemini',
@@ -274,7 +281,7 @@ describe('Gemini provider module', () => {
       // been reshaped yet.
       await expect(context.listModels()).resolves.toEqual([]);
       await expect(context.loadMcpServers()).resolves.toEqual([]);
-      await expect(context.listCommands()).resolves.toEqual([]);
+      expect(context.commandsPort()).toBeUndefined();
       expect(context.cachedPlanUsage()).toBeNull();
     });
   });
