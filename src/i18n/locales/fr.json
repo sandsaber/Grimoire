@@ -85,16 +85,17 @@
     "orchestrator": {
       "planTitle": "Tâches indépendantes pour cette note",
       "planEyebrow": "Agents parallèles",
-      "planSummary": "{count} tâches indépendantes ont été préparées. Chaque tâche s’exécute dans son propre onglet et ne partage ni contexte ni résultats avec les autres.",
+      "planSummary": "{count} tâches indépendantes ont été préparées. Chacune s’exécute en arrière-plan dans sa propre conversation et ne partage ni contexte ni résultats avec les autres.",
       "badge": "Agents parallèles",
       "workerCount": "{count} sur {total} sélectionnées",
-      "spawnWorkers": "Ouvrir les onglets des agents",
+      "spawnWorkers": "Lancer le travail en arrière-plan",
       "parallel": "Indépendant",
       "toggleTask": "Inclure la tâche : {task}",
-      "workerTabsHint": "Un agent indépendant par onglet · aucun contexte partagé",
+      "workerTabsHint": "Un agent indépendant chacune · aucun contexte partagé",
       "toggleTitle": "Agents parallèles",
       "toggleAriaLabel": "Basculer les agents parallèles",
-      "toggleFailed": "Impossible de basculer les agents parallèles"
+      "toggleFailed": "Impossible de basculer les agents parallèles",
+      "dispatchFailed": "Une partie du travail en arrière-plan n’a pas pu démarrer."
     },
     "vaultSearch": {
       "toolName": "Recherche dans le coffre",

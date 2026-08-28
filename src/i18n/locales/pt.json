@@ -85,16 +85,17 @@
     "orchestrator": {
       "planTitle": "Tarefas independentes para esta nota",
       "planEyebrow": "Trabalhadores paralelos",
-      "planSummary": "Foram preparadas {count} tarefas independentes. Cada uma é executada em sua própria aba e não compartilha contexto nem resultados com as outras.",
+      "planSummary": "Foram preparadas {count} tarefas independentes. Cada uma é executada em segundo plano na própria conversa e não compartilha contexto nem resultados com as outras.",
       "badge": "Trabalhadores paralelos",
       "workerCount": "{count} de {total} selecionadas",
-      "spawnWorkers": "Abrir abas dos trabalhadores",
+      "spawnWorkers": "Iniciar trabalho em segundo plano",
       "parallel": "Independente",
       "toggleTask": "Incluir tarefa: {task}",
-      "workerTabsHint": "Um trabalhador independente por aba · sem contexto compartilhado",
+      "workerTabsHint": "Um trabalhador independente cada · sem contexto compartilhado",
       "toggleTitle": "Trabalhadores paralelos",
       "toggleAriaLabel": "Alternar trabalhadores paralelos",
-      "toggleFailed": "Falha ao alternar os trabalhadores paralelos"
+      "toggleFailed": "Falha ao alternar os trabalhadores paralelos",
+      "dispatchFailed": "Não foi possível iniciar parte do trabalho em segundo plano."
     },
     "vaultSearch": {
       "toolName": "Busca no cofre",

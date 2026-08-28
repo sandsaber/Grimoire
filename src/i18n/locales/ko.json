@@ -85,16 +85,17 @@
     "orchestrator": {
       "planTitle": "이 노트의 독립 작업",
       "planEyebrow": "병렬 작업자",
-      "planSummary": "{count}개의 독립 작업을 준비했습니다. 각 작업은 별도 탭에서 실행되며 다른 작업과 컨텍스트나 결과를 공유하지 않습니다.",
+      "planSummary": "{count}개의 독립 작업을 준비했습니다. 각 작업은 별도 대화에서 백그라운드로 실행되며 다른 작업과 컨텍스트나 결과를 공유하지 않습니다.",
       "badge": "병렬 작업자",
       "workerCount": "{total}개 중 {count}개 선택",
-      "spawnWorkers": "작업자 탭 열기",
+      "spawnWorkers": "백그라운드 작업 시작",
       "parallel": "독립",
       "toggleTask": "작업 포함: {task}",
-      "workerTabsHint": "탭마다 독립 작업자 한 명 · 컨텍스트를 공유하지 않음",
+      "workerTabsHint": "작업마다 독립 작업자 한 명 · 컨텍스트를 공유하지 않음",
       "toggleTitle": "병렬 작업자",
       "toggleAriaLabel": "병렬 작업자 전환",
-      "toggleFailed": "병렬 작업자를 전환하지 못했습니다"
+      "toggleFailed": "병렬 작업자를 전환하지 못했습니다",
+      "dispatchFailed": "일부 백그라운드 작업을 시작하지 못했습니다."
     },
     "vaultSearch": {
       "toolName": "보관소 검색",

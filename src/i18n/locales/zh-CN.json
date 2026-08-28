@@ -85,16 +85,17 @@
     "orchestrator": {
       "planTitle": "此笔记的独立任务",
       "planEyebrow": "并行工作者",
-      "planSummary": "已准备 {count} 个独立任务。每个任务都在自己的标签页中运行，且不与其他任务共享上下文或结果。",
+      "planSummary": "已准备 {count} 个独立任务。每个任务都在各自的对话中后台运行，且不与其他任务共享上下文或结果。",
       "badge": "并行工作者",
       "workerCount": "已选择 {count}/{total}",
-      "spawnWorkers": "打开工作者标签页",
+      "spawnWorkers": "开始后台工作",
       "parallel": "独立",
       "toggleTask": "包括任务：{task}",
-      "workerTabsHint": "每个标签页一个独立工作者 · 不共享上下文",
+      "workerTabsHint": "每个任务一个独立工作者 · 不共享上下文",
       "toggleTitle": "并行工作者",
       "toggleAriaLabel": "切换并行工作者",
-      "toggleFailed": "无法切换并行工作者"
+      "toggleFailed": "无法切换并行工作者",
+      "dispatchFailed": "部分后台工作无法启动。"
     },
     "vaultSearch": {
       "toolName": "仓库搜索",

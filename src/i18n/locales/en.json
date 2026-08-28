@@ -85,16 +85,17 @@
     "orchestrator": {
       "planTitle": "Independent tasks for this note",
       "planEyebrow": "Parallel workers",
-      "planSummary": "Prepared {count} independent tasks. Each runs in its own tab and does not share context or results with the others.",
+      "planSummary": "Prepared {count} independent tasks. Each runs as background work in its own chat and does not share context or results with the others.",
       "badge": "Parallel workers",
       "workerCount": "{count} of {total} selected",
-      "spawnWorkers": "Open worker tabs",
+      "spawnWorkers": "Start background work",
       "parallel": "Independent",
       "toggleTask": "Include {task}",
-      "workerTabsHint": "One independent worker per tab · no shared context",
+      "workerTabsHint": "One independent worker each · no shared context",
       "toggleTitle": "Parallel workers",
       "toggleAriaLabel": "Toggle parallel workers",
-      "toggleFailed": "Failed to toggle parallel workers"
+      "toggleFailed": "Failed to toggle parallel workers",
+      "dispatchFailed": "Some background work could not be started."
     },
     "vaultSearch": {
       "toolName": "Vault search",

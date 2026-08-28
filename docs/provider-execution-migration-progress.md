@@ -10450,6 +10450,25 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — review pass: the plan's own words still promised tabs (`this commit`)
+
+**Two more findings from reviewing the worker change, and the first is the kind a test suite cannot
+raise.** The approved-plan card told a person *"Each runs in its own tab"*, its button said *"Open
+worker tabs"*, and its hint said *"One independent worker per tab"* — in ten languages. None of that
+is true any more. Copy is part of the change, and a refactor that leaves the product describing the
+behaviour it replaced has shipped a lie rather than a feature.
+
+- Gates: unit 8755 passed, 8755 total (554 suites); integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- All three strings are rewritten in every locale, and two suites that asserted the old wording —
+  one in English, one in Russian — are repointed rather than deleted, because what they check is that
+  the card renders in the active locale and that is still worth checking.
+- **The second: a failed dispatch said nothing.** A worker used to arrive as a tab, so one that
+  failed to start was visible by its absence; background work that never started looks exactly like
+  background work that has not finished. `dispatchWorker` answers rather than swallows now, and the
+  caller says it once for the whole plan — a plan that could not start is one thing that happened,
+  not one thing per task. Proven by disabling the notice: the new test is the only one that fails.
+
 ### M5 — review pass: the dispatcher assumed a prompt survives its provider (`this commit`)
 
 **A defect in the commit below this one, found by reviewing it.** The orchestrator wrote each task

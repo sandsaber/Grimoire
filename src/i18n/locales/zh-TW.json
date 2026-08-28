@@ -85,16 +85,17 @@
     "orchestrator": {
       "planTitle": "此筆記的獨立任務",
       "planEyebrow": "平行工作者",
-      "planSummary": "已準備 {count} 個獨立任務。每個任務都在自己的分頁中執行，且不與其他任務共用脈絡或結果。",
+      "planSummary": "已準備 {count} 個獨立任務。每個任務都在各自的對話中背景執行，且不與其他任務共用脈絡或結果。",
       "badge": "平行工作者",
       "workerCount": "已選取 {count}/{total}",
-      "spawnWorkers": "開啟工作者分頁",
+      "spawnWorkers": "開始背景工作",
       "parallel": "獨立",
       "toggleTask": "包含任務：{task}",
-      "workerTabsHint": "每個分頁一位獨立工作者 · 不共用脈絡",
+      "workerTabsHint": "每個任務一位獨立工作者 · 不共用脈絡",
       "toggleTitle": "平行工作者",
       "toggleAriaLabel": "切換平行工作者",
-      "toggleFailed": "無法切換平行工作者"
+      "toggleFailed": "無法切換平行工作者",
+      "dispatchFailed": "部分背景工作無法啟動。"
     },
     "vaultSearch": {
       "toolName": "庫存搜尋",

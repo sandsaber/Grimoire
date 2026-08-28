@@ -1,7 +1,7 @@
 import '@/providers';
 
 import { createMockEl } from '@test/helpers/mockElement';
-import { Scope, setIcon } from 'obsidian';
+import { Notice, Scope, setIcon } from 'obsidian';
 
 import { GrimoireView } from '@/features/chat/GrimoireView';
 
@@ -728,6 +728,35 @@ describe('GrimoireView orchestrator wiring', () => {
     }
 
     expect(prepareAndDispatch).not.toHaveBeenCalled();
+  });
+
+  it('says once when some of the plan could not be started', async () => {
+    // A worker used to arrive as a tab, so one that failed to start was visible
+    // by its absence. Background work that never started looks exactly like
+    // background work that has not finished, so it has to be said.
+    const { orchestratorStreamController, orchestratorTab, prepareAndDispatch, view } =
+      createOrchestratorHarness();
+    prepareAndDispatch.mockRejectedValue(new Error('provider unavailable'));
+    (Notice as unknown as jest.Mock).mockClear();
+    const containerEl = createMockEl();
+
+    view.wireOrchestratorCallbacks(orchestratorTab);
+    const [onPlanDetected] = orchestratorStreamController.setOrchestratorCallbacks.mock.calls[0];
+    onPlanDetected(containerEl, {
+      type: 'parallel_worker_plan',
+      tasks: [
+        { id: 'a', description: 'A', prompt: 'Do the thing' },
+        { id: 'b', description: 'B', prompt: 'Do the other thing' },
+      ],
+    });
+    containerEl.querySelector('.grimoire-orchestrator-plan-spawn-button')?.click();
+    for (let tick = 0; tick < 8; tick += 1) {
+      await Promise.resolve();
+    }
+
+    // Once for two failures, not once each: a plan that could not start is one
+    // thing that happened.
+    expect(Notice).toHaveBeenCalledTimes(1);
   });
 
   it('offers the plan callback to every tab, because none is a worker', () => {

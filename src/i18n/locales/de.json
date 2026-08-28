@@ -85,16 +85,17 @@
     "orchestrator": {
       "planTitle": "Unabhängige Aufgaben für diese Notiz",
       "planEyebrow": "Parallele Worker",
-      "planSummary": "Es wurden {count} unabhängige Aufgaben vorbereitet. Jede läuft in einem eigenen Tab und teilt weder Kontext noch Ergebnisse mit den anderen.",
+      "planSummary": "Es wurden {count} unabhängige Aufgaben vorbereitet. Jede läuft als Hintergrundarbeit in einem eigenen Chat und teilt weder Kontext noch Ergebnisse mit den anderen.",
       "badge": "Parallele Worker",
       "workerCount": "{count} von {total} ausgewählt",
-      "spawnWorkers": "Worker-Tabs öffnen",
+      "spawnWorkers": "Hintergrundarbeit starten",
       "parallel": "Unabhängig",
       "toggleTask": "Aufgabe einschließen: {task}",
-      "workerTabsHint": "Ein unabhängiger Worker pro Tab · kein gemeinsamer Kontext",
+      "workerTabsHint": "Je ein unabhängiger Worker · kein gemeinsamer Kontext",
       "toggleTitle": "Parallele Worker",
       "toggleAriaLabel": "Parallele Worker umschalten",
-      "toggleFailed": "Parallele Worker konnten nicht umgeschaltet werden"
+      "toggleFailed": "Parallele Worker konnten nicht umgeschaltet werden",
+      "dispatchFailed": "Ein Teil der Hintergrundarbeit konnte nicht gestartet werden."
     },
     "vaultSearch": {
       "toolName": "Tresorsuche",

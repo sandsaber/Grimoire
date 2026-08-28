@@ -882,8 +882,17 @@ export class GrimoireView extends ItemView {
     }
     const providerId = getTabProviderId(orchestratorTab, this.plugin);
 
+    let failed = 0;
     for (const task of decision.plan.tasks) {
-      await this.dispatchWorker(ownerId, providerId, task.prompt, runtime);
+      if (!await this.dispatchWorker(ownerId, providerId, task.prompt, runtime)) {
+        failed += 1;
+      }
+    }
+    if (failed > 0) {
+      // **Said, not swallowed.** A worker used to arrive as a tab, so one that
+      // failed to start was visible by its absence; background work that never
+      // started looks exactly like background work that has not finished.
+      new Notice(t('chat.orchestrator.dispatchFailed'));
     }
 
     this.updateTabBar();
@@ -913,7 +922,7 @@ export class GrimoireView extends ItemView {
     providerId: ProviderId,
     prompt: string,
     runtime: NonNullable<ReturnType<NonNullable<GrimoirePlugin['getApplicationRuntimeOrNull']>>>,
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       const conversation = await this.plugin.createConversation({ providerId });
       const identity = opaqueAgentId();
@@ -951,9 +960,11 @@ export class GrimoireView extends ItemView {
         },
         idempotency: 'none',
       }, runtime.agentDispatcher);
+      return true;
     } catch {
-      // One task failing to start must not take the rest of the plan with it.
-      // The run record says what happened to the ones that did.
+      // One task failing to start must not take the rest of the plan with it,
+      // so this answers rather than throws. The caller counts and says so once.
+      return false;
     }
   }
 

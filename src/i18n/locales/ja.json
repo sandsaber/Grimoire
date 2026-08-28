@@ -85,16 +85,17 @@
     "orchestrator": {
       "planTitle": "このノートの独立タスク",
       "planEyebrow": "並列ワーカー",
-      "planSummary": "{count}件の独立したタスクを準備しました。各タスクは専用のタブで実行され、他のタスクとコンテキストや結果を共有しません。",
+      "planSummary": "{count}件の独立したタスクを準備しました。各タスクは専用のチャットでバックグラウンド実行され、他のタスクとコンテキストや結果を共有しません。",
       "badge": "並列ワーカー",
       "workerCount": "{total}件中{count}件を選択",
-      "spawnWorkers": "ワーカーのタブを開く",
+      "spawnWorkers": "バックグラウンド実行を開始",
       "parallel": "独立",
       "toggleTask": "タスクを含める: {task}",
-      "workerTabsHint": "各タブに独立したワーカーが1つ · コンテキストは共有されません",
+      "workerTabsHint": "タスクごとに独立したワーカーが1つ · コンテキストは共有されません",
       "toggleTitle": "並列ワーカー",
       "toggleAriaLabel": "並列ワーカーを切り替え",
-      "toggleFailed": "並列ワーカーを切り替えられませんでした"
+      "toggleFailed": "並列ワーカーを切り替えられませんでした",
+      "dispatchFailed": "一部のバックグラウンド実行を開始できませんでした。"
     },
     "vaultSearch": {
       "toolName": "Vault検索",
