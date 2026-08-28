@@ -436,20 +436,6 @@ describe('StreamController - Text Content', () => {
   });
 
   describe('Error and notice handling', () => {
-    it('should show an ephemeral status indicator without appending message text', async () => {
-      const msg = createTestMessage();
-      const showThinkingIndicatorSpy = jest.spyOn(controller, 'showThinkingIndicator');
-
-      await controller.handleStreamChunk(
-        { type: 'status', content: 'Starting Antigravity...' } as any,
-        msg
-      );
-
-      expect(showThinkingIndicatorSpy).toHaveBeenCalledWith('Starting Antigravity...');
-      expect(deps.state.currentTextContent).toBe('');
-      expect(msg.contentBlocks).toEqual([]);
-    });
-
     it('should append error message on error chunk', async () => {
       const msg = createTestMessage();
       deps.state.currentTextEl = createMockEl();

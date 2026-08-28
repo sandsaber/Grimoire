@@ -225,11 +225,11 @@ describe('Grok content presenter', () => {
     // thinking and the badge, and nothing for the updates that are not content.
     // `assistant_message_start` was in this list and is not any more — it was
     // framing, the tab binding filters framing off the content channel, and
-    // what it opened a message for the projection opens per run.
+    // what it opened a message for the projection opens per run. The variant
+    // itself is deleted, so there is nothing left to assert its absence with.
     expect(chunks.map(chunk => chunk.type)).toEqual(
       expect.arrayContaining(['thinking', 'usage']),
     );
-    expect(chunks.every(chunk => chunk.type !== 'assistant_message_start')).toBe(true);
     expect(chunks.some(chunk => chunk.type === 'error')).toBe(false);
   });
 });

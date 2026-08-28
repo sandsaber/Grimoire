@@ -181,8 +181,10 @@ live('Qwen live smoke', () => {
     report('ROW 1', JSON.stringify(summarize(chunks)));
     expect(errorsOf(chunks)).toEqual([]);
     expect(answerOf(chunks)).toContain('OK');
-    // The message the answer hangs on, which the surface needs before the text.
-    expect(chunks.some(chunk => chunk.type === 'assistant_message_start')).toBe(true);
+    // The message-start chunk this used to require is gone. It never reached a
+    // surface — the tab binding filters framing off the content channel — and
+    // the message the answer hangs on is opened by the projection, from the
+    // run. What a live row can still see is the answer above.
     expect(runtime.consumeTurnMetadata()).toMatchObject({ wasSent: true });
     await shutdown();
   });

@@ -273,9 +273,6 @@ export type ChatContentItem =
  * which is why they are named apart from the content that stays.
  */
 export type ChatTurnLifecycleChunk =
-  | { type: 'user_message_start'; content: string; itemId?: string }
-  | { type: 'assistant_message_start'; itemId?: string; phase?: AssistantTextPhase }
-  | { type: 'status'; content: string }
   | { type: 'error'; content: string }
   | { type: 'done' };
 

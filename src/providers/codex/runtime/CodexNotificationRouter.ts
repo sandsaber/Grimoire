@@ -27,8 +27,6 @@ import type {
   TokenUsageUpdatedNotification,
   TurnCompletedNotification,
   TurnPlanUpdatedNotification,
-  UserInput,
-  UserMessageItem,
   WebSearchItem,
 } from './codexAppServerTypes';
 
@@ -84,7 +82,6 @@ export class CodexNotificationRouter {
   private planUpdateCounter = 0;
   private isPlanTurn = false;
   private sawPlanDelta = false;
-  private startedUserMessageIds = new Set<string>();
   private startedAgentMessageIds = new Set<string>();
   private agentMessageDeltaIds = new Set<string>();
   private agentMessagePhases = new Map<string, AssistantTextPhase>();
@@ -151,7 +148,6 @@ export class CodexNotificationRouter {
   beginTurn(params: { isPlanTurn: boolean }): void {
     this.isPlanTurn = params.isPlanTurn;
     this.sawPlanDelta = false;
-    this.startedUserMessageIds.clear();
     this.startedAgentMessageIds.clear();
     this.agentMessageDeltaIds.clear();
     this.agentMessagePhases.clear();
@@ -167,7 +163,6 @@ export class CodexNotificationRouter {
   endTurn(): void {
     this.isPlanTurn = false;
     this.sawPlanDelta = false;
-    this.startedUserMessageIds.clear();
     this.startedAgentMessageIds.clear();
     this.agentMessageDeltaIds.clear();
     this.agentMessagePhases.clear();
@@ -275,8 +270,11 @@ export class CodexNotificationRouter {
     }
 
     switch (item.type) {
+      // Nothing is drawn from a user item. The projection carries the user's
+      // message — it is what the surface renders and what the vault stores —
+      // and the boundary chunk this used to send was filtered off the content
+      // channel before it reached anything.
       case 'userMessage':
-        this.emitUserMessageBoundary(item);
         break;
 
       case 'agentMessage':
@@ -322,9 +320,6 @@ export class CodexNotificationRouter {
 
     switch (item.type) {
       case 'userMessage':
-        if (!this.startedUserMessageIds.has(item.id)) {
-          this.emitUserMessageBoundary(item);
-        }
         break;
 
       case 'agentMessage':
@@ -777,19 +772,6 @@ export class CodexNotificationRouter {
     this.emit({ type: 'context_compacted' });
   }
 
-  private emitUserMessageBoundary(item: UserMessageItem): void {
-    if (this.startedUserMessageIds.has(item.id)) {
-      return;
-    }
-
-    this.startedUserMessageIds.add(item.id);
-    this.emit({
-      type: 'user_message_start',
-      itemId: item.id,
-      content: this.extractUserMessageText(item.content),
-    });
-  }
-
   private emitAgentMessageBoundary(item: AgentMessageItem): void {
     if (this.startedAgentMessageIds.has(item.id)) {
       return;
@@ -800,12 +782,10 @@ export class CodexNotificationRouter {
     if (phase) {
       this.agentMessagePhases.set(item.id, phase);
     }
+    // Marked and claimed, not emitted, for the reason above. The phase and the
+    // segment claim are both read later — by the fallback completion text and
+    // by the segment bookkeeping — so only the chunk goes.
     this.claimAssistantSegment(item.id);
-    this.emit({
-      type: 'assistant_message_start',
-      itemId: item.id,
-      ...(phase ? { phase } : {}),
-    });
   }
 
   private completeAgentMessage(item: AgentMessageItem): void {
@@ -821,13 +801,6 @@ export class CodexNotificationRouter {
       item.text,
       normalizeAssistantTextPhase(item.phase) ?? this.agentMessagePhases.get(item.id),
     );
-  }
-
-  private extractUserMessageText(content: UserInput[]): string {
-    return content
-      .map((part) => (part.type === 'text' ? part.text : ''))
-      .filter((text) => text.length > 0)
-      .join('\n\n');
   }
 
   // -- turn/plan/updated (update_plan) ----------------------------------------

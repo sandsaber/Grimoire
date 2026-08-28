@@ -189,11 +189,15 @@ const SEARCHES: readonly DeletionSearch[] = [
     // union alias counted every content consumer, and could never reach zero.
     what: 'StreamChunk and the subagent chunk vocabulary',
     pattern: /\bChatTurnLifecycleChunk\b|async_subagent_result|subagent_tool_(use|result)/,
-    // **5.** The lifecycle union, its re-export, and the three modules that
-    // still name a subagent chunk kind. What is left to delete is the union and
-    // the framing two provider normalizers emit into a channel the projection
-    // drops it from — normalizer surgery against tests written from real
-    // transcripts, which belongs with the smoke matrix.
+    // **Still 5, and the count is right — three of the union's five variants
+    // are gone and no file stopped naming it.** `user_message_start` and
+    // `assistant_message_start` were deleted with their last two emitters, the
+    // ACP normalizer and the Codex router; `status` had no emitter at all, only
+    // a `StreamController` case and two `TurnFeedbackMetrics` arms, which went
+    // with it. `error` and `done` are still emitted and still filtered, so the
+    // union stays and so do the files naming it. What closes this now is the
+    // terminal pair, which the projection already states and the surface still
+    // reads off the content channel.
     files: 5,
     closedBy: 'the seam deletion — the lifecycle meaning goes, the content type keeps its own name',
   },

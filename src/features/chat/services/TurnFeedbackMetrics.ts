@@ -88,7 +88,6 @@ export class TurnFeedbackMetrics {
       case 'thinking':
       case 'notice':
       case 'error':
-      case 'status':
         return true;
       case 'text':
         return chunk.content.trim().length > 0;
@@ -102,7 +101,6 @@ export class TurnFeedbackMetrics {
       case 'progress':
       case 'notice':
       case 'error':
-      case 'status':
         return true;
       case 'text':
         return chunk.content.trim().length > 0;

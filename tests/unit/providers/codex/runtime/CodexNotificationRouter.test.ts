@@ -1353,26 +1353,57 @@ describe('CodexNotificationRouter', () => {
       expect(chunks).toHaveLength(0);
     });
 
-    it('maps userMessage item/started to a user_message_start chunk', () => {
+    it('draws nothing from a user item, and still draws the assistant\'s', () => {
+      // The boundary chunk this asserted was filtered off the content channel
+      // before it reached anything, and the user's message is what the
+      // projection carries. Paired with an assistant item so the emptiness is
+      // this router staying silent rather than the harness collecting nothing.
       router.handleNotification('item/started', {
         item: { type: 'userMessage', id: 'u1', content: [{ type: 'text', text: 'hi' }] },
         threadId: 't1',
         turnId: 'turn1',
       });
-      expect(chunks).toEqual([
-        { type: 'user_message_start', itemId: 'u1', content: 'hi' },
-      ]);
-    });
 
-    it('maps agentMessage item/started to an assistant_message_start chunk', () => {
-      router.handleNotification('item/started', {
-        item: { type: 'agentMessage', id: 'a1', text: '', phase: 'streaming', memoryCitation: null },
+      expect(chunks).toEqual([]);
+
+      router.handleNotification('item/completed', {
+        item: {
+          type: 'agentMessage', id: 'a1', text: 'answer', phase: 'final_answer',
+          memoryCitation: null,
+        },
         threadId: 't1',
         turnId: 'turn1',
       });
 
       expect(chunks).toEqual([
-        { type: 'assistant_message_start', itemId: 'a1' },
+        { type: 'text', content: 'answer', phase: 'final_answer' },
+      ]);
+    });
+
+    it('records the phase an agent item started with, for a completion that omits it', () => {
+      // This asserted the boundary chunk, which no surface received. What the
+      // boundary still does is remember the phase, and the reader is a
+      // completion that arrives without one — so the recording is asserted
+      // through the text chunk it decides the phase of.
+      router.handleNotification('item/started', {
+        item: {
+          type: 'agentMessage', id: 'a1', text: '', phase: 'final_answer',
+          memoryCitation: null,
+        },
+        threadId: 't1',
+        turnId: 'turn1',
+      });
+
+      expect(chunks).toEqual([]);
+
+      router.handleNotification('item/completed', {
+        item: { type: 'agentMessage', id: 'a1', text: 'answer', memoryCitation: null },
+        threadId: 't1',
+        turnId: 'turn1',
+      });
+
+      expect(chunks).toEqual([
+        { type: 'text', content: 'answer', phase: 'final_answer' },
       ]);
     });
 
@@ -1389,8 +1420,9 @@ describe('CodexNotificationRouter', () => {
         turnId: 'turn1',
       });
 
+      // The boundary chunk that led this list is gone; the phase it carried is
+      // on the text chunk, which is the one a surface reads.
       expect(chunks).toEqual([
-        { type: 'assistant_message_start', itemId: 'a1', phase: 'final_answer' },
         { type: 'text', content: 'The implementation is complete.', phase: 'final_answer' },
       ]);
     });

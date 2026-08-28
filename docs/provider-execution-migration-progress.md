@@ -10417,6 +10417,39 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — three of the five lifecycle variants are deleted (`this commit`)
+
+- Gates: unit 8739 passed, 8739 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **`CodexNotificationRouter` stops emitting framing**, the second and last emitter. Its bookkeeping
+  is not symmetric with the ACP one, so it was not deleted wholesale:
+  - `startedAgentMessageIds`, `agentMessagePhases` and `claimAssistantSegment` **stay**. The phase
+    map has a reader — a completion arriving without a phase falls back to the one the start
+    recorded — and the started-set is what keeps a completion from overwriting it;
+  - `startedUserMessageIds` and `emitUserMessageBoundary` **go**. With nothing emitted, the set's
+    only effect was gating a method that did nothing, and both its readers took the same branch.
+    `extractUserMessageText` and two now-unused imports went with them.
+- **`ChatTurnLifecycleChunk` loses three of its five variants**: `user_message_start` and
+  `assistant_message_start`, whose last emitters are gone, and `status`, which **never had one** —
+  its only consumers were a `StreamController` case and two `TurnFeedbackMetrics` arms, so the path
+  was unreachable and its test asserted a chunk no provider sends. The union keeps `error` and
+  `done`, which are still emitted and still filtered.
+- The deletion count for this search **stays at 5, and that is the right answer**: it counts files
+  naming the union, and the union still exists. What closes it is the terminal pair.
+- **Test changes, each with what replaced it:**
+  - the three Codex router tests assert what survives — that a user item draws nothing while an
+    assistant item in the same router still draws its text (so the emptiness is silence, not a
+    harness collecting nothing), and that the phase recorded at `item/started` decides the phase of
+    a completion that omits one. Breaking the phase recording fails it;
+  - the projection's *"drops the turn framing"* test lists what remains of the lifecycle half;
+  - `chatContentVocabulary`'s `LIFECYCLE_VARIANTS` is down to two, with the rule written that it may
+    shrink and never grow — a variant added back is a fact the projection owns being restated on the
+    content channel;
+  - six live-smoke rows required an `assistant_message_start`, described as *"the message the answer
+    hangs on, which the surface needs before the text"*. That was not true on this path: the message
+    is opened by the projection from the run. The requirement is gone and the reason is written in
+    its place; the answer assertion above it is what a live row still checks.
+
 ### M5 — the ACP turn framing is deleted, and the identity it stood for is asserted where it lives (`this commit`)
 
 - Gates: unit 8740 passed, 8740 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;

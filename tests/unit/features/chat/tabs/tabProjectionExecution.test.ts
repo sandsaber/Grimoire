@@ -93,16 +93,17 @@ describe('tab projection execution', () => {
   });
 
   it('drops the turn framing a provider still sends down the content channel', () => {
-    // The presenter returns the whole `StreamChunk` union, because
-    // `InputController` reads framing off that channel on the legacy path. A
-    // turn's shape is what the projection states here, so framing arriving as
-    // content would be a second opinion about where this turn begins and ends.
+    // The presenter returns the whole `StreamChunk` union. A turn's shape is
+    // what the projection states here, so framing arriving as content would be
+    // a second opinion about where this turn begins and ends.
+    //
+    // Three of the variants this listed no longer exist. `user_message_start`
+    // and `assistant_message_start` were deleted with the emitters that put
+    // them here, and `status` never had one. What is left of the lifecycle half
+    // is the terminal pair, which the filter still has to drop.
     const presented: StreamChunk[] = [
-      { type: 'user_message_start', content: 'typed' },
       { type: 'text', content: 'answer' },
-      { type: 'assistant_message_start' },
       { type: 'tool_use', id: 'tool-1', name: 'Read', input: {} },
-      { type: 'status', content: 'thinking' },
       { type: 'error', content: 'boom' },
       { type: 'done' },
       { type: 'usage', usage: { inputTokens: 1, contextWindow: 2, contextTokens: 1, percentage: 1 } },

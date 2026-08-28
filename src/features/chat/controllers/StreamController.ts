@@ -270,10 +270,6 @@ export class StreamController {
           : t('chat.ui.messages.noticeLabel')}:** ${chunk.content}`);
         break;
 
-      case 'status':
-        this.showThinkingIndicator(chunk.content);
-        break;
-
       case 'error':
         // Flush pending tools before rendering error message
         this.flushPendingTools();

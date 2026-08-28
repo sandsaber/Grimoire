@@ -22,17 +22,20 @@ import { listAllSourceModules } from '@test/helpers/moduleReachability';
 const CHAT_TYPES = 'src/core/types/chat.ts';
 
 /**
- * The five the projection replaced, each with the fact that replaces it.
+ * What the projection replaced, each with the fact that replaces it.
  *
- * `user_message_start` / `assistant_message_start` — a turn's boundaries, which
- * a run's start and terminal state; `status` — the thinking indicator's text,
- * which the run's state drives; `error` — the terminal's own reason; `done` —
- * the terminal itself.
+ * `error` — the terminal's own reason; `done` — the terminal itself.
+ *
+ * **Three of the five are deleted.** `user_message_start` and
+ * `assistant_message_start` were a turn's boundaries, which a run's start and
+ * terminal state are; their last two emitters are gone, and what a turn's
+ * assistant message is called comes from its run. `status` was the thinking
+ * indicator's text, which the run's state drives — it had no emitter at all,
+ * only a `StreamController` case and two `TurnFeedbackMetrics` arms, and those
+ * went with it. This list may shrink and never grow: a variant added back is a
+ * fact the projection owns being restated on the content channel.
  */
 const LIFECYCLE_VARIANTS = [
-  'user_message_start',
-  'assistant_message_start',
-  'status',
   'error',
   'done',
 ];
