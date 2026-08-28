@@ -5,18 +5,18 @@ import * as path from 'path';
 import type { ProjectWorkspace } from '../../../core/context/types';
 import type { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type {
+  ProviderChatUiContribution,
+  ProviderModelOption,
+  ProviderModeSelector,
+  ProviderPermissionModeToggle,
+  ProviderReasoningTier,
+  ProviderServiceTierToggle,
   ProviderUsageSnapshot,
   ProviderUsageWindow,
 } from '../../../core/providers/ProviderModule';
 import type {
   ProviderCapabilities,
-  ProviderChatUIConfig,
   ProviderId,
-  ProviderModeSelectorConfig,
-  ProviderPermissionModeToggleConfig,
-  ProviderReasoningOption,
-  ProviderServiceTierToggleConfig,
-  ProviderUIOption,
 } from '../../../core/providers/types';
 import type {
   ManagedMcpServer,
@@ -223,7 +223,7 @@ export interface ToolbarCallbacks {
   onOrchestratorModeChange?: () => Promise<void>;
   getSettings: () => ToolbarSettings;
   getEnvironmentVariables?: () => string;
-  getUIConfig: () => ProviderChatUIConfig;
+  getChatUI: () => ProviderChatUiContribution;
   getCapabilities: () => ProviderCapabilities;
   refreshModelOptions?: () => Promise<void>;
   getProviderId?: () => ProviderId;
@@ -278,8 +278,7 @@ export class ModelSelector {
 
   private getAvailableModels() {
     const settings = this.callbacks.getSettings();
-    const uiConfig = this.callbacks.getUIConfig();
-    return uiConfig.getModelOptions({
+    return this.callbacks.getChatUI().models.options({
       ...settings,
       environmentVariables: this.callbacks.getEnvironmentVariables?.(),
     });
@@ -375,7 +374,7 @@ export class ModelSelector {
     const providerId = modelInfo
       ? this.resolveProviderIdForModel(modelInfo)
       : this.callbacks.resolveProviderForModel?.(currentModel) ?? this.callbacks.getProviderId?.() ?? null;
-    const icon = modelInfo?.providerIcon ?? this.callbacks.getUIConfig().getProviderIcon?.();
+    const icon = modelInfo?.providerIcon ?? this.callbacks.getChatUI().icon();
     if (icon) {
       this.buttonEl.appendChild(createProviderIconSvg(icon, {
         className: 'grimoire-model-button-provider-icon',
@@ -438,8 +437,8 @@ export class ModelSelector {
       return;
     }
 
-    const groups: Array<{ name: string; models: ProviderUIOption[] }> = [];
-    const groupsByName = new Map<string, ProviderUIOption[]>();
+    const groups: Array<{ name: string; models: ProviderModelOption[] }> = [];
+    const groupsByName = new Map<string, ProviderModelOption[]>();
     for (const model of filteredModels) {
       const group = model.group || t('chat.ui.model.models');
       let groupModels = groupsByName.get(group);
@@ -472,7 +471,7 @@ export class ModelSelector {
       });
 
       const providerId = this.resolveGroupProviderId(group.models);
-      const firstIcon = group.models[0]?.providerIcon ?? this.callbacks.getUIConfig().getProviderIcon?.();
+      const firstIcon = group.models[0]?.providerIcon ?? this.callbacks.getChatUI().icon();
       if (firstIcon) {
         headerEl.appendChild(createProviderIconSvg(firstIcon, {
           className: 'grimoire-model-group-provider-icon',
@@ -550,7 +549,7 @@ export class ModelSelector {
       });
   }
 
-  private resolveGroupProviderId(models: ProviderUIOption[]): ProviderId | null {
+  private resolveGroupProviderId(models: readonly ProviderModelOption[]): ProviderId | null {
     const providerIds = new Set<ProviderId>();
     for (const model of models) {
       const providerId = this.resolveProviderIdForModel(model);
@@ -561,7 +560,7 @@ export class ModelSelector {
     return providerIds.size === 1 ? [...providerIds][0] : null;
   }
 
-  private resolveProviderIdForModel(model: ProviderUIOption): ProviderId | null {
+  private resolveProviderIdForModel(model: ProviderModelOption): ProviderId | null {
     if (model.providerId) {
       return model.providerId;
     }
@@ -679,7 +678,7 @@ export class ModelSelector {
     errorEl.setText(t('chat.ui.model.loadFailed'));
   }
 
-  private filterModels(models: ProviderUIOption[]): ProviderUIOption[] {
+  private filterModels(models: readonly ProviderModelOption[]): readonly ProviderModelOption[] {
     const query = this.searchQuery.trim().toLowerCase();
     if (!query) {
       return models;
@@ -699,7 +698,7 @@ export class ModelSelector {
 
   private renderOption(
     parentEl: HTMLElement,
-    model: ProviderUIOption,
+    model: ProviderModelOption,
     index: number,
     currentModel: string,
   ): void {
@@ -711,7 +710,7 @@ export class ModelSelector {
       option.addClass('selected');
     }
 
-    const icon = model.providerIcon ?? this.callbacks.getUIConfig().getProviderIcon?.();
+    const icon = model.providerIcon ?? this.callbacks.getChatUI().icon();
     if (icon) {
       option.appendChild(createProviderIconSvg(icon, {
         className: 'grimoire-model-provider-icon',
@@ -863,8 +862,8 @@ export class ModeSelector {
     this.render();
   }
 
-  private getSelectorConfig(): ProviderModeSelectorConfig | null {
-    return this.callbacks.getUIConfig().getModeSelector?.(this.callbacks.getSettings()) ?? null;
+  private getSelectorConfig(): ProviderModeSelector | null {
+    return this.callbacks.getChatUI().modeSelector?.selector(this.callbacks.getSettings()) ?? null;
   }
 
   private render() {
@@ -885,8 +884,8 @@ export class ModeSelector {
 
   /** Resolves the active/inactive option pair for a two-option toggle. */
   private resolveOptionPair(
-    selectorConfig: ProviderModeSelectorConfig,
-  ): { active: ProviderUIOption; inactive: ProviderUIOption } {
+    selectorConfig: ProviderModeSelector,
+  ): { active: ProviderModelOption; inactive: ProviderModelOption } {
     const [first, second] = selectorConfig.options;
     const active = selectorConfig.activeValue
       ? selectorConfig.options.find((option) => option.value === selectorConfig.activeValue) ?? second
@@ -987,10 +986,10 @@ export class ThinkingBudgetSelector {
     this.effortGearsEl.empty();
 
     const currentEffort = this.callbacks.getSettings().effortLevel;
-    const uiConfig = this.callbacks.getUIConfig();
+    const reasoning = this.callbacks.getChatUI().reasoning;
     const settings = this.callbacks.getSettings();
     const model = settings.model;
-    const options = uiConfig.getReasoningOptions(model, settings);
+    const options = reasoning?.options(model, settings) ?? [];
     const currentInfo = options.find(e => e.value === currentEffort);
 
     const currentEl = this.effortGearsEl.createDiv({ cls: 'grimoire-thinking-current' });
@@ -1043,10 +1042,10 @@ export class ThinkingBudgetSelector {
     this.budgetGearsEl.empty();
 
     const currentBudget = this.callbacks.getSettings().thinkingBudget;
-    const uiConfig = this.callbacks.getUIConfig();
+    const reasoning = this.callbacks.getChatUI().reasoning;
     const settings = this.callbacks.getSettings();
     const model = settings.model;
-    const options: ProviderReasoningOption[] = uiConfig.getReasoningOptions(model, settings);
+    const options: readonly ProviderReasoningTier[] = reasoning?.options(model, settings) ?? [];
     const currentBudgetInfo = options.find(b => b.value === currentBudget);
 
     const currentEl = this.budgetGearsEl.createDiv({ cls: 'grimoire-thinking-current' });
@@ -1174,9 +1173,14 @@ export class ThinkingBudgetSelector {
 
     const settings = this.callbacks.getSettings();
     const model = settings.model;
-    const uiConfig = this.callbacks.getUIConfig();
-    const options = uiConfig.getReasoningOptions(model, settings);
-    const defaultValue = uiConfig.getDefaultReasoningValue(model, settings);
+    // A provider with no reasoning group has no control to draw. The
+    // capability check above says the same thing for the two providers that
+    // declare `reasoningControl: 'none'`; this says it from the contribution
+    // itself, so the group's absence is what hides the row rather than a
+    // second declaration agreeing with it.
+    const reasoning = this.callbacks.getChatUI().reasoning;
+    const options = reasoning?.options(model, settings) ?? [];
+    const defaultValue = reasoning?.defaultValue(model, settings) ?? '';
     const shouldHide = options.length === 0
       || (options.length === 1 && options[0]?.value === defaultValue);
 
@@ -1186,7 +1190,7 @@ export class ThinkingBudgetSelector {
       return;
     }
 
-    const adaptive = uiConfig.isAdaptiveReasoningModel(model, settings);
+    const adaptive = reasoning?.isTiered(model, settings) ?? false;
 
     if (this.effortEl) {
       this.effortEl.toggleClass('grimoire-hidden', !adaptive);
@@ -1256,9 +1260,8 @@ export class PermissionToggle {
     this.updateDisplay();
   }
 
-  private getToggleConfig(): ProviderPermissionModeToggleConfig | null {
-    const uiConfig = this.callbacks.getUIConfig();
-    return uiConfig.getPermissionModeToggle?.() ?? null;
+  private getToggleConfig(): ProviderPermissionModeToggle | null {
+    return this.callbacks.getChatUI().permissionMode?.toggle() ?? null;
   }
 
   updateDisplay() {
@@ -1364,7 +1367,7 @@ export class PermissionToggle {
 
 export function getNextPermissionMode(
   current: string,
-  toggleConfig: ProviderPermissionModeToggleConfig,
+  toggleConfig: ProviderPermissionModeToggle,
   supportsPlanMode: boolean,
 ): string {
   const planValue = toggleConfig.planValue;
@@ -1405,9 +1408,8 @@ export class ServiceTierToggle {
     });
   }
 
-  private getToggleConfig(): ProviderServiceTierToggleConfig | null {
-    const uiConfig = this.callbacks.getUIConfig();
-    return uiConfig.getServiceTierToggle?.(this.callbacks.getSettings()) ?? null;
+  private getToggleConfig(): ProviderServiceTierToggle | null {
+    return this.callbacks.getChatUI().serviceTier?.toggle(this.callbacks.getSettings()) ?? null;
   }
 
   updateDisplay() {

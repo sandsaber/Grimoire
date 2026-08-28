@@ -12,10 +12,10 @@ import type { ProviderCommandEntry } from '../../../core/providers/commands/Prov
 import { getOpaqueProviderState } from '../../../core/providers/getOpaqueProviderState';
 import { getEnabledProviderForModel, getProviderForModel } from '../../../core/providers/modelRouting';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
+import type { ProviderChatUiContribution } from '../../../core/providers/ProviderModule';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import type {
-  ProviderChatUIConfig,
   ProviderId,
 } from '../../../core/providers/types';
 import {
@@ -566,20 +566,22 @@ function initializeInputToolbar(
   const inputToolbar = dom.inputWrapper.createDiv({ cls: 'grimoire-input-toolbar' });
 
   // The model picker is mixed-provider even when the active session remains bound.
-  const mixedModelUIConfigProxy = (): ProviderChatUIConfig => {
+  const mixedModelChatUIProxy = (): ProviderChatUiContribution => {
     const draftProvider = tab.draftModel
       ? getEnabledProviderForModel(tab.draftModel, plugin.settings)
       : getTabProviderId(tab, plugin);
-    const baseConfig = ProviderRegistry.getChatUIConfig(draftProvider);
+    const base = providerCatalog().declarations(draftProvider).chatUI;
     return {
-      ...baseConfig,
-      getModelOptions: (settings: Record<string, unknown>) =>
-        getBlankTabModelOptions(settings),
+      ...base,
+      models: {
+        ...base.models,
+        options: (settings: Record<string, unknown>) => getBlankTabModelOptions(settings),
+      },
     };
   };
 
   const toolbarComponents = createInputToolbar(inputToolbar, {
-    getUIConfig: () => mixedModelUIConfigProxy(),
+    getChatUI: () => mixedModelChatUIProxy(),
     getCapabilities: () => getTabCapabilities(tab, plugin),
     getSettings: () => getTabSettingsSnapshot(tab, plugin),
     getEnvironmentVariables: () => plugin.getActiveEnvironmentVariables(),
@@ -1445,7 +1447,6 @@ export function initializeTabControllers(
       }
 
       const previousProviderId = tab.providerId;
-      const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
       const targetModel = model ?? resolveBlankTabModel(plugin, providerId);
       const snapshot = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
         plugin.settings,
@@ -1453,7 +1454,8 @@ export function initializeTabControllers(
       ) as TabProviderSettings;
 
       snapshot.model = targetModel;
-      uiConfig.applyModelDefaults(targetModel, snapshot);
+      providerCatalog().declarations(providerId).chatUI.models
+        .applyDefaults(targetModel, snapshot);
       ProviderSettingsCoordinator.commitProviderSettingsSnapshot(
         plugin.settings,
         providerId,
@@ -1995,9 +1997,9 @@ async function renderAutoTriggeredTurn(tab: TabData, plugin: GrimoirePlugin, res
 export function updatePlanModeUI(tab: TabData, plugin: GrimoirePlugin, mode: string): void {
   const providerId = getTabProviderId(tab, plugin);
   const snapshot = getTabSettingsSnapshot(tab, plugin);
-  const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
-  if (uiConfig.applyPermissionMode) {
-    uiConfig.applyPermissionMode(mode, snapshot);
+  const permissionMode = providerCatalog().declarations(providerId).chatUI.permissionMode;
+  if (permissionMode?.apply) {
+    permissionMode.apply(mode, snapshot);
   } else {
     snapshot.permissionMode = mode;
   }

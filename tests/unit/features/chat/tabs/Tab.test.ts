@@ -972,21 +972,13 @@ describe('Tab - Service Initialization', () => {
     });
 
     it('should initialize toolbar config for the tab provider', () => {
-      const getChatUIConfigSpy = jest.spyOn(ProviderRegistry, 'getChatUIConfig');
+      // The chat UI is asked for by declaration now, so the spy is the
+      // catalog's and it calls through: what is being checked is which
+      // provider the toolbar asks about, and a stubbed return would only
+      // prove the stub was returned.
+      const declarationsSpy = jest.spyOn(ProviderCatalog.prototype, 'declarations');
       const getCapabilitiesSpy = jest.spyOn(ProviderCatalog.prototype, 'capabilities');
       jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-      getChatUIConfigSpy.mockReturnValue({
-        getModelOptions: jest.fn().mockReturnValue([]),
-        ownsModel: jest.fn().mockReturnValue(false),
-        isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-        getReasoningOptions: jest.fn().mockReturnValue([]),
-        getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-        getContextWindowSize: jest.fn().mockReturnValue(200000),
-        isDefaultModel: jest.fn().mockReturnValue(true),
-        applyModelDefaults: jest.fn(),
-        normalizeModelVariant: jest.fn((model: string) => model),
-        getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-      });
       getCapabilitiesSpy.mockReturnValue({
         providerId: 'codex',
         supportsPersistentRuntime: true,
@@ -1020,10 +1012,15 @@ describe('Tab - Service Initialization', () => {
       const toolbarCallbacks = toolbarModule.createInputToolbar.mock.calls.at(-1)?.[1];
       expect(toolbarCallbacks).toBeDefined();
 
-      toolbarCallbacks.getUIConfig();
+      // Cleared immediately before the call, so the assertion below reads the
+      // toolbar's own question rather than any of the catalog lookups the tab
+      // made while it was being built.
+      declarationsSpy.mockClear();
+      getCapabilitiesSpy.mockClear();
+      toolbarCallbacks.getChatUI();
       toolbarCallbacks.getCapabilities();
 
-      expect(getChatUIConfigSpy).toHaveBeenCalledWith('codex');
+      expect(declarationsSpy).toHaveBeenCalledWith('codex');
       expect(getCapabilitiesSpy).toHaveBeenCalledWith('codex');
     });
 
@@ -4057,7 +4054,7 @@ describe('Tab - Cross-Provider Model Rejection', () => {
     const toolbarModule = jest.requireMock('@/features/chat/ui/InputToolbar');
     const toolbarCallbacks = toolbarModule.createInputToolbar.mock.calls.at(-1)?.[1];
 
-    expect(toolbarCallbacks.getUIConfig().getModelOptions(plugin.settings)).toEqual([
+    expect(toolbarCallbacks.getChatUI().models.options(plugin.settings)).toEqual([
       { value: DEFAULT_CODEX_PRIMARY_MODEL, label: DEFAULT_CODEX_PRIMARY_MODEL_LABEL, group: 'Codex', providerId: 'codex' },
       { value: 'opus', label: 'Opus 4.8', group: 'Claude', providerId: 'claude' },
     ]);
@@ -5040,8 +5037,8 @@ describe('Tab - Blank Tab Draft Model Change', () => {
     await toolbarCallbacks.onModelChange('antigravity');
 
     const modelValues = toolbarCallbacks
-      .getUIConfig()
-      .getModelOptions(plugin.settings)
+      .getChatUI()
+      .models.options(plugin.settings)
       .map((option: { value: string }) => option.value);
 
     expect(modelValues).toContain('antigravity');

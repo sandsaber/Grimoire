@@ -9646,21 +9646,41 @@ Two questions to settle before writing it, both recorded rather than guessed:
 
 #### Where to pick this up
 
-The chat-UI row is half moved. **Eleven call sites left**, and they are not all the same kind of
-work:
+The chat-UI row is **four call sites from done**, and all four are in core, in
+`ProviderSettingsCoordinator`. Two of them iterate every provider asking `isDefaultModel`; one is
+`resolveProviderForModel`'s neighbour. Moving them takes the registry's model-routing statics with
+it, which is the row's real end.
 
-| Where | Sites | What it needs |
-|---|---|---|
-| `ProviderSettingsCoordinator` | 4 | The only ones in **core**. Two of them iterate every provider asking `isDefaultModel`; one is `resolveProviderForModel`'s neighbour. Moving them takes the registry's model-routing statics with it, which is the row's real end. |
-| `Tab.ts` | 3 | The blank-tab provider switch and the draft-model path. |
-| `GrimoireView`, `GrimoireSettings`, `tabContextUI`, `main.ts` | 1 each | Single questions, like the seven already moved. |
+The seven the entry below listed are moved. The four single questions —
+`GrimoireView`, `GrimoireSettings`, `tabContextUI`, `main.ts` — went the way the first seven did,
+and `Tab.ts`'s three went with the toolbar, which is what the third of them supplies.
 
-**One user-visible change is queued and deliberate.** Gemini and Antigravity declare
-`reasoningControl: { kind: 'none' }`, their chat-UI configs offer four reasoning options each, and
-neither runtime reads a reasoning level — Gemini's module says its session carries no config option
-one could be set through. The picker draws a control that changes nothing. When the toolbar reads
-`chatUI.reasoning`, that row disappears for both. It is a fix, and it should be stated in the
-release notes rather than discovered.
+**The toolbar is the row's largest consumer and it reads the contribution now.** `ToolbarCallbacks`
+carries `getChatUI(): ProviderChatUiContribution` in place of `getUIConfig(): ProviderChatUIConfig`,
+and eight questions moved with it: model options, the icon three controls draw, the mode selector,
+the three reasoning reads, the permission toggle and the service-tier toggle. The five row types the
+toolbar was annotated with — `ProviderUIOption`, `ProviderReasoningOption`,
+`ProviderModeSelectorConfig`, `ProviderPermissionModeToggleConfig`, `ProviderServiceTierToggleConfig`
+— are the module's five restatements now, so the file names no `core/providers/types` UI shape at
+all.
+
+**The queued user-visible change does not exist, and the entry that queued it was wrong.** It said a
+Gemini or Antigravity reasoning row would disappear when the toolbar read `chatUI.reasoning`, because
+neither provider declares a reasoning control. Both halves of that are true and the conclusion is
+not: `ThinkingBudgetSelector.updateDisplay` already returns early on
+`capabilities.reasoningControl === 'none'`, which `legacyCapabilities` derives from
+`descriptor.reasoningControl.kind` — the same declaration. `renderEffortGears` and
+`renderBudgetGears` have one call site each, both past that guard. So the row has never rendered for
+those two, and reading the contribution replaces a second path to the same answer rather than
+changing one. Recorded because the claim was written into a resume pointer as a release note, and a
+release note for a change that did not happen is worse than no note.
+
+What the move does change is where the answer comes from, and one place where that matters is the
+test harness: `InputToolbar.test.ts` builds its contribution by running its existing row-shaped mock
+through the real `chatUiContributionFor`, so the mock cannot drift from the delegation nine providers
+use. It adds exactly one group by hand — `modeSelector`, which the delegation deliberately omits
+because all four `getModeSelector` implementations return `null`. The control and its slot both still
+exist; the mock fills the slot the way a provider that had one would.
 
 After the row: **`ProviderRegistry.resolveProviderForModel` and `getCustomModelIds`** are the last
 two statics that read `getChatUIConfig`, and both are model routing rather than presentation. They

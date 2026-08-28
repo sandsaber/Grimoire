@@ -4,7 +4,6 @@ import { ItemView, Menu, Notice, Platform, Scope } from 'obsidian';
 import { GRIMOIRE_CHANGELOG_URL } from '../../app/changelog/source';
 import { getHiddenProviderCommandSet } from '../../core/providers/commands/hiddenCommands';
 import { providerCatalog } from '../../core/providers/ProviderCatalog';
-import { ProviderRegistry } from '../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
 import { DEFAULT_CHAT_PROVIDER_ID, type ProviderId } from '../../core/providers/types';
 import { VIEW_TYPE_GRIMOIRE } from '../../core/types';
@@ -180,13 +179,13 @@ export class GrimoireView extends ItemView {
       const providerId = getTabProviderId(tab, this.plugin);
       const providerSettings = getTabSettingsSnapshot(tab, this.plugin);
       const model = providerSettings.model;
-      const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
       const capabilities = providerCatalog().capabilities(providerId);
-      const contextWindow = uiConfig.getContextWindowSize(
-        model,
-        providerSettings.customContextLimits,
-        providerSettings,
-      );
+      const contextWindow = providerCatalog().declarations(providerId)
+        .chatUI.models.contextWindow(
+          model,
+          providerSettings,
+          providerSettings.customContextLimits,
+        );
 
       if (tab.state.usage) {
         tab.state.usage = recalculateUsageForModel(tab.state.usage, model, contextWindow);

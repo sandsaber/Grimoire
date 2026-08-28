@@ -1418,9 +1418,8 @@ export default class GrimoirePlugin extends Plugin {
       return providerCatalog().displayName(conversation.providerId);
     }
 
-    const uiConfig = ProviderRegistry.getChatUIConfig(conversation.providerId);
-    const modelInfo = uiConfig
-      .getModelOptions(this.settings)
+    const modelInfo = providerCatalog().declarations(conversation.providerId)
+      .chatUI.models.options(this.settings)
       .find(option => option.value === model);
     return modelInfo?.label ?? formatHistoryModelFallbackLabel(model);
   }

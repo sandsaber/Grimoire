@@ -1,7 +1,6 @@
 import { Notice, setIcon, TFile } from 'obsidian';
 
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import type { ProviderId } from '../../../core/providers/types';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
@@ -139,8 +138,9 @@ export function syncContextSummary(tab: TabData, plugin: GrimoirePlugin): void {
 
 export function getModelSummaryLabel(providerId: ProviderId, settings: TabProviderSettings): string {
   const model = settings.model || '';
-  const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
-  const modelInfo = uiConfig.getModelOptions(settings).find(option => option.value === model);
+  const modelInfo = providerCatalog().declarations(providerId)
+    .chatUI.models.options(settings)
+    .find(option => option.value === model);
   return modelInfo?.label ?? formatModelFallbackLabel(model);
 }
 

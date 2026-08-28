@@ -2,6 +2,9 @@ import { createMockEl } from '@test/helpers/mockElement';
 import { readFileSync } from 'fs';
 import { setIcon, setTooltip } from 'obsidian';
 
+import type {
+  ProviderChatUiContribution,
+} from '@/core/providers/ProviderModule';
 import type { UsageInfo } from '@/core/types';
 import {
   ContextUsageMeter,
@@ -21,6 +24,7 @@ import {
   DEFAULT_CODEX_PRIMARY_MODEL,
   DEFAULT_CODEX_PRIMARY_MODEL_LABEL,
 } from '@/providers/codex/types/models';
+import { chatUiContributionFor } from '@/providers/shared/chatUiContribution';
 
 jest.mock('obsidian', () => ({
   Notice: jest.fn(),
@@ -140,6 +144,8 @@ function createMockUIConfig() {
     ),
     applyModelDefaults: jest.fn(),
     normalizeModelVariant: jest.fn((model: string) => model),
+    ownsModel: jest.fn().mockReturnValue(true),
+    getCustomModelIds: jest.fn().mockReturnValue(new Set<string>()),
     getPermissionModeToggle: jest.fn().mockReturnValue({
       inactiveValue: 'normal',
       inactiveLabel: 'Safe',
@@ -173,6 +179,34 @@ function createMockUIConfig() {
   };
 }
 
+/**
+ * The mock config as the chat-UI contribution the toolbar now takes.
+ *
+ * Built by the production delegation rather than hand-written, so what these
+ * tests drive is what a provider's module actually produces — and a mock that
+ * drifts from the row it stands for fails here rather than passing quietly.
+ *
+ * One group is added on top. `chatUiContributionFor` declares no
+ * `modeSelector`, because no provider has one: all four `getModeSelector`
+ * implementations return `null`. The toolbar's control and the contract's slot
+ * both still exist, so the mock fills the slot the way a provider that had a
+ * mode selector would.
+ */
+function createMockChatUI(
+  config: ReturnType<typeof createMockUIConfig> = createMockUIConfig(),
+): ProviderChatUiContribution {
+  return {
+    ...chatUiContributionFor(
+      config,
+      { kind: 'effort', tiers: ['low', 'medium', 'high'] },
+    ),
+    modeSelector: {
+      selector: settings => config.getModeSelector(settings),
+      apply: jest.fn(),
+    },
+  };
+}
+
 function createMockCallbacks(overrides: Record<string, any> = {}) {
   return {
     onModelChange: jest.fn().mockResolvedValue(undefined),
@@ -202,7 +236,7 @@ function createMockCallbacks(overrides: Record<string, any> = {}) {
     getProviderUsage: jest.fn().mockReturnValue(null),
     refreshProviderUsage: jest.fn().mockResolvedValue(null),
     resolveProviderForModel: jest.fn().mockReturnValue('claude'),
-    getUIConfig: jest.fn().mockReturnValue(createMockUIConfig()),
+    getChatUI: jest.fn().mockReturnValue(createMockChatUI()),
     getCapabilities: jest.fn().mockReturnValue({
       providerId: 'claude',
       supportsPersistentRuntime: true,
@@ -251,7 +285,7 @@ describe('ModelSelector', () => {
         path: 'M0 0h1v1H0z',
       }),
     };
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     const iconParent = createMockEl();
     new ModelSelector(iconParent, callbacks);
     const icon = iconParent.querySelector('.grimoire-model-button-provider-icon');
@@ -283,7 +317,7 @@ describe('ModelSelector', () => {
         label: 'MiniMax Token Plan (minimax.io)/MiniMax-M2.7-highspeed',
       },
     ]);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.getSettings.mockReturnValue({
       model: 'opencode:minimax-token-plan/minimax-m2.7-highspeed',
       thinkingBudget: 'low',
@@ -307,7 +341,7 @@ describe('ModelSelector', () => {
         value: 'qwen:qwen3.8-max(openai)',
       },
     ]);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.getSettings.mockReturnValue({
       model: 'qwen:qwen3.8-max(openai)',
       thinkingBudget: 'low',
@@ -422,7 +456,7 @@ describe('ModelSelector', () => {
     ];
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockImplementation(() => models);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.refreshModelOptions.mockReset();
     callbacks.refreshModelOptions.mockImplementation(() => new Promise<void>((resolve) => {
       resolveRefresh = resolve;
@@ -460,7 +494,7 @@ describe('ModelSelector', () => {
     ];
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockImplementation(() => models);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.refreshModelOptions.mockReset();
     callbacks.refreshModelOptions.mockImplementation(() => new Promise<void>((resolve) => {
       resolveRefresh = resolve;
@@ -500,7 +534,7 @@ describe('ModelSelector', () => {
     uiConfig.getModelOptions.mockReturnValue([
       { value: 'sonnet', label: 'Sonnet 4.6', description: 'Balanced performance', group: 'Claude' },
     ]);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.refreshModelOptions.mockReset();
     callbacks.refreshModelOptions.mockRejectedValue(new Error('model/list failed'));
     selector.renderOptions();
@@ -593,7 +627,7 @@ describe('ModelSelector', () => {
     ];
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockReturnValue(groupedModels);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.getSettings.mockReturnValue({
       model: 'sonnet',
       thinkingBudget: 'low',
@@ -626,7 +660,7 @@ describe('ModelSelector', () => {
         path: 'M0 0h1v1H0z',
       }),
     };
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
 
     selector.renderOptions();
 
@@ -647,7 +681,7 @@ describe('ModelSelector', () => {
     ];
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockReturnValue(groupedModels);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.getSettings.mockReturnValue({
       model: 'sonnet',
       thinkingBudget: 'low',
@@ -686,7 +720,7 @@ describe('ModelSelector', () => {
     ];
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockReturnValue(groupedModels);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     selector.renderOptions();
 
     const input = parentEl.querySelector('.grimoire-model-search-input');
@@ -706,7 +740,7 @@ describe('ModelSelector', () => {
       description: 'Opus 5 with 1M context',
       group: 'Claude Code',
     }]);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     selector.renderOptions();
 
     const input = parentEl.querySelector('.grimoire-model-search-input');
@@ -729,7 +763,7 @@ describe('ModelSelector', () => {
         group: 'OpenCode',
       },
     ]);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.getSettings.mockReturnValue({
       model: longModel,
       thinkingBudget: 'low',
@@ -793,7 +827,7 @@ describe('ModelSelector', () => {
     ];
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockReturnValue(groupedModels);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.getProviderUsage.mockImplementation((providerId: string) => (
       providerId === 'claude'
         ? {
@@ -824,7 +858,7 @@ describe('ModelSelector', () => {
     ];
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockReturnValue(groupedModels);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.getProviderUsage.mockImplementation((providerId: string) => (
       providerId === 'opencode'
         ? { plan: 'API keys', spend: '$4.20 this month', note: 'Pay per token across vendors · no cap set.' }
@@ -848,7 +882,7 @@ describe('ModelSelector', () => {
     ];
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockReturnValue(groupedModels);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.getProviderUsage.mockImplementation((providerId: string) => (
       providerId === 'claude'
         ? {
@@ -879,7 +913,7 @@ describe('ModelSelector', () => {
     ];
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockReturnValue(groupedModels);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.getProviderUsage.mockImplementation((providerId: string) => (
       providerId === 'claude'
         ? {
@@ -908,7 +942,7 @@ describe('ModelSelector', () => {
     ];
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockReturnValue(groupedModels);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.getSettings.mockReturnValue({
       ...callbacks.getSettings(),
       usageIndicatorsEnabled: false,
@@ -930,7 +964,7 @@ describe('ModelSelector', () => {
     ];
     const uiConfig = createMockUIConfig();
     uiConfig.getModelOptions.mockReturnValue(groupedModels);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
     callbacks.getProviderUsage.mockReturnValue(null);
 
     selector.renderOptions();
@@ -1170,7 +1204,7 @@ describe('ModeSelector', () => {
   it('should hide when the provider exposes no mode selector', () => {
     const uiConfig = createMockUIConfig();
     uiConfig.getModeSelector.mockReturnValue(null);
-    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getChatUI.mockReturnValue(createMockChatUI(uiConfig));
 
     selector.updateDisplay();
 
@@ -1520,10 +1554,10 @@ describe('PermissionToggle', () => {
   });
 
   it('should hide the control when provider exposes no permission toggle UI', () => {
-    callbacks.getUIConfig.mockReturnValue({
+    callbacks.getChatUI.mockReturnValue(createMockChatUI({
       ...createMockUIConfig(),
       getPermissionModeToggle: jest.fn().mockReturnValue(null),
-    });
+    }));
     const parentEl2 = createMockEl();
     new PermissionToggle(parentEl2, callbacks);
 
@@ -1558,7 +1592,7 @@ describe('ServiceTierToggle', () => {
       description: '1.5x speed, 2x credits',
     });
     callbacks = createMockCallbacks({
-      getUIConfig: jest.fn().mockReturnValue(uiConfig),
+      getChatUI: jest.fn().mockReturnValue(createMockChatUI(uiConfig)),
       getSettings: jest.fn().mockReturnValue({
         model: DEFAULT_CODEX_PRIMARY_MODEL,
         thinkingBudget: 'off',
@@ -1625,10 +1659,10 @@ describe('ServiceTierToggle', () => {
   });
 
   it('hides the control when the provider exposes no service tier UI', () => {
-    callbacks.getUIConfig.mockReturnValue({
+    callbacks.getChatUI.mockReturnValue(createMockChatUI({
       ...createMockUIConfig(),
       getServiceTierToggle: jest.fn().mockReturnValue(null),
-    });
+    }));
     const parentEl2 = createMockEl();
     new ServiceTierToggle(parentEl2, callbacks);
 

@@ -19,7 +19,6 @@ import {
 } from '../../core/providers/commands/hiddenCommands';
 import type { ProviderCommandEntry } from '../../core/providers/commands/ProviderCommandEntry';
 import { providerCatalog } from '../../core/providers/ProviderCatalog';
-import { ProviderRegistry } from '../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '../../core/providers/ProviderWorkspaceRegistry';
 import type {
@@ -1972,8 +1971,8 @@ export class GrimoireSettingTab extends PluginSettingTab {
           const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
           const seenValues = new Set<string>();
           for (const providerId of providerCatalog().ids()) {
-            const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
-            for (const model of uiConfig.getModelOptions(settingsBag)) {
+            const chatUi = providerCatalog().declarations(providerId).chatUI;
+            for (const model of chatUi.models.options(settingsBag)) {
               if (!seenValues.has(model.value)) {
                 seenValues.add(model.value);
                 dropdown.addOption(model.value, model.label);
