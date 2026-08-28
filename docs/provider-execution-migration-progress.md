@@ -9833,14 +9833,26 @@ is not what is missing. `AgentCoordinator.cancelAttachedTree` exists and is comp
 `AgentCancellationPort`, and **no provider implements one**. The only reference to that interface
 outside its own declaration is the coordinator's parameter.
 
-That absence is not an oversight. These agents are *observed*, not dispatched: a background subagent
-runs inside a provider turn, so for most CLIs "stop this one agent" is not an operation the tool
-exposes — the only stop available is cancelling the turn, which is what tab close already does. So
-the stop affordance is a **provider capability question**, and the honest first step is the one this
-migration has taken for every other row: read all nine and find out which can actually do it.
+That absence is not an oversight, and the audit this migration performs before designing any slot —
+read all nine — answers it in one pass:
+
+- **only Claude produces background agents at all.** `SubagentManager.resolveTaskMode` decides async
+  from `run_in_background`, which is Claude Code's own Task-tool parameter; Codex's normalization
+  writes `mode: 'sync'` outright, and no other provider registers a subagent contribution. Six of the
+  nine have no background agents to survive anything;
+- **and Claude offers no per-agent stop.** The SDK's stop is `response.interrupt()`, which ends the
+  *query* — the whole turn — and that is precisely what tab close does today through the adapter's
+  cleanup.
+
+So the row is a one-provider question, and for that one provider the operation does not exist. What
+is left is therefore not engineering but a **product decision**, and it is the last thing in the
+milestone: when a background agent cannot be stopped individually, does the card (a) offer a stop
+that interrupts the conversation's turn, (b) offer none and let the work finish, or (c) does tab
+close keep cancelling, which is the behaviour shipping today?
 
 Work that survives a tab and cannot be stopped from anywhere is worse than work that stops when you
-close the tab, which is why this ordering matters.
+close the tab — which is why the ordering matters, and why this question has to be answered before
+`destroyTab` stops calling cleanup rather than after.
 
 The second is a **session budget in the kernel**, and it is the same blocker the warm-runtime LRU
 has — the two remaining seam items converge on one missing capability.
