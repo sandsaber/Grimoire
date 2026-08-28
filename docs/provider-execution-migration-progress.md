@@ -10445,6 +10445,33 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — correcting the harness-fidelity finding before acting on it (`this commit`)
+
+- Gates: unit 8745 passed, 8745 total; `tsc --noEmit` clean; `npm run lint` clean.
+- An earlier entry recorded that the nine `*LiveSmoke` harnesses drive
+  `ExecutionChatRuntimeAdapter.query()`, which nothing in `src/` calls, and concluded that each
+  provider's smoke-matrix row *"was certified against a chunk stream no user receives"*. **That
+  conclusion was too broad, and the correction matters more than the finding.**
+- Every one of those files says what it is, in its own docstring: *"The manual smoke matrix has two
+  halves: what the protocol does, and what the surface draws. This is the first half, run
+  headlessly … so the second half is left with only the questions a person has to look at."* They
+  are the **protocol** half by design, and the surface half is the `*ChatProjectionLiveSmoke`
+  family. Observing the adapter's generator is a defensible vantage point for that job — it is the
+  richest normalized view of what a backend produced.
+- **What was genuinely wrong is narrower, and is already fixed**: six of those rows had drifted into
+  a *surface* claim, requiring an `assistant_message_start` and calling it "the message the answer
+  hangs on, which the surface needs before the text". No surface ever received one. Those
+  requirements are gone.
+- **So the remaining question is not fidelity but observation point.** Letting `error` and `done`
+  leave `ChatTurnLifecycleChunk` means the harnesses read a run's terminal from the kernel instead
+  of an error chunk — which keeps their protocol purpose and drops the dependency on `query()`. That
+  is a rewrite of nine files and roughly sixty rows, none of which can be executed here: they are
+  `describe.skip` behind a per-provider env var and start real CLIs that spend the account's tokens.
+  Rewriting tests that cannot be run once before they are trusted is how a broken matrix ships
+  quietly.
+- Owner: **M5**, with an account that can run the matrix. Recorded here rather than attempted,
+  because the version of this work that is safe is the version whose author can watch it pass.
+
 ### M5 — the compositions move under the providers they compose (`this commit`)
 
 **The owner's answer to the relocation question: provider-specific code belongs under the provider.**
