@@ -42,14 +42,6 @@ describe('ProviderRegistry', () => {
     return plugin;
   }
 
-  it('creates a runtime with the default provider id', () => {
-    const runtime = ProviderRegistry.createChatRuntime({
-      plugin: pluginWithCodexExecution(),
-    });
-
-    expect(runtime.providerId).toBe('codex');
-  });
-
   it('returns capabilities for the default provider', () => {
     const caps = providerCatalog().capabilities(DEFAULT_CHAT_PROVIDER_ID);
     expect(caps.providerId).toBe('codex');
@@ -73,13 +65,12 @@ describe('ProviderRegistry', () => {
   });
 
   it('creates a Codex runtime, over the execution kernel', () => {
-    // The flip, at the only row it moves: a runtime that is not a client of the
+    // The flip, asked of the composition: a runtime that is not a client of the
     // kernel means Codex chat execution never left the legacy path, which no
-    // other assertion in this file would notice.
-    const runtime = ProviderRegistry.createChatRuntime({
-      providerId: 'codex',
-      plugin: pluginWithCodexExecution(),
-    });
+    // other assertion in this file would notice. It was asked of the registry
+    // until the factory row left it — the registration carried a
+    // `createRuntime` that reached this same composition through a plugin.
+    const runtime = pluginWithCodexExecution().getCodexExecution().createRuntime();
 
     expect(runtime).toBeInstanceOf(ExecutionChatRuntimeAdapter);
     expect(runtime.providerId).toBe('codex');
@@ -159,7 +150,7 @@ describe('ProviderRegistry', () => {
     // The registry is no longer an inventory. A registration for an id the
     // catalog never heard of used to create a tenth provider that appeared in
     // nothing and answered for nothing.
-    expect(() => ProviderRegistry.register('ghost', {} as never))
+    expect(() => ProviderRegistry.register('ghost', {}))
       .toThrow('Provider "ghost" is not in the catalog.');
   });
 

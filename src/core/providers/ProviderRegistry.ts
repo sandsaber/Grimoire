@@ -1,8 +1,6 @@
-import type { ExecutionChatRuntimeAdapter } from '../runtime/execution/ExecutionChatRuntimeAdapter';
 import { NO_TASK_RESULT_INTERPRETATION } from './noTaskResultInterpretation';
 import { providerCatalog } from './ProviderCatalog';
 import {
-  type CreateChatRuntimeOptions,
   DEFAULT_CHAT_PROVIDER_ID,
   type ProviderId,
   type ProviderRegistration,
@@ -49,10 +47,6 @@ export class ProviderRegistry {
     return registration;
   }
 
-  static createChatRuntime(options: CreateChatRuntimeOptions): ExecutionChatRuntimeAdapter {
-    const providerId = options.providerId ?? DEFAULT_CHAT_PROVIDER_ID;
-    return this.getProviderRegistration(providerId).createRuntime(options);
-  }
 
   static getTaskResultInterpreter(
     providerId: ProviderId = DEFAULT_CHAT_PROVIDER_ID,

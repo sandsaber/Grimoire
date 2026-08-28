@@ -5,7 +5,6 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 import { AntigravityExecution } from '@/app/execution/antigravity/AntigravityExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { antigravityWorkspaceRegistration } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
 import { discoverAntigravityModels } from '@/providers/antigravity/runtime/AntigravityModelDiscovery';
@@ -34,9 +33,10 @@ describe('Antigravity provider registration', () => {
   });
 
   it('creates a kernel-backed Antigravity runtime through the provider registry', () => {
-    // The flip, at the only row it moves. A runtime that is not a client of the
-    // execution kernel means chat execution never left the legacy path, which
-    // no other assertion in this file would notice.
+    // The flip, asked of the composition rather than of a registration whose
+    // factory reached the same composition through the plugin. A runtime that
+    // is not a client of the execution kernel means chat execution never left
+    // the legacy path, which no other assertion in this file would notice.
     const host = new ExecutionKernelHost({
       storage: new TestDurableStorage(),
       scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
@@ -44,7 +44,7 @@ describe('Antigravity provider registration', () => {
     const plugin = { settings: {} } as any;
     plugin.getAntigravityExecution = () => new AntigravityExecution(plugin, host.registry);
 
-    const runtime = ProviderRegistry.createChatRuntime({ plugin, providerId: 'antigravity' });
+    const runtime = plugin.getAntigravityExecution().createRuntime();
 
     expect(runtime).toBeInstanceOf(ExecutionChatRuntimeAdapter);
     expect(runtime.providerId).toBe('antigravity');

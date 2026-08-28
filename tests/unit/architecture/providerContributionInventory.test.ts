@@ -141,12 +141,13 @@ describe('provider contribution inventory', () => {
     });
 
     it('claims the count the heading advertises', () => {
-      // Three, not nine: the three auxiliary factories left with the auxiliary
-      // owner, `chatUIConfig` left for `ProviderDeclarations.chatUI`,
-      // `settingsReconciler` for the codec's reconciliation half, and
-      // `historyService` split across a declaration and a workspace slot. All
-      // six are recorded in the moved table below.
-      expect(documented).toHaveLength(3);
+      // Two, and both optional: what is left of the registration is
+      // `taskResultInterpreter?` and `subagentLifecycleAdapter?`, which three
+      // providers fill and durable agents takes. Everything else is recorded in
+      // the moved table below — including `createRuntime`, whose flip was M2's
+      // and whose registration *hop* went at M5, when a tab started asking the
+      // application for a runtime instead of a registry for a factory.
+      expect(documented).toHaveLength(2);
     });
 
     it('accounts for every field the registration ever declared', () => {
@@ -174,6 +175,7 @@ describe('provider contribution inventory', () => {
         'createInlineEditService',
         'chatUIConfig',
         'settingsReconciler',
+        'createRuntime',
         'historyService',
       ]);
     });

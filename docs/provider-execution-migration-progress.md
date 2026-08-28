@@ -9748,6 +9748,30 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### The runtime factory left the registry, and six registrations are empty
+
+`ProviderRegistry.createChatRuntime` looked up a registration whose factory called
+`plugin.getXExecution().createRuntime()` — reaching the composition `ApplicationRuntime` already
+holds, through a plugin, by way of a second inventory of providers. A tab asks
+`ApplicationRuntime.createRuntimeFor(providerId)` now, and the registration's `createRuntime` is
+deleted.
+
+**Six of the nine registrations are empty objects.** What is left of `ProviderRegistration` is two
+optional members — `taskResultInterpreter?` and `subagentLifecycleAdapter?` — filled by Claude,
+Codex and Grok, and both are durable agents' to take. `ProviderRegistry` is two accessors and
+`register`.
+
+The tests moved with it: nine `registration.test.ts` files asked the registry to build a runtime and
+ask the composition directly now, which is what they were describing — three of them already said
+"the registry no longer constructs a runtime, it asks the execution the plugin built at load", and
+the registry was still in the sentence because it was still in the path.
+
+A `Tab.test.ts` detail worth keeping: seven cases spied on the registry factory, and they steer a
+shared `createdRuntimes` queue now — with a `reset()` between cases, because a queued runtime left
+over would be handed to the next one. The case that observes *when* a runtime is asked for reads the
+plugin's settings through an `onCreate` hook rather than off an options bag the factory used to
+carry, since there is no options bag any more.
+
 #### `ChatRuntime` is deleted
 
 The plan's condition is *"when the last UI consumer of `ChatRuntime` is gone: delete the

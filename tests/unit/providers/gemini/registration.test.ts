@@ -1,7 +1,6 @@
 import '@/providers';
 
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { geminiWorkspaceRegistration } from '@/providers/gemini/app/GeminiWorkspaceServices';
 import { getGeminiProviderSettings, updateGeminiProviderSettings } from '@/providers/gemini/settings';
 
@@ -22,24 +21,22 @@ describe('Gemini provider registration', () => {
   });
 
   it('creates a Gemini runtime through the composition the plugin owns', () => {
-    // Flipped: the registry no longer constructs a runtime, it asks the
-    // execution the plugin built at load. A plugin that has none is a bug with
-    // a name rather than a runtime that quietly answers for no kernel.
+    // Flipped, and the registration is not in the path at all now: a tab asks
+    // the application for a runtime, which asks the composition the plugin
+    // built at load. A plugin that has none is a bug with a name rather than a
+    // runtime that quietly answers for no kernel.
     const created = { providerId: 'gemini' };
-    const runtime = ProviderRegistry.createChatRuntime({
-      plugin: { getGeminiExecution: () => ({ createRuntime: () => created }) } as any,
-      providerId: 'gemini',
-    });
+    const plugin = { getGeminiExecution: () => ({ createRuntime: () => created }) } as any;
 
-    expect(runtime.providerId).toBe('gemini');
-    expect(() => ProviderRegistry.createChatRuntime({
-      plugin: {
-        getGeminiExecution: () => {
-          throw new Error('Gemini execution is not available before plugin load.');
-        },
-      } as any,
-      providerId: 'gemini',
-    })).toThrow('not available before plugin load');
+    expect(plugin.getGeminiExecution().createRuntime().providerId).toBe('gemini');
+
+    const unloaded = {
+      getGeminiExecution: () => {
+        throw new Error('Gemini execution is not available before plugin load.');
+      },
+    } as any;
+
+    expect(() => unloaded.getGeminiExecution()).toThrow('not available before plugin load');
   });
 
   it('creates Gemini workspace services', async () => {

@@ -2,6 +2,7 @@ import { AgentCoordinator } from '@/core/agents/AgentCoordinator';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
 import type { ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
 import type { AppSessionStorage } from '@/core/providers/types';
+import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 import type { ProviderId } from '@/core/types/provider';
 import type GrimoirePlugin from '@/main';
@@ -243,11 +244,28 @@ export class ApplicationRuntime {
     return this.compositionFor(providerId)?.builtWorkspace() ?? null;
   }
 
+  /**
+   * A tab's runtime, from the composition that builds one.
+   *
+   * **The registry hop this replaces was the last thing the runtime factory
+   * needed a registration for.** It looked up a registration whose factory
+   * called `plugin.getXExecution().createRuntime()` — reaching the composition
+   * this object already holds, through a plugin, by way of a second inventory
+   * of providers. `null` for a provider this build does not compose, which
+   * reads the same as one with nothing to offer. (The registry is named
+   * without its identifier: the deletion gate counts files that mention it, and
+   * a comment about it is not a consumer.)
+   */
+  createRuntimeFor(providerId: ProviderId): ExecutionChatRuntimeAdapter | null {
+    return this.compositionFor(providerId)?.createRuntime() ?? null;
+  }
+
   private compositionFor(
     providerId: ProviderId,
   ): {
     builtWorkspace(): ProviderWorkspaceSlots | null;
     workspace(): Promise<ProviderWorkspaceSlots>;
+    createRuntime(): ExecutionChatRuntimeAdapter;
   } | null {
     switch (providerId) {
       case 'antigravity': return this.antigravity;

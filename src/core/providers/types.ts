@@ -70,7 +70,10 @@ export interface ProviderRegistration {
   // reconciliation, both reached through the catalog — and in both cases the
   // provider's own object is what the module delegates to, so what moved is
   // where the host asks, not who answers.
-  createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => ExecutionChatRuntimeAdapter;
+  // `createRuntime` was here. A tab asks the application for a runtime now —
+  // `ApplicationRuntime.createRuntimeFor(providerId)` reaches the same
+  // composition the registration's factory reached through a plugin, without a
+  // second inventory of providers in between.
   /**
    * How this provider reads a subagent task result.
    *

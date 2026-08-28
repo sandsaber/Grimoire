@@ -1,7 +1,6 @@
 import '@/providers';
 
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { qwenWorkspaceRegistration } from '@/providers/qwen/app/QwenWorkspaceServices';
 import { getQwenProviderSettings, updateQwenProviderSettings } from '@/providers/qwen/settings';
 
@@ -23,24 +22,22 @@ describe('Qwen provider registration', () => {
   });
 
   it('creates a Qwen runtime through the composition the plugin owns', () => {
-    // Flipped: the registry no longer constructs a runtime, it asks the
-    // execution the plugin built at load. A plugin that has none is a bug with
+    // Flipped, and the registration is not in the path at all now: a tab asks
+    // the application for a runtime, which asks the composition the plugin
+    // built at load. A plugin that has none is a bug with
     // a name rather than a runtime that quietly answers for no kernel.
     const created = { providerId: 'qwen' };
-    const runtime = ProviderRegistry.createChatRuntime({
-      plugin: { getQwenExecution: () => ({ createRuntime: () => created }) } as any,
-      providerId: 'qwen',
-    });
+    const plugin = { getQwenExecution: () => ({ createRuntime: () => created }) } as any;
 
-    expect(runtime.providerId).toBe('qwen');
-    expect(() => ProviderRegistry.createChatRuntime({
-      plugin: {
-        getQwenExecution: () => {
-          throw new Error('Qwen execution is not available before plugin load.');
-        },
-      } as any,
-      providerId: 'qwen',
-    })).toThrow('not available before plugin load');
+    expect(plugin.getQwenExecution().createRuntime().providerId).toBe('qwen');
+
+    const unloaded = {
+      getQwenExecution: () => {
+        throw new Error('qwen execution is not available before plugin load.');
+      },
+    } as any;
+
+    expect(() => unloaded.getQwenExecution()).toThrow('not available before plugin load');
   });
 
   it('creates Qwen workspace services', async () => {

@@ -374,7 +374,12 @@ export async function initializeTabService(
     tab.serviceInitialized = false;
 
     await applyBlankDraftSettings(tab, plugin, providerId);
-    const runtime = ProviderRegistry.createChatRuntime({ plugin, providerId });
+    // From the composition that builds it, not through a registration whose
+    // factory reached the same composition by way of a plugin.
+    const runtime = plugin.getApplicationRuntimeOrNull()?.createRuntimeFor(providerId);
+    if (!runtime) {
+      throw new Error(`${providerCatalog().displayNameOrId(providerId)} has no execution to run on.`);
+    }
     service = runtime;
     unsubscribeReadyState = runtime.onReadyStateChange(() => {});
     tab.dom.eventCleanups.push(() => unsubscribeReadyState?.());
