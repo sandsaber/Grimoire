@@ -56,10 +56,6 @@ const ROWS: readonly RowFit[] = [
     slot: { name: 'ProviderRuntimeCommandsPort', path: MODULE },
   },
   {
-    row: 'mcpStorage',
-    real: { name: 'AppMcpStorage', path: TYPES },
-  },
-  {
     // Typed as a concrete class, so there is no interface to count and no
     // contract a provider could satisfy without constructing Grimoire's own
     // manager. The table says `class` where the others carry a number.

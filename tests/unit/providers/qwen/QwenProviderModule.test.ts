@@ -38,8 +38,12 @@ describe('Qwen provider module', () => {
       refreshModels: async () => [{ id: 'qwen3-coder-plus', label: 'qwen3-coder-plus' }],
       cachedPlanUsage: () => null,
       refreshPlanUsage: async () => null,
-      loadMcpServers: async () => [{ id: 'vault', label: 'Vault', enabled: true }],
-      saveMcpServers: async () => undefined,
+      mcpPort: () => ({
+        load: async () => [
+          { name: 'vault', config: { command: 'x' }, contextSaving: false, enabled: true },
+        ],
+        save: async () => undefined,
+      }),
       renderSettingsTab: () => undefined,
       hydrateConversation: async () => ({ outcome: 'absent' as const }),
       deleteConversationSession: async () => undefined,
@@ -272,7 +276,7 @@ describe('Qwen provider module', () => {
       // it, and the slot that still refuses does so because its row has not
       // been reshaped yet.
       await expect(context.listModels()).resolves.toEqual([]);
-      await expect(context.loadMcpServers()).resolves.toEqual([]);
+      expect(context.mcpPort()).toBeUndefined();
       expect(context.commandsPort()).toBeUndefined();
       expect(context.cachedPlanUsage()).toBeNull();
     });

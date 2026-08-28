@@ -591,16 +591,12 @@ export class QwenExecution {
         // Reloading the vault's servers is what the tab asks for; the restart
         // that makes a running process see them is the launch key's job.
         mcp: {
-          loadServers: async () => {
+          load: async () => {
             const manager = ProviderWorkspaceRegistry.getMcpServerManager('qwen');
             await manager?.loadServers();
-            return (manager?.getServers() ?? []).map(server => ({
-              id: server.name,
-              label: server.name,
-              enabled: server.enabled,
-            }));
+            return manager?.getServers() ?? [];
           },
-          saveServers: () => notWiredHere('saveServers'),
+          save: () => notWiredHere('save'),
         },
       },
       () => {

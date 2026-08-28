@@ -1,5 +1,6 @@
 import type { ExecutionBackendFactory } from '../execution/ExecutionBackendDescriptor';
 import type { SlashCommand } from '../types';
+import type { ManagedMcpServer } from '../types/mcp';
 import type { ProviderId } from '../types/provider';
 import type { ProviderCommandEntry } from './commands/ProviderCommandEntry';
 
@@ -405,29 +406,33 @@ export interface ProviderRuntimeCommandsPort {
 /**
  * Grimoire-owned MCP configuration.
  *
- * **Storage and one parser, not a lifecycle.** The first version of this port
- * had `start(serverId)` and `stop(serverId)`, and nothing in the product starts
- * or stops an MCP server: a server is a record with an `enabled` flag that the
- * provider's own CLI launches. Those two members existed only in this contract
- * and in the nine contexts that stubbed them — invented operations that every
- * provider would have had to implement as a lie.
+ * **Storage, and only storage.** The first version had `start(serverId)` and
+ * `stop(serverId)`, and nothing in the product starts or stops an MCP server: a
+ * server is a record with an `enabled` flag that the provider's own CLI
+ * launches. Those two existed only in this contract and in the nine contexts
+ * that stubbed them — invented operations every provider would have had to
+ * implement as a lie.
  *
- * `tryParseClipboardConfig` went the other way. It is how a user pastes a
- * server config, it is the only member that parses rather than stores, and it
- * had no slot at all.
+ * The second version added `tryParseClipboardConfig`, on the reasoning that a
+ * user pasting a server config had no slot. It had none because it is not a
+ * provider question: `McpConfigParser.tryParseClipboardConfig` is one shared
+ * function, the settings UI imports it directly, and **no provider implements
+ * the member**. It was the same mistake as `start`/`stop` made in the opposite
+ * direction — a slot invented from a feature rather than from nine
+ * implementations — and it is gone.
+ *
+ * **`ManagedMcpServer`, not a flattened record.** It answered
+ * `{ id, label, enabled }`, and the consumer — `McpSettingsManager`, which
+ * every provider's settings tab constructs over this same storage — loads the
+ * list, edits a server's command, args and disabled tools, adds one, deletes
+ * one, and writes the whole list back. A three-field record cannot survive that
+ * round trip: `saveServers` could not have added a server it was handed.
  */
 export interface ProviderMcpPort {
-  loadServers(): Promise<readonly ProviderMcpServer[]>;
-  saveServers(servers: readonly ProviderMcpServer[]): Promise<void>;
-  /** Reads a pasted config, or answers `null` when the text is not one. */
-  tryParseClipboardConfig?(text: string): unknown;
+  load(): Promise<readonly ManagedMcpServer[]>;
+  save(servers: readonly ManagedMcpServer[]): Promise<void>;
 }
 
-export interface ProviderMcpServer {
-  readonly id: string;
-  readonly label: string;
-  readonly enabled: boolean;
-}
 
 /**
  * Renders the provider's settings tab.

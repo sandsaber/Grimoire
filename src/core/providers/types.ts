@@ -157,7 +157,6 @@ export interface AppSessionStorage {
 export interface AppMcpStorage {
   load(): Promise<ManagedMcpServer[]>;
   save(servers: ManagedMcpServer[]): Promise<void>;
-  tryParseClipboardConfig?(text: string): unknown;
 }
 
 export interface AppCommandStorage {

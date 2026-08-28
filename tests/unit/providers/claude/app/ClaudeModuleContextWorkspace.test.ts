@@ -45,8 +45,7 @@ describe('Claude module context workspace slots', () => {
     expect(context.commandsPort()).toBeUndefined();
     expect(await context.listAgentMentions()).toEqual([]);
     expect(await context.listModels()).toEqual([]);
-    expect(await context.loadMcpServers()).toEqual([]);
-    await expect(context.saveMcpServers([])).resolves.toBeUndefined();
+    expect(context.mcpPort()).toBeUndefined();
   });
 
   it('hands the registered catalog through, as the same object', async () => {
@@ -72,55 +71,17 @@ describe('Claude module context workspace slots', () => {
     expect(searchAgents).toHaveBeenCalledWith('');
   });
 
-  it('keeps everything about a stored MCP server that the port cannot carry', async () => {
-    const stored = [
-      {
-        name: 'vault',
-        config: { command: 'npx', args: ['mcp-vault'] },
-        contextSaving: true,
-        disabledTools: ['delete'],
-        enabled: false,
-      },
-      { name: 'other', config: { command: 'other' }, contextSaving: false, enabled: true },
-    ];
-    const save = jest.fn(async () => undefined);
-    const plugin = pluginWith({
-      mcpStorage: { load: jest.fn(async () => stored), save },
-    });
-    const context = createClaudeModuleContext(plugin, () => null, ports);
+  it('hands the registered MCP storage through, as the same object', async () => {
+    // **The two tests this replaces existed because the port could not carry a
+    // server.** It answered `{ id, label, enabled }`, so a save had to reload
+    // the stored list and merge three fields back into it — reconstruction the
+    // shared slot performed, and which would have dropped a server's command,
+    // args, context-saving mode and disabled tools the moment anything wrote a
+    // rebuilt record instead. The port carries `ManagedMcpServer` now, so there
+    // is nothing to reconstruct and nothing to lose.
+    const mcpStorage = { load: jest.fn(async () => []), save: jest.fn(async () => undefined) };
+    const context = createClaudeModuleContext(pluginWith({ mcpStorage }), () => null, ports);
 
-    expect(await context.loadMcpServers()).toEqual([
-      { id: 'vault', label: 'vault', enabled: false },
-      { id: 'other', label: 'other', enabled: true },
-    ]);
-
-    await context.saveMcpServers([{ id: 'vault', label: 'vault', enabled: true }]);
-
-    // The port carries identity and enablement. A save that rebuilt the record
-    // from those three fields would drop the command, the args, the
-    // context-saving mode and the disabled tools — everything the user
-    // configured — on the first toggle of a checkbox.
-    expect(save).toHaveBeenCalledWith([
-      {
-        name: 'vault',
-        config: { command: 'npx', args: ['mcp-vault'] },
-        contextSaving: true,
-        disabledTools: ['delete'],
-        enabled: true,
-      },
-      { name: 'other', config: { command: 'other' }, contextSaving: false, enabled: true },
-    ]);
-  });
-
-  it('leaves a server the port never mentioned exactly as it was', async () => {
-    const stored = [{ name: 'untouched', config: { command: 'x' }, contextSaving: false, enabled: true }];
-    const save = jest.fn(async () => undefined);
-    const plugin = pluginWith({ mcpStorage: { load: jest.fn(async () => stored), save } });
-    const context = createClaudeModuleContext(plugin, () => null, ports);
-
-    await context.saveMcpServers([]);
-
-    // A caller that saves a subset is not a caller that deleted the rest.
-    expect(save).toHaveBeenCalledWith(stored);
+    expect(context.mcpPort()).toBe(mcpStorage);
   });
 });

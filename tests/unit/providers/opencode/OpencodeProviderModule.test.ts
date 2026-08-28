@@ -35,8 +35,12 @@ describe('OpenCode provider module', () => {
       refreshModels: async () => [{ id: 'anthropic/claude-sonnet', label: 'Sonnet' }],
       cachedPlanUsage: () => null,
       refreshPlanUsage: async () => null,
-      loadMcpServers: async () => [{ id: 'vault', label: 'Vault', enabled: true }],
-      saveMcpServers: async () => undefined,
+      mcpPort: () => ({
+        load: async () => [
+          { name: 'vault', config: { command: 'x' }, contextSaving: false, enabled: true },
+        ],
+        save: async () => undefined,
+      }),
       renderSettingsTab: () => undefined,
       hydrateConversation: async () => ({ outcome: 'complete' as const }),
       deleteConversationSession: async () => undefined,
@@ -126,8 +130,8 @@ describe('OpenCode provider module', () => {
         'settingsPresentation',
         'usage',
       ]);
-      expect(await workspace.mcp?.loadServers()).toEqual([
-        { id: 'vault', label: 'Vault', enabled: true },
+      expect(await workspace.mcp?.load()).toEqual([
+        { name: 'vault', config: { command: 'x' }, contextSaving: false, enabled: true },
       ]);
     });
 

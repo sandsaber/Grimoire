@@ -35,8 +35,12 @@ describe('Claude provider module', () => {
       refreshModels: async () => [{ id: 'opus', label: 'Opus 5' }],
       cachedPlanUsage: () => ({ plan: 'Max', windows: [{ label: '5h', pct: 50, reset: '2h' }] }),
       refreshPlanUsage: async () => ({ plan: 'Max', windows: [{ label: '5h', pct: 50, reset: '2h' }] }),
-      loadMcpServers: async () => [{ id: 'vault', label: 'Vault', enabled: true }],
-      saveMcpServers: async () => undefined,
+      mcpPort: () => ({
+        load: async () => [
+          { name: 'vault', config: { command: 'x' }, contextSaving: false, enabled: true },
+        ],
+        save: async () => undefined,
+      }),
       renderSettingsTab: () => undefined,
       hydrateConversation: async () => ({ outcome: 'complete' as const }),
       deleteConversationSession: async () => undefined,
@@ -119,8 +123,8 @@ describe('Claude provider module', () => {
     it('owns its MCP servers rather than reading a provider-native config', async () => {
       const mcp = (await workspaceSlots()).mcp;
 
-      expect(await mcp?.loadServers()).toEqual([
-        { id: 'vault', label: 'Vault', enabled: true },
+      expect(await mcp?.load()).toEqual([
+        { name: 'vault', config: { command: 'x' }, contextSaving: false, enabled: true },
       ]);
     });
 

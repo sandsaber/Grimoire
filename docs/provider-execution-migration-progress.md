@@ -9729,6 +9729,40 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### The MCP port was wrong three times, and each version was wrong differently
+
+`start(serverId)` and `stop(serverId)` came first — **operations the product does not have**. An MCP
+server is a record with an `enabled` flag that the provider's own CLI launches; those two members
+existed only in this contract and in the nine contexts that stubbed them.
+
+`tryParseClipboardConfig` replaced them, on the reasoning that pasting a server config was something
+the product does and had no slot. It had no slot because it is **not a provider question**:
+`McpConfigParser.tryParseClipboardConfig` is one shared function, the settings UI imports it
+directly, and **no provider implements the member** — on the port or on the row it was also added
+to. The same mistake as `start`/`stop`, made in the opposite direction: a slot invented from a
+feature rather than from nine implementations.
+
+What was actually wrong the whole time was the **record**. `ProviderMcpServer` was
+`{ id, label, enabled }`, and the consumer — `McpSettingsManager`, which every provider's settings
+tab constructs over this same storage — loads the list, edits a server's command, args,
+context-saving mode and disabled tools, adds one, deletes one, and writes the whole list back. The
+proof it did not fit was already in the tree: the shared slot's `saveMcpServers` reloaded the stored
+list and merged three fields into it, with a comment explaining that rebuilding from three fields
+"would erase all of it on the first toggle of a checkbox". A port whose consumer has to reconstruct
+around it is a port that did not carry the row.
+
+Two members now — `load()` and `save(servers)` over `ManagedMcpServer` — handed through as the
+registered storage itself, the same identity argument as the command catalog. The reconstruction
+shim and the two tests that pinned its behaviour are deleted, because there is nothing left to
+reconstruct.
+
+**`mcpServerManager` is not a row, and the next session should stop treating it as one.** It is one
+concrete class, constructed identically over each provider's storage, whose ten members are all
+generic computation over `ManagedMcpServer[]` — enabled counts, disallowed tools, mention extraction
+and transformation, context-saving servers. No provider specializes it. It is a host service over
+this port, and its ~15 call sites in the execution compositions are the application reaching a
+registry for something it could build itself.
+
 #### CLI resolution was never a workspace service either
 
 `ProviderWorkspaceSlots.cliResolution` was declared, wired for all nine, and **read by nobody**.

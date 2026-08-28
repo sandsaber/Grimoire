@@ -2,7 +2,7 @@ import type {
   ProviderAgentMention,
   ProviderAgentMentionSource,
   ProviderCommandsPort,
-  ProviderMcpServer,
+  ProviderMcpPort,
   ProviderModelDescriptor,
   ProviderUsageSnapshot,
 } from '../../core/providers/ProviderModule';
@@ -14,7 +14,6 @@ import type {
   ProviderPlanUsageContext,
   ProviderPlanUsageProvider,
 } from '../../core/providers/types';
-import type { ManagedMcpServer } from '../../core/types/mcp';
 import type { ProviderId } from '../../core/types/provider';
 import type GrimoirePlugin from '../../main';
 
@@ -83,12 +82,12 @@ export interface WorkspaceContextSlots {
   /** The registered catalog, or nothing when this provider has none. */
   commandsPort(): ProviderCommandsPort | undefined;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
-  loadMcpServers(): Promise<readonly ProviderMcpServer[]>;
+  /** The registered MCP storage, or nothing where the provider owns its own config. */
+  mcpPort(): ProviderMcpPort | undefined;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   refreshAgentMentions(): Promise<void>;
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
-  saveMcpServers(servers: readonly ProviderMcpServer[]): Promise<void>;
 }
 
 export function createWorkspaceContextSlots(
@@ -149,14 +148,10 @@ export function createWorkspaceContextSlots(
 
     listModels: async () => models(),
 
-    loadMcpServers: async () => {
-      const stored = await services()?.mcpStorage?.load() ?? [];
-      return stored.map(server => ({
-        id: server.name,
-        label: server.name,
-        enabled: server.enabled,
-      }));
-    },
+    // Handed through, like the command catalog: the settings hub edits the
+    // same list the runtime reads, and a wrapper would be a second object
+    // whose writes land where nothing looks.
+    mcpPort: () => services()?.mcpStorage ?? undefined,
 
     cachedPlanUsage: () => {
       const provider = availableUsageProvider();
@@ -182,26 +177,6 @@ export function createWorkspaceContextSlots(
         settings: plugin.settings,
       });
       return models();
-    },
-
-
-    saveMcpServers: async servers => {
-      const storage = services()?.mcpStorage;
-      if (!storage) {
-        return;
-      }
-      // The port carries identity and enablement; a server's command, its
-      // transport, its context-saving mode and its disabled tools are the
-      // stored record's. Rebuilding the record from three fields would erase
-      // all of it on the first toggle of a checkbox, and a caller that saves a
-      // subset has not deleted the rest.
-      const stored: ManagedMcpServer[] = await storage.load();
-      const enabled = new Map(servers.map(server => [server.id, server.enabled]));
-      await storage.save(stored.map(server => (
-        enabled.has(server.name)
-          ? { ...server, enabled: enabled.get(server.name) as boolean }
-          : server
-      )));
     },
   };
 }

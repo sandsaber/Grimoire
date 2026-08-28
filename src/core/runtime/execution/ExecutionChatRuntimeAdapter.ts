@@ -1118,7 +1118,7 @@ export class ExecutionChatRuntimeAdapter {
       // to reload, and pretending otherwise would hide a missing contribution.
       return;
     }
-    await mcp.loadServers();
+    await mcp.load();
   }
 
   async getSupportedCommands(): Promise<SlashCommand[]> {

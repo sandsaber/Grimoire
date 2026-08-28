@@ -35,8 +35,12 @@ describe('Gemini provider module', () => {
       refreshModels: async () => [{ id: 'gemini-2.5-pro', label: 'gemini-2.5-pro' }],
       cachedPlanUsage: () => null,
       refreshPlanUsage: async () => null,
-      loadMcpServers: async () => [{ id: 'vault', label: 'Vault', enabled: true }],
-      saveMcpServers: async () => undefined,
+      mcpPort: () => ({
+        load: async () => [
+          { name: 'vault', config: { command: 'x' }, contextSaving: false, enabled: true },
+        ],
+        save: async () => undefined,
+      }),
       renderSettingsTab: () => undefined,
       hydrateConversation: async () => ({ outcome: 'absent' as const }),
       deleteConversationSession: async () => undefined,
@@ -153,8 +157,8 @@ describe('Gemini provider module', () => {
           'settingsPresentation',
         'usage',
       ]);
-      expect(await workspace.mcp?.loadServers()).toEqual([
-        { id: 'vault', label: 'Vault', enabled: true },
+      expect(await workspace.mcp?.load()).toEqual([
+        { name: 'vault', config: { command: 'x' }, contextSaving: false, enabled: true },
       ]);
     });
 
@@ -278,7 +282,7 @@ describe('Gemini provider module', () => {
       // it, and the slot that still refuses does so because its row has not
       // been reshaped yet.
       await expect(context.listModels()).resolves.toEqual([]);
-      await expect(context.loadMcpServers()).resolves.toEqual([]);
+      expect(context.mcpPort()).toBeUndefined();
       expect(context.commandsPort()).toBeUndefined();
       expect(context.cachedPlanUsage()).toBeNull();
     });

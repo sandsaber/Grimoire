@@ -22,7 +22,7 @@ describe('provider workspace context slots', () => {
     readonly build: (plugin: never) => {
       commandsPort(): unknown;
       listModels(): Promise<readonly unknown[]>;
-      loadMcpServers(): Promise<readonly { id: string }[]>;
+      mcpPort(): { load(): Promise<readonly { name: string }[]> } | undefined;
       cachedPlanUsage(): unknown;
     };
     readonly providerId: string;
@@ -62,12 +62,12 @@ describe('provider workspace context slots', () => {
       });
     }
 
-    const servers = await build(plugin()).loadMcpServers();
+    const servers = await build(plugin()).mcpPort()?.load() ?? [];
 
     // The marker is the provider's own id: a context wired to a neighbour's
     // accessor returns the neighbour's server, and every other assertion about
     // this answer would still pass.
-    expect(servers.map(server => server.id)).toEqual([`${providerId}-server`]);
+    expect(servers.map(server => server.name)).toEqual([`${providerId}-server`]);
   });
 
   it('hands the registered catalog through, as the same object', async () => {
@@ -121,7 +121,7 @@ describe('provider workspace context slots', () => {
 
     expect(context.commandsPort()).toBeUndefined();
     expect(await context.listModels()).toEqual([]);
-    expect(await context.loadMcpServers()).toEqual([]);
+    expect(context.mcpPort()).toBeUndefined();
     expect(context.cachedPlanUsage()).toBeNull();
   });
 });

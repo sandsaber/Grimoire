@@ -53,7 +53,7 @@ asserted only so the table cannot drift away from the code.
 | `modelCatalog` | 2 | 2 | **moved** | `isAvailable` is absent by design — a provider that cannot discover models contributes no `models` port, which is the contract's own "absent means unsupported", and both call sites guard on it exactly that way. `refreshModels` returns a `Promise<boolean>` that **neither call site reads**, so the slot returning descriptors instead loses nothing. The slot adds `list`, which the row lacked. |
 | `usageProvider` | 3 | 2 | **moved** | It was one `read()` against a row with a cached read and a refreshing one: the indicator shows what it holds the moment a tab paints and refreshes behind it, so one method makes every paint either a network call or permanently stale. Two now. The record was worse — `{label, usedFraction?, resetsAt?}` is a single window flattened, and a provider on a five-hour *and* a weekly quota reports both, while plans billed by amount report `spend` and no window at all. `isAvailable` is correctly absent: all nine answered `settings.enabled`, which the catalog decides. |
 | `runtimeCommandLoader` | 2 | 1 | reshape | `listForSession(sessionId)` presumes a session exists, and the row's context carries `allowSessionCreation` — command discovery may *start* a short-lived session, and the tab manager decides when that is allowed. The context also carries the conversation, the runtime and the external context paths. |
-| `mcpStorage` | 3 | 3 (shared) | reshape | Half reshaped. The port had `start(serverId)` and `stop(serverId)` — **operations the product does not have**: an MCP server is a record with an `enabled` flag that the provider's own CLI launches, and those two existed only in this contract and the nine contexts that stubbed them. `tryParseClipboardConfig`, which the product does have and had no slot, is on the port now. **What is still wrong is the shape of the record.** `ProviderMcpServer` is `{id, label, enabled}`, and the consumer — `McpSettingsManager`, which every provider's settings tab constructs over this same `AppMcpStorage` — adds servers, edits a server's command and args, imports a pasted config, edits its disabled-tool list and deletes it. A toggle port facing a CRUD consumer: everything but the toggle has nowhere to go, and `saveServers` cannot add a server it was handed. |
+| `mcpStorage` | 2 | 2 (shared) | **moved** | Three shapes in a row, and each was wrong differently. The first port had `start(serverId)` and `stop(serverId)` — **operations the product does not have**: an MCP server is a record with an `enabled` flag that the provider's own CLI launches, and those two existed only in this contract and the nine contexts that stubbed them. The second replaced them with `tryParseClipboardConfig`, on the reasoning that a user pasting a config had no slot — and it had none because it is **not a provider question**: `McpConfigParser.tryParseClipboardConfig` is one shared function the settings UI imports directly, and **no provider implements the member**. The same mistake as `start`/`stop` in the opposite direction, a slot invented from a feature rather than from nine implementations. What was actually wrong all along was the *record*: `ProviderMcpServer` was `{id,label,enabled}` against a consumer — `McpSettingsManager`, which every provider's settings tab constructs over this same storage — that loads the list, edits a server's command, args and disabled tools, adds one, deletes one, and writes it all back. The shared slot had to reload and merge three fields into the stored record to survive that, which is reconstruction the port existed to avoid. It carries `ManagedMcpServer` now, two members, handed through as the registered storage itself. |
 | `mcpServerManager` | class | 3 (shared) | reshape | Mention extraction and transformation, disallowed-tool computation (two forms), context-saving servers, and the enabled count — ten public members against a port describing storage and start/stop. **And the row is typed as a concrete class, not an interface**, so nothing else can satisfy it: a provider cannot contribute an MCP port without constructing Grimoire's own manager. That is the reshape, before any member is counted. |
 | `settingsTabRenderer` | 1 + a 7-member context | 1 | reshape | The contract is the context, not the method: the host supplies section builders, model-selector refresh, custom context limits, the advanced section, the hidden-command setting and a discovery suppression flag. `render(host)` types the host as `unknown`, which is honest about the DOM and silent about all seven. |
 
@@ -96,7 +96,7 @@ a row moves or a slot changes.
 
 ## What this means for sequencing
 
-**Eight rows have moved**, counting the app-level workspace capability row. `modelCatalog` was the one whose slot fitted, and it was blocked twice over
+**Nine rows have moved**, counting the app-level workspace capability row. `modelCatalog` was the one whose slot fitted, and it was blocked twice over
 — by eight contexts whose `listModels`/`refreshModels` threw, and by nothing building a workspace at
 all. `usageProvider` needed its slot reshaped first, and then moved the same way. Both read
 `ApplicationRuntime.workspaceFor(providerId)` — or `builtWorkspaceFor` on the paint path — and
@@ -110,11 +110,11 @@ So the work splits in two, and only one half is design:
    So did a second thing the first version of this file did not look for: **nothing built a
    workspace.** `module.workspace.initialize` had one caller. `ProviderWorkspaceHolder` and
    `ApplicationRuntime.workspaceFor(providerId)` are the path a consumer takes; both are done.
-2. **Reshape seven slots.** Design, from the implementations, with the notes above as input.
-   `chatUIConfig`, `settingsReconciler`, `commandCatalog` and `cliResolver` were four of the
-   eleven, and all four were reshaped and carried through inside the same milestone.
+2. **Reshape six slots.** Design, from the implementations, with the notes above as input.
+   `chatUIConfig`, `settingsReconciler`, `commandCatalog`, `cliResolver` and `mcpStorage` were
+   five of the eleven, and all five were reshaped and carried through inside the same milestone.
 
-**Three of the seven wait on their consumers rather than on design.** `taskResultInterpreter` and
+**Three of the six wait on their consumers rather than on design.** `taskResultInterpreter` and
 `subagentLifecycleAdapter` are read by `SubagentManager` and `MessageRenderer`, both of which the
 durable-agents work is replacing. A slot shaped for a consumer that is being replaced is a slot
 shaped twice, so they are last, not first — even though they are the smallest.

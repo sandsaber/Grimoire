@@ -4,7 +4,7 @@ import type {
   ProviderChatUiContribution,
   ProviderCommandsPort,
   ProviderHistoryHydration,
-  ProviderMcpServer,
+  ProviderMcpPort,
   ProviderModelDescriptor,
   ProviderModule,
   ProviderSettingsCodec,
@@ -92,8 +92,7 @@ export interface GeminiWorkspaceContext {
   refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
-  loadMcpServers(): Promise<readonly ProviderMcpServer[]>;
-  saveMcpServers(servers: readonly ProviderMcpServer[]): Promise<void>;
+  mcpPort(): ProviderMcpPort | undefined;
   renderSettingsTab(host: unknown): void;
   hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
   deleteConversationSession(conversationId: string): Promise<void>;
@@ -291,10 +290,7 @@ GeminiProviderSettings
           cached: () => context.cachedPlanUsage(),
           refresh: () => context.refreshPlanUsage(),
         },
-        mcp: {
-          loadServers: () => context.loadMcpServers(),
-          saveServers: servers => context.saveMcpServers(servers),
-        },
+        ...(context.mcpPort() ? { mcp: context.mcpPort()! } : {}),
         settingsPresentation: { render: host => context.renderSettingsTab(host) },
       };
     },
