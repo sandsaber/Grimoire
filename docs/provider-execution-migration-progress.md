@@ -10402,6 +10402,34 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the application layer stops asking a global for a provider's own service (`this commit`)
+
+- Gates: `npm run test -- --selectProjects unit` 8754 passed, 8754 total; `tsc --noEmit` clean;
+  `npm run lint` clean.
+- Parity manifest: unchanged. Contribution inventory rows moved: none yet — this is the consumer
+  half of the MCP row, which closes when the manager itself is reached through the workspace
+  contribution.
+- **`src/app` is now clear of both registries. 27 → 21.** Six ACP compositions — OpenCode, Grok,
+  MiMoCode, Kimi Code, Gemini, Qwen — held sixteen calls to
+  `ProviderWorkspaceRegistry.getMcpServerManager(<id>)`, and each now asks its own provider:
+  `maybeGet<Provider>WorkspaceServices()?.mcpServerManager`. The same object arrives by the same
+  `getServices` call underneath, so nothing about behaviour changed; what went is a string-keyed
+  global lookup performed by the application layer for a service the provider owns and already
+  publishes an accessor for.
+- **What was deliberately not done.** The override each composition installs at its `mcp` slot
+  reloads the *manager*, and the manager's identity is what three chat surfaces hold —
+  `setMcpManager` on the server selector and the file-context manager, through
+  `getProviderMcpManager`. Falling back to the default `mcpPort()` from `createWorkspaceContextSlots`
+  would read the same file and return the same servers, but it would stop refreshing the object
+  those widgets are holding, so a tab's MCP reload would leave them stale. The widgets wanting a
+  manager rather than a snapshot is its own row.
+- **Proved by breaking.** Five composition tests stubbed `getMcpServerManager` and had to move to
+  `getServices`; a stub can be repointed and still pass for the wrong reason, so the OpenCode one was
+  re-run with its `servers.push` removed and failed, which is what says the fingerprint it asserts is
+  still reading the stub through the new path.
+- Open, with owners: the remaining 21 are the feature layer, `main.ts`, `modelRouting`, and the
+  provider files that publish the accessors. Owner: **M5**, with the provider rows.
+
 ### M5 — the registries drop to 27, and a sentence that outlived what it described (`this commit`)
 
 - Gates: `npm run test -- --selectProjects unit` 8754 passed, 8754 total; `tsc --noEmit` clean;

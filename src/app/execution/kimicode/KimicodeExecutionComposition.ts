@@ -27,7 +27,6 @@ import type {
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import {
   type BoundConversation,
   ExecutionChatRuntimeAdapter,
@@ -49,6 +48,7 @@ import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedA
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createKimicodeModuleContext } from '@/providers/kimicode/app/KimicodeModuleContext';
 import { kimicodePlanUsageStore } from '@/providers/kimicode/app/KimicodePlanUsageStore';
+import { maybeGetKimicodeWorkspaceServices } from '@/providers/kimicode/app/KimicodeWorkspaceServices';
 import type { KimicodeAcpDynamicConfig } from '@/providers/kimicode/execution/KimicodeAcpDynamicConfig';
 import { KimicodeAcpDynamicConfigApplier } from '@/providers/kimicode/execution/KimicodeAcpDynamicConfig';
 import { KimicodeAcpFileSystem } from '@/providers/kimicode/execution/KimicodeAcpFileSystem';
@@ -589,7 +589,7 @@ export class KimicodeExecution {
         // that makes a running process see them is the launch key's job.
         mcp: {
           load: async () => {
-            const manager = ProviderWorkspaceRegistry.getMcpServerManager('kimicode');
+            const manager = maybeGetKimicodeWorkspaceServices()?.mcpServerManager;
             await manager?.loadServers();
             return manager?.getServers() ?? [];
           },
@@ -927,7 +927,7 @@ export class KimicodeExecution {
       }),
       cwd,
       mcpServers: toAcpMcpServers([
-        ...(ProviderWorkspaceRegistry.getMcpServerManager('kimicode')?.getServers() ?? []),
+        ...(maybeGetKimicodeWorkspaceServices()?.mcpServerManager?.getServers() ?? []),
       ]),
     };
   }
@@ -1021,7 +1021,7 @@ export class KimicodeExecution {
       settings: promptSettings,
       workspaceRoot: cwd,
     });
-    const mcpServers = ProviderWorkspaceRegistry.getMcpServerManager('kimicode')?.getServers() ?? [];
+    const mcpServers = maybeGetKimicodeWorkspaceServices()?.mcpServerManager?.getServers() ?? [];
     return {
       executable,
       cwd,

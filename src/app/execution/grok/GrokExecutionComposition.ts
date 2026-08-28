@@ -27,7 +27,6 @@ import type {
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import {
   type BoundConversation,
   ExecutionChatRuntimeAdapter,
@@ -57,6 +56,7 @@ import type {
 } from '@/providers/acp/types';
 import { createGrokModuleContext } from '@/providers/grok/app/GrokModuleContext';
 import { grokPlanUsageStore } from '@/providers/grok/app/GrokPlanUsageStore';
+import { maybeGetGrokWorkspaceServices } from '@/providers/grok/app/GrokWorkspaceServices';
 import {
   type GrokAcpDynamicConfig,
   GrokAcpDynamicConfigApplier,
@@ -706,7 +706,7 @@ export class GrokExecution {
         // that makes a running process see them is the launch key's job.
         mcp: {
           load: async () => {
-            const manager = ProviderWorkspaceRegistry.getMcpServerManager('grok');
+            const manager = maybeGetGrokWorkspaceServices()?.mcpServerManager;
             await manager?.loadServers();
             return manager?.getServers() ?? [];
           },
@@ -1186,7 +1186,7 @@ export class GrokExecution {
       }),
       cwd,
       mcpServers: toAcpMcpServers([
-        ...(ProviderWorkspaceRegistry.getMcpServerManager('grok')?.getServers() ?? []),
+        ...(maybeGetGrokWorkspaceServices()?.mcpServerManager?.getServers() ?? []),
       ]),
     };
   }
@@ -1304,7 +1304,7 @@ export class GrokExecution {
         promptKey: computeSystemPromptKey(promptSettings),
         reasoningEffort,
       }),
-      mcpServers: ProviderWorkspaceRegistry.getMcpServerManager('grok')?.getServers() ?? [],
+      mcpServers: maybeGetGrokWorkspaceServices()?.mcpServerManager?.getServers() ?? [],
     };
   }
 }

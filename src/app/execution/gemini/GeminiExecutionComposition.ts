@@ -21,7 +21,6 @@ import type {
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import {
   type BoundConversation,
   ExecutionChatRuntimeAdapter,
@@ -42,6 +41,7 @@ import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedA
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createGeminiModuleContext } from '@/providers/gemini/app/GeminiModuleContext';
 import { geminiPlanUsageStore } from '@/providers/gemini/app/GeminiPlanUsageStore';
+import { maybeGetGeminiWorkspaceServices } from '@/providers/gemini/app/GeminiWorkspaceServices';
 import type { GeminiAcpDynamicConfig } from '@/providers/gemini/execution/GeminiAcpDynamicConfig';
 import { GeminiAcpDynamicConfigApplier } from '@/providers/gemini/execution/GeminiAcpDynamicConfig';
 import { GeminiAcpFileSystem } from '@/providers/gemini/execution/GeminiAcpFileSystem';
@@ -473,7 +473,7 @@ export class GeminiExecution {
         // that makes a running process see them is the launch key's job.
         mcp: {
           load: async () => {
-            const manager = ProviderWorkspaceRegistry.getMcpServerManager('gemini');
+            const manager = maybeGetGeminiWorkspaceServices()?.mcpServerManager;
             await manager?.loadServers();
             return manager?.getServers() ?? [];
           },
@@ -699,7 +699,7 @@ export class GeminiExecution {
     const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
     const executable = this.plugin.getResolvedProviderCliPath('gemini') ?? 'gemini';
     const runtimeEnv = buildGeminiRuntimeEnv(this.plugin.settings, executable);
-    const mcpServers = ProviderWorkspaceRegistry.getMcpServerManager('gemini')?.getServers() ?? [];
+    const mcpServers = maybeGetGeminiWorkspaceServices()?.mcpServerManager?.getServers() ?? [];
     return {
       executable,
       cwd,

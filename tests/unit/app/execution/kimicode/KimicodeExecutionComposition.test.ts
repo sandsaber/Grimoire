@@ -843,8 +843,10 @@ describe('Kimi Code execution composition', () => {
     // running process cannot be told, and the fingerprint is what restarts it.
     const { execution, host } = await createHarness();
     const servers: unknown[] = [];
-    jest.spyOn(ProviderWorkspaceRegistry, 'getMcpServerManager').mockReturnValue({
-      getServers: () => servers,
+    // Stubbed where the composition now asks: it reaches the provider's own
+    // services rather than a registry accessor keyed by a provider id string.
+    jest.spyOn(ProviderWorkspaceRegistry, 'getServices').mockReturnValue({
+      mcpServerManager: { getServers: () => servers },
     } as never);
 
     const before = await execution.turnRequests.resolve(execution.turnRequests.reference({

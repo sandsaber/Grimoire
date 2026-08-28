@@ -27,7 +27,6 @@ import type {
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import {
   type BoundConversation,
   ExecutionChatRuntimeAdapter,
@@ -49,6 +48,7 @@ import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedA
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createMimocodeModuleContext } from '@/providers/mimocode/app/MimocodeModuleContext';
 import { mimocodePlanUsageStore } from '@/providers/mimocode/app/MimocodePlanUsageStore';
+import { maybeGetMimocodeWorkspaceServices } from '@/providers/mimocode/app/MimocodeWorkspaceServices';
 import type { MimocodeAcpDynamicConfig } from '@/providers/mimocode/execution/MimocodeAcpDynamicConfig';
 import { MimocodeAcpDynamicConfigApplier } from '@/providers/mimocode/execution/MimocodeAcpDynamicConfig';
 import { MimocodeAcpFileSystem } from '@/providers/mimocode/execution/MimocodeAcpFileSystem';
@@ -581,7 +581,7 @@ export class MimocodeExecution {
         // that makes a running process see them is the launch key's job.
         mcp: {
           load: async () => {
-            const manager = ProviderWorkspaceRegistry.getMcpServerManager('mimocode');
+            const manager = maybeGetMimocodeWorkspaceServices()?.mcpServerManager;
             await manager?.loadServers();
             return manager?.getServers() ?? [];
           },
@@ -919,7 +919,7 @@ export class MimocodeExecution {
       }),
       cwd,
       mcpServers: toAcpMcpServers([
-        ...(ProviderWorkspaceRegistry.getMcpServerManager('mimocode')?.getServers() ?? []),
+        ...(maybeGetMimocodeWorkspaceServices()?.mcpServerManager?.getServers() ?? []),
       ]),
     };
   }
@@ -1013,7 +1013,7 @@ export class MimocodeExecution {
       settings: promptSettings,
       workspaceRoot: cwd,
     });
-    const mcpServers = ProviderWorkspaceRegistry.getMcpServerManager('mimocode')?.getServers() ?? [];
+    const mcpServers = maybeGetMimocodeWorkspaceServices()?.mcpServerManager?.getServers() ?? [];
     return {
       executable,
       cwd,

@@ -23,7 +23,6 @@ import type {
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import {
   type BoundConversation,
   ExecutionChatRuntimeAdapter,
@@ -49,6 +48,7 @@ import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import type { AcpUsageUpdate } from '@/providers/acp/types';
 import { createQwenModuleContext } from '@/providers/qwen/app/QwenModuleContext';
 import { qwenPlanUsageStore } from '@/providers/qwen/app/QwenPlanUsageStore';
+import { maybeGetQwenWorkspaceServices } from '@/providers/qwen/app/QwenWorkspaceServices';
 import type { QwenAcpDynamicConfig } from '@/providers/qwen/execution/QwenAcpDynamicConfig';
 import { QwenAcpDynamicConfigApplier } from '@/providers/qwen/execution/QwenAcpDynamicConfig';
 import { QwenAcpFileSystem } from '@/providers/qwen/execution/QwenAcpFileSystem';
@@ -591,7 +591,7 @@ export class QwenExecution {
         // that makes a running process see them is the launch key's job.
         mcp: {
           load: async () => {
-            const manager = ProviderWorkspaceRegistry.getMcpServerManager('qwen');
+            const manager = maybeGetQwenWorkspaceServices()?.mcpServerManager;
             await manager?.loadServers();
             return manager?.getServers() ?? [];
           },
@@ -846,7 +846,7 @@ export class QwenExecution {
     const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
     const executable = this.plugin.getResolvedProviderCliPath('qwen') ?? 'qwen';
     const runtimeEnv = buildQwenRuntimeEnv(this.plugin.settings, executable);
-    const mcpServers = ProviderWorkspaceRegistry.getMcpServerManager('qwen')?.getServers() ?? [];
+    const mcpServers = maybeGetQwenWorkspaceServices()?.mcpServerManager?.getServers() ?? [];
     return {
       executable,
       cwd,

@@ -27,7 +27,6 @@ import type {
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import {
   type BoundConversation,
   ExecutionChatRuntimeAdapter,
@@ -49,6 +48,7 @@ import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedA
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createOpencodeModuleContext } from '@/providers/opencode/app/OpencodeModuleContext';
 import { opencodePlanUsageStore } from '@/providers/opencode/app/OpencodePlanUsageStore';
+import { maybeGetOpencodeWorkspaceServices } from '@/providers/opencode/app/OpencodeWorkspaceServices';
 import type { OpencodeAcpDynamicConfig } from '@/providers/opencode/execution/OpencodeAcpDynamicConfig';
 import { OpencodeAcpDynamicConfigApplier } from '@/providers/opencode/execution/OpencodeAcpDynamicConfig';
 import { OpencodeAcpFileSystem } from '@/providers/opencode/execution/OpencodeAcpFileSystem';
@@ -580,7 +580,7 @@ export class OpencodeExecution {
         // that makes a running process see them is the launch key's job.
         mcp: {
           load: async () => {
-            const manager = ProviderWorkspaceRegistry.getMcpServerManager('opencode');
+            const manager = maybeGetOpencodeWorkspaceServices()?.mcpServerManager;
             await manager?.loadServers();
             return manager?.getServers() ?? [];
           },
@@ -918,7 +918,7 @@ export class OpencodeExecution {
       }),
       cwd,
       mcpServers: toAcpMcpServers([
-        ...(ProviderWorkspaceRegistry.getMcpServerManager('opencode')?.getServers() ?? []),
+        ...(maybeGetOpencodeWorkspaceServices()?.mcpServerManager?.getServers() ?? []),
       ]),
     };
   }
@@ -1012,7 +1012,7 @@ export class OpencodeExecution {
       settings: promptSettings,
       workspaceRoot: cwd,
     });
-    const mcpServers = ProviderWorkspaceRegistry.getMcpServerManager('opencode')?.getServers() ?? [];
+    const mcpServers = maybeGetOpencodeWorkspaceServices()?.mcpServerManager?.getServers() ?? [];
     return {
       executable,
       cwd,
