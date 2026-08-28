@@ -10445,6 +10445,38 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the agent-record projection durable agents was waiting on (`this commit`)
+
+The entry below named the missing piece. This is it.
+
+- Gates: unit 8744 passed, 8744 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **`listOwnedAgents` no longer walks the store on every call.** It read *every* instance record in
+  the vault to find the handful a conversation owns, then a run record for each — and every
+  background-subagent state change asks the tab for a card refresh, so a sidecar hydration retry
+  walked the store once per event. Instance and run records this process has read are now kept.
+- **The eviction is wired to the write funnel, not to the call sites**, which is what makes it
+  correct rather than careful. `MutableAgentRepository` announces every `create`, `update` and
+  `removeIfPresent` after it succeeds, and both write directions pass through it: the coordinator
+  writing one record directly, and the transaction coordinator applying a batch — its handler calls
+  the same three methods. A cached record cannot outlive the write that replaced it, by
+  construction.
+- Announced **after** the write, never before: a listener told early would evict and immediately
+  refill from the record the write is about to replace, which is worse than not caching. A throwing
+  write announces nothing, because nothing changed.
+- **Both halves are asserted, and both were proved by breaking.** *"Sees a record that changed after
+  it was last read"* lists, retries, and lists again — dropping the instance eviction makes the
+  second call answer with the first call's attempt. *"Does not read the store again for a listing
+  nothing changed"* counts `storage.read` across a second identical listing and expects **zero** —
+  removing the cache lookup makes it one.
+- Stated plainly in the code: it is process-local and not a cross-process cache. Another window
+  writing these records would not invalidate it; nothing does that, and the alternative is the
+  re-read this replaces.
+- **What this unblocks.** The synchronous `hasRunning` the Claude `Stop` hook needs is a projection
+  over the same records, and the card path was the other reader that forced the walk. The remaining
+  step for `SubagentManager lifecycle` is to derive that answer here and let the manager keep only
+  its rendering.
+
 ### M5 — what durable agents has to build first, found by trying to move one method (`this commit`)
 
 - Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean.

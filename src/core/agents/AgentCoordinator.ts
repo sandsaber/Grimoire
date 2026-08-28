@@ -171,6 +171,56 @@ export class AgentCoordinator {
       throw new Error('Agent control timeout must be a positive safe integer.');
     }
     this.scheduler = options.scheduler;
+    // Evicted from the write funnel rather than from each call site, so a cached
+    // record cannot outlive the write that replaced it — see `onChanged`.
+    this.repositories.instances.onChanged(id => this.instanceRecords.delete(id));
+    this.repositories.runs.onChanged(id => this.runRecords.delete(id));
+  }
+
+  /**
+   * Records this process has already read, by id.
+   *
+   * **`listOwnedAgents` re-read the whole store on every call**, and every
+   * background-subagent state change asks for one: the tab's card refresh reads
+   * every instance record in the vault to find the handful its conversation
+   * owns, then a run record for each. During a burst — a sidecar hydration
+   * retry produces one — that is the store walked once per event.
+   *
+   * Process-local on purpose, and correct because the eviction is wired to the
+   * only funnel writes pass through. It is not a cross-process cache: another
+   * window writing these records would not invalidate it. Nothing does that —
+   * a vault is opened once and these records are Grimoire's own — and the
+   * alternative, re-reading everything forever, is what this replaces.
+   */
+  private readonly instanceRecords = new Map<string, AgentInstanceRecord>();
+  private readonly runRecords = new Map<string, AgentRunRecord>();
+
+  /** One instance record, from this process's copy when it has a current one. */
+  private async readInstanceRecord(instanceId: string): Promise<AgentInstanceRecord | null> {
+    const cached = this.instanceRecords.get(instanceId);
+    if (cached) {
+      return cached;
+    }
+    const read = await this.repositories.instances.read(instanceId);
+    if (read.kind !== 'current' && read.kind !== 'migrated') {
+      return null;
+    }
+    this.instanceRecords.set(instanceId, read.record.payload);
+    return read.record.payload;
+  }
+
+  /** One run record, on the same terms. */
+  private async readRunRecord(agentRunId: string): Promise<AgentRunRecord | null> {
+    const cached = this.runRecords.get(agentRunId);
+    if (cached) {
+      return cached;
+    }
+    const read = await this.repositories.runs.read(agentRunId);
+    if (read.kind !== 'current' && read.kind !== 'migrated') {
+      return null;
+    }
+    this.runRecords.set(agentRunId, read.record.payload);
+    return read.record.payload;
   }
 
   async prepareAndDispatch(
@@ -607,26 +657,25 @@ export class AgentCoordinator {
     const ownerKey = stableSerialize(owner);
     const summaries: OwnedAgentSummary[] = [];
     for (const instanceId of await this.repositories.instances.listRecordIds()) {
-      const instance = await this.repositories.instances.read(instanceId);
-      if (instance.kind !== 'current' && instance.kind !== 'migrated') continue;
-      const record = instance.record.payload;
+      const record = await this.readInstanceRecord(instanceId);
+      if (!record) continue;
       if (stableSerialize(record.rootOwner) !== ownerKey) continue;
       const latestRunId = record.runIds.at(-1);
       if (!latestRunId) continue;
-      const run = await this.repositories.runs.read(latestRunId);
-      if (run.kind !== 'current' && run.kind !== 'migrated') continue;
+      const run = await this.readRunRecord(latestRunId);
+      if (!run) continue;
       summaries.push({
         agentInstanceId: record.agentInstanceId,
-        agentRunId: run.record.payload.agentRunId,
+        agentRunId: run.agentRunId,
         providerId: record.providerId,
-        goalRef: run.record.payload.goalRef,
+        goalRef: run.goalRef,
         nativeAgentRef: record.nativeAgentRef,
-        state: run.record.payload.state,
-        terminal: run.record.payload.terminal,
-        attempt: run.record.payload.attempt,
+        state: run.state,
+        terminal: run.terminal,
+        attempt: run.attempt,
         observation: record.observation,
-        startedAt: run.record.payload.createdAt,
-        updatedAt: run.record.payload.updatedAt,
+        startedAt: run.createdAt,
+        updatedAt: run.updatedAt,
       });
     }
     return summaries.sort((left, right) => right.startedAt - left.startedAt);

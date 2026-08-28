@@ -22,7 +22,26 @@ import {
 } from './AgentSchemas';
 
 export class MutableAgentRepository<TRecord> {
+  private readonly changeListeners = new Set<(recordId: string) => void>();
+
   constructor(private readonly records: VersionedRepository<TRecord>) {}
+
+  /**
+   * Says which record changed, after it has changed.
+   *
+   * **The point is that it cannot be bypassed.** Agent records are written from
+   * two directions — the coordinator writing one directly, and the transaction
+   * coordinator applying a batch — and both reach the store through the three
+   * mutating methods below. A reader that caches records can evict from here and
+   * be right by construction, rather than by every write path remembering to
+   * say so.
+   */
+  onChanged(listener: (recordId: string) => void): () => void {
+    this.changeListeners.add(listener);
+    return () => {
+      this.changeListeners.delete(listener);
+    };
+  }
 
   read(recordId: string): Promise<VersionedRecordReadResult<TRecord>> {
     return this.records.read(recordId);
@@ -32,8 +51,10 @@ export class MutableAgentRepository<TRecord> {
     return this.records.listRecordIds();
   }
 
-  create(recordId: string, record: TRecord): Promise<VersionedRecord<TRecord>> {
-    return this.records.save(recordId, record, null);
+  async create(recordId: string, record: TRecord): Promise<VersionedRecord<TRecord>> {
+    const saved = await this.records.save(recordId, record, null);
+    this.announce(recordId);
+    return saved;
   }
 
   /**
@@ -43,16 +64,32 @@ export class MutableAgentRepository<TRecord> {
    * interrupted half-way is finished at the next start, against records some of
    * which are already gone.
    */
-  removeIfPresent(recordId: string): Promise<void> {
-    return this.records.removeIfPresent(recordId);
+  async removeIfPresent(recordId: string): Promise<void> {
+    await this.records.removeIfPresent(recordId);
+    this.announce(recordId);
   }
 
-  update(
+  async update(
     recordId: string,
     expectedRevision: number,
     mutation: (record: TRecord) => TRecord,
   ): Promise<VersionedRecord<TRecord>> {
-    return this.records.mutate(recordId, expectedRevision, mutation);
+    const updated = await this.records.mutate(recordId, expectedRevision, mutation);
+    this.announce(recordId);
+    return updated;
+  }
+
+  /**
+   * Announced after the write, never before.
+   *
+   * A listener told early would evict a cache and refill it from the record the
+   * write is about to replace, which is worse than not caching at all. A
+   * throwing write announces nothing, because nothing changed.
+   */
+  private announce(recordId: string): void {
+    for (const listener of this.changeListeners) {
+      listener(recordId);
+    }
   }
 }
 

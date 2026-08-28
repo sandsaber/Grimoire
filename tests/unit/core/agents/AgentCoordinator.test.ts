@@ -433,6 +433,66 @@ describe('AgentCoordinator', () => {
     expect(listed[0]).not.toHaveProperty('finalText');
   });
 
+  it('does not read the store again for a listing nothing changed', async () => {
+    // **Why the cache is there.** Every background-subagent state change asks
+    // the tab for a card refresh, and a refresh listed every instance record in
+    // the vault and then a run record for each. A sidecar hydration retry
+    // produces a burst of them, so that was the store walked once per event.
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+    await coordinator.prepareAndDispatch(rootCommand(), {
+      dispatch: async () => ({ kind: 'accepted' }),
+    });
+    const owner = { kind: 'conversation' as const, ownerId: 'conversation-1' };
+    await coordinator.listOwnedAgents(owner);
+
+    let reads = 0;
+    const underlying = storage.read.bind(storage);
+    storage.read = async (path: string) => {
+      reads += 1;
+      return await underlying(path);
+    };
+    const again = await coordinator.listOwnedAgents(owner);
+
+    // The listing still answers, and it answered without opening a file.
+    expect(again).toHaveLength(1);
+    expect(reads).toBe(0);
+  });
+
+  it('sees a record that changed after it was last read', async () => {
+    // **The cache behind `listOwnedAgents` has to be evicted, and this is what
+    // says so.** Reading the whole store on every call was the previous
+    // behaviour and could not go stale; a process-local copy can. Listing
+    // before the retry warms both caches — the instance, whose `runIds` gains
+    // one, and the run, whose attempt is superseded — so a missing eviction
+    // answers the second call with the first call's attempt.
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+    await coordinator.prepareAndDispatch(rootCommand(), {
+      dispatch: async () => ({ kind: 'rejected', code: 'refused', sideEffectFree: true }),
+    });
+    const owner = { kind: 'conversation' as const, ownerId: 'conversation-1' };
+    const before = await coordinator.listOwnedAgents(owner);
+    expect(before[0]).toMatchObject({ attempt: 1 });
+
+    await coordinator.retry({
+      prepareTransactionId: tx('8'),
+      dispatchStartTransactionId: tx('9'),
+      settlementTransactionId: tx('a'),
+      terminalTransactionId: tx('b'),
+      agentInstanceId: ROOT_INSTANCE_ID,
+      agentRunId: agentRunId(`agr-${'c'.repeat(32)}`),
+      dispatchToken: agentDispatchToken(`adt-${'d'.repeat(32)}`),
+      goalRef: 'second-attempt',
+      policyInputs: POLICY_INPUTS,
+      idempotency: 'provider-key',
+    }, { dispatch: async () => ({ kind: 'accepted' }) });
+
+    expect(await coordinator.listOwnedAgents(owner)).toMatchObject([
+      { attempt: 2, goalRef: 'second-attempt' },
+    ]);
+  });
+
   it('lists the attempt that is happening, not the ones before it', async () => {
     // A retry keeps its predecessors and they are history; a card showing three
     // attempts of one agent is showing one agent.
