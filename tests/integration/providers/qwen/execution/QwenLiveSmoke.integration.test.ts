@@ -247,7 +247,7 @@ live('Qwen live smoke', () => {
     await drain(first.runtime.query(first.runtime.prepareTurn({
       text: 'Remember the word cobalt. Reply with exactly: OK',
     })));
-    const updates = first.runtime.buildSessionUpdates({
+    const updates = first.runtime.sessionBinding({
       conversation,
       sessionInvalidated: false,
     }).updates;

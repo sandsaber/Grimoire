@@ -231,7 +231,7 @@ live('MiMoCode live smoke', () => {
     await drain(first.runtime.query(first.runtime.prepareTurn({
       text: 'Remember the word cobalt. Reply with exactly: OK',
     })));
-    const updates = first.runtime.buildSessionUpdates({
+    const updates = first.runtime.sessionBinding({
       conversation,
       sessionInvalidated: false,
     }).updates;
@@ -362,7 +362,7 @@ live('MiMoCode live smoke', () => {
 
     const sessionId = runtime.getSessionId();
     const conversation: any = { id: 'conv-cost', messages: [], providerState: {}, sessionId: null };
-    const providerState = runtime.buildSessionUpdates({ conversation, sessionInvalidated: false })
+    const providerState = runtime.sessionBinding({ conversation, sessionInvalidated: false })
       .updates.providerState as { databasePath?: string } | undefined;
     // What MiMoCode's own database says this session cost, which is the source
     // the fallback reads when the vendor reports nothing on the wire.

@@ -40,6 +40,7 @@ import {
   ExecutionInteractionBridge,
   type ExecutionInteractionPresenter,
 } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type { ChatRuntimeConversationState } from '../../../core/runtime/types';
 import type { ChatMessage, Conversation, UsageInfo } from '../../../core/types';
 import {
   type ChatProjection,
@@ -152,7 +153,33 @@ export interface SubmitChatTurnCommand {
   readonly resumeCheckpoint?: string;
   /** The provider-native session this conversation continues, where it has one. */
   readonly nativeSessionRef?: string;
+  /**
+   * What the conversation's provider binding is once this turn has ended.
+   *
+   * The symmetric half of `nativeSessionRef`: that says which session the turn
+   * continues, this says which one it left the conversation on. Asked at the
+   * barrier rather than carried from submit, because the session a turn ends on
+   * is not always the one it started on — a provider that refused a resume
+   * opens a new one mid-turn, and the point of writing it here is that the
+   * refusal is durable before the next turn tries the dead session again.
+   *
+   * Optional, and absent for a run this coordinator adopted rather than
+   * dispatched: an adopted run belongs to a process that is gone, and there is
+   * no provider adapter here to ask.
+   */
+  readonly sessionBinding?: () => ChatSessionBinding | null;
 }
+
+/**
+ * A conversation's provider session, as the barrier writes it.
+ *
+ * Two fields and no more. `sessionId` is present-and-undefined when a provider
+ * refused to resume — the write has to *clear* the binding, and an absent key
+ * would leave the dead session id in the vault — so a caller building one
+ * distinguishes "no opinion" (return `null`) from "no session" (`sessionId:
+ * undefined`).
+ */
+export type ChatSessionBinding = ChatRuntimeConversationState;
 
 export interface StartedChatTurn {
   readonly commandId: string;
@@ -1063,9 +1090,24 @@ export class ChatExecutionCoordinator {
         streamed,
         completedAt,
       );
+      // **Read here, and inside the same write as the answer.** The session a
+      // turn ends on and the answer it produced are one fact about the
+      // conversation, and the surface used to write them separately — the
+      // barrier stored the message, then `save()` stored the binding, and a
+      // plan turn whose approval was invalidated skipped that second write
+      // entirely and left the conversation bound to a session it had left.
+      const binding = active.submitted?.sessionBinding?.();
       const saved = await this.conversations.apply(
         active.conversationId,
-        current => completeConversation(current, assistantMessage, active.usage, completedAt),
+        current => {
+          const completed = completeConversation(
+            current, assistantMessage, active.usage, completedAt,
+          );
+          // Spread whole rather than field by field: `sessionId: undefined` is
+          // how an invalidated binding is cleared, and skipping undefined keys
+          // would leave the dead session id behind.
+          return binding ? { ...completed, ...binding } : completed;
+        },
       );
       active.finalized = true;
       this.apply(entry, {

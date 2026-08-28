@@ -70,6 +70,10 @@ function toConversation(metadata: SessionMetadata): Conversation {
       ? { lastResponseAt: metadata.lastResponseAt }
       : {}),
     sessionId: metadata.sessionId ?? null,
+    // **Carried, because the barrier writes it.** This projection is a local
+    // stand-in for the vault's own, and dropping a field here makes a write the
+    // production store keeps look like one nothing persists.
+    ...(metadata.providerState ? { providerState: metadata.providerState } : {}),
     ...(metadata.usage ? { usage: metadata.usage } : {}),
     messages: metadata.messages ? [...metadata.messages] : [],
   };
@@ -86,6 +90,7 @@ function toMetadata(conversation: Conversation): SessionMetadata {
       ? { lastResponseAt: conversation.lastResponseAt }
       : {}),
     sessionId: conversation.sessionId,
+    ...(conversation.providerState ? { providerState: conversation.providerState } : {}),
     ...(conversation.usage ? { usage: conversation.usage } : {}),
     messages: [...conversation.messages],
   };

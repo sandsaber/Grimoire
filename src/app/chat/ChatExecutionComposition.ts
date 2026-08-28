@@ -14,6 +14,7 @@ import {
   type ChatConversationPort,
   ChatExecutionCoordinator,
   type ChatExecutionLifecyclePort,
+  type ChatSessionBinding,
   type ChatTurnTicket,
 } from '@/features/chat/application/ChatExecutionCoordinator';
 import {
@@ -142,6 +143,7 @@ export class ChatExecutionComposition {
       userMessage,
       ...(command.nativeSessionRef ? { nativeSessionRef: command.nativeSessionRef } : {}),
       ...(command.resumeCheckpoint ? { resumeCheckpoint: command.resumeCheckpoint } : {}),
+      ...(command.sessionBinding ? { sessionBinding: command.sessionBinding } : {}),
     });
     // Handed back because the surface has already drawn its own copy: the
     // legacy path overwrites the message it rendered with what the provider
@@ -178,6 +180,8 @@ export interface SubmitChatMessageCommand {
   readonly queryOptions?: ChatRuntimeQueryOptions;
   readonly nativeSessionRef?: string;
   readonly resumeCheckpoint?: string;
+  /** What the conversation's provider binding is once the turn has ended. */
+  readonly sessionBinding?: () => ChatSessionBinding | null;
 }
 
 function opaqueId(prefix: string): string {

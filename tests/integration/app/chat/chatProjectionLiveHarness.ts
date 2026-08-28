@@ -243,7 +243,7 @@ export async function openChatProjection(
      * run did exactly that.
      */
     saveAfterTurn: async () => {
-      const { updates } = options.runtime.buildSessionUpdates({
+      const updates = options.runtime.sessionBinding({
         conversation: { id: options.conversationId },
         sessionInvalidated: false,
       });

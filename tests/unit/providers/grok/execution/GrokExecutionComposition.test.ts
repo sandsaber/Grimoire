@@ -659,12 +659,12 @@ describe('Grok execution composition', () => {
     );
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
-    const updates = runtime.buildSessionUpdates({
+    const updates = runtime.sessionBinding({
       conversation: { id: 'conversation-1' },
       sessionInvalidated: false,
     });
 
-    expect(updates.updates).toEqual({
+    expect(updates).toEqual({
       sessionId: 'grok-session',
       providerState: { sessionDirPath: sessionDir, workspacePath: vault },
     });

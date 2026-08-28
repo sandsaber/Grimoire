@@ -206,10 +206,27 @@ const SEARCHES: readonly DeletionSearch[] = [
     // content presenters, which is a provider's own API for its own normalizer.
     what: 'turn metadata and session updates',
     pattern: /buildSessionUpdates/,
-    // **2.** The adapter that builds the patch and the one caller that applies
-    // it, which is the conversation save path in `ConversationController`.
-    files: 2,
-    closedBy: 'the coordinator taking the persistence barrier',
+    // **Zero, and the `closedBy` was right about what would do it.** The two
+    // were the adapter that built the patch and the conversation save path that
+    // applied it. The write moved into the persistence barrier: the tab hands
+    // the turn a closure over its own adapter, and the coordinator calls it
+    // inside the same `apply` as the assistant message.
+    //
+    // **The tab still builds it, which is the part that could not move.**
+    // `ProviderModule` carries a long note on why a conversation-scoped caller
+    // cannot: four providers resolve a path through a context that reads the
+    // tab's last launch first. A closure keeps the tab as the answerer and
+    // moves only the write, which is what that note had folded into one
+    // question.
+    //
+    // The rename to `sessionBinding` follows the move rather than causing it —
+    // the method no longer returns a `Partial<Conversation>` for somebody
+    // else's write, so `buildSessionUpdates` had stopped describing it. What
+    // the move fixed: a turn whose surface save was skipped — a plan turn whose
+    // approval was invalidated, or a failed turn — left the conversation bound
+    // to a session the provider had already refused.
+    files: 0,
+    closedBy: 'closed — the barrier writes the binding in the same write as the answer',
   },
   {
     // **Narrowed to the half that goes**, which is what the split was for.
@@ -310,7 +327,6 @@ describe('structural deletion progress', () => {
     expect(remaining.map(search => `${search.what}: ${search.files}`)).toEqual([
       'worker tab ownership: 3',
       'SubagentManager lifecycle: 2',
-      'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
     ]);
     // Seven of twelve are zero: two closed in the 2026-08-27 session, the
@@ -319,6 +335,6 @@ describe('structural deletion progress', () => {
     // neutral settings imports closed by two contract additions, the subagent
     // hooks closed once the loaders beside them were read, and both registries
     // are deleted.
-    expect(SEARCHES).toHaveLength(remaining.length + 8);
+    expect(SEARCHES).toHaveLength(remaining.length + 9);
   });
 });

@@ -11,6 +11,7 @@ import type {
 } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
 import type { ProviderId } from '@/core/types/provider';
+import type { ChatSessionBinding } from '@/features/chat/application/ChatExecutionCoordinator';
 import type { ChatProjectionAttachment } from '@/features/chat/application/ChatProjectionAttachment';
 
 import type {
@@ -118,6 +119,7 @@ export class ChatTabExecution {
       readonly queryOptions?: ChatRuntimeQueryOptions;
       readonly nativeSessionRef?: string;
       readonly resumeCheckpoint?: string;
+      readonly sessionBinding?: () => ChatSessionBinding | null;
     } = {},
   ): Promise<SubmittedChatTurn> {
     const encoder = this.options.turnEncoder();
@@ -139,6 +141,7 @@ export class ChatTabExecution {
       ...(options.queryOptions ? { queryOptions: options.queryOptions } : {}),
       ...(options.nativeSessionRef ? { nativeSessionRef: options.nativeSessionRef } : {}),
       ...(options.resumeCheckpoint ? { resumeCheckpoint: options.resumeCheckpoint } : {}),
+      ...(options.sessionBinding ? { sessionBinding: options.sessionBinding } : {}),
     });
   }
 

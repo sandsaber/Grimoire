@@ -29,6 +29,7 @@ import {
   type ChatExecutionLifecyclePort,
 } from '@/features/chat/application/ChatExecutionCoordinator';
 import { liveAssistantText } from '@/features/chat/projections/ChatProjection';
+import { grokProviderModule } from '@/providers/grok/GrokProviderModule';
 
 /**
  * Turn acceptance, dispatch, the persistence barrier, and queued-input release.
@@ -110,6 +111,133 @@ describe('chat execution coordinator', () => {
         assistantMessageId: `result-${started.runId}`,
       }),
     ]);
+  });
+
+  describe('the session binding', () => {
+    const SESSION_DIR = '/vault/.grok/sessions/conv-1';
+
+    /**
+     * Grok's own patch rule, not a stand-in for it.
+     *
+     * The provider whose patch has something in it: the session id goes when a
+     * resume is refused, and the directory stays, because the next session is
+     * written into the same one and the transcript already there is still this
+     * conversation's. A fake that returned `{ sessionId }` would pass every
+     * assertion below while proving nothing about the half that matters.
+     */
+    const buildSessionPatch = grokProviderModule.runtimePorts({
+      readSessionPaths: () => ({ sessionDirPath: SESSION_DIR }),
+    } as never).history?.buildSessionPatch;
+
+    function binding(sessionInvalidated: boolean) {
+      const patch = buildSessionPatch?.({
+        conversationId: CONVERSATION_ID,
+        sessionInvalidated,
+        nativeSessionRef: 'grok-session-9',
+      });
+      return () => ({
+        sessionId: patch?.sessionId ?? null,
+        ...(patch?.providerState === undefined
+          ? {}
+          : { providerState: patch.providerState as Record<string, unknown> }),
+      });
+    }
+
+    /** What the vault holds, read by a store that never saw the write. */
+    async function reloaded(harness: Awaited<ReturnType<typeof createHarness>>) {
+      const read = await new ConversationRepository({ storage: harness.storage })
+        .read(CONVERSATION_ID);
+      return read.kind === 'present' ? read.metadata : null;
+    }
+
+    async function runTurn(
+      harness: Awaited<ReturnType<typeof createHarness>>,
+      sessionBinding: (() => { sessionId: string | null }) | undefined,
+      terminal: 'succeeded' | 'failed',
+    ) {
+      const ticket = await harness.coordinator.submitTurn(turnCommand(
+        sessionBinding ? { sessionBinding } : {},
+      ));
+      const started = await ticket.started;
+      harness.backend.emit(started.runId, { kind: 'run-started' });
+      if (terminal === 'succeeded') {
+        // An answer, so the assertion that the binding and the answer land in
+        // one write has an answer to look for.
+        harness.backend.emit(started.runId, {
+          kind: 'output-delta',
+          channel: 'assistant',
+          text: 'Botanically, yes.',
+        });
+        harness.backend.emit(started.runId, {
+          kind: 'result',
+          result: { resultId: `result-${started.runId}`, storage: 'projection' },
+        });
+      }
+      harness.backend.emit(started.runId, {
+        kind: 'terminal',
+        terminal,
+        reason: terminal === 'succeeded' ? 'completed' : 'provider-failure',
+      });
+      await ticket.completion;
+    }
+
+    it('writes what the turn ended on, in the same write as the answer', async () => {
+      const harness = await createHarness();
+
+      await runTurn(harness, binding(false), 'succeeded');
+
+      const stored = await reloaded(harness);
+      expect(stored?.sessionId).toBe('grok-session-9');
+      expect(stored?.providerState).toEqual({ sessionDirPath: SESSION_DIR });
+      // The same write, which is the point of moving it here: the surface used
+      // to store the answer and then the binding, and a turn whose save was
+      // skipped left the vault holding one without the other.
+      expect(stored?.messages?.map(message => message.role)).toEqual(['user', 'assistant']);
+    });
+
+    it('clears a refused session and keeps the state that outlives it', async () => {
+      const harness = await createHarness();
+      await runTurn(harness, binding(false), 'succeeded');
+
+      // A second turn, on a coordinator that has the binding, whose provider
+      // refuses the resume. `sessionId: null` has to reach the vault — an
+      // applier that skipped falsy fields would leave the dead id behind and
+      // every later turn would try it again.
+      await runTurn(harness, binding(true), 'succeeded');
+
+      const stored = await reloaded(harness);
+      expect(stored?.sessionId).toBeNull();
+      expect(stored?.providerState).toEqual({ sessionDirPath: SESSION_DIR });
+    });
+
+    it('writes it for a turn that failed, which is when it matters most', async () => {
+      // The refusal that invalidates a session is discovered by a turn that
+      // then fails. The surface's save was the writer before this, and it runs
+      // after a turn rather than for one — a failed turn whose surface never
+      // saved kept resuming a session the provider had already refused.
+      const harness = await createHarness();
+      // **A session first.** `null` is what an unbound conversation already
+      // holds, so asserting it after a failing turn passes just as well with
+      // the barrier's write deleted. The clear has to be a change.
+      await runTurn(harness, binding(false), 'succeeded');
+      expect((await reloaded(harness))?.sessionId).toBe('grok-session-9');
+
+      await runTurn(harness, binding(true), 'failed');
+
+      expect((await reloaded(harness))?.sessionId).toBeNull();
+    });
+
+    it('writes nothing for a turn that carries no binding', async () => {
+      // An adopted run has no command and no adapter to ask, and a provider
+      // with no history port answers `null`. Neither may clear a binding that
+      // something else established.
+      const harness = await createHarness();
+      await runTurn(harness, binding(false), 'succeeded');
+
+      await runTurn(harness, undefined, 'succeeded');
+
+      expect((await reloaded(harness))?.sessionId).toBe('grok-session-9');
+    });
   });
 
   it('shows the answer while the turn is still running', async () => {

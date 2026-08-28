@@ -479,7 +479,10 @@ export class ConversationController {
     }
 
     const agentService = this.getAgentService();
-    const sessionInvalidated = agentService?.consumeSessionInvalidation?.() ?? false;
+    // **The invalidation flag is not consumed here.** It is one-shot, and the
+    // turn's own binding closure is what has to see it: a save running first
+    // would take the flag and the barrier would write a session the provider
+    // has already refused.
 
     // Entry point with messages - create conversation lazily
     // New conversations always use SDK-native storage.
@@ -502,14 +505,14 @@ export class ConversationController {
     const mcpServerSelector = this.deps.getMcpServerSelector();
     const enabledMcpServers = mcpServerSelector ? Array.from(mcpServerSelector.getEnabledServers()) : [];
 
-    const conversation = plugin.getConversationSync(state.currentConversationId!);
-
-    const { updates: sessionUpdates } = agentService
-      ? agentService.buildSessionUpdates({ conversation, sessionInvalidated })
-      : { updates: {} };
-
     const updates: Partial<Conversation> = {
-      ...sessionUpdates,
+      // **No session binding here any more.** The conversation's provider
+      // session is written by the persistence barrier, inside the same write as
+      // the answer the turn produced — see `ChatExecutionCoordinator`. This
+      // save runs on tab switches and background saves as well as after a turn,
+      // and asking the adapter for a binding at each of those wrote the same
+      // value back repeatedly while missing the one case that mattered: a turn
+      // whose surface save was skipped.
       messages: state.messages,
       currentNote: currentNote,
       externalContextPaths: externalContextPaths.length > 0 ? externalContextPaths : undefined,

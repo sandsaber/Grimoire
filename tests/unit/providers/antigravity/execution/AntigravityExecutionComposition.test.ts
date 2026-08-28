@@ -300,10 +300,13 @@ describe('Antigravity execution composition', () => {
 
     expect(runtime.getSessionId()).toBeNull();
     expect(runtime.resolveSessionIdForFork?.({ id: 'conversation-1' })).toBeNull();
-    expect(runtime.buildSessionUpdates?.({
+    // `null`, not an empty patch: no history port means no opinion about this
+    // conversation's binding, and the barrier writes nothing rather than
+    // writing an empty object over what is there.
+    expect(runtime.sessionBinding?.({
       conversation: { id: 'conversation-1' },
       sessionInvalidated: false,
-    })).toEqual({ updates: {} });
+    })).toBeNull();
   });
 
   it('explains the failures it can, and defers on the rest', () => {

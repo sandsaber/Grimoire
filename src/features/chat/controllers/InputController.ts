@@ -600,6 +600,22 @@ export class InputController {
         queryOptions,
         ...(nativeSessionRef ? { nativeSessionRef } : {}),
         ...(resumeCheckpoint ? { resumeCheckpoint } : {}),
+        // **Built by the tab, written by the barrier.** Three providers resolve
+        // their session state through a context that reads *this tab's* last
+        // launch first, so a conversation-scoped caller would write the
+        // previous turn's path over the one this turn established. The closure
+        // keeps the tab as the one answering; what moved to the barrier is the
+        // write, so the session a turn ended on reaches the vault in the same
+        // write as the answer it produced.
+        sessionBinding: () => agentService.sessionBinding({
+          // Read at the barrier, not captured at submit: a blank tab has no
+          // conversation until the coordinator creates one.
+          conversation: projection.conversationId
+            ? { id: projection.conversationId }
+            : null,
+          // One-shot, and this is its only consumer now.
+          sessionInvalidated: agentService.consumeSessionInvalidation?.() ?? false,
+        }),
       });
       userMsg.content = submitted.userMessage.content;
       userMsg.currentNote = submitted.userMessage.currentNote;

@@ -10450,6 +10450,45 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the persistence barrier writes the session binding (`this commit`)
+
+**`turn metadata and session updates` closes: 2 → 0.** The two were the adapter that built a
+conversation's provider session patch and the surface save path that folded it into its own write.
+The write is the barrier's now: a tab hands its turn a closure over its own adapter, and the
+coordinator calls it inside the same `conversations.apply` as the assistant message.
+
+- Gates: unit 8749 passed, 8749 total (553 suites); integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- **The blocker on record was one question that turned out to be two.** `ProviderModule` carried a
+  long note saying this could not move to the barrier, because four providers — OpenCode, MiMoCode,
+  Kimi Code and Grok — resolve a database path or a session directory through a context that reads
+  *the tab's last launch first*, so a conversation-scoped caller writes the previous turn's path over
+  the one this turn established. That is true, and it is about **building** the patch. Writing it is
+  a separate question, and a closure answers it: the tab is still the one asked, and only the write
+  moved. The note has been rewritten to say which half is still open, which is none of it.
+- **What the move fixes, rather than tidies.** The surface's save ran *after* a turn and not *for*
+  one, and it was skipped in exactly the cases the binding matters: a plan turn whose approval was
+  invalidated returns before saving, and a failed turn — which is how a refused resume is discovered
+  — was the one that most needed its dead session id cleared. The barrier runs on every terminal.
+  The one-shot invalidation flag is consumed by the turn's closure now and nowhere else, because two
+  consumers means one of them reads `false`.
+- **Seven tests died and it is worth saying why.** `ConversationController`'s
+  `Previous SDK Session IDs` and `Fork Session ID Isolation` suites asserted that `save()` persisted
+  `providerSessionId`, `previousProviderSessionIds`, `legacyCutoffAt` and `forkSource` — none of
+  which are fields of `Conversation` any more — by handing the controller a forty-line mock that
+  computed them and asserting the controller passed them through. Claude's real patch builder is two
+  lines. They could not fail for anything production did, and they are replaced by four tests over
+  Grok's real patch, a real kernel and a vault opened again.
+- **Proven by breaking it**, and one of the four was vacuous on the first pass: "writes it for a
+  turn that failed" asserted `sessionId` was `null`, which is what an unbound conversation already
+  holds, so it passed with the barrier's write deleted. It establishes a session first now. All four
+  fail without the write.
+- **The harness was dropping the field.** `chatExecutionHarness`'s local stand-in for the vault's
+  projection carried `sessionId` and not `providerState`, so the first run of these tests reported a
+  write the production store keeps as one nothing persists. Fixed there, not asserted around.
+- Still open: `worker tab ownership: 3`, `SubagentManager lifecycle: 2`,
+  `StreamChunk and the subagent chunk vocabulary: 5`.
+
 ### M5 — `src/core` stops naming the plugin type (`this commit`)
 
 **`core importing the plugin type` closes: 1 → 0.** The last file was

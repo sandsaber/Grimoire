@@ -1015,23 +1015,26 @@ export interface ProviderSessionPatchInput {
 }
 
 /**
- * **Why this is still built from a tab and not at the persistence barrier.**
+ * **Built from a tab, written at the persistence barrier.**
  *
- * Every implementation takes its `conversationId` from the input rather than
- * from a bound conversation, which reads as though a conversation-scoped caller
- * could build one. Three cannot. OpenCode, MiMoCode and Kimi Code resolve a
- * database path, and Grok a session directory, through a context that reads
- * *the tab's last launch first* and the conversation's stored state only as a
- * fallback — so a caller without the tab writes the previous turn's path over
- * the one this turn established, silently, for exactly the providers whose
- * resume depends on it.
+ * The two halves were treated as one question for a long time, and they are
+ * not. Building this from a conversation id alone is still impossible: OpenCode,
+ * MiMoCode and Kimi Code resolve a database path, and Grok a session directory,
+ * through a context that reads *the tab's last launch first* and the
+ * conversation's stored state only as a fallback — so a conversation-scoped
+ * caller writes the previous turn's path over the one this turn established,
+ * silently, for exactly the providers whose resume depends on it.
  *
- * The shape that closes it is the one `nativeSessionRef` already has:
- * `ExecutionSessionSnapshot` grows the provider's own state, the backend
- * reports it as it learns it, and the registry copies it into the session
- * record on every accepted envelope the way it copies the session ref today.
- * That is a control-record schema change plus three backends learning to report
- * what they resolve, which is a milestone rather than a move.
+ * Writing it is a different question, and that half has moved. The tab hands
+ * the coordinator a closure over its own adapter, and the barrier calls it
+ * inside the same write as the assistant message. Nothing here is
+ * conversation-scoped: the tab is still the one answering, and what changed is
+ * that its answer no longer depends on a surface save running afterwards.
+ *
+ * Which leaves the shape that would let this be answered without a tab at all —
+ * `ExecutionSessionSnapshot` growing the provider's own state, reported by the
+ * backend as it resolves it — as a control-record schema change nothing now
+ * needs.
  */
 
 export interface ProviderSessionPatch {

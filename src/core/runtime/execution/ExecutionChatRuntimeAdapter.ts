@@ -31,13 +31,13 @@ import type {
   AutoTurnCallback,
   ChatRewindMode,
   ChatRewindResult,
+  ChatRuntimeConversationState,
   ChatRuntimeEnsureReadyOptions,
   ChatRuntimeQueryOptions,
   ChatTurnMetadata,
   ChatTurnRequest,
   ExitPlanModeCallback,
   PreparedChatTurn,
-  SessionUpdateResult,
   SubagentRuntimeState,
 } from '../types';
 
@@ -1216,29 +1216,47 @@ export class ExecutionChatRuntimeAdapter {
       : { canRewind: false, error: outcome.reason };
   }
 
-  buildSessionUpdates(params: {
+  /**
+   * What this conversation's provider binding is, right now.
+   *
+   * **Answered for the persistence barrier, which is what changed.** This used
+   * to return a `Partial<Conversation>` for the surface's save path to fold
+   * into its own write — so the answer a turn produced and the session it
+   * produced it in reached the vault as two writes, and the second one was
+   * skipped whenever the surface's save was. The coordinator asks this inside
+   * the same write as the assistant message now, so the name says what it is
+   * rather than what a caller was going to do with it.
+   *
+   * `null` when there is no opinion to record. That is distinct from a binding
+   * with `sessionId: undefined`, which is a provider saying the session it had
+   * is gone and the stored one must be cleared.
+   */
+  sessionBinding(params: {
     conversation: { id: string } | null;
     sessionInvalidated: boolean;
-  }): SessionUpdateResult {
+  }): ChatRuntimeConversationState | null {
     const history = this.features.history;
     if (!history || !params.conversation) {
       // No native history means no binding to patch, and inventing one would
       // write a session id the provider will not recognize.
-      return { updates: {} };
+      return null;
     }
     const patch = history.buildSessionPatch({
       conversationId: params.conversation.id,
       sessionInvalidated: params.sessionInvalidated,
       nativeSessionRef: this.ports.currentSessionId(),
     });
-    // The caller applies `updates` to the conversation, so the patch is named
-    // there rather than returned in the port's own shape.
     return {
-      updates: {
-        sessionId: patch.sessionId,
-        ...(patch.providerState === undefined ? {} : { providerState: patch.providerState }),
-      },
-    } as SessionUpdateResult;
+      sessionId: patch.sessionId,
+      // **Narrowed rather than cast.** The port declares this `unknown` because
+      // core stores it without reading it; the conversation field is a record.
+      // The previous version bridged the two with `as SessionUpdateResult` over
+      // the whole object, which also hid that `null` — which a provider does
+      // return — is not a record.
+      ...(isProviderStateRecord(patch.providerState)
+        ? { providerState: patch.providerState }
+        : {}),
+    };
   }
 
   resolveSessionIdForFork(conversation: { id: string } | null): string | null {
@@ -1587,4 +1605,9 @@ export function classifyForPresentation(kind: ExecutionEvent['kind']): Execution
       // with the chat projections at M5 rather than being guessed at here.
       return 'ignored';
   }
+}
+
+/** A provider state bag the conversation record can hold: an object, not `null`. */
+function isProviderStateRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
