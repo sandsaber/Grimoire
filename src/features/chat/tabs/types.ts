@@ -289,12 +289,6 @@ export interface TabData {
   /** Whether this tab should ask the provider to produce parallel-worker plans. */
   orchestratorMode: boolean;
 
-  /** Set on worker tabs: the tab ID of the orchestrator that spawned this tab. */
-  orchestratorTabId?: TabId | null;
-
-  /** Set on orchestrator tabs: IDs of all worker tabs spawned by this orchestrator. */
-  workerTabIds?: TabId[];
-
   /** Monotonic guard for overlapping bound-session model selections. */
   modelSelectionGeneration?: number;
 }
@@ -324,8 +318,6 @@ export interface ClosedTabSnapshot {
   draftSettings: Record<string, unknown> | null;
   titleOverride: string | null;
   orchestratorMode: boolean;
-  orchestratorTabId?: TabId | null;
-  workerTabIds?: TabId[];
   inputValue: string;
 }
 
@@ -395,8 +387,4 @@ export interface TabBarItem {
   isStreaming: boolean;
   needsAttention: boolean;
   canClose: boolean;
-  /** True when this tab has spawned worker tabs. */
-  isOrchestrator?: boolean;
-  /** True when this tab was spawned by an orchestrator tab. */
-  isWorker?: boolean;
 }

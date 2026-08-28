@@ -59,35 +59,32 @@ const SEARCHES: readonly DeletionSearch[] = [
       + '`installInteractions` on the adapter, which is not a contract member',
   },
   {
-    // **Three, and they are one feature: `GrimoireView` spawns a chat tab per
-    // task in an approved orchestrator plan and sends the task prompt into
-    // it.** For these to become durable attempts, an orchestrator worker has to
-    // run without a tab — a dispatched agent rather than an observed one — and
-    // its result has to be surfaced somewhere that is not a tab. The plan gates
-    // that behind the durable-ownership UI, and says so where it says tab close
-    // keeps cancelling until the surface that shows durable work ships.
+    // **Zero.** An approved orchestrator plan dispatches a durable agent per
+    // task instead of spawning a chat tab per task. What made that possible was
+    // the first implementation of `AgentDispatchPort`, which is short because
+    // nothing new was needed: a provider adapter is built without a tab
+    // already, a tab was only ever one holder of one, and the persistence
+    // barrier runs whether or not a surface is attached. A dispatched turn is
+    // an ordinary turn with nobody drawing it.
     //
-    // So this is the one remaining row that is genuinely feature work rather
-    // than a move, and it changes what a person sees: workers stop being tabs.
+    // **Two conversations, which is what the design question turned out to
+    // be** (D10 in the persistence decisions). Each worker writes into its own,
+    // because a conversation runs one turn at a time and two workers cannot
+    // share one; the orchestrator's is the `rootOwner`, so the background work
+    // card on the tab a person is looking at lists what that tab started. The
+    // task text lives in the worker's conversation and nowhere else — a control
+    // record holds references, and a prompt is free text somebody wrote — which
+    // is also what lets a redispatch after a reload find the same task instead
+    // of inventing one.
     //
-    // **The concrete blocker, so nobody has to find it again.**
-    // `AgentDispatchPort` has no implementation anywhere in `src/`: the agent
-    // domain can *adopt* an agent a provider started and record what it did,
-    // and it cannot start one. A worker without a tab needs a turn dispatched
-    // without a tab, and every path to `submitTurn` runs through a tab's
-    // encoder and its adapter. That port's first implementation is what unlocks
-    // this row.
-    //
-    // The plan's other precondition here is already met, and separately:
-    // closing a tab cancels the streaming turn and nothing else — `destroyTab`
-    // says so — nothing sets `orphaned` any more, and the background work card
-    // reads the vault by conversation, so an agent survives the tab that
-    // started it and is still findable.
+    // Three fields went with it: the parent link, the child list, and the tab
+    // bar's two badges. The tab cap counts every tab now, because the exception
+    // was the fleet a single plan owned and there is no fleet of tabs.
     what: 'worker tab ownership',
     pattern: /createWorkerTab|orchestratorTabId|workerTabIds/,
-    files: 3,
-    closedBy: 'durable agents plus the ownership surface — a worker has to be '
-      + 'dispatchable without a tab before a tab can be optional',
+    files: 0,
+    closedBy: 'closed — an approved plan dispatches durable agents, and a worker '
+      + 'is not a tab',
   },
   {
     what: 'core importing the plugin type',
@@ -395,7 +392,6 @@ describe('structural deletion progress', () => {
     // Printed by being asserted, like the live-matrix summary: a reader who
     // wants "what is left" reads this line rather than eleven assertions.
     expect(remaining.map(search => `${search.what}: ${search.files}`)).toEqual([
-      'worker tab ownership: 3',
       'SubagentManager lifecycle: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
     ]);
@@ -405,6 +401,6 @@ describe('structural deletion progress', () => {
     // neutral settings imports closed by two contract additions, the subagent
     // hooks closed once the loaders beside them were read, and both registries
     // are deleted.
-    expect(SEARCHES).toHaveLength(remaining.length + 9);
+    expect(SEARCHES).toHaveLength(remaining.length + 10);
   });
 });

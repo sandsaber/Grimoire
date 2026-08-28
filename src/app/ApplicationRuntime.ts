@@ -1,5 +1,8 @@
+import { randomUUID } from 'node:crypto';
+
 import { AgentCoordinator } from '@/core/agents/AgentCoordinator';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import type { ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
 import type { AppSessionStorage } from '@/core/providers/types';
 import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
@@ -19,6 +22,7 @@ import type {
   ProviderWorkspaceServices,
 } from '@/providers/shared/providerHostContracts';
 
+import { ConversationAgentDispatcher } from './agents/ConversationAgentDispatcher';
 import { SubagentAgentRecorder } from './agents/SubagentAgentRecorder';
 import { AuxiliaryExecutionOwner } from './auxiliary/AuxiliaryExecutionOwner';
 import { ChatExecutionComposition } from './chat/ChatExecutionComposition';
@@ -83,6 +87,8 @@ export interface ApplicationRuntimeOptions {
 export class ApplicationRuntime {
   readonly kernel: ExecutionKernelHost;
   readonly chat: ChatExecutionComposition;
+  /** Starting a durable agent, as the orchestrator's approved plan does. */
+  readonly agentDispatcher: ConversationAgentDispatcher;
   /**
    * The agent domain, and the thing that feeds it.
    *
@@ -213,6 +219,29 @@ export class ApplicationRuntime {
         projection: options.sessions,
         defaultProviderId: options.defaultProviderId,
       }),
+    });
+
+    // **Starting an agent, beside the thing that records one somebody else
+    // started.** The dispatcher needs the chat composition above it, so it is
+    // built after; everything else it needs — a provider adapter with no tab in
+    // it, and the conversation store — this object already holds.
+    this.agentDispatcher = new ConversationAgentDispatcher({
+      chat: this.chat,
+      conversations: new StoredChatConversations({
+        repository: options.sessions.records,
+        projection: options.sessions,
+        defaultProviderId: options.defaultProviderId,
+      }),
+      createRuntime: providerId => this.createRuntimeFor(providerId),
+      // Only a run whose conversation has not been written yet needs this, and
+      // a dispatch reaching this object has already written one: the caller
+      // creates the worker's conversation with its task in it, so the goal is
+      // read back rather than remembered. `null` says so rather than pretending.
+      goalFor: () => null,
+      nextCommandId: () => `cmd-${randomUUID().replaceAll('-', '')}`,
+      backendIdFor: providerId => (
+        providerCatalog().get(providerId)?.execution.descriptor.backendId ?? null
+      ),
     });
   }
 

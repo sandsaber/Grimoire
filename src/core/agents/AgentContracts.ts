@@ -88,6 +88,24 @@ export interface AgentRunRecord {
   readonly workGraphExecutionRef?: string;
   readonly workNodeRef?: string;
   readonly dispatchToken?: AgentDispatchToken;
+  /**
+   * The conversation this run's chat turn writes into (D10).
+   *
+   * **Not `rootOwner`, and the two are different conversations on purpose.** A
+   * dispatched worker is a chat turn with nobody drawing it, and two workers
+   * cannot share a conversation — one runs at a time, and the second would
+   * queue behind the first. So each gets its own, while `rootOwner` stays the
+   * conversation the *person* is looking at, or the background work card, which
+   * looks up by the conversation a tab is showing, would list nothing.
+   *
+   * A reference, like `nativeAgentRef` and the execution identities beside it.
+   * The goal text lives in the conversation this names, which is where free
+   * text already lives and where a person can read and delete it. A reader that
+   * cannot resolve it treats it as absent rather than as an error: D3 deletes a
+   * run with its owner, so a dangling reference is a state the store already
+   * has.
+   */
+  readonly conversationId?: string;
   readonly executionSessionId?: ExecutionSessionId;
   readonly executionRunId?: RunId;
   readonly nativeAgentRef?: string;
@@ -236,6 +254,8 @@ export interface AgentDispatchRequest {
    * new store, retention rule or redaction question comes with it.
    */
   readonly rootOwner: ExecutionOwner;
+  /** The conversation this run's turn writes into, where the run names one (D10). */
+  readonly conversationId?: string;
   readonly goalRef: string;
   readonly policy: EffectiveAgentPolicy;
   readonly idempotency: 'provider-key' | 'none';

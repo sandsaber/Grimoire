@@ -1,7 +1,14 @@
+import { createHash, randomUUID } from 'node:crypto';
+
 import type { EventRef, WorkspaceLeaf } from 'obsidian';
 import { ItemView, Menu, Notice, Platform, Scope } from 'obsidian';
 
 import { GRIMOIRE_CHANGELOG_URL } from '../../app/changelog/source';
+import {
+  agentDispatchToken,
+  agentInstanceId,
+  agentRunId,
+} from '../../core/agents/AgentIds';
 import { getHiddenProviderCommandSet } from '../../core/providers/commands/hiddenCommands';
 import { providerCatalog } from '../../core/providers/ProviderCatalog';
 import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
@@ -825,11 +832,12 @@ export class GrimoireView extends ItemView {
     const streamController = tab.controllers.streamController;
     if (!streamController) return;
 
-    const isWorker = tab.orchestratorTabId != null;
+    // Every tab may be asked to approve a plan now. The exception was a worker
+    // tab, which had to be refused one or an approved plan could spawn its own
+    // fleet; a worker is a dispatched agent rather than a tab, so there is no
+    // tab to exclude.
     streamController.setOrchestratorCallbacks(
-      isWorker
-        ? undefined
-        : (containerEl, plan) => this.renderOrchestratorApproval(tab, containerEl, plan),
+      (containerEl, plan) => this.renderOrchestratorApproval(tab, containerEl, plan),
       () => tab.orchestratorMode,
     );
   }
@@ -864,19 +872,91 @@ export class GrimoireView extends ItemView {
       return;
     }
 
-    for (const task of decision.plan.tasks) {
-      const workerTab = await this.tabManager?.createWorkerTab(orchestratorTab.id);
-      if (!workerTab) {
-        continue;
-      }
+    const ownerId = orchestratorTab.state?.currentConversationId;
+    const runtime = this.plugin.getApplicationRuntimeOrNull?.();
+    if (!ownerId || !runtime) {
+      // Nothing to own the work and nowhere to record it. A plan approved in a
+      // blank tab has no conversation yet, and dispatching against one that
+      // does not exist would write runs nobody can find.
+      return;
+    }
+    const providerId = getTabProviderId(orchestratorTab, this.plugin);
 
-      workerTab.orchestratorMode = false;
-      this.wireOrchestratorCallbacks(workerTab);
-      void workerTab.controllers.inputController?.sendMessage({ content: task.prompt });
+    for (const task of decision.plan.tasks) {
+      await this.dispatchWorker(ownerId, providerId, task.prompt, runtime);
     }
 
     this.updateTabBar();
     this.persistTabState();
+  }
+
+  /**
+   * One task of an approved plan, as durable work rather than as a tab.
+   *
+   * **The conversation is created first and with the task already in it**, and
+   * that ordering is the design rather than a convenience. A control record
+   * holds references and not free text, so the task's words live in a
+   * conversation; the dispatcher reads them back from there, which is what lets
+   * a redispatch after a reload find the same task instead of inventing one.
+   *
+   * Two conversations, per D10: the worker's own, because a conversation runs
+   * one turn at a time and two workers cannot share one, and the
+   * orchestrator's as `rootOwner`, so the background work card on the tab a
+   * person is actually looking at lists the workers that tab started.
+   */
+  private async dispatchWorker(
+    ownerId: string,
+    providerId: ProviderId,
+    prompt: string,
+    runtime: NonNullable<ReturnType<NonNullable<GrimoirePlugin['getApplicationRuntimeOrNull']>>>,
+  ): Promise<void> {
+    try {
+      const conversation = await this.plugin.createConversation({ providerId });
+      await this.plugin.updateConversation(conversation.id, {
+        messages: [{
+          id: `user-${conversation.id}`,
+          role: 'user',
+          content: prompt,
+          timestamp: Date.now(),
+        }],
+      });
+      const identity = opaqueAgentId();
+      await runtime.agents.prepareAndDispatch({
+        prepareTransactionId: `tx-${opaqueAgentId()}`,
+        dispatchStartTransactionId: `tx-${opaqueAgentId()}`,
+        settlementTransactionId: `tx-${opaqueAgentId()}`,
+        terminalTransactionId: `tx-${opaqueAgentId()}`,
+        agentInstanceId: agentInstanceId(`agi-${identity}`),
+        agentRunId: agentRunId(`agr-${identity}`),
+        dispatchToken: agentDispatchToken(`adt-${identity}`),
+        providerId,
+        definition: {
+          definitionId: `${providerId}-worker`,
+          revisionDigest: '0'.repeat(64),
+          source: 'provider-native',
+        },
+        executionMode: 'grimoire-managed',
+        rootOwner: { kind: 'conversation', ownerId },
+        conversationId: conversation.id,
+        // Detached: a worker is exactly the work a person walks away from, and
+        // the plan says orchestrator launches keep their independent-task
+        // behaviour. Nothing cascades from the orchestrator cancelling.
+        attachment: 'detached',
+        observation: 'terminal-only',
+        goalRef: workerGoalReference(prompt, conversation.id),
+        // The ceiling, not a grant — the resolver intersects rather than adds.
+        policyInputs: {
+          provider: { granted: [], approvable: [] },
+          workspace: { granted: [], approvable: [] },
+          root: { granted: [], approvable: [] },
+          definition: { requested: [], approvable: [] },
+        },
+        idempotency: 'none',
+      }, runtime.agentDispatcher);
+    } catch {
+      // One task failing to start must not take the rest of the plan with it.
+      // The run record says what happened to the ones that did.
+    }
   }
 
   // ============================================
@@ -1049,4 +1129,31 @@ export class GrimoireView extends ItemView {
   getTabManager(): TabManager | null {
     return this.tabManager;
   }
+}
+
+/**
+ * An opaque id for one dispatched worker, minted once and reused for its four
+ * transactions so a crash between them leaves a recoverable set rather than
+ * four unrelated ones.
+ */
+function opaqueAgentId(): string {
+  return randomUUID().replaceAll('-', '');
+}
+
+/**
+ * A worker's goal as a record can hold it: the task slugged, with the
+ * conversation behind it so two workers asked the same thing stay two workers.
+ *
+ * Not the task itself. `.grimoire/control/**` holds references, and a task
+ * prompt is free text somebody wrote — which is why the words live in the
+ * conversation the run names instead.
+ */
+function workerGoalReference(prompt: string, conversationId: string): string {
+  const slug = prompt
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  const suffix = createHash('sha256').update(conversationId).digest('hex').slice(0, 8);
+  return slug ? `${slug}-${suffix}` : `worker-${suffix}`;
 }

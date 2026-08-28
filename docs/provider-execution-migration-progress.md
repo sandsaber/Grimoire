@@ -82,7 +82,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
-| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the chat surface is done**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design; bang-bash runs on the local-shell backend; **all nine providers execute their chat turns through the projection path**, and `InputController`'s generator branch is deleted with the turn-framing machinery it carried. `ApplicationRuntime` is the composition root. The durable agent domain is harvested from the v1 Phase 6 and dark, minus the work graphs M5 bans. Certification is account-bound and recorded per provider in `docs/chat-projection-flip-smoke-matrix.md`. **Ten of the plan's thirteen structural deletion searches are zero**, and all thirteen are a gate rather than a shell command. Both provider registries are deleted, all thirteen provider rows have moved, `src/core` names the plugin type nowhere, and the persistence barrier writes the session binding. Still open, and each with its reason written on its own scoreboard row: the durable-ownership UI that the plan makes a precondition for tab close ceasing to cancel; orchestrator worker launches on durable attempts, which is what makes a worker tab optional; and the auto-turn path, which carries the last lifecycle chunk variant because it has no projection to read a terminal off | `fa9cfbc` … `bd1083b` |
+| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the chat surface is done**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design; bang-bash runs on the local-shell backend; **all nine providers execute their chat turns through the projection path**, and `InputController`'s generator branch is deleted with the turn-framing machinery it carried. `ApplicationRuntime` is the composition root. The durable agent domain is harvested from the v1 Phase 6 and dark, minus the work graphs M5 bans. Certification is account-bound and recorded per provider in `docs/chat-projection-flip-smoke-matrix.md`. **All thirteen of the plan's structural deletion searches are zero**, and all thirteen are a gate rather than a shell command. Both provider registries are deleted, all thirteen provider rows have moved, `src/core` names the plugin type nowhere, and the persistence barrier writes the session binding. Orchestrator workers are dispatched durable agents rather than tabs, and `AgentDispatchPort` has its first implementation. What M5's exit gate still asks for is the rest of its own list: parity manifest green (it is), agents surviving detach and restart with honest classification, and the full local gate plus trace parity and the manual test-vault matrix | `fa9cfbc` … `bd1083b` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
@@ -10449,6 +10449,34 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### M5 — workers stop being tabs (`this commit`)
+
+**`worker tab ownership` closes: 3 → 0.** An approved orchestrator plan dispatches a durable agent
+per task instead of spawning a chat tab per task. `createWorkerTab`, `orchestratorTabId`,
+`workerTabIds` and the tab bar's two badges are deleted, and the tab cap counts every tab now,
+because the exception it had was the fleet a single plan owned.
+
+- Gates: unit 8753 passed, 8753 total (554 suites); integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean. Proven by putting one
+  of the three fields back: the scoreboard row is the only test that fails.
+- **Two conversations, which is what the design question turned out to be** — D10, recorded in the
+  persistence decisions before any code. Each worker writes into its own, because a conversation
+  runs one turn at a time and two workers cannot share one; the orchestrator's is the `rootOwner`, so
+  the background work card on the tab a person is looking at lists what that tab started. The task
+  text lives in the worker's conversation and nowhere else, which is also what lets a redispatch
+  after a reload find the same task instead of inventing one.
+- **The run schema went to version 2 for `conversationId`, and the bump is the point.** The run shape
+  is exact, so a build without the field reading a record that has one would report `corrupt` — an
+  error about a well-formed file. With the bump it reports `future`, which is D5's read-only state
+  and what D6's revert safety rests on. A version-1 record is a version-2 record without the field,
+  so the migration re-stamps and rewrites nothing; both directions are asserted.
+- **What the deleted tests were really asserting.** `createWorkerTab`'s suite checked that a fleet
+  does not eat the user's tab budget. That is true now because there is no fleet of tabs to count,
+  and the three tests that replace them assert what does happen: a conversation created per task with
+  the task in it, a dispatch carrying the two conversations, and nothing dispatched from a tab with
+  no conversation to own the work.
+- **All thirteen structural deletion searches are zero.**
 
 ### M5 — the first agent dispatch port (`this commit`)
 

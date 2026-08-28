@@ -591,22 +591,27 @@ describe('GrimoireView permission mode shortcut', () => {
 describe('GrimoireView orchestrator wiring', () => {
   function createOrchestratorHarness() {
     const view = Object.create(GrimoireView.prototype);
-    view.plugin = { settings: {} };
     const orchestratorStreamController = {
       setOrchestratorCallbacks: jest.fn(),
     };
-    const workerStreamController = {
-      setOrchestratorCallbacks: jest.fn(),
-    };
-    const workerSendMessage = jest.fn().mockResolvedValue(undefined);
-    const workerTab = {
-      id: 'worker-tab',
-      orchestratorMode: false,
-      orchestratorTabId: 'orchestrator-tab',
-      controllers: {
-        inputController: { sendMessage: workerSendMessage },
-        streamController: workerStreamController,
-      },
+    const created: string[] = [];
+    const updated: { id: string; updates: Record<string, unknown> }[] = [];
+    const prepareAndDispatch = jest.fn().mockResolvedValue(undefined);
+    const agentDispatcher = { dispatch: jest.fn() };
+    view.plugin = {
+      settings: {},
+      createConversation: jest.fn(async () => {
+        const id = `conv-worker-${created.length + 1}`;
+        created.push(id);
+        return { id, providerId: 'codex', messages: [] };
+      }),
+      updateConversation: jest.fn(async (id: string, updates: Record<string, unknown>) => {
+        updated.push({ id, updates });
+      }),
+      getApplicationRuntimeOrNull: () => ({
+        agents: { prepareAndDispatch },
+        agentDispatcher,
+      }),
     };
     const orchestratorTab = {
       id: 'orchestrator-tab',
@@ -614,41 +619,42 @@ describe('GrimoireView orchestrator wiring', () => {
       lifecycleState: 'blank',
       draftSettings: { model: 'gpt-5.6-luna', effortLevel: 'high' },
       orchestratorMode: true,
+      state: { currentConversationId: 'conv-orchestrator' },
       controllers: {
         streamController: orchestratorStreamController,
       },
     };
-    const tabManager = {
-      createWorkerTab: jest.fn().mockResolvedValue(workerTab),
-      getTab: jest.fn((tabId: string) => {
-        if (tabId === 'orchestrator-tab') return orchestratorTab;
-        if (tabId === 'worker-tab') return workerTab;
-        return null;
-      }),
+    view.tabManager = {
+      getTab: jest.fn(() => orchestratorTab),
     };
-    view.tabManager = tabManager;
     view.updateTabBar = jest.fn();
     view.persistTabState = jest.fn();
 
     return {
+      agentDispatcher,
+      created,
       orchestratorStreamController,
       orchestratorTab,
-      tabManager,
+      prepareAndDispatch,
+      updated,
       view,
-      workerSendMessage,
-      workerStreamController,
-      workerTab,
     };
   }
 
-  it('spawns worker tabs from an approved orchestrator plan', async () => {
+  it('dispatches a durable agent per task of an approved plan', async () => {
+    // **Workers are not tabs any more.** An approved plan used to spawn one
+    // chat tab per task and type the prompt into it; each task is a dispatched
+    // agent now, with its own conversation to run its turn in — because a
+    // conversation runs one turn at a time — and the orchestrator's
+    // conversation as its owner, so the background work card on the tab a
+    // person is looking at lists what that tab started.
     const {
+      created,
       orchestratorStreamController,
       orchestratorTab,
-      tabManager,
+      prepareAndDispatch,
+      updated,
       view,
-      workerSendMessage,
-      workerStreamController,
     } = createOrchestratorHarness();
     const containerEl = createMockEl();
 
@@ -661,39 +667,70 @@ describe('GrimoireView orchestrator wiring', () => {
     onPlanDetected(containerEl, {
       type: 'parallel_worker_plan',
       tasks: [
-        {
-          id: 'research',
-          description: 'Research implementation',
-          prompt: 'Inspect the implementation files',
-        },
-        {
-          id: 'tests',
-          description: 'Add regression tests',
-          prompt: 'Write focused tests',
-        },
+        { id: 'research', description: 'Research implementation', prompt: 'Inspect the files' },
+        { id: 'tests', description: 'Add regression tests', prompt: 'Write focused tests' },
       ],
     });
 
     containerEl.querySelector('.grimoire-orchestrator-plan-spawn-button')?.click();
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let tick = 0; tick < 8; tick += 1) {
+      await Promise.resolve();
+    }
 
-    expect(tabManager.createWorkerTab).toHaveBeenCalledTimes(2);
-    expect(tabManager.createWorkerTab).toHaveBeenCalledWith('orchestrator-tab');
-    expect(workerSendMessage).toHaveBeenCalledWith({ content: 'Inspect the implementation files' });
-    expect(workerStreamController.setOrchestratorCallbacks).toHaveBeenCalled();
+    expect(created).toEqual(['conv-worker-1', 'conv-worker-2']);
+    // **The task text is written into the conversation, not into a record.** A
+    // control record holds references and a prompt is free text somebody wrote,
+    // so this is what the dispatcher reads the goal back from — including after
+    // a reload, which is what makes a redispatch find the same task.
+    expect(updated.map(entry => entry.updates.messages)).toEqual([
+      [expect.objectContaining({ role: 'user', content: 'Inspect the files' })],
+      [expect.objectContaining({ role: 'user', content: 'Write focused tests' })],
+    ]);
+    expect(prepareAndDispatch).toHaveBeenCalledTimes(2);
+    expect(prepareAndDispatch.mock.calls[0][0]).toEqual(expect.objectContaining({
+      providerId: 'codex',
+      rootOwner: { kind: 'conversation', ownerId: 'conv-orchestrator' },
+      conversationId: 'conv-worker-1',
+      attachment: 'detached',
+    }));
     expect(view.updateTabBar).toHaveBeenCalled();
     expect(view.persistTabState).toHaveBeenCalled();
   });
 
-  it('does not attach plan or result-forwarding callbacks to worker tabs', () => {
-    const { view, workerStreamController, workerTab } = createOrchestratorHarness();
+  it('dispatches nothing from a tab with no conversation to own the work', async () => {
+    // A plan approved in a blank tab. Dispatching against a conversation that
+    // does not exist would write runs nobody can find.
+    const { orchestratorStreamController, orchestratorTab, prepareAndDispatch, view } =
+      createOrchestratorHarness();
+    orchestratorTab.state = { currentConversationId: null } as never;
+    const containerEl = createMockEl();
 
-    view.wireOrchestratorCallbacks(workerTab);
+    view.wireOrchestratorCallbacks(orchestratorTab);
+    const [onPlanDetected] = orchestratorStreamController.setOrchestratorCallbacks.mock.calls[0];
+    onPlanDetected(containerEl, {
+      type: 'parallel_worker_plan',
+      tasks: [{ id: 'a', description: 'A', prompt: 'Do the thing' }],
+    });
+    containerEl.querySelector('.grimoire-orchestrator-plan-spawn-button')?.click();
+    for (let tick = 0; tick < 4; tick += 1) {
+      await Promise.resolve();
+    }
 
-    const [onPlanDetected, isOrchestratorMode] = workerStreamController
+    expect(prepareAndDispatch).not.toHaveBeenCalled();
+  });
+
+  it('offers the plan callback to every tab, because none is a worker', () => {
+    // The exclusion this replaces was real: a worker tab had to be refused a
+    // plan callback or an approved plan could spawn its own fleet. There is no
+    // worker tab to refuse.
+    const { orchestratorStreamController, orchestratorTab, view } = createOrchestratorHarness();
+    orchestratorTab.orchestratorMode = false;
+
+    view.wireOrchestratorCallbacks(orchestratorTab);
+
+    const [onPlanDetected, isOrchestratorMode] = orchestratorStreamController
       .setOrchestratorCallbacks.mock.calls[0];
-    expect(onPlanDetected).toBeUndefined();
+    expect(onPlanDetected).toBeInstanceOf(Function);
     expect(isOrchestratorMode()).toBe(false);
   });
 });

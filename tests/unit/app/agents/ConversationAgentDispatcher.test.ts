@@ -131,7 +131,28 @@ describe('conversation agent dispatcher', () => {
     await expect(storedMessages(harness)).resolves.toEqual([]);
   });
 
-  it('refuses an owner that is not a conversation', async () => {
+  it('writes into the conversation the run names, not the owner\'s', async () => {
+    // **The two are different conversations on purpose (D10).** The owner is
+    // what a person is looking at, so its work card lists what it started; the
+    // run's own is what this turn writes into, because a conversation runs one
+    // turn at a time and two dispatched workers cannot share one.
+    const harness = await createHarness();
+
+    const outcome = await dispatcher(harness).dispatch({
+      ...REQUEST,
+      rootOwner: { kind: 'conversation', ownerId: 'conv-orchestrator' },
+      conversationId: CONVERSATION_ID,
+    });
+
+    expect(outcome.kind).toBe('accepted');
+    // Written to the run's conversation. The owner's does not exist in this
+    // vault at all, so a dispatcher that used it would have refused.
+    await expect(storedMessages(harness)).resolves.toEqual([
+      expect.objectContaining({ role: 'user', content: 'Refactor the auth module.' }),
+    ]);
+  });
+
+  it('refuses when nothing names a conversation to write into', async () => {
     const harness = await createHarness();
 
     const outcome = await dispatcher(harness).dispatch({
@@ -141,7 +162,7 @@ describe('conversation agent dispatcher', () => {
 
     expect(outcome).toEqual({
       kind: 'rejected',
-      code: 'dispatch.owner-not-a-conversation',
+      code: 'dispatch.no-conversation-to-write-into',
       sideEffectFree: true,
     });
   });

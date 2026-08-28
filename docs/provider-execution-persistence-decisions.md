@@ -147,6 +147,37 @@ deletion story, and it would be Claude-only. That is a product decision about wh
 about a user's conversation, not a migration decision, which is why it is recorded here as open
 rather than answered.
 
+## D10 — Where a dispatched agent's own conversation is named
+
+A run record may carry `conversationId`: the conversation the run's chat turn writes into.
+
+**Why a run needs one at all, and why it is not the owner.** An orchestrator worker is a chat turn
+with nobody drawing it, and a turn writes into a conversation — but two workers cannot share one,
+because a conversation runs one turn at a time and the second would queue behind the first. So each
+worker gets its own. Meanwhile `rootOwner` has to stay the conversation the *person* is looking at,
+or the background work card, which looks up by the conversation the tab is showing, lists nothing:
+the workers would exist and announce themselves nowhere. The two are different conversations and
+both are needed, so the second one is named here.
+
+**Why this is permitted under D2.** It is a logical id and an owner link — the first two words of the
+permitted list — of exactly the class `nativeAgentRef`, `executionSessionId` and `executionRunId`
+already are. It establishes *who owns what*, and it reconstructs nothing that was said: the goal text
+lives in the conversation it points at, which is where free text already lives and where a person can
+read and delete it. The alternative considered and rejected was a Grimoire-owned prompt store, which
+would have put a task description — free text somebody wrote — into `.grimoire/`, with a retention
+rule and a redaction question of its own.
+
+**Retention and deletion follow D3 and D4 unchanged.** The field is a reference, so deleting the
+conversation it names leaves a run record pointing at a conversation that is gone — the same state a
+run whose owning conversation was deleted is already in, and D3 deletes the run with its owner. A
+reader must treat an unresolvable `conversationId` as absent rather than as an error, for the same
+reason D5 makes an unreadable record a state rather than a failure.
+
+**Schema version.** Optional and additive, so a record written before it reads back unchanged and a
+record written with it is refused by no earlier reader that ignores unknown keys — but the run
+schema is exact rather than permissive, so this is a version bump the same way every other field
+would be. `agentRunRecordSchema` lists it and validates it as a non-empty identifier.
+
 ## D8 — What is deliberately not decided here
 
 - The concrete record shapes and their field names: M1, designed against the contribution inventory.

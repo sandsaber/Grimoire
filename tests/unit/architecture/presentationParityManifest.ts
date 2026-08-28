@@ -901,16 +901,11 @@ export const PARITY_SURFACES: ParitySurface[] = [
     description:
       'Starting a durable agent, rather than noticing one a provider started: a chat turn '
       + 'dispatched with no tab behind it, whose goal lives in the conversation it writes into.',
-    state: 'pending',
-    owner:
-      'M5 — worker tab ownership. The port is built and proven end to end against the real '
-      + 'coordinator, kernel and vault; what it is waiting for is a second design decision, and '
-      + 'it is a storage one rather than a UI one. An orchestrator worker needs two things named: '
-      + 'the conversation the person is looking at, so its card shows the workers it started, and '
-      + 'the conversation each worker writes its own turn into, because two workers cannot share '
-      + 'one — a conversation runs one turn at a time. `rootOwner` can be one of those and this '
-      + 'port reads the goal from it, so the other needs a home on the run record, which is a '
-      + 'control-record schema change and belongs in the persistence decisions doc before code.',
+    // Composed by `ApplicationRuntime` beside the recorder that notices an agent
+    // somebody else started. The two conversations a dispatched worker needs are
+    // both named now — `rootOwner` for the card, `conversationId` on the run for
+    // the turn — which is D10 in the persistence decisions.
+    state: 'wired',
     modules: [
       'src/app/agents/ConversationAgentDispatcher.ts',
     ],

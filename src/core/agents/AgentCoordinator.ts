@@ -51,6 +51,15 @@ export interface PrepareAgentDispatchCommand {
   readonly definition: AgentDefinitionSnapshot;
   readonly executionMode: AgentExecutionMode;
   readonly rootOwner: ExecutionOwner;
+  /**
+   * The conversation this run's turn writes into, where it is not the owner's.
+   *
+   * Two conversations, on purpose — D10. `rootOwner` is the one a person is
+   * looking at, so the work card can list what it started; this is the one the
+   * turn writes into, because a conversation runs one turn at a time and two
+   * dispatched runs cannot share one.
+   */
+  readonly conversationId?: string;
   readonly parentAgentInstanceId?: AgentInstanceId;
   readonly attachment: AgentAttachmentPolicy;
   readonly observation: AgentObservationFidelity;
@@ -318,6 +327,7 @@ export class AgentCoordinator {
         policy,
         terminalTransactionId: command.terminalTransactionId,
         dispatchToken: command.dispatchToken,
+        ...(command.conversationId ? { conversationId: command.conversationId } : {}),
         state: 'dispatching',
         resultIds: [],
         observedResultIds: [],
@@ -918,6 +928,7 @@ export class AgentCoordinator {
         providerId: instance.providerId,
         executionMode: instance.executionMode,
         rootOwner: instance.rootOwner,
+        ...(run.conversationId ? { conversationId: run.conversationId } : {}),
         goalRef: run.goalRef,
         policy: run.policy,
         idempotency: intent.idempotency,

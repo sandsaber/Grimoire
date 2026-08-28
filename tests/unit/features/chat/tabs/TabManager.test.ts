@@ -953,69 +953,16 @@ describe('TabManager - Tab Bar Data', () => {
       expect(items[0].providerId).toBe('codex');
     });
 
-    it('marks orchestrator and worker tabs for tab bar rendering', async () => {
-      const orchestrator = await manager.createTab();
-      const worker = await manager.createWorkerTab(orchestrator!.id);
-
-      const items = manager.getTabBarItems();
-
-      expect(worker!.orchestratorTabId).toBe(orchestrator!.id);
-      expect(orchestrator!.workerTabIds).toEqual([worker!.id]);
-      expect(items.find(item => item.id === orchestrator!.id)?.isOrchestrator).toBe(true);
-      expect(items.find(item => item.id === worker!.id)?.isWorker).toBe(true);
-    });
+    // **Two suites were deleted here.** They covered `createWorkerTab` and the
+    // orchestrator/worker tab-bar badges, and a worker is not a tab any more: an
+    // approved plan dispatches a durable agent per task, each into its own
+    // conversation, owned by the conversation the person is looking at. What
+    // they were really asserting — that a fleet does not eat the user's tab
+    // budget — is true now because there is no fleet of tabs to count.
+    //
+    // What replaced them: `tests/unit/app/agents/ConversationAgentDispatcher.test.ts`.
   });
 
-  describe('createWorkerTab', () => {
-    it('inherits the orchestrator provider, model, and tab-local settings', async () => {
-      const orchestrator = await manager.createTab();
-      orchestrator!.providerId = 'codex';
-      orchestrator!.draftSettings = {
-        model: 'gpt-5.6-luna',
-        effortLevel: 'high',
-        permissionMode: 'full_access',
-      };
-
-      await manager.createWorkerTab(orchestrator!.id);
-
-      expect(mockCreateTab).toHaveBeenLastCalledWith(expect.objectContaining({
-        defaultProviderId: 'codex',
-        draftModel: 'gpt-5.6-luna',
-        draftSettings: {
-          model: 'gpt-5.6-luna',
-          effortLevel: 'high',
-          permissionMode: 'full_access',
-        },
-      }));
-    });
-
-    it('creates a background worker tab even when the user tab limit is reached', async () => {
-      await manager.createTab();
-      await manager.createTab();
-      const orchestrator = await manager.createTab();
-
-      const worker = await manager.createWorkerTab(orchestrator!.id);
-
-      expect(worker).not.toBeNull();
-      expect(worker!.orchestratorTabId).toBe(orchestrator!.id);
-      expect(orchestrator!.workerTabIds).toEqual([worker!.id]);
-      expect(manager.getTabCount()).toBe(4);
-      expect(manager.getActiveTabId()).toBe(orchestrator!.id);
-    });
-
-    it('does not count worker tabs against user-created tab capacity', async () => {
-      const orchestrator = await manager.createTab();
-      await manager.createWorkerTab(orchestrator!.id);
-      await manager.createWorkerTab(orchestrator!.id);
-
-      expect(manager.canCreateTab()).toBe(true);
-
-      for (let i = 1; i < DEFAULT_MAX_TABS; i++) {
-        expect(await manager.createTab()).not.toBeNull();
-      }
-      expect(manager.canCreateTab()).toBe(false);
-    });
-  });
 });
 
 describe('TabManager - Conversation Management', () => {

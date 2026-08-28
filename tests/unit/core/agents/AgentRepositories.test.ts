@@ -5,6 +5,7 @@ import type {
   AgentResultRecord,
   AgentRunRecord,
 } from '@/core/agents/AgentContracts';
+import { AGENT_RUNS_PATH } from '@/core/agents/AgentControlPaths';
 import {
   agentInstanceId,
   agentResultId,
@@ -45,6 +46,41 @@ describe('AgentRepositories', () => {
       agentResultId: agentResultId(`ares-${'5'.repeat(32)}`),
       hiddenReasoning: 'not a whitelisted result field',
     } as AgentResultRecord)).rejects.toThrow('contains unknown fields');
+  });
+
+  describe('the run record\'s own conversation (D10)', () => {
+    const RUN_PATH = `${AGENT_RUNS_PATH}/${RUN_ID}.json`;
+
+    it('round trips the reference through a store opened again', async () => {
+      const files = new TestDurableStorage();
+      await new AgentRepositories(files, () => 10).runs.create(RUN_ID, {
+        ...runRecord(),
+        conversationId: 'conv-worker-1',
+      });
+
+      const read = await new AgentRepositories(files, () => 10).runs.read(RUN_ID);
+
+      expect(read.kind).toBe('current');
+      expect(read.kind === 'current' && read.record.payload.conversationId).toBe('conv-worker-1');
+    });
+
+    it('reads a record written before the field, and re-stamps it', async () => {
+      // **The whole reason the version was bumped rather than the field added
+      // quietly.** The run shape is exact, so a build without the field reading
+      // a record that has one reports `corrupt` — an error about a well-formed
+      // file. With the bump it reports `future`, which is D5's read-only state
+      // and what D6's revert safety rests on. This is the other direction: a
+      // version-1 record is a version-2 record without the field.
+      const files = new TestDurableStorage();
+      await new AgentRepositories(files, () => 10).runs.create(RUN_ID, runRecord());
+      const stored = JSON.parse(await files.read(RUN_PATH) as string);
+      await files.writeAtomic(RUN_PATH, JSON.stringify({ ...stored, schemaVersion: 1 }));
+
+      const read = await new AgentRepositories(files, () => 10).runs.read(RUN_ID);
+
+      expect(read.kind).toBe('migrated');
+      expect(read.kind === 'migrated' && read.record.payload.conversationId).toBeUndefined();
+    });
   });
 });
 

@@ -21,7 +21,6 @@ import {
   deactivateTab,
   destroyTab,
   type ForkContext,
-  getTabSettingsSnapshot,
   getTabTitle,
   initializeTabControllers,
   initializeTabService,
@@ -152,9 +151,11 @@ export class TabManager implements TabManagerInterface {
   }
 
   private getUserTabCount(): number {
-    return Array.from(this.tabs.values())
-      .filter((tab) => tab.orchestratorTabId == null)
-      .length;
+    // Every tab is a user tab now. Worker tabs were the exception — they were
+    // spawned per task of an approved plan and bypassed the cap because one
+    // plan owned the fleet — and a worker is a dispatched agent rather than a
+    // tab, so there is nothing left to exclude.
+    return this.tabs.size;
   }
 
   private hasStartedConversation(conversation: Conversation | null | undefined): conversation is Conversation {
@@ -332,41 +333,6 @@ export class TabManager implements TabManagerInterface {
   }
 
   /**
-   * Creates a background worker tab for an orchestrator. Worker tabs intentionally
-   * bypass the user-facing tab cap because a single approved plan owns the fleet.
-   */
-  async createWorkerTab(orchestratorTabId: TabId): Promise<TabData | null> {
-    const orchestratorTab = this.tabs.get(orchestratorTabId);
-    const providerId = orchestratorTab
-      ? getTabProviderId(orchestratorTab, this.plugin)
-      : undefined;
-    const draftSettings = orchestratorTab
-      ? getTabSettingsSnapshot(orchestratorTab, this.plugin)
-      : undefined;
-    const draftModel = typeof draftSettings?.model === 'string'
-      ? draftSettings.model
-      : undefined;
-    const tab = await this.createTab(undefined, undefined, {
-      activate: false,
-      bypassTabLimit: true,
-      ...(draftModel ? { draftModel } : {}),
-      ...(draftSettings ? { draftSettings: cloneValue(draftSettings) } : {}),
-      ...(providerId ? { providerId } : {}),
-    });
-    if (!tab) {
-      return null;
-    }
-
-    tab.orchestratorTabId = orchestratorTabId;
-    if (orchestratorTab) {
-      orchestratorTab.workerTabIds = orchestratorTab.workerTabIds ?? [];
-      orchestratorTab.workerTabIds.push(tab.id);
-    }
-
-    return tab;
-  }
-
-  /**
    * Switches to a different tab.
    * @param tabId The tab to switch to.
    */
@@ -501,8 +467,6 @@ export class TabManager implements TabManagerInterface {
       draftSettings: tab.draftSettings ? cloneValue(tab.draftSettings) : null,
       titleOverride: tab.titleOverride ?? null,
       orchestratorMode: tab.orchestratorMode,
-      orchestratorTabId: tab.orchestratorTabId,
-      workerTabIds: tab.workerTabIds ? [...tab.workerTabIds] : undefined,
       inputValue: tab.dom.inputEl.value,
     };
 
@@ -525,8 +489,6 @@ export class TabManager implements TabManagerInterface {
       });
       if (!tab) continue;
 
-      tab.orchestratorTabId = snapshot.orchestratorTabId;
-      tab.workerTabIds = snapshot.workerTabIds ? [...snapshot.workerTabIds] : undefined;
       tab.dom.inputEl.value = snapshot.inputValue;
       this.moveTabToIndex(tab.id, snapshot.index);
       restored.push(tab);
@@ -690,8 +652,6 @@ export class TabManager implements TabManagerInterface {
         isStreaming: tab.state.isStreaming,
         needsAttention: tab.state.needsAttention,
         canClose: this.tabs.size > 1,
-        isOrchestrator: (tab.workerTabIds?.length ?? 0) > 0,
-        isWorker: tab.orchestratorTabId != null,
       });
     }
 

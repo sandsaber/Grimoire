@@ -32,11 +32,18 @@ import type {
  * **Where the goal lives, which was the design question.** A control record may
  * hold references and not free text, and a task description is free text
  * somebody wrote — so the words live where free text already lives, in the
- * conversation, and `rootOwner` is how this finds them. On a first dispatch the
- * conversation is empty and the caller supplies the text, which the turn itself
- * persists as that conversation's first user message; on a retry the message is
- * already there and is read back. No second store, no retention rule, and no
- * redaction question.
+ * conversation the run names. On a first dispatch that conversation is empty
+ * and the caller supplies the text, which the turn itself persists as its first
+ * user message; on a retry the message is already there and is read back. No
+ * second store, no retention rule, and no redaction question.
+ *
+ * **Two conversations, and the run says which is which (D10).** `conversationId`
+ * is the one this writes into, because a conversation runs one turn at a time
+ * and two dispatched workers cannot share one. `rootOwner` is the one a person
+ * is looking at, so the background work card — which looks up by the
+ * conversation a tab is showing — lists the workers that conversation started.
+ * A run that names no conversation of its own writes into its owner's, which is
+ * the single-conversation case and the simpler one.
  */
 
 export interface ConversationAgentDispatcherOptions {
@@ -69,10 +76,11 @@ export class ConversationAgentDispatcher implements AgentDispatchPort {
     // load-bearing: the coordinator files a rejection as `invalidated`, which
     // says the run never reached the provider, and saying that after a turn had
     // been dispatched would be a durable claim nobody could support.
-    if (request.rootOwner.kind !== 'conversation') {
-      return rejected('dispatch.owner-not-a-conversation');
+    const conversationId = request.conversationId
+      ?? (request.rootOwner.kind === 'conversation' ? request.rootOwner.ownerId : null);
+    if (!conversationId) {
+      return rejected('dispatch.no-conversation-to-write-into');
     }
-    const conversationId = request.rootOwner.ownerId;
     const read = await this.options.conversations.read(conversationId);
     if (read.kind !== 'present') {
       return rejected(read.kind === 'absent'

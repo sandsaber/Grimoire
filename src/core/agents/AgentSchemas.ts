@@ -101,10 +101,26 @@ export const agentInstanceRecordSchema: RecordSchema<AgentInstanceRecord> = {
 };
 
 export const agentRunRecordSchema: RecordSchema<AgentRunRecord> = {
-  currentVersion: 1,
+  /**
+   * **2, for `conversationId` (D10).**
+   *
+   * Bumped rather than added silently, even though the field is optional and a
+   * version-1 record decodes unchanged under this decoder. The record shape is
+   * *exact*, so a build without the field reading a record that has it would
+   * report `corrupt` — an error about a file that is perfectly well formed.
+   * With the bump it reports `future` instead, which is the read-only state D5
+   * defines and D6's revert safety depends on.
+   */
+  currentVersion: 2,
+  migrate(fromVersion, payload) {
+    // Additive and optional: a version-1 record is a version-2 record without
+    // the field. Nothing to rewrite, only to re-stamp.
+    return fromVersion === 1 ? { schemaVersion: 2, payload } : null;
+  },
   decode(payload) {
     const record = exactRecord(payload, [
       'agentRunId', 'agentInstanceId', 'attempt', 'goalRef', 'policy', 'dispatchToken',
+      'conversationId',
       'executionSessionId', 'executionRunId', 'nativeAgentRef', 'state', 'resultIds', 'terminal',
       'terminalTransactionId', 'workGraphRef', 'workGraphExecutionRef', 'workNodeRef',
       'observedResultIds',
@@ -139,6 +155,9 @@ export const agentRunRecordSchema: RecordSchema<AgentRunRecord> = {
       throw new Error('Execution run identity requires an execution session identity.');
     }
     const nativeAgentRef = optionalIdentifier(record.nativeAgentRef, 'native agent ref');
+    const conversationId = record.conversationId === undefined
+      ? undefined
+      : requireString(record.conversationId, 'run conversation id');
     const state = oneOf(record.state, [
       'dispatching', 'running', 'waiting', 'cancelling', 'succeeded', 'failed', 'cancelled',
       'interrupted', 'invalidated', 'indeterminate',
@@ -176,6 +195,7 @@ export const agentRunRecordSchema: RecordSchema<AgentRunRecord> = {
       ...(workGraphExecutionRef ? { workGraphExecutionRef } : {}),
       ...(workNodeRef ? { workNodeRef } : {}),
       ...(dispatchToken ? { dispatchToken } : {}),
+      ...(conversationId ? { conversationId } : {}),
       ...(executionSession ? { executionSessionId: executionSession } : {}),
       ...(executionRun ? { executionRunId: executionRun } : {}),
       ...(nativeAgentRef ? { nativeAgentRef } : {}),
