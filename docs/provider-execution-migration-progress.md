@@ -10417,6 +10417,29 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the coverage gate learns the two routes it was missing (`this commit`)
+
+- Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean.
+- The entry below established that `wireVocabularyCoverage` was reading turn framing as proof an
+  update had been modelled. It asks three questions now, and **none of the declared unmodelled lists
+  changed** — the same answers, arrived at honestly:
+  - chunks count only if `isChatContent` keeps them. A presenter whose entire output is framing
+    draws nothing, because the tab binding filters framing out of the content channel;
+  - the effect ports count, as before;
+  - **the normalizer is asked**, which is the route that was missing. For an ACP provider the
+    answer's text never reaches the surface through the presenter: the normalizer produces a `text`
+    chunk and the presenter strips it, because the backend mirrors the same text as `output-delta`
+    and letting both through prints every sentence twice. `AcpNormalizedUpdate` has `unsupported` as
+    its own word for an update it has no meaning for, which is this gate's question asked on the
+    kernel's side.
+- Claude's block passes `false` for the third, with the reason at the call: its SDK messages reach
+  the kernel by another route, so there is no normalizer to ask.
+- **Proved by removing the thing the gate used to lean on.** With the framing emission deleted from
+  `AcpSessionUpdateNormalizer`, all seventeen still pass. Before this change the same deletion filed
+  `agent_message_chunk` and `user_message_chunk` under *nothing draws the surface from this*. The
+  framing is no longer load-bearing for any gate, which is what the plan's "delete the lifecycle
+  `StreamChunk` variants" was waiting on.
+
 ### M5 — why the turn framing cannot simply be deleted, established by probe (`this commit`)
 
 - Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean.

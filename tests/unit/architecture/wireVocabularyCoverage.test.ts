@@ -1,6 +1,9 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import type { StreamChunk } from '@/core/types';
+import { isChatContent } from '@/features/chat/rendering/chatContentChunks';
+import { AcpSessionUpdateNormalizer } from '@/providers/acp/AcpSessionUpdateNormalizer';
 import type { AcpSessionNotification } from '@/providers/acp/types';
 import { ClaudePlanUsageStore } from '@/providers/claude/app/ClaudePlanUsageStore';
 import { ClaudeContentPresenter } from '@/providers/claude/execution/ClaudeContentPresenter';
@@ -126,6 +129,33 @@ function readRecordings(): WireRecording[] {
     ) as WireRecording);
 }
 
+/**
+ * Whether anything in the adapter draws a surface from this update.
+ *
+ * Three questions, because the answer arrives by three routes and asking only
+ * the first was wrong in both directions. **Chunks are counted only if the
+ * surface keeps them** — a presenter whose whole output is turn framing draws
+ * nothing, because `isChatContent` filters framing out of the content channel,
+ * and counting it called such an update consumed. **And the normalizer is asked
+ * separately**, because for an ACP provider the answer's text never comes
+ * through the presenter at all: `GrokContentPresenter` given an
+ * `agent_message_chunk` returns `assistant_message_start` and nothing else, and
+ * nothing for the chunks after it, since the backend mirrors that text as
+ * `output-delta` and letting both through would print every sentence twice. So
+ * dropping the framing without asking the normalizer would file the assistant's
+ * own message under "nothing draws the surface from this".
+ *
+ * `unsupported` is the normalizer's own word for an update it has no meaning
+ * for, which is exactly this gate's question asked on the kernel's side.
+ */
+function drawsASurface(
+  chunks: readonly StreamChunk[],
+  effects: readonly string[],
+  modelled: boolean,
+): boolean {
+  return chunks.some(isChatContent) || effects.length > 0 || modelled;
+}
+
 describe('wire vocabulary coverage', () => {
   const recordings = readRecordings();
 
@@ -202,7 +232,9 @@ describe('wire vocabulary coverage', () => {
           onCurrentMode: () => effects.push('mode'),
         });
         const chunks = presenter.present({ kind: 'session-update', notification });
-        return chunks.length > 0 || effects.length > 0
+        const modelled = new AcpSessionUpdateNormalizer()
+          .normalize(notification.update).type !== 'unsupported';
+        return drawsASurface(chunks, effects, modelled)
           ? [notification.update.sessionUpdate]
           : [];
       }),
@@ -232,7 +264,9 @@ describe('wire vocabulary coverage', () => {
           onModelChanged: () => effects.push('model'),
         });
         const chunks = presenter.present({ kind: 'session-update', notification });
-        return chunks.length > 0 || effects.length > 0
+        const modelled = new AcpSessionUpdateNormalizer()
+          .normalize(notification.update).type !== 'unsupported';
+        return drawsASurface(chunks, effects, modelled)
           ? [(notification.update as { sessionUpdate: string }).sessionUpdate]
           : [];
       }),
@@ -261,7 +295,9 @@ describe('wire vocabulary coverage', () => {
           },
         });
         const chunks = presenter.present(message);
-        return chunks.length > 0 || effects.length > 0 ? [messageTypeOf(message)] : [];
+        // Claude has no ACP normalizer: its SDK messages reach the kernel by a
+        // different route, so the third question has no source here.
+        return drawsASurface(chunks, effects, false) ? [messageTypeOf(message)] : [];
       }),
     );
     const missing = observed.filter(type => !consumed.has(type)).sort();
