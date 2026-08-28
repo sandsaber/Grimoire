@@ -274,7 +274,7 @@ export class ClaudeExecution {
   /**
    * The Claude chat runtime, over the kernel.
    *
-   * One per tab, matching how `ProviderRegistry` constructs runtimes today. Two
+   * One per tab, not one per provider. Two
    * things are built per tab rather than shared: the content presenter, because
    * it tracks a turn's streamed text and the session the tab is on, and the
    * interaction presenter, because a prompt belongs to the tab that raised it.

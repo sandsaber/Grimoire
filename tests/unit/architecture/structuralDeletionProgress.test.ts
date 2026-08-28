@@ -153,9 +153,15 @@ const SEARCHES: readonly DeletionSearch[] = [
   {
     what: 'the two registries',
     pattern: /\bProviderRegistry\b|\bProviderWorkspaceRegistry\b/,
-    // **30.** Four rows have left, and `ProviderRegistry` is three members over
-    // three rows: `createRuntime`, `taskResultInterpreter?` and
-    // `subagentLifecycleAdapter?`. The chat-UI row took its accessor and the
+    // **27.** `createRuntime` has left, so `ProviderRegistry` is two members
+    // over two rows: `taskResultInterpreter?` and `subagentLifecycleAdapter?`.
+    // Three compositions left the count without losing a dependency they had:
+    // each carried a sentence saying its per-tab runtime matched how the
+    // registry built one, and the registry stopped building any. A false
+    // sentence is corrected wherever it is found; that it was also the whole of
+    // those files' match is what made the count move. The six that remain are
+    // the ACP providers, each reaching the registry only for the MCP server
+    // manager, whose snapshot they read while assembling a launch config. The chat-UI row took its accessor and the
     // four model-routing statics that only lived there to reach it; the
     // settings reconciler took `getSettingsReconciler`; the command catalog
     // took `getCommandCatalog`; and the history service took
@@ -163,7 +169,7 @@ const SEARCHES: readonly DeletionSearch[] = [
     // `SessionStorage`, `tabSettings` and `ConversationController` held.
     // `GrimoireSettings` still counts, because the pattern is both registries
     // and it holds eight workspace-registry calls.
-    files: 30,
+    files: 27,
     closedBy: 'the provider rows, when the last consumer of each has moved',
   },
 ];
@@ -207,7 +213,7 @@ describe('structural deletion progress', () => {
       'the application importing a concrete provider module: 20',
       'turn metadata and session updates: 6',
       'StreamChunk and the subagent chunk vocabulary: 5',
-      'the two registries: 30',
+      'the two registries: 27',
     ]);
     // Three of eleven are zero: two closed in the 2026-08-27 session, and the
     // interaction callbacks closed with the first step of the seam deletion.

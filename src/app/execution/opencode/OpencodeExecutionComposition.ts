@@ -300,7 +300,7 @@ export class OpencodeExecution {
   /**
    * The OpenCode chat runtime, over the kernel.
    *
-   * One per tab, matching how `ProviderRegistry` constructs runtimes today.
+   * One per tab, not one per provider.
    * Four things are built per tab rather than shared, each for the same reason
    * — they are about *this* conversation's session: what it is set to, what it
    * has said, what commands it offers, and which prompt is on screen.

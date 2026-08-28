@@ -334,7 +334,7 @@ export class QwenExecution {
   /**
    * The Qwen chat runtime, over the kernel.
    *
-   * One per tab, matching how `ProviderRegistry` constructs runtimes today.
+   * One per tab, not one per provider.
    * Three things are built per tab rather than shared, each because they are
    * about *this* conversation's session: what it is set to, what it has said,
    * and which prompt is on screen.

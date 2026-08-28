@@ -10402,6 +10402,52 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the registries drop to 27, and a sentence that outlived what it described (`this commit`)
+
+- Gates: `npm run test -- --selectProjects unit` 8754 passed, 8754 total; `tsc --noEmit` clean;
+  `npm run lint` clean. The count gate proved itself on the way through — it failed reading
+  `Expected 30 / Received 27` before the declaration was updated.
+- Parity manifest: unchanged. Contribution inventory rows moved: none. This is a count correction,
+  not a row.
+- **Deleted: a false claim, from nine compositions.** Each said its per-tab runtime was "one per tab,
+  matching how `ProviderRegistry` constructs runtimes today". `createRuntime` left the registry
+  earlier in this milestone and the sentence outlived it; the registry is now two members. Three of
+  those files — Claude, Codex, Antigravity — held no other reference to either registry, so
+  correcting the text is what took them off the scoreboard. **30 → 27.** Worth stating plainly,
+  because it is the third time a comment has moved this gate: the gate counts files, a comment
+  naming an identifier counts as a use, and the rule stays "word the comment without the
+  identifier". Here the comment was also simply wrong, which is why it was rewritten rather than
+  reworded.
+
+Two findings recorded rather than built:
+
+- **the provider turn framing is dead on the projection path, and removing it is an owner's call.**
+  `AcpSessionUpdateNormalizer` and `CodexNotificationRouter` emit `user_message_start` and
+  `assistant_message_start` into the content channel; `tabProjectionExecution` filters that channel
+  with `isChatContent`, which drops framing, and `content.present()` has exactly one consumer —
+  `presentProviderContent` — so nothing receives one. A resumed transcript is drawn from the vault,
+  not from replayed chunks: `ConversationController` hydrates `state.messages` from the stored
+  conversation. The removal was attempted and **reverted**. Twenty-one suites assert the emission,
+  and `wireVocabularyCoverage` counts a wire update as consumed when the presenter returns any
+  chunk — so dropping it would move that gate's *unconsumed* list up. That is a true statement about
+  the projection and a decision about a gate, not a refactor, and the `StreamChunk` search's own
+  comment already scopes this work to the smoke matrix. Owner: **M5**, with the smoke matrix;
+- **one test's stated reason no longer holds.** `KimicodeContentPresenter`'s *"keeps a user chunk
+  whole, because nothing else carries it"* says in its comment that what the user said "reaches the
+  surface inside the message it opens, and nothing else carries it into a resumed transcript". The
+  vault carries it. The assertion still passes and the chunk is still produced; only the reason is
+  stale, written when the chunk stream rebuilt the transcript. Owner: whoever removes the framing,
+  in the same pass.
+
+Open, with owners:
+
+- the six ACP compositions — OpenCode, Grok, MiMoCode, Kimi Code, Gemini, Qwen — hold either
+  registry only for the MCP server manager, whose `getServers()` snapshot they read **synchronously**
+  while assembling a launch config, while `ProviderMcpPort.load()` is async. The `mcp` slot each of
+  them already wires delegates to that same manager through the registry, so the row closes when the
+  manager is reached through the workspace contribution instead. Owner: **M5**, with the provider
+  rows.
+
 ### Where the session of 2026-08-25 ended
 
 **M3 is complete, at a scope the owner revised mid-session.** `ProviderCatalog` is the one validated inventory of

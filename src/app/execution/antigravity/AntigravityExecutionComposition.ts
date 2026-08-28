@@ -144,7 +144,7 @@ export class AntigravityExecution {
   /**
    * The Antigravity chat runtime, over the kernel.
    *
-   * One per tab, matching how `ProviderRegistry` constructs runtimes today.
+   * One per tab, not one per provider.
    * Print mode has no resume and keeps nothing per conversation, so the only
    * thing the binding below is for is naming the owner of what a turn records.
    */

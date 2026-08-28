@@ -280,7 +280,7 @@ export class CodexExecution {
   /**
    * The Codex chat runtime, over the kernel.
    *
-   * One per tab, matching how `ProviderRegistry` constructs runtimes today. The
+   * One per tab, not one per provider. The
    * conversation is held here rather than in the shared store because one store
    * serves every tab: what the next dispatch resumes, forks, or starts is a
    * property of *this* tab, read when the turn is dispatched.
