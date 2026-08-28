@@ -223,29 +223,47 @@ export class AgentCoordinator {
    *
    * It is answerable at all because the records this process has read are kept
    * current *by* each write rather than invalidated after it, so there is no
-   * window where the copy is behind the store. Unknown is honest in exactly two
-   * cases: before this owner has ever been listed, and if the run a listing
-   * cached has since been dropped.
+   * window where the copy is behind the store.
+   *
+   * **The two answers need different amounts of knowledge, and treating them
+   * the same lost information.** This copy is a subset of the store, so one
+   * running agent in it establishes `true` however much else is unread — an
+   * agent adopted a moment ago answers for its owner before anything has listed
+   * that owner. `false` is the claim that needs the whole picture, so it is the
+   * only one a listing gates. Unknown is what is left: an owner nothing has
+   * listed and nothing running in it, or a listing whose cached run has since
+   * been dropped.
    */
   runningOwnedAgents(owner: ExecutionOwner): boolean | undefined {
     const ownerKey = stableSerialize(owner);
-    if (!this.listedOwners.has(ownerKey)) {
-      return undefined;
-    }
+    const listed = this.listedOwners.has(ownerKey);
     let running = false;
+    let incomplete = false;
     for (const instance of this.instanceRecords.values()) {
       if (stableSerialize(instance.rootOwner) !== ownerKey) continue;
       const latestRunId = instance.runIds.at(-1);
       if (!latestRunId) continue;
       const run = this.runRecords.get(latestRunId);
       if (!run) {
-        return undefined;
+        // **Noted, not returned.** What this copy holds is a subset of the
+        // store, so a gap in it cannot disprove a run that is visibly going —
+        // and returning early on the first gap threw away a `true` this loop
+        // had already established, which the caller reads as "nothing is
+        // running". Only the negative answer needs a complete picture.
+        incomplete = true;
+        continue;
       }
       if (!run.terminal) {
         running = true;
       }
     }
-    return running;
+    // A known running agent is an answer whatever else is unread: this copy is
+    // a subset, and a subset can establish a positive. "Nothing is running"
+    // needs the whole picture, which is what a listing gives.
+    if (running) {
+      return true;
+    }
+    return listed && !incomplete ? false : undefined;
   }
 
   /** One instance record, from this process's copy when it has a current one. */

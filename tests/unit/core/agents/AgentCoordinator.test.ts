@@ -468,6 +468,24 @@ describe('AgentCoordinator', () => {
       .toBeUndefined();
   });
 
+  it('answers `true` for a running agent before anything has listed its owner', async () => {
+    // **The two answers need different amounts of knowledge.** This copy is a
+    // subset of the store, so one running agent in it settles the question
+    // whatever else is unread; "nothing is running" is the claim that needs the
+    // whole picture. Gating both on a listing lost the positive — a subagent
+    // adopted a moment ago, in a conversation nothing had listed yet, read as
+    // "not running", which is the answer the `Stop` hook must never be given
+    // wrongly: it ends the turn on top of work that has just started.
+    const coordinator = new AgentCoordinator(new TestDurableStorage(), { now: monotonicClock() });
+    const owner = { kind: 'conversation' as const, ownerId: 'conversation-1' };
+
+    await coordinator.prepareAndDispatch(rootCommand(), {
+      dispatch: async () => ({ kind: 'accepted' }),
+    });
+
+    expect(coordinator.runningOwnedAgents(owner)).toBe(true);
+  });
+
   it('answers whether an agent is running without waiting, once it has listed', async () => {
     const storage = new TestDurableStorage();
     const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });

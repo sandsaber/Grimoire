@@ -10450,6 +10450,26 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — an unknown was erasing a known running agent (`this commit`)
+
+**Found by writing down why `SubagentManager lifecycle` cannot close.** `runningOwnedAgents` gated
+*both* of its answers on the owner having been listed, and returned `undefined` on the first cached
+run it could not resolve — throwing away a `true` the same loop had already established. Its caller
+reads unknown as "not running", and the caller is Claude's `Stop` hook, which decides whether a turn
+may end on top of a background subagent.
+
+The two answers need different amounts of knowledge. This copy is a subset of the store, so one
+running agent in it settles the question whatever else is unread; "nothing is running" is the claim
+that needs the whole picture, and it is the only one a listing now gates. So a subagent adopted a
+moment ago, in a conversation nothing has listed yet, answers for its owner.
+
+- Gates: unit 8756 passed, 8756 total (554 suites); integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean. Proven by restoring the
+  listing gate on the positive answer: the new test is the only one that fails.
+- **It does not close the row, and the row says so.** The record write is asynchronous and the hook
+  is not, so the live map is still the synchronous half of the union. What changed is that the
+  durable half stopped discarding an answer it already had.
+
 ### Correction — two commits overstated the search count (`this commit`)
 
 `d6ad1880` and `0e5939e2` both say **"all thirteen structural deletion searches are zero"**. There are

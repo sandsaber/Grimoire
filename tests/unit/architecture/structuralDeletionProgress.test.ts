@@ -174,11 +174,18 @@ const SEARCHES: readonly DeletionSearch[] = [
     // halves are load-bearing.** The records are the durable half — an agent
     // started in a tab that has since closed is in no live map anywhere. The
     // live map is the *synchronous* half, and Claude's `Stop` hook asks
-    // synchronously: `runningOwnedAgents` answers `undefined` for an owner
-    // nothing has listed, the caller reads that as "not running", and the
-    // record write is fire-and-forget. Deleting the live half would trade a
-    // correct two-line union for a race in the one place where losing means
-    // ending a turn on top of running work.
+    // synchronously, while the record write is fire-and-forget. Deleting the
+    // live half would trade a correct two-line union for a race in the one
+    // place where losing means ending a turn on top of running work.
+    //
+    // The durable half got stronger on the way to writing this down, which is
+    // the useful part of having read it: `runningOwnedAgents` gated *both* its
+    // answers on the owner having been listed, so a subagent adopted a moment
+    // ago in a conversation nothing had listed read as "not running". Its copy
+    // is a subset of the store, and a subset settles a positive; only "nothing
+    // is running" needs the whole picture. It still cannot close this row —
+    // the write is asynchronous and the hook is not — but it is no longer
+    // discarding an answer it already had.
     //
     // Closing it needs the records to be authoritative the instant a background
     // agent starts, which is an optimistic in-memory mark whose only purpose
