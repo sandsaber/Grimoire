@@ -9827,9 +9827,20 @@ the agent whose record now survives it.
 
 **Two things have to exist before that is safe, and neither does.**
 
-The first is a **stop affordance**. `BackgroundAgentCard` is `{ agentInstanceId, label, detail,
-state }` and the panel draws it read-only. Work that survives a tab and cannot be stopped from
-anywhere is worse than work that stops when you close the tab.
+The first is a **stop affordance**, and it is blocked one level below the UI. `BackgroundAgentCard`
+is `{ agentInstanceId, label, detail, state }` and the panel draws it read-only — but wiring a button
+is not what is missing. `AgentCoordinator.cancelAttachedTree` exists and is complete; it takes an
+`AgentCancellationPort`, and **no provider implements one**. The only reference to that interface
+outside its own declaration is the coordinator's parameter.
+
+That absence is not an oversight. These agents are *observed*, not dispatched: a background subagent
+runs inside a provider turn, so for most CLIs "stop this one agent" is not an operation the tool
+exposes — the only stop available is cancelling the turn, which is what tab close already does. So
+the stop affordance is a **provider capability question**, and the honest first step is the one this
+migration has taken for every other row: read all nine and find out which can actually do it.
+
+Work that survives a tab and cannot be stopped from anywhere is worse than work that stops when you
+close the tab, which is why this ordering matters.
 
 The second is a **session budget in the kernel**, and it is the same blocker the warm-runtime LRU
 has — the two remaining seam items converge on one missing capability.
