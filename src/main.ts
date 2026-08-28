@@ -57,7 +57,9 @@ import {
 import type { ProviderHistoryHydration } from './core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from './core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceManager } from './core/providers/ProviderWorkspaceManager';
-import type { ProviderId, ProviderWorkspaceServices } from './core/providers/types';
+import type {
+  ProviderId,
+} from './core/providers/types';
 import type { AppTabManagerState } from './core/providers/types';
 import { DEFAULT_CHAT_PROVIDER_ID } from './core/providers/types';
 import { HomeFileAdapter } from './core/storage/HomeFileAdapter';
@@ -88,6 +90,9 @@ import {
 } from './providers/claude/settings';
 import { CCSettingsStorage } from './providers/claude/storage/CCSettingsStorage';
 import { OPENCODE_PLAN_MODE_ID, OPENCODE_SAFE_MODE_ID } from './providers/opencode/modes';
+import type {
+  ProviderWorkspaceServices,
+} from './providers/shared/providerHostContracts';
 import { GRIMOIRE_APP_ICON_ID, GRIMOIRE_APP_ICON_SVG } from './shared/appIcon';
 import { buildCursorContext } from './utils/editor';
 import { revealWorkspaceLeaf } from './utils/obsidianCompat';

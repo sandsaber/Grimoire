@@ -2,10 +2,12 @@ import * as fs from 'fs';
 import { Setting } from 'obsidian';
 
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
-import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
 import { renderEnvironmentSettingsSection } from '../../../features/settings/ui/EnvironmentSettingsSection';
 import { renderProviderDisabledNotice } from '../../../features/settings/ui/ProviderDisabledNotice';
 import { t } from '../../../i18n/i18n';
+import type {
+  ProviderSettingsTabRenderer,
+} from '../../../providers/shared/providerHostContracts';
 import { getHostnameKey } from '../../../utils/env';
 import { expandHomePath } from '../../../utils/path';
 import { getCodexWorkspaceServices } from '../app/CodexWorkspaceServices';

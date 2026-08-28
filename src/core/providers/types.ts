@@ -1,13 +1,8 @@
-import type GrimoirePlugin from '../../main';
 import type { CursorContext } from '../../utils/editor';
 import type { ConversationListing } from '../bootstrap/SessionStorage';
 import type { ConversationMetadataField } from '../bootstrap/SessionStorage';
-import type { SharedAppStorage } from '../bootstrap/storage';
 import type { ConversationRepository } from '../conversations/ConversationRepository';
-import type { McpServerManager } from '../mcp/McpServerManager';
 import type { ExecutionChatRuntimeAdapter } from '../runtime/execution/ExecutionChatRuntimeAdapter';
-import type { HomeFileAdapter } from '../storage/HomeFileAdapter';
-import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
 import type {
   AgentDefinition,
   Conversation,
@@ -20,7 +15,6 @@ import type {
   ToolCallInfo,
 } from '../types';
 import type { ProviderId } from '../types/provider';
-import type { ProviderCommandCatalog } from './commands/ProviderCommandCatalog';
 import type { ProviderHistoryHydration } from './ProviderModule';
 
 export type { ProviderId } from '../types/provider';
@@ -196,15 +190,6 @@ export interface ProviderPlanUsageWindow {
   reset: string;
 }
 
-export interface ProviderPlanUsage {
-  plan: string;
-  windows?: ProviderPlanUsageWindow[];
-  spend?: string;
-  note?: string;
-  /** Unix epoch milliseconds for the last successfully received usage snapshot. */
-  updatedAt?: number;
-}
-
 export interface ProviderPathIconSvg {
   kind?: 'path';
   viewBox: string;
@@ -268,98 +253,9 @@ export interface ProviderModeSelectorConfig {
   value: string;
 }
 
-/** Static UI configuration owned by the provider (model list, reasoning, context window). */
-export interface ProviderChatUIConfig {
-  /** Model options for the selector dropdown. Provider extracts what it needs from the settings bag. */
-  getModelOptions(settings: Record<string, unknown>): ProviderUIOption[];
-
-  /** Whether this provider owns the given model id. */
-  ownsModel(model: string, settings: Record<string, unknown>): boolean;
-
-  /** Whether the model uses adaptive reasoning (effort levels vs token budgets). */
-  isAdaptiveReasoningModel(model: string, settings: Record<string, unknown>): boolean;
-
-  /** Reasoning options for the current model (effort levels if adaptive, budgets otherwise). */
-  getReasoningOptions(model: string, settings: Record<string, unknown>): ProviderReasoningOption[];
-
-  /** Default reasoning value for the model. */
-  getDefaultReasoningValue(model: string, settings: Record<string, unknown>): string;
-
-  /** Context window size in tokens. */
-  getContextWindowSize(
-    model: string,
-    customLimits?: Record<string, number>,
-    settings?: Record<string, unknown>,
-  ): number;
-
-  /**
-   * The model the app ships selected, when this provider is the default one.
-   *
-   * **Optional, and absent for eight of the nine — truthfully.** It is not "the
-   * provider's favourite model": `isDefaultModel` is already set membership over
-   * everything a provider ships, and the picker resolves what a provider offers
-   * from its own options. This answers a narrower question that only
-   * `DEFAULT_CHAT_PROVIDER_ID` is ever asked — what `GrimoireSettings.model`
-   * holds in a vault nobody has opened yet — and it exists because
-   * `src/app/settings` was answering it by importing a Codex constant directly.
-   */
-  readonly primaryModel?: string;
-
-  /** Whether this is a built-in (default) model vs custom/env model. */
-  isDefaultModel(model: string): boolean;
-
-  /** Apply model change side effects to settings (defaults, tracking). */
-  applyModelDefaults(model: string, settings: unknown): void;
-
-  /** Optional provider hook to discover model-scoped metadata after a model is selected. */
-  prepareModelMetadata?(
-    model: string,
-    settings: Record<string, unknown>,
-    context: { plugin: GrimoirePlugin },
-  ): Promise<void>;
-
-  /** Optional hook when the toolbar changes a reasoning selection. */
-  applyReasoningSelection?(model: string, value: string, settings: unknown): void;
-
-  /** Normalize model variant based on visibility flags. Provider extracts what it needs from the settings bag. */
-  normalizeModelVariant(model: string, settings: Record<string, unknown>): string;
-
-  /** Extract custom model IDs from parsed environment variables. Used for per-model context limit UI. */
-  getCustomModelIds(envVars: Record<string, string>): Set<string>;
-
-  /** Optional permission-mode toggle descriptor. Return null when the provider exposes no permission toggle UI. */
-  getPermissionModeToggle?(): ProviderPermissionModeToggleConfig | null;
-
-  /** Optional provider-owned mapping back into the shared permission-mode contract. */
-  resolvePermissionMode?(settings: Record<string, unknown>): string | null;
-
-  /** Optional hook when the toolbar changes permission mode. */
-  applyPermissionMode?(value: string, settings: unknown): void;
-
-  /** Optional service-tier toggle descriptor. Return null when the provider exposes no fast/standard UI. */
-  getServiceTierToggle?(settings: Record<string, unknown>): ProviderServiceTierToggleConfig | null;
-
-  /** Optional provider-owned mode selector descriptor. */
-  getModeSelector?(settings: Record<string, unknown>): ProviderModeSelectorConfig | null;
-
-  /** Optional hook when the toolbar changes a provider-owned mode selection. */
-  applyModeSelection?(value: string, settings: unknown): void;
-
-  /** Whether the provider enables the shared bang-bash input mode. */
-  isBangBashEnabled?(settings: Record<string, unknown>): boolean;
-
-  /** SVG icon for the provider (shown next to model names in selectors). */
-  getProviderIcon?(): ProviderIconSvg | null;
-}
-
 // ---------------------------------------------------------------------------
 // Provider-owned boundary services
 // ---------------------------------------------------------------------------
-
-export interface ProviderCliResolver {
-  resolveFromSettings(settings: Record<string, unknown>): string | null;
-  reset(): void;
-}
 
 export interface ProviderRuntimeCommandLoaderContext {
   // Shared command discovery may need a short-lived provider session; the tab
@@ -375,33 +271,8 @@ export interface ProviderRuntimeCommandLoader {
   loadCommands(context: ProviderRuntimeCommandLoaderContext): Promise<SlashCommand[]>;
 }
 
-export interface ProviderModelCatalogRefreshContext {
-  plugin: GrimoirePlugin;
-  settings: Record<string, unknown>;
-}
-
-export interface ProviderModelCatalog {
-  isAvailable?(settings: Record<string, unknown>): boolean;
-  refreshModels(context: ProviderModelCatalogRefreshContext): Promise<boolean>;
-}
-
-export interface ProviderPlanUsageContext {
-  plugin: GrimoirePlugin;
-  providerId: ProviderId;
-  settings: Record<string, unknown>;
-}
-
-export interface ProviderPlanUsageProvider {
-  isAvailable?(settings: Record<string, unknown>): boolean;
-  getCachedUsage(context: ProviderPlanUsageContext): ProviderPlanUsage | null;
-  refreshUsage(context: ProviderPlanUsageContext): Promise<ProviderPlanUsage | null>;
-}
-
 // `commands` warms provider-owned command discovery without fully priming the
 // bound tab runtime. `runtime` primes the real tab runtime itself.
-
-
-
 
 export type ProviderWorkspaceResourceKind =
   | 'skills'
@@ -424,56 +295,6 @@ export type ProviderWorkspaceCapabilities = Record<
   ProviderWorkspaceResourceKind,
   ProviderWorkspaceResourceCapability
 >;
-
-export interface ProviderWorkspaceServices {
-  commandCatalog?: ProviderCommandCatalog | null;
-  agentMentionProvider?: AgentMentionProvider | null;
-  cliResolver?: ProviderCliResolver | null;
-  modelCatalog?: ProviderModelCatalog | null;
-  usageProvider?: ProviderPlanUsageProvider | null;
-  runtimeCommandLoader?: ProviderRuntimeCommandLoader | null;
-  mcpStorage?: AppMcpStorage | null;
-  mcpServerManager?: McpServerManager | null;
-  settingsTabRenderer?: ProviderSettingsTabRenderer | null;
-  refreshAgentMentions?(): Promise<void>;
-}
-
-export interface ProviderSettingsTabRendererContext {
-  plugin: GrimoirePlugin;
-  suppressAutomaticDiscovery: boolean;
-  createWorkspaceSection(
-    container: HTMLElement,
-    sections: ProviderWorkspaceResourceKind[],
-  ): HTMLElement;
-  renderHiddenProviderCommandSetting(
-    container: HTMLElement,
-    providerId: ProviderId,
-    copy: { name: string; desc: string; placeholder: string },
-  ): void;
-  refreshModelSelectors(): void;
-  renderCustomContextLimits(container: HTMLElement, providerId?: ProviderId): void;
-  renderAdvancedSection(
-    container: HTMLElement,
-    opts: { count: number; summary: string },
-  ): HTMLElement;
-}
-
-export interface ProviderSettingsTabRenderer {
-  render(container: HTMLElement, context: ProviderSettingsTabRendererContext): void;
-}
-
-export interface ProviderWorkspaceInitContext {
-  plugin: GrimoirePlugin;
-  storage: SharedAppStorage;
-  vaultAdapter: VaultFileAdapter;
-  homeAdapter: HomeFileAdapter;
-}
-
-export interface ProviderWorkspaceRegistration<
-  TServices extends ProviderWorkspaceServices = ProviderWorkspaceServices,
-> {
-  initialize(context: ProviderWorkspaceInitContext): Promise<TServices>;
-}
 
 export interface ProviderConversationHistoryService {
   /**

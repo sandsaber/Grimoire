@@ -1,7 +1,9 @@
 import { requestUrl } from 'obsidian';
 
-import type { ProviderModelCatalog } from '../../../core/providers/types';
 import type GrimoirePlugin from '../../../main';
+import type {
+  ProviderModelCatalog,
+} from '../../../providers/shared/providerHostContracts';
 import { probeRuntimeModels } from '../commands/probeRuntimeModels';
 import {
   type ClaudeDiscoveredModel,

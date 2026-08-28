@@ -1,9 +1,11 @@
 import type {
-  ProviderChatUIConfig,
   ProviderPermissionModeToggleConfig,
   ProviderReasoningOption,
   ProviderUIOption,
 } from '../../../core/providers/types';
+import type {
+  ProviderChatUIConfig,
+} from '../../../providers/shared/providerHostContracts';
 import { KIMICODE_PROVIDER_ICON } from '../../../shared/icons';
 import {
   buildKimicodeBaseModels,

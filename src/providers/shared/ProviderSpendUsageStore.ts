@@ -2,7 +2,7 @@ import type {
   ProviderPlanUsage,
   ProviderPlanUsageContext,
   ProviderPlanUsageProvider,
-} from './types';
+} from './providerHostContracts';
 
 export interface ProviderCostValue {
   amount: number;

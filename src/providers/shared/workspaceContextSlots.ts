@@ -9,15 +9,17 @@ import type {
 } from '../../core/providers/ProviderModule';
 import type {
   AppMcpStorage,
+  ProviderRuntimeCommandLoader,
+} from '../../core/providers/types';
+import type { ProviderId } from '../../core/types/provider';
+import type GrimoirePlugin from '../../main';
+import type {
   ProviderChatUIConfig,
   ProviderModelCatalog,
   ProviderPlanUsage,
   ProviderPlanUsageContext,
   ProviderPlanUsageProvider,
-  ProviderRuntimeCommandLoader,
-} from '../../core/providers/types';
-import type { ProviderId } from '../../core/types/provider';
-import type GrimoirePlugin from '../../main';
+} from '../../providers/shared/providerHostContracts';
 
 /**
  * The workspace half of a provider's module context, written once.

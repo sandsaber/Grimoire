@@ -1,10 +1,10 @@
 import grokWire from '@test/fixtures/provider-traces/wire/grok-wire.json';
 
-import type { ProviderCostValue } from '@/core/providers/ProviderSpendUsageStore';
 import type { StreamChunk } from '@/core/types';
 import { AcpSessionUpdateNormalizer } from '@/providers/acp/AcpSessionUpdateNormalizer';
 import type { AcpSessionNotification } from '@/providers/acp/types';
 import { GrokContentPresenter } from '@/providers/grok/execution/GrokContentPresenter';
+import type { ProviderCostValue } from '@/providers/shared/ProviderSpendUsageStore';
 
 /**
  * What a flipped Grok tab draws a turn from.

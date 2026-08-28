@@ -1,11 +1,13 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
-import { ProviderSpendUsageStore } from '../../../core/providers/ProviderSpendUsageStore';
+import type {
+  ProviderPlanUsageWindow,
+} from '../../../core/providers/types';
 import type {
   ProviderPlanUsage,
   ProviderPlanUsageContext,
-  ProviderPlanUsageWindow,
-} from '../../../core/providers/types';
+} from '../../../providers/shared/providerHostContracts';
+import { ProviderSpendUsageStore } from '../../../providers/shared/ProviderSpendUsageStore';
 import { isRecord } from '../../../utils/records';
 import { getClaudeProviderSettings } from '../settings';
 import { loadClaudeStatusLineUsageSnapshot } from './ClaudeStatusLineUsageSnapshot';

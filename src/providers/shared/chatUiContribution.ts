@@ -3,7 +3,9 @@ import type {
   ProviderChatUiContribution,
   ProviderReasoningControl,
 } from '../../core/providers/ProviderModule';
-import type { ProviderChatUIConfig } from '../../core/providers/types';
+import type {
+  ProviderChatUIConfig,
+} from '../../providers/shared/providerHostContracts';
 
 /**
  * A provider's chat-UI contribution, over the config it already has.

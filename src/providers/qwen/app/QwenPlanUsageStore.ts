@@ -1,4 +1,4 @@
-import { ProviderSpendUsageStore } from '../../../core/providers/ProviderSpendUsageStore';
+import { ProviderSpendUsageStore } from '../../../providers/shared/ProviderSpendUsageStore';
 import { getQwenProviderSettings } from '../settings';
 
 export const qwenPlanUsageStore = new ProviderSpendUsageStore({

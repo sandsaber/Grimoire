@@ -1,9 +1,9 @@
 import { installProviderCatalog } from '../core/providers/ProviderCatalog';
+import type { ProviderId } from '../core/types/provider';
 import type {
   ProviderWorkspaceInitContext,
   ProviderWorkspaceServices,
-} from '../core/providers/types';
-import type { ProviderId } from '../core/types/provider';
+} from '../providers/shared/providerHostContracts';
 import { antigravityWorkspaceRegistration } from './antigravity/app/AntigravityWorkspaceServices';
 import { builtInProviderCatalog } from './BuiltInProviderCatalog';
 import { claudeWorkspaceRegistration } from './claude/app/ClaudeWorkspaceServices';

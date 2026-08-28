@@ -5,13 +5,17 @@ import type {
   AppAgentStorage,
   AppMcpStorage,
   AppPluginManager,
-  ProviderCliResolver,
-  ProviderModelCatalog,
-  ProviderWorkspaceRegistration,
-  ProviderWorkspaceServices,
 } from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
+import type {
+  ProviderWorkspaceRegistration,
+} from '../../../providers/shared/providerHostContracts';
+import type {
+  ProviderCliResolver,
+  ProviderModelCatalog,
+  ProviderWorkspaceServices,
+} from '../../../providers/shared/providerHostContracts';
 import { parseEnvironmentVariables } from '../../../utils/env';
 import { getVaultPath } from '../../../utils/path';
 import { AgentManager } from '../agents/AgentManager';

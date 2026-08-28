@@ -1,10 +1,12 @@
 import type {
-  ProviderChatUIConfig,
   ProviderPermissionModeToggleConfig,
   ProviderReasoningOption,
   ProviderServiceTierToggleConfig,
   ProviderUIOption,
 } from '../../../core/providers/types';
+import type {
+  ProviderChatUIConfig,
+} from '../../../providers/shared/providerHostContracts';
 import { OPENAI_PROVIDER_ICON } from '../../../shared/icons';
 import { getCodexModelOptions } from '../modelOptions';
 import { applyCodexModelDefaults } from '../settings';

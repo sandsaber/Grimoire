@@ -1,5 +1,7 @@
-import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
 import type GrimoirePlugin from '../../../main';
+import type {
+  ProviderSettingsTabRenderer,
+} from '../../../providers/shared/providerHostContracts';
 import { createWorkspaceContextSlots } from '../../shared/workspaceContextSlots';
 import type { AntigravityWorkspaceContext } from '../AntigravityProviderModule';
 import { antigravityChatUIConfig } from '../ui/AntigravityChatUIConfig';

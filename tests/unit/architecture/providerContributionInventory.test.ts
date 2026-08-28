@@ -60,7 +60,9 @@ function readMovedRows(): Array<{ contribution: string; from: string }> {
 
   return rows;
 }
-const TYPES_PATH = 'src/core/providers/types.ts';
+// The host-shaped contracts, which is where `ProviderWorkspaceServices` is
+// declared since core stopped naming the plugin type.
+const TYPES_PATH = 'src/providers/shared/providerHostContracts.ts';
 
 const WORKSPACE_REGISTRATIONS = {
   antigravity: antigravityWorkspaceRegistration,

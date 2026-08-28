@@ -1,10 +1,12 @@
+import type GrimoirePlugin from '../../../main';
+import type {
+  ProviderWorkspaceRegistration,
+} from '../../../providers/shared/providerHostContracts';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
-  ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
-} from '../../../core/providers/types';
-import type GrimoirePlugin from '../../../main';
+} from '../../../providers/shared/providerHostContracts';
 import { ANTIGRAVITY_FALLBACK_DISCOVERED_MODELS } from '../models';
 import { antigravityCliResolver } from '../runtime/AntigravityCliResolver';
 import { discoverAntigravityModels } from '../runtime/AntigravityModelDiscovery';

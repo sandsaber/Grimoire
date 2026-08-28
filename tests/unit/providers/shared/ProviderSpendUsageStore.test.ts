@@ -1,4 +1,4 @@
-import { ProviderSpendUsageStore } from '@/core/providers/ProviderSpendUsageStore';
+import { ProviderSpendUsageStore } from '@/providers/shared/ProviderSpendUsageStore';
 
 describe('ProviderSpendUsageStore', () => {
   it('formats accumulated USD spend as provider plan usage', () => {

@@ -63,14 +63,16 @@ const STRICT_MODULES = [
  * moves; they belong to M5 now, with the consumers they serve. Until then the
  * list may shrink but never grow.
  */
-const LEGACY_CORE_PLUGIN_IMPORTS = [
-  // Both registries have left this list. The chat one went first — its three
-  // auxiliary factories were the only members that took a plugin, and they went
-  // with the auxiliary owner — and the class itself is deleted now. The
-  // workspace one took a plugin for exactly one method, to assemble the
-  // plugin-shaped context a contribution's `initialize` wants; the plugin
-  // assembles it. What is left is the types the contracts are written in.
-  'src/core/providers/types.ts',
+const LEGACY_CORE_PLUGIN_IMPORTS: string[] = [
+  // **Empty, and that is the point.** Both registries left this list, then the
+  // contracts did: eleven host-shaped types in `providers/types.ts` named a
+  // plugin because that is what the host hands a provider, and none of them had
+  // a consumer inside `src/core`. They live in
+  // `src/providers/shared/providerHostContracts.ts` now.
+  //
+  // Kept as an empty array rather than deleted, because the assertion below is
+  // what stops it refilling: a file added here must be a real violation, so the
+  // only way to grow the list is to reintroduce the edge it excuses.
 ];
 
 /**

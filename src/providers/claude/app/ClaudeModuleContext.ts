@@ -1,7 +1,9 @@
-import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
 import type { BoundConversation } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { Conversation } from '../../../core/types';
 import type GrimoirePlugin from '../../../main';
+import type {
+  ProviderSettingsTabRenderer,
+} from '../../../providers/shared/providerHostContracts';
 import { getVaultPath } from '../../../utils/path';
 import { createWorkspaceContextSlots } from '../../shared/workspaceContextSlots';
 import type { ClaudeWorkspaceContext } from '../ClaudeProviderModule';

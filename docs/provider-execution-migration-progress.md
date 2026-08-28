@@ -10450,6 +10450,42 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — `src/core` stops naming the plugin type (`this commit`)
+
+**`core importing the plugin type` closes: 1 → 0.** The last file was
+`src/core/providers/types.ts`, and what it held was not a leak but a category: eleven contracts
+describing what the *host* hands a provider. `ProviderWorkspaceInitContext` and
+`ProviderWorkspaceServices` and the registration that produces them; the settings-tab renderer and
+its context; the model catalog and its refresh context; the plan-usage provider, its context and its
+value; the chat UI config; the CLI resolver. Each one names a plugin because a plugin is what is on
+the other end of it.
+
+- Gates: unit 8752 passed, 8752 total (553 suites); integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- **The measurement that made it a move rather than a redesign.** Before touching anything: which of
+  these eleven has a consumer inside `src/core`? None. `ProviderSpendUsageStore` was the only core
+  module that even imported them, and it reads nothing else from core — its context parameter is
+  spelled `getCachedUsage(_context)`, unused — while all thirteen of its consumers are providers. So
+  the file moved with the contracts, to `src/providers/shared/`, which the root `AGENTS.md` already
+  defines as the home for "provider-neutral helpers that need the plugin type, and so cannot live in
+  `src/core/`". The contracts were the definition's own example, sitting in the wrong directory.
+- **Two gates, both proven by breaking them.** `executionCompositionBoundaries` has one test for a
+  new `src/core` → `src/providers` import and one for a new plugin import under `src/core`. Putting
+  either edge back into `types.ts` fails the matching test and only that test. The plugin allowlist
+  is now an empty array rather than deleted, because the second assertion — every listed file must
+  still be a real violation — is what stops it refilling: the only way to add a line is to reintroduce
+  the edge it excuses.
+- **Four gates tracked the path and said so.** `providerContributionInventory` reads
+  `ProviderWorkspaceServices` members out of a named file and failed with "Interface was not found";
+  `rowSlotFit` reads eight interfaces from two files and failed on the three that did *not* move,
+  because the constant had been repointed wholesale rather than per row; `presentationParityManifest`
+  lists the spend store by path; the contribution-inventory doc links to it by line. Every one of them
+  is a gate that knows where a thing lives, which is exactly what makes a silent move impossible —
+  and the `rowSlotFit` failure is the useful one, since a single `TYPES` constant covering interfaces
+  in two files would have been the quiet wrong answer.
+- Still open, and unchanged by this: `worker tab ownership: 3`, `SubagentManager lifecycle: 2`,
+  `turn metadata and session updates: 2`, `StreamChunk and the subagent chunk vocabulary: 5`.
+
 ### M5 — both provider registries are deleted (`this commit`)
 
 **`the registries` closes: 12 → 0.** `src/core/providers/ProviderWorkspaceRegistry.ts` is gone, and
@@ -12423,10 +12459,11 @@ Open obligations, each with an owner:
   Owner: whoever declares a call site for one of the four;
 - the kernel and adapter carry long explanatory comments where a sentence would do. Owner: a focused
   pass, so it does not ride along with behaviour changes;
-- three `src/core/**` modules import the plugin type — still exactly three on 2026-08-27, and two of
-  them are the registries themselves: `ProviderRegistry`, `ProviderWorkspaceRegistry` and
-  `providers/types.ts`. Owner: **M5**, with the registry deletion the provider rows lead to; M3
-  handed it over rather than closing it. **The eight core→provider imports previously listed here did not exist** — they were an
+- ~~three `src/core/**` modules import the plugin type~~ **zero on 2026-08-28.** Two were the
+  registries themselves and went when those were deleted; the third, `providers/types.ts`, held
+  eleven host-shaped contracts with no core consumer, which now live in
+  `src/providers/shared/providerHostContracts.ts`. Both directions are gated by
+  `executionCompositionBoundaries`. **The eight core→provider imports previously listed here did not exist** — they were an
   artifact of a gate that matched specifiers as text; see the M2-adapter correction above.
 
 Standing rules that outlive any milestone:

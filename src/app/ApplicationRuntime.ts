@@ -1,7 +1,6 @@
 import { AgentCoordinator } from '@/core/agents/AgentCoordinator';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
 import type { ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
-import type { ProviderWorkspaceServices } from '@/core/providers/types';
 import type { AppSessionStorage } from '@/core/providers/types';
 import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
@@ -16,6 +15,9 @@ import { KimicodeExecution } from '@/providers/kimicode/execution/KimicodeExecut
 import { MimocodeExecution } from '@/providers/mimocode/execution/MimocodeExecutionComposition';
 import { OpencodeExecution } from '@/providers/opencode/execution/OpencodeExecutionComposition';
 import { QwenExecution } from '@/providers/qwen/execution/QwenExecutionComposition';
+import type {
+  ProviderWorkspaceServices,
+} from '@/providers/shared/providerHostContracts';
 
 import { SubagentAgentRecorder } from './agents/SubagentAgentRecorder';
 import { AuxiliaryExecutionOwner } from './auxiliary/AuxiliaryExecutionOwner';

@@ -1,4 +1,3 @@
-import type { ProviderCostValue } from '@/core/providers/ProviderSpendUsageStore';
 import type { ChatTurnMetadata } from '@/core/runtime/types';
 import type { SlashCommand, StreamChunk, UsageInfo } from '@/core/types';
 import { AcpSessionUpdateNormalizer } from '@/providers/acp/AcpSessionUpdateNormalizer';
@@ -18,6 +17,7 @@ import type {
   AcpUsageUpdate,
 } from '@/providers/acp/types';
 import { createGrokToolStreamAdapter } from '@/providers/grok/normalization/grokToolNormalization';
+import type { ProviderCostValue } from '@/providers/shared/ProviderSpendUsageStore';
 
 import { isRecord } from '../../../utils/records';
 

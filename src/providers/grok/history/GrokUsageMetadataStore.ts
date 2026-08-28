@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises';
 
-import type { ProviderCostValue } from '../../../core/providers/ProviderSpendUsageStore';
+import type { ProviderCostValue } from '../../../providers/shared/ProviderSpendUsageStore';
 import type { AcpUsageUpdate } from '../../acp/types';
 import {
   resolveGrokSignalsPath,

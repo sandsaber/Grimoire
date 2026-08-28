@@ -1,12 +1,14 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
-import type {
-  ProviderModelCatalog,
-  ProviderWorkspaceRegistration,
-  ProviderWorkspaceServices,
-} from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
+import type {
+  ProviderWorkspaceRegistration,
+} from '../../../providers/shared/providerHostContracts';
+import type {
+  ProviderModelCatalog,
+  ProviderWorkspaceServices,
+} from '../../../providers/shared/providerHostContracts';
 import { getVaultPath } from '../../../utils/path';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { GrokAgentMentionProvider } from '../agents/GrokAgentMentionProvider';

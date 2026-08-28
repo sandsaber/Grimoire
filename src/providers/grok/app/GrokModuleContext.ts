@@ -9,7 +9,9 @@ import { grokChatUIConfig } from '@/providers/grok/ui/GrokChatUIConfig';
 import { createWorkspaceContextSlots } from '@/providers/shared/workspaceContextSlots';
 import { getVaultPath } from '@/utils/path';
 
-import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
+import type {
+  ProviderSettingsTabRenderer,
+} from '../../../providers/shared/providerHostContracts';
 
 /**
  * What one tab's conversation is, read when it is asked for.

@@ -8,7 +8,9 @@ import type { QwenWorkspaceContext } from '@/providers/qwen/QwenProviderModule';
 import { qwenChatUIConfig } from '@/providers/qwen/ui/QwenChatUIConfig';
 import { createWorkspaceContextSlots } from '@/providers/shared/workspaceContextSlots';
 
-import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
+import type {
+  ProviderSettingsTabRenderer,
+} from '../../../providers/shared/providerHostContracts';
 
 /**
  * What one tab's conversation is, read when it is asked for.

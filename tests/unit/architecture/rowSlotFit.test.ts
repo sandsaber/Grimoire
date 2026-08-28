@@ -32,6 +32,8 @@ interface RowFit {
 }
 
 const TYPES = 'src/core/providers/types.ts';
+/** The host-shaped half, which core no longer declares. */
+const HOST = 'src/providers/shared/providerHostContracts.ts';
 const MODULE = 'src/core/providers/ProviderModule.ts';
 
 const ROWS: readonly RowFit[] = [
@@ -60,7 +62,7 @@ const ROWS: readonly RowFit[] = [
   },
   {
     row: 'settingsTabRenderer',
-    real: { name: 'ProviderSettingsTabRenderer', path: TYPES },
+    real: { name: 'ProviderSettingsTabRenderer', path: HOST },
     slot: { name: 'ProviderSettingsPresentationPort', path: MODULE },
   },
 ];

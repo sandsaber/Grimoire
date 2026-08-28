@@ -68,19 +68,25 @@ const SEARCHES: readonly DeletionSearch[] = [
     what: 'core importing the plugin type',
     pattern: /GrimoirePlugin/,
     within: 'src/core',
-    // **One.** Both registries have left it. The chat one took a plugin for
-    // exactly three members — the title, refine and inline-edit factories — and
-    // handing them a plugin was the whole reason a provider's auxiliary services
-    // could not be reached without one; they are the application's now, and the
-    // class is deleted. The workspace one took a plugin for exactly one method,
-    // to assemble the plugin-shaped context a contribution's `initialize` wants,
-    // which its one caller was already holding a plugin to supply.
+    // **Zero.** The last one was `providers/types.ts`, where eleven contracts
+    // named a plugin because that is what the host hands a provider: the
+    // workspace init context, the settings-tab renderer, the model catalog and
+    // its refresh, the plan-usage provider and its context, the chat UI config,
+    // the CLI resolver, the workspace services themselves, and the registration
+    // that produces them. None had a consumer inside `src/core`.
     //
-    // What is left is `providers/types.ts`, where the contracts themselves are
-    // written: `ProviderWorkspaceInitContext` names a plugin because that is
-    // what a workspace contribution is handed. It goes when the contracts do.
-    files: 1,
-    closedBy: 'the provider rows — the legacy contracts are the last thing naming it',
+    // They moved whole to `providers/shared/providerHostContracts.ts`, which is
+    // the documented home for a provider-neutral helper that needs the plugin
+    // type. `ProviderSpendUsageStore` went with them — it lived in core, read
+    // nothing from core, and had thirteen consumers, every one a provider.
+    //
+    // The direction is a gate, not a habit: `executionCompositionBoundaries`
+    // fails on a new provider import under `src/core`, by relative path or
+    // alias, so the edge cannot come back the other way.
+    files: 0,
+    closedBy: 'closed — the eleven host-shaped contracts moved to '
+      + '`providers/shared/providerHostContracts.ts`, which is where a helper '
+      + 'that needs the plugin type belongs',
   },
   {
     what: 'subagent hooks and loaders',
@@ -303,7 +309,6 @@ describe('structural deletion progress', () => {
     // wants "what is left" reads this line rather than eleven assertions.
     expect(remaining.map(search => `${search.what}: ${search.files}`)).toEqual([
       'worker tab ownership: 3',
-      'core importing the plugin type: 1',
       'SubagentManager lifecycle: 2',
       'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
@@ -314,6 +319,6 @@ describe('structural deletion progress', () => {
     // neutral settings imports closed by two contract additions, the subagent
     // hooks closed once the loaders beside them were read, and both registries
     // are deleted.
-    expect(SEARCHES).toHaveLength(remaining.length + 7);
+    expect(SEARCHES).toHaveLength(remaining.length + 8);
   });
 });

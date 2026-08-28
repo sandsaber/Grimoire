@@ -72,7 +72,7 @@ That is a tab lifecycle, not an agent lifecycle. Closing a view is neither proof
 
 The current agent types are also presentation-oriented. [`AgentDefinition`](../src/core/types/agent.ts#L1-L16) describes reusable configuration, while [`SubagentInfo`](../src/core/types/tools.ts#L56-L79) mixes display expansion, tool calls, runtime status, result text, and provider IDs. There is no durable identity for an agent instance or a retry attempt.
 
-The optional [`ProviderSubagentLifecycleAdapter`](../src/core/providers/types.ts#L538-L553) recognizes provider tool names and parses spawn/wait strings into that display model. It is currently registered only by Codex and Grok. This is a useful compatibility normalizer, but it is not an execution, cancellation, recovery, interaction, or result contract.
+The optional [`ProviderSubagentLifecycleAdapter`](../src/core/providers/types.ts#L358-L373) recognizes provider tool names and parses spawn/wait strings into that display model. It is currently registered only by Codex and Grok. This is a useful compatibility normalizer, but it is not an execution, cancellation, recovery, interaction, or result contract.
 
 ### Parallel workers are tabs, not a work model
 
@@ -105,7 +105,7 @@ Conversation save currently asks the active runtime to build provider updates an
 
 Background agent completion, title generation, history hydration, multiple views, rewind, and settings reconciliation all need to update related state without a last-writer-wins race. A lifecycle platform that leaves conversation persistence mutable and unversioned would move the race rather than solve it.
 
-Provider history hydration is also a side-effect-only contract, so callers cannot distinguish absent, partial, corrupt, stale, and recovered history states ([history service contract](../src/core/providers/types.ts#L481-L496)). Recovery must become observable without replacing the provider-native transcript as the source of truth.
+Provider history hydration is also a side-effect-only contract, so callers cannot distinguish absent, partial, corrupt, stale, and recovered history states ([history service contract](../src/core/providers/types.ts#L299-L314)). Recovery must become observable without replacing the provider-native transcript as the source of truth.
 
 ## Options considered
 

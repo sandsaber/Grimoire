@@ -1,7 +1,6 @@
 import '@/providers';
 
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
-import type { ProviderChatUIConfig } from '@/core/providers/types';
 import { antigravityChatUIConfig } from '@/providers/antigravity/ui/AntigravityChatUIConfig';
 import { claudeChatUIConfig } from '@/providers/claude/ui/ClaudeChatUIConfig';
 import { codexChatUIConfig } from '@/providers/codex/ui/CodexChatUIConfig';
@@ -11,6 +10,9 @@ import { kimicodeChatUIConfig } from '@/providers/kimicode/ui/KimicodeChatUIConf
 import { mimocodeChatUIConfig } from '@/providers/mimocode/ui/MimocodeChatUIConfig';
 import { opencodeChatUIConfig } from '@/providers/opencode/ui/OpencodeChatUIConfig';
 import { qwenChatUIConfig } from '@/providers/qwen/ui/QwenChatUIConfig';
+import type {
+  ProviderChatUIConfig,
+} from '@/providers/shared/providerHostContracts';
 
 /**
  * The module's chat-UI contribution against the config the product renders from.

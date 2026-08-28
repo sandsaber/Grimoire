@@ -24,8 +24,6 @@ import type { ProviderCommandsPort } from '../../core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
 import type {
   ProviderId,
-  ProviderSettingsTabRendererContext,
-  ProviderWorkspaceServices,
 } from '../../core/providers/types';
 import type {
   EnvironmentScope,
@@ -40,6 +38,10 @@ import {
 import { getAvailableLocales, getLocaleDisplayName, setLocale, t } from '../../i18n/i18n';
 import type { Locale, TranslationKey } from '../../i18n/types';
 import type GrimoirePlugin from '../../main';
+import type {
+  ProviderSettingsTabRendererContext,
+  ProviderWorkspaceServices,
+} from '../../providers/shared/providerHostContracts';
 import { confirmDelete } from '../../shared/modals/ConfirmModal';
 import { showWhatsNewModal } from '../../shared/modals/WhatsNewModal';
 import { formatContextLimit, parseContextLimit, parseEnvironmentVariables } from '../../utils/env';

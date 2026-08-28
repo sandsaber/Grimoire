@@ -228,7 +228,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: [
       'src/features/chat/utils/usageInfo.ts',
       'src/features/chat/utils/assistantResponseMetadata.ts',
-      'src/core/providers/ProviderSpendUsageStore.ts',
+      'src/providers/shared/ProviderSpendUsageStore.ts',
     ],
   },
   {

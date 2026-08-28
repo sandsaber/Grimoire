@@ -1,6 +1,6 @@
 # Providers Agent Instructions
 
-`src/providers/` contains provider adapters and provider-owned workspace services. Shared provider contracts belong in `src/core/providers/`; concrete runtime behavior belongs in a provider subdirectory.
+`src/providers/` contains provider adapters and provider-owned workspace services. Provider-neutral contracts belong in `src/core/providers/`, unless they name the plugin type — a contract describing what the host hands a provider lives in `src/providers/shared/providerHostContracts.ts`, because `src/core/` may not import the plugin. Concrete runtime behavior belongs in a provider subdirectory.
 
 ## Rules
 

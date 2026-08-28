@@ -7,7 +7,9 @@ import { GeminiConversationHistoryService } from '@/providers/gemini/history/Gem
 import { geminiChatUIConfig } from '@/providers/gemini/ui/GeminiChatUIConfig';
 import { createWorkspaceContextSlots } from '@/providers/shared/workspaceContextSlots';
 
-import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
+import type {
+  ProviderSettingsTabRenderer,
+} from '../../../providers/shared/providerHostContracts';
 
 /**
  * What one tab's conversation is, read when it is asked for.

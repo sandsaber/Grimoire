@@ -38,7 +38,7 @@ plan and this file both refer to rows by number.
 Every row has moved. `ProviderRegistration` no longer exists, and neither do the nine
 `registration.ts` files that filled it or the `ProviderRegistry` that held them.
 
-## `ProviderWorkspaceServices` members (10) — [types.ts:436](../src/core/providers/types.ts)
+## `ProviderWorkspaceServices` members (10) — [providerHostContracts.ts:155](../src/providers/shared/providerHostContracts.ts)
 
 | # | Member | What it carries | Consumed by today | Target home | Moves at |
 |---|---|---|---|---|---|

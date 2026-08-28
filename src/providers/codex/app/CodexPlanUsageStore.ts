@@ -1,9 +1,11 @@
 import type {
+  ProviderPlanUsageWindow,
+} from '../../../core/providers/types';
+import type {
   ProviderPlanUsage,
   ProviderPlanUsageContext,
   ProviderPlanUsageProvider,
-  ProviderPlanUsageWindow,
-} from '../../../core/providers/types';
+} from '../../../providers/shared/providerHostContracts';
 import { isRecord } from '../../../utils/records';
 import { getCodexProviderSettings } from '../settings';
 

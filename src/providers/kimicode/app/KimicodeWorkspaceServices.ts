@@ -1,13 +1,15 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import type {
-  ProviderModelCatalog,
-  ProviderWorkspaceRegistration,
-  ProviderWorkspaceServices,
-} from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
+import type {
+  ProviderWorkspaceRegistration,
+} from '../../../providers/shared/providerHostContracts';
+import type {
+  ProviderModelCatalog,
+  ProviderWorkspaceServices,
+} from '../../../providers/shared/providerHostContracts';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { KimicodeAgentMentionProvider } from '../agents/KimicodeAgentMentionProvider';
 import { KimicodeCommandCatalog } from '../commands/KimicodeCommandCatalog';
