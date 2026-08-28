@@ -14,7 +14,6 @@ import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { GeminiExecution } from '@/app/execution/gemini/GeminiExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
-import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { geminiProviderModule } from '@/providers/gemini/GeminiProviderModule';
 import { updateGeminiProviderSettings } from '@/providers/gemini/settings';
 
@@ -150,7 +149,7 @@ live('Gemini CLI chat projection live smoke', () => {
     host.registerBackend(execution.createBackendRegistration());
     await host.start();
 
-    const runtime = execution.createRuntime() as unknown as ExecutionChatRuntimeAdapter;
+    const runtime = execution.createRuntime();
     const harness = await openChatProjection({
       backendId: geminiProviderModule.execution.descriptor.backendId,
       conversationId: CONVERSATION_ID,

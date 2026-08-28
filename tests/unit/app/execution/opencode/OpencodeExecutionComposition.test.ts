@@ -587,10 +587,10 @@ describe('OpenCode execution composition', () => {
     const { execution, host, permissions } = await createHarness({ asksPermission: true });
     const runtime = execution.createRuntime();
     const asked: Array<{ toolName: string; description: string }> = [];
-    runtime.setApprovalCallback(async (toolName: string, _input: unknown, description: string) => {
+    runtime.installInteractions({ approval: async (toolName: string, _input: unknown, description: string) => {
       asked.push({ toolName, description });
       return 'allow';
-    });
+    } });
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'run it' })));
 

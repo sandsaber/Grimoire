@@ -1717,20 +1717,15 @@ describe('Tab - Service Callbacks', () => {
         resetStreamingState: jest.fn(),
       } as any;
 
-      const service = {
-        setApprovalCallback: jest.fn(),
-        setApprovalDismisser: jest.fn(),
-        setAskUserQuestionCallback: jest.fn(),
-        setExitPlanModeCallback: jest.fn(),
-        setSubagentHookProvider: jest.fn(),
-        setAutoTurnCallback: jest.fn(),
-        setPermissionModeSyncCallback: jest.fn(),
-      };
+      // One installation, not seven setters: the interaction callbacks came off
+      // the frozen `ChatRuntime` with the seam deletion, and a double that
+      // still carried the setters would be installed on by nothing.
+      const service = { installInteractions: jest.fn() };
       tab.service = service as any;
 
       setupServiceCallbacks(tab, plugin);
 
-      const autoTurnCallback = service.setAutoTurnCallback.mock.calls[0][0];
+      const autoTurnCallback = service.installInteractions.mock.calls[0][0].autoTurn;
       return { tab, addMessageSpy, addMessage, handleStreamChunk, scrollToBottom, autoTurnCallback, plugin, service };
     }
 
@@ -1804,9 +1799,20 @@ describe('Tab - Service Callbacks', () => {
       expect(scrollToBottom).not.toHaveBeenCalled();
     });
 
+    it('leaves a runtime that cannot take an installation alone', () => {
+      // **The narrowing has to be a guard, not a cast.** `tab.service` is typed
+      // as the frozen `ChatRuntime`, which no longer carries these — so the
+      // installer is found by shape, and a runtime without one is a tab with no
+      // interactions rather than a crash while the tab opens.
+      const { tab, plugin } = setupAutoTurnTest();
+      tab.service = { isReady: () => true } as never;
+
+      expect(() => setupServiceCallbacks(tab, plugin)).not.toThrow();
+    });
+
     it('keeps Auto-approve when an ACP provider syncs full_access', () => {
       const { tab, plugin, service } = setupAutoTurnTest();
-      const syncPermissionMode = service.setPermissionModeSyncCallback.mock.calls[0][0];
+      const syncPermissionMode = service.installInteractions.mock.calls[0][0].permissionModeSync;
 
       expect(getTabPermissionMode(tab, plugin)).toBe('full_access');
       syncPermissionMode('full_access');

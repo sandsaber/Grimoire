@@ -14,7 +14,6 @@ import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { GrokExecution } from '@/app/execution/grok/GrokExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
-import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { grokProviderModule } from '@/providers/grok/GrokProviderModule';
 import { updateGrokProviderSettings } from '@/providers/grok/settings';
 
@@ -153,7 +152,7 @@ live('Grok Build chat projection live smoke', () => {
     host.registerBackend(execution.createBackendRegistration());
     await host.start();
 
-    const runtime = execution.createRuntime() as unknown as ExecutionChatRuntimeAdapter;
+    const runtime = execution.createRuntime();
     const harness = await openChatProjection({
       backendId: grokProviderModule.execution.descriptor.backendId,
       conversationId: CONVERSATION_ID,

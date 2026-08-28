@@ -20,7 +20,6 @@ import type {
 import { buildSystemPrompt } from '@/core/prompt/mainAgent';
 import type { ProviderRuntimePorts, ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
-import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
 import {
   type BoundConversation,
   ExecutionChatRuntimeAdapter,
@@ -289,7 +288,7 @@ export class CodexExecution {
   createRuntime(
     features?: ProviderRuntimePorts,
     workspace?: ProviderWorkspaceSlots,
-  ): ChatRuntime {
+  ): ExecutionChatRuntimeAdapter {
     let conversation: BoundConversation | null = null;
     let adapter: CodexRuntimeAdapter | undefined;
     // One store serves every tab, so each turn says which tab queued it: the

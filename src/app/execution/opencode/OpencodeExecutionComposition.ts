@@ -28,7 +28,6 @@ import type {
 } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
-import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
 import {
   type BoundConversation,
   ExecutionChatRuntimeAdapter,
@@ -322,7 +321,7 @@ export class OpencodeExecution {
     return this.workspaceHolder.peek() ?? null;
   }
 
-  createRuntime(): ChatRuntime {
+  createRuntime(): ExecutionChatRuntimeAdapter {
     let conversation: BoundConversation | null = null;
     let adapter: OpencodeRuntimeAdapter | undefined;
     let sessionCommands: readonly ProviderCommandDescriptor[] = [];

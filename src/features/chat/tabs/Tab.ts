@@ -22,6 +22,7 @@ import {
   DEFAULT_CHAT_PROVIDER_ID,
 } from '../../../core/providers/types';
 import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
+import type { ExecutionInteractionCallbacks } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { AutoTurnResult } from '../../../core/runtime/types';
 import { TOOL_AGENT_OUTPUT } from '../../../core/tools/toolNames';
 import {
@@ -1821,44 +1822,47 @@ export function getTabTitle(tab: TabData, plugin: GrimoirePlugin): string {
   return t('chat.ui.messages.newChatTitle');
 }
 
-/** Shared between Tab.ts and TabManager.ts to avoid duplication. */
+/**
+ * Gives the tab's adapter everything its presenter needs, in one call.
+ *
+ * **Off the frozen contract.** These were seven `ChatRuntime` setters that the
+ * adapter stored and never acted on — a seam, not a runtime capability — and
+ * they are one `installInteractions` on the adapter now. Installed together
+ * rather than one at a time, so a presenter is never half built between two of
+ * them.
+ *
+ * Shared between Tab.ts and TabManager.ts to avoid duplication.
+ */
 export function setupServiceCallbacks(tab: TabData, plugin: GrimoirePlugin): void {
-  if (tab.service && tab.controllers.inputController) {
-    tab.service.setApprovalCallback(
-      async (toolName, input, description, options) =>
-        await tab.controllers.inputController?.handleApprovalRequest(toolName, input, description, options)
-        ?? 'cancel'
-    );
-    tab.service.setApprovalDismisser(
-      () => tab.controllers.inputController?.dismissPendingApprovalPrompt()
-    );
-    tab.service.setAskUserQuestionCallback(
-      async (input, signal) =>
-        await tab.controllers.inputController?.handleAskUserQuestion(input, signal)
-        ?? null
-    );
-    tab.service.setExitPlanModeCallback(
-      async (input, signal) => {
-        const decision = await tab.controllers.inputController?.handleExitPlanMode(input, signal) ?? null;
-        // Revert only on approve; feedback and cancel keep plan mode active.
-        if (decision !== null && decision.type !== 'feedback') {
-          // Only restore permission mode if still in plan mode — user may have toggled out via Shift+Tab
-          if (getTabPermissionMode(tab, plugin) === 'plan') {
-            const restoreMode = tab.state.prePlanPermissionMode ?? 'normal';
-            tab.state.prePlanPermissionMode = null;
-            updatePlanModeUI(tab, plugin, restoreMode);
-          }
+  const adapter = interactionInstallerFor(tab);
+  if (!adapter || !tab.controllers.inputController) {
+    return;
+  }
+
+  adapter.installInteractions({
+    approval: async (toolName, input, description, options) =>
+      await tab.controllers.inputController?.handleApprovalRequest(toolName, input, description, options)
+      ?? 'cancel',
+
+    approvalDismisser: () => tab.controllers.inputController?.dismissPendingApprovalPrompt(),
+
+    autoTurn: (result: AutoTurnResult) => renderAutoTriggeredTurn(tab, plugin, result),
+
+    planDecision: async (input, signal) => {
+      const decision = await tab.controllers.inputController?.handleExitPlanMode(input, signal) ?? null;
+      // Revert only on approve; feedback and cancel keep plan mode active.
+      if (decision !== null && decision.type !== 'feedback') {
+        // Only restore permission mode if still in plan mode — user may have toggled out via Shift+Tab
+        if (getTabPermissionMode(tab, plugin) === 'plan') {
+          const restoreMode = tab.state.prePlanPermissionMode ?? 'normal';
+          tab.state.prePlanPermissionMode = null;
+          updatePlanModeUI(tab, plugin, restoreMode);
         }
-        return decision;
       }
-    );
-    tab.service.setSubagentHookProvider(
-      () => ({
-        hasRunning: tab.services.subagentManager.hasRunningSubagents(),
-      })
-    );
-    tab.service.setAutoTurnCallback((result: AutoTurnResult) => renderAutoTriggeredTurn(tab, plugin, result));
-    tab.service.setPermissionModeSyncCallback((sdkMode) => {
+      return decision;
+    },
+
+    permissionModeSync: (sdkMode: string) => {
       // Claude SDK uses bypassPermissions; ACP providers emit already-normalized
       // Grimoire modes (full_access / plan / normal). Unknown values stay Safe.
       const mode = sdkMode === 'bypassPermissions' || sdkMode === LEGACY_YOLO_PERMISSION_MODE
@@ -1873,8 +1877,36 @@ export function setupServiceCallbacks(tab: TabData, plugin: GrimoirePlugin): voi
         }
         updatePlanModeUI(tab, plugin, mode);
       }
-    });
-  }
+    },
+
+    question: async (input, signal) =>
+      await tab.controllers.inputController?.handleAskUserQuestion(input, signal) ?? null,
+
+    subagentState: () => ({
+      hasRunning: tab.services.subagentManager.hasRunningSubagents(),
+    }),
+  });
+}
+
+/**
+ * The tab's runtime as something that can take an interaction installation.
+ *
+ * Asked by shape rather than by class, like `tabProjectionExecution` asks for
+ * the same object: the field is typed as the frozen `ChatRuntime`, which no
+ * longer carries these — and must not. A tab whose runtime cannot take them is
+ * left alone rather than guessed at.
+ */
+interface InteractionInstaller {
+  installInteractions(callbacks: ExecutionInteractionCallbacks): void;
+}
+
+function interactionInstallerFor(tab: TabData): InteractionInstaller | null {
+  const service: unknown = tab.service;
+  return isInteractionInstaller(service) ? service : null;
+}
+
+function isInteractionInstaller(value: unknown): value is InteractionInstaller {
+  return typeof (value as InteractionInstaller | null)?.installInteractions === 'function';
 }
 
 function generateMessageId(): string {

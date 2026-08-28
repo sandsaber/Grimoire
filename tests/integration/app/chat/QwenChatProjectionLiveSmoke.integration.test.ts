@@ -14,7 +14,6 @@ import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { QwenExecution } from '@/app/execution/qwen/QwenExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
-import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { qwenProviderModule } from '@/providers/qwen/QwenProviderModule';
 import { updateQwenProviderSettings } from '@/providers/qwen/settings';
 
@@ -151,7 +150,7 @@ live('Qwen Code chat projection live smoke', () => {
     host.registerBackend(execution.createBackendRegistration());
     await host.start();
 
-    const runtime = execution.createRuntime() as unknown as ExecutionChatRuntimeAdapter;
+    const runtime = execution.createRuntime();
     const harness = await openChatProjection({
       backendId: qwenProviderModule.execution.descriptor.backendId,
       conversationId: CONVERSATION_ID,

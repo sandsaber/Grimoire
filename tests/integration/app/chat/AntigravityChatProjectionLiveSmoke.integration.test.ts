@@ -15,7 +15,6 @@ import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { AntigravityExecution } from '@/app/execution/antigravity/AntigravityExecutionComposition';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
-import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
 import { updateAntigravityProviderSettings } from '@/providers/antigravity/settings';
 
@@ -110,7 +109,7 @@ live('Antigravity chat projection live smoke', () => {
     host.registerBackend({ backend: execution.createBackend() });
     await host.start();
 
-    const runtime = execution.createRuntime() as unknown as ExecutionChatRuntimeAdapter;
+    const runtime = execution.createRuntime();
     const harness = await openChatProjection({
       backendId: antigravityProviderModule.execution.descriptor.backendId,
       conversationId: CONVERSATION_ID,

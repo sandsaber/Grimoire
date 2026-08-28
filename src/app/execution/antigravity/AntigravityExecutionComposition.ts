@@ -6,7 +6,6 @@ import { executionSessionId, runId, sessionInstanceId } from '@/core/execution/E
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
 import type { ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
-import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
 import {
   type BoundConversation,
   ExecutionChatRuntimeAdapter,
@@ -149,7 +148,7 @@ export class AntigravityExecution {
    * Print mode has no resume and keeps nothing per conversation, so the only
    * thing the binding below is for is naming the owner of what a turn records.
    */
-  createRuntime(): ChatRuntime {
+  createRuntime(): ExecutionChatRuntimeAdapter {
     const plugin = this.plugin;
     // Minted once, and only used while no conversation is bound: a fallback
     // minted per read would give one tab's session and its runs different

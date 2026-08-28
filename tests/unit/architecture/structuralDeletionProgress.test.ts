@@ -54,8 +54,9 @@ const SEARCHES: readonly DeletionSearch[] = [
   {
     what: 'runtime interaction callbacks',
     pattern: /setApprovalCallback|setAskUserQuestionCallback|setExitPlanModeCallback/,
-    files: 3,
-    closedBy: 'the seam deletion',
+    files: 0,
+    closedBy: 'closed — the six setters came off `ChatRuntime` and became one '
+      + '`installInteractions` on the adapter, which is not a contract member',
   },
   {
     what: 'worker tab ownership',
@@ -78,7 +79,10 @@ const SEARCHES: readonly DeletionSearch[] = [
   {
     what: 'subagent hooks and loaders',
     pattern: /setSubagentHookProvider|loadSubagent(ToolCalls|FinalResult)/,
-    files: 7,
+    // **5.** `setSubagentHookProvider` left with the other five interaction
+    // setters; what remains is the two subagent loaders, which are durable
+    // agents' to take.
+    files: 5,
     closedBy: 'durable agents',
   },
   {
@@ -162,17 +166,17 @@ describe('structural deletion progress', () => {
     // Printed by being asserted, like the live-matrix summary: a reader who
     // wants "what is left" reads this line rather than eleven assertions.
     expect(remaining.map(search => `${search.what}: ${search.files}`)).toEqual([
-      'runtime interaction callbacks: 3',
       'worker tab ownership: 3',
       'core importing the plugin type: 2',
-      'subagent hooks and loaders: 7',
+      'subagent hooks and loaders: 5',
       'SubagentManager lifecycle: 20',
       'the application importing a concrete provider module: 20',
       'turn metadata and session updates: 24',
       'StreamChunk and the subagent chunk vocabulary: 25',
       'the two registries: 30',
     ]);
-    // Two of eleven are zero, and both closed in the 2026-08-27 session.
-    expect(SEARCHES).toHaveLength(remaining.length + 2);
+    // Three of eleven are zero: two closed in the 2026-08-27 session, and the
+    // interaction callbacks closed with the first step of the seam deletion.
+    expect(SEARCHES).toHaveLength(remaining.length + 3);
   });
 });

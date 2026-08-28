@@ -17,7 +17,6 @@ import type {
 import type { ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
 import type { ProviderRuntimePorts } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
-import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
 import {
   type BoundConversation,
   ExecutionChatRuntimeAdapter,
@@ -296,7 +295,7 @@ export class ClaudeExecution {
     return this.workspaceHolder.peek() ?? null;
   }
 
-  createRuntime(): ChatRuntime {
+  createRuntime(): ExecutionChatRuntimeAdapter {
     let conversation: BoundConversation | null = null;
     let adapter: ClaudeRuntimeAdapter | undefined;
     let currentExecutionSession: string | null = null;

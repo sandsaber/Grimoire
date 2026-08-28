@@ -299,9 +299,9 @@ describe('Antigravity execution composition', () => {
     const { runtime } = await createTurnHarness(createPlugin());
 
     expect(runtime.getSessionId()).toBeNull();
-    expect(runtime.resolveSessionIdForFork?.({ id: 'conversation-1' } as never)).toBeNull();
+    expect(runtime.resolveSessionIdForFork?.({ id: 'conversation-1' })).toBeNull();
     expect(runtime.buildSessionUpdates?.({
-      conversation: { id: 'conversation-1' } as never,
+      conversation: { id: 'conversation-1' },
       sessionInvalidated: false,
     })).toEqual({ updates: {} });
   });

@@ -332,7 +332,7 @@ describe('Claude execution composition', () => {
     const { execution, host, startedWith } = await createHarness();
     const runtime = execution.createRuntime();
     let hasRunning = true;
-    runtime.setSubagentHookProvider(() => ({ hasRunning }));
+    runtime.installInteractions({ subagentState: () => ({ hasRunning }) });
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
 
@@ -357,10 +357,10 @@ describe('Claude execution composition', () => {
     });
     const runtime = execution.createRuntime();
     const asked: Array<{ toolName: string; description: string }> = [];
-    runtime.setApprovalCallback(async (toolName, _input, description) => {
+    runtime.installInteractions({ approval: async (toolName, _input, description) => {
       asked.push({ toolName, description });
       return 'allow';
-    });
+    } });
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'run it' })));
 

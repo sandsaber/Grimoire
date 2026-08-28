@@ -37,6 +37,7 @@ import type {
   ExitPlanModeCallback,
   PreparedChatTurn,
   SessionUpdateResult,
+  SubagentRuntimeState,
 } from '../types';
 
 /**
@@ -1217,32 +1218,24 @@ export class ExecutionChatRuntimeAdapter {
       : null;
   }
 
-  // The five interaction callbacks and the two observation hooks are stored
-  // rather than acted on: the kernel carries an interaction as an opaque
-  // presentation reference, so turning one into an approval prompt needs the
-  // provider-owned presenter the host builds from exactly these.
-  setApprovalCallback(callback: unknown): void {
-    this.callbacks.approval = callback as ApprovalCallback;
-  }
-
-  setApprovalDismisser(dismisser: unknown): void {
-    this.callbacks.approvalDismisser = dismisser as () => void;
-  }
-
-  setAskUserQuestionCallback(callback: unknown): void {
-    this.callbacks.question = callback as AskUserQuestionCallback;
-  }
-
-  setExitPlanModeCallback(callback: unknown): void {
-    this.callbacks.planDecision = callback as ExitPlanModeCallback;
-  }
-
-  setPermissionModeSyncCallback(callback: unknown): void {
-    this.callbacks.permissionModeSync = callback;
-  }
-
-  setSubagentHookProvider(getState: unknown): void {
-    this.callbacks.subagentState = getState;
+  /**
+   * Installs everything the host's presenter needs, in one call.
+   *
+   * **Seven `ChatRuntime` setters became this, and the interface lost them.**
+   * They were stored rather than acted on — the kernel carries an interaction
+   * as an opaque presentation reference, so turning one into an approval prompt
+   * needs the provider-owned presenter the host builds from exactly these — and
+   * being stored is what made them a seam rather than a runtime capability. A
+   * tab installing them one setter at a time could leave the presenter half
+   * built between two of them; there is one moment now, and it is not on the
+   * frozen interface.
+   *
+   * The members already installed are kept where the caller omits them, so a
+   * surface that only has an approval to offer does not clear a question
+   * somebody else installed.
+   */
+  installInteractions(callbacks: ExecutionInteractionCallbacks): void {
+    Object.assign(this.callbacks, callbacks);
   }
 
   setAutoTurnCallback(callback: unknown): void {
@@ -1410,14 +1403,16 @@ export interface ExecutionInteractionCallbacks {
   readonly planDecision?: ExitPlanModeCallback;
   readonly autoTurn?: AutoTurnCallback;
   /**
-   * Installed by the surface and read by nothing yet.
+   * The provider's own permission mode, as it reports one.
    *
-   * Declared because the store is typed: a key only the setter knows is a key
-   * the presenter can never find, and leaving these two out was how typing the
-   * store found them.
+   * Typed now that there is one installation point. It was `unknown` because
+   * seven setters each knew their own argument's type and the store knew none
+   * of them, so every reader cast — and a cast is where the surface and the
+   * composition can disagree about what a mode is.
    */
-  readonly permissionModeSync?: unknown;
-  readonly subagentState?: unknown;
+  readonly permissionModeSync?: (sdkMode: string) => void;
+  /** Whether the tab has a subagent running, which a stop hook must not cut off. */
+  readonly subagentState?: () => SubagentRuntimeState;
 }
 
 /** The same names, writable, for the one object that owns them. */

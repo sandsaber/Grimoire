@@ -37,12 +37,15 @@ const FROZEN_MEMBERS = [
   'getAuxiliaryModel',
   'cleanup',
   'rewind',
-  'setApprovalCallback',
-  'setApprovalDismisser',
-  'setAskUserQuestionCallback',
-  'setExitPlanModeCallback',
-  'setPermissionModeSyncCallback',
-  'setSubagentHookProvider',
+  // The six interaction setters were frozen here and are **deleted**, which the
+  // freeze permits and a new member does not: the plan's seam deletion names
+  // "runtime approval/question/plan/subagent callbacks" among what goes. They
+  // were stored by the adapter and acted on by nothing, which is what made them
+  // a seam rather than a capability, and they are one `installInteractions` on
+  // the adapter now — off this contract entirely.
+  //
+  // `setAutoTurnCallback` stayed: the kernel starts turns of its own, and the
+  // surface has to be told about a turn nothing in it asked for.
   'setAutoTurnCallback',
   'consumeTurnMetadata',
   'buildSessionUpdates',
@@ -63,8 +66,12 @@ describe('ChatRuntime contract freeze', () => {
     expect([...declared].sort()).toEqual([...FROZEN_MEMBERS].sort());
   });
 
-  it('declares 32 members', () => {
-    expect(declared).toHaveLength(32);
+  it('declares 26 members', () => {
+    // **32 until the seam deletion took six.** The count is asserted separately
+    // from the set so a deletion has to be stated twice rather than sliding
+    // through as a list edit — the freeze forbids growth, and a shrink is a
+    // milestone step that should be visible in the diff.
+    expect(declared).toHaveLength(26);
   });
 
   it('maps every member in the adapter specification', () => {

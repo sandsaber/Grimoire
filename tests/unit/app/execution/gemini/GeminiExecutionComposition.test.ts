@@ -668,10 +668,10 @@ describe('Gemini execution composition', () => {
     const { execution, host, permissions } = await createHarness({ asksPermission: true });
     const runtime = execution.createRuntime();
     const asked: Array<{ toolName: string; description: string }> = [];
-    runtime.setApprovalCallback(async (toolName: string, _input: unknown, description: string) => {
+    runtime.installInteractions({ approval: async (toolName: string, _input: unknown, description: string) => {
       asked.push({ toolName, description });
       return 'allow';
-    });
+    } });
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'write it' })));
 
@@ -695,7 +695,7 @@ describe('Gemini execution composition', () => {
     const { execution, host } = await createHarness({ plugin });
     const runtime = execution.createRuntime();
     const approval = jest.fn(async () => 'allow' as const);
-    runtime.setApprovalCallback(approval);
+    runtime.installInteractions({ approval: approval });
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
 
     // The client factory is one process for every tab, so the tab is found by
@@ -753,7 +753,7 @@ describe('Gemini execution composition', () => {
     const { execution, host } = await createHarness({ plugin });
     const runtime = execution.createRuntime();
     const approval = jest.fn(async () => 'deny' as const);
-    runtime.setApprovalCallback(approval);
+    runtime.installInteractions({ approval: approval });
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
 
     await expect((execution as any).approveWrite({
@@ -774,9 +774,7 @@ describe('Gemini execution composition', () => {
     const { execution, host, modes } = await createHarness({ plugin });
     const runtime = execution.createRuntime();
     const synced: string[] = [];
-    (runtime as unknown as {
-      setPermissionModeSyncCallback: (callback: (mode: string) => void) => void;
-    }).setPermissionModeSyncCallback(mode => synced.push(mode));
+    runtime.installInteractions({ permissionModeSync: mode => synced.push(mode) });
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
     // The session sync is started by the content channel and settled off the
@@ -806,9 +804,7 @@ describe('Gemini execution composition', () => {
     const { execution, host } = await createHarness({ plugin, switchesMode: 'autoEdit' });
     const runtime = execution.createRuntime();
     const synced: string[] = [];
-    (runtime as unknown as {
-      setPermissionModeSyncCallback: (callback: (mode: string) => void) => void;
-    }).setPermissionModeSyncCallback(mode => synced.push(mode));
+    runtime.installInteractions({ permissionModeSync: mode => synced.push(mode) });
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
     await waitFor(() => synced.length > 0);

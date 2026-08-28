@@ -303,10 +303,10 @@ live('Kimi Code live smoke', () => {
   it('rows 12 and 13: asks before it writes, and writes what was allowed', async () => {
     const { runtime, vault, shutdown } = await createHarness({ permissionMode: 'normal' });
     const asked: Array<{ tool: string; description: string }> = [];
-    runtime.setApprovalCallback(async (tool: string, _input: unknown, description: string) => {
+    runtime.installInteractions({ approval: async (tool: string, _input: unknown, description: string) => {
       asked.push({ tool, description });
       return 'allow';
-    });
+    } });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
       text: 'Create a file called allowed-live.txt in the working directory containing '
@@ -322,10 +322,10 @@ live('Kimi Code live smoke', () => {
   it('row 15: writes nothing when the prompt is refused', async () => {
     const { runtime, vault, shutdown } = await createHarness({ permissionMode: 'normal' });
     const asked: string[] = [];
-    runtime.setApprovalCallback(async (tool: string) => {
+    runtime.installInteractions({ approval: async (tool: string) => {
       asked.push(tool);
       return 'deny';
-    });
+    } });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
       text: 'Create a file called refused-live.txt in the working directory containing '

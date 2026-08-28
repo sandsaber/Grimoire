@@ -9748,6 +9748,47 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### The seam deletion started: the interaction callbacks are off `ChatRuntime`
+
+**The first of the plan's three seam-deletion searches is closed.** `setApprovalCallback`,
+`setApprovalDismisser`, `setAskUserQuestionCallback`, `setExitPlanModeCallback`,
+`setPermissionModeSyncCallback` and `setSubagentHookProvider` are gone from the frozen contract, and
+the tab installs all of them in one `ExecutionChatRuntimeAdapter.installInteractions(callbacks)`.
+
+**They were never runtime capabilities.** The adapter's own comment said so: the six were *stored
+rather than acted on*, because the kernel carries an interaction as an opaque presentation reference
+and turning one into an approval prompt needs the provider-owned presenter the host builds from
+exactly these. A member the contract declares and nothing on it ever acts on is the definition of a
+seam. `setAutoTurnCallback` stayed, and the difference is worth stating: the kernel starts turns of
+its own, and the surface has to be told about a turn nothing in it asked for.
+
+Installing them together rather than one at a time is not tidiness. Seven setters meant seven
+moments at which a presenter could be half built, and the compositions read the store lazily —
+`() => adapter?.interactionCallbacks() ?? {}` — precisely so they would not capture it too early.
+There is one moment now.
+
+Two things fell out of having a single typed installation. The nine compositions' `createRuntime()`
+returns `ExecutionChatRuntimeAdapter` rather than `ChatRuntime`, which is what they have always
+built. And `permissionModeSync` and `subagentState` are **typed**: they were `unknown` because each
+setter knew its own argument and the store knew none of them, so every reader cast — and a cast is
+where the surface and the composition can disagree about what a permission mode is.
+
+`ChatRuntime` is 26 members, down from 32. The freeze test asserts the count separately from the
+set, so a deletion has to be stated twice rather than sliding through as a list edit; the contract
+forbids growth, and a shrink is a milestone step that should be visible in the diff.
+
+The narrowing is a guard, not a cast: `tab.service` is typed as the frozen contract, so a runtime
+that cannot take an installation leaves the tab without interactions rather than crashing while it
+opens. That is tested, and proved by replacing the guard with `!` and watching it go red.
+
+**Where the seam deletion goes next.** Its remaining two searches are the large ones — turn metadata
+and session updates (24 files), and `StreamChunk` with the subagent chunk vocabulary (25). Both are
+gated the same way the plan states: *when the last UI consumer of `ChatRuntime` is gone*. That is now
+`TabData.service`, which is typed as the contract and read for about seventeen members. All nine
+providers are already on `PROJECTION_CHAT_PROVIDERS`, so the rendering migration that gates it is
+done; what remains is moving that field to the adapter and following the members off one surface at
+a time.
+
 #### The history row split four-two, on the same question as the two before it
 
 Six members, three unrelated operations, and a slot bound to one conversation. What made it movable

@@ -1,8 +1,6 @@
 import type { ProviderCapabilities, ProviderId } from '../providers/types';
 import type { ChatMessage, Conversation, SlashCommand, StreamChunk, ToolCallInfo } from '../types';
 import type {
-  ApprovalCallback,
-  AskUserQuestionCallback,
   AutoTurnCallback,
   ChatRewindMode,
   ChatRewindResult,
@@ -11,10 +9,8 @@ import type {
   ChatRuntimeQueryOptions,
   ChatTurnMetadata,
   ChatTurnRequest,
-  ExitPlanModeCallback,
   PreparedChatTurn,
   SessionUpdateResult,
-  SubagentRuntimeState,
 } from './types';
 
 export interface ChatRuntime {
@@ -46,12 +42,11 @@ export interface ChatRuntime {
   getAuxiliaryModel?(): string | null;
   cleanup(): void;
   rewind(userMessageId: string, assistantMessageId: string, mode?: ChatRewindMode): Promise<ChatRewindResult>;
-  setApprovalCallback(callback: ApprovalCallback | null): void;
-  setApprovalDismisser(dismisser: (() => void) | null): void;
-  setAskUserQuestionCallback(callback: AskUserQuestionCallback | null): void;
-  setExitPlanModeCallback(callback: ExitPlanModeCallback | null): void;
-  setPermissionModeSyncCallback(callback: ((sdkMode: string) => void) | null): void;
-  setSubagentHookProvider(getState: () => SubagentRuntimeState): void;
+  // The five interaction callbacks and the two observation hooks were declared
+  // here and stored by the adapter, which is what made them a seam rather than
+  // a runtime capability: nothing on this interface ever acted on one. They are
+  // `ExecutionChatRuntimeAdapter.installInteractions`, in a single call the
+  // surface makes once, off the frozen contract.
   setAutoTurnCallback(callback: AutoTurnCallback | null): void;
   consumeTurnMetadata(): ChatTurnMetadata;
 

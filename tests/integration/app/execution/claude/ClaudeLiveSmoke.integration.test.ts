@@ -228,10 +228,10 @@ live('Claude live smoke', () => {
   it('row 2: asks before running a command, and shows what it produced', async () => {
     const { runtime, shutdown } = await createHarness({ permissionMode: 'normal' });
     const asked: Array<{ tool: string; description: string }> = [];
-    runtime.setApprovalCallback(async (tool: string, _input: unknown, description: string) => {
+    runtime.installInteractions({ approval: async (tool: string, _input: unknown, description: string) => {
       asked.push({ tool, description });
       return 'allow';
-    });
+    } });
 
     // A command that writes. Claude Code decides for itself that a read-only
     // shell command is safe and never routes it through `canUseTool` — `echo`
@@ -258,10 +258,10 @@ live('Claude live smoke', () => {
   it('row 3: writes the file it was allowed to write', async () => {
     const { runtime, vault, shutdown } = await createHarness({ permissionMode: 'normal' });
     const asked: string[] = [];
-    runtime.setApprovalCallback(async (tool: string) => {
+    runtime.installInteractions({ approval: async (tool: string) => {
       asked.push(tool);
       return 'allow';
-    });
+    } });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
       text: 'Create a file called allowed-live.txt in the working directory containing '
@@ -277,10 +277,10 @@ live('Claude live smoke', () => {
   it('row 10: refusing the prompt writes nothing', async () => {
     const { runtime, vault, shutdown } = await createHarness({ permissionMode: 'normal' });
     const asked: string[] = [];
-    runtime.setApprovalCallback(async (tool: string) => {
+    runtime.installInteractions({ approval: async (tool: string) => {
       asked.push(tool);
       return 'deny';
-    });
+    } });
 
     await drain(runtime.query(runtime.prepareTurn({
       text: 'Create a file called refused-live.txt in the working directory containing '

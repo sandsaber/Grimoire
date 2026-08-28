@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { readInterfaceMembers } from '@test/helpers/interfaceMembers';
 
 import type { ChatRuntime } from '@/core/runtime/ChatRuntime';
+import type { ExecutionInteractionCallbacks } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 
 /**
@@ -66,12 +67,11 @@ ChatRuntime,
 | 'getSupportedCommands'
 | 'cleanup'
 | 'rewind'
-| 'setApprovalCallback'
-| 'setApprovalDismisser'
-| 'setAskUserQuestionCallback'
-| 'setExitPlanModeCallback'
-| 'setPermissionModeSyncCallback'
-| 'setSubagentHookProvider'
+// The six interaction setters were here until the seam deletion took them off
+// the contract. They are one `installInteractions` on the adapter now, which is
+// not a `ChatRuntime` member and so cannot be listed — the assertion below
+// checks it exists instead. `setAutoTurnCallback` stayed, because the kernel's
+// backend-initiated turns still reach the surface through it.
 | 'setAutoTurnCallback'
 | 'consumeTurnMetadata'
 | 'buildSessionUpdates'
@@ -80,11 +80,25 @@ ChatRuntime,
 
 const ADAPTER_IS_ASSIGNABLE: AdapterSatisfiesContract = true;
 
+/**
+ * The interaction installation, which is deliberately *not* on the contract.
+ *
+ * Six setters that the adapter stored and never acted on were a seam, not a
+ * runtime capability. Asserted here rather than in the `Pick` above because
+ * `keyof ChatRuntime` can no longer name it — which is the point.
+ */
+type AdapterInstallsInteractions =
+  ExecutionChatRuntimeAdapter['installInteractions'] extends
+    (callbacks: ExecutionInteractionCallbacks) => void ? true : false;
+
+const ADAPTER_INSTALLS_INTERACTIONS: AdapterInstallsInteractions = true;
+
 describe('adapter member coverage', () => {
   it('is assignable to the contract, which the compiler decides', () => {
     // The assertion above is the real check; this only keeps the constant used
     // so the file cannot drift into being type-only and stop being compiled.
     expect(ADAPTER_IS_ASSIGNABLE).toBe(true);
+    expect(ADAPTER_INSTALLS_INTERACTIONS).toBe(true);
   });
 
   const contractMembers = readInterfaceMembers('src/core/runtime/ChatRuntime.ts', 'ChatRuntime');
@@ -98,7 +112,7 @@ describe('adapter member coverage', () => {
   it('reads a contract of the size the freeze test pins', () => {
     // Guards the guard: a reader that returned nothing would make every claim
     // below vacuous.
-    expect(contractMembers.length).toBe(32);
+    expect(contractMembers.length).toBe(26);
   });
 
   it('covers every member or declares why not', () => {

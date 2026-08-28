@@ -457,10 +457,10 @@ describe('Grok execution composition', () => {
     const { execution, host } = await createHarness();
     const runtime = execution.createRuntime();
     const asked: unknown[] = [];
-    runtime.setAskUserQuestionCallback(async (request: unknown) => {
+    runtime.installInteractions({ question: async (request: unknown) => {
       asked.push(request);
       return { 'What do you want to do?': 'notes' };
-    });
+    } });
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
     const answer = await (execution as any).askUserQuestion({
@@ -491,14 +491,14 @@ describe('Grok execution composition', () => {
     // have put its question to the new conversation's user.
     const { execution, host } = await createHarness();
     const runtime = execution.createRuntime();
-    runtime.setAskUserQuestionCallback(async () => ({ 'anyone?': 'yes' }));
+    runtime.installInteractions({ question: async () => ({ 'anyone?': 'yes' }) });
     runtime.syncConversationState(
-      { id: 'conversation-1', providerState: {}, sessionId: null } as never,
+      { id: 'conversation-1', providerState: {}, sessionId: null },
     );
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
 
     runtime.syncConversationState(
-      { id: 'conversation-2', providerState: {}, sessionId: null } as never,
+      { id: 'conversation-2', providerState: {}, sessionId: null },
     );
 
     await expect((execution as any).askUserQuestion({
@@ -655,12 +655,12 @@ describe('Grok execution composition', () => {
     const { execution, host } = await createHarness({ plugin });
     const runtime = execution.createRuntime();
     runtime.syncConversationState(
-      { id: 'conversation-1', providerState: {}, sessionId: null } as never,
+      { id: 'conversation-1', providerState: {}, sessionId: null },
     );
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
     const updates = runtime.buildSessionUpdates({
-      conversation: { id: 'conversation-1' } as never,
+      conversation: { id: 'conversation-1' },
       sessionInvalidated: false,
     });
 
@@ -676,10 +676,10 @@ describe('Grok execution composition', () => {
     const { execution, host, permissions } = await createHarness({ asksPermission: true });
     const runtime = execution.createRuntime();
     const asked: Array<{ toolName: string; description: string }> = [];
-    runtime.setApprovalCallback(async (toolName: string, _input: unknown, description: string) => {
+    runtime.installInteractions({ approval: async (toolName: string, _input: unknown, description: string) => {
       asked.push({ toolName, description });
       return 'allow';
-    });
+    } });
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'run it' })));
 

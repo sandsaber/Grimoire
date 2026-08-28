@@ -229,10 +229,10 @@ live('Codex live smoke', () => {
   it('row 8: asks for approval and runs what the user allowed', async () => {
     const { runtime, shutdown } = await createHarness();
     const asked: string[] = [];
-    runtime.setApprovalCallback(async (_tool: string, _input: unknown, description: string) => {
+    runtime.installInteractions({ approval: async (_tool: string, _input: unknown, description: string) => {
       asked.push(description);
       return 'allow';
-    });
+    } });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
       text: 'Create a file called approved-live.txt in the working directory '

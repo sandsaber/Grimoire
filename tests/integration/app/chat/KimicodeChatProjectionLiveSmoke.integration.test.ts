@@ -14,7 +14,6 @@ import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { KimicodeExecution } from '@/app/execution/kimicode/KimicodeExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
-import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { kimicodeProviderModule } from '@/providers/kimicode/KimicodeProviderModule';
 import { updateKimicodeProviderSettings } from '@/providers/kimicode/settings';
 
@@ -153,7 +152,7 @@ live('Kimi Code chat projection live smoke', () => {
     host.registerBackend(execution.createBackendRegistration());
     await host.start();
 
-    const runtime = execution.createRuntime() as unknown as ExecutionChatRuntimeAdapter;
+    const runtime = execution.createRuntime();
     const harness = await openChatProjection({
       backendId: kimicodeProviderModule.execution.descriptor.backendId,
       conversationId: CONVERSATION_ID,

@@ -170,7 +170,7 @@ live('Codex chat projection live smoke', () => {
     }));
     await host.start();
 
-    const runtime = execution.createRuntime() as unknown as ExecutionChatRuntimeAdapter;
+    const runtime = execution.createRuntime();
     const harness = await openChatProjection({
       backendId: codexProviderModule.execution.descriptor.backendId,
       conversationId: CONVERSATION_ID,

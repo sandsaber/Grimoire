@@ -17,7 +17,6 @@ import { ClaudeExecution } from '@/app/execution/claude/ClaudeExecutionCompositi
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
-import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 import { createClaudeWorkspaceServices } from '@/providers/claude/app/ClaudeWorkspaceServices';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
@@ -165,7 +164,7 @@ live('Claude chat projection live smoke', () => {
     host.registerBackend(execution.createBackendRegistration(realQuery as never));
     await host.start();
 
-    const runtime = execution.createRuntime() as unknown as ExecutionChatRuntimeAdapter;
+    const runtime = execution.createRuntime();
     const harness = await openChatProjection({
       backendId: claudeProviderModule.execution.descriptor.backendId,
       conversationId: CONVERSATION_ID,

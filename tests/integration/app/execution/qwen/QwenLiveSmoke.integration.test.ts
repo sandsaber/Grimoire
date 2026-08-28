@@ -298,10 +298,10 @@ live('Qwen live smoke', () => {
   it('rows 12 and 13: asks before it writes, and writes what was allowed', async () => {
     const { runtime, vault, shutdown } = await createHarness({ permissionMode: 'normal' });
     const asked: Array<{ tool: string; description: string }> = [];
-    runtime.setApprovalCallback(async (tool: string, _input: unknown, description: string) => {
+    runtime.installInteractions({ approval: async (tool: string, _input: unknown, description: string) => {
       asked.push({ tool, description });
       return 'allow';
-    });
+    } });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
       text: 'Create a file called allowed-live.txt in the working directory containing '
@@ -317,10 +317,10 @@ live('Qwen live smoke', () => {
   it('row 15: writes nothing when the prompt is refused', async () => {
     const { runtime, vault, shutdown } = await createHarness({ permissionMode: 'normal' });
     const asked: string[] = [];
-    runtime.setApprovalCallback(async (tool: string) => {
+    runtime.installInteractions({ approval: async (tool: string) => {
       asked.push(tool);
       return 'deny';
-    });
+    } });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
       text: 'Create a file called refused-live.txt in the working directory containing '
@@ -341,10 +341,10 @@ live('Qwen live smoke', () => {
     // translation landed is the agent behaving like a read-only session.
     const { runtime, vault, shutdown } = await createHarness({ permissionMode: 'plan' });
     const asked: string[] = [];
-    runtime.setApprovalCallback(async (tool: string) => {
+    runtime.installInteractions({ approval: async (tool: string) => {
       asked.push(tool);
       return 'allow';
-    });
+    } });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
       text: 'Create a file called planned-live.txt in the working directory containing '
@@ -388,14 +388,10 @@ live('Qwen live smoke', () => {
     // row that failed, and the report says which.
     const { runtime, shutdown } = await createHarness();
     const asked: unknown[] = [];
-    (runtime as unknown as {
-      setAskUserQuestionCallback: (
-        callback: (input: Record<string, unknown>) => Promise<Record<string, string>>,
-      ) => void;
-    }).setAskUserQuestionCallback(async input => {
+    runtime.installInteractions({ question: async (input: unknown) => {
       asked.push(input);
       return { colour: 'blue' };
-    });
+    } });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
       text: 'Ask me which colour I prefer before answering, then reply with the colour.',

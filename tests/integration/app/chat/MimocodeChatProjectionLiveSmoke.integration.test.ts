@@ -14,7 +14,6 @@ import { usesProjectionChat } from '@/app/chat/projectionChatProviders';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { MimocodeExecution } from '@/app/execution/mimocode/MimocodeExecutionComposition';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
-import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { mimocodeProviderModule } from '@/providers/mimocode/MimocodeProviderModule';
 import { updateMimocodeProviderSettings } from '@/providers/mimocode/settings';
 
@@ -153,7 +152,7 @@ live('MiMoCode chat projection live smoke', () => {
     host.registerBackend(execution.createBackendRegistration());
     await host.start();
 
-    const runtime = execution.createRuntime() as unknown as ExecutionChatRuntimeAdapter;
+    const runtime = execution.createRuntime();
     const harness = await openChatProjection({
       backendId: mimocodeProviderModule.execution.descriptor.backendId,
       conversationId: CONVERSATION_ID,

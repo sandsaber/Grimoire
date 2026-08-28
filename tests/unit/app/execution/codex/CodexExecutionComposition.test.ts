@@ -380,10 +380,10 @@ describe('Codex execution composition', () => {
     // an empty surface and decline every approval.
     const { runtime, connection, execution } = await createTurnHarness();
     const asked: string[] = [];
-    runtime.setApprovalCallback?.(async (_tool: string, _input: unknown, description: string) => {
+    runtime.installInteractions({ approval: async (_tool: string, _input: unknown, description: string) => {
       asked.push(description);
       return 'allow';
-    });
+    } });
     connection.approveOnTurnStart = true;
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'run the build' })));
