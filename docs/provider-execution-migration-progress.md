@@ -10445,6 +10445,37 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — two searches that were counting things the plan keeps (`this commit`)
+
+Re-reading the remaining searches against the plan, the way the `StreamChunk` one was re-read.
+Two were measuring names rather than the behaviour they were written for.
+
+- Gates: unit 8750 passed, 8750 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **`subagent hooks and loaders` closes: 3 → 0.** `setSubagentHookProvider` left with the other five
+  interaction setters. The two loaders are a *settlement*, and the old `closedBy` — "durable agents
+  — what is left is Claude reading its own sidecar" — was **wrong about what durable agents can do**.
+  `ClaudeHistoryStore` and its sidecar reader fill a stored conversation's subagent tool calls from
+  Claude's own JSONL so a past turn renders with what it did. An `AgentResultRecord` carries
+  `finalText`, artifacts, changed files and citations and **deliberately no tool calls** — the
+  records say that work exists and how it ended, not what it did. Durable agents cannot take this
+  over; it is provider-internal history parsing, in the directory the rules put it in.
+- **`SubagentManager lifecycle` narrows: 7 → 2**, on the argument the `StreamChunk` search was
+  narrowed on. The plan's own words are that the class *"loses lifecycle authority while its
+  rendering is retained"* — so it survives, and a search counting files that name it counts the
+  rendering it is meant to keep. Six of the seven named nothing else. The pattern is the one
+  lifecycle question anything asks it, `hasRunningSubagents`, and the tab's call site is already
+  half moved: it unions the manager's answer with `runningOwnedAgents`.
+- What is left there is a product question, not a storage one: whether an *in-turn* subagent should
+  hold a turn open at all. The records deliberately do not carry those — a subagent that runs inside
+  a turn is drawn and finished before the turn is — so the manager keeps them, and the `Stop` hook
+  counting them is a decision about Claude's turn-ending.
+- **`worker tab ownership` was read the same way and stands at 3.** All three files use the
+  ownership fields, not just `createWorkerTab`, so there is nothing to narrow: it closes when an
+  orchestrator's worker launches become durable attempts and the tab-to-tab pointer is replaced by
+  the instance's own owner. That is feature work with a gate in front of it — the plan forbids tab
+  close ceasing to cancel before the durable-ownership UI ships.
+
 ### M5 — an agent from a closed tab now keeps a turn open (`this commit`)
 
 The projection below made the synchronous answer possible. This is it, and its first consumer.

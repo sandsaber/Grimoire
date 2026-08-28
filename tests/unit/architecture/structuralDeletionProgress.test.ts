@@ -84,14 +84,25 @@ const SEARCHES: readonly DeletionSearch[] = [
   },
   {
     what: 'subagent hooks and loaders',
-    pattern: /setSubagentHookProvider|loadSubagent(ToolCalls|FinalResult)/,
-    // **3, and all three are Claude's own history.** `setSubagentHookProvider`
-    // left with the other five interaction setters, and the two loaders left
-    // the contract with the retry ladder that was their only caller. What the
-    // pattern still finds is the live recovery path — `ClaudeHistoryStore` and
-    // its sidecar reader — which is provider-internal rather than a seam.
-    files: 3,
-    closedBy: 'durable agents — what is left is Claude reading its own sidecar',
+    // **Narrowed to the member that was on the seam, and it is zero.**
+    // `setSubagentHookProvider` left with the other five interaction setters,
+    // when six became one `installInteractions` on the adapter.
+    //
+    // The two loaders came out of the pattern, and it is a settlement rather
+    // than a deletion. They left the *contract* with the retry ladder that was
+    // their only caller; what the old pattern still found was
+    // `ClaudeHistoryStore` and its sidecar reader filling in a stored
+    // conversation's subagent tool calls, from Claude's own JSONL, so a past
+    // turn renders with what it did. **Durable agents cannot take that over**,
+    // which is what the previous `closedBy` claimed: an `AgentResultRecord`
+    // carries `finalText`, artifacts, changed files and citations, and
+    // deliberately no tool calls — the records say that work exists and how it
+    // ended, not what it did. Provider-internal history parsing, in the
+    // directory the architecture rules put it in.
+    pattern: /setSubagentHookProvider/,
+    files: 0,
+    closedBy: 'closed — the setter went with the interaction callbacks, and the '
+      + "loaders are Claude's own history parsing rather than a seam",
   },
   {
     // **The pattern is narrowed, and the evidence is why.** It was
@@ -103,40 +114,30 @@ const SEARCHES: readonly DeletionSearch[] = [
     // dominated by a type the milestone keeps, and a reader chasing it to zero
     // would delete the rendering the plan says to keep.
     //
-    // What it measures now is the class losing lifecycle authority, not the
-    // type it renders with — the same correction `StreamChunk` already got,
-    // where the content half was named `ChatContentItem` so the gate could
-    // search for the half that goes.
+    // **Narrowed to the lifecycle half, on the same argument the `StreamChunk`
+    // search was narrowed on: the old pattern could never reach zero.** The
+    // plan's own words are that the class *"loses lifecycle authority while its
+    // rendering is retained"* — so it survives, and a search counting files
+    // that name it counts the rendering it is supposed to keep. Six of the
+    // seven named nothing else.
+    //
+    // What goes is the one lifecycle question anything asks it:
+    // `hasRunningSubagents`, which the tab installs as the `subagentState`
+    // interaction and Claude's `Stop` hook reads to decide whether a turn may
+    // end. **2**, and the tab's call site is already half moved — it unions the
+    // manager's answer with `runningOwnedAgents`, so an agent from a closed tab
+    // keeps a turn open. What is left is the manager's in-turn tracking, which
+    // the records deliberately do not carry: a subagent that runs inside a turn
+    // is drawn and finished before the turn is, and there is nothing for it to
+    // survive. Closing this is deciding whether the `Stop` hook should count
+    // those at all — a question about Claude's turn-ending, not about storage.
+    //
+    // `orphanAllActive` matched nothing when this search was written and still
+    // does; it is kept because the plan names it.
     what: 'SubagentManager lifecycle',
-    pattern: /\bSubagentManager\b|orphanAllActive/,
-    // **7, of which one is the replacement** — `SubagentAgentRecorder` names
-    // the class while describing what it takes over from it. The rest are the
-    // three chat controllers, the tab and its types, and the class itself.
-    //
-    // **The authority it has to lose is one method, and what blocks the
-    // transfer is now specific.** `hasRunningSubagents()` is live and
-    // load-bearing: the tab installs it as the `subagentState` interaction, the
-    // Claude composition reads it back off the adapter, and it becomes the
-    // `Stop` hook that keeps the SDK from ending a turn while a background
-    // subagent is still going. The durable domain already knows the same fact —
-    // an `OwnedAgentSummary` without a `terminal` is running — but
-    // `listOwnedAgents` is **async and reads every agent record in the vault**,
-    // and the hook needs an answer synchronously at the end of every turn.
-    // **Half of that is now built**: the coordinator keeps the instance and run
-    // records it has read, evicted from the write funnel, so a listing no
-    // longer walks the store. What it does not yet give is a *synchronous*
-    // answer, and the reason is worth writing down rather than rediscovering.
-    //
-    // A sync answer needs an owner-keyed index, and an index has to say
-    // something during the window between a write and the read that refreshes
-    // it. Answering "unknown" there and letting the hook fall back to its safe
-    // default blocks turns that should have ended. Answering from a stale index
-    // is worse in the other direction: an agent that has just *started* is
-    // written while the turn is still going, and a stale "none running" ends the
-    // turn on top of it. So the index has to be maintained through the write,
-    // not refreshed after it — which is the piece still missing.
-    files: 7,
-    closedBy: 'durable agents — it loses lifecycle authority and keeps its rendering',
+    pattern: /hasRunningSubagents|orphanAllActive/,
+    files: 2,
+    closedBy: 'durable agents — whether an in-turn subagent should hold a turn open',
   },
   {
     // **Split from one search of 20, with the total preserved.** The single
@@ -287,16 +288,16 @@ describe('structural deletion progress', () => {
     expect(remaining.map(search => `${search.what}: ${search.files}`)).toEqual([
       'worker tab ownership: 3',
       'core importing the plugin type: 1',
-      'subagent hooks and loaders: 3',
-      'SubagentManager lifecycle: 7',
+      'SubagentManager lifecycle: 2',
       'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
       'the registries — one left: 16',
     ]);
-    // Five of twelve are zero: two closed in the 2026-08-27 session, the
+    // Six of twelve are zero: two closed in the 2026-08-27 session, the
     // interaction callbacks closed with the first step of the seam deletion,
-    // the compositions closed by moving under the providers they compose, and
-    // the neutral settings imports closed by two contract additions.
-    expect(SEARCHES).toHaveLength(remaining.length + 5);
+    // the compositions closed by moving under the providers they compose, the
+    // neutral settings imports closed by two contract additions, and the
+    // subagent hooks closed once the loaders beside them were read.
+    expect(SEARCHES).toHaveLength(remaining.length + 6);
   });
 });
