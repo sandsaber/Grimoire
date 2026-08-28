@@ -917,6 +917,7 @@ export class AgentCoordinator {
         dispatchToken: intent.dispatchToken,
         providerId: instance.providerId,
         executionMode: instance.executionMode,
+        rootOwner: instance.rootOwner,
         goalRef: run.goalRef,
         policy: run.policy,
         idempotency: intent.idempotency,

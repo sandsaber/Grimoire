@@ -222,6 +222,20 @@ export interface AgentDispatchRequest {
   readonly dispatchToken: AgentDispatchToken;
   readonly providerId: ProviderId;
   readonly executionMode: AgentExecutionMode;
+  /**
+   * Whose work this is.
+   *
+   * **Here because `goalRef` is a slug and a dispatcher needs a goal.** The
+   * reference is deliberately not the goal itself: `.grimoire/control/**` holds
+   * references, and a task description is free text somebody wrote. So the
+   * words live where free text already lives — a conversation — and the owner
+   * is how a dispatcher finds them.
+   *
+   * A reference like every other field here, which is why it can be carried:
+   * the coordinator reads it off the instance record it already holds, and no
+   * new store, retention rule or redaction question comes with it.
+   */
+  readonly rootOwner: ExecutionOwner;
   readonly goalRef: string;
   readonly policy: EffectiveAgentPolicy;
   readonly idempotency: 'provider-key' | 'none';

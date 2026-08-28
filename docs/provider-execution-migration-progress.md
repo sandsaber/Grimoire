@@ -10450,6 +10450,41 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the first agent dispatch port (`this commit`)
+
+**`AgentDispatchPort` has an implementation.** `ConversationAgentDispatcher` starts an agent rather
+than noticing one a provider started, and it is short because nothing new was needed:
+`ApplicationRuntime.createRuntimeFor` already builds a provider adapter with no tab in it, a tab was
+only ever one holder of one, and the persistence barrier already runs whether or not a surface is
+attached. **A dispatched turn is an ordinary turn with nobody drawing it.**
+
+- Gates: unit 8755 passed, 8755 total (554 suites); integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- **Where the goal lives, which the owner decided.** A control record holds references and not free
+  text, and a task description is free text somebody wrote — so the words live where free text
+  already lives, in the conversation, and `rootOwner` is how the dispatcher finds them. On a first
+  dispatch the conversation is empty and the caller supplies the text, which the turn persists as
+  that conversation's first user message; on a retry it is read back. No second store, no retention
+  rule, no redaction question. `AgentDispatchRequest` gained `rootOwner` for it — a reference like
+  every other field on that request, read off the instance record the coordinator already holds.
+- **Six tests, against the real coordinator, the real kernel and a real vault.** The only fake is the
+  provider's encoder, which is the one thing a provider genuinely owns. They assert the accepted
+  outcome carries the kernel's own identities, that a redispatch reads the goal back from the
+  conversation and appends nothing twice, and that all four refusals happen *before* the turn is
+  submitted with nothing written — which is what makes `sideEffectFree: true` true, and what lets the
+  coordinator file a rejection as `invalidated`.
+- **The harness gained the production composition.** These tests submit through
+  `ChatExecutionComposition.submitTurn` rather than reaching past it to the coordinator, because that
+  is where a provider's encoding happens and where the user message the vault holds is decided.
+- **Registered `pending`, not wired, and the reason is a second design decision — a storage one.** An
+  orchestrator worker needs two conversations named: the one the person is looking at, so its card
+  shows the workers it started, and the one each worker writes its own turn into, because two workers
+  cannot share one — a conversation runs one turn at a time. `rootOwner` can be one of those and this
+  port reads the goal from it, so the other needs a home on the run record. That is a control-record
+  schema change and belongs in `docs/provider-execution-persistence-decisions.md` before it is code.
+  `worker tab ownership` stays at 3, with the remaining question now one question rather than a
+  milestone.
+
 ### M5 — the worker row's blocker, named exactly (`this commit`)
 
 **`AgentDispatchPort` has no implementation anywhere in `src/`.** The agent domain can *adopt* an

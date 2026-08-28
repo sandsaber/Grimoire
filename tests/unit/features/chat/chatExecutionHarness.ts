@@ -1,5 +1,6 @@
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
+import { ChatExecutionComposition } from '@/app/chat/ChatExecutionComposition';
 import { ConversationRepository } from '@/core/conversations/ConversationRepository';
 import { executionBackendId } from '@/core/execution/ExecutionBackendDescriptor';
 import { ExecutionControlRepositories } from '@/core/execution/ExecutionControlRepositories';
@@ -39,6 +40,16 @@ export interface Harness {
   readonly backend: DeterministicFakeBackend;
   readonly storage: TestDurableStorage;
   readonly conversations: ConversationRepository;
+  /**
+   * The production composition over the same kernel and vault.
+   *
+   * Built here rather than in the suites that need it, because it is the seam
+   * a turn is actually submitted through — `submitTurn` is where the provider's
+   * encoding happens and where the user message the vault holds is decided, and
+   * a caller that reached past it to the coordinator would be testing a path no
+   * surface takes.
+   */
+  readonly composition: ChatExecutionComposition;
   advance(milliseconds: number): void;
   /** A second coordinator over the same kernel and vault, as a reload gives. */
   createCoordinator(): ChatExecutionCoordinator;
@@ -175,12 +186,18 @@ export async function createHarness(options: { readonly withRecovery?: boolean }
     now,
   });
 
+  const coordinator = createCoordinator();
   return {
-    coordinator: createCoordinator(),
+    coordinator,
     registry,
     backend,
     storage,
     conversations,
+    composition: new ChatExecutionComposition({
+      lifecycle: registry,
+      conversations: conversationPort(conversations),
+      now,
+    }),
     createCoordinator,
     advance(milliseconds) {
       clock += milliseconds;
