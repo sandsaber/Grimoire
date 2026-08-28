@@ -82,7 +82,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
-| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the chat surface is done**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design; bang-bash runs on the local-shell backend; **all nine providers execute their chat turns through the projection path**, and `InputController`'s generator branch is deleted with the turn-framing machinery it carried. `ApplicationRuntime` is the composition root. The durable agent domain is harvested from the v1 Phase 6 and dark, minus the work graphs M5 bans. Certification is account-bound and recorded per provider in `docs/chat-projection-flip-smoke-matrix.md`. **Two of the plan's eleven structural deletion searches are zero**, and all eleven are now a gate rather than a shell command. Still open: a producer for agent instances and the work card that reads them, tab-close ownership, the thirteen provider rows, registry deletion, and the seam deletion | `fa9cfbc` … `bd1083b` |
+| M5 — presentation evolution, provider rows, and seam deletion | In progress — **the chat surface is done**. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design; bang-bash runs on the local-shell backend; **all nine providers execute their chat turns through the projection path**, and `InputController`'s generator branch is deleted with the turn-framing machinery it carried. `ApplicationRuntime` is the composition root. The durable agent domain is harvested from the v1 Phase 6 and dark, minus the work graphs M5 bans. Certification is account-bound and recorded per provider in `docs/chat-projection-flip-smoke-matrix.md`. **Ten of the plan's thirteen structural deletion searches are zero**, and all thirteen are a gate rather than a shell command. Both provider registries are deleted, all thirteen provider rows have moved, `src/core` names the plugin type nowhere, and the persistence barrier writes the session binding. Still open, and each with its reason written on its own scoreboard row: the durable-ownership UI that the plan makes a precondition for tab close ceasing to cancel; orchestrator worker launches on durable attempts, which is what makes a worker tab optional; and the auto-turn path, which carries the last lifecycle chunk variant because it has no projection to read a terminal off | `fa9cfbc` … `bd1083b` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
@@ -10449,6 +10449,27 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### M5 — the worker row's blocker, named exactly (`this commit`)
+
+**`AgentDispatchPort` has no implementation anywhere in `src/`.** The agent domain can *adopt* an
+agent a provider started and record what it did; it cannot start one. That is the whole of what
+stands between orchestrator workers and durable attempts — a worker without a tab needs a turn
+dispatched without a tab, and every path to `submitTurn` runs through a tab's encoder and its
+adapter. The port's first implementation unlocks `worker tab ownership: 3`, and nothing else does.
+
+**The plan's other precondition for that step is already met, and it is worth saying so because the
+plan words the two as one sentence.** "Tab close stops cancelling background work only in the same
+checkpoint that ships the durable-ownership UI" — tab close already does not cancel background work:
+`destroyTab` cancels the streaming turn and detaches the view, with a comment saying a tab that
+stopped drawing is not a tab that stopped the turn; nothing sets `orphaned` any more, which is why
+half of that row's own pattern finds nothing; and the background work card reads the vault by
+conversation, so an agent outlives the tab that started it and is still findable from another.
+
+**The M5 status row is refreshed** — it still said two of eleven searches were zero and listed
+registry deletion and the provider rows as open.
+
+- Gates: unit 8749 passed, 8749 total (553 suites); `tsc --noEmit` clean; `npm run lint` clean.
 
 ### M5 — what the last three searches actually need (`this commit`)
 

@@ -69,6 +69,20 @@ const SEARCHES: readonly DeletionSearch[] = [
     //
     // So this is the one remaining row that is genuinely feature work rather
     // than a move, and it changes what a person sees: workers stop being tabs.
+    //
+    // **The concrete blocker, so nobody has to find it again.**
+    // `AgentDispatchPort` has no implementation anywhere in `src/`: the agent
+    // domain can *adopt* an agent a provider started and record what it did,
+    // and it cannot start one. A worker without a tab needs a turn dispatched
+    // without a tab, and every path to `submitTurn` runs through a tab's
+    // encoder and its adapter. That port's first implementation is what unlocks
+    // this row.
+    //
+    // The plan's other precondition here is already met, and separately:
+    // closing a tab cancels the streaming turn and nothing else — `destroyTab`
+    // says so — nothing sets `orphaned` any more, and the background work card
+    // reads the vault by conversation, so an agent survives the tab that
+    // started it and is still findable.
     what: 'worker tab ownership',
     pattern: /createWorkerTab|orchestratorTabId|workerTabIds/,
     files: 3,
