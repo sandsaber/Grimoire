@@ -8279,7 +8279,51 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
-### Where the session of 2026-08-27 is
+### Where the session of 2026-08-28 ended
+
+**M5 is code complete. Eleven of the twelve structural deletion searches are zero**, and the twelfth
+is 3 with a design question attached rather than a milestone. Working tree clean, fifteen commits,
+head `50392dd6`.
+
+**What closed today**, each with a journal entry above and each proven by breaking its own gate:
+
+- `core importing the plugin type` — eleven host-shaped contracts moved to
+  `src/providers/shared/providerHostContracts.ts`, with `ProviderSpendUsageStore` beside them;
+- `turn metadata and session updates` — the session binding is written by the persistence barrier, in
+  the same `apply` as the assistant message;
+- `worker tab ownership` — an approved orchestrator plan dispatches a durable agent per task.
+  `AgentDispatchPort` has its first implementation, and D10 in the persistence decisions names the two
+  conversations a dispatched worker needs;
+- `SubagentManager lifecycle` — the durable records are the only source of "is one running", after
+  the recorded blocker turned out to be a parameter's type rather than a fact.
+
+**The one search that is not zero, and what it is waiting for.** `async_subagent_result`, in three
+files. Claude is the only provider with background agents — the only `progressObservation: 'full'` in
+the catalog and the only emitter — so a one-provider feature sits in a provider-neutral union. It
+**cannot** be replaced by the durable records, which are downstream of it: this chunk is what tells
+the manager an agent ended, and the recorder writes from that. The slot Codex and Grok fill,
+`subagentLifecycle`, recognizes tool *names* and a terminal notification is not one. What moves it is
+a provider port for an out-of-band agent terminal, or a second provider growing background agents,
+because the shape is unproven with one.
+
+**Two things are the owner's, not a gate's.** Whether that twelfth row's argument retires it, and the
+manual test-vault matrix — the one exit-gate clause nothing here can answer. Everything else in M5's
+gate holds: parity manifest green, each agent guarantee with a named test in `AgentCoordinator.test.ts`,
+unit 8749/8749 across 554 suites, integration 156 passed with 128 skipped behind credentials, `tsc`,
+`lint`, and `build:release` including the community-review checks and the bundle-load and view-open
+smokes.
+
+**Where to pick up.** M6 — final hardening — is the next milestone and has not started: its list is
+crash injection at each durable boundary, and the duplicate / gap / stale-generation / wrong-session /
+late-terminal / unload cases. Nothing from M5 is half-built; `ConversationAgentDispatcher` is wired
+and in the bundle, and the parity manifest records it as such.
+
+**A habit that paid three times today**, worth carrying into M6: re-read a recorded blocker against
+the code before quoting it. Two of them named a *contract* constraint — a parameter's type, a
+signature — rather than a behavioural one, and a contract constraint can simply be widened. The third
+had folded two questions into one sentence.
+
+### Where the session of 2026-08-27 ended
 
 **Every provider is on the chat projection path.** `projectionChatProviders` holds all nine, so a
 chat tab submits its turn to the chat execution coordinator, the kernel runs it, and the surface
