@@ -9659,19 +9659,31 @@ six provider rows moved, and then **the seam deletion started and `ChatRuntime` 
 | core importing the plugin type | 2 | the workspace registry and `types.ts`, with the rows still in them |
 | worker tab ownership | 3 | durable agents |
 | subagent hooks and loaders | 3 | durable agents — what is left is Claude reading its own sidecar |
-| SubagentManager lifecycle | 20 | durable agents |
+| `StreamChunk` lifecycle vocabulary | 5 | the union, its re-export, and framing two normalizers still emit |
+| turn metadata and session updates | 6 | `buildSessionUpdates` and `syncConversationState` |
+| SubagentManager lifecycle | 7 | durable agents |
 | the application importing a concrete provider module | 20 | the provider rows |
-| turn metadata and session updates | 22 | seventeen are a provider's own presenter; the seam is `buildSessionUpdates` and `syncConversationState` |
-| `StreamChunk` and the subagent chunk vocabulary | 24 | the lifecycle variants have no feature-layer consumer left, but four files still emit or read them |
 | the two registries | 30 | `ProviderRegistry` is two accessors over two optional rows, both durable agents' |
 
-**Two of these eleven cannot reach zero as written, and that is worth deciding before they are
-chased.** `StreamChunk`'s own `closedBy` says "the content type keeps its own name", and
-`ChatContentItem` is that rename — so the search will keep finding the content half forever. The
-turn-metadata search finds `consumeTurnMetadata` on nine provider content presenters, which is a
-provider's own API for its own normalizer. Both need their patterns narrowed to what they are
-actually about — the lifecycle variants, and the two members the feature layer still reaches — or
-they will read as unfinished work that is finished.
+**Three of these eleven could not reach zero as written, and the patterns are corrected.** Each
+counted a name the plan explicitly keeps, so its headline number measured retained code rather than
+remaining work:
+
+- **`SubagentManager lifecycle` was 20, and thirteen of those files named only `SubagentInfo`** — the
+  rendering type the plan retains in as many words ("`SubagentManager` loses lifecycle authority
+  while its rendering is retained"). `orphanAllActive`, the third term, matched **nothing**: the
+  method it was named for is already deleted. A reader chasing 20 to zero would have deleted the
+  rendering the plan says to keep. It measures the class now: **7**;
+- **`StreamChunk` was 24**, and `StreamChunk` is `ChatContentItem | ChatTurnLifecycleChunk`. The
+  content half was given its own name *precisely so this search could stop finding it* — the type's
+  comment says so, and the entry's own `closedBy` has always read "the content type keeps its own
+  name". It measures the lifecycle half now: **5**;
+- **turn metadata was 22**, and seventeen were `consumeTurnMetadata` on nine provider content
+  presenters and the compositions wiring them — a provider's own API for its own normalizer, which
+  this milestone does not touch. It measures the two members the feature layer still reaches: **6**.
+
+Narrowing a gate is a decision, so it is written here rather than only in the test: the evidence is
+the file lists above, and the precedent is `ChatContentItem`, which exists for exactly this reason.
 
 **What is genuinely left is two milestones and one decision.** Durable agents gates four of the
 searches; the provider rows gate two more and are themselves gated on durable agents, the seam's

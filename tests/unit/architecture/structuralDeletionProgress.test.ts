@@ -88,15 +88,25 @@ const SEARCHES: readonly DeletionSearch[] = [
     closedBy: 'durable agents — what is left is Claude reading its own sidecar',
   },
   {
+    // **The pattern is narrowed, and the evidence is why.** It was
+    // `SubagentManager|SubagentInfo|orphanAllActive`, and of the twenty files
+    // that matched, **thirteen named only `SubagentInfo`** — the rendering type
+    // the plan explicitly retains ("`SubagentManager` loses lifecycle authority
+    // while its rendering is retained"). `orphanAllActive` matched **nothing**:
+    // the method it was named for is already deleted. The headline number was
+    // dominated by a type the milestone keeps, and a reader chasing it to zero
+    // would delete the rendering the plan says to keep.
+    //
+    // What it measures now is the class losing lifecycle authority, not the
+    // type it renders with — the same correction `StreamChunk` already got,
+    // where the content half was named `ChatContentItem` so the gate could
+    // search for the half that goes.
     what: 'SubagentManager lifecycle',
-    pattern: /\bSubagentManager\b|\bSubagentInfo\b|orphanAllActive/,
-    // **20, and two of them are the replacement rather than the thing being
-    // replaced**: `SubagentAgentRecorder` and `tabDurableSubagents`, which name
-    // it while describing what they take over from it. A count that rises for
-    // that reason is still a count rising, and recording it is cheaper than
-    // wording a comment around a grep. The real fall comes when the work card
-    // ships and `orphanAllActive` stops being what tab close does.
-    files: 20,
+    pattern: /\bSubagentManager\b|orphanAllActive/,
+    // **7, of which one is the replacement** — `SubagentAgentRecorder` names
+    // the class while describing what it takes over from it. The rest are the
+    // three chat controllers, the tab and its types, and the class itself.
+    files: 7,
     closedBy: 'durable agents — it loses lifecycle authority and keeps its rendering',
   },
   {
@@ -107,25 +117,37 @@ const SEARCHES: readonly DeletionSearch[] = [
     closedBy: 'the provider rows',
   },
   {
+    // **Narrowed to the two the feature layer still reaches.**
+    // `consumeTurnMetadata` is off the deleted contract — the coordinator
+    // carries its three facts on `CompletedChatTurn`, where the surface already
+    // read the other half of the same turn — and what the old pattern still
+    // found was that name on nine provider **content presenters** and the
+    // compositions wiring them. That is a provider's own API for its own
+    // normalizer, which this milestone does not touch: seventeen of the
+    // twenty-two files were it.
     what: 'turn metadata and session updates',
-    pattern: /consumeTurnMetadata|buildSessionUpdates|syncConversationState/,
-    // **23, and the shape of what is left has changed.** The turn-metadata
-    // member is off `ChatRuntime`: the coordinator carries its three facts on
-    // `CompletedChatTurn`, which is where the surface already read the other
-    // half of the same turn. Seventeen of the twenty-three are a provider's own
-    // content presenter and the composition that wires it — provider-internal,
-    // not a seam. What is left of the seam is `buildSessionUpdates` in
-    // `ConversationController` and `syncConversationState` in the tab layer.
-    files: 22,
+    pattern: /buildSessionUpdates|syncConversationState/,
+    // The two members the seam still has: `buildSessionUpdates` in
+    // `ConversationController`, and `syncConversationState` across the tab
+    // layer and the adapter that answers it.
+    files: 6,
     closedBy: 'the seam deletion',
   },
   {
+    // **Narrowed to the half that goes**, which is what the split was for.
+    // `StreamChunk` is `ChatContentItem | ChatTurnLifecycleChunk`, and the
+    // content half was given its own name precisely so this search could stop
+    // finding it — the type's own comment says so, and this entry's `closedBy`
+    // has always said "the content type keeps its own name". Searching for the
+    // union alias counted every content consumer, and could never reach zero.
     what: 'StreamChunk and the subagent chunk vocabulary',
-    pattern: /\bStreamChunk\b|async_subagent_result|subagent_tool_(use|result)/,
-    // **24.** The contract that declared the lifecycle chunk vocabulary is
-    // deleted; what the pattern finds now is the content type, which keeps its
-    // own name, and the subagent chunk kinds the presenters still emit.
-    files: 24,
+    pattern: /\bChatTurnLifecycleChunk\b|async_subagent_result|subagent_tool_(use|result)/,
+    // **5.** The lifecycle union, its re-export, and the three modules that
+    // still name a subagent chunk kind. What is left to delete is the union and
+    // the framing two provider normalizers emit into a channel the projection
+    // drops it from — normalizer surgery against tests written from real
+    // transcripts, which belongs with the smoke matrix.
+    files: 5,
     closedBy: 'the seam deletion — the lifecycle meaning goes, the content type keeps its own name',
   },
   {
@@ -181,10 +203,10 @@ describe('structural deletion progress', () => {
       'worker tab ownership: 3',
       'core importing the plugin type: 2',
       'subagent hooks and loaders: 3',
-      'SubagentManager lifecycle: 20',
+      'SubagentManager lifecycle: 7',
       'the application importing a concrete provider module: 20',
-      'turn metadata and session updates: 22',
-      'StreamChunk and the subagent chunk vocabulary: 24',
+      'turn metadata and session updates: 6',
+      'StreamChunk and the subagent chunk vocabulary: 5',
       'the two registries: 30',
     ]);
     // Three of eleven are zero: two closed in the 2026-08-27 session, and the
