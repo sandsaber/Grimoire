@@ -64,6 +64,18 @@ function surface() {
       calls.push({ method: `chunk:${chunk.type}`, args: [chunk] });
       return Promise.resolve();
     },
+    // Named operations rather than chunks: a turn's failure and its ending are
+    // facts the projection states, so it asks the column for them by name.
+    // Recorded under the old chunk labels so the ordering assertions below
+    // still read as the sequence a column receives.
+    renderTurnFailure: (content: string) => {
+      calls.push({ method: 'chunk:error', args: [{ type: 'error', content }] });
+      return Promise.resolve();
+    },
+    finishTurn: () => {
+      calls.push({ method: 'chunk:done', args: [{ type: 'done' }] });
+      return Promise.resolve();
+    },
     appendText: record('appendText'),
     appendThinking: record('appendThinking'),
     finalizeCurrentTextBlock: record('finalizeCurrentTextBlock'),

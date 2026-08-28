@@ -55,6 +55,8 @@ function harness() {
   };
   const stream = {
     handleStreamChunk: record('handleStreamChunk'),
+    renderTurnFailure: record('renderTurnFailure'),
+    finishTurn: record('finishTurn'),
     appendText: record('appendText'),
     appendThinking: record('appendThinking'),
     finalizeCurrentTextBlock: record('finalizeCurrentTextBlock'),
@@ -214,7 +216,7 @@ describe('chat surface render target', () => {
       'finalizeCurrentThinkingBlock',
       'finalizeCurrentTextBlock',
       'appendText',
-      'handleStreamChunk',
+      'finishTurn',
       'hideThinkingIndicator',
       'stopTurnSilenceIndicator',
     ]);
@@ -374,11 +376,12 @@ describe('chat surface render target', () => {
     chat.target.endTurn(RUN_ID, terminal({ kind: 'failed', reason: 'provider-failure' }));
 
     await drained(chat.target);
-    expect(chat.calls.filter(call => call.method === 'handleStreamChunk').map(call => call.args[0]))
-      .toEqual([
-        { type: 'error', content: 'ended: provider-failure' },
-        { type: 'done' },
-      ]);
+    // Asked by name rather than as chunks: a turn's ending is a fact the
+    // projection states, and it used to say so by handing the column an `error`
+    // chunk and a `done` chunk, dressed as things a provider sent.
+    expect(chat.calls.filter(call => call.method === 'renderTurnFailure').map(call => call.args[0]))
+      .toEqual(['ended: provider-failure']);
+    expect(chat.calls.filter(call => call.method === 'finishTurn')).toHaveLength(1);
     await drained(chat.target);
     expect(chat.methods().slice(-2)).toEqual(['hideThinkingIndicator', 'stopTurnSilenceIndicator']);
   });
@@ -406,8 +409,11 @@ describe('chat surface render target', () => {
     chat.target.endTurn(RUN_ID, terminal());
 
     await drained(chat.target);
-    expect(chat.calls.filter(call => call.method === 'handleStreamChunk').map(call => call.args[0]))
-      .toEqual([{ type: 'done' }]);
+    // Nothing is drawn into it, and the turn is still closed. Asserted as both,
+    // because "no chunks" alone is what a target that did nothing at all would
+    // also report.
+    expect(chat.calls.filter(call => call.method === 'handleStreamChunk')).toEqual([]);
+    expect(chat.calls.filter(call => call.method === 'finishTurn')).toHaveLength(1);
   });
 
   it('stops the silence timer counting a person who is reading a question', async () => {

@@ -10417,6 +10417,25 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the projection stops saying "this turn ended" as a chunk (`this commit`)
+
+- Gates: unit 8739 passed, 8739 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- `ChatSurfaceRenderTarget` ended a turn by constructing `{ type: 'error' }` and `{ type: 'done' }`
+  and handing them to `handleStreamChunk` — the projection dressing its own facts as things a
+  provider sent. `ChatStreamOperations` has `renderTurnFailure(content)` and `finishTurn(msg)` now,
+  and `handleStreamChunk` narrows to `ChatContentItem`. The two `StreamController` cases moved into
+  the new methods; the cases stay, because the adapter's generator still sends those chunks on the
+  path the entry below describes.
+- **The production path no longer names a lifecycle chunk.** What is left of `error` and `done` is
+  the adapter's generator — which nothing in `src/` calls — and three provider emitters whose output
+  the tab binding filters, exactly as the framing's was. That makes the remaining decision a single
+  one rather than two.
+- Proved by removing the `finishTurn` call: six tests fail.
+- The succeeded-turn test asserted `[{ type: 'done' }]` and would have passed against a target that
+  did nothing at all once the chunk was gone. It asserts both halves now — nothing drawn into the
+  turn, **and** the turn closed.
+
 ### M5 — the certification harnesses drive an API production no longer uses (`this commit`)
 
 - Gates: unit 8739 passed, 8739 total; `tsc --noEmit` clean; `npm run lint` clean.

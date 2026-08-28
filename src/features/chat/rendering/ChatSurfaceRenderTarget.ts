@@ -55,9 +55,12 @@ import type {
  */
 export interface ChatStreamOperations {
   handleStreamChunk(
-    chunk: ChatContentItem | { type: 'done' } | { type: 'error'; content: string },
+    chunk: ChatContentItem,
     msg: ChatMessage,
   ): Promise<void>;
+  /** How a turn's failure and its ending are said, rather than sent as chunks. */
+  renderTurnFailure(content: string): Promise<void>;
+  finishTurn(msg: ChatMessage): Promise<void>;
   appendText(text: string, phase?: AssistantTextPhase): Promise<void>;
   appendThinking(content: string): Promise<void>;
   finalizeCurrentTextBlock(msg?: ChatMessage): Promise<void>;
@@ -359,17 +362,14 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
     // reached the provider, and saying nothing leaves an empty assistant
     // message where the explanation belongs.
     if (terminal.kind === 'failed' || terminal.kind === 'invalidated') {
-      this.enqueue(() => this.deps.stream.handleStreamChunk(
-        { type: 'error', content: this.deps.describeTerminal(terminal) },
-        message,
-      ));
+      this.enqueue(() => this.deps.stream.renderTurnFailure(this.deps.describeTerminal(terminal)));
     } else if (terminal.kind === 'indeterminate') {
       this.enqueue(() => this.deps.stream.handleStreamChunk(
         { type: 'notice', level: 'warning', content: this.deps.describeTerminal(terminal) },
         message,
       ));
     }
-    this.enqueue(() => this.deps.stream.handleStreamChunk({ type: 'done' }, message));
+    this.enqueue(() => this.deps.stream.finishTurn(message));
     // Behind the drawing, not beside it: an indicator that goes out while the
     // last block is still being written says the turn is over before it looks
     // over.

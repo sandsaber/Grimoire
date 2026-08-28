@@ -271,19 +271,11 @@ export class StreamController {
         break;
 
       case 'error':
-        // Flush pending tools before rendering error message
-        this.flushPendingTools();
-        await this.appendText(
-          `\n\n❌ **${t('chat.ui.messages.errorLabel')}:** `
-          + `${this.normalizeErrorMessage(chunk.content)}`,
-        );
+        await this.renderTurnFailure(chunk.content);
         break;
 
       case 'done':
-        // Flush any remaining pending tools
-        this.flushPendingTools();
-        await this.finalizeProgressBlocks(msg);
-        this.handleDone(msg);
+        await this.finishTurn(msg);
         break;
 
       case 'context_compacted': {
@@ -335,6 +327,30 @@ export class StreamController {
   // ============================================
   // Tool Use Handling
   // ============================================
+
+  /**
+   * Draws the reason a turn failed into the message it was drawing.
+   *
+   * Called directly by the projection's render target, which used to say the
+   * same thing by handing this an `error` chunk. A turn ending is a fact the
+   * projection states, so it asks for it by name rather than dressing it as
+   * something a provider sent.
+   */
+  async renderTurnFailure(content: string): Promise<void> {
+    // Pending tools go first, so the reason lands after what was in flight.
+    this.flushPendingTools();
+    await this.appendText(
+      `\n\n❌ **${t('chat.ui.messages.errorLabel')}:** `
+      + `${this.normalizeErrorMessage(content)}`,
+    );
+  }
+
+  /** Closes out a turn's message. The other half of the pair above. */
+  async finishTurn(msg: ChatMessage): Promise<void> {
+    this.flushPendingTools();
+    await this.finalizeProgressBlocks(msg);
+    this.handleDone(msg);
+  }
 
   private handleDone(msg: ChatMessage): void {
     this.maybeHandleOrchestratorPlan(msg);
