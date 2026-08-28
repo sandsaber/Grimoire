@@ -114,6 +114,20 @@ So the work splits in two, and only one half is design:
    `chatUIConfig`, `settingsReconciler`, `commandCatalog`, `cliResolver` and `mcpStorage` were
    five of the eleven, and all five were reshaped and carried through inside the same milestone.
 
+### Every remaining row is blocked on something structural, not on design
+
+This is the state after the 2026-08-28 session, and it is the useful thing to know before planning
+another row-by-row pass: **the provider rows have run out of independently-movable work.** What is
+left divides into one row that needs a decision and five that need another milestone first.
+
+| Row | What blocks it |
+|---|---|
+| `historyService` | **A decision, not a blocker.** Three unrelated operations sharing a name, and `ProviderHistoryPort` hangs off `ProviderRuntimePorts`, which is bound to one conversation, while the row is workspace-global — nine consumers hand it a `Conversation` and a vault path from anywhere. It needs a workspace-global home before it can move, and it is the last row that could move without another milestone. |
+| `settingsTabRenderer` | **A host contract.** `ProviderSettingsTabRendererContext.plugin` is the whole `GrimoirePlugin`, and the nine renderers use it as one — `settings`, `saveSettings`, `getView`, `getAllViews`, `app`. A module port cannot name it, so this row waits on the settings tabs having a host contract of their own. |
+| `runtimeCommandLoader` | **The seam.** Its context carries a `ChatRuntime`, which the seam deletion removes, and its fallback reaches `plugin.getXExecution().metadata.listCommands()`. |
+| `mcpServerManager` | **Not a row.** One concrete class, constructed identically over each provider's storage, whose ten members are all generic computation over `ManagedMcpServer[]`. It is a host service over `mcpStorage`; what it needs is host ownership, including who loads it and what its ~15 synchronous `getServers()` readers see before it has. |
+| `taskResultInterpreter`, `subagentLifecycleAdapter` | **Durable agents.** Their consumers are `SubagentManager` and `MessageRenderer`, both mid-replacement. |
+
 **Three of the six wait on their consumers rather than on design.** `taskResultInterpreter` and
 `subagentLifecycleAdapter` are read by `SubagentManager` and `MessageRenderer`, both of which the
 durable-agents work is replacing. A slot shaped for a consumer that is being replaced is a slot

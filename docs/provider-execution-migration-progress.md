@@ -9650,15 +9650,26 @@ Two questions to settle before writing it, both recorded rather than guessed:
 catalog and CLI resolution — and the entries below record each in turn, newest first. What is left,
 in the order it can be taken:
 
-| Next | Why it is next |
-|---|---|
-| **`mcpStorage` + `mcpServerManager`** | One consumer, `McpSettingsManager`, which every provider's settings tab constructs over the same `AppMcpStorage`. A toggle port facing a CRUD consumer, and a row typed as a **concrete class** so nothing else can satisfy it. Design both together or the second reshape undoes the first. |
-| **`settingsTabRenderer`** | The contract is the *context*, not the method: seven host-supplied members against a `render(host: unknown)`. It is also one of the two members still stubbed in every module context. |
-| **`historyService`** | Three unrelated operations sharing a name, and it needs a home decision first: `ProviderHistoryPort` hangs off `ProviderRuntimePorts`, which is bound to a conversation, while the row is workspace-global. |
-| *(waiting)* `runtimeCommandLoader`, `taskResultInterpreter`, `subagentLifecycleAdapter` | All three are shaped around something being deleted — a `ChatRuntime` for the first, `SubagentManager` and `MessageRenderer` for the other two. |
+**Five rows moved: the chat UI, the settings reconciler, the command catalog, CLI resolution and MCP
+storage.** And the most useful thing the session found is where it stopped: **every remaining
+provider row is blocked on something structural, not on design effort.** The table in
+[`provider-row-slot-fit.md`](provider-row-slot-fit.md#every-remaining-row-is-blocked-on-something-structural-not-on-design)
+names each blocker; the short version is one row that needs a decision and five that need another
+milestone first:
 
-Then: the registry deletion needs `historyService` plus the two durable-agents rows plus
-`createRuntime`; the seam deletion and M6 are untouched.
+- **`historyService`** is the decision — a workspace-global home for a port that currently hangs off
+  the conversation-bound `ProviderRuntimePorts`. It is the last row that can move without another
+  milestone, and it is one of the four things standing between here and deleting `ProviderRegistry`;
+- **`settingsTabRenderer`** needs the settings tabs to have a host contract: its context is the whole
+  `GrimoirePlugin`, and the nine renderers use it as one;
+- **`runtimeCommandLoader`** needs the seam deletion, because its context carries a `ChatRuntime`;
+- **`mcpServerManager`** is not a row at all — it is a host service over `mcpStorage`, and what it
+  needs is an ownership decision, including what its ~15 synchronous `getServers()` readers see
+  before it has loaded;
+- **`taskResultInterpreter`** and **`subagentLifecycleAdapter`** need durable agents.
+
+So the next milestone is not another row pass. It is the seam deletion or durable agents, and the
+rows follow them.
 
 **Two rows in a row turned out not to be workspace services at all** — the command dropdown and CLI
 resolution — and both were found by the same question: *which of this row's consumers are
