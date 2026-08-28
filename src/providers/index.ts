@@ -1,5 +1,9 @@
 import { installProviderCatalog } from '../core/providers/ProviderCatalog';
-import { ProviderWorkspaceRegistry } from '../core/providers/ProviderWorkspaceRegistry';
+import type {
+  ProviderWorkspaceInitContext,
+  ProviderWorkspaceServices,
+} from '../core/providers/types';
+import type { ProviderId } from '../core/types/provider';
 import { antigravityWorkspaceRegistration } from './antigravity/app/AntigravityWorkspaceServices';
 import { builtInProviderCatalog } from './BuiltInProviderCatalog';
 import { claudeWorkspaceRegistration } from './claude/app/ClaudeWorkspaceServices';
@@ -11,6 +15,31 @@ import { mimocodeWorkspaceRegistration } from './mimocode/app/MimocodeWorkspaceS
 import { opencodeWorkspaceRegistration } from './opencode/app/OpencodeWorkspaceServices';
 import { qwenWorkspaceRegistration } from './qwen/app/QwenWorkspaceServices';
 
+/**
+ * How each built-in provider builds its workspace services.
+ *
+ * **A table rather than a registration, because that is all a registration was
+ * left holding.** It carried a capability map beside this, duplicated from the
+ * module's own descriptor and kept in step by a test; that copy is deleted, and
+ * a one-member interface reached through a registry is a lookup with ceremony.
+ * `main.ts` drives these through `ProviderWorkspaceManager`, which is what
+ * decides when a provider starts, what a failure means, and what is released.
+ */
+export const builtInWorkspaceInitializers: Readonly<Record<
+  ProviderId,
+  (context: ProviderWorkspaceInitContext) => Promise<ProviderWorkspaceServices>
+>> = {
+  antigravity: context => antigravityWorkspaceRegistration.initialize(context),
+  claude: context => claudeWorkspaceRegistration.initialize(context),
+  codex: context => codexWorkspaceRegistration.initialize(context),
+  gemini: context => geminiWorkspaceRegistration.initialize(context),
+  grok: context => grokWorkspaceRegistration.initialize(context),
+  kimicode: context => kimicodeWorkspaceRegistration.initialize(context),
+  mimocode: context => mimocodeWorkspaceRegistration.initialize(context),
+  opencode: context => opencodeWorkspaceRegistration.initialize(context),
+  qwen: context => qwenWorkspaceRegistration.initialize(context),
+};
+
 let builtInProvidersRegistered = false;
 
 export function registerBuiltInProviders(): void {
@@ -19,15 +48,6 @@ export function registerBuiltInProviders(): void {
   }
 
   installProviderCatalog(builtInProviderCatalog);
-  ProviderWorkspaceRegistry.register('claude', claudeWorkspaceRegistration);
-  ProviderWorkspaceRegistry.register('codex', codexWorkspaceRegistration);
-  ProviderWorkspaceRegistry.register('opencode', opencodeWorkspaceRegistration);
-  ProviderWorkspaceRegistry.register('grok', grokWorkspaceRegistration);
-  ProviderWorkspaceRegistry.register('mimocode', mimocodeWorkspaceRegistration);
-  ProviderWorkspaceRegistry.register('kimicode', kimicodeWorkspaceRegistration);
-  ProviderWorkspaceRegistry.register('antigravity', antigravityWorkspaceRegistration);
-  ProviderWorkspaceRegistry.register('gemini', geminiWorkspaceRegistration);
-  ProviderWorkspaceRegistry.register('qwen', qwenWorkspaceRegistration);
   builtInProvidersRegistered = true;
 }
 

@@ -1,6 +1,5 @@
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { createClaudeModuleContext } from '@/providers/claude/app/ClaudeModuleContext';
-import { claudeWorkspaceRegistration } from '@/providers/claude/app/ClaudeWorkspaceServices';
 
 /**
  * Claude's workspace half, which threw by name until this checkpoint.
@@ -18,7 +17,8 @@ describe('Claude module context workspace slots', () => {
   };
 
   function pluginWith(services: Record<string, unknown>): any {
-    ProviderWorkspaceRegistry.register('claude', claudeWorkspaceRegistration);
+    // Published straight in: registration was a lookup table for the builder,
+    // and the builder is the providers' own now.
     ProviderWorkspaceRegistry.setServices('claude', services);
     return {
       settings: {},

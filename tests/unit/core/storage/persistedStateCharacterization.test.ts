@@ -239,7 +239,7 @@ describe('persisted state characterization', () => {
       const providerConfigs = parsed.providerConfigs as Record<string, unknown>;
       const registered = [
         ...readFileSync(resolve(process.cwd(), 'src/providers/index.ts'), 'utf8').matchAll(
-          /ProviderWorkspaceRegistry\.register\('([^']+)'/g,
+          /^ {2}(\w+): context => \w+WorkspaceRegistration\.initialize\(context\),$/gm,
         ),
       ].map(match => match[1]);
 

@@ -80,6 +80,7 @@ import { type InlineEditContext, InlineEditModal } from './features/inline-edit/
 import { GrimoireSettingTab } from './features/settings/GrimoireSettings';
 import { setLocale, t } from './i18n/i18n';
 import type { Locale } from './i18n/types';
+import { builtInWorkspaceInitializers } from './providers';
 import {
   getClaudeProviderSettings,
   getClaudeRuntimeEnvironmentText,
@@ -551,10 +552,11 @@ export default class GrimoirePlugin extends Plugin {
     }
     const manager = new ProviderWorkspaceManager<ProviderWorkspaceServices>({
       contribution: providerId => ({
-        // The context is assembled here rather than inside the registry: it
-        // is plugin-shaped, and a registry that had to take a plugin to build
-        // it was the last thing in `src/core/providers` naming the type.
-        initialize: () => ProviderWorkspaceRegistry.contributionFor(providerId).initialize({
+        // The context is assembled here because it is plugin-shaped, and the
+        // builder is looked up in the providers' own table rather than through
+        // a registry: what a registration held, after its capability map was
+        // deleted as a duplicate, was this one function.
+        initialize: () => builtInWorkspaceInitializers[providerId]({
           plugin: this,
           storage: this.storage,
           vaultAdapter: this.storage.getAdapter(),

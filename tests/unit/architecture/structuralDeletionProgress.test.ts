@@ -249,7 +249,7 @@ const SEARCHES: readonly DeletionSearch[] = [
     // is `undefined` and every suite importing Claude fails to load. The
     // registry's indirection is breaking that cycle, which is a reason to keep
     // it that no reading of the call site would have shown.
-    // **14, and every one of the registry's four accessors is gone.**
+    // **13, and the registry is a map with three methods on it.**
     // `refreshAgentMentions`, `getRuntimeCommandLoader` and
     // `getSettingsTabRenderer` have all moved to module slots; `TabManager` left
     // the count with the second.
@@ -265,10 +265,21 @@ const SEARCHES: readonly DeletionSearch[] = [
     // selector prunes every enabled server no longer listed, and for an empty
     // list that is all of them — the same end state, by the path already there.
     //
-    // What is left after it is the storage role: `register`, `setServices`,
-    // `getServices` and `requireServices`, read by the nine provider accessors
-    // and `main.ts`.
-    files: 14,
+    // `register` and `contributionFor` went with it: a registration held one
+    // member after its duplicated capability map was deleted, so the providers'
+    // hub exports the initializers as a table and `main.ts` looks the builder up
+    // there. `providers/index.ts` left the count with them.
+    //
+    // **What is left is the reason the class exists**, and it is not a row.
+    // These services are a per-provider singleton built asynchronously — eight
+    // of the nine read MCP servers and agent definitions off disk to construct —
+    // while a module context is built per tab. Something has to hold the one
+    // instance between them, and today that is `setServices`/`getServices`, read
+    // by nine `maybeGet<Provider>WorkspaceServices` accessors, `main.ts`, and
+    // two rows of the settings hub. Closing it means the composition owning that
+    // singleton, which is one pass over two lifecycles rather than nine row
+    // moves.
+    files: 13,
     closedBy: 'the provider rows, when the last consumer of each has moved',
   },
 ];
@@ -310,7 +321,7 @@ describe('structural deletion progress', () => {
       'SubagentManager lifecycle: 2',
       'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
-      'the registries — one left: 14',
+      'the registries — one left: 13',
     ]);
     // Six of twelve are zero: two closed in the 2026-08-27 session, the
     // interaction callbacks closed with the first step of the seam deletion,

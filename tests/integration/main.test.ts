@@ -18,6 +18,7 @@ jest.mock('@/shared/modals/WhatsNewModal', () => ({
 
 // Now import the plugin after mocking
 import GrimoirePlugin from '@/main';
+import { builtInWorkspaceInitializers } from '@/providers';
 
 describe('GrimoirePlugin', () => {
   let plugin: GrimoirePlugin;
@@ -375,23 +376,22 @@ describe('GrimoirePlugin', () => {
       // `try`, so a single throw cost every provider after it in the iteration
       // order its command catalog, model list, CLI resolution and settings tab
       // — and which ones those were depended on object key order.
-      // Failed through the contribution rather than a registry build step:
-      // assembling the context moved to the plugin, so the initializer this
-      // has to make throw is the contribution's own.
-      const real = ProviderWorkspaceRegistry.contributionFor.bind(ProviderWorkspaceRegistry);
-      jest.spyOn(ProviderWorkspaceRegistry, 'contributionFor')
-        .mockImplementation(providerId => {
-          const contribution = real(providerId);
-          if (providerId !== 'claude') {
-            return contribution;
-          }
-          return {
-            ...contribution,
-            initialize: () => Promise.reject(new Error('no Claude CLI on this machine')),
-          };
-        });
+      // Failed through the providers' own initializer table, which is where the
+      // builder is looked up now — the registration this used to spy on held
+      // nothing else and is deleted.
+      const real = builtInWorkspaceInitializers.claude;
+      const restore = () => {
+        (builtInWorkspaceInitializers as Record<string, unknown>).claude = real;
+      };
+      (builtInWorkspaceInitializers as Record<string, unknown>).claude = () => (
+        Promise.reject(new Error('no Claude CLI on this machine'))
+      );
+      try {
 
-      await plugin.onload();
+        await plugin.onload();
+      } finally {
+        restore();
+      }
 
       const withoutServices = providerCatalog().ids()
         .filter(providerId => ProviderWorkspaceRegistry.getServices(providerId) === null);

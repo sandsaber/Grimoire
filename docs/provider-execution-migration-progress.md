@@ -10450,6 +10450,32 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the registration table moves to the providers; the registry is a map (`this commit`)
+
+- Gates: unit 8752 passed, 8752 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **`register` and `contributionFor` are deleted, and `ProviderWorkspaceRegistration` with them.**
+  Once its duplicated capability map went, a registration held one function, and a one-member
+  interface reached through a registry is a lookup with ceremony. `src/providers/index.ts` exports
+  `builtInWorkspaceInitializers` — provider id to builder — and `main.ts` looks it up there, still
+  driving it through `ProviderWorkspaceManager`, which is what decides when a provider starts, what
+  a failure means and what is released. **`providers/index.ts` leaves the count: 14 → 13.**
+- Three gates moved with it, and two of them are worth naming because they read the hub as *text*:
+  `persistedStateCharacterization` and `providerExecutionTopology` enumerate providers by scraping
+  the registration calls out of `index.ts`, which is deliberate — a provider added to the catalog
+  and forgotten in the hub is exactly what they catch. They scrape the table now, and deleting Qwen
+  from it still fails both.
+- The startup failure-isolation test in `main.test.ts` spied on the registration to make Claude
+  throw; it replaces the table's entry instead, and restores it in a `finally`.
+- **What is left of the registry is the reason it exists**, written at the class: these services are
+  a per-provider singleton built asynchronously — eight of the nine read MCP servers and agent
+  definitions off disk to construct — while a module context is built **per tab**. Something has to
+  hold the one instance between them. That is `setServices`/`getServices`, read by nine
+  `maybeGet<Provider>WorkspaceServices` accessors, `main.ts`, and two rows of the settings hub.
+- So the last step is named precisely: **the composition owns that singleton.** It is per provider,
+  it already has a workspace holder, and it is where the two lifecycles — this registry and
+  `ProviderWorkspaceContribution` — stop being two. One pass, not nine row moves.
+
 ### M5 — the workspace registration is `initialize` alone (`this commit`)
 
 - Gates: unit 8752 passed, 8752 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
