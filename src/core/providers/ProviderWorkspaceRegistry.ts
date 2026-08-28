@@ -1,6 +1,5 @@
 import type {
   ProviderId,
-  ProviderRuntimeCommandLoader,
   ProviderSettingsTabRenderer,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
@@ -81,10 +80,6 @@ export class ProviderWorkspaceRegistry {
       throw new Error(`Provider workspace "${providerId}" is not initialized.`);
     }
     return services;
-  }
-
-  static getRuntimeCommandLoader(providerId: ProviderId): ProviderRuntimeCommandLoader | null {
-    return this.getServices(providerId)?.runtimeCommandLoader ?? null;
   }
 
 

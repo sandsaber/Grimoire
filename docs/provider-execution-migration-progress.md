@@ -10445,6 +10445,21 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — `getRuntimeCommandLoader` is deleted (`this commit`)
+
+- Gates: unit 8751 passed, 8751 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- The settings hub was the accessor's last caller, warming an ephemeral discovery session so a
+  provider's commands appear in the workspace hub before any tab has opened one. It reads
+  `workspaceFor(providerId).runtimeCommands` now, and **`ProviderWorkspaceRegistry` loses the
+  method**. Two of its four accessors are gone; `getMcpServerManager` and `getSettingsTabRenderer`
+  remain, each with its own recorded blocker.
+- Its test moved to what the registry still is — a holder — rather than being deleted: the row it
+  covered lives on the port, and what is worth asserting here is that services put in come back out.
+- **The file count stays at 15, and that is right.** `GrimoireSettings` keeps two other registry
+  rows, so the file stays on the scoreboard; what changed is one row fewer inside it. A count of
+  files answers "how many places still know about this", not "how much is left in each".
+
 ### M5 — the runtime command row reaches its provider through the module (`this commit`)
 
 - Gates: unit 8751 passed, 8751 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;

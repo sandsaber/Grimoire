@@ -1258,9 +1258,14 @@ export class GrimoireSettingTab extends PluginSettingTab {
           }
           if (section === 'commands' && providerId !== 'claude' && providerId !== 'codex') {
             const discovery = capability.runtimeCommandDiscovery ?? 'none';
-            const loader = ProviderWorkspaceRegistry.getRuntimeCommandLoader(providerId);
+            // The module's slot rather than a registry accessor keyed by an id
+            // string: the loader's context is entirely host-owned now, which is
+            // what let the row move.
+            const loader = (await this.plugin.getApplicationRuntimeOrNull()
+              ?.workspaceFor(providerId))?.runtimeCommands;
             if (discovery === 'ephemeral'
-              && loader?.isAvailable(this.plugin.settings)) {
+              && loader?.loadCommands
+              && loader.isAvailable?.(this.plugin.settings)) {
               const commands = await loader.loadCommands({
                 allowSessionCreation: true,
                 conversation: null,

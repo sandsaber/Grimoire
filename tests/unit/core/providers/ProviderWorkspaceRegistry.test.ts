@@ -7,17 +7,16 @@ describe('ProviderWorkspaceRegistry', () => {
     ProviderWorkspaceRegistry.clear();
   });
 
-  it('returns the runtime command loader for a provider', () => {
-    const runtimeCommandLoader = {
-      isAvailable: jest.fn().mockReturnValue(true),
-      loadCommands: jest.fn().mockResolvedValue([]),
-    };
+  it('holds a provider\'s services and gives them back', () => {
+    // What is left of this registry is holding. The accessor this replaced —
+    // `getRuntimeCommandLoader` — is deleted with its row: the loader is a
+    // member of `ProviderRuntimeCommandsPort` now, reached through
+    // `ApplicationRuntime.workspaceFor`.
+    const services = { runtimeCommandLoader: { isAvailable: () => true } };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
-      runtimeCommandLoader: runtimeCommandLoader,
-    });
+    ProviderWorkspaceRegistry.setServices('opencode', services as never);
 
-    expect(ProviderWorkspaceRegistry.getRuntimeCommandLoader('opencode')).toBe(runtimeCommandLoader);
+    expect(ProviderWorkspaceRegistry.getServices('opencode')).toBe(services);
   });
 
 });
