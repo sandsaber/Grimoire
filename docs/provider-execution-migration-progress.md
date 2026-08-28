@@ -10417,6 +10417,31 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the certification harnesses drive an API production no longer uses (`this commit`)
+
+- Gates: unit 8739 passed, 8739 total; `tsc --noEmit` clean; `npm run lint` clean.
+- **Finding, recorded rather than acted on.** `ExecutionChatRuntimeAdapter.query()` has **no caller
+  in `src/`**. Its comment still said *"what still consumes `query()` is the legacy branch in
+  `InputController`, which is what the next step deletes"* — that step happened. What consumes it
+  now is eighteen test files, **and nine of them are the live-smoke certification harnesses**.
+- So a provider's row in `docs/chat-projection-flip-smoke-matrix.md` was certified against a chunk
+  stream no user receives. This is not hypothetical: six of those rows required an
+  `assistant_message_start` and described it as *"the message the answer hangs on, which the surface
+  needs before the text"* — a chunk the tab binding filters off the content channel, so the surface
+  never saw one, and the message it names is opened by the projection from the run. The harness was
+  measuring the harness. That is the same defect `isChatContent`'s own comment records from the
+  first Codex projection run, where a harness that left the filter out reported framing in the
+  column as a finding.
+- **Not fixed here, deliberately.** Moving those rows onto `submitTurn` — the path a user takes — is
+  a change to the certification apparatus itself, and the rows already run are the evidence the
+  flips were accepted on. Redoing them needs live CLIs, which is account-bound. Owner: **M5**, with
+  the smoke matrix. What is fixed is the comment, which claimed a consumer that no longer exists.
+- **This is also why `error` and `done` cannot leave `ChatTurnLifecycleChunk` yet.** They have two
+  roles: the adapter's generator pushes them, which is the test-only path above, and
+  `ChatSurfaceRenderTarget` constructs them to drive `StreamController` — that one is production, and
+  it is a contained refactor (two methods on `ChatStreamOperations` in place of chunk-shaped calls).
+  Doing only the second would not move the count, because the union would still exist for the first.
+
 ### M5 — three of the five lifecycle variants are deleted (`this commit`)
 
 - Gates: unit 8739 passed, 8739 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;

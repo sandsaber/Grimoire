@@ -61,11 +61,19 @@ import type {
  *   it had already had effects, is the run's answer to give — asynchronously,
  *   as `cancelled` or `indeterminate`.
  *
- * In production for every provider. **Its generator is no longer what draws a
- * chat**, though: every provider is on the chat projection path, where the
- * coordinator owns the run and this serves the surface through `turnEncoder`
- * and `surfacePorts` instead. What still consumes `query()` is the legacy
- * branch in `InputController`, which is what the next step deletes.
+ * In production for every provider. **Its generator is not**: every provider is
+ * on the chat projection path, where the coordinator owns the run and this
+ * serves the surface through `turnEncoder` and `surfacePorts` instead.
+ *
+ * `query()` had one production consumer, the legacy branch in
+ * `InputController`, and that branch is deleted. **Nothing in `src/` calls it
+ * now.** What does is eighteen test files, the nine live-smoke certification
+ * harnesses among them — so a provider's row in the smoke matrix is certified
+ * against a stream no user receives. That is a fidelity problem with the
+ * harnesses rather than a reason to keep the generator, and it is recorded in
+ * the migration journal rather than fixed here: moving those rows onto
+ * `submitTurn` is a change to the certification apparatus, and the rows already
+ * run are the evidence the flips were accepted on.
  */
 
 /** What the adapter needs from its host to serve one conversation. */
