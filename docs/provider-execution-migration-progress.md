@@ -9646,7 +9646,37 @@ Two questions to settle before writing it, both recorded rather than guessed:
 
 #### Where to pick this up
 
-The entries below record the 2026-08-28 session in turn, newest first.
+The entries below record the 2026-08-28 session in turn, newest first. Two things happened in it:
+six provider rows moved, and then **the seam deletion started and `ChatRuntime` was deleted**.
+
+**The exit gate, after that session:**
+
+| Search | Files | What closes it |
+|---|---|---|
+| runtime interaction callbacks | **0** | closed — one `installInteractions` on the adapter |
+| generator consumption in the feature layer | **0** | closed earlier |
+| `child_process` in the feature layer | **0** | closed earlier |
+| core importing the plugin type | 2 | the workspace registry and `types.ts`, with the rows still in them |
+| worker tab ownership | 3 | durable agents |
+| subagent hooks and loaders | 3 | durable agents — what is left is Claude reading its own sidecar |
+| SubagentManager lifecycle | 20 | durable agents |
+| the application importing a concrete provider module | 20 | the provider rows |
+| turn metadata and session updates | 22 | seventeen are a provider's own presenter; the seam is `buildSessionUpdates` and `syncConversationState` |
+| `StreamChunk` and the subagent chunk vocabulary | 24 | the lifecycle variants have no feature-layer consumer left, but four files still emit or read them |
+| the two registries | 30 | `ProviderRegistry` is two accessors over two optional rows, both durable agents' |
+
+**Two of these eleven cannot reach zero as written, and that is worth deciding before they are
+chased.** `StreamChunk`'s own `closedBy` says "the content type keeps its own name", and
+`ChatContentItem` is that rename — so the search will keep finding the content half forever. The
+turn-metadata search finds `consumeTurnMetadata` on nine provider content presenters, which is a
+provider's own API for its own normalizer. Both need their patterns narrowed to what they are
+actually about — the lifecycle variants, and the two members the feature layer still reaches — or
+they will read as unfinished work that is finished.
+
+**What is genuinely left is two milestones and one decision.** Durable agents gates four of the
+searches; the provider rows gate two more and are themselves gated on durable agents, the seam's
+`ChatRuntime` removal (done) and a host contract for the settings tabs; and D9 (redo) is still
+recorded as awaiting an owner decision.
 
 **Six rows moved: the chat UI, the settings reconciler, the command catalog, CLI resolution, MCP
 storage and the history service.** And the most useful thing the session found is where it stopped:
