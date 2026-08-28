@@ -10381,6 +10381,34 @@ This list supersedes the numbered one further down, which was written before the
 *Re-read against the source on 2026-08-28; three of its claims had gone stale and are corrected
 here rather than left to mislead the next session.*
 
+**Scoreboard at the end of that day's work**, after `ProviderRegistry` and the three lifecycle
+variants were deleted: worker tab ownership 3, core importing the plugin type 1, subagent hooks and
+loaders 3, `SubagentManager` lifecycle 7, provider-neutral application code importing a concrete
+provider 2, a provider composition living under `src/app` 18, turn metadata and session updates 2,
+`StreamChunk` and the subagent chunk vocabulary 5, the registries — one left 17.
+
+**Every one of those was traced to a named blocker, and none of the blockers is "more of the same
+refactoring".** They fall into four kinds, and the kind is what decides who moves next:
+
+1. **An owner's decision.** The `app/execution/<id>` relocation (18). Whether a provider's default
+   model becomes a declaration and whether a settings codec carries its own legacy migration (2).
+   Whether the live-smoke rows move off `query()` onto `submitTurn`, which is what would let `error`
+   and `done` leave the union (5).
+2. **A named milestone that is feature work, not cleanup.** Durable agents owns worker tab ownership
+   (3), the subagent loaders (3) and `SubagentManager` losing lifecycle authority (7) — a
+   1,084-line class with twenty-two public methods written against Claude's task-tool protocol,
+   whose evidence is live transcripts.
+3. **A contract that has to move first.** `providers/types.ts` is the last `src/core` file naming
+   the plugin type, because that is where `ProviderWorkspaceInitContext` is written (1). The
+   registries' remaining 17 are three accessors, each blocked on something specific — the command
+   loader's session-opening policy needs a plugin and a runtime, three chat widgets hold the MCP
+   manager by identity, and two synchronous settings render paths face an asynchronous lookup — plus
+   the storage role nine `maybeGet<Provider>WorkspaceServices` read through.
+4. **A persistence change.** `buildSessionUpdates` moving to the coordinator's barrier (2), which
+   writes the session binding a conversation resumes from.
+
+
+
 1. **Durable agents, continued.** ~~The domain is harvested and dark~~ — **it has a producer now.**
    `SubagentAgentRecorder` is built by `ApplicationRuntime` and observed from `Tab.ts` through
    `recordDurableSubagent`, which records the *background* subagents — the ones with an async status
