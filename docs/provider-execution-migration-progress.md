@@ -10450,6 +10450,32 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — review pass: the dispatcher assumed a prompt survives its provider (`this commit`)
+
+**A defect in the commit below this one, found by reviewing it.** The orchestrator wrote each task
+into its worker's conversation and the dispatcher handed that stored message back to the turn. But
+what a turn persists is the *provider's* to decide — `persistedContent` — and the nine disagree:
+three of them replace the text outright, two rewrite it, and only the rest pass it through. So the
+turn appended a different object under an id the conversation already held, which the coordinator
+refuses as a caller bug. It is right to refuse: what that rule protects is that a stored message is
+what was sent. The dispatch would have thrown and been recorded as `indeterminate`, silently,
+**for the majority of providers**.
+
+- Gates: unit 8754 passed, 8754 total (554 suites); integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- **The fix is that the goal travels as text and the turn writes its own message.** The conversation
+  is created empty, the orchestrator tells the dispatcher the task, and the turn persists whatever
+  the provider composes. Every later attempt reads the goal back from the conversation, which is
+  still the durable copy — it is just written by the turn rather than before it. The caller's copy is
+  dropped as soon as the turn is submitted, so it holds at most the plan being started.
+- **Proven by restoring the shape it replaced**: the new test — a provider whose `prepareTurn` wraps
+  the text — fails, and so does the retry test beside it.
+- **A second thing the review corrected, in the test rather than the code.** The suite modelled a
+  "redispatch of the same run", which is not reachable: `dispatchPrepared` returns early for an
+  intent that is `accepted` and refuses one that is `dispatching`, so a run whose turn went out is
+  never dispatched again. The path that does redispatch is a *retry*, which is a new run against the
+  same conversation, and it asks again — two messages, because the question was put twice.
+
 ### M5 — workers stop being tabs (`this commit`)
 
 **`worker tab ownership` closes: 3 → 0.** An approved orchestrator plan dispatches a durable agent

@@ -5,7 +5,6 @@ import type {
 } from '@/core/agents/AgentContracts';
 import type { ExecutionBackendId } from '@/core/execution/ExecutionBackendDescriptor';
 import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
-import type { ChatMessage } from '@/core/types';
 import type { ProviderId } from '@/core/types/provider';
 import type { ChatConversationPort } from '@/features/chat/application/ChatExecutionCoordinator';
 
@@ -51,24 +50,35 @@ export interface ConversationAgentDispatcherOptions {
   readonly conversations: Pick<ChatConversationPort, 'read'>;
   /** A provider adapter with no tab behind it. `ApplicationRuntime` builds these. */
   createRuntime(providerId: ProviderId): ExecutionChatRuntimeAdapter | null;
-  /**
-   * What this run was asked to do, from whoever asked for it.
-   *
-   * Read only when the conversation has no first message of its own — which is
-   * a first dispatch. A caller that has forgotten (a reload between preparing
-   * an intent and dispatching it) answers `null`, and this refuses rather than
-   * inventing a task: the dispatch recovery port is what settles an intent
-   * whose fate is unknown, and a fabricated prompt would make it known and
-   * wrong.
-   */
-  goalFor(request: AgentDispatchRequest): string | null;
   nextCommandId(): string;
   /** The backend a dispatched turn runs on, per provider. */
   backendIdFor(providerId: ProviderId): ExecutionBackendId | null;
 }
 
 export class ConversationAgentDispatcher implements AgentDispatchPort {
+  /**
+   * What a run was asked to do, until its conversation holds it.
+   *
+   * **Needed for one window and no longer.** A first dispatch writes into a
+   * conversation that is still empty, so the words have to come from whoever
+   * asked; every attempt after that reads them back from the vault, which is
+   * the copy that survives a reload. Entries are dropped as soon as the turn is
+   * submitted, so this holds at most the plan currently being started.
+   *
+   * A reload inside that window leaves a dispatch intent in `prepared` with no
+   * remembered goal, and this refuses rather than inventing a task — which is
+   * the correct answer: an intent whose fate is unknown is what the dispatch
+   * recovery port settles, and a fabricated prompt would make it known and
+   * wrong.
+   */
+  private readonly remembered = new Map<string, string>();
+
   constructor(private readonly options: ConversationAgentDispatcherOptions) {}
+
+  /** Tells this what a run it is about to dispatch was asked to do. */
+  rememberGoal(agentRunId: string, goal: string): void {
+    this.remembered.set(agentRunId, goal);
+  }
 
   async dispatch(request: AgentDispatchRequest): Promise<AgentDispatchOutcome> {
     // Every refusal below is `sideEffectFree: true` and every one of them is
@@ -87,8 +97,15 @@ export class ConversationAgentDispatcher implements AgentDispatchPort {
         ? 'dispatch.conversation-absent'
         : `dispatch.conversation-${read.reason}`);
     }
+    // **The stored message is read for its text and not resubmitted.** A
+    // provider composes what a turn actually persists — three of the nine
+    // replace it outright, two rewrite it — so handing back the message this
+    // conversation already holds would append a *different* object under an id
+    // it already has, which the coordinator refuses as a caller bug. It is
+    // right to refuse: what it protects is that a stored message is what was
+    // sent. So the goal travels as text, and the turn writes its own message.
     const stored = read.conversation.messages.find(message => message.role === 'user');
-    const goal = stored?.content ?? this.options.goalFor(request);
+    const goal = stored?.content ?? this.remembered.get(request.agentRunId) ?? null;
     if (!goal?.trim()) {
       return rejected('dispatch.no-goal-recorded');
     }
@@ -106,8 +123,12 @@ export class ConversationAgentDispatcher implements AgentDispatchPort {
       // paths and its history against the conversation it is told it is on, and
       // an adapter told nothing answers for whichever conversation it saw last.
       runtime.syncConversationState(read.conversation);
-      const submitted = await this.submit(request, conversationId, backendId, runtime, goal, stored);
+      const submitted = await this.submit(request, conversationId, backendId, runtime, goal);
       const started = await submitted.ticket.started;
+      // The conversation holds the goal now, so the caller's copy is spent:
+      // every later attempt on this run reads it back from the vault, which is
+      // the copy that survives a reload.
+      this.remembered.delete(request.agentRunId);
       return {
         kind: 'accepted',
         execution: {
@@ -130,7 +151,6 @@ export class ConversationAgentDispatcher implements AgentDispatchPort {
     backendId: ExecutionBackendId,
     runtime: ExecutionChatRuntimeAdapter,
     goal: string,
-    stored: ChatMessage | undefined,
   ): Promise<SubmittedChatTurn> {
     return this.options.chat.submitTurn({
       commandId: this.options.nextCommandId(),
@@ -140,8 +160,9 @@ export class ConversationAgentDispatcher implements AgentDispatchPort {
       request: { text: goal },
       // Derived from the run, so a redispatch of the same run submits the same
       // message rather than a second one: the coordinator's append is
-      // idempotent by id and refuses a different message under an id it holds.
-      userMessage: stored ?? {
+      // idempotent by id, and the content is whatever the provider composed
+      // both times because it is the same provider and the same text.
+      userMessage: {
         id: `user-${request.agentRunId}`,
         role: 'user',
         content: goal,

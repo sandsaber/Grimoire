@@ -597,7 +597,14 @@ describe('GrimoireView orchestrator wiring', () => {
     const created: string[] = [];
     const updated: { id: string; updates: Record<string, unknown> }[] = [];
     const prepareAndDispatch = jest.fn().mockResolvedValue(undefined);
-    const agentDispatcher = { dispatch: jest.fn() };
+    const remembered: [string, string][] = [];
+    const agentDispatcher = {
+      dispatch: jest.fn(),
+      rememberGoal: jest.fn((runId: string, goal: string) => {
+        remembered.push([`agr-${remembered.length + 1}`, goal]);
+        void runId;
+      }),
+    };
     view.plugin = {
       settings: {},
       createConversation: jest.fn(async () => {
@@ -633,6 +640,7 @@ describe('GrimoireView orchestrator wiring', () => {
     return {
       agentDispatcher,
       created,
+      remembered,
       orchestratorStreamController,
       orchestratorTab,
       prepareAndDispatch,
@@ -653,6 +661,7 @@ describe('GrimoireView orchestrator wiring', () => {
       orchestratorStreamController,
       orchestratorTab,
       prepareAndDispatch,
+      remembered,
       updated,
       view,
     } = createOrchestratorHarness();
@@ -678,14 +687,16 @@ describe('GrimoireView orchestrator wiring', () => {
     }
 
     expect(created).toEqual(['conv-worker-1', 'conv-worker-2']);
-    // **The task text is written into the conversation, not into a record.** A
-    // control record holds references and a prompt is free text somebody wrote,
-    // so this is what the dispatcher reads the goal back from — including after
-    // a reload, which is what makes a redispatch find the same task.
-    expect(updated.map(entry => entry.updates.messages)).toEqual([
-      [expect.objectContaining({ role: 'user', content: 'Inspect the files' })],
-      [expect.objectContaining({ role: 'user', content: 'Write focused tests' })],
+    // **The conversation is created empty and the task is told to the
+    // dispatcher**, because a provider composes what a turn persists — three of
+    // the nine replace the text outright — so the turn has to write its own
+    // message. What ends up in the conversation is the goal, and every later
+    // attempt reads it back from there.
+    expect(remembered).toEqual([
+      ['agr-1', 'Inspect the files'],
+      ['agr-2', 'Write focused tests'],
     ]);
+    expect(updated).toEqual([]);
     expect(prepareAndDispatch).toHaveBeenCalledTimes(2);
     expect(prepareAndDispatch.mock.calls[0][0]).toEqual(expect.objectContaining({
       providerId: 'codex',

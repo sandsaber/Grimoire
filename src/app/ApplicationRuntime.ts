@@ -233,11 +233,6 @@ export class ApplicationRuntime {
         defaultProviderId: options.defaultProviderId,
       }),
       createRuntime: providerId => this.createRuntimeFor(providerId),
-      // Only a run whose conversation has not been written yet needs this, and
-      // a dispatch reaching this object has already written one: the caller
-      // creates the worker's conversation with its task in it, so the goal is
-      // read back rather than remembered. `null` says so rather than pretending.
-      goalFor: () => null,
       nextCommandId: () => `cmd-${randomUUID().replaceAll('-', '')}`,
       backendIdFor: providerId => (
         providerCatalog().get(providerId)?.execution.descriptor.backendId ?? null

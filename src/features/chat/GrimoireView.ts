@@ -893,11 +893,15 @@ export class GrimoireView extends ItemView {
   /**
    * One task of an approved plan, as durable work rather than as a tab.
    *
-   * **The conversation is created first and with the task already in it**, and
-   * that ordering is the design rather than a convenience. A control record
-   * holds references and not free text, so the task's words live in a
-   * conversation; the dispatcher reads them back from there, which is what lets
-   * a redispatch after a reload find the same task instead of inventing one.
+   * **The conversation is created empty and the turn writes the task into it.**
+   * A control record holds references and not free text, so the task's words
+   * live in a conversation — but they are written by the turn rather than
+   * before it, because a provider composes what a turn actually persists and
+   * three of the nine replace the text outright. Pre-writing the prompt meant
+   * the dispatched turn tried to append a different message under an id the
+   * conversation already held, which the coordinator refuses. The dispatcher is
+   * told the task instead, and reads it back from the conversation on every
+   * later attempt.
    *
    * Two conversations, per D10: the worker's own, because a conversation runs
    * one turn at a time and two workers cannot share one, and the
@@ -912,22 +916,16 @@ export class GrimoireView extends ItemView {
   ): Promise<void> {
     try {
       const conversation = await this.plugin.createConversation({ providerId });
-      await this.plugin.updateConversation(conversation.id, {
-        messages: [{
-          id: `user-${conversation.id}`,
-          role: 'user',
-          content: prompt,
-          timestamp: Date.now(),
-        }],
-      });
       const identity = opaqueAgentId();
+      const runIdentity = agentRunId(`agr-${identity}`);
+      runtime.agentDispatcher.rememberGoal(runIdentity, prompt);
       await runtime.agents.prepareAndDispatch({
         prepareTransactionId: `tx-${opaqueAgentId()}`,
         dispatchStartTransactionId: `tx-${opaqueAgentId()}`,
         settlementTransactionId: `tx-${opaqueAgentId()}`,
         terminalTransactionId: `tx-${opaqueAgentId()}`,
         agentInstanceId: agentInstanceId(`agi-${identity}`),
-        agentRunId: agentRunId(`agr-${identity}`),
+        agentRunId: runIdentity,
         dispatchToken: agentDispatchToken(`adt-${identity}`),
         providerId,
         definition: {

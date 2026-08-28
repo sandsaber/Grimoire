@@ -32,15 +32,23 @@ describe('conversation agent dispatcher', () => {
     idempotency: 'none',
   };
 
-  /** The provider's three steps, which is all a dispatched turn needs of it. */
-  function runtime(): ExecutionChatRuntimeAdapter {
+  /**
+   * The provider's three steps, which is all a dispatched turn needs of it.
+   *
+   * `compose` is a parameter because **the providers disagree and the
+   * disagreement is the defect this suite caught**: what a turn persists is the
+   * provider's to decide, three of the nine replace the text outright and two
+   * rewrite it, so a dispatcher that assumed the stored message equals the
+   * prompt works for Claude and fails for OpenCode.
+   */
+  function runtime(compose: (text: string) => string = text => text): ExecutionChatRuntimeAdapter {
     return {
       syncConversationState: jest.fn(),
       getSessionId: () => null,
       turnEncoder: {
         prepareTurn: (request: { text: string }) => ({
           request,
-          persistedContent: request.text,
+          persistedContent: compose(request.text),
           prompt: request.text,
           isCompact: false,
         }),
@@ -57,11 +65,20 @@ describe('conversation agent dispatcher', () => {
       chat: { submitTurn: command => harness.composition.submitTurn(command) },
       conversations: conversationPort(harness.conversations),
       createRuntime: () => runtime(),
-      goalFor: () => 'Refactor the auth module.',
       nextCommandId: () => 'cmd-worker-1',
       backendIdFor: () => FAKE_BACKEND_ID,
       ...overrides,
     });
+  }
+
+  /** A dispatcher that has been told the task, as the orchestrator tells it. */
+  function toldDispatcher(
+    harness: Awaited<ReturnType<typeof createHarness>>,
+    overrides: Partial<ConstructorParameters<typeof ConversationAgentDispatcher>[0]> = {},
+  ) {
+    const port = dispatcher(harness, overrides);
+    port.rememberGoal(REQUEST.agentRunId, 'Refactor the auth module.');
+    return port;
   }
 
   async function storedMessages(harness: Awaited<ReturnType<typeof createHarness>>) {
@@ -73,7 +90,7 @@ describe('conversation agent dispatcher', () => {
   it('runs a turn with nobody drawing it, and the vault holds the goal', async () => {
     const harness = await createHarness();
 
-    const outcome = await dispatcher(harness).dispatch(REQUEST);
+    const outcome = await toldDispatcher(harness).dispatch(REQUEST);
 
     expect(outcome.kind).toBe('accepted');
     // The kernel's own identities, which is what makes the run findable later:
@@ -88,12 +105,16 @@ describe('conversation agent dispatcher', () => {
     ]);
   });
 
-  it('reads the goal back from the conversation on a redispatch', async () => {
+  it('reads the goal back from the conversation when a retry is dispatched', async () => {
+    // **A retry, which is the path that actually redispatches.** The
+    // coordinator returns early for a run whose intent is already `accepted`
+    // and refuses one that is `dispatching`, so the same run is never
+    // dispatched twice after a turn went out; a retry is a *new* run against
+    // the same conversation. The caller has forgotten the task by then — a
+    // reload, or simply a later session — and the conversation is the record
+    // that did not.
     const harness = await createHarness();
-    const first = await dispatcher(harness).dispatch(REQUEST);
-    // Ended before the second, because a conversation runs one turn at a time:
-    // a redispatch against a live run queues behind it, which is the
-    // coordinator being right rather than this being a retry.
+    const first = await toldDispatcher(harness).dispatch(REQUEST);
     const runId = first.kind === 'accepted' ? first.execution?.executionRunId : undefined;
     harness.backend.emit(runId as never, {
       kind: 'terminal',
@@ -102,23 +123,45 @@ describe('conversation agent dispatcher', () => {
     });
     await harness.registry.waitForIdle();
 
-    // The caller has forgotten — a reload between the attempts — and the
-    // conversation is the record that did not.
-    const forgetful = dispatcher(harness, { goalFor: () => null });
-    const outcome = await forgetful.dispatch(REQUEST);
+    const forgetful = dispatcher(harness);
+    const outcome = await forgetful.dispatch({
+      ...REQUEST,
+      agentRunId: 'agr-worker-1-retry' as never,
+    });
 
     expect(outcome.kind).toBe('accepted');
-    // Still one message: the append is idempotent by id, so a redispatch of the
-    // same run resubmits rather than asking twice.
+    // Asked again, which is what a retry is: two messages, both the task, and
+    // the transcript says the question was put twice because it was.
     await expect(storedMessages(harness)).resolves.toEqual([
       expect.objectContaining({ role: 'user', content: 'Refactor the auth module.' }),
+      expect.objectContaining({ role: 'user', content: 'Refactor the auth module.' }),
+    ]);
+  });
+
+  it('lets the provider compose what the turn persists', async () => {
+    // **The defect this caught.** What a turn persists is the provider's to
+    // decide — three of the nine replace the text outright and two rewrite it —
+    // and a first version wrote the prompt into the conversation itself and
+    // then handed that message back to the turn. The turn appended a different
+    // object under an id the conversation already held, which the coordinator
+    // refuses as a caller bug, so every provider that composes anything failed
+    // to dispatch and was recorded as indeterminate.
+    const harness = await createHarness();
+
+    const outcome = await toldDispatcher(harness, {
+      createRuntime: () => runtime(text => `<task>${text}</task>`),
+    }).dispatch(REQUEST);
+
+    expect(outcome.kind).toBe('accepted');
+    await expect(storedMessages(harness)).resolves.toEqual([
+      expect.objectContaining({ content: '<task>Refactor the auth module.</task>' }),
     ]);
   });
 
   it('refuses without a side effect when nothing recorded a goal', async () => {
     const harness = await createHarness();
 
-    const outcome = await dispatcher(harness, { goalFor: () => null }).dispatch(REQUEST);
+    const outcome = await dispatcher(harness).dispatch(REQUEST);
 
     // A refusal rather than an invented task. The coordinator files this as
     // `invalidated` — the run never reached the provider — which is only
@@ -138,7 +181,7 @@ describe('conversation agent dispatcher', () => {
     // turn at a time and two dispatched workers cannot share one.
     const harness = await createHarness();
 
-    const outcome = await dispatcher(harness).dispatch({
+    const outcome = await toldDispatcher(harness).dispatch({
       ...REQUEST,
       rootOwner: { kind: 'conversation', ownerId: 'conv-orchestrator' },
       conversationId: CONVERSATION_ID,
@@ -155,7 +198,7 @@ describe('conversation agent dispatcher', () => {
   it('refuses when nothing names a conversation to write into', async () => {
     const harness = await createHarness();
 
-    const outcome = await dispatcher(harness).dispatch({
+    const outcome = await toldDispatcher(harness).dispatch({
       ...REQUEST,
       rootOwner: { kind: 'agent', ownerId: 'agi-parent' } as never,
     });
@@ -170,7 +213,7 @@ describe('conversation agent dispatcher', () => {
   it('refuses a provider this build does not compose', async () => {
     const harness = await createHarness();
 
-    const outcome = await dispatcher(harness, { createRuntime: () => null })
+    const outcome = await toldDispatcher(harness, { createRuntime: () => null })
       .dispatch(REQUEST);
 
     expect(outcome).toEqual({
@@ -191,7 +234,7 @@ describe('conversation agent dispatcher', () => {
     const harness = await createHarness();
     const adapter = runtime();
 
-    await dispatcher(harness, { createRuntime: () => adapter }).dispatch(REQUEST);
+    await toldDispatcher(harness, { createRuntime: () => adapter }).dispatch(REQUEST);
 
     expect(adapter.syncConversationState).toHaveBeenCalledWith(
       expect.objectContaining({ id: CONVERSATION_ID }),
