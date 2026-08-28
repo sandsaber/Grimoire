@@ -6,7 +6,6 @@ import type {
   ProviderChatUiContribution,
   ProviderReasoningPresentation,
 } from './ProviderModule';
-import { ProviderRegistry } from './ProviderRegistry';
 import type { ProviderId } from './types';
 
 export interface SettingsReconciliationResult {
@@ -107,6 +106,35 @@ function normalizeReasoningValue(
   return reasoning.defaultValue(model, settings);
 }
 
+/**
+ * Drops the session binding of every conversation that has one.
+ *
+ * **The host's job, and the reason the module answers a boolean.** Each
+ * provider's reconciler used to walk the conversation list itself and clear
+ * `sessionId` and `providerState` on the ones whose own state field was set —
+ * a thread id for Codex, a database path for OpenCode, a session directory for
+ * Grok. Those are three spellings of one question: does this conversation have
+ * a session to lose. `providerState` is opaque here, which is exactly what
+ * makes "set at all" the provider-neutral form of it, and Claude — the one
+ * provider that checked `sessionId` alone — writes no `providerState`, so the
+ * two readings agree for every provider that ships.
+ *
+ * The conversations that had nothing are left out of the returned list, because
+ * the caller writes one metadata file per entry.
+ */
+function clearSessionBindings(conversations: readonly Conversation[]): Conversation[] {
+  const invalidated: Conversation[] = [];
+  for (const conversation of conversations) {
+    if (!conversation.sessionId && conversation.providerState === undefined) {
+      continue;
+    }
+    conversation.sessionId = null;
+    conversation.providerState = undefined;
+    invalidated.push(conversation);
+  }
+  return invalidated;
+}
+
 function chatUiFor(providerId: ProviderId): ProviderChatUiContribution {
   return providerCatalog().declarations(providerId).chatUI;
 }
@@ -129,8 +157,7 @@ export class ProviderSettingsCoordinator {
   ): boolean {
     let anyChanged = false;
     for (const providerId of providerIds) {
-      const reconciler = ProviderRegistry.getSettingsReconciler(providerId);
-      if (reconciler.handleEnvironmentChange?.(settings)) {
+      if (providerCatalog().settingsReconciliation(providerId).clearDiscoveryState?.(settings)) {
         anyChanged = true;
       }
     }
@@ -383,7 +410,6 @@ export class ProviderSettingsCoordinator {
     const settingsProvider = getSettingsProviderId(settings);
 
     for (const providerId of providerIds) {
-      const reconciler = ProviderRegistry.getSettingsReconciler(providerId);
       const providerConversations = conversations.filter(c => c.providerId === providerId);
       const targetSettings = providerId === settingsProvider
         ? settings
@@ -393,10 +419,12 @@ export class ProviderSettingsCoordinator {
         this.projectProviderState(targetSettings, providerId);
       }
 
-      const { changed, invalidatedConversations } = reconciler.reconcileModelWithEnvironment(
-        targetSettings,
-        providerConversations,
-      );
+      const { changed, invalidatesSessions } = providerCatalog()
+        .settingsReconciliation(providerId)
+        .reconcileEnvironment(targetSettings);
+      const invalidatedConversations = invalidatesSessions
+        ? clearSessionBindings(providerConversations)
+        : [];
 
       if (changed) {
         anyChanged = true;
@@ -420,7 +448,6 @@ export class ProviderSettingsCoordinator {
     const settingsProvider = getSettingsProviderId(settings);
 
     for (const providerId of providerCatalog().ids()) {
-      const reconciler = ProviderRegistry.getSettingsReconciler(providerId);
       const targetSettings = providerId === settingsProvider
         ? settings
         : cloneProviderSettings(settings);
@@ -429,7 +456,9 @@ export class ProviderSettingsCoordinator {
         this.projectProviderState(targetSettings, providerId);
       }
 
-      const changed = reconciler.normalizeModelVariantSettings(targetSettings);
+      const changed = providerCatalog()
+        .settingsReconciliation(providerId)
+        .normalizeModelVariants(targetSettings);
       if (changed) {
         anyChanged = true;
         this.persistProjectedProviderState(targetSettings, providerId);

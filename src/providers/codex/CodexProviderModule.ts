@@ -7,14 +7,14 @@ import type {
   ProviderModelDescriptor,
   ProviderModule,
   ProviderSettingsCodec,
-  ProviderSettingsReconcileResult,
   ProviderUsageSnapshot,
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
-import { parseEnvironmentVariables } from '@/utils/env';
 
 import { isRecord } from '../../utils/records';
 import { chatUiContributionFor } from '../shared/chatUiContribution';
+import { settingsReconciliationFor } from '../shared/settingsReconciliation';
+import { codexSettingsReconciler } from './env/CodexSettingsReconciler';
 import {
   CODEX_EXECUTION_DESCRIPTOR,
   CodexExecutionBackend,
@@ -258,24 +258,7 @@ export const codexSettingsCodec: ProviderSettingsCodec<CodexProviderSettings> = 
 
   environmentKeyPrefixes: ['OPENAI_', 'CODEX_'],
 
-  reconcile(settings): ProviderSettingsReconcileResult<CodexProviderSettings> {
-    // The saved hash and the environment text that produces it both live in the
-    // settings, so the comparison the legacy reconciler makes is available here
-    // without the conversation list it also takes.
-    const environmentHash = computeEnvironmentHash(settings.environmentVariables);
-    const normalized = decodeSettings(this.encode({ ...settings, environmentHash }));
-    return {
-      settings: normalized,
-      // Order-insensitive: encode and decode rebuild the object, so comparing
-      // serialized forms would report a change on every load.
-      changed: !deepEqual(normalized, settings),
-      // Codex resumes by native thread id, and those threads live in a daemon
-      // launched with the old environment. A changed environment therefore
-      // invalidates every Codex session, which is what the legacy reconciler
-      // does when it clears `sessionId` and `providerState` on each of them.
-      invalidatesSessions: environmentHash !== settings.environmentHash,
-    };
-  },
+  ...settingsReconciliationFor(codexSettingsReconciler),
 };
 
 export const codexProviderModule: ProviderModule<
@@ -486,45 +469,5 @@ function normalizeStringMap(value: unknown): Record<string, string> {
       .filter(([host, entry]) => host.trim() !== '' && typeof entry === 'string')
       .map(([host, entry]) => [host, (entry as string).trim()]),
   );
-}
-
-/**
- * The three variables whose change makes an existing thread unusable.
- *
- * Mirrors `CodexSettingsReconciler`, which is the behavior a flip has to
- * preserve. Deliberately three named keys rather than the registration's
- * `/^OPENAI_/` and `/^CODEX_/` patterns: those invalidate a session when any
- * matching variable changes, including ones the daemon never reads.
- */
-const ENVIRONMENT_HASH_KEYS = ['OPENAI_MODEL', 'OPENAI_BASE_URL', 'OPENAI_API_KEY'];
-
-function computeEnvironmentHash(environmentText: string): string {
-  const variables = parseEnvironmentVariables(environmentText || '');
-  return ENVIRONMENT_HASH_KEYS
-    .filter(key => variables[key])
-    .map(key => `${key}=${variables[key]}`)
-    .sort()
-    .join('|');
-}
-
-/** Structural equality that ignores key order and treats arrays as ordered. */
-function deepEqual(left: unknown, right: unknown): boolean {
-  if (left === right) {
-    return true;
-  }
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return Array.isArray(left)
-      && Array.isArray(right)
-      && left.length === right.length
-      && left.every((item, index) => deepEqual(item, right[index]));
-  }
-  if (!isRecord(left) || !isRecord(right)) {
-    return false;
-  }
-  const leftKeys = Object.keys(left).sort();
-  const rightKeys = Object.keys(right).sort();
-  return leftKeys.length === rightKeys.length
-    && leftKeys.every((key, index) => key === rightKeys[index])
-    && leftKeys.every(key => deepEqual(left[key], right[key]));
 }
 

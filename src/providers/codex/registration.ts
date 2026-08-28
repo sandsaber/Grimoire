@@ -1,10 +1,8 @@
 import type { ProviderRegistration } from '../../core/providers/types';
-import { codexSettingsReconciler } from './env/CodexSettingsReconciler';
 import { CodexConversationHistoryService } from './history/CodexConversationHistoryService';
 import { codexSubagentLifecycleAdapter } from './normalization/codexSubagentNormalization';
 
 export const codexProviderRegistration: ProviderRegistration = {
-  settingsReconciler: codexSettingsReconciler,
   // The second provider flip: chat execution runs through the kernel. Only this
   // row moves — workspace services, settings, auxiliary services, history and
   // UI config stay exactly as they were, per the mixed-authority rule that

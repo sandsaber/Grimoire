@@ -141,12 +141,6 @@ describe('Kimi Code provider module', () => {
   });
 
   describe('settings codec', () => {
-    it('round-trips defaults without reporting a change', () => {
-      const defaults = kimicodeSettingsCodec.defaults();
-
-      expect(kimicodeSettingsCodec.decode(kimicodeSettingsCodec.encode(defaults)).ok).toBe(true);
-      expect(kimicodeSettingsCodec.reconcile(defaults, 'load').changed).toBe(false);
-    });
 
     it('never writes discovery state into the settings file', () => {
       // The persisted interface excludes these two, and encoding them would
@@ -173,43 +167,6 @@ describe('Kimi Code provider module', () => {
       expect(decoded.ok ? [] : decoded.fallback.discoveredModels).toEqual([]);
     });
 
-    it('keeps discovery state across a reconciliation that did not persist it', () => {
-      const discovered = [{ rawId: 'anthropic/claude-sonnet', label: 'Sonnet' }];
-
-      const result = kimicodeSettingsCodec.reconcile({
-        ...kimicodeSettingsCodec.defaults(),
-        discoveredModels: discovered,
-      }, 'load');
-
-      expect(result.settings.discoveredModels).toEqual(discovered);
-      expect(result.changed).toBe(false);
-    });
-
-    it('invalidates sessions when a variable the CLI reads its state from changes', () => {
-      const changed = kimicodeSettingsCodec.reconcile({
-        ...kimicodeSettingsCodec.defaults(),
-        environmentVariables: 'XDG_DATA_HOME=/tmp/kimicode\n',
-        environmentHash: '',
-      }, 'environment-change');
-
-      expect(changed.invalidatesSessions).toBe(true);
-      expect(changed.settings.environmentHash).toBe('XDG_DATA_HOME=/tmp/kimicode');
-    });
-
-    it('ignores the KIMICODE_ variable the default settings ship with', () => {
-      // `KIMICODE_ENABLE_EXA` is in the shipped defaults and matches the
-      // registration's `/^KIMICODE_/i` pattern, so the pattern would invalidate
-      // every session on a fresh install. The four keys that decide a session's
-      // usability do not.
-      const result = kimicodeSettingsCodec.reconcile(
-        kimicodeSettingsCodec.defaults(),
-        'environment-change',
-      );
-
-      expect(kimicodeSettingsCodec.defaults().environmentVariables)
-        .toContain('KIMICODE_ENABLE_EXA');
-      expect(result.invalidatesSessions).toBe(false);
-    });
   });
 
   describe('model presentation', () => {

@@ -169,12 +169,6 @@ describe('Qwen provider module', () => {
   });
 
   describe('settings codec', () => {
-    it('round-trips defaults without reporting a change', () => {
-      const defaults = qwenSettingsCodec.defaults();
-
-      expect(qwenSettingsCodec.decode(qwenSettingsCodec.encode(defaults)).ok).toBe(true);
-      expect(qwenSettingsCodec.reconcile(defaults, 'load').changed).toBe(false);
-    });
 
     it('never writes discovery state into the settings file', () => {
       const encoded = qwenSettingsCodec.encode({
@@ -202,28 +196,6 @@ describe('Qwen provider module', () => {
       expect(decoded.ok ? '' : decoded.fallback.effortLevel).toBe('high');
     });
 
-    it('invalidates sessions when the account answering would change', () => {
-      // `OPENAI_API_KEY` is the only auth method the recorded handshake offers.
-      const changed = qwenSettingsCodec.reconcile({
-        ...qwenSettingsCodec.defaults(),
-        environmentVariables: 'OPENAI_API_KEY=abc\n',
-        environmentHash: '',
-      }, 'environment-change');
-
-      expect(changed.invalidatesSessions).toBe(true);
-      expect(changed.settings.environmentHash).toBe('OPENAI_API_KEY=abc');
-    });
-
-    it('ignores a QWEN_ variable that decides nothing about the account', () => {
-      const result = qwenSettingsCodec.reconcile({
-        ...qwenSettingsCodec.defaults(),
-        environmentVariables: 'QWEN_CODE_TELEMETRY=0\n',
-        environmentHash: '',
-      }, 'environment-change');
-
-      expect(result.invalidatesSessions).toBe(false);
-      expect(result.settings.environmentHash).toBe('');
-    });
   });
 
   describe('model presentation', () => {

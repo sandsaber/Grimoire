@@ -171,12 +171,6 @@ describe('Claude provider module', () => {
   });
 
   describe('settings codec', () => {
-    it('round-trips defaults without reporting a change', () => {
-      const defaults = claudeSettingsCodec.defaults();
-
-      expect(claudeSettingsCodec.decode(claudeSettingsCodec.encode(defaults)).ok).toBe(true);
-      expect(claudeSettingsCodec.reconcile(defaults, 'load').changed).toBe(false);
-    });
 
     it('carries unknown keys through so a newer settings file survives', () => {
       const decoded = claudeSettingsCodec.decode({
@@ -197,40 +191,6 @@ describe('Claude provider module', () => {
         .toContain('projectSettingsSnapshot is not a valid snapshot');
     });
 
-    it('treats a changed project settings hash as an environment change', () => {
-      // Claude folds the project settings hash into the environment hash when
-      // it respects project settings, which is the behavior a flip must keep.
-      const result = claudeSettingsCodec.reconcile({
-        ...claudeSettingsCodec.defaults(),
-        respectProjectSettings: true,
-        projectSettingsSnapshot: { model: 'opus', env: {}, hash: 'stale' },
-      }, 'load');
-
-      expect(result.invalidatesSessions).toBe(true);
-      // The snapshot hash is derived from the model and environment, not stored:
-      // a stale one from an older write is recomputed rather than trusted.
-      expect(result.settings.environmentHash).toBe('project=model=opus');
-    });
-
-    it('ignores the project settings hash when the user opted out', () => {
-      const result = claudeSettingsCodec.reconcile({
-        ...claudeSettingsCodec.defaults(),
-        respectProjectSettings: false,
-        projectSettingsSnapshot: { model: 'opus', env: {}, hash: 'abc123' },
-      }, 'load');
-
-      expect(result.invalidatesSessions).toBe(false);
-      expect(result.settings.environmentHash).toBe('');
-    });
-
-    it('ignores an environment variable the SDK never reads', () => {
-      const result = claudeSettingsCodec.reconcile({
-        ...claudeSettingsCodec.defaults(),
-        environmentVariables: 'ANTHROPIC_LOG=debug\n',
-      }, 'environment-change');
-
-      expect(result.invalidatesSessions).toBe(false);
-    });
   });
 
   describe('model presentation', () => {

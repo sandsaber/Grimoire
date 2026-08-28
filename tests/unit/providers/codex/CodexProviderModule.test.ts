@@ -188,13 +188,6 @@ describe('Codex provider module', () => {
   });
 
   describe('settings codec', () => {
-    it('round-trips defaults without reporting a change', () => {
-      const defaults = codexSettingsCodec.defaults();
-      const decoded = codexSettingsCodec.decode(codexSettingsCodec.encode(defaults));
-
-      expect(decoded.ok).toBe(true);
-      expect(codexSettingsCodec.reconcile(defaults, 'load').changed).toBe(false);
-    });
 
     it('carries unknown keys through so a newer settings file survives', () => {
       const decoded = codexSettingsCodec.decode({
@@ -235,36 +228,6 @@ describe('Codex provider module', () => {
       expect(codexSettingsCodec.runtimeInputKeys).toContain('installationMethod');
       expect(codexSettingsCodec.runtimeInputKeys.every(key => key in codexSettingsCodec.defaults()))
         .toBe(true);
-    });
-
-    it('invalidates sessions when the environment the daemon reads has changed', () => {
-      const defaults = codexSettingsCodec.defaults();
-
-      // Nothing set, nothing saved: no session can have gone stale.
-      expect(codexSettingsCodec.reconcile(defaults, 'load').invalidatesSessions).toBe(false);
-
-      const changed = codexSettingsCodec.reconcile({
-        ...defaults,
-        environmentVariables: 'OPENAI_BASE_URL=https://example.test\n',
-        environmentHash: '',
-      }, 'environment-change');
-      expect(changed.invalidatesSessions).toBe(true);
-      expect(changed.settings.environmentHash).toBe('OPENAI_BASE_URL=https://example.test');
-
-      // Already reconciled: the same environment must not invalidate twice.
-      expect(codexSettingsCodec.reconcile(changed.settings, 'load').invalidatesSessions)
-        .toBe(false);
-    });
-
-    it('ignores an environment variable the daemon never reads', () => {
-      // The registration's `/^OPENAI_/` pattern would invalidate every session
-      // on this change; the three keys that decide a thread's usability do not.
-      const result = codexSettingsCodec.reconcile({
-        ...codexSettingsCodec.defaults(),
-        environmentVariables: 'OPENAI_LOG_LEVEL=debug\n',
-      }, 'environment-change');
-
-      expect(result.invalidatesSessions).toBe(false);
     });
 
     it('toggles enablement without touching the rest of the settings', () => {

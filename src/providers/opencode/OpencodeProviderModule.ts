@@ -8,14 +8,14 @@ import type {
   ProviderModelDescriptor,
   ProviderModule,
   ProviderSettingsCodec,
-  ProviderSettingsReconcileResult,
   ProviderUsageSnapshot,
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
-import { parseEnvironmentVariables } from '@/utils/env';
 
 import { isRecord } from '../../utils/records';
 import { chatUiContributionFor } from '../shared/chatUiContribution';
+import { settingsReconciliationFor } from '../shared/settingsReconciliation';
+import { opencodeSettingsReconciler } from './env/OpencodeSettingsReconciler';
 import {
   OPENCODE_EXECUTION_DESCRIPTOR,
   OpencodeExecutionBackend,
@@ -73,20 +73,6 @@ const KNOWN_SETTINGS_FIELDS = new Set([
   'thinkingOptionsByModel',
   'visibleModels',
 ]);
-
-/**
- * The variables whose change makes an existing ACP session unusable.
- *
- * Mirrors `OpencodeSettingsReconciler`. All four change where the CLI reads its
- * configuration or writes its state, which is why they invalidate a session
- * while an unrelated `OPENCODE_*` variable does not.
- */
-const ENVIRONMENT_HASH_KEYS = [
-  'OPENCODE_CONFIG',
-  'OPENCODE_DB',
-  'OPENCODE_DISABLE_PROJECT_CONFIG',
-  'XDG_DATA_HOME',
-];
 
 export interface OpencodeWorkspaceContext {
   listCommands(): Promise<readonly ProviderCommandDescriptor[]>;
@@ -252,21 +238,7 @@ export const opencodeSettingsCodec: ProviderSettingsCodec<OpencodeProviderSettin
 
   environmentKeyPrefixes: ['OPENCODE_'],
 
-  reconcile(settings): ProviderSettingsReconcileResult<OpencodeProviderSettings> {
-    const environmentHash = computeEnvironmentHash(settings.environmentVariables);
-    const normalized = decodeSettings(this.encode({ ...settings, environmentHash }));
-    return {
-      // Discovery state survives reconciliation because the codec does not
-      // persist it: it belongs to the caller that refreshed it.
-      settings: {
-        ...normalized,
-        availableModes: settings.availableModes,
-        discoveredModels: settings.discoveredModels,
-      },
-      changed: !deepEqual({ ...normalized, environmentHash }, stripDiscovery(settings)),
-      invalidatesSessions: environmentHash !== settings.environmentHash,
-    };
-  },
+  ...settingsReconciliationFor(opencodeSettingsReconciler),
 };
 
 export const opencodeProviderModule: ProviderModule<
@@ -399,15 +371,6 @@ function decodeSettings(record: Readonly<Record<string, unknown>>): OpencodeProv
   };
 }
 
-function stripDiscovery(
-  settings: OpencodeProviderSettings,
-): Omit<OpencodeProviderSettings, 'availableModes' | 'discoveredModels'> & {
-  availableModes: never[];
-  discoveredModels: never[];
-} {
-  return { ...settings, availableModes: [], discoveredModels: [] };
-}
-
 function validateKnownSettings(record: Readonly<Record<string, unknown>>): string[] {
   const issues: string[] = [];
   requireType(record, 'enabled', value => typeof value === 'boolean', issues);
@@ -456,15 +419,6 @@ function requireType(
   }
 }
 
-function computeEnvironmentHash(environmentText: string): string {
-  const variables = parseEnvironmentVariables(environmentText || '');
-  return ENVIRONMENT_HASH_KEYS
-    .filter(key => variables[key])
-    .map(key => `${key}=${variables[key]}`)
-    .sort()
-    .join('|');
-}
-
 function normalizeStringMap(value: unknown): Record<string, string> {
   if (!isRecord(value)) {
     return {};
@@ -474,26 +428,5 @@ function normalizeStringMap(value: unknown): Record<string, string> {
       .filter(([host, entry]) => host.trim() !== '' && typeof entry === 'string')
       .map(([host, entry]) => [host, (entry as string).trim()]),
   );
-}
-
-/** Structural equality that ignores key order and treats arrays as ordered. */
-function deepEqual(left: unknown, right: unknown): boolean {
-  if (left === right) {
-    return true;
-  }
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return Array.isArray(left)
-      && Array.isArray(right)
-      && left.length === right.length
-      && left.every((item, index) => deepEqual(item, right[index]));
-  }
-  if (!isRecord(left) || !isRecord(right)) {
-    return false;
-  }
-  const leftKeys = Object.keys(left).sort();
-  const rightKeys = Object.keys(right).sort();
-  return leftKeys.length === rightKeys.length
-    && leftKeys.every((key, index) => key === rightKeys[index])
-    && leftKeys.every(key => deepEqual(left[key], right[key]));
 }
 

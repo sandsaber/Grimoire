@@ -393,7 +393,7 @@ describe('execution composition boundaries', () => {
       { row: 'capabilities', owner: 'ProviderModule', slot: 'capabilities' },
       { row: 'environmentKeyPatterns', owner: 'ProviderSettingsCodec', slot: 'runtimeInputKeys' },
       { row: 'chatUIConfig', owner: 'ProviderDeclarations', slot: 'chatUI' },
-      { row: 'settingsReconciler', owner: 'ProviderSettingsCodec', slot: 'reconcile' },
+      { row: 'settingsReconciler', owner: 'ProviderSettingsReconciliation', slot: 'reconcileEnvironment' },
       { row: 'createRuntime', owner: 'ProviderModule', slot: 'execution' },
       // Not a module slot. Auxiliary work runs through the backend the provider
       // already has, and the runner that reaches it is built by the host from a

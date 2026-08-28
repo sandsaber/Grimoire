@@ -1,5 +1,4 @@
 import type { ProviderRegistration } from '../../core/providers/types';
-import { antigravitySettingsReconciler } from './env/AntigravitySettingsReconciler';
 import { AntigravityConversationHistoryService } from './history/AntigravityConversationHistoryService';
 
 export const antigravityProviderRegistration: ProviderRegistration = {
@@ -8,5 +7,4 @@ export const antigravityProviderRegistration: ProviderRegistration = {
   // other registration stay exactly as they were. Codex followed in wave 2.
   createRuntime: ({ plugin }) => plugin.getAntigravityExecution().createRuntime(),
   historyService: new AntigravityConversationHistoryService(),
-  settingsReconciler: antigravitySettingsReconciler,
 };

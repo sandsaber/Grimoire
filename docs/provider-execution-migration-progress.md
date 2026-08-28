@@ -9709,7 +9709,53 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
-After the row: the ten rows still marked `reshape` in
+#### The settings reconciler moved, and the module's own version was wrong three ways
+
+**Nine modules carried a `reconcile` no production caller ever reached**, and every one of them
+disagreed with the reconciler the product actually runs:
+
+- it hashed `settings.environmentVariables` — the provider's **own** scope — while every reconciler
+  hashes `getRuntimeEnvironmentText`, which joins the shared scope with the provider's. A user who
+  sets `XAI_API_KEY` once, in the shared scope, would have stopped invalidating Grok's model cache;
+- it hashed the whole environment text, while each reconciler hashes a **named key list**, so any
+  unrelated variable — a system-prompt path, a log level — would have invalidated every session;
+- for Gemini and Qwen it reported `invalidatesSessions` on a hash change, while their shipped
+  reconcilers invalidate nothing, ever.
+
+None of it was visible, because nothing called it — and nine test blocks asserted it, passing while
+describing behavior no user has ever had. Wiring the module's version up as part of the row move
+would have shipped all three at once, to nine providers, as a side effect of a refactor. So the
+module's reconciliation **is** the live reconciler, grouped, the same shape
+`chatUiContributionFor` takes. The nine deleted bodies are in git history, and adopting any of them
+is a product decision with its own evidence, not a refactor.
+
+**The slot was one method with a reason against a row of three operations.**
+`reconcile(TSettings, reason)` over `'load' | 'environment-change' | 'model-change'` — and no
+implementation has ever seen a reason, because the row has no such parameter. It is the same
+invented vocabulary M3 found in the `toggle` reasoning kind: a word nothing uses is a word nothing
+checks. Worse, folding would have merged the two the host runs *in sequence* on an environment
+change — clearing discovery caches and re-deriving the hash are two different repairs, called from
+two different places. Three members now: `clearDiscoveryState?`, `reconcileEnvironment`,
+`normalizeModelVariants`, over `ProviderScopedSettings` — the third row to need the whole record.
+
+**Session invalidation is the host's now, and the boolean is why.** Each reconciler walked the
+conversation list itself and cleared `sessionId` and `providerState` where its own state field was
+set — a thread id for Codex, a database path for OpenCode, a session directory for Grok. Those are
+three spellings of one question: does this conversation have a session to lose. `providerState` is
+opaque to core, which is exactly what makes "set at all" the provider-neutral form, and Claude — the
+one provider that checked `sessionId` alone — writes no `providerState`, so the two readings agree
+for every provider that ships. A conversation with nothing to clear stays out of the returned list,
+because the caller writes one metadata file per entry.
+
+The nine dead test blocks are replaced by one spec over all nine providers, which pins the two
+things a per-provider block could not see: that the **shared** environment scope reaches every
+provider's hash, and which three providers reconcile nothing at all. It was proved by making Grok's
+reconciler read only its own scope and watching that row go red.
+
+`ProviderSettingsCoordinator` has no registry import left, and `ProviderRegistry` is four members
+over three rows. The two-registry count falls 34 -> 33.
+
+After the row: the nine rows still marked `reshape` in
 [`provider-row-slot-fit.md`](provider-row-slot-fit.md), of which two —
 `taskResultInterpreter` and `subagentLifecycleAdapter` — are deliberately **last**, because their
 consumers are mid-replacement and a slot shaped for a consumer being replaced is a slot shaped

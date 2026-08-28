@@ -36,10 +36,6 @@ const MODULE = 'src/core/providers/ProviderModule.ts';
 
 const ROWS: readonly RowFit[] = [
   {
-    row: 'settingsReconciler',
-    real: { name: 'ProviderSettingsReconciler', path: TYPES },
-  },
-  {
     row: 'historyService',
     real: { name: 'ProviderConversationHistoryService', path: TYPES },
     slot: { name: 'ProviderHistoryPort', path: MODULE },

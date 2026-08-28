@@ -173,12 +173,6 @@ describe('Grok provider module', () => {
   });
 
   describe('settings codec', () => {
-    it('round-trips defaults without reporting a change', () => {
-      const defaults = grokSettingsCodec.defaults();
-
-      expect(grokSettingsCodec.decode(grokSettingsCodec.encode(defaults)).ok).toBe(true);
-      expect(grokSettingsCodec.reconcile(defaults, 'load').changed).toBe(false);
-    });
 
     it('never writes discovery state into the settings file', () => {
       const encoded = grokSettingsCodec.encode({
@@ -203,42 +197,6 @@ describe('Grok provider module', () => {
       expect(decoded.ok ? [] : decoded.fallback.discoveredModels).toEqual([]);
     });
 
-    it('keeps discovery state across a reconciliation that did not persist it', () => {
-      const discovered = [{ rawId: 'grok-4.6', label: 'Grok 4.6' }];
-
-      const result = grokSettingsCodec.reconcile({
-        ...grokSettingsCodec.defaults(),
-        discoveredModels: discovered,
-      }, 'load');
-
-      expect(result.settings.discoveredModels).toEqual(discovered);
-      expect(result.changed).toBe(false);
-    });
-
-    it('invalidates sessions when the account or the managed home changes', () => {
-      const changed = grokSettingsCodec.reconcile({
-        ...grokSettingsCodec.defaults(),
-        environmentVariables: 'XAI_API_KEY=xai-second-account\n',
-        environmentHash: '',
-      }, 'environment-change');
-
-      expect(changed.invalidatesSessions).toBe(true);
-      expect(changed.settings.environmentHash).toBe('XAI_API_KEY=xai-second-account');
-    });
-
-    it('ignores a GROK_ variable that decides nothing about a session', () => {
-      // The registration's `/^GROK_/i` pattern matches every one of them; the
-      // four keys that decide whether a saved session is still resumable do
-      // not include the ones that only change how the CLI prints.
-      const result = grokSettingsCodec.reconcile({
-        ...grokSettingsCodec.defaults(),
-        environmentVariables: 'GROK_THEME=dark\n',
-        environmentHash: '',
-      }, 'environment-change');
-
-      expect(result.invalidatesSessions).toBe(false);
-      expect(result.settings.environmentHash).toBe('');
-    });
   });
 
   describe('model presentation', () => {

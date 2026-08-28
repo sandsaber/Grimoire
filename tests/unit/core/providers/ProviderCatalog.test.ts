@@ -37,11 +37,8 @@ function testModule(
     withEnabled: (value: TestSettings, enabled: boolean) => ({ ...value, enabled }),
     runtimeInputKeys: ['label'],
     environmentKeyPrefixes: [`${providerId.toUpperCase()}_`],
-    reconcile: (value: TestSettings) => ({
-      settings: value,
-      changed: false,
-      invalidatesSessions: false,
-    }),
+    reconcileEnvironment: () => ({ changed: false, invalidatesSessions: false }),
+    normalizeModelVariants: () => false,
   };
 
   return {

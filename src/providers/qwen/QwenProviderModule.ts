@@ -8,14 +8,14 @@ import type {
   ProviderModelDescriptor,
   ProviderModule,
   ProviderSettingsCodec,
-  ProviderSettingsReconcileResult,
   ProviderUsageSnapshot,
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
-import { parseEnvironmentVariables } from '@/utils/env';
 
 import { isRecord } from '../../utils/records';
 import { chatUiContributionFor } from '../shared/chatUiContribution';
+import { settingsReconciliationFor } from '../shared/settingsReconciliation';
+import { qwenSettingsReconciler } from './env/QwenSettingsReconciler';
 import {
   QWEN_EXECUTION_DESCRIPTOR,
   QwenExecutionBackend,
@@ -85,26 +85,6 @@ const KNOWN_SETTINGS_FIELDS = new Set([
   'selectedMode',
   'visibleModels',
 ]);
-
-/**
- * The variables whose change means a different account is answering.
- *
- * The recorded `initialize` lists exactly one auth method — *"Use OpenAI API
- * key: Requires setting the `OPENAI_API_KEY` environment variable"* — so that
- * one is evidence and the two beside it are the endpoints a key is used
- * against. `DASHSCOPE_API_KEY` is what `registration.ts` anticipates with its
- * `/^DASHSCOPE_/i` pattern; the recording has never seen it offered.
- *
- * As with Gemini there is no config-path or database variable here: this
- * provider writes no launch artifacts, so nothing in the environment moves where
- * its state lives.
- */
-const ENVIRONMENT_HASH_KEYS = [
-  'DASHSCOPE_API_KEY',
-  'OPENAI_API_KEY',
-  'OPENAI_BASE_URL',
-  'OPENAI_MODEL',
-];
 
 export interface QwenWorkspaceContext {
   listCommands(): Promise<readonly ProviderCommandDescriptor[]>;
@@ -260,19 +240,7 @@ export const qwenSettingsCodec: ProviderSettingsCodec<QwenProviderSettings> = {
 
   environmentKeyPrefixes: ['QWEN_', 'DASHSCOPE_', 'WEB_SEARCH_'],
 
-  reconcile(settings): ProviderSettingsReconcileResult<QwenProviderSettings> {
-    const environmentHash = computeEnvironmentHash(settings.environmentVariables);
-    const normalized = decodeSettings(this.encode({ ...settings, environmentHash }));
-    return {
-      settings: {
-        ...normalized,
-        availableModes: settings.availableModes,
-        discoveredModels: settings.discoveredModels,
-      },
-      changed: !deepEqual({ ...normalized, environmentHash }, stripDiscovery(settings)),
-      invalidatesSessions: environmentHash !== settings.environmentHash,
-    };
-  },
+  ...settingsReconciliationFor(qwenSettingsReconciler),
 };
 
 export const qwenProviderModule: ProviderModule<
@@ -395,15 +363,6 @@ function decodeSettings(record: Readonly<Record<string, unknown>>): QwenProvider
   };
 }
 
-function stripDiscovery(
-  settings: QwenProviderSettings,
-): Omit<QwenProviderSettings, 'availableModes' | 'discoveredModels'> & {
-  availableModes: never[];
-  discoveredModels: never[];
-} {
-  return { ...settings, availableModes: [], discoveredModels: [] };
-}
-
 function validateKnownSettings(record: Readonly<Record<string, unknown>>): string[] {
   const issues: string[] = [];
   requireType(record, 'enabled', value => typeof value === 'boolean', issues);
@@ -452,15 +411,6 @@ function requireType(
   }
 }
 
-function computeEnvironmentHash(environmentText: string): string {
-  const variables = parseEnvironmentVariables(environmentText || '');
-  return ENVIRONMENT_HASH_KEYS
-    .filter(key => variables[key])
-    .map(key => `${key}=${variables[key]}`)
-    .sort()
-    .join('|');
-}
-
 function normalizeStringMap(value: unknown): Record<string, string> {
   if (!isRecord(value)) {
     return {};
@@ -470,25 +420,4 @@ function normalizeStringMap(value: unknown): Record<string, string> {
       .filter(([host, entry]) => host.trim() !== '' && typeof entry === 'string')
       .map(([host, entry]) => [host, (entry as string).trim()]),
   );
-}
-
-/** Structural equality that ignores key order and treats arrays as ordered. */
-function deepEqual(left: unknown, right: unknown): boolean {
-  if (left === right) {
-    return true;
-  }
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return Array.isArray(left)
-      && Array.isArray(right)
-      && left.length === right.length
-      && left.every((item, index) => deepEqual(item, right[index]));
-  }
-  if (!isRecord(left) || !isRecord(right)) {
-    return false;
-  }
-  const leftKeys = Object.keys(left).sort();
-  const rightKeys = Object.keys(right).sort();
-  return leftKeys.length === rightKeys.length
-    && leftKeys.every((key, index) => key === rightKeys[index])
-    && leftKeys.every(key => deepEqual(left[key], right[key]));
 }

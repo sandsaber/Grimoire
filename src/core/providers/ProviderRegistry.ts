@@ -7,7 +7,6 @@ import {
   type ProviderConversationHistoryService,
   type ProviderId,
   type ProviderRegistration,
-  type ProviderSettingsReconciler,
   type ProviderSubagentLifecycleAdapter,
   type ProviderTaskResultInterpreter,
 } from './types';
@@ -73,9 +72,5 @@ export class ProviderRegistry {
     providerId: ProviderId = DEFAULT_CHAT_PROVIDER_ID,
   ): ProviderSubagentLifecycleAdapter | null {
     return this.getProviderRegistration(providerId).subagentLifecycleAdapter ?? null;
-  }
-
-  static getSettingsReconciler(providerId: ProviderId = DEFAULT_CHAT_PROVIDER_ID): ProviderSettingsReconciler {
-    return this.getProviderRegistration(providerId).settingsReconciler;
   }
 }

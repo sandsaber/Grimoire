@@ -10,15 +10,15 @@ import type {
   ProviderRewindOutcome,
   ProviderRewindRequest,
   ProviderSettingsCodec,
-  ProviderSettingsReconcileResult,
   ProviderUsageSnapshot,
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 import { TOOL_SUBAGENT, TOOL_SUBAGENT_LEGACY } from '@/core/tools/toolNames';
-import { parseEnvironmentVariables } from '@/utils/env';
 
 import { isRecord } from '../../utils/records';
 import { chatUiContributionFor } from '../shared/chatUiContribution';
+import { settingsReconciliationFor } from '../shared/settingsReconciliation';
+import { claudeSettingsReconciler } from './env/ClaudeSettingsReconciler';
 import {
   CLAUDE_EXECUTION_DESCRIPTOR,
   ClaudeExecutionBackend,
@@ -26,7 +26,6 @@ import {
 } from './execution/ClaudeExecutionBackend';
 import { ClaudeTaskResultInterpreter } from './runtime/ClaudeTaskResultInterpreter';
 import {
-  type ClaudeCodeProjectSettingsSnapshot,
   type ClaudeDiscoveredModel,
   type ClaudeProviderSettings,
   DEFAULT_CLAUDE_PROVIDER_SETTINGS,
@@ -69,21 +68,6 @@ const KNOWN_SETTINGS_FIELDS = new Set([
   'projectSettingsSnapshot',
   'respectProjectSettings',
 ]);
-
-/**
- * The variables whose change makes an existing SDK session unusable.
- *
- * Mirrors `ClaudeSettingsReconciler`. The registration's `/^ANTHROPIC_/i` and
- * `/^CLAUDE_/i` patterns are wider than this: they invalidate a session when
- * any matching variable changes, including ones the SDK never reads.
- */
-const ENVIRONMENT_HASH_KEYS = [
-  'ANTHROPIC_MODEL',
-  'ANTHROPIC_DEFAULT_OPUS_MODEL',
-  'ANTHROPIC_DEFAULT_SONNET_MODEL',
-  'ANTHROPIC_DEFAULT_HAIKU_MODEL',
-  'ANTHROPIC_BASE_URL',
-];
 
 
 export interface ClaudeWorkspaceContext {
@@ -266,18 +250,7 @@ export const claudeSettingsCodec: ProviderSettingsCodec<ClaudeProviderSettings> 
 
   environmentKeyPrefixes: ['ANTHROPIC_', 'CLAUDE_'],
 
-  reconcile(settings): ProviderSettingsReconcileResult<ClaudeProviderSettings> {
-    // Claude folds the project settings hash into its environment hash when it
-    // respects project settings, so a changed `.claude/settings.json` is an
-    // environment change like any other.
-    const environmentHash = computeEnvironmentHash(settings);
-    const normalized = decodeSettings(this.encode({ ...settings, environmentHash }));
-    return {
-      settings: normalized,
-      changed: !deepEqual(normalized, settings),
-      invalidatesSessions: environmentHash !== settings.environmentHash,
-    };
-  },
+  ...settingsReconciliationFor(claudeSettingsReconciler),
 };
 
 export const claudeProviderModule: ProviderModule<
@@ -472,22 +445,6 @@ function isProjectSettingsSnapshot(value: Record<string, unknown>): boolean {
     && Object.values(value.env).every(entry => typeof entry === 'string');
 }
 
-function computeEnvironmentHash(settings: ClaudeProviderSettings): string {
-  const variables = parseEnvironmentVariables(settings.environmentVariables || '');
-  const environment = ENVIRONMENT_HASH_KEYS
-    .filter(key => variables[key])
-    .map(key => `${key}=${variables[key]}`)
-    .sort()
-    .join('|');
-  const snapshot: ClaudeCodeProjectSettingsSnapshot = normalizeClaudeCodeProjectSettingsSnapshot(
-    settings.projectSettingsSnapshot,
-  );
-  const projectHash = settings.respectProjectSettings && snapshot.hash
-    ? `project=${snapshot.hash}`
-    : '';
-  return [environment, projectHash].filter(Boolean).join('|');
-}
-
 function requireType(
   record: Readonly<Record<string, unknown>>,
   field: string,
@@ -515,26 +472,5 @@ export const CLAUDE_SUBAGENT_TOOL_NAMES: readonly string[] = [
   TOOL_SUBAGENT,
   TOOL_SUBAGENT_LEGACY,
 ];
-
-/** Structural equality that ignores key order and treats arrays as ordered. */
-function deepEqual(left: unknown, right: unknown): boolean {
-  if (left === right) {
-    return true;
-  }
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return Array.isArray(left)
-      && Array.isArray(right)
-      && left.length === right.length
-      && left.every((item, index) => deepEqual(item, right[index]));
-  }
-  if (!isRecord(left) || !isRecord(right)) {
-    return false;
-  }
-  const leftKeys = Object.keys(left).sort();
-  const rightKeys = Object.keys(right).sort();
-  return leftKeys.length === rightKeys.length
-    && leftKeys.every((key, index) => key === rightKeys[index])
-    && leftKeys.every(key => deepEqual(left[key], right[key]));
-}
 
 export type { ClaudeDiscoveredModel };

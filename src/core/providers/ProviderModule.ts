@@ -59,7 +59,8 @@ export type ProviderSettingsDecodeResult<TSettings extends object> =
     readonly preservedUnknown: Readonly<Record<string, unknown>>;
   };
 
-export interface ProviderSettingsCodec<TSettings extends object = Record<string, unknown>> {
+export interface ProviderSettingsCodec<TSettings extends object = Record<string, unknown>>
+  extends ProviderSettingsReconciliation {
   readonly providerId: ProviderId;
   readonly schemaVersion: number;
 
@@ -96,29 +97,62 @@ export interface ProviderSettingsCodec<TSettings extends object = Record<string,
    */
   readonly environmentKeyPrefixes: readonly string[];
 
-  /**
-   * Normalization on load and on environment change. Inventory row 9.
-   * Returns the reconciled settings and what the change invalidates, instead of
-   * mutating settings and reporting a boolean.
-   */
-  reconcile(settings: TSettings, reason: ProviderSettingsReconcileReason): ProviderSettingsReconcileResult<TSettings>;
 }
 
-export type ProviderSettingsReconcileReason = 'load' | 'environment-change' | 'model-change';
-
-export interface ProviderSettingsReconcileResult<TSettings extends object> {
-  readonly settings: TSettings;
-  readonly changed: boolean;
+/**
+ * Normalization on load, on environment change, and on model change. Inventory
+ * row 9.
+ *
+ * **Three operations, not one method with a reason.** The slot this replaces
+ * was `reconcile(settings: TSettings, reason)` over
+ * `'load' | 'environment-change' | 'model-change'` — and the row it faces has
+ * three separate methods that the host calls from three different places, in a
+ * fixed order, with no implementation reading any reason at all. The enum was
+ * vocabulary invented while writing the contract, like the `toggle` reasoning
+ * kind M3 found: a word nothing uses is a word nothing checks. Folding the
+ * three into one would also have merged the two the host runs *in sequence* on
+ * an environment change, which are two different repairs.
+ *
+ * **And the settings are the app's, not `TSettings`.** Every implementation
+ * computes its environment hash from `getRuntimeEnvironmentText`, which joins
+ * the shared environment scope with the provider's, and two of them read and
+ * write the top-level `model`. A provider-scoped record disowns every shared
+ * variable: a user who sets `XAI_API_KEY` in the shared scope would stop
+ * invalidating Grok's model cache. This is the third row to want the whole
+ * record — see `ProviderScopedSettings`.
+ *
+ * The settings are mutated in place, which is what nine implementations do and
+ * what the host's projection dance is built on; a contract documenting the
+ * opposite would be worse than one admitting the shape it has.
+ */
+export interface ProviderSettingsReconciliation {
   /**
-   * Whether the reconciliation makes this provider's existing sessions
-   * unusable.
+   * Discovery state this provider must drop when its environment changes.
    *
-   * A boolean rather than a list of conversation ids: `reconcile` receives
-   * settings, not the conversation list, so the ids are unknowable from inside
-   * the module. The host owns conversations and applies this to its own list,
-   * which is what the legacy reconciler does when it walks every conversation
-   * of the provider.
+   * Optional, and absent means there is none: four providers cache a model
+   * catalogue keyed to the environment that produced it, and five do not.
    */
+  clearDiscoveryState?(settings: ProviderScopedSettings): boolean;
+
+  /**
+   * Re-derives the environment hash, and says whether the sessions this
+   * provider already has are now unusable.
+   *
+   * `invalidatesSessions` is a boolean rather than a list of conversations: the
+   * host owns the conversation list, and a module handed one would be a module
+   * editing the host's state. What the host clears is the session binding —
+   * `sessionId` and the opaque `providerState` — for the conversations of this
+   * provider that have one.
+   */
+  reconcileEnvironment(settings: ProviderScopedSettings): ProviderSettingsReconcileOutcome;
+
+  /** Normalizes model ids whose variant suffix the visibility settings no longer allow. */
+  normalizeModelVariants(settings: ProviderScopedSettings): boolean;
+}
+
+export interface ProviderSettingsReconcileOutcome {
+  readonly changed: boolean;
+  /** Whether the reconciliation makes this provider's existing sessions unusable. */
   readonly invalidatesSessions: boolean;
 }
 

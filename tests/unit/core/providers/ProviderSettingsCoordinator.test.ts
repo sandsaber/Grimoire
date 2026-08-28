@@ -1,6 +1,5 @@
 import '@/providers';
 
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import type { Conversation } from '@/core/types';
 import { DEFAULT_CLAUDE_PROVIDER_SETTINGS } from '@/providers/claude/settings';
@@ -81,31 +80,59 @@ describe('ProviderSettingsCoordinator', () => {
       expect(Array.isArray(result.invalidatedConversations)).toBe(true);
     });
 
-    it('filters conversations per provider', () => {
-      const reconcileSpy = jest.spyOn(
-        ProviderRegistry.getSettingsReconciler('claude'),
-        'reconcileModelWithEnvironment',
-      );
-
-      const claudeConv = { providerId: 'claude', messages: [] } as unknown as Conversation;
-      const otherConv = { providerId: 'codex', messages: [] } as unknown as Conversation;
+    // The reconciler no longer sees conversations at all: it answers whether
+    // this provider's sessions survived, and the host applies that to its own
+    // list. So what "per provider" means is which conversations get cleared,
+    // which is what this asserts now rather than which list was passed in.
+    it('clears only the conversations of the provider whose environment changed', () => {
+      const claudeConv = {
+        providerId: 'claude',
+        messages: [],
+        sessionId: 'claude-session',
+      } as unknown as Conversation;
+      const otherConv = {
+        providerId: 'codex',
+        messages: [],
+        sessionId: 'codex-thread',
+      } as unknown as Conversation;
       const settings: Record<string, unknown> = {
         model: 'haiku',
         settingsProvider: 'claude',
+        sharedEnvironmentVariables: 'ANTHROPIC_BASE_URL=https://example.invalid\n',
         providerConfigs: {
           claude: { enabled: true },
         },
       };
 
-      ProviderSettingsCoordinator.reconcileAllProviders(settings, [claudeConv, otherConv]);
+      const { invalidatedConversations } = ProviderSettingsCoordinator
+        .reconcileAllProviders(settings, [claudeConv, otherConv]);
 
-      // Claude reconciler should only receive claude conversations
-      expect(reconcileSpy).toHaveBeenCalledWith(
-        settings,
-        [claudeConv],
-      );
+      expect(invalidatedConversations).toEqual([claudeConv]);
+      expect(claudeConv.sessionId).toBeNull();
+      expect(otherConv.sessionId).toBe('codex-thread');
+    });
 
-      reconcileSpy.mockRestore();
+    it('leaves a conversation that has no session binding out of the invalidated list', () => {
+      // The caller writes one metadata file per entry, so a conversation with
+      // nothing to clear must not appear: it would be a write per conversation
+      // of the provider on every environment change.
+      const bound = {
+        providerId: 'claude',
+        messages: [],
+        sessionId: 'claude-session',
+      } as unknown as Conversation;
+      const unbound = { providerId: 'claude', messages: [] } as unknown as Conversation;
+      const settings: Record<string, unknown> = {
+        model: 'haiku',
+        settingsProvider: 'claude',
+        sharedEnvironmentVariables: 'ANTHROPIC_BASE_URL=https://example.invalid\n',
+        providerConfigs: { claude: { enabled: true } },
+      };
+
+      const { invalidatedConversations } = ProviderSettingsCoordinator
+        .reconcileAllProviders(settings, [bound, unbound]);
+
+      expect(invalidatedConversations).toEqual([bound]);
     });
   });
 

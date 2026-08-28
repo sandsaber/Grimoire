@@ -65,17 +65,12 @@ describe('ProviderRegistry', () => {
     expect(taskInterpreter).toHaveProperty('resolveTerminalStatus');
   });
 
-  it('returns a settings reconciler for the default provider', () => {
-    const reconciler = ProviderRegistry.getSettingsReconciler();
-    expect(reconciler).toHaveProperty('reconcileModelWithEnvironment');
-    expect(reconciler).toHaveProperty('normalizeModelVariantSettings');
-  });
-
   it('throws when an unknown provider is requested', () => {
-    // Was asked of `getChatUIConfig`, which the chat-UI row took with it. Any
-    // accessor proves the same thing — that an unregistered id is refused
-    // rather than answered — so it moved to one that is still here.
-    expect(() => ProviderRegistry.getSettingsReconciler(
+    // Was asked of `getChatUIConfig` and then of `getSettingsReconciler`, both
+    // of which their rows took with them. Any accessor proves the same thing —
+    // that an unregistered id is refused rather than answered — so it follows
+    // whichever one is still here.
+    expect(() => ProviderRegistry.getConversationHistoryService(
       'nonexistent' as any,
     )).toThrow('Provider "nonexistent" is not registered.');
   });

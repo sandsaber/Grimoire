@@ -176,12 +176,6 @@ describe('Gemini provider module', () => {
   });
 
   describe('settings codec', () => {
-    it('round-trips defaults without reporting a change', () => {
-      const defaults = geminiSettingsCodec.defaults();
-
-      expect(geminiSettingsCodec.decode(geminiSettingsCodec.encode(defaults)).ok).toBe(true);
-      expect(geminiSettingsCodec.reconcile(defaults, 'load').changed).toBe(false);
-    });
 
     it('never writes discovery state into the settings file', () => {
       // The persisted interface excludes these two, and encoding them would
@@ -208,43 +202,6 @@ describe('Gemini provider module', () => {
       expect(decoded.ok ? [] : decoded.fallback.discoveredModels).toEqual([]);
     });
 
-    it('keeps discovery state across a reconciliation that did not persist it', () => {
-      const discovered = [{ rawId: 'gemini-2.5-pro', label: 'gemini-2.5-pro' }];
-
-      const result = geminiSettingsCodec.reconcile({
-        ...geminiSettingsCodec.defaults(),
-        discoveredModels: discovered,
-      }, 'load');
-
-      expect(result.settings.discoveredModels).toEqual(discovered);
-      expect(result.changed).toBe(false);
-    });
-
-    it('invalidates sessions when the account answering would change', () => {
-      const changed = geminiSettingsCodec.reconcile({
-        ...geminiSettingsCodec.defaults(),
-        environmentVariables: 'GEMINI_API_KEY=abc\n',
-        environmentHash: '',
-      }, 'environment-change');
-
-      expect(changed.invalidatesSessions).toBe(true);
-      expect(changed.settings.environmentHash).toBe('GEMINI_API_KEY=abc');
-    });
-
-    it('ignores a GEMINI_ variable that decides nothing about the account', () => {
-      // The registration's `/^GEMINI_/i` pattern matches every variable this
-      // CLI reads, and most of them say nothing about who is answering.
-      // Hashing the pattern would invalidate every conversation over a system
-      // prompt path.
-      const result = geminiSettingsCodec.reconcile({
-        ...geminiSettingsCodec.defaults(),
-        environmentVariables: 'GEMINI_SYSTEM_MD=/vault/system.md\n',
-        environmentHash: '',
-      }, 'environment-change');
-
-      expect(result.invalidatesSessions).toBe(false);
-      expect(result.settings.environmentHash).toBe('');
-    });
   });
 
   describe('model presentation', () => {

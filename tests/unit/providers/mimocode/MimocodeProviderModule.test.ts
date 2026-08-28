@@ -141,12 +141,6 @@ describe('MiMoCode provider module', () => {
   });
 
   describe('settings codec', () => {
-    it('round-trips defaults without reporting a change', () => {
-      const defaults = mimocodeSettingsCodec.defaults();
-
-      expect(mimocodeSettingsCodec.decode(mimocodeSettingsCodec.encode(defaults)).ok).toBe(true);
-      expect(mimocodeSettingsCodec.reconcile(defaults, 'load').changed).toBe(false);
-    });
 
     it('never writes discovery state into the settings file', () => {
       // The persisted interface excludes these two, and encoding them would
@@ -173,43 +167,6 @@ describe('MiMoCode provider module', () => {
       expect(decoded.ok ? [] : decoded.fallback.discoveredModels).toEqual([]);
     });
 
-    it('keeps discovery state across a reconciliation that did not persist it', () => {
-      const discovered = [{ rawId: 'anthropic/claude-sonnet', label: 'Sonnet' }];
-
-      const result = mimocodeSettingsCodec.reconcile({
-        ...mimocodeSettingsCodec.defaults(),
-        discoveredModels: discovered,
-      }, 'load');
-
-      expect(result.settings.discoveredModels).toEqual(discovered);
-      expect(result.changed).toBe(false);
-    });
-
-    it('invalidates sessions when a variable the CLI reads its state from changes', () => {
-      const changed = mimocodeSettingsCodec.reconcile({
-        ...mimocodeSettingsCodec.defaults(),
-        environmentVariables: 'XDG_DATA_HOME=/tmp/mimocode\n',
-        environmentHash: '',
-      }, 'environment-change');
-
-      expect(changed.invalidatesSessions).toBe(true);
-      expect(changed.settings.environmentHash).toBe('XDG_DATA_HOME=/tmp/mimocode');
-    });
-
-    it('ignores the MIMOCODE_ variable the default settings ship with', () => {
-      // `MIMOCODE_ENABLE_EXA` is in the shipped defaults and matches the
-      // registration's `/^MIMOCODE_/i` pattern, so the pattern would invalidate
-      // every session on a fresh install. The four keys that decide a session's
-      // usability do not.
-      const result = mimocodeSettingsCodec.reconcile(
-        mimocodeSettingsCodec.defaults(),
-        'environment-change',
-      );
-
-      expect(mimocodeSettingsCodec.defaults().environmentVariables)
-        .toContain('MIMOCODE_ENABLE_EXA');
-      expect(result.invalidatesSessions).toBe(false);
-    });
   });
 
   describe('model presentation', () => {

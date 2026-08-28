@@ -8,14 +8,14 @@ import type {
   ProviderModelDescriptor,
   ProviderModule,
   ProviderSettingsCodec,
-  ProviderSettingsReconcileResult,
   ProviderUsageSnapshot,
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
-import { parseEnvironmentVariables } from '@/utils/env';
 
 import { isRecord } from '../../utils/records';
 import { chatUiContributionFor } from '../shared/chatUiContribution';
+import { settingsReconciliationFor } from '../shared/settingsReconciliation';
+import { geminiSettingsReconciler } from './env/GeminiSettingsReconciler';
 import {
   GEMINI_EXECUTION_DESCRIPTOR,
   GeminiExecutionBackend,
@@ -82,25 +82,6 @@ const KNOWN_SETTINGS_FIELDS = new Set([
   'selectedMode',
   'visibleModels',
 ]);
-
-/**
- * The variables whose change means a different account is answering.
- *
- * Read off the recorded `initialize`, which lists this CLI's four auth methods:
- * personal OAuth, a Gemini API key, Vertex AI, and a gateway. The three that
- * can be carried in the environment are what this hashes. Unlike the OpenCode
- * family there is no config-path or database variable here — this provider
- * writes no launch artifacts, so nothing in the environment moves where its
- * state lives.
- */
-const ENVIRONMENT_HASH_KEYS = [
-  'GEMINI_API_KEY',
-  'GOOGLE_API_KEY',
-  'GOOGLE_APPLICATION_CREDENTIALS',
-  'GOOGLE_CLOUD_LOCATION',
-  'GOOGLE_CLOUD_PROJECT',
-  'GOOGLE_GENAI_USE_VERTEXAI',
-];
 
 export interface GeminiWorkspaceContext {
   listCommands(): Promise<readonly ProviderCommandDescriptor[]>;
@@ -271,21 +252,7 @@ export const geminiSettingsCodec: ProviderSettingsCodec<GeminiProviderSettings> 
 
   environmentKeyPrefixes: ['GEMINI_', 'GOOGLE_', 'VERTEX_'],
 
-  reconcile(settings): ProviderSettingsReconcileResult<GeminiProviderSettings> {
-    const environmentHash = computeEnvironmentHash(settings.environmentVariables);
-    const normalized = decodeSettings(this.encode({ ...settings, environmentHash }));
-    return {
-      // Discovery state survives reconciliation because the codec does not
-      // persist it: it belongs to the caller that refreshed it.
-      settings: {
-        ...normalized,
-        availableModes: settings.availableModes,
-        discoveredModels: settings.discoveredModels,
-      },
-      changed: !deepEqual({ ...normalized, environmentHash }, stripDiscovery(settings)),
-      invalidatesSessions: environmentHash !== settings.environmentHash,
-    };
-  },
+  ...settingsReconciliationFor(geminiSettingsReconciler),
 };
 
 export const geminiProviderModule: ProviderModule<
@@ -411,15 +378,6 @@ function decodeSettings(record: Readonly<Record<string, unknown>>): GeminiProvid
   };
 }
 
-function stripDiscovery(
-  settings: GeminiProviderSettings,
-): Omit<GeminiProviderSettings, 'availableModes' | 'discoveredModels'> & {
-  availableModes: never[];
-  discoveredModels: never[];
-} {
-  return { ...settings, availableModes: [], discoveredModels: [] };
-}
-
 function validateKnownSettings(record: Readonly<Record<string, unknown>>): string[] {
   const issues: string[] = [];
   requireType(record, 'enabled', value => typeof value === 'boolean', issues);
@@ -463,15 +421,6 @@ function requireType(
   }
 }
 
-function computeEnvironmentHash(environmentText: string): string {
-  const variables = parseEnvironmentVariables(environmentText || '');
-  return ENVIRONMENT_HASH_KEYS
-    .filter(key => variables[key])
-    .map(key => `${key}=${variables[key]}`)
-    .sort()
-    .join('|');
-}
-
 function normalizeStringMap(value: unknown): Record<string, string> {
   if (!isRecord(value)) {
     return {};
@@ -481,25 +430,4 @@ function normalizeStringMap(value: unknown): Record<string, string> {
       .filter(([host, entry]) => host.trim() !== '' && typeof entry === 'string')
       .map(([host, entry]) => [host, (entry as string).trim()]),
   );
-}
-
-/** Structural equality that ignores key order and treats arrays as ordered. */
-function deepEqual(left: unknown, right: unknown): boolean {
-  if (left === right) {
-    return true;
-  }
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return Array.isArray(left)
-      && Array.isArray(right)
-      && left.length === right.length
-      && left.every((item, index) => deepEqual(item, right[index]));
-  }
-  if (!isRecord(left) || !isRecord(right)) {
-    return false;
-  }
-  const leftKeys = Object.keys(left).sort();
-  const rightKeys = Object.keys(right).sort();
-  return leftKeys.length === rightKeys.length
-    && leftKeys.every((key, index) => key === rightKeys[index])
-    && leftKeys.every(key => deepEqual(left[key], right[key]));
 }

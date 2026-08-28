@@ -151,27 +151,6 @@ describe('Antigravity provider module', () => {
       );
     });
 
-    it('invalidates no conversation, because there is no session to invalidate', () => {
-      const result = antigravitySettingsCodec.reconcile(
-        antigravitySettingsCodec.defaults(),
-        'environment-change',
-      );
-
-      expect(result.invalidatesSessions).toBe(false);
-      expect(result.changed).toBe(false);
-    });
-
-    it('reports a change when normalization rewrites the input', () => {
-      const messy = {
-        ...antigravitySettingsCodec.defaults(),
-        cliPath: '  /usr/local/bin/agy  ',
-      };
-
-      const result = antigravitySettingsCodec.reconcile(messy, 'load');
-
-      expect(result.changed).toBe(true);
-      expect(result.settings.cliPath).toBe('/usr/local/bin/agy');
-    });
   });
 
   describe('workspace contribution', () => {

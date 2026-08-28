@@ -4,6 +4,7 @@ import { toLegacyCapabilities } from './legacyCapabilities';
 import { getProviderConfig, setProviderConfig } from './providerConfig';
 import type {
   ProviderModule,
+  ProviderSettingsReconciliation,
   ProviderWorkspaceCapabilityMap,
 } from './ProviderModule';
 import type { ProviderCapabilities } from './types';
@@ -228,6 +229,17 @@ export class ProviderCatalog {
   }
 
   /**
+   * How a provider normalizes its settings on load and on environment change.
+   *
+   * The codec, narrowed to the three members that take the **app** record
+   * rather than the provider's own decoded settings — which is why they are
+   * reachable here and `decode`/`encode` are not.
+   */
+  settingsReconciliation(providerId: string): ProviderSettingsReconciliation {
+    return this.require(providerId).settings;
+  }
+
+  /**
    * A provider's settings as its own codec reads them.
    *
    * An unreadable config still answers: the fallback is what the provider would
@@ -323,7 +335,13 @@ function validateModules(modules: readonly CatalogProviderModule[]): void {
         + `${String(settings.schemaVersion)}.`,
       );
     }
-    for (const method of ['defaults', 'decode', 'encode', 'isEnabled', 'withEnabled', 'reconcile']) {
+    for (const method of [
+      'defaults', 'decode', 'encode', 'isEnabled', 'withEnabled',
+      // The reconciliation half. `clearDiscoveryState` is deliberately
+      // absent from this list: five providers cache no environment-keyed
+      // discovery state, and absence is what they say so with.
+      'reconcileEnvironment', 'normalizeModelVariants',
+    ]) {
       requireMethod(providerId, 'settings', settings, method);
     }
     if (!Array.isArray(settings.runtimeInputKeys)

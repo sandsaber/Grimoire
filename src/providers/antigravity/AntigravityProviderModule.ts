@@ -4,12 +4,13 @@ import type {
   ProviderModelDescriptor,
   ProviderModule,
   ProviderSettingsCodec,
-  ProviderSettingsReconcileResult,
   ProviderWorkspaceSlots,
 } from '@/core/providers/ProviderModule';
 
 import { isRecord } from '../../utils/records';
 import { chatUiContributionFor } from '../shared/chatUiContribution';
+import { settingsReconciliationFor } from '../shared/settingsReconciliation';
+import { antigravitySettingsReconciler } from './env/AntigravitySettingsReconciler';
 import {
   ANTIGRAVITY_EXECUTION_DESCRIPTOR,
   AntigravityExecutionBackend,
@@ -213,19 +214,7 @@ export const antigravitySettingsCodec: ProviderSettingsCodec<AntigravityProvider
 
   environmentKeyPrefixes: ['ANTIGRAVITY_', 'GOOGLE_', 'GEMINI_', 'VERTEX_'],
 
-  reconcile(settings): ProviderSettingsReconcileResult<AntigravityProviderSettings> {
-    const normalized = decodeSettings(this.encode(settings));
-    return {
-      settings: normalized,
-      // Order-insensitive: encode and decode rebuild the object, so a raw
-      // `JSON.stringify` comparison reports every reconciliation as a change
-      // purely from key ordering, and a settings write would follow every load.
-      changed: !deepEqual(normalized, settings),
-      // No resumable session exists, so there is nothing reconciliation could
-      // invalidate: the next run simply starts a fresh process.
-      invalidatesSessions: false,
-    };
-  },
+  ...settingsReconciliationFor(antigravitySettingsReconciler),
 };
 
 export const antigravityProviderModule: ProviderModule<
@@ -357,27 +346,6 @@ function requireType(
   if (field in record && !validate(record[field])) {
     issues.push(`${field} has an invalid type`);
   }
-}
-
-/** Structural equality that ignores key order and treats arrays as ordered. */
-function deepEqual(left: unknown, right: unknown): boolean {
-  if (left === right) {
-    return true;
-  }
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return Array.isArray(left)
-      && Array.isArray(right)
-      && left.length === right.length
-      && left.every((item, index) => deepEqual(item, right[index]));
-  }
-  if (!isRecord(left) || !isRecord(right)) {
-    return false;
-  }
-  const leftKeys = Object.keys(left).sort();
-  const rightKeys = Object.keys(right).sort();
-  return leftKeys.length === rightKeys.length
-    && leftKeys.every((key, index) => key === rightKeys[index])
-    && leftKeys.every(key => deepEqual(left[key], right[key]));
 }
 
 function isDiscoveredModel(value: unknown): value is AntigravityDiscoveredModel {

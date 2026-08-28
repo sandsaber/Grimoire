@@ -133,12 +133,6 @@ describe('OpenCode provider module', () => {
   });
 
   describe('settings codec', () => {
-    it('round-trips defaults without reporting a change', () => {
-      const defaults = opencodeSettingsCodec.defaults();
-
-      expect(opencodeSettingsCodec.decode(opencodeSettingsCodec.encode(defaults)).ok).toBe(true);
-      expect(opencodeSettingsCodec.reconcile(defaults, 'load').changed).toBe(false);
-    });
 
     it('never writes discovery state into the settings file', () => {
       // The persisted interface excludes these two, and encoding them would
@@ -165,43 +159,6 @@ describe('OpenCode provider module', () => {
       expect(decoded.ok ? [] : decoded.fallback.discoveredModels).toEqual([]);
     });
 
-    it('keeps discovery state across a reconciliation that did not persist it', () => {
-      const discovered = [{ rawId: 'anthropic/claude-sonnet', label: 'Sonnet' }];
-
-      const result = opencodeSettingsCodec.reconcile({
-        ...opencodeSettingsCodec.defaults(),
-        discoveredModels: discovered,
-      }, 'load');
-
-      expect(result.settings.discoveredModels).toEqual(discovered);
-      expect(result.changed).toBe(false);
-    });
-
-    it('invalidates sessions when a variable the CLI reads its state from changes', () => {
-      const changed = opencodeSettingsCodec.reconcile({
-        ...opencodeSettingsCodec.defaults(),
-        environmentVariables: 'XDG_DATA_HOME=/tmp/opencode\n',
-        environmentHash: '',
-      }, 'environment-change');
-
-      expect(changed.invalidatesSessions).toBe(true);
-      expect(changed.settings.environmentHash).toBe('XDG_DATA_HOME=/tmp/opencode');
-    });
-
-    it('ignores the OPENCODE_ variable the default settings ship with', () => {
-      // `OPENCODE_ENABLE_EXA` is in the shipped defaults and matches the
-      // registration's `/^OPENCODE_/i` pattern, so the pattern would invalidate
-      // every session on a fresh install. The four keys that decide a session's
-      // usability do not.
-      const result = opencodeSettingsCodec.reconcile(
-        opencodeSettingsCodec.defaults(),
-        'environment-change',
-      );
-
-      expect(opencodeSettingsCodec.defaults().environmentVariables)
-        .toContain('OPENCODE_ENABLE_EXA');
-      expect(result.invalidatesSessions).toBe(false);
-    });
   });
 
   describe('model presentation', () => {
