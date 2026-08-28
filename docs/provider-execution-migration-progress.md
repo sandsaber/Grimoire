@@ -9685,10 +9685,25 @@ remaining work:
 Narrowing a gate is a decision, so it is written here rather than only in the test: the evidence is
 the file lists above, and the precedent is `ChatContentItem`, which exists for exactly this reason.
 
-**What is genuinely left is two milestones and one decision.** Durable agents gates four of the
-searches; the provider rows gate two more and are themselves gated on durable agents, the seam's
-`ChatRuntime` removal (done) and a host contract for the settings tabs; and D9 (redo) is still
-recorded as awaiting an owner decision.
+**Every remaining item has a named blocker, and each was checked rather than assumed.** This is the
+list a resuming session should start from:
+
+| Item | Blocker, and the evidence |
+|---|---|
+| `warm-runtime tab LRU ownership` — the plan deletes it with the seam | **The owner it would move to does not exist.** `ExecutionLifecycleRegistry` has no session cap: grep finds no `maxSessions`, no budget, no eviction. The tab-level LRU (`MAX_WARM_PROVIDER_RUNTIMES = 5`) is the *only* thing bounding how many provider processes are alive, so deleting it uncaps them — twenty open tabs would mean twenty live CLIs. The kernel needs a session budget first, and that is a design with a real question in it: what happens to an evicted session mid-turn. |
+| `worker tab ownership` (3) | durable agents. Worker tabs are a live feature — the orchestrator spawns one per task and sends it a prompt — and the plan turns them into "optional focused views" only once attempts are durable. |
+| `SubagentManager lifecycle` (7) | durable agents. The recorder and the background-agent card exist; what has not shipped is tab close ceasing to cancel, which the plan forbids before the durable-ownership UI. |
+| `the two registries` (30) | durable agents. `ProviderRegistry` is `register` plus two accessors over `taskResultInterpreter?` and `subagentLifecycleAdapter?`, filled by three providers, and both rows are shaped for consumers durable agents replaces. |
+| `the application importing a concrete provider module` (20) | **Not a defect, and the `closedBy` is ambiguous.** All twenty are `src/app/execution/<id>/` — each provider's execution composition and its transport — plus two settings modules. Closing it means *relocating* those into `src/providers/<id>/`, which is an architecture decision, not a row move. |
+| `core importing the plugin type` (2) | `ProviderWorkspaceRegistry` and `types.ts`, both waiting on the workspace rows still in them. |
+| `turn metadata and session updates` (6) | `buildSessionUpdates` would move to the coordinator's persistence barrier, which does not carry the provider's **native** session ref — only the execution session id. Touching it is conversation-persistence work. `syncConversationState` is arguably the adapter's own API now that no interface declares it. |
+| `StreamChunk` lifecycle vocabulary (5) | the union has no feature-layer consumer left, but two provider normalizers still emit framing into a channel the projection drops it from. Removing it is normalizer surgery against tests written from real transcripts — smoke-matrix work. |
+| D9 (redo) | an owner decision, recorded and still open. |
+
+So the honest reading: **the refactoring half of M5 is done.** What remains is one feature milestone
+(durable agents, with its UI), one kernel capability that does not exist (a session budget), one
+architecture decision (where provider compositions live), one live-certified change (normalizer
+framing), and one product decision (D9).
 
 **Six rows moved: the chat UI, the settings reconciler, the command catalog, CLI resolution, MCP
 storage and the history service.** And the most useful thing the session found is where it stopped:
