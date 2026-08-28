@@ -112,6 +112,20 @@ const SEARCHES: readonly DeletionSearch[] = [
     // **7, of which one is the replacement** — `SubagentAgentRecorder` names
     // the class while describing what it takes over from it. The rest are the
     // three chat controllers, the tab and its types, and the class itself.
+    //
+    // **The authority it has to lose is one method, and what blocks the
+    // transfer is now specific.** `hasRunningSubagents()` is live and
+    // load-bearing: the tab installs it as the `subagentState` interaction, the
+    // Claude composition reads it back off the adapter, and it becomes the
+    // `Stop` hook that keeps the SDK from ending a turn while a background
+    // subagent is still going. The durable domain already knows the same fact —
+    // an `OwnedAgentSummary` without a `terminal` is running — but
+    // `listOwnedAgents` is **async and reads every agent record in the vault**,
+    // and the hook needs an answer synchronously at the end of every turn.
+    // Making the hook await it would put several file reads on that path, which
+    // is the cost `refreshBackgroundAgentCard` already warns about. So the
+    // transfer waits on an in-memory projection over the records — which is
+    // durable agents' own missing piece, not this row's.
     files: 7,
     closedBy: 'durable agents — it loses lifecycle authority and keeps its rendering',
   },

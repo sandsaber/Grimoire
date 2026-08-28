@@ -10445,6 +10445,27 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — what durable agents has to build first, found by trying to move one method (`this commit`)
+
+- Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean.
+- `SubagentManager lifecycle` is 7 files and its `closedBy` says durable agents. Attempting the
+  named slice — *"`SubagentManager` loses lifecycle authority while its rendering is retained"* —
+  turns that into something specific enough to build.
+- **The authority is one method.** `hasRunningSubagents()` is the only lifecycle question anything
+  asks it. It is live and load-bearing, by a chain that is easy to miss: `Tab.ts` installs it as the
+  `subagentState` interaction, `ClaudeExecutionComposition` reads it back through
+  `adapter.interactionCallbacks()`, and it becomes the SDK `Stop` hook that refuses to end a turn
+  while a background subagent is still running. *Two greps said it was dead before the third found
+  the composition reading it by a different name.*
+- **The durable domain already knows the fact and cannot answer in time.** An `OwnedAgentSummary`
+  with no `terminal` is a running agent, which is the same question — but `listOwnedAgents` is
+  **async and reads every agent record in the vault**, and the hook needs the answer synchronously at
+  the end of every turn. Making it await would put several file reads on the end of every turn, the
+  cost `refreshBackgroundAgentCard` already carries a warning about.
+- **So the missing piece is named: an in-memory projection over the agent records.** Durable agents
+  needs one anyway — the card path re-reads the whole store on every subagent state change for the
+  same reason — and once it exists, this row is a one-line swap. Owner: durable agents, first.
+
 ### M5 — the review pass: the instructions still described the deleted architecture (`this commit`)
 
 The second 25-step review. It found nothing wrong with the code and one thing badly wrong beside it.
