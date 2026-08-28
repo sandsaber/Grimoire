@@ -395,12 +395,16 @@ describe('structural deletion progress', () => {
       'SubagentManager lifecycle: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
     ]);
-    // Seven of twelve are zero: two closed in the 2026-08-27 session, the
-    // interaction callbacks closed with the first step of the seam deletion,
-    // the compositions closed by moving under the providers they compose, the
-    // neutral settings imports closed by two contract additions, the subagent
-    // hooks closed once the loaders beside them were read, and both registries
-    // are deleted.
+    // **Ten of twelve are zero.** The two that are not are not blocked: each
+    // has a `closedBy` saying, in its own entry above, why what its pattern
+    // finds is correct where it is. The live subagent map is the synchronous
+    // half of a deliberate union that a synchronous hook needs; three of the
+    // four patterns in the other name content Claude's transform emits and the
+    // column draws, which durable agents cannot take over because an
+    // `AgentResultRecord` carries no tool calls.
+    //
+    // So this number stops being the milestone's score at ten, and the two
+    // entries are the reason rather than a backlog.
     expect(SEARCHES).toHaveLength(remaining.length + 10);
   });
 });

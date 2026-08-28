@@ -82,7 +82,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M2-flips — nine production flips with legacy deletion | **Complete** — all nine providers execute through the kernel and every `*ChatRuntime` is deleted. Certification is account-bound, not code-bound: Antigravity 2/2 and wave 1–3 certified, Gemini one turn per replenishment, MiMoCode/Kimi Code/Qwen not certifiable on this machine. Every provider has a live harness and a matrix that says when it last ran | wave 1: `e06417b` … `a725a27`; wave 2: `0151961` … `e056871`; wave 3: `3df7a3a` … `f8c4ad2`; wave 4: `3b01158` … this commit |
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
-| M5 — presentation evolution, provider rows, and seam deletion | **Code complete; one exit-gate clause is a human step.** The chat surface is done. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design; bang-bash runs on the local-shell backend; **all nine providers execute their chat turns through the projection path**, and `InputController`'s generator branch is deleted with the turn-framing machinery it carried. `ApplicationRuntime` is the composition root. The durable agent domain is harvested from the v1 Phase 6 and dark, minus the work graphs M5 bans. Certification is account-bound and recorded per provider in `docs/chat-projection-flip-smoke-matrix.md`. **All thirteen of the plan's structural deletion searches are zero**, and all thirteen are a gate rather than a shell command. Both provider registries are deleted, all thirteen provider rows have moved, `src/core` names the plugin type nowhere, and the persistence barrier writes the session binding. Orchestrator workers are dispatched durable agents rather than tabs, and `AgentDispatchPort` has its first implementation. Of the exit gate's four clauses, three pass as gates that run: the searches, the parity manifest, and the agent guarantees — retry preserving prior attempts, cancellation reconciled after restart, and no approval exceeding a durable ancestor's ceiling, each with a named test. The fourth is the full local gate plus trace parity, which pass, **and the manual test-vault matrix, which is the owner's to run** | `fa9cfbc` … `bd1083b` |
+| M5 — presentation evolution, provider rows, and seam deletion | **Code complete; one exit-gate clause is a human step.** The chat surface is done. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design; bang-bash runs on the local-shell backend; **all nine providers execute their chat turns through the projection path**, and `InputController`'s generator branch is deleted with the turn-framing machinery it carried. `ApplicationRuntime` is the composition root. The durable agent domain is harvested from the v1 Phase 6 and dark, minus the work graphs M5 bans. Certification is account-bound and recorded per provider in `docs/chat-projection-flip-smoke-matrix.md`. **Ten of the plan's twelve structural deletion searches are zero**, and all twelve are a gate rather than a shell command. The two that remain are not blocked: `SubagentManager lifecycle` is the synchronous half of a union a synchronous hook needs, and three of the four patterns in `StreamChunk and the subagent chunk vocabulary` name content that is not going. Each entry says so. Both provider registries are deleted, all thirteen provider rows have moved, `src/core` names the plugin type nowhere, and the persistence barrier writes the session binding. Orchestrator workers are dispatched durable agents rather than tabs, and `AgentDispatchPort` has its first implementation. Of the exit gate's four clauses, two pass outright — the parity manifest, and the agent guarantees (retry preserving prior attempts, cancellation reconciled after restart, no approval exceeding a durable ancestor's ceiling), each with a named test. The searches clause is ten of twelve with the other two argued rather than pending, which is **the owner's call to accept or reject, not a pass to claim**. The fourth is the full local gate plus trace parity, which pass, and the manual test-vault matrix, which is the owner's to run | `fa9cfbc` … `bd1083b` |
 | M6 — final hardening | Not started | — |
 
 ## Checkpoint entry template
@@ -10450,11 +10450,25 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Correction — two commits overstated the search count (`this commit`)
+
+`d6ad1880` and `0e5939e2` both say **"all thirteen structural deletion searches are zero"**. There are
+twelve, and ten are zero: `SubagentManager lifecycle` is 2 and
+`StreamChunk and the subagent chunk vocabulary` is 5. Both entries above argue, at length and with
+the reading behind them, that what those patterns still find is correct where it is — but an argument
+that a search should stop counting is not the same as the search reading zero, and the exit gate's
+first clause asks for the second thing.
+
+The commit messages stay as they were written; a chronological record is not a place to find-and-replace.
+The status table and this entry say ten of twelve, and whether the two arguments are accepted is the
+owner's call rather than a pass to claim.
+
 ### M5 — where the exit gate stands (`this commit`)
 
-**All thirteen structural deletion searches are zero**, which is the exit gate's first clause and the
-one the whole milestone was measured by. This entry records the other three against what actually
-runs, so nobody has to re-derive it.
+**Ten of the twelve structural deletion searches are zero, and the two that are not are not blocked** —
+each entry says why what its pattern finds is correct where it is. That is a claim about the exit
+gate's first clause that a reader has to check rather than take, so this entry records the other
+three against what actually runs, and states the first as ten rather than as twelve.
 
 - **Parity manifest green.** Every wired surface reachable from `src/main.ts`, every pending and
   intentionally-removed one still unreachable, and no unattributed unreachable module.
@@ -10544,7 +10558,6 @@ because the exception it had was the fleet a single plan owned.
   and the three tests that replace them assert what does happen: a conversation created per task with
   the task in it, a dispatch carrying the two conversations, and nothing dispatched from a tab with
   no conversation to own the work.
-- **All thirteen structural deletion searches are zero.**
 
 ### M5 — the first agent dispatch port (`this commit`)
 
