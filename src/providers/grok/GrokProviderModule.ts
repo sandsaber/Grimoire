@@ -350,8 +350,8 @@ GrokProviderSettings
         return {
           sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
           // Kept even when the session was invalidated, which is what the
-          // legacy runtime's `buildSessionUpdates` does and for its reason: the
-          // next session is written to the same directory, and the transcript
+          // host's session-update builder does and for its reason: the next
+          // session is written to the same directory, and the transcript
           // already there is still this conversation's.
           ...(Object.keys(providerState).length > 0 ? { providerState } : {}),
         };

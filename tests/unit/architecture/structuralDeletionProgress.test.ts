@@ -117,21 +117,24 @@ const SEARCHES: readonly DeletionSearch[] = [
     closedBy: 'the provider rows',
   },
   {
-    // **Narrowed to the two the feature layer still reaches.**
-    // `consumeTurnMetadata` is off the deleted contract — the coordinator
-    // carries its three facts on `CompletedChatTurn`, where the surface already
-    // read the other half of the same turn — and what the old pattern still
-    // found was that name on nine provider **content presenters** and the
-    // compositions wiring them. That is a provider's own API for its own
-    // normalizer, which this milestone does not touch: seventeen of the
-    // twenty-two files were it.
+    // **Narrowed again, to the one member whose home is still open.**
+    // `syncConversationState` left this search settled rather than moved. It
+    // was counted because the seam had it, and the seam is deleted; what it
+    // does now is tell a tab's adapter which conversation the tab is on, which
+    // is how the adapter notices a tab moving between conversations and drops
+    // the session rather than filing one chat's runs under another's name
+    // (D4). Nine call sites across the tab layer and `main.ts`, and no version
+    // of this architecture has an adapter that is never told. The earlier
+    // narrowing, which still holds: `consumeTurnMetadata` is off the deleted
+    // contract — the coordinator carries its three facts on `CompletedChatTurn`
+    // — and what that pattern still found was that name on nine provider
+    // content presenters, which is a provider's own API for its own normalizer.
     what: 'turn metadata and session updates',
-    pattern: /buildSessionUpdates|syncConversationState/,
-    // The two members the seam still has: `buildSessionUpdates` in
-    // `ConversationController`, and `syncConversationState` across the tab
-    // layer and the adapter that answers it.
-    files: 6,
-    closedBy: 'the seam deletion',
+    pattern: /buildSessionUpdates/,
+    // **2.** The adapter that builds the patch and the one caller that applies
+    // it, which is the conversation save path in `ConversationController`.
+    files: 2,
+    closedBy: 'the coordinator taking the persistence barrier',
   },
   {
     // **Narrowed to the half that goes**, which is what the split was for.
@@ -204,7 +207,7 @@ describe('structural deletion progress', () => {
       'subagent hooks and loaders: 3',
       'SubagentManager lifecycle: 7',
       'the application importing a concrete provider module: 20',
-      'turn metadata and session updates: 6',
+      'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
       'the registries — one left: 17',
     ]);

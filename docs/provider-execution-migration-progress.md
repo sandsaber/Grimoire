@@ -10402,6 +10402,36 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — `syncConversationState` leaves a search by being settled, not by moving (`this commit`)
+
+- Gates: unit 8741 passed, 8741 total; `tsc --noEmit` clean; `npm run lint` clean.
+- **`turn metadata and session updates` narrowed from 6 to 2**, and this one is a *settlement*
+  rather than a deletion, which is why the evidence is written down. The search was
+  `buildSessionUpdates|syncConversationState`, closing at "the seam deletion". The seam is deleted,
+  and the two members did not share a fate:
+  - `syncConversationState` is the adapter doing its own job. It is how a tab's adapter is told
+    which conversation the tab is on, which is how it notices a tab moving between conversations and
+    drops the session rather than filing one chat's runs under another's name — **D4**, with the
+    reasoning already written at the method. Nine call sites across the tab layer and `main.ts`, and
+    no version of this architecture has an adapter that is never told. It leaves the search;
+  - `buildSessionUpdates` does not. Its one caller is the conversation save path in
+    `ConversationController`, and the plan puts the persistence barrier on
+    `ChatExecutionCoordinator`. The `closedBy` is corrected to say so, because "the seam deletion"
+    has already happened and a `closedBy` naming a completed event can never close.
+- One stale comment corrected with it: Grok's `buildSessionPatch` cited "the legacy runtime's
+  `buildSessionUpdates`" for its reason. That runtime is deleted; the builder it matches is the
+  adapter's.
+- **A near-miss worth recording.** The narrowing edit dropped the search's `files` line, which made
+  the row vanish from the scoreboard instead of failing — the exact failure this file exists to
+  catch. Both the per-search assertion and the one-place summary went red, and `tsc` would have said
+  it in one line, because `DeletionSearch.files` is required. The lesson is ordering: typecheck
+  before running tests when the edit is to a typed table.
+
+Scoreboard after this entry: worker tab ownership 3, core importing the plugin type 2, subagent
+hooks and loaders 3, SubagentManager lifecycle 7, the application importing a concrete provider
+module 20, turn metadata and session updates 2, StreamChunk and the subagent chunk vocabulary 5,
+the registries — one left 17.
+
 ### M5 — the review pass: a wrong blocker, and a regression caught before it shipped (`this commit`)
 
 The 25-step review the owner asked for, run over the four commits above. It changed two of their
