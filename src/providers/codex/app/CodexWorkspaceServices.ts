@@ -171,13 +171,6 @@ export async function createCodexWorkspaceServices(
 }
 
 export const codexWorkspaceRegistration: ProviderWorkspaceRegistration<CodexWorkspaceServices> = {
-  workspaceCapabilities: {
-    skills: { inventory: 'managed', manager: 'managed' },
-    commands: { inventory: 'none', manager: 'none' },
-    agents: { inventory: 'managed', manager: 'managed' },
-    mcp: { inventory: 'none', manager: 'guidance' },
-    environment: { inventory: 'managed', manager: 'managed' },
-  },
   initialize: async ({ plugin, vaultAdapter, homeAdapter }) => createCodexWorkspaceServices(
     plugin,
     vaultAdapter,

@@ -10450,6 +10450,29 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the workspace registration is `initialize` alone (`this commit`)
+
+- Gates: unit 8752 passed, 8752 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **`ProviderWorkspaceRegistration.workspaceCapabilities` is deleted, from the interface and from
+  nine registrations.** Production had already stopped reading it —
+  `ProviderCatalog.workspaceCapabilities` answers off `capabilities.workspace` on the module — and
+  its own doc comment said why it stayed: *"the nine registrations still supply it and the registry
+  validates it"*. The registry does not validate it; `register` is one assignment. What kept the two
+  copies in step was a **test**, which is a record with two owners and a gate standing between them.
+- The parity gate is repointed rather than deleted: it asserted the two agreed, and now asserts
+  there is no second copy to disagree. Putting one back on Claude's registration fails it.
+- **What this leaves is the shape that finishes the row.** The registration is
+  `initialize(context)` and nothing else, and `ProviderWorkspaceContribution` on the module is
+  `initialize(context, signal)` plus `dispose(workspace)` — the same lifecycle, one of them owned by
+  a global and one by the module. The remaining 14 files are that duplication: nine
+  `maybeGet<Provider>WorkspaceServices()` reading a static map, `main.ts` filling it, and the hub
+  reading two rows out of it.
+- Recorded as the honest size of it: this is not a row move but the unification of **two lifecycles
+  that both claim to own a provider's workspace services**. Doing it a provider at a time leaves the
+  codebase running both patterns, which is the mixed-authority state the plan warns about — so it
+  wants one pass, and the pass is now a small one because the registration has one member left.
+
 ### M5 — the last registry accessor goes; what is left is storage (`this commit`)
 
 - Gates: unit 8752 passed, 8752 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;

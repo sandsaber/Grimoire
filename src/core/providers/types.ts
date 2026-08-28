@@ -472,17 +472,6 @@ export interface ProviderWorkspaceInitContext {
 export interface ProviderWorkspaceRegistration<
   TServices extends ProviderWorkspaceServices = ProviderWorkspaceServices,
 > {
-  /**
-   * What Grimoire may do with each workspace resource.
-   *
-   * The declaration moved to `ProviderCapabilityDescriptor.workspace` and is
-   * read through `ProviderCatalog.workspaceCapabilities`. This one is still
-   * required here because the nine registrations still supply it and the
-   * registry validates it, and it is the same record — copied into the
-   * descriptor rather than reworded, so the two cannot disagree until the
-   * registry goes.
-   */
-  workspaceCapabilities: ProviderWorkspaceCapabilities;
   initialize(context: ProviderWorkspaceInitContext): Promise<TServices>;
 }
 

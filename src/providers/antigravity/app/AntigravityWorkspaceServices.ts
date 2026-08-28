@@ -167,13 +167,6 @@ export async function createAntigravityWorkspaceServices(plugin: GrimoirePlugin)
 }
 
 export const antigravityWorkspaceRegistration: ProviderWorkspaceRegistration<AntigravityWorkspaceServices> = {
-  workspaceCapabilities: {
-    skills: { inventory: 'none', manager: 'none' },
-    commands: { inventory: 'none', manager: 'none' },
-    agents: { inventory: 'none', manager: 'none' },
-    mcp: { inventory: 'none', manager: 'none' },
-    environment: { inventory: 'managed', manager: 'managed' },
-  },
   initialize: async ({ plugin }) => createAntigravityWorkspaceServices(plugin),
 };
 

@@ -40,10 +40,17 @@ describe('workspace capability parity', () => {
   });
 
   it.each(Object.entries(REGISTRATIONS))(
-    '%s declares the same record in the descriptor as in its registration',
+    '%s declares its workspace capabilities once, on the descriptor',
     (providerId, registration) => {
-      expect(providerCatalog().workspaceCapabilities(providerId))
-        .toEqual(registration.workspaceCapabilities);
+      // **This asserted the two copies agreed.** The registration carried its
+      // own, duplicated into the descriptor "so the two cannot disagree until
+      // the registry goes" — and production had already stopped reading it:
+      // `ProviderCatalog.workspaceCapabilities` answers off
+      // `capabilities.workspace`. A record kept in step by a test is a record
+      // with two owners, so the registration's copy is deleted and this asserts
+      // there is no second one to drift.
+      expect(providerCatalog().workspaceCapabilities(providerId)).toBeDefined();
+      expect(registration).not.toHaveProperty('workspaceCapabilities');
     },
   );
 

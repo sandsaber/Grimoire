@@ -182,7 +182,6 @@ describe('provider contribution inventory', () => {
         // registration exists and carries capabilities plus an initializer.
         // Row 3 of the app-level table owns the missing dispose half.
         expect(typeof registration.initialize).toBe('function');
-        expect(registration.workspaceCapabilities).toBeDefined();
       },
     );
   });
@@ -285,10 +284,14 @@ describe('provider contribution inventory', () => {
       expect(documented.length + moved.length).toBe(3);
     });
 
-    it('anchors workspaceCapabilities on the workspace registration', () => {
-      expect(readInterfaceMembers(TYPES_PATH, 'ProviderWorkspaceRegistration')).toContain(
-        'workspaceCapabilities',
-      );
+    it('anchors workspaceCapabilities on the capability descriptor, and nowhere else', () => {
+      // **It was anchored on the registration, and read off the descriptor.**
+      // The registration's copy existed only to be kept in step with the one
+      // production reads — two owners for one record, with a test standing
+      // between them. The registration is `initialize` alone now.
+      expect(readInterfaceMembers(TYPES_PATH, 'ProviderWorkspaceRegistration'))
+        .toEqual(['initialize']);
+      expect(providerCatalog().workspaceCapabilities('claude')).toBeDefined();
     });
 
     it('has no third source of provider defaults left to anchor', () => {
