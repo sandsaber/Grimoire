@@ -9805,6 +9805,46 @@ use. It adds exactly one group by hand — `modeSelector`, which the delegation 
 because all four `getModeSelector` implementations return `null`. The control and its slot both still
 exist; the mock fills the slot the way a provider that had one would.
 
+#### Durable agents is one step from done, and that step is blocked on a capability nobody has
+
+Checked rather than assumed, because the plan's checkpoint reads as a single act and it is not:
+
+- **agent instances survive tab close** — done. `SubagentAgentRecorder` writes an observed agent as a
+  durable instance keyed on the provider's own id, idempotently, and `recordDurableSubagent` is wired
+  to every background subagent state change;
+- **`SubagentManager` lost lifecycle authority and kept its rendering** — done. `orphanAllActive` is
+  deleted; `destroyTab` clears the in-memory maps and says why: *"Closing a tab no longer abandons
+  the work it started."*;
+- **the work card ships** — done. `StatusPanel.updateBackgroundAgents` draws the cards, with a running
+  count, from `toBackgroundAgentCards`;
+- **reattachment ships** — done, and by construction: the card is redrawn from the vault every time,
+  so an agent started in a tab that has since closed appears in a conversation reopened later.
+
+**What is left is the one thing the plan gates on all of that: tab close ceasing to cancel.** It
+still cancels — `destroyTab` ends with `void tab.service?.cleanup()`, and the adapter's cleanup is
+cancel, wait, dispose. A background subagent runs inside a provider turn, so cancelling the turn ends
+the agent whose record now survives it.
+
+**Two things have to exist before that is safe, and neither does.**
+
+The first is a **stop affordance**. `BackgroundAgentCard` is `{ agentInstanceId, label, detail,
+state }` and the panel draws it read-only. Work that survives a tab and cannot be stopped from
+anywhere is worse than work that stops when you close the tab.
+
+The second is a **session budget in the kernel**, and it is the same blocker the warm-runtime LRU
+has — the two remaining seam items converge on one missing capability.
+`ExecutionLifecycleRegistry` caps nothing. Today `MAX_WARM_PROVIDER_RUNTIMES = 5` is the only bound
+on live provider processes; stop cancelling on close and that bound stops applying to exactly the
+sessions that outlive their tab.
+
+**And the plan's item for it is under-specified, not merely unbuilt.** It says the warm-runtime tab
+LRU ownership is deleted with the seam — but the policy that LRU implements protects *the active tab*
+and *a streaming tab*. The kernel knows about runs; it does not know which tab a person is looking
+at, and it should not. So the budget cannot move wholesale: either the surface keeps supplying the
+protection and the kernel supplies the cap, or the plan means something the current shape cannot
+express. That is a decision, and it is the one thing standing between here and closing four of the
+eleven searches.
+
 #### The runtime factory left the registry, and six registrations are empty
 
 `ProviderRegistry.createChatRuntime` looked up a registration whose factory called
