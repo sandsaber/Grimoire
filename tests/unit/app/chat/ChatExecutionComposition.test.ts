@@ -268,6 +268,45 @@ describe('chat execution composition', () => {
       app.composition.dispose();
     });
 
+    it('names every turn\'s answer after its own run', async () => {
+      // What stops a second answer joining the first one's bubble. The ACP
+      // agents reuse a message id across turns, and five provider compositions
+      // used to assert an `assistant_message_start` on the second turn to cover
+      // this — a chunk the tab binding filters off the content channel, so no
+      // surface ever saw it. The identity that matters is derived here, from the
+      // run, and `ChatSurfaceRenderTarget` opens one message per turn from it.
+      const app = await createComposition();
+      const turns = encoder();
+      const runIds: string[] = [];
+      for (const [index, text] of ['first', 'second'].entries()) {
+        const { ticket } = await app.composition.submitTurn({
+          commandId: `cmd-${index + 1}`,
+          conversationId: CONVERSATION_ID,
+          backendId: executionBackendId('internal-deterministic-fake'),
+          encoder: turns,
+          request: turnRequest(text),
+          userMessage: {
+            id: `msg-user-${index + 1}`, role: 'user', content: text, timestamp: index + 1,
+          },
+        });
+        const started = await ticket.started;
+        runIds.push(started.runId);
+        app.backend.emit(started.runId, { kind: 'output-delta', channel: 'assistant', text: 'A.' });
+        app.backend.emit(started.runId, {
+          kind: 'terminal', terminal: 'succeeded', reason: 'completed',
+        });
+        await ticket.completion;
+      }
+
+      const encoded = (turns as ChatTurnEncoder & { encoded: { history: ChatMessage[] }[] }).encoded;
+      expect(runIds[0]).not.toBe(runIds[1]);
+      // The second turn is encoded against a history that already names the
+      // first turn's answer, and it is named after the first turn's run.
+      expect(encoded[1]?.history.map(message => message.id))
+        .toEqual(['msg-user-1', `assistant-${runIds[0]}`]);
+      app.composition.dispose();
+    });
+
     it('encodes the reference from the conversation before this turn joins it', async () => {
       // The legacy path passes everything but the message it just added and the
       // placeholder beside it. Encoding after the coordinator appends would send

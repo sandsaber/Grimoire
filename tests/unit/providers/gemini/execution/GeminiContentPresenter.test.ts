@@ -60,9 +60,12 @@ describe('Gemini content presenter', () => {
     } as unknown as AcpSessionUpdate));
 
     expect(chunks.some(chunk => chunk.type === 'text')).toBe(false);
-    expect(chunks).toContainEqual(expect.objectContaining({
-      type: 'assistant_message_start',
-      itemId: 'msg-1',
+    // Asserted against the message id rather than an empty array, because an
+    // update the presenter ignored outright would also produce no text. The
+    // framing chunk that used to carry this id reached no surface and is gone;
+    // the id itself still has to arrive, and turn metadata is where it lands.
+    expect(presenter.consumeTurnMetadata()).toEqual(expect.objectContaining({
+      assistantMessageId: 'msg-1',
     }));
   });
 

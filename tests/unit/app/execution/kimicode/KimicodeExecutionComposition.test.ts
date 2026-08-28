@@ -822,21 +822,6 @@ describe('Kimi Code execution composition', () => {
     await host.dispose();
   });
 
-  it('opens a message for every turn, not only the first', async () => {
-    const { execution, host } = await createHarness();
-    const runtime = execution.createRuntime();
-    await drain(runtime.query(runtime.prepareTurn({ text: 'first' })));
-
-    const second = await drain(runtime.query(runtime.prepareTurn({ text: 'second' })));
-
-    // The agent reuses a message id across turns, and a normalizer that was
-    // never reset opens no message for the second — the surface then appends
-    // the second answer to the first one's bubble.
-    expect(second).toContainEqual(expect.objectContaining({ type: 'assistant_message_start' }));
-    execution.dispose();
-    await host.dispose();
-  });
-
   it('restarts the process when the vault MCP servers change', async () => {
     // The legacy runtime shut the process down on an MCP reload so the next
     // turn's session picks the servers up. Here the launch key is what says a

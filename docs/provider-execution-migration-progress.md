@@ -10417,6 +10417,42 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the ACP turn framing is deleted, and the identity it stood for is asserted where it lives (`this commit`)
+
+- Gates: unit 8740 passed, 8740 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **Deleted from `AcpSessionUpdateNormalizer`:** the `user_message_start` / `assistant_message_start`
+  push, `extractPrimaryText`, and — once the push was gone — the whole claim behind it:
+  `seenMessages`, `claimMessageStart`, `ANONYMOUS_MESSAGE_KEY`, and that half of `reset()`. `reset()`
+  stays, because it still clears tool calls. This is the deletion the previous entry unblocked and
+  the plan's *"delete the lifecycle `StreamChunk` variants"* asks for.
+- **The claim was dead the moment the chunk was.** It existed to fire the boundary exactly once per
+  message id. With nothing emitted, its return value had no reader.
+- **What the framing stood for is real, and is asserted where it now lives.** The defect is that an
+  ACP agent reuses a message id across turns, so a second answer joins the first one's bubble. Five
+  provider tests covered it by asserting a chunk **no surface receives** — the tab binding filters
+  framing off the content channel. What prevents it is that a turn's assistant message id comes from
+  its *run*: `ChatExecutionComposition` derives `assistant-${runId}`. That was only ever pinned
+  incidentally, so it is now a test of its own — two turns, different runs, the second encoded
+  against a history naming the first turn's answer by the first turn's run. Fixing the derivation to
+  a constant fails it.
+- **Sixteen tests moved, none deleted without replacement.** The pattern throughout was to replace a
+  framing assertion with the fact that survives, and to avoid asserting an empty array on its own,
+  because an update the presenter *ignored* produces the same emptiness:
+  - five *"drops the copy of the answer the kernel already carries"* now assert the message id
+    reaching `consumeTurnMetadata`;
+  - two *"keeps a user chunk whole, because nothing else carries it"* asserted a claim that was not
+    true — the chunk it named was filtered off the content channel, and a resumed transcript is
+    hydrated from the vault. They now assert the id and that nothing is drawn;
+  - three *"starts each turn without the ids the last one opened"* were repointed at a live part of
+    `beginTurn`. The first attempt used turn metadata and **passed with the `beginTurn` call
+    removed** — vacuous, caught by trying it. They assert the refusal, which has a reader;
+  - Grok's recording chunk carries no message id, so its test pairs "draws nothing" with the
+    normalizer modelling the update — the distinction between deliberately silent and ignored;
+  - three composition tests were replaced by the one composition-level assertion above. An interim
+    version left `expect(true).toBe(true)` behind, which is worse than no test; it is gone.
+- Still emitting framing: `CodexNotificationRouter`. Next.
+
 ### M5 — the coverage gate learns the two routes it was missing (`this commit`)
 
 - Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean.

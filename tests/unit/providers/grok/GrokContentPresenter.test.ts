@@ -2,6 +2,7 @@ import grokWire from '@test/fixtures/provider-traces/wire/grok-wire.json';
 
 import type { ProviderCostValue } from '@/core/providers/ProviderSpendUsageStore';
 import type { StreamChunk } from '@/core/types';
+import { AcpSessionUpdateNormalizer } from '@/providers/acp/AcpSessionUpdateNormalizer';
 import type { AcpSessionNotification } from '@/providers/acp/types';
 import { GrokContentPresenter } from '@/providers/grok/execution/GrokContentPresenter';
 
@@ -127,9 +128,18 @@ describe('Grok content presenter', () => {
     const chunks = present(presenter, updateOf('agent_message_chunk'));
 
     // The backend mirrors the text as `output-delta`; a second copy here would
-    // print every sentence twice. What is left is the message it opens.
-    expect(chunks.some(chunk => chunk.type === 'text')).toBe(false);
-    expect(chunks).toContainEqual(expect.objectContaining({ type: 'assistant_message_start' }));
+    // print every sentence twice. So the presenter draws *nothing* from this
+    // update — it used to return the framing chunk that opened the message, and
+    // no surface received one.
+    //
+    // Paired with the normalizer on purpose. An empty array on its own is what
+    // an update nobody understands also produces, and this recording's chunk
+    // carries no message id, so there is no metadata to read instead. What
+    // separates "deliberately silent" from "ignored" is that the adapter models
+    // it, which is the same question `wireVocabularyCoverage` asks.
+    expect(chunks).toEqual([]);
+    expect(new AcpSessionUpdateNormalizer().normalize(updateOf('agent_message_chunk').update as never))
+      .toMatchObject({ role: 'assistant', type: 'message_chunk' });
   });
 
   it('lists the commands the session announced', () => {
@@ -211,12 +221,15 @@ describe('Grok content presenter', () => {
 
     const chunks = recordedUpdates().flatMap(notification => [...present(presenter, notification)]);
 
-    // Every update the agent actually sent, in order: what comes out is a
-    // message, its thinking, and the badge — and nothing for the updates that
-    // are not content.
+    // Every update the agent actually sent, in order: what comes out is the
+    // thinking and the badge, and nothing for the updates that are not content.
+    // `assistant_message_start` was in this list and is not any more — it was
+    // framing, the tab binding filters framing off the content channel, and
+    // what it opened a message for the projection opens per run.
     expect(chunks.map(chunk => chunk.type)).toEqual(
-      expect.arrayContaining(['assistant_message_start', 'thinking', 'usage']),
+      expect.arrayContaining(['thinking', 'usage']),
     );
+    expect(chunks.every(chunk => chunk.type !== 'assistant_message_start')).toBe(true);
     expect(chunks.some(chunk => chunk.type === 'error')).toBe(false);
   });
 });

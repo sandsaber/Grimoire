@@ -18,7 +18,14 @@ describe('AcpSessionUpdateNormalizer', () => {
     expect(normalized).toEqual({ type: 'unsupported' });
   });
 
-  it('emits assistant message boundaries once per message id', () => {
+  it('reports a message chunk as text, with the id it belongs to', () => {
+    // **No boundary chunk.** This asserted one per message id, fired by a claim
+    // the normalizer kept. Nothing received it: the tab binding filters framing
+    // off the content channel, and the defect the claim guarded — a provider
+    // reusing an id across turns, so a second answer joins the first bubble —
+    // is unreachable, because the projection derives a turn's assistant message
+    // id from its run. What a presenter needs is the id, and it is on the
+    // result rather than inside a chunk.
     const normalizer = new AcpSessionUpdateNormalizer();
 
     const first = normalizer.normalize({
@@ -33,18 +40,15 @@ describe('AcpSessionUpdateNormalizer', () => {
     });
 
     expect(first).toMatchObject({
+      messageId: 'assistant-1',
       role: 'assistant',
-      streamChunks: [
-        { itemId: 'assistant-1', type: 'assistant_message_start' },
-        { content: 'Hello', type: 'text' },
-      ],
+      streamChunks: [{ content: 'Hello', type: 'text' }],
       type: 'message_chunk',
     });
     expect(second).toMatchObject({
+      messageId: 'assistant-1',
       role: 'assistant',
-      streamChunks: [
-        { content: ' world', type: 'text' },
-      ],
+      streamChunks: [{ content: ' world', type: 'text' }],
       type: 'message_chunk',
     });
   });

@@ -100,9 +100,12 @@ describe('MiMoCode content presenter', () => {
     // The backend mirrors this text as `output-delta`, which is the copy core
     // reads; letting both through prints every sentence twice.
     expect(chunks.some(chunk => chunk.type === 'text')).toBe(false);
-    expect(chunks).toContainEqual(expect.objectContaining({
-      type: 'assistant_message_start',
-      itemId: 'msg-1',
+    // Asserted against the message id rather than an empty array, because an
+    // update the presenter ignored outright would also produce no text. The
+    // framing chunk that used to carry this id reached no surface and is gone;
+    // the id itself still has to arrive, and turn metadata is where it lands.
+    expect(presenter.consumeTurnMetadata()).toEqual(expect.objectContaining({
+      assistantMessageId: 'msg-1',
     }));
   });
 
@@ -118,7 +121,7 @@ describe('MiMoCode content presenter', () => {
     expect(chunks).toContainEqual({ type: 'thinking', content: 'The user wants me' });
   });
 
-  it('keeps a user chunk whole, because nothing else carries it', () => {
+  it('reports a replayed user chunk by id, and draws nothing from it', () => {
     const { presenter } = createPresenter();
 
     const chunks = presenter.present(sessionUpdate({
@@ -127,13 +130,16 @@ describe('MiMoCode content presenter', () => {
       content: { type: 'text', text: 'Reply with exactly: ok' },
     } as unknown as AcpSessionUpdate));
 
-    // Only the assistant's chunks are filtered, and only their text: what the
-    // user said reaches the surface inside the message it opens, and nothing
-    // else carries it into a resumed transcript.
-    expect(chunks).toContainEqual(expect.objectContaining({
-      type: 'user_message_start',
-      itemId: 'msg-user',
-      content: 'Reply with exactly: ok',
+    // **This asserted the opposite, on a reason that was not true.** It said
+    // what the user said reaches the surface inside the message this opens and
+    // that nothing else carries it into a resumed transcript. The chunk it
+    // named was `user_message_start`, which the tab binding filters off the
+    // content channel — so it reached no surface — and a resumed transcript is
+    // hydrated from the conversation the vault holds, not from a provider's
+    // replay. What the presenter takes from the update is the id.
+    expect(chunks.filter(chunk => chunk.type !== 'thinking')).toEqual([]);
+    expect(presenter.consumeTurnMetadata()).toEqual(expect.objectContaining({
+      userMessageId: 'msg-user',
     }));
   });
 
@@ -327,27 +333,18 @@ describe('MiMoCode content presenter', () => {
     expect(presenter.lastSessionId()).toBe('ses_-ffe5fd9eb2b92ffe');
   });
 
-  it('starts each turn without the ids the last one opened', () => {
+  it('starts each turn without what the last one was refused with', () => {
+    // **This asserted a message-start chunk the reset used to make possible.**
+    // That chunk reached no surface and is gone, and the defect it stood for —
+    // a provider reusing a message id, so the second answer joins the first
+    // bubble — cannot happen: the projection derives a turn's assistant message
+    // id from its run. What `beginTurn` still clears is per-turn state that is
+    // read back, and the refusal is the one with a reader.
     const { presenter } = createPresenter();
-    presenter.present(sessionUpdate({
-      sessionUpdate: 'agent_message_chunk',
-      messageId: 'msg-1',
-      content: { type: 'text', text: 'first' },
-    } as unknown as AcpSessionUpdate));
+    presenter.present({ kind: 'turn-refused', message: 'the model declined' });
 
     presenter.beginTurn();
-    const chunks = presenter.present(sessionUpdate({
-      sessionUpdate: 'agent_message_chunk',
-      messageId: 'msg-1',
-      content: { type: 'text', text: 'second' },
-    } as unknown as AcpSessionUpdate));
 
-    // Same message id, second turn: without the reset the normalizer treats it
-    // as the message it already opened and the answer is appended to the
-    // previous turn's.
-    expect(chunks).toContainEqual(expect.objectContaining({
-      type: 'assistant_message_start',
-      itemId: 'msg-1',
-    }));
+    expect(presenter.consumeTurnRefusal()).toBeUndefined();
   });
 });

@@ -94,9 +94,12 @@ describe('OpenCode content presenter', () => {
     // The backend mirrors this text as `output-delta`, which is the copy core
     // reads; letting both through prints every sentence twice.
     expect(chunks.some(chunk => chunk.type === 'text')).toBe(false);
-    expect(chunks).toContainEqual(expect.objectContaining({
-      type: 'assistant_message_start',
-      itemId: 'msg-1',
+    // Asserted against the message id rather than an empty array, because an
+    // update the presenter ignored outright would also produce no text. The
+    // framing chunk that used to carry this id reached no surface and is gone;
+    // the id itself still has to arrive, and turn metadata is where it lands.
+    expect(presenter.consumeTurnMetadata()).toEqual(expect.objectContaining({
+      assistantMessageId: 'msg-1',
     }));
   });
 
@@ -314,24 +317,19 @@ describe('OpenCode content presenter', () => {
     expect(presenter.lastSessionId()).toBe('acp-session-1');
   });
 
-  it('starts each turn without the last turn message ids', () => {
+  it('starts each turn without what the last one was refused with', () => {
+    // **This asserted a message-start chunk the reset used to make possible.**
+    // That chunk reached no surface and is gone, and the defect it stood for —
+    // a provider reusing a message id, so the second answer joins the first
+    // bubble — cannot happen: the projection derives a turn's assistant message
+    // id from its run. What `beginTurn` still clears is per-turn state that is
+    // read back, and the refusal is the one with a reader.
     const { presenter } = createPresenter();
-    const update = sessionUpdate({
-      sessionUpdate: 'agent_message_chunk',
-      messageId: 'msg-1',
-      content: { type: 'text', text: 'OK' },
-    } as unknown as AcpSessionUpdate);
-    presenter.present(update);
+    presenter.present({ kind: 'turn-refused', message: 'the model declined' });
 
     presenter.beginTurn();
-    const chunks = presenter.present(update);
 
-    // Without the reset the second turn's answer has no start, and the surface
-    // appends it to the message the first turn opened.
-    expect(chunks).toContainEqual(expect.objectContaining({
-      type: 'assistant_message_start',
-      itemId: 'msg-1',
-    }));
+    expect(presenter.consumeTurnRefusal()).toBeUndefined();
   });
 
   it('ignores a payload that carries nothing it knows', () => {
