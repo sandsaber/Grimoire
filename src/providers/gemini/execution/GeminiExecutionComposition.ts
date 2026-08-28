@@ -472,7 +472,7 @@ export class GeminiExecution {
         // that makes a running process see them is the launch key's job.
         mcp: {
           load: async () => {
-            const manager = maybeGetGeminiWorkspaceServices()?.mcpServerManager;
+            const manager = maybeGetGeminiWorkspaceServices(this.plugin)?.mcpServerManager;
             await manager?.loadServers();
             return manager?.getServers() ?? [];
           },
@@ -698,7 +698,7 @@ export class GeminiExecution {
     const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
     const executable = this.plugin.getResolvedProviderCliPath('gemini') ?? 'gemini';
     const runtimeEnv = buildGeminiRuntimeEnv(this.plugin.settings, executable);
-    const mcpServers = maybeGetGeminiWorkspaceServices()?.mcpServerManager?.getServers() ?? [];
+    const mcpServers = maybeGetGeminiWorkspaceServices(this.plugin)?.mcpServerManager?.getServers() ?? [];
     return {
       executable,
       cwd,

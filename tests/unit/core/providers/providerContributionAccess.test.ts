@@ -5,7 +5,6 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { NO_TASK_RESULT_INTERPRETATION } from '@/core/providers/noTaskResultInterpretation';
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import {
   DEFAULT_CHAT_PROVIDER_ID,
 } from '@/core/providers/types';
@@ -13,14 +12,6 @@ import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionC
 import { CodexExecution } from '@/providers/codex/execution/CodexExecutionComposition';
 
 describe('reading a provider\'s contributions through the catalog', () => {
-  beforeEach(() => {
-    ProviderWorkspaceRegistry.clear();
-    ProviderWorkspaceRegistry.setServices('claude', {
-      mcpManager: {} as any,
-      mcpServerManager: {} as any,
-    } as any);
-  });
-
   afterEach(() => {
     jest.restoreAllMocks();
   });

@@ -10450,6 +10450,41 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — both provider registries are deleted (`this commit`)
+
+**`the registries` closes: 12 → 0.** `src/core/providers/ProviderWorkspaceRegistry.ts` is gone, and
+with it the last global anything reached a provider through.
+
+- Gates: unit 8752 passed, 8752 total (553 suites, none skipped by a failed import); integration
+  156 passed, 128 skipped; `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release`
+  clean.
+- **Why it survived everything else, written down before it went.** A provider's workspace services
+  are a per-provider singleton built *asynchronously* — eight of the nine read MCP servers and agent
+  definitions off disk to construct — while a module context is built **per tab**. Something had to
+  hold the one instance between them. Three alternatives were tried and each failed for a stated
+  reason: a per-context memo builds nine copies of every manager; a synchronous build is impossible
+  for eight providers; a lazy build lets a launch config read MCP servers before they load.
+- **What made it possible: every reader has a plugin.** Module contexts, compositions and settings
+  tabs all hold one — the settings tab through `context.plugin`. So `ApplicationRuntime`, which
+  already holds the compositions and the agent coordinator, holds these too; `main.ts` publishes
+  what `ProviderWorkspaceManager` builds; and the nine `maybeGet<Provider>WorkspaceServices` take
+  the plugin they were always called beside. The static existed to stand in for a parameter nobody
+  had passed.
+- The two `get<Provider>WorkspaceServices` throwing accessors moved with them. **A grep exclusion
+  hid three production callers and I nearly deleted them as dead** — `tsc` caught it. Worth the
+  note: an exclusion pattern written to filter noise filters evidence just as well.
+- **Twenty test files moved off it**, and the shape of the move is the same everywhere: what used to
+  be `setServices` on a global is now a map the plugin double answers out of. `TabManager.test.ts`
+  mocked the module wholesale; what that mock actually provided was a setter, so it is a function
+  now. The registry's own test had no subject left — the composition root's map is a `Map` — so it
+  is deleted rather than reworded, and the behaviour that matters is asserted where it always was:
+  the startup isolation test in `main.test.ts`, which makes one provider's initializer throw and
+  checks the other eight still have services.
+- One bug in my own edit worth recording: `a ?? null === null` parses as `a ?? (null === null)`, so
+  the isolation test passed vacuously for one run. Parenthesised.
+- Five agent instruction files named the deleted class; all five now say where a provider's services
+  actually live.
+
 ### M5 — Claude's history is told where the transcripts are (`this commit`)
 
 - Gates: unit 8753 passed, 8753 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;

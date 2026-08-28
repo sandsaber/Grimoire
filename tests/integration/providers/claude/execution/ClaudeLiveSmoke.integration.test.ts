@@ -9,7 +9,6 @@ import { loadEsmModule } from '@test/helpers/loadEsmModule';
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 import type { StreamChunk } from '@/core/types';
 import { claudePlanUsageStore } from '@/providers/claude/app/ClaudePlanUsageStore';
@@ -57,7 +56,6 @@ live('Claude live smoke', () => {
     for (const release of running.splice(0)) {
       await release().catch(() => undefined);
     }
-    ProviderWorkspaceRegistry.clear();
   });
 
   function createPlugin(
@@ -117,12 +115,15 @@ live('Claude live smoke', () => {
         adapter: nodeVaultAdapter(vault),
       },
     } as never);
-    // The composition asks the workspace registry for the MCP and plugin
-    // managers every turn, so this is not optional scaffolding.
-    ProviderWorkspaceRegistry.setServices(
-      'claude',
-      await createClaudeWorkspaceServices(plugin, adapter),
-    );
+    // The composition asks for the MCP and plugin managers every turn, so this
+    // is not optional scaffolding. It reaches them through the plugin's
+    // composition root, which is where a provider's services live now.
+    const claudeServices = await createClaudeWorkspaceServices(plugin, adapter);
+    (plugin as { getApplicationRuntimeOrNull?: unknown }).getApplicationRuntimeOrNull = () => ({
+      workspaceServicesFor: (providerId: string) => (
+        providerId === 'claude' ? claudeServices : null
+      ),
+    });
     const host = new ExecutionKernelHost({
       storage: new TestDurableStorage(),
       scheduler: {

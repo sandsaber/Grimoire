@@ -1,6 +1,7 @@
 import { AgentCoordinator } from '@/core/agents/AgentCoordinator';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
 import type { ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
+import type { ProviderWorkspaceServices } from '@/core/providers/types';
 import type { AppSessionStorage } from '@/core/providers/types';
 import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
@@ -88,6 +89,7 @@ export class ApplicationRuntime {
    * one control store would each believe they own every agent in it.
    */
   readonly agents: AgentCoordinator;
+  private readonly workspaceServices = new Map<ProviderId, ProviderWorkspaceServices>();
   readonly agentRecorder: SubagentAgentRecorder;
   readonly localShell: LocalShellExecution;
   /** Titles, instruction refinement and inline edits, for every provider. */
@@ -222,6 +224,36 @@ export class ApplicationRuntime {
    * nothing, and one whose workspace fails to build fails where the question
    * was asked rather than during load.
    */
+  /**
+   * A provider's legacy workspace services, once something has built them.
+   *
+   * **Held here because they are a per-provider singleton and a module context
+   * is per tab.** Eight of the nine read MCP servers and agent definitions off
+   * disk to construct, so they are built once, at load, by
+   * `ProviderWorkspaceManager` — and every consumer that reads them has a
+   * plugin, which is what lets this be a member of the composition root rather
+   * than the static registry it replaces.
+   *
+   * `null` before that startup completes, and for a provider whose build threw:
+   * the manager isolates each one, so a provider that cannot start does not
+   * take the others' command catalogs and model lists with it.
+   */
+  workspaceServicesFor(providerId: ProviderId): ProviderWorkspaceServices | null {
+    return this.workspaceServices.get(providerId) ?? null;
+  }
+
+  /** Publishes what the workspace manager built, or withdraws it at unload. */
+  publishWorkspaceServices(
+    providerId: ProviderId,
+    services: ProviderWorkspaceServices | undefined,
+  ): void {
+    if (services) {
+      this.workspaceServices.set(providerId, services);
+    } else {
+      this.workspaceServices.delete(providerId);
+    }
+  }
+
   workspaceFor(providerId: ProviderId): Promise<ProviderWorkspaceSlots> {
     const composition = this.compositionFor(providerId);
     if (!composition) {

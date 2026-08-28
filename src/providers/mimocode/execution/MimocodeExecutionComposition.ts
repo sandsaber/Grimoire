@@ -580,7 +580,7 @@ export class MimocodeExecution {
         // that makes a running process see them is the launch key's job.
         mcp: {
           load: async () => {
-            const manager = maybeGetMimocodeWorkspaceServices()?.mcpServerManager;
+            const manager = maybeGetMimocodeWorkspaceServices(this.plugin)?.mcpServerManager;
             await manager?.loadServers();
             return manager?.getServers() ?? [];
           },
@@ -918,7 +918,7 @@ export class MimocodeExecution {
       }),
       cwd,
       mcpServers: toAcpMcpServers([
-        ...(maybeGetMimocodeWorkspaceServices()?.mcpServerManager?.getServers() ?? []),
+        ...(maybeGetMimocodeWorkspaceServices(this.plugin)?.mcpServerManager?.getServers() ?? []),
       ]),
     };
   }
@@ -1012,7 +1012,7 @@ export class MimocodeExecution {
       settings: promptSettings,
       workspaceRoot: cwd,
     });
-    const mcpServers = maybeGetMimocodeWorkspaceServices()?.mcpServerManager?.getServers() ?? [];
+    const mcpServers = maybeGetMimocodeWorkspaceServices(this.plugin)?.mcpServerManager?.getServers() ?? [];
     return {
       executable,
       cwd,

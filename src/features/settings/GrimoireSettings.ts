@@ -22,7 +22,6 @@ import { providerCatalog } from '../../core/providers/ProviderCatalog';
 import type { ProviderSettingsPresentationPort } from '../../core/providers/ProviderModule';
 import type { ProviderCommandsPort } from '../../core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderId,
   ProviderSettingsTabRendererContext,
@@ -898,7 +897,11 @@ export class GrimoireSettingTab extends PluginSettingTab {
   }
 
   private getWorkspaceServices(providerId: ProviderId): WorkspaceServicesWithStorage | null {
-    return ProviderWorkspaceRegistry.getServices(providerId);
+    // The composition root holds them. The hub reads two rows the module slots
+    // do not carry yet — a provider's agent storage and its MCP storage — which
+    // is the last thing keeping this legacy shape reachable at all.
+    return (this.plugin.getApplicationRuntimeOrNull?.()
+      ?.workspaceServicesFor(providerId) ?? null);
   }
 
   private openWorkspaceManager(

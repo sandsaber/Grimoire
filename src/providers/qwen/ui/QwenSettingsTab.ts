@@ -18,7 +18,7 @@ const QWEN_CLI_PATH_PLACEHOLDER = '/usr/local/bin/qwen';
 
 export const qwenSettingsTabRenderer: ProviderSettingsTabRenderer = {
   render(container, context) {
-    const qwenWorkspace = maybeGetQwenWorkspaceServices();
+    const qwenWorkspace = maybeGetQwenWorkspaceServices(context.plugin);
     const settingsBag = context.plugin.settings as unknown as Record<string, unknown>;
     const qwenSettings = getQwenProviderSettings(settingsBag);
     const hostnameKey = getHostnameKey();

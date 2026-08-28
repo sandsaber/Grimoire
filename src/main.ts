@@ -57,7 +57,6 @@ import {
 import type { ProviderHistoryHydration } from './core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from './core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceManager } from './core/providers/ProviderWorkspaceManager';
-import { ProviderWorkspaceRegistry } from './core/providers/ProviderWorkspaceRegistry';
 import type { ProviderId, ProviderWorkspaceServices } from './core/providers/types';
 import type { AppTabManagerState } from './core/providers/types';
 import { DEFAULT_CHAT_PROVIDER_ID } from './core/providers/types';
@@ -569,7 +568,10 @@ export default class GrimoirePlugin extends Plugin {
         dispose: async () => {},
       }),
       publish: (providerId, services) => {
-        ProviderWorkspaceRegistry.setServices(providerId, services ?? undefined);
+        // Into the composition root, which is what holds a provider's services
+        // now: every consumer of them has a plugin, so the static that used to
+        // stand in for one is gone.
+        this.applicationRuntime?.publishWorkspaceServices(providerId, services ?? undefined);
       },
       reportFailure: ({ providerId, phase, error }) => {
         this.recordDebugLog({

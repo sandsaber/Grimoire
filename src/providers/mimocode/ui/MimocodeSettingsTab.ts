@@ -38,7 +38,7 @@ interface EnrichedModel {
 
 export const mimocodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
   render(container, context) {
-    const mimocodeWorkspace = maybeGetMimocodeWorkspaceServices();
+    const mimocodeWorkspace = maybeGetMimocodeWorkspaceServices(context.plugin);
     const settingsBag = context.plugin.settings as unknown as Record<string, unknown>;
     const mimocodeSettings = getMimocodeProviderSettings(settingsBag);
     const hostnameKey = getHostnameKey();

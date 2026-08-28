@@ -1,7 +1,6 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderModelCatalog,
   ProviderWorkspaceRegistration,
@@ -117,6 +116,9 @@ export const mimocodeWorkspaceRegistration: ProviderWorkspaceRegistration<Mimoco
   initialize: async ({ plugin, vaultAdapter }) => createMimocodeWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetMimocodeWorkspaceServices(): MimocodeWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('mimocode') as MimocodeWorkspaceServices | null;
+export function maybeGetMimocodeWorkspaceServices(
+  plugin: GrimoirePlugin,
+): MimocodeWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('mimocode') as MimocodeWorkspaceServices | null ?? null;
 }

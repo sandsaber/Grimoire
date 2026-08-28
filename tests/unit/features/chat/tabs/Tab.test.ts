@@ -7,7 +7,6 @@ import os from 'os';
 import path from 'path';
 
 import { ProviderCatalog } from '@/core/providers/ProviderCatalog';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { ChatState } from '@/features/chat/state/ChatState';
 import {
   activateTab,
@@ -479,6 +478,9 @@ function createMockPlugin(overrides: Record<string, any> = {}): any {
     getApplicationRuntimeOrNull: () => ({
       auxiliary,
       createRuntimeFor: (providerId: string) => createdRuntimes.next(providerId),
+      // A provider's workspace services come off the composition root now, not
+      // a static registry, so the plugin double answers for them too.
+      workspaceServicesFor: (providerId: string) => stubbedWorkspaceServices[providerId] ?? null,
     }),
     // Since the Claude flip a tab's runtime comes from the plugin's execution
     // composition rather than from a constructor the registration calls.
@@ -568,14 +570,14 @@ function createMockOptions(overrides: Partial<TestTabCreateOptions> = {}): TestT
   } as TestTabCreateOptions;
 
   const plugin = options.plugin as any;
-  ProviderWorkspaceRegistry.setServices('claude', {
+  stubbedWorkspaceServices.claude = {
     mcpManager: plugin.mcpManager,
     mcpServerManager: plugin.mcpManager,
     agentMentionProvider: plugin.agentManager,
-  } as any);
-  ProviderWorkspaceRegistry.setServices('codex', {
+  };
+  stubbedWorkspaceServices.codex = {
     agentMentionProvider: plugin.codexAgentMentionProvider,
-  });
+  };
 
   return options;
 }
@@ -589,6 +591,8 @@ async function flushMicrotasks(times = 8): Promise<void> {
     await Promise.resolve();
   }
 }
+
+const stubbedWorkspaceServices: Record<string, unknown> = {};
 
 describe('Tab - Creation', () => {
   describe('createTab', () => {
@@ -4009,7 +4013,6 @@ describe('Tab - handleForkAll (via /fork command)', () => {
 
 describe('Tab - Blank Tab Model Selector', () => {
   afterEach(() => {
-    ProviderWorkspaceRegistry.clear();
     jest.restoreAllMocks();
   });
 
@@ -4507,7 +4510,6 @@ describe('Tab - Bound Conversation Model', () => {
 
 describe('Tab - Blank Tab Draft Model Change', () => {
   afterEach(() => {
-    ProviderWorkspaceRegistry.clear();
     jest.restoreAllMocks();
   });
 
@@ -4904,7 +4906,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
       },
     ]);
 
-    ProviderWorkspaceRegistry.setServices('codex', { commandCatalog: codexCatalog as any });
+    stubbedWorkspaceServices.codex = { commandCatalog: codexCatalog };
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4971,7 +4973,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
       refresh: jest.fn(),
     };
 
-    ProviderWorkspaceRegistry.setServices('codex', { commandCatalog: codexCatalog as any });
+    stubbedWorkspaceServices.codex = { commandCatalog: codexCatalog };
 
     const plugin = createMockPlugin({
       settings: {
@@ -5283,7 +5285,7 @@ describe('Tab - History Bind Without Runtime', () => {
         insertPrefix: '$',
       },
     ]);
-    ProviderWorkspaceRegistry.setServices('codex', { commandCatalog: codexCatalog as any });
+    stubbedWorkspaceServices.codex = { commandCatalog: codexCatalog };
 
     const plugin = createMockPlugin({
       settings: {

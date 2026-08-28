@@ -1,7 +1,6 @@
 import '@/providers';
 
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { antigravityWorkspaceRegistration } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
 import { claudeWorkspaceRegistration } from '@/providers/claude/app/ClaudeWorkspaceServices';
 import { codexWorkspaceRegistration } from '@/providers/codex/app/CodexWorkspaceServices';
@@ -35,9 +34,6 @@ const REGISTRATIONS = {
 };
 
 describe('workspace capability parity', () => {
-  beforeEach(() => {
-    ProviderWorkspaceRegistry.clear();
-  });
 
   it.each(Object.entries(REGISTRATIONS))(
     '%s declares its workspace capabilities once, on the descriptor',

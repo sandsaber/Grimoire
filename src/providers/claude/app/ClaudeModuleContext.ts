@@ -52,17 +52,17 @@ export function createClaudeModuleContext(
   // this has and the history service does not — so it is passed rather than
   // looked up. See the constructor for what looking it up cost.
   const history = new ClaudeConversationHistoryService(
-    () => maybeGetClaudeWorkspaceServices()?.getClaudeConfigDir?.(),
+    () => maybeGetClaudeWorkspaceServices(plugin)?.getClaudeConfigDir?.(),
   );
   const workspace = createWorkspaceContextSlots({
     chatUI: claudeChatUIConfig,
     plugin,
     providerId: 'claude',
-    services: () => maybeGetClaudeWorkspaceServices(),
+    services: () => maybeGetClaudeWorkspaceServices(plugin),
   });
 
   return {
-    claudeConfigDir: () => maybeGetClaudeWorkspaceServices()?.getClaudeConfigDir?.(),
+    claudeConfigDir: () => maybeGetClaudeWorkspaceServices(plugin)?.getClaudeConfigDir?.(),
     hydrateConversation: async conversationId => {
       const bound = matching(conversation, conversationId);
       if (!bound) {
@@ -121,7 +121,7 @@ export function createClaudeModuleContext(
         container: HTMLElement;
         context: Parameters<ProviderSettingsTabRenderer['render']>[1];
       };
-      maybeGetClaudeWorkspaceServices()?.settingsTabRenderer
+      maybeGetClaudeWorkspaceServices(plugin)?.settingsTabRenderer
         ?.render(rendered.container, rendered.context);
     },
     dispose: async () => {

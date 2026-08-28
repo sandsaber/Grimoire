@@ -1,6 +1,5 @@
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
@@ -178,10 +177,26 @@ export const codexWorkspaceRegistration: ProviderWorkspaceRegistration<CodexWork
   ),
 };
 
-export function maybeGetCodexWorkspaceServices(): CodexWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('codex') as CodexWorkspaceServices | null;
+/**
+ * This provider's services, or a throw.
+ *
+ * For the callers that cannot proceed without them and would otherwise read a
+ * half-built surface as an empty one. Takes a plugin for the same reason
+ * `maybeGet` does: the services live on the composition root now, not in a
+ * static that stood in for having one.
+ */
+export function getCodexWorkspaceServices(plugin: GrimoirePlugin): CodexWorkspaceServices {
+  const services = maybeGetCodexWorkspaceServices(plugin);
+  if (!services) {
+    throw new Error('Provider workspace "codex" is not initialized.');
+  }
+  return services;
 }
 
-export function getCodexWorkspaceServices(): CodexWorkspaceServices {
-  return ProviderWorkspaceRegistry.requireServices('codex') as CodexWorkspaceServices;
+export function maybeGetCodexWorkspaceServices(
+  plugin: GrimoirePlugin,
+): CodexWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('codex') as CodexWorkspaceServices | null ?? null;
 }
+

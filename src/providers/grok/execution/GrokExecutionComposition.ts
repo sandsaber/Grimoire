@@ -705,7 +705,7 @@ export class GrokExecution {
         // that makes a running process see them is the launch key's job.
         mcp: {
           load: async () => {
-            const manager = maybeGetGrokWorkspaceServices()?.mcpServerManager;
+            const manager = maybeGetGrokWorkspaceServices(this.plugin)?.mcpServerManager;
             await manager?.loadServers();
             return manager?.getServers() ?? [];
           },
@@ -1185,7 +1185,7 @@ export class GrokExecution {
       }),
       cwd,
       mcpServers: toAcpMcpServers([
-        ...(maybeGetGrokWorkspaceServices()?.mcpServerManager?.getServers() ?? []),
+        ...(maybeGetGrokWorkspaceServices(this.plugin)?.mcpServerManager?.getServers() ?? []),
       ]),
     };
   }
@@ -1303,7 +1303,7 @@ export class GrokExecution {
         promptKey: computeSystemPromptKey(promptSettings),
         reasoningEffort,
       }),
-      mcpServers: maybeGetGrokWorkspaceServices()?.mcpServerManager?.getServers() ?? [],
+      mcpServers: maybeGetGrokWorkspaceServices(this.plugin)?.mcpServerManager?.getServers() ?? [],
     };
   }
 }

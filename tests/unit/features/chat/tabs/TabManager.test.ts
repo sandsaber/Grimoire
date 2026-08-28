@@ -1,6 +1,5 @@
 import { createMockEl } from '@test/helpers/mockElement';
 
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { TabManager } from '@/features/chat/tabs/TabManager';
 import {
   DEFAULT_MAX_TABS,
@@ -143,30 +142,31 @@ const mockCommandDropdowns: Record<string, {
   opencode: { triggerChars: ['/'], builtInPrefix: '/', skillPrefix: '/', commandPrefix: '/' },
 };
 
-jest.mock('@/core/providers/ProviderWorkspaceRegistry', () => ({
-  ProviderWorkspaceRegistry: {
-    getCommandCatalog: (providerId: string) => mockCommandCatalogs[providerId] ?? null,
-    getRuntimeCommandLoader: (providerId: string) => mockRuntimeCommandLoaders[providerId] ?? null,
-    getTabWarmupPolicy: (providerId: string) => mockTabWarmupPolicies[providerId] ?? null,
-    setServices: (providerId: string, services: any) => {
-      if (services?.commandCatalog) {
-        mockCommandCatalogs[providerId] = services.commandCatalog;
-      } else {
-        delete mockCommandCatalogs[providerId];
-      }
-      if (services?.runtimeCommandLoader) {
-        mockRuntimeCommandLoaders[providerId] = services.runtimeCommandLoader;
-      } else {
-        delete mockRuntimeCommandLoaders[providerId];
-      }
-      if (services?.tabWarmupPolicy) {
-        mockTabWarmupPolicies[providerId] = services.tabWarmupPolicy;
-      } else {
-        delete mockTabWarmupPolicies[providerId];
-      }
-    },
-  },
-}));
+/**
+ * Installs a provider's workspace services, as the workspace manager would.
+ *
+ * **A function rather than a module mock.** This mocked
+ * `ProviderWorkspaceRegistry`, which is deleted: a provider's services live on
+ * the composition root, and the plugin double below answers out of these maps.
+ * What the mock was really providing was this setter.
+ */
+function installWorkspaceServices(providerId: string, services: any): void {
+  if (services?.commandCatalog) {
+    mockCommandCatalogs[providerId] = services.commandCatalog;
+  } else {
+    delete mockCommandCatalogs[providerId];
+  }
+  if (services?.runtimeCommandLoader) {
+    mockRuntimeCommandLoaders[providerId] = services.runtimeCommandLoader;
+  } else {
+    delete mockRuntimeCommandLoaders[providerId];
+  }
+  if (services?.tabWarmupPolicy) {
+    mockTabWarmupPolicies[providerId] = services.tabWarmupPolicy;
+  } else {
+    delete mockTabWarmupPolicies[providerId];
+  }
+}
 
 jest.mock('@/core/providers/ProviderSettingsCoordinator', () => ({
   ProviderSettingsCoordinator: {
@@ -1399,7 +1399,7 @@ describe('TabManager - Persistence', () => {
         setRuntimeCommands: jest.fn(),
       };
 
-      ProviderWorkspaceRegistry.setServices('opencode', {
+      installWorkspaceServices('opencode', {
         commandCatalog: mockCatalog as any,
         runtimeCommandLoader: runtimeCommandLoader,
       });
@@ -1669,7 +1669,7 @@ describe('TabManager - SDK Commands', () => {
       loadCommands: jest.fn(),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
     });
@@ -1730,7 +1730,7 @@ describe('TabManager - SDK Commands', () => {
         .mockResolvedValueOnce(secondCommands),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
     });
@@ -1824,7 +1824,7 @@ describe('TabManager - SDK Commands', () => {
       loadCommands: jest.fn().mockResolvedValue(supportedCommands),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
     });
@@ -1873,7 +1873,7 @@ describe('TabManager - SDK Commands', () => {
       isAvailable: jest.fn().mockReturnValue(false),
       loadCommands: jest.fn().mockResolvedValue([]),
     };
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
     });
@@ -1915,7 +1915,7 @@ describe('TabManager - SDK Commands', () => {
       loadCommands: jest.fn().mockResolvedValue(supportedCommands),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
     });
@@ -1969,7 +1969,7 @@ describe('TabManager - SDK Commands', () => {
       loadCommands: jest.fn().mockResolvedValue(supportedCommands),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
     });
@@ -2022,7 +2022,7 @@ describe('TabManager - SDK Commands', () => {
       loadCommands: jest.fn(),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
     });
@@ -2086,7 +2086,7 @@ describe('TabManager - SDK Commands', () => {
       loadCommands: jest.fn().mockResolvedValue(loaderCommands),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
     });
@@ -2139,7 +2139,7 @@ describe('TabManager - SDK Commands', () => {
   });
 
   it('should keep an active restored Claude conversation tab cold', async () => {
-    ProviderWorkspaceRegistry.setServices('claude', {
+    installWorkspaceServices('claude', {
       commandCatalog: {
         setRuntimeCommands: jest.fn(),
       } as any,
@@ -2213,13 +2213,13 @@ describe('TabManager - Provider Command Catalog', () => {
   };
 
   afterEach(() => {
-    ProviderWorkspaceRegistry.setServices('codex', undefined);
-    ProviderWorkspaceRegistry.setServices('claude', undefined);
-    ProviderWorkspaceRegistry.setServices('opencode', undefined);
+    installWorkspaceServices('codex', undefined);
+    installWorkspaceServices('claude', undefined);
+    installWorkspaceServices('opencode', undefined);
   });
 
   it('should pass provider catalog config to initializeTabUI for Codex tab', async () => {
-    ProviderWorkspaceRegistry.setServices('codex', { commandCatalog: mockCatalog });
+    installWorkspaceServices('codex', { commandCatalog: mockCatalog });
 
     const manager = createManager({
       tabFactory: () => createMockTabData({ id: 'tab-1', providerId: 'codex' }),
@@ -2236,7 +2236,7 @@ describe('TabManager - Provider Command Catalog', () => {
   });
 
   it('should provide scan-backed entries for Codex without runtime', async () => {
-    ProviderWorkspaceRegistry.setServices('codex', { commandCatalog: mockCatalog });
+    installWorkspaceServices('codex', { commandCatalog: mockCatalog });
 
     const manager = createManager({
       tabFactory: () => createMockTabData({ id: 'tab-1', providerId: 'codex' }),
@@ -2275,8 +2275,8 @@ describe('TabManager - Provider Command Catalog', () => {
       }),
       refresh: jest.fn(),
     };
-    ProviderWorkspaceRegistry.setServices('claude', { commandCatalog: claudeCatalog });
-    ProviderWorkspaceRegistry.setServices('codex', { commandCatalog: mockCatalog });
+    installWorkspaceServices('claude', { commandCatalog: claudeCatalog });
+    installWorkspaceServices('codex', { commandCatalog: mockCatalog });
 
     const manager = createManager({
       tabFactory: () => createMockTabData({
@@ -2322,7 +2322,7 @@ describe('TabManager - Provider Command Catalog', () => {
       }),
       refresh: jest.fn(),
     };
-    ProviderWorkspaceRegistry.setServices('claude', { commandCatalog: claudeCatalog });
+    installWorkspaceServices('claude', { commandCatalog: claudeCatalog });
 
     const manager = createManager({
       tabFactory: () => createMockTabData({
@@ -2363,7 +2363,7 @@ describe('TabManager - Provider Command Catalog', () => {
       }),
       refresh: jest.fn(),
     };
-    ProviderWorkspaceRegistry.setServices('claude', { commandCatalog: claudeCatalog });
+    installWorkspaceServices('claude', { commandCatalog: claudeCatalog });
 
     const manager = createManager({
       tabFactory: () => createMockTabData({

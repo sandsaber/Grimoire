@@ -39,7 +39,7 @@ export function createCodexModuleContext(
     chatUI: codexChatUIConfig,
     plugin,
     providerId: 'codex',
-    services: () => maybeGetCodexWorkspaceServices(),
+    services: () => maybeGetCodexWorkspaceServices(plugin),
   });
 
   return {
@@ -49,7 +49,7 @@ export function createCodexModuleContext(
         container: HTMLElement;
         context: Parameters<ProviderSettingsTabRenderer['render']>[1];
       };
-      maybeGetCodexWorkspaceServices()?.settingsTabRenderer
+      maybeGetCodexWorkspaceServices(plugin)?.settingsTabRenderer
         ?.render(rendered.container, rendered.context);
     },
     hydrateConversation: async conversationId => {

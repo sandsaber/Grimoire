@@ -1,7 +1,6 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderModelCatalog,
   ProviderWorkspaceRegistration,
@@ -116,6 +115,9 @@ export const opencodeWorkspaceRegistration: ProviderWorkspaceRegistration<Openco
   initialize: async ({ plugin, vaultAdapter }) => createOpencodeWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetOpencodeWorkspaceServices(): OpencodeWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('opencode') as OpencodeWorkspaceServices | null;
+export function maybeGetOpencodeWorkspaceServices(
+  plugin: GrimoirePlugin,
+): OpencodeWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('opencode') as OpencodeWorkspaceServices | null ?? null;
 }

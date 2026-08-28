@@ -49,7 +49,7 @@ export function createKimicodeModuleContext(
     chatUI: kimicodeChatUIConfig,
     plugin,
     providerId: 'kimicode',
-    services: () => maybeGetKimicodeWorkspaceServices(),
+    services: () => maybeGetKimicodeWorkspaceServices(plugin),
   });
 
   return {
@@ -96,7 +96,7 @@ export function createKimicodeModuleContext(
         container: HTMLElement;
         context: Parameters<ProviderSettingsTabRenderer['render']>[1];
       };
-      maybeGetKimicodeWorkspaceServices()?.settingsTabRenderer
+      maybeGetKimicodeWorkspaceServices(plugin)?.settingsTabRenderer
         ?.render(rendered.container, rendered.context);
     },
     dispose: async () => {

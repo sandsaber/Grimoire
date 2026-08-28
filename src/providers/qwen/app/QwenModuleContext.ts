@@ -51,7 +51,7 @@ export function createQwenModuleContext(
     chatUI: qwenChatUIConfig,
     plugin,
     providerId: 'qwen',
-    services: () => maybeGetQwenWorkspaceServices(),
+    services: () => maybeGetQwenWorkspaceServices(plugin),
   });
 
   return {
@@ -91,7 +91,7 @@ export function createQwenModuleContext(
         container: HTMLElement;
         context: Parameters<ProviderSettingsTabRenderer['render']>[1];
       };
-      maybeGetQwenWorkspaceServices()?.settingsTabRenderer
+      maybeGetQwenWorkspaceServices(plugin)?.settingsTabRenderer
         ?.render(rendered.container, rendered.context);
     },
     dispose: async () => {

@@ -14,7 +14,6 @@ import {
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 import { createClaudeWorkspaceServices } from '@/providers/claude/app/ClaudeWorkspaceServices';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
@@ -61,7 +60,6 @@ live('Claude chat projection live smoke', () => {
     for (const release of running.splice(0)) {
       await release().catch(() => undefined);
     }
-    ProviderWorkspaceRegistry.clear();
   });
 
   function report(...parts: readonly string[]): void {
@@ -132,15 +130,18 @@ live('Claude chat projection live smoke', () => {
     const vault = mkdtempSync(join(tmpdir(), 'grimoire-claude-projection-'));
     writeFileSync(join(vault, 'Note.md'), '# Note\n\nThe vault has one note in it.\n');
     const plugin = createPlugin(vault, overrides);
-    // The composition asks the workspace registry for the MCP and plugin
-    // managers every turn, so this is not optional scaffolding.
-    ProviderWorkspaceRegistry.setServices(
-      'claude',
-      await createClaudeWorkspaceServices(
-        plugin,
-        new VaultFileAdapter({ vault: { adapter: nodeVaultAdapter(vault) } } as never),
-      ),
+    // The composition asks for the MCP and plugin managers every turn, so this
+    // is not optional scaffolding. It reaches them through the plugin's
+    // composition root, which is where a provider's services live now.
+    const claudeServices = await createClaudeWorkspaceServices(
+      plugin,
+      new VaultFileAdapter({ vault: { adapter: nodeVaultAdapter(vault) } } as never),
     );
+    (plugin as { getApplicationRuntimeOrNull?: unknown }).getApplicationRuntimeOrNull = () => ({
+      workspaceServicesFor: (providerId: string) => (
+        providerId === 'claude' ? claudeServices : null
+      ),
+    });
     const host = new ExecutionKernelHost({
       storage: new VaultDurableStorage(createDurableInMemoryVaultAdapter()),
       scheduler: {

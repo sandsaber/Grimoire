@@ -4,12 +4,12 @@
 
 ## Rules
 
-- Declare runtimes, capabilities and auxiliary services on the provider's `ProviderModule`, which `BuiltInProviderCatalog` holds. Only workspace services still register, through `ProviderWorkspaceRegistry`.
+- Declare runtimes, capabilities and auxiliary services on the provider's `ProviderModule`, which `BuiltInProviderCatalog` holds. A provider's workspace services are built by the initializer it contributes to `builtInWorkspaceInitializers` and held on `ApplicationRuntime`; there is no registry.
 - Keep provider-specific launch specs, CLI resolution, history parsing, storage, settings tabs, and UI config in the concrete provider directory.
 - Keep cross-provider protocol helpers only when at least two providers use them. ACP helpers belong in `src/providers/acp/`.
 - Do not leak provider-specific `providerState` fields into `src/features/`; expose typed provider helpers or neutral runtime/session updates instead.
 - Provider defaults and enablement should stay explicit. Do not silently turn opt-in providers into default providers.
-- Provider plan usage belongs to provider-owned stores registered through `ProviderWorkspaceRegistry`. UI code consumes only the shared `ProviderPlanUsageProvider` contract.
+- Provider plan usage belongs to provider-owned stores reached through the provider's workspace services. UI code consumes only the shared `ProviderPlanUsageProvider` contract.
 
 ## When Adding or Changing a Provider
 

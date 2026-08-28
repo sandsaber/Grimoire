@@ -1,6 +1,5 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
@@ -75,6 +74,9 @@ export const geminiWorkspaceRegistration: ProviderWorkspaceRegistration<GeminiWo
   initialize: async ({ plugin, vaultAdapter }) => createGeminiWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetGeminiWorkspaceServices(): GeminiWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('gemini') as GeminiWorkspaceServices | null;
+export function maybeGetGeminiWorkspaceServices(
+  plugin: GrimoirePlugin,
+): GeminiWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('gemini') as GeminiWorkspaceServices | null ?? null;
 }

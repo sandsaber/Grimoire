@@ -38,7 +38,7 @@ interface EnrichedModel {
 
 export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
   render(container, context) {
-    const opencodeWorkspace = maybeGetOpencodeWorkspaceServices();
+    const opencodeWorkspace = maybeGetOpencodeWorkspaceServices(context.plugin);
     const settingsBag = context.plugin.settings as unknown as Record<string, unknown>;
     const opencodeSettings = getOpencodeProviderSettings(settingsBag);
     const hostnameKey = getHostnameKey();

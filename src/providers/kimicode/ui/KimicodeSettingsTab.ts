@@ -38,7 +38,7 @@ interface EnrichedModel {
 
 export const kimicodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
   render(container, context) {
-    const kimicodeWorkspace = maybeGetKimicodeWorkspaceServices();
+    const kimicodeWorkspace = maybeGetKimicodeWorkspaceServices(context.plugin);
     const settingsBag = context.plugin.settings as unknown as Record<string, unknown>;
     const kimicodeSettings = getKimicodeProviderSettings(settingsBag);
     const hostnameKey = getHostnameKey();

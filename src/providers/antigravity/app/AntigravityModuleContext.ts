@@ -21,7 +21,7 @@ export function createAntigravityModuleContext(
     chatUI: antigravityChatUIConfig,
     plugin,
     providerId: 'antigravity',
-    services: () => maybeGetAntigravityWorkspaceServices(),
+    services: () => maybeGetAntigravityWorkspaceServices(plugin),
   });
 
   return {
@@ -32,7 +32,7 @@ export function createAntigravityModuleContext(
         container: HTMLElement;
         context: Parameters<ProviderSettingsTabRenderer['render']>[1];
       };
-      maybeGetAntigravityWorkspaceServices()?.settingsTabRenderer
+      maybeGetAntigravityWorkspaceServices(plugin)?.settingsTabRenderer
         ?.render(rendered.container, rendered.context);
     },
   };

@@ -9,7 +9,6 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
 import { executionSessionId, type InteractionId, runId } from '@/core/execution/ExecutionIds';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { TOOL_READ } from '@/core/tools/toolNames';
 import type { StreamChunk } from '@/core/types';
 import { JsonRpcErrorResponse } from '@/providers/acp';
@@ -63,6 +62,8 @@ describe('Qwen execution composition', () => {
     }
   });
 
+  let stubbedWorkspaceServices: unknown = null;
+
   function createPlugin(): any {
     const vault = mkdtempSync(join(tmpdir(), 'grimoire-qwen-composition-'));
     vaults.push(vault);
@@ -74,6 +75,9 @@ describe('Qwen execution composition', () => {
     };
     updateQwenProviderSettings(settings, { enabled: true });
     return {
+      getApplicationRuntimeOrNull: () => ({
+        workspaceServicesFor: () => stubbedWorkspaceServices,
+      }),
       settings,
       manifest: { version: '1.2.3' },
       app: { vault: { adapter: { basePath: vault } } },
@@ -1305,11 +1309,9 @@ describe('Qwen execution composition', () => {
     // running process cannot be told, and the fingerprint is what restarts it.
     const { execution, host } = await createHarness();
     const servers: unknown[] = [];
-    // Stubbed where the composition now asks: it reaches the provider's own
-    // services rather than a registry accessor keyed by a provider id string.
-    jest.spyOn(ProviderWorkspaceRegistry, 'getServices').mockReturnValue({
-      mcpServerManager: { getServers: () => servers },
-    } as never);
+    // Stubbed where the composition now asks: through the plugin's composition
+    // root, which is where a provider's services live.
+    stubbedWorkspaceServices = { mcpServerManager: { getServers: () => servers } };
 
     const before = await execution.turnRequests.resolve(execution.turnRequests.reference({
       prompt: [{ type: 'text', text: 'first' }],

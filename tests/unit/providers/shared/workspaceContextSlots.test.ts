@@ -1,4 +1,3 @@
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { createGeminiModuleContext } from '@/providers/gemini/app/GeminiModuleContext';
 import { createGrokModuleContext } from '@/providers/grok/app/GrokModuleContext';
 import { createKimicodeModuleContext } from '@/providers/kimicode/app/KimicodeModuleContext';
@@ -41,17 +40,36 @@ describe('provider workspace context slots', () => {
     { build: p => createQwenModuleContext(p, () => null, ports), providerId: 'qwen' },
   ];
 
+  /**
+   * What the composition root would be holding, per provider.
+   *
+   * The registry these were installed in is deleted: a provider's services live
+   * on `ApplicationRuntime` now, and every reader has a plugin to reach it
+   * with. So the stub is a map and the plugin answers out of it.
+   */
+  const stubbedServices = new Map<string, unknown>();
+
+  function stubServices(providerId: string, services: unknown): void {
+    stubbedServices.set(providerId, services);
+  }
+
   function plugin(): never {
-    return { getResolvedProviderCliPath: () => null, settings: {} } as never;
+    return {
+      getResolvedProviderCliPath: () => null,
+      settings: {},
+      getApplicationRuntimeOrNull: () => ({
+        workspaceServicesFor: (providerId: string) => stubbedServices.get(providerId) ?? null,
+      }),
+    } as never;
   }
 
   afterEach(() => {
-    ProviderWorkspaceRegistry.clear();
+    stubbedServices.clear();
   });
 
   it.each(WIRINGS)('$providerId reads its own workspace services', async ({ build, providerId }) => {
     for (const wiring of WIRINGS) {
-      ProviderWorkspaceRegistry.setServices(wiring.providerId, {
+      stubServices(wiring.providerId, {
         mcpStorage: {
           load: async () => [{
             config: { command: 'x' },
@@ -84,7 +102,7 @@ describe('provider workspace context slots', () => {
     expect(await port.listDropdownEntries({ includeBuiltIns: false })).toEqual([]);
 
     const listDropdownEntries = jest.fn(async () => [{ name: 'review' }]);
-    ProviderWorkspaceRegistry.setServices('grok', { commandCatalog: { listDropdownEntries } } as never);
+    stubServices('grok', { commandCatalog: { listDropdownEntries } });
 
     expect(await port.listDropdownEntries({ includeBuiltIns: false })).toEqual([{ name: 'review' }]);
     expect(listDropdownEntries).toHaveBeenCalledWith({ includeBuiltIns: false });
@@ -98,7 +116,7 @@ describe('provider workspace context slots', () => {
       listVaultEntries: jest.fn(async () => []),
       setRuntimeCommands: jest.fn(),
     };
-    ProviderWorkspaceRegistry.setServices('grok', { commandCatalog: catalog } as never);
+    stubServices('grok', { commandCatalog: catalog });
 
     const context = createGrokModuleContext(plugin(), () => null, ports);
     context.commandsPort().setRuntimeCommands([{ id: 'g:x', name: 'x', content: '' }]);
@@ -110,9 +128,9 @@ describe('provider workspace context slots', () => {
 
   it('reports no plan for a provider the user has switched off', async () => {
     const getCachedUsage = jest.fn(() => ({ plan: 'Pro' }));
-    ProviderWorkspaceRegistry.setServices('grok', {
+    stubServices('grok', {
       usageProvider: { getCachedUsage, isAvailable: () => false },
-    } as never);
+    });
 
     const usage = createGrokModuleContext(plugin(), () => null, ports).cachedPlanUsage();
 
@@ -124,9 +142,9 @@ describe('provider workspace context slots', () => {
   });
 
   it('reports the plan a provider that is on has cached', async () => {
-    ProviderWorkspaceRegistry.setServices('grok', {
+    stubServices('grok', {
       usageProvider: { getCachedUsage: () => ({ plan: 'Pro' }), isAvailable: () => true },
-    } as never);
+    });
 
     const usage = createGrokModuleContext(plugin(), () => null, ports).cachedPlanUsage();
 

@@ -357,7 +357,7 @@ export class ClaudeExecution {
     const ports: ExecutionChatRuntimeHostPorts = {
       prepareTurn: (request: ChatTurnRequest) => encodeClaudeTurn(
         request,
-        getClaudeWorkspaceServices().mcpManager,
+        getClaudeWorkspaceServices(this.plugin).mcpManager,
       ),
       encodeRequestRef: (turn: PreparedChatTurn) => {
         // The turn boundary, and the one place a turn is known to be starting.
@@ -539,7 +539,7 @@ export class ClaudeExecution {
    * settings change must start the SDK the user has configured now.
    */
   private async environment(): Promise<ClaudeInvocationEnvironment> {
-    const workspace = getClaudeWorkspaceServices();
+    const workspace = getClaudeWorkspaceServices(this.plugin);
     const cliPath = this.plugin.getResolvedProviderCliPath('claude');
     if (!cliPath) {
       throw new Error('The Claude CLI could not be resolved.');

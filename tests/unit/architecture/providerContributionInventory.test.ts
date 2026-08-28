@@ -1,6 +1,6 @@
 import '@/providers';
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { readInterfaceMembers } from '@test/helpers/interfaceMembers';
@@ -312,19 +312,17 @@ describe('provider contribution inventory', () => {
     it('has both halves of the workspace lifecycle, where the moved row says', () => {
       // The row used to say init existed and dispose did not, and that shipping
       // one without the other is the v1 defect repeating. Both halves are on
-      // the manager now, and the registry owns no lifecycle at all.
+      // the manager, which is the only thing that owns this lifecycle now — the
+      // registry it used to be checked against is deleted.
       const manager = readFileSync(
         resolve(process.cwd(), 'src/core/providers/ProviderWorkspaceManager.ts'),
-        'utf8',
-      );
-      const registry = readFileSync(
-        resolve(process.cwd(), 'src/core/providers/ProviderWorkspaceRegistry.ts'),
         'utf8',
       );
 
       expect(manager).toContain('async initializeAll');
       expect(manager).toContain('async disposeAll');
-      expect(registry).not.toContain('initializeAll');
+      expect(existsSync(resolve(process.cwd(), 'src/core/providers/ProviderWorkspaceRegistry.ts')))
+        .toBe(false);
     });
   });
 });

@@ -55,7 +55,7 @@ export function createGrokModuleContext(
     chatUI: grokChatUIConfig,
     plugin,
     providerId: 'grok',
-    services: () => maybeGetGrokWorkspaceServices(),
+    services: () => maybeGetGrokWorkspaceServices(plugin),
   });
 
   return {
@@ -110,7 +110,7 @@ export function createGrokModuleContext(
         container: HTMLElement;
         context: Parameters<ProviderSettingsTabRenderer['render']>[1];
       };
-      maybeGetGrokWorkspaceServices()?.settingsTabRenderer
+      maybeGetGrokWorkspaceServices(plugin)?.settingsTabRenderer
         ?.render(rendered.container, rendered.context);
     },
     dispose: async () => {

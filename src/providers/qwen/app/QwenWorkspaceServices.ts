@@ -1,6 +1,5 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
@@ -71,6 +70,9 @@ export const qwenWorkspaceRegistration: ProviderWorkspaceRegistration<QwenWorksp
   initialize: async ({ plugin, vaultAdapter }) => createQwenWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetQwenWorkspaceServices(): QwenWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('qwen') as QwenWorkspaceServices | null;
+export function maybeGetQwenWorkspaceServices(
+  plugin: GrimoirePlugin,
+): QwenWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('qwen') as QwenWorkspaceServices | null ?? null;
 }

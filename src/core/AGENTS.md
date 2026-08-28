@@ -24,6 +24,5 @@
 
 ## Gotchas
 
-- `ProviderWorkspaceRegistry` owns workspace services such as command catalogs, agent mentions, MCP managers, CLI resolvers, usage providers, and settings tabs.
 - A tab's `ExecutionChatRuntimeAdapter` must be cleaned up when the tab is disposed.
 - Plan mode is capability-driven. Claude and Codex surface it through different provider-native mechanisms, so shared code should not hard-code provider event names.

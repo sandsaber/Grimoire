@@ -49,7 +49,7 @@ export function createMimocodeModuleContext(
     chatUI: mimocodeChatUIConfig,
     plugin,
     providerId: 'mimocode',
-    services: () => maybeGetMimocodeWorkspaceServices(),
+    services: () => maybeGetMimocodeWorkspaceServices(plugin),
   });
 
   return {
@@ -96,7 +96,7 @@ export function createMimocodeModuleContext(
         container: HTMLElement;
         context: Parameters<ProviderSettingsTabRenderer['render']>[1];
       };
-      maybeGetMimocodeWorkspaceServices()?.settingsTabRenderer
+      maybeGetMimocodeWorkspaceServices(plugin)?.settingsTabRenderer
         ?.render(rendered.container, rendered.context);
     },
     dispose: async () => {

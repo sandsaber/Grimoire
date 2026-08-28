@@ -227,7 +227,7 @@ const SEARCHES: readonly DeletionSearch[] = [
     closedBy: 'the seam deletion — the lifecycle meaning goes, the content type keeps its own name',
   },
   {
-    what: 'the registries — one left',
+    what: 'the registries',
     pattern: /\bProviderRegistry\b|\bProviderWorkspaceRegistry\b/,
     // **17, and `ProviderRegistry` is deleted.** Its last two rows —
     // `taskResultInterpreter` and `subagentLifecycleAdapter` — are
@@ -243,54 +243,30 @@ const SEARCHES: readonly DeletionSearch[] = [
     // deleted.
     //
     // `ClaudeConversationHistoryService` was tried and put back. Reaching
-    // `maybeGetClaudeWorkspaceServices()` instead of the registry — the same
+    // `maybeGetClaudeWorkspaceServices(plugin)` instead of the registry — the same
     // move the compositions took — introduces a **circular import**: the
     // workspace services reach the history service, so at module init the class
     // is `undefined` and every suite importing Claude fails to load. The
     // registry's indirection is breaking that cycle, which is a reason to keep
     // it that no reading of the call site would have shown.
-    // **12, and the registry is a map with three methods on it.**
-    // `refreshAgentMentions`, `getRuntimeCommandLoader` and
-    // `getSettingsTabRenderer` have all moved to module slots; `TabManager` left
-    // the count with the second.
+    // **Closed. Both registries are deleted.**
     //
-    // `getMcpServerManager` went last. Three chat surfaces held the manager by
-    // identity and called it later, so neither the manager nor a snapshot would
-    // do: the mention dropdown and the file context want the context-saving
-    // servers, the composer's selector wants the enabled ones, and both ask
-    // while drawing. `ProviderMcpPort` grew two **synchronous** members over
-    // what the workspace holds now, and `tabSettings` hands the widgets a view
-    // that resolves the workspace on each call. The `setMcpManager(null)` signal
-    // that used to clear the enabled set needed no replacement after all: the
-    // selector prunes every enabled server no longer listed, and for an empty
-    // list that is all of them — the same end state, by the path already there.
+    // The chat one went when its last two rows became declarations. The
+    // workspace one took longer because it was doing something real: a
+    // provider's services are a per-provider singleton built asynchronously —
+    // eight of the nine read MCP servers and agent definitions off disk to
+    // construct — while a module context is built **per tab**, so something had
+    // to hold the one instance between them. A static in `src/core/providers`
+    // did, which meant provider-neutral core held a map of provider services
+    // and every reader reached it without saying who it was.
     //
-    // `register` and `contributionFor` went with it: a registration held one
-    // member after its duplicated capability map was deleted, so the providers'
-    // hub exports the initializers as a table and `main.ts` looks the builder up
-    // there. `providers/index.ts` left the count with them.
-    //
-    // **What is left is the reason the class exists**, and it is not a row.
-    // These services are a per-provider singleton built asynchronously — eight
-    // of the nine read MCP servers and agent definitions off disk to construct —
-    // while a module context is built per tab. Something has to hold the one
-    // instance between them, and today that is `setServices`/`getServices`, read
-    // by nine `maybeGet<Provider>WorkspaceServices` accessors, `main.ts`, and
-    // two rows of the settings hub.
-    //
-    // `ClaudeConversationHistoryService` left the count by being *told* where
-    // Claude's transcripts are instead of looking it up. That read was also the
-    // import cycle recorded earlier: the workspace services reach the history
-    // service, so reaching back left the class `undefined` at module init. The
-    // directory resolves from the plugin's configured environment, which the
-    // module context has, so the context passes an accessor — and the module's
-    // own workspace builds an instance with it, because the two transcript
-    // members read the SDK's session files and reading them in the wrong place
-    // finds nothing. Closing it means the composition owning that
-    // singleton, which is one pass over two lifecycles rather than nine row
-    // moves.
-    files: 12,
-    closedBy: 'the provider rows, when the last consumer of each has moved',
+    // Every reader has a plugin. So `ApplicationRuntime` — the composition root,
+    // which already holds the compositions and the agent coordinator — holds
+    // them, `main.ts` publishes what `ProviderWorkspaceManager` builds, and the
+    // nine `maybeGet<Provider>WorkspaceServices` accessors take the plugin they
+    // were always called beside.
+    files: 0,
+    closedBy: 'closed — the composition root holds what the registries held',
   },
 ];
 
@@ -331,13 +307,13 @@ describe('structural deletion progress', () => {
       'SubagentManager lifecycle: 2',
       'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
-      'the registries — one left: 12',
     ]);
-    // Six of twelve are zero: two closed in the 2026-08-27 session, the
+    // Seven of twelve are zero: two closed in the 2026-08-27 session, the
     // interaction callbacks closed with the first step of the seam deletion,
     // the compositions closed by moving under the providers they compose, the
-    // neutral settings imports closed by two contract additions, and the
-    // subagent hooks closed once the loaders beside them were read.
-    expect(SEARCHES).toHaveLength(remaining.length + 6);
+    // neutral settings imports closed by two contract additions, the subagent
+    // hooks closed once the loaders beside them were read, and both registries
+    // are deleted.
+    expect(SEARCHES).toHaveLength(remaining.length + 7);
   });
 });

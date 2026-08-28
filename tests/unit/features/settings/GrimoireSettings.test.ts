@@ -6,7 +6,6 @@ import { Notice } from 'obsidian';
 import { readBundledChangelog } from '@/app/changelog/source';
 import { DEFAULT_GRIMOIRE_SETTINGS } from '@/app/settings/defaultSettings';
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { GrimoireSettingTab } from '@/features/settings/GrimoireSettings';
 import { setLocale, t } from '@/i18n/i18n';
 import type { Locale } from '@/i18n/types';
@@ -584,21 +583,19 @@ describe('GrimoireSettingTab settings hub', () => {
         persistenceKey: `${providerId}-agent:review.md`,
       }]),
     }]));
-    jest.spyOn(ProviderWorkspaceRegistry, 'getServices').mockImplementation((providerId: any) => {
-      const storage = storages[providerId];
-      if (!storage) return null;
-      return {
-        agentMentionProvider: { searchAgents: jest.fn().mockReturnValue([]) },
-        agentStorage: storage,
-      } as any;
-    });
-
-    // The mention refresh a delete triggers is routed per provider through the
-    // built workspace, which is where the deleted registry accessor's own
-    // routing test moved: this one already says "keeps providers independent",
-    // so it asserts it of the path that carries it now.
+    // Both halves come off the composition root now — the hub's two legacy rows
+    // and the mention refresh a delete triggers — so they are stubbed together
+    // rather than one on a registry and one on the runtime.
     const refreshes = Object.fromEntries(providerIds.map(providerId => [providerId, jest.fn()]));
     (tab as any).plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceServicesFor: (providerId: string) => {
+        const storage = storages[providerId];
+        if (!storage) return null;
+        return {
+          agentMentionProvider: { searchAgents: jest.fn().mockReturnValue([]) },
+          agentStorage: storage,
+        };
+      },
       workspaceFor: async (providerId: string) => (
         refreshes[providerId] ? { agentMentions: { refresh: refreshes[providerId] } } : {}
       ),
@@ -660,18 +657,16 @@ describe('GrimoireSettingTab settings hub', () => {
 
   it('keeps Codex MCP guidance in the inventory without advertising it as managed', async () => {
     const tab = new GrimoireSettingTab(createSettingsApp(), createSettingsPlugin());
-    jest.spyOn(ProviderWorkspaceRegistry, 'getServices').mockImplementation((providerId: any) => {
-      if (providerId === 'claude') {
-        return {
-          mcpServerManager: { getServers: jest.fn().mockReturnValue([]) },
-          mcpStorage: { save: jest.fn() },
-          workspaceCapabilities: { mcp: 'managed' },
-        } as any;
-      }
-      if (providerId === 'codex') {
-        return { workspaceCapabilities: { mcp: 'native' } } as any;
-      }
-      return null;
+    (tab as any).plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceServicesFor: (providerId: string) => {
+        if (providerId === 'claude') {
+          return {
+            mcpServerManager: { getServers: jest.fn().mockReturnValue([]) },
+            mcpStorage: { save: jest.fn() },
+          };
+        }
+        return null;
+      },
     });
 
     expect((tab as any).getWorkspaceManagerProviders(['claude', 'codex'], 'mcp'))

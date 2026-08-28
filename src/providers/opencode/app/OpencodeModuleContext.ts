@@ -49,7 +49,7 @@ export function createOpencodeModuleContext(
     chatUI: opencodeChatUIConfig,
     plugin,
     providerId: 'opencode',
-    services: () => maybeGetOpencodeWorkspaceServices(),
+    services: () => maybeGetOpencodeWorkspaceServices(plugin),
   });
 
   return {
@@ -96,7 +96,7 @@ export function createOpencodeModuleContext(
         container: HTMLElement;
         context: Parameters<ProviderSettingsTabRenderer['render']>[1];
       };
-      maybeGetOpencodeWorkspaceServices()?.settingsTabRenderer
+      maybeGetOpencodeWorkspaceServices(plugin)?.settingsTabRenderer
         ?.render(rendered.container, rendered.context);
     },
     dispose: async () => {

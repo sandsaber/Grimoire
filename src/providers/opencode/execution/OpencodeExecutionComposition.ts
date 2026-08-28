@@ -579,7 +579,7 @@ export class OpencodeExecution {
         // that makes a running process see them is the launch key's job.
         mcp: {
           load: async () => {
-            const manager = maybeGetOpencodeWorkspaceServices()?.mcpServerManager;
+            const manager = maybeGetOpencodeWorkspaceServices(this.plugin)?.mcpServerManager;
             await manager?.loadServers();
             return manager?.getServers() ?? [];
           },
@@ -917,7 +917,7 @@ export class OpencodeExecution {
       }),
       cwd,
       mcpServers: toAcpMcpServers([
-        ...(maybeGetOpencodeWorkspaceServices()?.mcpServerManager?.getServers() ?? []),
+        ...(maybeGetOpencodeWorkspaceServices(this.plugin)?.mcpServerManager?.getServers() ?? []),
       ]),
     };
   }
@@ -1011,7 +1011,7 @@ export class OpencodeExecution {
       settings: promptSettings,
       workspaceRoot: cwd,
     });
-    const mcpServers = maybeGetOpencodeWorkspaceServices()?.mcpServerManager?.getServers() ?? [];
+    const mcpServers = maybeGetOpencodeWorkspaceServices(this.plugin)?.mcpServerManager?.getServers() ?? [];
     return {
       executable,
       cwd,

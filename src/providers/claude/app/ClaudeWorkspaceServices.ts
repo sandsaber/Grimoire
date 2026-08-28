@@ -1,6 +1,5 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   AppAgentManager,
   AppAgentStorage,
@@ -99,10 +98,26 @@ export const claudeWorkspaceRegistration: ProviderWorkspaceRegistration<ClaudeWo
   initialize: async ({ plugin, vaultAdapter }) => createClaudeWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetClaudeWorkspaceServices(): ClaudeWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('claude') as ClaudeWorkspaceServices | null;
+/**
+ * This provider's services, or a throw.
+ *
+ * For the callers that cannot proceed without them and would otherwise read a
+ * half-built surface as an empty one. Takes a plugin for the same reason
+ * `maybeGet` does: the services live on the composition root now, not in a
+ * static that stood in for having one.
+ */
+export function getClaudeWorkspaceServices(plugin: GrimoirePlugin): ClaudeWorkspaceServices {
+  const services = maybeGetClaudeWorkspaceServices(plugin);
+  if (!services) {
+    throw new Error('Provider workspace "claude" is not initialized.');
+  }
+  return services;
 }
 
-export function getClaudeWorkspaceServices(): ClaudeWorkspaceServices {
-  return ProviderWorkspaceRegistry.requireServices('claude') as ClaudeWorkspaceServices;
+export function maybeGetClaudeWorkspaceServices(
+  plugin: GrimoirePlugin,
+): ClaudeWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('claude') as ClaudeWorkspaceServices | null ?? null;
 }
+

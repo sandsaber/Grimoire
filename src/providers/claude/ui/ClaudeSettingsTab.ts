@@ -22,7 +22,7 @@ import { SlashCommandSettings } from './SlashCommandSettings';
 
 export const claudeSettingsTabRenderer: ProviderSettingsTabRenderer = {
   render(container, context) {
-    const claudeWorkspace = getClaudeWorkspaceServices();
+    const claudeWorkspace = getClaudeWorkspaceServices(context.plugin);
     const settingsBag = context.plugin.settings as unknown as Record<string, unknown>;
     const claudeSettings = getClaudeProviderSettings(settingsBag);
 

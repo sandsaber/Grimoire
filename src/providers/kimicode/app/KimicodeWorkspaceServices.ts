@@ -1,7 +1,6 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderModelCatalog,
   ProviderWorkspaceRegistration,
@@ -117,6 +116,9 @@ export const kimicodeWorkspaceRegistration: ProviderWorkspaceRegistration<Kimico
   initialize: async ({ plugin, vaultAdapter }) => createKimicodeWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetKimicodeWorkspaceServices(): KimicodeWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('kimicode') as KimicodeWorkspaceServices | null;
+export function maybeGetKimicodeWorkspaceServices(
+  plugin: GrimoirePlugin,
+): KimicodeWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('kimicode') as KimicodeWorkspaceServices | null ?? null;
 }

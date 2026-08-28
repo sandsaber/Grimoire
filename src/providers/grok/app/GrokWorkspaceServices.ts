@@ -1,6 +1,5 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderModelCatalog,
   ProviderWorkspaceRegistration,
@@ -155,6 +154,9 @@ export const grokWorkspaceRegistration: ProviderWorkspaceRegistration<GrokWorksp
   initialize: async ({ plugin, vaultAdapter }) => createGrokWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetGrokWorkspaceServices(): GrokWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('grok') as GrokWorkspaceServices | null;
+export function maybeGetGrokWorkspaceServices(
+  plugin: GrimoirePlugin,
+): GrokWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('grok') as GrokWorkspaceServices | null ?? null;
 }

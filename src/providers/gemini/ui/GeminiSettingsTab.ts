@@ -18,7 +18,7 @@ const GEMINI_CLI_PATH_PLACEHOLDER = '/usr/local/bin/gemini';
 
 export const geminiSettingsTabRenderer: ProviderSettingsTabRenderer = {
   render(container, context) {
-    const geminiWorkspace = maybeGetGeminiWorkspaceServices();
+    const geminiWorkspace = maybeGetGeminiWorkspaceServices(context.plugin);
     const settingsBag = context.plugin.settings as unknown as Record<string, unknown>;
     const geminiSettings = getGeminiProviderSettings(settingsBag);
     const hostnameKey = getHostnameKey();

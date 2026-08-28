@@ -1,7 +1,6 @@
 import { addIcon, setTooltip } from 'obsidian';
 
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { TOOL_SUBAGENT } from '@/core/tools/toolNames';
 import { VIEW_TYPE_GRIMOIRE } from '@/core/types';
 import { setLocale } from '@/i18n/i18n';
@@ -394,7 +393,9 @@ describe('GrimoirePlugin', () => {
       }
 
       const withoutServices = providerCatalog().ids()
-        .filter(providerId => ProviderWorkspaceRegistry.getServices(providerId) === null);
+        .filter(providerId => (
+          plugin.getApplicationRuntimeOrNull()?.workspaceServicesFor(providerId) ?? null
+        ) === null);
 
       expect(withoutServices).toEqual(['claude']);
     });
@@ -404,14 +405,16 @@ describe('GrimoirePlugin', () => {
       // filled it, so the next load read the previous load's services until its
       // own initializer overwrote them.
       await plugin.onload();
-      expect(ProviderWorkspaceRegistry.getServices('codex')).not.toBeNull();
+      expect(plugin.getApplicationRuntimeOrNull()?.workspaceServicesFor('codex') ?? null).not.toBeNull();
 
       plugin.onunload();
       await Promise.resolve();
       await Promise.resolve();
 
       const stillPublished = providerCatalog().ids()
-        .filter(providerId => ProviderWorkspaceRegistry.getServices(providerId) !== null);
+        .filter(providerId => (
+          plugin.getApplicationRuntimeOrNull()?.workspaceServicesFor(providerId) ?? null
+        ) !== null);
 
       expect(stillPublished).toEqual([]);
     });

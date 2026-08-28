@@ -43,7 +43,7 @@ export function createGeminiModuleContext(
     chatUI: geminiChatUIConfig,
     plugin,
     providerId: 'gemini',
-    services: () => maybeGetGeminiWorkspaceServices(),
+    services: () => maybeGetGeminiWorkspaceServices(plugin),
   });
 
   return {
@@ -81,7 +81,7 @@ export function createGeminiModuleContext(
         container: HTMLElement;
         context: Parameters<ProviderSettingsTabRenderer['render']>[1];
       };
-      maybeGetGeminiWorkspaceServices()?.settingsTabRenderer
+      maybeGetGeminiWorkspaceServices(plugin)?.settingsTabRenderer
         ?.render(rendered.container, rendered.context);
     },
     dispose: async () => {

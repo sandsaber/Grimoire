@@ -588,7 +588,7 @@ export class KimicodeExecution {
         // that makes a running process see them is the launch key's job.
         mcp: {
           load: async () => {
-            const manager = maybeGetKimicodeWorkspaceServices()?.mcpServerManager;
+            const manager = maybeGetKimicodeWorkspaceServices(this.plugin)?.mcpServerManager;
             await manager?.loadServers();
             return manager?.getServers() ?? [];
           },
@@ -926,7 +926,7 @@ export class KimicodeExecution {
       }),
       cwd,
       mcpServers: toAcpMcpServers([
-        ...(maybeGetKimicodeWorkspaceServices()?.mcpServerManager?.getServers() ?? []),
+        ...(maybeGetKimicodeWorkspaceServices(this.plugin)?.mcpServerManager?.getServers() ?? []),
       ]),
     };
   }
@@ -1020,7 +1020,7 @@ export class KimicodeExecution {
       settings: promptSettings,
       workspaceRoot: cwd,
     });
-    const mcpServers = maybeGetKimicodeWorkspaceServices()?.mcpServerManager?.getServers() ?? [];
+    const mcpServers = maybeGetKimicodeWorkspaceServices(this.plugin)?.mcpServerManager?.getServers() ?? [];
     return {
       executable,
       cwd,

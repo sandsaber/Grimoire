@@ -1,4 +1,3 @@
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { createClaudeModuleContext } from '@/providers/claude/app/ClaudeModuleContext';
 
 /**
@@ -16,25 +15,20 @@ describe('Claude module context workspace slots', () => {
     rewind: async () => ({ canRewind: false, error: 'not running' }),
   };
 
-  function pluginWith(services: Record<string, unknown>): any {
-    // Published straight in: registration was a lookup table for the builder,
-    // and the builder is the providers' own now.
-    ProviderWorkspaceRegistry.setServices('claude', services);
+  function pluginWith(services: Record<string, unknown> | null): any {
+    // Off the plugin's composition root, which is where a provider's services
+    // live: the static registry that used to hold them is deleted.
     return {
       settings: {},
       app: { vault: { adapter: { basePath: '/vault' } } },
       getResolvedProviderCliPath: () => '/usr/local/bin/claude',
+      getApplicationRuntimeOrNull: () => ({ workspaceServicesFor: () => services }),
     };
   }
 
-  afterEach(() => {
-    ProviderWorkspaceRegistry.clear();
-  });
-
   it('offers nothing at all where no workspace is registered', async () => {
-    ProviderWorkspaceRegistry.clear();
     const context = createClaudeModuleContext(
-      { settings: {}, getResolvedProviderCliPath: () => null } as never,
+      pluginWith(null),
       () => null,
       ports,
     );

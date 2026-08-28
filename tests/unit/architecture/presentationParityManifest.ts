@@ -83,7 +83,6 @@ export const PARITY_SURFACES: ParitySurface[] = [
     modules: [
       'src/providers/index.ts',
       'src/providers/defaultProviderConfigs.ts',
-      'src/core/providers/ProviderWorkspaceRegistry.ts',
     ],
   },
   {

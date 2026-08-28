@@ -40,7 +40,7 @@ interface EnrichedModel {
 
 export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
   render(container, context) {
-    const grokWorkspace = maybeGetGrokWorkspaceServices();
+    const grokWorkspace = maybeGetGrokWorkspaceServices(context.plugin);
     const settingsBag = context.plugin.settings as unknown as Record<string, unknown>;
     const grokSettings = getGrokProviderSettings(settingsBag);
     const hostnameKey = getHostnameKey();
@@ -547,7 +547,7 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
       renderAll();
 
       try {
-        const catalog = maybeGetGrokWorkspaceServices()?.modelCatalog;
+        const catalog = maybeGetGrokWorkspaceServices(context.plugin)?.modelCatalog;
         if (catalog) {
           await catalog.refreshModels({
             plugin: context.plugin,

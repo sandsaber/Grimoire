@@ -13,7 +13,7 @@
 - `ChatState` is per-tab. Do not move per-tab runtime or scroll state into globals.
 - `InputController` builds provider-neutral `ChatTurnRequest` values. Providers own prompt encoding through `prepareTurn()`.
 - `StreamController` consumes provider-neutral `StreamChunk` values and updates DOM state.
-- Provider-owned services must be resolved through `ProviderCatalog` declarations, `ApplicationRuntime.workspaceFor()`, or — for the rows that have not moved yet — `ProviderWorkspaceRegistry`. Never by importing a provider directly.
+- Provider-owned services must be resolved through `ProviderCatalog` declarations or `ApplicationRuntime.workspaceFor()`. Never by importing a provider directly, and never through a global — there is no provider registry.
 
 ## Rendering
 

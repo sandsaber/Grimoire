@@ -18,7 +18,7 @@ import { CodexSubagentSettings } from './CodexSubagentSettings';
 
 export const codexSettingsTabRenderer: ProviderSettingsTabRenderer = {
   render(container, context) {
-    const codexWorkspace = getCodexWorkspaceServices();
+    const codexWorkspace = getCodexWorkspaceServices(context.plugin);
     const settingsBag = context.plugin.settings as unknown as Record<string, unknown>;
     const codexSettings = getCodexProviderSettings(settingsBag);
     const hostnameKey = getHostnameKey();

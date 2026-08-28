@@ -1,4 +1,3 @@
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
@@ -170,6 +169,9 @@ export const antigravityWorkspaceRegistration: ProviderWorkspaceRegistration<Ant
   initialize: async ({ plugin }) => createAntigravityWorkspaceServices(plugin),
 };
 
-export function maybeGetAntigravityWorkspaceServices(): AntigravityWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('antigravity') as AntigravityWorkspaceServices | null;
+export function maybeGetAntigravityWorkspaceServices(
+  plugin: GrimoirePlugin,
+): AntigravityWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('antigravity') as AntigravityWorkspaceServices | null ?? null;
 }
