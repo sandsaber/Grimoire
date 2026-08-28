@@ -688,7 +688,6 @@ export class ExecutionChatRuntimeAdapter {
   private readonly readyListeners = new Set<(ready: boolean) => void>();
   private executionSessionId: ExecutionSessionId | null = null;
   private adoptedExecutionSessionId: string | null = null;
-  private boundSessionId: string | null | undefined;
   /** Which conversation this tab is showing, so a move to another is visible. */
   private boundConversationId: string | null | undefined;
   /**
@@ -1002,12 +1001,11 @@ export class ExecutionChatRuntimeAdapter {
    * Session configuration changed.
    *
    * A change to what the provider was launched with fences the backend
-   * generation, which is the registry's job; the adapter's job is to notice
-   * that the conversation's native binding no longer matches and say so once
-   * through `consumeSessionInvalidation`.
+   * generation, which is the registry's job. What this does is notice the tab
+   * moving between conversations, so a session opened for one does not carry on
+   * under another's name.
    */
   syncConversationState(state: BoundConversation | null): void {
-    const next = state?.sessionId ?? null;
     const nextConversationId = state?.id ?? null;
     // Two cases, and the second was missing. A tab moving between conversations
     // must not carry the first one's session into the second — that puts one
@@ -1027,10 +1025,13 @@ export class ExecutionChatRuntimeAdapter {
       this.resetSession();
     }
     this.boundConversationId = nextConversationId;
-    if (this.boundSessionId !== undefined && this.boundSessionId !== next) {
-      this.session.markInvalidated();
-    }
-    this.boundSessionId = next;
+    // **A session this adapter did not bind is not an invalidation.** This used
+    // to call any change to the conversation's stored id one, which made the
+    // signal tab-scoped: two tabs on one conversation do not share an adapter,
+    // so the second one to be re-synced reported the first one's session as
+    // invalid and its next save wrote `null` over it. Letting a session go is a
+    // fact about the *conversation* — the provider refused to resume it — and
+    // `noteSessionUnusable` is the one thing that says so now.
     // Forwarded rather than absorbed: a provider whose next dispatch depends on
     // what the conversation remembers — a native thread to resume, a fork to
     // complete — cannot read that from `currentSessionId` alone, and core is not
@@ -1064,7 +1065,6 @@ export class ExecutionChatRuntimeAdapter {
   resetSession(): void {
     const executionSessionId = this.executionSessionId;
     this.executionSessionId = null;
-    this.boundSessionId = undefined;
     this.boundConversationId = undefined;
     // The run goes with the session. `cleanup()` always cancelled first and
     // waited for the terminal before disposing; this path did neither, and the

@@ -686,19 +686,15 @@ describe('the assembled ChatRuntime adapter', () => {
     expect(harness.sessionOwner()).toEqual({ kind: 'conversation', ownerId: 'conversation-1' });
   });
 
-  it('reports the conversation invalidated when its session changed underneath it', async () => {
-    // **Two tabs, one conversation.** The other tab's turn established a
-    // session and saved it, so this adapter is re-synced to an id it did not
-    // bind. `syncConversationState` calls that an invalidation, and the save
-    // path reads that one-shot to decide whether to write the session id or
-    // `null` — so what this records is that a second tab *can* be told to
-    // clear a session the first one just established.
+  it('does not clear a session another tab established', async () => {
+    // **Two tabs, one conversation, and they do not share an adapter.** This
+    // characterized the old behaviour: the other tab's turn established a
+    // session and saved it, this adapter was re-synced to an id it did not
+    // bind, and it called that an invalidation — which the save path reads to
+    // write `null` over the session the first tab had just established.
     //
-    // Characterized rather than judged: the invalidation signal is the one
-    // thing left between `buildSessionUpdates` and the coordinator's
-    // persistence barrier, and whoever moves it needs to know this is the shape
-    // of it. Two tabs share a coordinator and a conversation; they do not share
-    // an adapter.
+    // Letting a session go is a fact about the *conversation*: the provider
+    // refused to resume it. A tab noticing it is behind is not that.
     const harness = await createHarness({ ownSession: true });
     const adapter = createAdapter(harness);
     harness.bindConversation('conversation-1');
@@ -710,16 +706,12 @@ describe('the assembled ChatRuntime adapter', () => {
       { id: 'conversation-1', providerState: {}, sessionId: 'session-from-the-other-tab' },
     );
 
-    expect(adapter.consumeSessionInvalidation()).toBe(true);
-    // One-shot: whoever read it owns the consequence, and a second reader gets
-    // nothing. That is what makes "which tab saves next" decide the outcome.
     expect(adapter.consumeSessionInvalidation()).toBe(false);
   });
 
-  it('does not call a first binding an invalidation', async () => {
-    // The guard that keeps a cold tab from clearing a session it never held:
-    // a conversation arriving with an id this adapter has not bound before is
-    // the tab learning where it is, not the session changing.
+  it('does not call a first binding an invalidation either', async () => {
+    // The same rule from the other side: a conversation arriving with an id
+    // this adapter has not bound before is the tab learning where it is.
     const harness = await createHarness({ ownSession: true });
     const adapter = createAdapter(harness);
     harness.bindConversation('conversation-1');

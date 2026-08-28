@@ -270,13 +270,28 @@ describe('adapter members that were missing until the coverage gate found them',
     ]);
   });
 
-  it('invalidates the session when the conversation binding changes underneath it', () => {
+  it('does not invalidate a session it did not bind', () => {
+    // **This asserted the opposite.** A change to the conversation's stored
+    // session id was called an invalidation, which made the signal tab-scoped:
+    // two tabs on one conversation do not share an adapter, so the second to be
+    // re-synced reported the first one's session as invalid and the save path
+    // wrote `null` over it. Letting a session go is a fact about the
+    // conversation — the provider refused to resume it — and
+    // `noteSessionUnusable` is what says so.
     const adapter = createBareAdapter(codexProviderModule.capabilities, {});
 
     adapter.syncConversationState({ sessionId: 'thread-1' });
-    expect(adapter.consumeSessionInvalidation()).toBe(false);
-
     adapter.syncConversationState({ sessionId: 'thread-2' });
+
+    expect(adapter.consumeSessionInvalidation()).toBe(false);
+  });
+
+  it('invalidates the session a provider refused to resume', () => {
+    const adapter = createBareAdapter(codexProviderModule.capabilities, {});
+    adapter.syncConversationState({ sessionId: 'thread-1' });
+
+    adapter.noteSessionUnusable();
+
     expect(adapter.consumeSessionInvalidation()).toBe(true);
     // One-shot, as the contract requires.
     expect(adapter.consumeSessionInvalidation()).toBe(false);

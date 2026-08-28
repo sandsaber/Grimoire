@@ -10445,6 +10445,34 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — session invalidation becomes conversation-scoped (`this commit`)
+
+**The owner chose the conversation-scoped reading** of the question the entry below records, so the
+tab-scoped half is deleted.
+
+- Gates: unit 8745 passed, 8745 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **Deleted:** the branch in `syncConversationState` that called any change to the conversation's
+  stored session id an invalidation, and the `boundSessionId` field that existed only to feed it.
+  Letting a session go is now said by exactly one thing — `noteSessionUnusable()`, which a provider
+  refusing to resume triggers.
+- **What that fixes.** Two tabs on one conversation do not share an adapter. The second to be
+  re-synced saw an id it had not bound, reported it invalid, and the save path wrote `null` over the
+  session the first tab had just established. The characterization test written in the entry below
+  became the assertion of the opposite, and reinstating the branch fails it.
+- **Why the branch was safe to delete, checked rather than assumed.** A conversation's `sessionId`
+  is written in three places: creation, the save path, and nothing else — a fork writes a *new*
+  conversation and the tab moving to it already resets the session through
+  `movedBetweenConversations`. So the branch could only ever fire for another tab's save on the same
+  conversation, which is the case the reading excludes.
+- `syncConversationState`'s remaining job is what its D4 comment always described: noticing the tab
+  move, so a session opened for one conversation does not carry on under another's name. Its doc no
+  longer claims the invalidation half.
+- **Still open, and now the only thing between `buildSessionUpdates` and the barrier:** the
+  coordinator needs a provider's `buildSessionPatch` without building a tab's adapter to get it.
+  `compositionFor(providerId).createRuntime()` is per-tab and too heavy for a barrier that runs per
+  turn, so this wants a patch accessor on the composition. Owner: **M5**, next.
+
 ### M5 — the invalidation signal, characterized rather than argued about (`this commit`)
 
 - Gates: unit 8744 passed, 8744 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
