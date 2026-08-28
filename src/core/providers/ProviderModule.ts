@@ -173,6 +173,23 @@ export interface ProviderSettingsReconciliation {
 
   /** Normalizes model ids whose variant suffix the visibility settings no longer allow. */
   normalizeModelVariants(settings: ProviderScopedSettings): boolean;
+
+  /**
+   * Lifts this provider's settings out of a record written before providers had
+   * their own configs, into the record being built from it.
+   *
+   * **Absent for six of the nine, and the list cannot grow.** The stored shape
+   * this migrates only ever held Claude, Codex and OpenCode at the top level; a
+   * provider added later was never written that way, so migrating it would move
+   * a field that never existed. The knowledge is a provider's own — Claude's
+   * reader falls back to `settings.claudeCliPathsByHost`, an on-disk name no
+   * neutral caller can be expected to know — which is why the host used to
+   * import three providers' accessors to do it.
+   */
+  adoptLegacyTopLevelFields?(
+    legacy: Record<string, unknown>,
+    into: Record<string, unknown>,
+  ): void;
 }
 
 export interface ProviderSettingsReconcileOutcome {
@@ -858,6 +875,16 @@ export interface ProviderModelPresentation {
    * is worse than not offering the question.
    */
   options(settings: ProviderScopedSettings): readonly ProviderModelOption[];
+  /**
+   * The model the app ships selected, when this provider is the default one.
+   *
+   * Reachable without settings and without a workspace, which is the point: it
+   * is read while the settings defaults are being *built*, so anything that
+   * wants settings first cannot answer it. Absent for the eight providers that
+   * `DEFAULT_CHAT_PROVIDER_ID` is not.
+   */
+  readonly primaryModel?: string;
+
   /**
    * Whether this is a model the provider ships, rather than one a user
    * configured or an environment variable introduced. Read when two providers

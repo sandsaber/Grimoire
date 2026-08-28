@@ -2,7 +2,7 @@ import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
 
 import { getDefaultHiddenProviderCommands } from '../../core/providers/commands/hiddenCommands';
 import { type GrimoireSettings } from '../../core/types/settings';
-import { DEFAULT_CODEX_PRIMARY_MODEL } from '../../providers/codex/types/models';
+import { builtInProviderCatalog } from '../../providers/BuiltInProviderCatalog';
 import { getBuiltInProviderDefaultConfigs } from '../../providers/defaultProviderConfigs';
 
 export const DEFAULT_GRIMOIRE_SETTINGS: GrimoireSettings = {
@@ -10,7 +10,12 @@ export const DEFAULT_GRIMOIRE_SETTINGS: GrimoireSettings = {
 
   permissionMode: 'normal',
 
-  model: DEFAULT_CODEX_PRIMARY_MODEL,
+  // The default provider's own answer, not a constant this file imports from
+  // inside it. Read off the catalog instance for the reason
+  // `defaultProviderConfigs` gives: this is a module-level constant, evaluated
+  // before the providers register and fill the installed accessor.
+  model: builtInProviderCatalog.declarations(DEFAULT_CHAT_PROVIDER_ID).chatUI.models.primaryModel
+    ?? '',
   thinkingBudget: 'off',
   effortLevel: 'high',
   serviceTier: 'default',

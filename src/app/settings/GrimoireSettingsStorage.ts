@@ -23,18 +23,7 @@ import {
   type ProviderConfigMap,
   type TabBarPosition,
 } from '../../core/types/settings';
-import {
-  getClaudeProviderSettings,
-  updateClaudeProviderSettings,
-} from '../../providers/claude/settings';
-import {
-  getCodexProviderSettings,
-  updateCodexProviderSettings,
-} from '../../providers/codex/settings';
-import {
-  getOpencodeProviderSettings,
-  updateOpencodeProviderSettings,
-} from '../../providers/opencode/settings';
+import { builtInProviderCatalog } from '../../providers/BuiltInProviderCatalog';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './defaultSettings';
 
 export { GRIMOIRE_SETTINGS_PATH };
@@ -418,23 +407,22 @@ export class GrimoireSettingsStorage {
       ...legacyNormalized,
     };
 
-    // Three providers by name, and it is not a list that fell behind: this is
-    // the migration of a *stored* shape, and the stored shape only ever held
-    // these three. A provider added later was never written in the old format,
-    // so migrating it would move a field that never existed. The list grows
-    // only if an old build did, which it cannot.
-    updateClaudeProviderSettings(
-      merged,
-      getClaudeProviderSettings(legacyProviderSettings),
-    );
-    updateCodexProviderSettings(
-      merged,
-      getCodexProviderSettings(legacyProviderSettings),
-    );
-    updateOpencodeProviderSettings(
-      merged,
-      getOpencodeProviderSettings(legacyProviderSettings),
-    );
+    // Three providers, and it is still not a list that fell behind: this is the
+    // migration of a *stored* shape, and the stored shape only ever held those
+    // three. A provider added later was never written in the old format, so
+    // migrating it would move a field that never existed.
+    //
+    // Which three is a provider's own answer now. The reader for each knows the
+    // on-disk names its own old build used — Claude falls back to
+    // `settings.claudeCliPathsByHost` — which is knowledge this file had by
+    // importing three providers directly. Read off the catalog instance rather
+    // than the installed accessor, for the reason `defaultProviderConfigs`
+    // gives: settings load before the providers register.
+    for (const providerId of builtInProviderCatalog.ids()) {
+      builtInProviderCatalog
+        .settingsReconciliation(providerId)
+        .adoptLegacyTopLevelFields?.(legacyProviderSettings, merged);
+    }
     const didNormalizeHostScopedProviderConfigs = hasHostScopedProviderConfigNormalization(
       providerConfigs,
       merged.providerConfigs,
@@ -515,29 +503,6 @@ export class GrimoireSettingsStorage {
   async update(updates: Partial<StoredGrimoireSettings>): Promise<void> {
     const current = await this.load();
     await this.save({ ...current, ...updates });
-  }
-
-  async setLastModel(model: string, isCustom: boolean): Promise<void> {
-    if (isCustom) {
-      await this.update({ lastCustomModel: model });
-      return;
-    }
-
-    const current = await this.load();
-    updateClaudeProviderSettings(
-      current,
-      { lastModel: model },
-    );
-    await this.save(current);
-  }
-
-  async setLastEnvHash(hash: string): Promise<void> {
-    const current = await this.load();
-    updateClaudeProviderSettings(
-      current,
-      { environmentHash: hash },
-    );
-    await this.save(current);
   }
 
   private getDefaults(): StoredGrimoireSettings {

@@ -74,6 +74,10 @@ export const codexChatUIConfig: ProviderChatUIConfig = {
     return DEFAULT_CONTEXT_WINDOW;
   },
 
+  // Codex is `DEFAULT_CHAT_PROVIDER_ID`, so this is what a vault nobody has
+  // opened yet holds in `GrimoireSettings.model`.
+  primaryModel: DEFAULT_CODEX_PRIMARY_MODEL,
+
   isDefaultModel(model: string): boolean {
     return DEFAULT_CODEX_MODEL_SET.has(model);
   },

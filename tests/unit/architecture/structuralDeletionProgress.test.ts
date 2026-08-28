@@ -117,38 +117,35 @@ const SEARCHES: readonly DeletionSearch[] = [
   },
   {
     // **Split from one search of 20, with the total preserved.** The single
-    // count could not fall, because eighteen of the twenty were a *provider's
-    // own composition* — `src/providers/codex/execution/` naming
-    // `src/providers/codex/` is a directory choosing where it lives, not
-    // neutral code reaching into a provider. Reporting those beside the two
-    // real violations meant neither number could be acted on: fixing both
-    // violations would have moved 20 to 18 and looked like nothing happened.
+    // count could not fall, because eighteen of the twenty were a provider's
+    // own composition — a directory under the application choosing where it
+    // lived, not neutral code reaching into a provider. Reporting those beside
+    // the two real violations meant neither number could be acted on: fixing
+    // both violations would have moved 20 to 18 and looked like nothing
+    // happened. Both halves are closed now, by different work.
     what: 'provider-neutral application code importing a concrete provider',
     pattern: /providers\/(claude|codex|antigravity|opencode|mimocode|kimicode|grok|qwen|gemini)\//,
     within: 'src/app/settings',
-    // **2, and both were read before this count was written down.**
+    files: 0,
+    // **Closed, and both halves went the way the reading said they would.**
     //
-    // `defaultSettings` takes Codex's default model constant for the app-level
-    // `model` field. It is *not* in `defaultConfigs()`: that map is
-    // `encode(defaults())` per provider and holds `cliPath`, `enabled`,
-    // `reasoningSummary` and the rest — `model` is a host field, and the
-    // default provider being Codex is why Codex's constant is the shipped
-    // value. Closing it means a provider declaring its default model, which is
-    // a new contract row for one value.
+    // `defaultSettings` took Codex's primary model constant for the app-level
+    // `model` field, which `defaultConfigs()` cannot supply — that map is
+    // `encode(defaults())` per provider and holds no `model` key. The default
+    // provider nominates it now, through `chatUI.models.primaryModel`, which is
+    // **optional and absent for the other eight** because it answers a question
+    // only `DEFAULT_CHAT_PROVIDER_ID` is ever asked.
     //
-    // `GrimoireSettingsStorage` takes the Claude, Codex and OpenCode settings
-    // accessors for the legacy top-level field migration, and the three are
-    // frozen: only those three were ever written in the old stored shape.
-    // `ProviderSettingsCoordinator.getProviderSettingsSnapshot` cannot stand in,
-    // because these accessors read the *legacy* fields —
-    // `config.cliPathsByHost ?? settings.claudeCliPathsByHost` — which is
-    // provider-specific knowledge of an on-disk format that no longer exists.
-    // Closing it means the codec carrying its own legacy migration.
+    // `GrimoireSettingsStorage` took three providers' settings accessors for
+    // the legacy top-level migration. Which three is a provider's own answer
+    // now, through `adoptLegacyTopLevelFields` on the settings reconciliation —
+    // the half of the codec that already takes the app record. The list still
+    // cannot grow: only those three were ever written that way.
     //
-    // Neither is drift. Both are a real coupling with a named cost, which is
-    // the thing the single count of 20 could not say.
-    files: 2,
-    closedBy: 'a default-model declaration, and a legacy migration on the settings codec',
+    // Two of its uses were neither: `setLastModel` and `setLastEnvHash` wrote
+    // *Claude's* settings for operations that read as global, and **had no
+    // caller in `src/` at all**. Deleted.
+    closedBy: 'closed — the default provider nominates its model, and each codec adopts its own legacy fields',
   },
   {
     // **Closed.** The eighteen were each provider's execution composition and
@@ -258,14 +255,14 @@ describe('structural deletion progress', () => {
       'core importing the plugin type: 1',
       'subagent hooks and loaders: 3',
       'SubagentManager lifecycle: 7',
-      'provider-neutral application code importing a concrete provider: 2',
       'turn metadata and session updates: 2',
       'StreamChunk and the subagent chunk vocabulary: 5',
       'the registries — one left: 17',
     ]);
-    // Four of twelve are zero: two closed in the 2026-08-27 session, the
+    // Five of twelve are zero: two closed in the 2026-08-27 session, the
     // interaction callbacks closed with the first step of the seam deletion,
-    // and the compositions closed by moving under the providers they compose.
-    expect(SEARCHES).toHaveLength(remaining.length + 4);
+    // the compositions closed by moving under the providers they compose, and
+    // the neutral settings imports closed by two contract additions.
+    expect(SEARCHES).toHaveLength(remaining.length + 5);
   });
 });

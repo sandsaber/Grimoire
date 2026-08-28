@@ -35,6 +35,7 @@ import {
   normalizeClaudeCodeProjectSettingsSnapshot,
   normalizeClaudeDiscoveredModels,
 } from './settings';
+import { getClaudeProviderSettings, updateClaudeProviderSettings } from './settings';
 import { claudeChatUIConfig } from './ui/ClaudeChatUIConfig';
 
 /**
@@ -254,6 +255,12 @@ export const claudeSettingsCodec: ProviderSettingsCodec<ClaudeProviderSettings> 
   environmentKeyPrefixes: ['ANTHROPIC_', 'CLAUDE_'],
 
   ...settingsReconciliationFor(claudeSettingsReconciler, 'session'),
+
+  // Only Claude, Codex and OpenCode were ever written at the top level, and
+  // the reader below knows the on-disk names this one used.
+  adoptLegacyTopLevelFields(legacy, into) {
+    updateClaudeProviderSettings(into, getClaudeProviderSettings(legacy));
+  },
 };
 
 export const claudeProviderModule: ProviderModule<

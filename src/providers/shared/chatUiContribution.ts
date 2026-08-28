@@ -44,6 +44,7 @@ export function chatUiContributionFor(
       customModelIds: environment => config.getCustomModelIds(environment),
       applyDefaults: (modelId, settings) => { config.applyModelDefaults(modelId, settings); },
       isBuiltIn: modelId => config.isDefaultModel(modelId),
+      ...(config.primaryModel ? { primaryModel: config.primaryModel } : {}),
       normalizeVariant: (modelId, settings) => config.normalizeModelVariant(modelId, settings),
       options: settings => config.getModelOptions(settings),
       ownsModel: (modelId, settings) => config.ownsModel(modelId, settings),

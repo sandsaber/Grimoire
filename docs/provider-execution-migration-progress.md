@@ -10445,6 +10445,32 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the application layer stops importing a provider entirely (`this commit`)
+
+- Gates: unit 8742 passed, 8742 total; integration 156 passed, 128 skipped; `tsc --noEmit` clean;
+  `npm run lint` clean; `npm run build:release` clean.
+- **`provider-neutral application code importing a concrete provider` closes: 2 → 0.** Both halves
+  went the way the earlier reading said they would, and both are contract additions rather than
+  moves:
+  - `defaultSettings` took Codex's primary model constant for the app-level `model` field.
+    `defaultConfigs()` cannot supply it — probed, not assumed: that map is `encode(defaults())` per
+    provider and has no `model` key. The default provider nominates it now, through
+    `chatUI.models.primaryModel`, **optional and absent for the other eight** because it answers a
+    question only `DEFAULT_CHAT_PROVIDER_ID` is ever asked: what a vault nobody has opened yet
+    holds. A required member would have meant inventing eight values, since no other provider has
+    such a constant;
+  - `GrimoireSettingsStorage` took three providers' settings accessors for the legacy top-level
+    migration. Which three is a provider's own answer now, through `adoptLegacyTopLevelFields` on
+    the settings *reconciliation* — the half of the codec that already takes the app record rather
+    than the provider's decoded settings. The list still cannot grow: only those three were ever
+    written that way, and each reader knows the on-disk names its own old build used.
+- **Two of its imports were neither, and were dead.** `setLastModel` and `setLastEnvHash` wrote
+  *Claude's* settings for operations that read as global, and had **no caller in `src/` at all** —
+  only their own tests. Deleted with them.
+- Both changes are pinned by tests that already existed and bite: removing Codex's `primaryModel`
+  fails *"starts first-run chat on Codex with the primary Codex model"*, and removing its
+  `adoptLegacyTopLevelFields` fails *"should preserve legacy codexCliPath field"*.
+
 ### M5 — correcting the harness-fidelity finding before acting on it (`this commit`)
 
 - Gates: unit 8745 passed, 8745 total; `tsc --noEmit` clean; `npm run lint` clean.
@@ -10484,6 +10510,11 @@ composition root, and the seam deletion.
   Their tests moved with them, mirroring `src/` as the testing rule requires. What stays in
   `src/app/execution` is what is provider-neutral: the kernel host, the workspace holder, the aux
   runner, the host timers, and the shared ACP and local-shell pieces.
+- **Paths in entries above this one are where things were when those entries were written.** The
+  rewrite that moved the imports also edited three lines of this record and one in the review
+  backlog, turning past entries into descriptions of a state that did not exist yet — including the
+  entry that argued for the move by naming what it was moving. They are restored. A chronological
+  record is not a place to find-and-replace: what a closed item cited is part of what it says.
 - The move was flat — same depth under `src/`, so every `../../../core/…` still resolves — and the
   only rewrites were the four sibling imports into the neutral modules, now `@/app/execution/…`.
 - **A gate went quietly blind, and its own guard caught it.** `diagnosticRedaction` scanned four
@@ -10825,7 +10856,7 @@ tab-scoped half is deleted.
 - Gates: unit 8742 passed, 8742 total; `tsc --noEmit` clean; `npm run lint` clean.
 - **`the application importing a concrete provider module: 20` is split, total preserved.** It was
   the second-largest search and the only one carrying no evidence at all. Reading it: **eighteen of
-  the twenty are a provider's own composition.** `src/providers/codex/execution/` naming
+  the twenty are a provider's own composition.** `src/app/execution/codex/` naming
   `src/providers/codex/` is a directory choosing where it lives, not neutral application code
   reaching into a provider — and the composition boundary test already holds each to its own
   provider. Reported together, neither half could be acted on: fixing both real violations would
@@ -11580,7 +11611,7 @@ one provider of this wave that can be certified live here, which is why it was b
 though the plan lists Qwen before it.
 
 **What is left for Gemini, in order:** `GeminiExecutionComposition` and `GeminiMetadataSession` under
-`src/providers/gemini/execution/` with `GeminiModuleContext` beside them — derive from **Grok's**, not from
+`src/app/execution/gemini/` with `GeminiModuleContext` beside them — derive from **Grok's**, not from
 the OpenCode family's, because that is the shape this provider matches; then the flip as one
 revertible commit; then the live harness and matrix, which for once will have something to say.
 Watch for the parts Gemini does *not* have: no launch artifacts, no config options, no tool stream

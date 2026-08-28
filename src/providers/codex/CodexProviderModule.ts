@@ -30,6 +30,7 @@ import {
   type CodexReasoningSummary,
   DEFAULT_CODEX_PROVIDER_SETTINGS,
 } from './settings';
+import { getCodexProviderSettings, updateCodexProviderSettings } from './settings';
 import { codexChatUIConfig } from './ui/CodexChatUIConfig';
 
 /**
@@ -262,6 +263,12 @@ export const codexSettingsCodec: ProviderSettingsCodec<CodexProviderSettings> = 
   environmentKeyPrefixes: ['OPENAI_', 'CODEX_'],
 
   ...settingsReconciliationFor(codexSettingsReconciler, 'session-and-state'),
+
+  // Only Claude, Codex and OpenCode were ever written at the top level, and
+  // the reader below knows the on-disk names this one used.
+  adoptLegacyTopLevelFields(legacy, into) {
+    updateCodexProviderSettings(into, getCodexProviderSettings(legacy));
+  },
 };
 
 export const codexProviderModule: ProviderModule<

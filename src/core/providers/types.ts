@@ -297,6 +297,19 @@ export interface ProviderChatUIConfig {
     settings?: Record<string, unknown>,
   ): number;
 
+  /**
+   * The model the app ships selected, when this provider is the default one.
+   *
+   * **Optional, and absent for eight of the nine — truthfully.** It is not "the
+   * provider's favourite model": `isDefaultModel` is already set membership over
+   * everything a provider ships, and the picker resolves what a provider offers
+   * from its own options. This answers a narrower question that only
+   * `DEFAULT_CHAT_PROVIDER_ID` is ever asked — what `GrimoireSettings.model`
+   * holds in a vault nobody has opened yet — and it exists because
+   * `src/app/settings` was answering it by importing a Codex constant directly.
+   */
+  readonly primaryModel?: string;
+
   /** Whether this is a built-in (default) model vs custom/env model. */
   isDefaultModel(model: string): boolean;
 

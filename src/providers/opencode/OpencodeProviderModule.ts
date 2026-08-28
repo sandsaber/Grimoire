@@ -32,6 +32,7 @@ import {
   type OpencodeProviderSettings,
   type PersistedOpencodeProviderSettings,
 } from './settings';
+import { getOpencodeProviderSettings, updateOpencodeProviderSettings } from './settings';
 import { opencodeChatUIConfig } from './ui/OpencodeChatUIConfig';
 
 /**
@@ -242,6 +243,12 @@ export const opencodeSettingsCodec: ProviderSettingsCodec<OpencodeProviderSettin
   environmentKeyPrefixes: ['OPENCODE_'],
 
   ...settingsReconciliationFor(opencodeSettingsReconciler, 'session-and-state'),
+
+  // Only Claude, Codex and OpenCode were ever written at the top level, and
+  // the reader below knows the on-disk names this one used.
+  adoptLegacyTopLevelFields(legacy, into) {
+    updateOpencodeProviderSettings(into, getOpencodeProviderSettings(legacy));
+  },
 };
 
 export const opencodeProviderModule: ProviderModule<
