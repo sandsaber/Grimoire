@@ -1,0 +1,338 @@
+{
+  "_note": [
+    "Exports no other module in src/ takes: the baseline this gate holds the line at.",
+    "Generated once, from the tree at the commit that added the gate. It is a backlog,",
+    "not an endorsement - several entries are genuinely dead code that wants deleting,",
+    "and most of the rest are port and wire-shape types consumed structurally rather",
+    "than by name. What the gate is for is the entry that is NOT here: a symbol added",
+    "with tests and no caller, which is what the main sync produced three times.",
+    "Removing an entry is always allowed. Adding one needs a reason in the commit."
+  ],
+  "modules": {
+    "src/core/agents/AgentFidelity.ts": [
+      "agentFidelityFromCapabilities"
+    ],
+    "src/core/agents/AgentPolicy.ts": [
+      "approveAgentPermission"
+    ],
+    "src/core/agents/AgentSchemas.ts": [
+      "decodePermissionBoundary",
+      "decodePermissionRequest"
+    ],
+    "src/core/context/ContextIngestionService.ts": [
+      "ContextIngestionService",
+      "MarkdownIngestor",
+      "PdfIngestor"
+    ],
+    "src/core/conversations/ConversationRepository.ts": [
+      "RevisionConflictError"
+    ],
+    "src/core/execution/ExecutionControlTransactionCoordinator.ts": [
+      "ExecutionControlRecord"
+    ],
+    "src/core/providers/types.ts": [
+      "AppCommandStorage",
+      "AppSkillStorage",
+      "ProviderWorkspaceCapabilities"
+    ],
+    "src/core/runtime/QueuedTurn.ts": [
+      "cloneQueuedChatTurn",
+      "mergeQueuedChatTurns"
+    ],
+    "src/core/runtime/execution/ExecutionChatRuntimeAdapter.ts": [
+      "classifyForPresentation"
+    ],
+    "src/core/runtime/types.ts": [
+      "SessionUpdateResult"
+    ],
+    "src/core/security/ApprovalManager.ts": [
+      "matchesRulePattern"
+    ],
+    "src/core/tools/todo.ts": [
+      "extractLastTodosFromMessages"
+    ],
+    "src/core/tools/toolInput.ts": [
+      "getPathFromToolInput"
+    ],
+    "src/core/tools/toolNames.ts": [
+      "isBashTool",
+      "isFileTool",
+      "isMcpTool",
+      "isSubagentHiddenTool",
+      "isSubagentSpawnTool"
+    ],
+    "src/core/types/index.ts": [
+      "AskUserQuestionOption",
+      "ChatTurnFailureChunk",
+      "DiffLine",
+      "DiffStats",
+      "HostnameCliPaths",
+      "McpConfigFile",
+      "PermissionMode",
+      "StructuredPatchHunk",
+      "SubagentMode",
+      "TabBarPosition"
+    ],
+    "src/features/chat/projections/ChatProjection.ts": [
+      "getActiveChatTurn",
+      "hasMissingRequiredResult"
+    ],
+    "src/features/chat/rendering/ThinkingBlockRenderer.ts": [
+      "appendThinkingContent"
+    ],
+    "src/features/chat/state/types.ts": [
+      "QueryOptions",
+      "SubagentInfo"
+    ],
+    "src/features/chat/tabs/tabSettings.ts": [
+      "TabCreateOptions",
+      "hasStartedConversation"
+    ],
+    "src/features/chat/tabs/types.ts": [
+      "DEFAULT_MAX_TABS",
+      "MAX_TABS",
+      "MIN_TABS"
+    ],
+    "src/i18n/constants.ts": [
+      "DEFAULT_LOCALE",
+      "getLocaleDisplayString"
+    ],
+    "src/providers/acp/AcpSubprocess.ts": [
+      "AcpSubprocess"
+    ],
+    "src/providers/acp/acpApprovals.ts": [
+      "approveAcpWriteTextFile",
+      "buildAcpApprovalDecisionOptions"
+    ],
+    "src/providers/acp/acpLifecycle.ts": [
+      "isAcpLifecycleCurrent",
+      "runAcpLifecycleCleanup"
+    ],
+    "src/providers/acp/acpManagedSession.ts": [
+      "bindAcpManagedSession",
+      "planAcpEnsureReadySessionPhase",
+      "runAcpEnsureReadyForQuery",
+      "shouldRetryAcpClosedTransport"
+    ],
+    "src/providers/acp/acpSessionResume.ts": [
+      "buildAcpPersistedSessionFields",
+      "buildAcpSessionLoadFailureDebugEvent",
+      "markAcpSessionLoadFailed"
+    ],
+    "src/providers/acp/history/sqliteModule.ts": [
+      "loadNodeSqliteModule"
+    ],
+    "src/providers/acp/types.ts": [
+      "AcpRole"
+    ],
+    "src/providers/antigravity/execution/AntigravityExecutionBackend.ts": [
+      "AntigravityResultCommitOutcome"
+    ],
+    "src/providers/antigravity/runtime/AntigravityCliCapabilities.ts": [
+      "resetAntigravityCliCapabilitiesCache"
+    ],
+    "src/providers/claude/ClaudeProviderModule.ts": [
+      "ClaudeDiscoveredModel"
+    ],
+    "src/providers/claude/history/ClaudeHistoryStore.ts": [
+      "AsyncSubagentResult",
+      "ResolvedAsyncStatus",
+      "SDKNativeContentBlock",
+      "SDKNativeMessage",
+      "SDKSessionReadResult",
+      "encodeVaultPathForSDK",
+      "getSDKProjectsPath",
+      "getSDKSessionPath",
+      "isValidSessionId",
+      "loadSubagentFinalResult",
+      "sdkSessionExists"
+    ],
+    "src/providers/claude/history/sdkSessionPaths.ts": [
+      "locateSDKSession"
+    ],
+    "src/providers/claude/runtime/ClaudeUserMessageFactory.ts": [
+      "buildClaudePromptWithImages"
+    ],
+    "src/providers/claude/runtime/types.ts": [
+      "ClaudeEnsureReadyOptions",
+      "ClosePersistentQueryOptions",
+      "MESSAGE_CHANNEL_CONFIG",
+      "PendingMessage",
+      "SessionState",
+      "createResponseHandler",
+      "isTurnCompleteMessage"
+    ],
+    "src/providers/claude/sdk/messages.ts": [
+      "SDKMessage"
+    ],
+    "src/providers/claude/sdk/toolResultContent.ts": [
+      "ToolResultContentOptions"
+    ],
+    "src/providers/claude/types/settings.ts": [
+      "DEFAULT_SETTINGS",
+      "parseCCPermissionRule"
+    ],
+    "src/providers/codex/execution/NodeCodexExecutionProcess.ts": [
+      "NodeCodexExecutionProcessFactory"
+    ],
+    "src/providers/codex/normalization/codexSubagentNormalization.ts": [
+      "isCodexSubagentSpawnToolCall"
+    ],
+    "src/providers/codex/runtime/codexAppServerTypes.ts": [
+      "CommandExecutionApprovalResponse",
+      "FileChangeApprovalResponse",
+      "InitializeParams",
+      "JsonRpcNotification",
+      "JsonRpcRequest",
+      "JsonRpcResponse",
+      "PermissionsApprovalResponse",
+      "ReasoningSummaryPartAddedNotification",
+      "ServerRequestResolvedNotification",
+      "SkillsListParams",
+      "ThreadCompactStartParams",
+      "ThreadCompactStartResult",
+      "ThreadForkParams",
+      "ThreadRollbackParams",
+      "ThreadRollbackResult",
+      "ThreadStartedNotification",
+      "ThreadStatusChangedNotification",
+      "TurnInterruptParams",
+      "TurnStartedNotification",
+      "TurnSteerParams",
+      "UserInputResponse"
+    ],
+    "src/providers/codex/types/models.ts": [
+      "DEFAULT_CODEX_MINI_MODEL_LABEL",
+      "DEFAULT_CODEX_PRIMARY_MODEL_LABEL"
+    ],
+    "src/providers/gemini/execution/GeminiExecutionBackend.ts": [
+      "GeminiAuxiliaryPort",
+      "GeminiExecutionRequestResolver",
+      "GeminiExecutionScheduler",
+      "GeminiInteractionBridgePort",
+      "GeminiPreparedInteraction"
+    ],
+    "src/providers/gemini/execution/GeminiInteractionBridge.ts": [
+      "GeminiApprovalOption",
+      "GeminiInteractionCallbacks",
+      "GeminiInteractionPresentation",
+      "normalizeApprovalInput"
+    ],
+    "src/providers/grok/execution/GrokInteractionBridge.ts": [
+      "GrokApprovalOption",
+      "GrokInteractionCallbacks",
+      "GrokInteractionPresentation",
+      "normalizeApprovalInput"
+    ],
+    "src/providers/grok/models.ts": [
+      "combineGrokRawModelSelection",
+      "groupGrokDiscoveredModels"
+    ],
+    "src/providers/grok/runtime/GrokRuntimeEnvironment.ts": [
+      "resolveGrokProviderAuthPath"
+    ],
+    "src/providers/grok/runtime/grokDebugLog.ts": [
+      "grokAuthPathExists",
+      "summarizeGrokCliText"
+    ],
+    "src/providers/kimicode/execution/KimicodeExecutionBackend.ts": [
+      "KimicodeAuxiliaryPort",
+      "KimicodeExecutionRequestResolver",
+      "KimicodeExecutionScheduler",
+      "KimicodeInteractionBridge",
+      "KimicodePreparedInteraction"
+    ],
+    "src/providers/kimicode/execution/KimicodeInteractionBridge.ts": [
+      "KimicodeApprovalOption",
+      "KimicodeApprovalOptionPresentation",
+      "KimicodeInteractionPresentation"
+    ],
+    "src/providers/kimicode/execution/KimicodeInteractionPresenter.ts": [
+      "KimicodeInteractionCallbacks"
+    ],
+    "src/providers/kimicode/execution/KimicodePermissionPresentation.ts": [
+      "normalizeApprovalInput"
+    ],
+    "src/providers/kimicode/models.ts": [
+      "combineKimicodeRawModelSelection",
+      "groupKimicodeDiscoveredModels"
+    ],
+    "src/providers/mimocode/execution/MimocodeExecutionBackend.ts": [
+      "MimocodeAuxiliaryPort",
+      "MimocodeExecutionRequestResolver",
+      "MimocodeExecutionScheduler",
+      "MimocodeInteractionBridge",
+      "MimocodePreparedInteraction"
+    ],
+    "src/providers/mimocode/execution/MimocodeInteractionBridge.ts": [
+      "MimocodeApprovalOption",
+      "MimocodeApprovalOptionPresentation",
+      "MimocodeInteractionPresentation"
+    ],
+    "src/providers/mimocode/execution/MimocodeInteractionPresenter.ts": [
+      "MimocodeInteractionCallbacks"
+    ],
+    "src/providers/mimocode/execution/MimocodePermissionPresentation.ts": [
+      "normalizeApprovalInput"
+    ],
+    "src/providers/mimocode/history/MimocodeSessionErrorStore.ts": [
+      "loadLatestMimocodeSessionError"
+    ],
+    "src/providers/mimocode/models.ts": [
+      "combineMimocodeRawModelSelection",
+      "groupMimocodeDiscoveredModels",
+      "resolveMimocodeUnsupportedModelFallback"
+    ],
+    "src/providers/opencode/execution/OpencodeExecutionBackend.ts": [
+      "OpencodeAuxiliaryPort",
+      "OpencodeExecutionRequestResolver",
+      "OpencodeExecutionScheduler",
+      "OpencodeInteractionBridge",
+      "OpencodePreparedInteraction"
+    ],
+    "src/providers/opencode/execution/OpencodeInteractionBridge.ts": [
+      "OpencodeApprovalOption",
+      "OpencodeApprovalOptionPresentation",
+      "OpencodeInteractionPresentation"
+    ],
+    "src/providers/opencode/execution/OpencodeInteractionPresenter.ts": [
+      "OpencodeInteractionCallbacks"
+    ],
+    "src/providers/opencode/execution/OpencodePermissionPresentation.ts": [
+      "normalizeApprovalInput"
+    ],
+    "src/providers/opencode/models.ts": [
+      "combineOpencodeRawModelSelection",
+      "groupOpencodeDiscoveredModels"
+    ],
+    "src/providers/qwen/execution/QwenExecutionBackend.ts": [
+      "QwenAuxiliaryPort",
+      "QwenExecutionRequestResolver",
+      "QwenExecutionScheduler",
+      "QwenInteractionBridgePort",
+      "QwenPreparedInteraction"
+    ],
+    "src/providers/qwen/execution/QwenInteractionBridge.ts": [
+      "QwenApprovalOption",
+      "QwenInteractionCallbacks",
+      "QwenInteractionPresentation",
+      "normalizeApprovalInput"
+    ],
+    "src/shared/icons.ts": [
+      "CHECK_ICON_SVG",
+      "MCP_ICON_SVG"
+    ],
+    "src/shared/modals/InstructionConfirmModal.ts": [
+      "InstructionDecision"
+    ],
+    "src/utils/context.ts": [
+      "stripCurrentNoteContext"
+    ],
+    "src/utils/externalContext.ts": [
+      "isValidDirectoryPath"
+    ],
+    "src/utils/session.ts": [
+      "isSessionExpiredError"
+    ]
+  }
+}

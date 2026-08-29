@@ -10549,6 +10549,37 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Phase 4 — the gate that would have caught the whole recovery (`this commit`)
+
+- Gates: unit 9029 passed / 9029 total across 567 suites; `tsc --noEmit` clean; `npm run lint` clean;
+  `npm run build:release` clean.
+- Recovery plan item 13, which closes the plan.
+
+**Every defect this recovery fixed had the same shape, and no gate could see it.** Three fixes
+arrived with the `main` merge, each with a module and a full unit suite and no production caller.
+`moduleReachability` answers about whole modules and called all three modules reachable — because
+they were: `isAcpSessionGone` lived in a module imported for a different function. A module test
+passes whether or not anything calls the module, which is what made the loss invisible.
+
+`listUnconsumedExports` asks the question one level down: which exported *symbols* does no other
+module in `src/` take. It counts `import type`, follows barrels down to the module that declares the
+name, and treats a namespace import as using everything behind it — a false negative rather than a
+false alarm. The rule that makes it usable rather than noise: **an export the module itself uses is
+used.** Without it the answer is 1090 entries, nearly all of them helpers exported so a test can
+reach code that is live anyway. With it, 183.
+
+**Proven against the tree it was written for.** Run over `d5cb9353` — this branch immediately before
+the recovery — it names `createClaudeTaskPlanState`, `readGrokAcpModelThinkingOptions` and
+`isAcpSessionGone`, which are exactly B, C and D from the recovery plan, without being told what to
+look for. On today's tree all three are gone from the list, because all three now have callers.
+
+The gate holds a checked-in baseline of today's 183 and fails on anything not in it, proven by adding
+a dead export and watching it name it. A second assertion fails on a baseline entry whose module no
+longer exists, which is how an allowance would otherwise outlive what it excused. **The baseline is a
+backlog, and the file says so**: several entries are real dead code the flip left — the whole of
+`acpManagedSession.ts`, `markAcpSessionLoadFailed`, which has no caller on `main` either — and want a
+deletion pass that is its own work, not this one.
+
 ### Phase 3 — three of the eight `main` carried, and two that turned out to be decisions (`this commit`)
 
 - Gates: unit 9022 passed / 9022 total across 566 suites; `tsc --noEmit` clean; `npm run lint` clean;

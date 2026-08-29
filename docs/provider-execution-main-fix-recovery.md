@@ -163,9 +163,18 @@ the only one where the product is plainly worse than `main`.
 
 **Phase 4 — the gate that would have caught all of this.**
 
-13. Turn the dead-export pass into a test: an export introduced by a merged
-    upstream commit must have a production consumer, or be listed with a reason.
-    Run against the merge range, it names B, C and D without being told.
+13. ~~Turn the dead-export pass into a test.~~ **Done.**
+    `tests/helpers/exportConsumers.ts` walks `src/` for exports no other module
+    in `src/` takes, counting `import type` and following barrels, and counting
+    an export the module itself uses as used — the test-only export is not the
+    defect; the symbol nothing outside its own tests names is. Run against
+    `d5cb9353`, the tree as it stood before this recovery, it names
+    `createClaudeTaskPlanState`, `readGrokAcpModelThinkingOptions` and
+    `isAcpSessionGone` without being told which to look for, which is B, C and D.
+    The gate holds a checked-in baseline of the 183 it finds today; that list is
+    a backlog rather than an endorsement, and several entries — the whole of
+    `acpManagedSession.ts`, `markAcpSessionLoadFailed` — look like real dead code
+    left by the flip and want a deletion pass of their own.
 
 ## What is deliberately not restored
 
