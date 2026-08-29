@@ -35,7 +35,12 @@ import { DebugLogService, sanitizeDebugLogData } from '@/core/debug/DebugLogServ
  * that found no call sites at all.
  */
 const ROOTS = [
-  'src/app/execution',
+  // **`src/app`, not `src/app/execution`.** The composition root logs through
+  // its own `report` port rather than `recordDebugLog`, and it is where startup
+  // recovery reports what it could not finish — so the gate read neither the
+  // file nor the call shape, which is the same subset-shaped hole this comment
+  // already describes one paragraph up.
+  'src/app',
   'src/core/execution',
   'src/core/runtime/execution',
   ...readdirSync(resolve(process.cwd(), 'src/providers'), { withFileTypes: true })
@@ -129,7 +134,7 @@ function readLogCallSites(): LogCallSite[] {
   for (const root of ROOTS) {
     for (const file of sourceFiles(root)) {
       const source = readFileSync(file, 'utf8');
-      for (const match of source.matchAll(/recordDebugLog\(\{([\s\S]*?)\n\s*\}\)/g)) {
+      for (const match of source.matchAll(/(?:recordDebugLog|report)\(\{([\s\S]*?)\n\s*\}\)/g)) {
         const block = match[1];
         const event = /event:\s*'([^']+)'/.exec(block)?.[1] ?? '(unnamed)';
         const data = /data:\s*\{([^}]*)\}/.exec(block)?.[1] ?? '';
@@ -160,17 +165,30 @@ describe('diagnostic redaction (D7)', () => {
     expect(sites.map(site => site.event)).toEqual(
       expect.arrayContaining(['execution.cleanup.failed']),
     );
-    expect([...new Set(sites.flatMap(site => site.dataKeys))]).toEqual(['modeId']);
+    expect([...new Set(sites.flatMap(site => site.dataKeys))].sort())
+      .toEqual(['codes', 'modeId', 'recordKind', 'stage']);
   });
 
   it('names every event the execution path logs', () => {
     // Printed by being asserted. A new event shows up as a diff here, which is
     // the moment to ask what it carries — not after it has been carrying it.
     expect([...new Set(sites.map(site => site.event))].sort()).toEqual([
+      // The composition root's eight, which this gate did not read until it
+      // learned the `report` port the root logs through: startup and shutdown
+      // failures, both stores' migration requirements, and what agent recovery
+      // could not finish.
+      'agents.migrationRequired',
+      'agents.record.failed',
+      'agents.recovery.failed',
+      'agents.recovery.incomplete',
+      'agents.recovery.recordSkipped',
       'execution.cleanup.failed',
       'execution.connection.lost',
+      'execution.migrationRequired',
       'execution.sessionConfig.failed',
       'execution.setMode.refused',
+      'execution.shutdown.failed',
+      'execution.start.failed',
     ]);
   });
 
@@ -205,7 +223,12 @@ describe('diagnostic redaction (D7)', () => {
     // it is provider vocabulary — a mode id, a provider id, a reason — and not
     // anything a person typed. Adding one is a decision, and this is where it
     // gets made rather than noticed.
-    expect([...new Set(sites.flatMap(site => site.dataKeys))]).toEqual(['modeId']);
+    // Four across the whole execution path, and each is a name rather than a
+    // value: which mode was refused, which recovery stage skipped a record,
+    // which kind of record a build cannot read, and which issue codes a
+    // result-link sweep collected. None of them can carry what a person typed.
+    expect([...new Set(sites.flatMap(site => site.dataKeys))].sort())
+      .toEqual(['codes', 'modeId', 'recordKind', 'stage']);
     const written = sanitizeDebugLogData({ modeId: 'Summarize my private note' });
 
     // Not redacted, because it is on the safe list — which is exactly why the

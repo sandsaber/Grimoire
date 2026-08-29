@@ -10494,6 +10494,36 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M6 — the privacy review, and the gate that was reading half the path (`this commit`)
+
+- Gates: unit 8766 passed / 8766 total across 554 suites; `tsc --noEmit` clean; `npm run lint`
+  clean.
+- Parity manifest: unchanged. Nothing deleted.
+
+**M6 asks for a privacy-boundary review and for confirmation that debug logs carry no newly durable
+sensitive payloads. The review found the gate was reading half the path.** `diagnosticRedaction`
+walks `src/app/execution`, `src/core/execution`, `src/core/runtime/execution` and every
+`src/providers/*/execution`, matching `recordDebugLog({ … })`. The composition root is in none of
+those directories and logs through a `report` port rather than that function — so the eight events
+`ApplicationRuntime` emits, including everything the new startup recovery says, were checked by
+nothing. That is the same subset-shaped hole this gate's own comment already describes one paragraph
+above the root list, which is why the fix is the gate rather than the call sites.
+
+`src/app` is a root now, `report({ … })` is a matched shape, and the two assertions that print what
+the path logs went from four events to twelve and from one data key to four. All four are names
+rather than values — which mode was refused, which recovery stage skipped a record, which kind of
+record a build cannot read, and which issue codes a result-link sweep collected — and none can carry
+what a person typed. Proven by logging `data: { prompt }` from the composition root: the gate names
+it.
+
+**The other half of the question — newly durable sensitive payloads — is clean, and for a reason
+worth writing down.** Every new write goes through `validateControlRecordPayload`, and the schema
+errors that reach a log interpolate *labels and identifiers* rather than the value they rejected:
+`${label} must be a constrained identifier`, `Transaction "id" is corrupt: …`. So an unreadable
+record reported by the new recovery names the field and not its content. D7's stated carve-out —
+that an error's own message is carried through, because that is the reason to keep a log — holds
+without leaking a payload here.
+
 ### M6 — an independent review of the agent recovery, and the state no sweep reached (`this commit`)
 
 - Gates: unit 8766 passed / 8766 total across 554 suites; `tsc --noEmit` clean; `npm run lint`
