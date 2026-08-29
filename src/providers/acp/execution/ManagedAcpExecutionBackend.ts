@@ -955,6 +955,11 @@ class ManagedAcpExecutionSession implements ExecutionSession {
           if (error instanceof JsonRpcErrorResponse) onLoadRefusal?.(error);
           throw new ExecutionDispatchError('Managed ACP session load failed.', true);
         }
+        // Checked on this branch too, and now it has to be: deciding the
+        // session gone can cost a `session/list` round trip, so the client and
+        // the generation are read again after an await rather than before one.
+        // The success branch above has always done this.
+        this.requireCurrentClient(client, generation);
         this.nativeSessionRef = undefined;
         this.loadedSessionRef = undefined;
         onResume?.('replaced');

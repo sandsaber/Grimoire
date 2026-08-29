@@ -77,6 +77,7 @@ describe('Grok execution composition', () => {
     modeIsUnsupported?: boolean;
     reportsNativeModes?: boolean;
     reportsNoModes?: boolean;
+    sessionForgotten?: boolean;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
     sessionLoadRefusal?: string;
@@ -147,7 +148,20 @@ describe('Grok execution composition', () => {
               type: 'select',
             }] as never,
           }),
+          // Grok advertises `sessionCapabilities.list` and answers `session/list`.
+          // The conversation's own id is never in the answer: the point of the
+          // option is a session the agent no longer has.
+          ...(options.sessionForgotten
+            ? { listSessions: async () => ({ sessions: [{ sessionId: 'grok-session' }] }) }
+            : {}),
           loadSession: async request => {
+            if (options.sessionForgotten) {
+              // The same generic service failure as `sessionLoadFails`, from an
+              // agent that *can* be asked. `FS_NOT_FOUND` is not the only way a
+              // Grok session goes missing, and the words alone cannot tell this
+              // apart from an auth or configuration failure.
+              throw new JsonRpcErrorResponse('session/load', -32603, 'Internal error');
+            }
             if (options.sessionIsGone) {
               // What Grok answers for a session whose directory is not there:
               // a filesystem error, with the session never named.
@@ -246,6 +260,7 @@ describe('Grok execution composition', () => {
     modeIsUnsupported?: boolean;
     reportsNativeModes?: boolean;
     reportsNoModes?: boolean;
+    sessionForgotten?: boolean;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
     sessionLoadRefusal?: string;
@@ -596,6 +611,25 @@ describe('Grok execution composition', () => {
     ))).toBe(true);
     // The tab is on the session the turn actually ran in, which is what the
     // conversation is then saved pointing at.
+    expect(runtime.getSessionId()).toBe('grok-session');
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('asks Grok which sessions it still has when the refusal names none', async () => {
+    // `FS_NOT_FOUND` is the case the provider rule was written for, and it is
+    // not the only one: a session Grok has dropped for any other reason answers
+    // with a bare service failure, and the words cannot be told from an auth or
+    // configuration failure. Grok advertises `sessionCapabilities.list`, so the
+    // shared decision asks — and the provider rule adds to that question rather
+    // than replacing it.
+    const { execution, host } = await createHarness({ sessionForgotten: true });
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({ providerState: {}, sessionId: 'grok-session-forgotten' });
+
+    const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(chunks.some(chunk => chunk.type === 'error')).toBe(false);
     expect(runtime.getSessionId()).toBe('grok-session');
     execution.dispose();
     await host.dispose();

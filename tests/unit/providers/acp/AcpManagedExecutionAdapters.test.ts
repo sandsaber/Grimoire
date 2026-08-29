@@ -88,6 +88,34 @@ describe('managed ACP execution adapters', () => {
     await client.close();
   });
 
+  it('asks the agent which sessions it still has', async () => {
+    // The one question a failed `session/load` is decided by. Every managed CLI
+    // we ship against reports a missing session as a generic internal error, so
+    // the answer is not in the words — `isAcpSessionGone` asks for the listing,
+    // and this is the wire it asks over.
+    const process = new WireProcess();
+    const factory = new AcpManagedClientAdapterFactory({
+      clientInfo: { name: 'grimoire-tests', version: '1.0.0' },
+      processLauncher: { launch: async () => process },
+    });
+    const client = await factory.create({
+      startupRef: 'opaque-startup',
+      signal: new AbortController().signal,
+      requestPermission: async () => ({ outcome: { outcome: 'cancelled' } }),
+    });
+
+    const listing = client.listSessions?.();
+    const request = await process.nextRequest() as { id: number; method: string };
+    // Sent with params, not without: the request travels through the same
+    // fallback the other methods use, and an agent that answers only the
+    // `session/list` spelling has to see a well-formed call.
+    expect(request).toEqual(expect.objectContaining({ method: 'session/list', params: {} }));
+    process.respond(request.id, { sessions: [{ sessionId: 'still-here' }] });
+
+    await expect(listing).resolves.toEqual({ sessions: [{ sessionId: 'still-here' }] });
+    await client.close();
+  });
+
   it('routes provider-owned contained filesystem delegates through ACP', async () => {
     const process = new WireProcess();
     const readTextFile = jest.fn(async () => ({ content: 'contained content' }));

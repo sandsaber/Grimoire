@@ -10582,6 +10582,44 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Phase 2 reviewed — two shipped capabilities with no test, and a trap I opened (`this commit`)
+
+- Gates: unit 9031 passed / 9031 total across 567 suites; `tsc --noEmit` clean; `npm run lint` clean;
+  `npm run build:release` clean.
+- Two independent reviews of `d5cb9353..HEAD`, one on correctness and one on test integrity.
+
+**The correctness review found nothing open.** Its five listed concerns were each read against the
+code and four did not hold — the `listSessions` closure takes the client that attempted the load,
+which is the right one to ask; `databasePath` survives the `providerState` rewrite through the
+context's fallback; the reported Grok model ids resolve against the same `discoveredModels` the
+picker reads; and the new `await` in `ensureSessionBinding` cannot race, because `createRun` refuses
+a second run while one is active and `start()` awaits `prepare()` to completion. The fifth was the
+re-sync defect, already fixed. It also reported the Grok wiring reverted, which was an intermediate
+state it caught mid-review — `git diff 3b4085bd HEAD` on that file is empty.
+
+**The test review found two shipped capabilities with no test, both confirmed by deleting them.**
+
+- **`AcpManagedClientAdapter.listSessions`** had none. Every sibling pass-through on that adapter has
+  a wire-level round trip in `AcpManagedExecutionAdapters.test.ts`; this one was reached in three
+  test files, all through hand-rolled fakes that bypass the adapter entirely, so the pass-through and
+  its default `{}` argument were unverified. It now has the round trip its siblings have;
+- **Grok's `|| isAcpSessionGone(probe)` fallback** had none. `GrokExecutionComposition.test.ts` was
+  never touched by the recovery, and its fake client has no `listSessions` at all — so the clause
+  could only ever reach the "agent cannot be asked" branch, which returns the same answer the old
+  code gave. Deleting the clause left all 9019 tests passing. `FS_NOT_FOUND` is not the only way a
+  Grok session goes missing, and the new test is the case that is not it.
+
+**One latent trap, and it is one I opened.** The review flagged that the success branch of
+`ensureSessionBinding` calls `requireCurrentClient` before mutating and the missing branch does not.
+It was not exploitable under the single-active-run invariant — but deciding the session gone can now
+cost a `session/list` round trip, so that branch reads its client and generation *after* an await
+where it used to read them before one. Checked there too.
+
+Not changed: the review called the third Grok level test redundant because it passes with the
+production change reverted. That is what the entry for it says it is — a guard on the behaviour the
+change must not break — and a test that fails only when the new code is present would be a different
+test.
+
 ### Phase 4 — the gate that would have caught the whole recovery (`this commit`)
 
 - Gates: unit 9029 passed / 9029 total across 567 suites; `tsc --noEmit` clean; `npm run lint` clean;
@@ -10717,7 +10755,8 @@ memory again, which is what the chat contract means by the notice coming down as
 joins the thread.
 
 **Wired for OpenCode and MiMoCode**, which mirror each other by their own instructions and are the
-two CLIs whose refusals say nothing at all. Six tests, three per provider, at composition level:
+two CLIs whose refusals say nothing at all. Six tests, three per provider, at composition level (a
+fourth each lands in the entry above this one):
 a forgotten session leaves the flag set and the marker written; a conversation carrying the marker
 lights it before any turn; a successful resume takes it off. Proven by deleting each half in turn —
 the payload handling fails the first and third, the read-back fails the second.
