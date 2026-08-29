@@ -1,6 +1,10 @@
 import { validateControlRecordPayload } from '../persistence/ControlRecordPayloadPolicy';
 import type { DurableStorage } from '../persistence/DurableStorage';
-import type { VersionedRecord, VersionedRecordReadResult } from '../persistence/VersionedRecord';
+import {
+  UnreadableControlRecordError,
+  type VersionedRecord,
+  type VersionedRecordReadResult,
+} from '../persistence/VersionedRecord';
 import { VersionedRepository } from '../persistence/VersionedRepository';
 import type {
   AgentDispatchIntentRecord,
@@ -21,6 +25,61 @@ import {
   agentRunRecordSchema,
 } from './AgentSchemas';
 
+/**
+ * What the store has proved about itself, shared by every repository over it.
+ *
+ * **D5, as one mechanism rather than four.** The decision says a control record
+ * this build cannot read opens the store read-only; the kernel answers that
+ * with a single latch on the registry plus a state that refuses admission. The
+ * agent half was assembled instead from a rethrow in two sweeps, a catch in a
+ * third that turned the same error back into an ordinary issue, and a boolean
+ * in the composition root — each correct locally, and together not the rule:
+ * two write paths were not covered, including the live one a background agent
+ * takes while a turn is running.
+ *
+ * Set on the first read this build cannot understand, checked by every write.
+ * A caller cannot forget it, because the reads and the writes both go through
+ * the repositories this belongs to.
+ */
+export class AgentStoreReadability {
+  private unreadable: UnreadableControlRecordError | null = null;
+
+  /** Passes a read through, remembering it if the build cannot understand it. */
+  observe<TRecord>(
+    result: VersionedRecordReadResult<TRecord>,
+  ): VersionedRecordReadResult<TRecord> {
+    if (result.kind === 'future') {
+      this.unreadable ??= new UnreadableControlRecordError(
+        'future',
+        `record "${result.recordId}" uses schema version ${result.schemaVersion}`,
+      );
+    } else if (result.kind === 'corrupt') {
+      this.unreadable ??= new UnreadableControlRecordError(
+        'corrupt',
+        `record "${result.recordId}": ${result.error}`,
+      );
+    }
+    return result;
+  }
+
+  /** The record that made the store read-only, or `null` while it is writable. */
+  requirement(): UnreadableControlRecordError | null {
+    return this.unreadable;
+  }
+
+  private requireWritable(): void {
+    if (this.unreadable) {
+      throw this.unreadable;
+    }
+  }
+
+  /** Runs a write, or refuses it because the store is read-only. */
+  guard<T>(write: () => Promise<T>): Promise<T> {
+    this.requireWritable();
+    return write();
+  }
+}
+
 /** What a write says about itself: the record's id, and what it now holds. */
 export type AgentRecordChangeListener<TRecord>
   = (recordId: string, record: TRecord | undefined) => void;
@@ -28,7 +87,10 @@ export type AgentRecordChangeListener<TRecord>
 export class MutableAgentRepository<TRecord> {
   private readonly changeListeners = new Set<AgentRecordChangeListener<TRecord>>();
 
-  constructor(private readonly records: VersionedRepository<TRecord>) {}
+  constructor(
+    private readonly records: VersionedRepository<TRecord>,
+    private readonly readability: AgentStoreReadability,
+  ) {}
 
   /**
    * Says which record changed, after it has changed, **and what it changed to**.
@@ -53,8 +115,8 @@ export class MutableAgentRepository<TRecord> {
     };
   }
 
-  read(recordId: string): Promise<VersionedRecordReadResult<TRecord>> {
-    return this.records.read(recordId);
+  async read(recordId: string): Promise<VersionedRecordReadResult<TRecord>> {
+    return this.readability.observe(await this.records.read(recordId));
   }
 
   listRecordIds(): Promise<string[]> {
@@ -62,7 +124,7 @@ export class MutableAgentRepository<TRecord> {
   }
 
   async create(recordId: string, record: TRecord): Promise<VersionedRecord<TRecord>> {
-    const saved = await this.records.save(recordId, record, null);
+    const saved = await this.readability.guard(() => this.records.save(recordId, record, null));
     this.announce(recordId, saved.payload);
     return saved;
   }
@@ -75,7 +137,7 @@ export class MutableAgentRepository<TRecord> {
    * which are already gone.
    */
   async removeIfPresent(recordId: string): Promise<void> {
-    await this.records.removeIfPresent(recordId);
+    await this.readability.guard(() => this.records.removeIfPresent(recordId));
     this.announce(recordId, undefined);
   }
 
@@ -84,7 +146,9 @@ export class MutableAgentRepository<TRecord> {
     expectedRevision: number,
     mutation: (record: TRecord) => TRecord,
   ): Promise<VersionedRecord<TRecord>> {
-    const updated = await this.records.mutate(recordId, expectedRevision, mutation);
+    const updated = await this.readability.guard(
+      () => this.records.mutate(recordId, expectedRevision, mutation),
+    );
     this.announce(recordId, updated.payload);
     return updated;
   }
@@ -104,10 +168,13 @@ export class MutableAgentRepository<TRecord> {
 }
 
 export class AppendOnlyAgentRepository<TRecord> {
-  constructor(private readonly records: VersionedRepository<TRecord>) {}
+  constructor(
+    private readonly records: VersionedRepository<TRecord>,
+    private readonly readability: AgentStoreReadability,
+  ) {}
 
-  read(recordId: string): Promise<VersionedRecordReadResult<TRecord>> {
-    return this.records.read(recordId);
+  async read(recordId: string): Promise<VersionedRecordReadResult<TRecord>> {
+    return this.readability.observe(await this.records.read(recordId));
   }
 
   listRecordIds(): Promise<string[]> {
@@ -115,7 +182,7 @@ export class AppendOnlyAgentRepository<TRecord> {
   }
 
   append(recordId: string, record: TRecord): Promise<VersionedRecord<TRecord>> {
-    return this.records.save(recordId, record, null);
+    return this.readability.guard(() => this.records.save(recordId, record, null));
   }
 
   /**
@@ -127,7 +194,7 @@ export class AppendOnlyAgentRepository<TRecord> {
    * emptied would make the second impossible to honour.
    */
   removeIfPresent(recordId: string): Promise<void> {
-    return this.records.removeIfPresent(recordId);
+    return this.readability.guard(() => this.records.removeIfPresent(recordId));
   }
 }
 
@@ -136,6 +203,8 @@ export class AgentRepositories {
   readonly runs: MutableAgentRepository<AgentRunRecord>;
   readonly dispatchIntents: MutableAgentRepository<AgentDispatchIntentRecord>;
   readonly results: AppendOnlyAgentRepository<AgentResultRecord>;
+  /** What the store has proved about itself; see `AgentStoreReadability`. */
+  readonly readability = new AgentStoreReadability();
 
   constructor(storage: DurableStorage, now?: () => number) {
     this.instances = new MutableAgentRepository(new VersionedRepository({
@@ -144,21 +213,21 @@ export class AgentRepositories {
       schema: agentInstanceRecordSchema,
       now,
       validatePayload: validateControlRecordPayload,
-    }));
+    }), this.readability);
     this.runs = new MutableAgentRepository(new VersionedRepository({
       storage,
       namespace: AGENT_RUNS_PATH,
       schema: agentRunRecordSchema,
       now,
       validatePayload: validateControlRecordPayload,
-    }));
+    }), this.readability);
     this.dispatchIntents = new MutableAgentRepository(new VersionedRepository({
       storage,
       namespace: AGENT_DISPATCH_INTENTS_PATH,
       schema: agentDispatchIntentRecordSchema,
       now,
       validatePayload: validateControlRecordPayload,
-    }));
+    }), this.readability);
     this.results = new AppendOnlyAgentRepository(new VersionedRepository({
       storage,
       namespace: AGENT_RESULTS_PATH,
@@ -170,6 +239,6 @@ export class AgentRepositories {
       // reasoning, no raw payload and no secret, and a result carrying one of
       // those is exactly how such a thing would arrive there.
       validatePayload: validateControlRecordPayload,
-    }));
+    }), this.readability);
   }
 }

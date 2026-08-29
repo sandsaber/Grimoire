@@ -311,9 +311,6 @@ export class ApplicationRuntime {
   /** Set by `dispose`, so a stage that has not started does not start. */
   private disposed = false;
 
-  /** D5: a store this build cannot read is not swept further. */
-  private agentStoreUnreadable = false;
-
   workspaceFor(providerId: ProviderId): Promise<ProviderWorkspaceSlots> {
     const composition = this.compositionFor(providerId);
     if (!composition) {
@@ -385,7 +382,22 @@ export class ApplicationRuntime {
    * plugin is usable without them, and what they could not finish is still
    * there for the next start.
    */
-  private async recoverAgentRecords(): Promise<void> {
+  private async recoverAgentRecords(executionStoreReadOnly: boolean): Promise<void> {
+    if (executionStoreReadOnly) {
+      // Said rather than skipped in silence. The two stores are almost always
+      // the same generation, so a kernel that opened its store read-only is a
+      // vault a newer build wrote — and sweeping the agent records beside it
+      // would rewrite exactly what D5 protects, one directory over. A user who
+      // sees only `execution.migrationRequired` has no way to learn that agent
+      // runs were left non-terminal too.
+      this.options.report({
+        data: { reason: 'execution-store-read-only' },
+        event: 'agents.recovery.skipped',
+        level: 'warn',
+        scope: 'plugin',
+      });
+      return;
+    }
     const links = await this.attemptAgentRecovery(
       'result-links',
       () => this.agents.recoverResultLinks(),
@@ -407,24 +419,21 @@ export class ApplicationRuntime {
     }
     // After the links, because a result that reached its run has already
     // terminalized it, and neither sweep below should reconcile a finished run.
-    // Each takes a reporter rather than relying on the throw: both sweeps
-    // collect per record, and both only throw when *nothing* came back — so a
-    // store with one unreadable record beside one readable one recovered
-    // "successfully" and said nothing, on every load, while the record it could
-    // not read kept its run non-terminal.
+    // Each takes a reporter, and takes its phase from the caller that named it,
+    // so the two events a sweep can raise cannot end up naming it differently.
     await this.attemptAgentRecovery(
       'pending-dispatches',
-      () => this.agents.recoverPendingDispatches(
+      phase => this.agents.recoverPendingDispatches(
         processBoundAgentRecovery,
-        { onFailure: error => this.reportAgentRecordSkipped('pending-dispatches', error) },
+        { onFailure: error => this.reportAgentRecordSkipped(phase, error) },
       ),
     );
     await this.attemptAgentRecovery(
       'active-runs',
-      () => this.agents.recoverActiveRuns(
+      phase => this.agents.recoverActiveRuns(
         processBoundAgentRecovery,
         processBoundAgentRecovery,
-        { onFailure: error => this.reportAgentRecordSkipped('active-runs', error) },
+        { onFailure: error => this.reportAgentRecordSkipped(phase, error) },
       ),
     );
   }
@@ -455,25 +464,23 @@ export class ApplicationRuntime {
    * exists to prevent. Between stages rather than between records: the sweeps
    * take no cancellation signal, so an unload that lands mid-sweep is not
    * stopped by this, and giving them one is a change to their contract.
-   * **An unreadable record stops the rest**, because D5 says a store this build
-   * cannot read opens read-only — the kernel's own start already answers that
-   * way for the execution store, and continuing to sweep the agent store would
-   * terminalize runs a newer build wrote. **Anything else is reported and the
+   * **A read-only store starts none either**, asked of the store itself rather
+   * than remembered here — so the answer the stages consult is the same one
+   * every write consults, and a stage cannot be added that forgets to ask. **Anything else is reported and the
    * next stage still runs**, for the reason the coordinator collects per record:
    * one bad record must not stall every later one on every restart.
    */
   private async attemptAgentRecovery<T>(
     phase: string,
-    recover: () => Promise<T>,
+    recover: (phase: string) => Promise<T>,
   ): Promise<T | null> {
-    if (this.disposed || this.agentStoreUnreadable) {
+    if (this.disposed || this.agents.migrationRequirement()) {
       return null;
     }
     try {
-      return await recover();
+      return await recover(phase);
     } catch (error) {
       if (error instanceof UnreadableControlRecordError) {
-        this.agentStoreUnreadable = true;
         this.options.report({
           data: { phase, recordKind: error.recordKind },
           error,
@@ -529,10 +536,7 @@ export class ApplicationRuntime {
     // stores are almost always the same generation — so sweeping the agent
     // records while the execution ones are correctly untouched would rewrite
     // exactly what D5 protects, one directory over.
-    if (this.kernel.migrationRequirement()) {
-      this.agentStoreUnreadable = true;
-    }
-    await this.recoverAgentRecords();
+    await this.recoverAgentRecords(this.kernel.migrationRequirement() !== null);
     if (!kernelStarted) {
       return;
     }

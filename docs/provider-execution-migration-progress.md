@@ -10494,6 +10494,58 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M6 — D5 on the agent store, as one mechanism instead of four (`this commit`)
+
+- Gates: unit 8778 passed / 8778 total across 556 suites; `tsc --noEmit` clean; `npm run lint`
+  clean; `npm run build:release` clean.
+- Parity manifest: unchanged. Nothing deleted.
+
+**A third review returned thirteen findings, and the largest is that the previous entry's D5 fix was
+four patches rather than a rule.** It had become: `requireCurrent` raising the shared error, a
+rethrow copied into two sweeps, a third sweep that caught the same error and turned it back into an
+ordinary issue code, and a boolean in the composition root. Each correct where it stood. Together
+they did not deliver *"the store opens read-only"*, because two write paths were not covered — the
+first sweep, which went on linking results and repairing instances in a store the other two now
+refuse to touch, and **the live path**, where a background agent observed during a turn writes an
+instance, a run and a result through the recorder.
+
+The kernel's own answer to D5 is one latch on one object plus a state that gates admission. The
+agent equivalent is now the same shape: `AgentStoreReadability` lives on `AgentRepositories`, is set
+by the first read this build cannot understand, and is consulted by every write — because the reads
+and the writes both go through the repositories it belongs to. `AgentCoordinator.migrationRequirement()`
+answers the same question `ExecutionLifecycleRegistry.getMigrationRequirement` answers for the
+execution store, so the composition asks rather than inferring it from an error it happened to
+catch. The test that matters is the live one: after a load that meets an unreadable record,
+`adoptNativeAgent` is refused.
+
+The other twelve, each fixed or recorded:
+
+- **`recoverResultLinks` joined the rule** rather than being the odd sweep out;
+- **failures collected before a sweep gives up are now reported on the way out** — a rethrow from
+  inside the loop skipped `reportSweepFailures` entirely, so the unfinishable record a sibling test
+  exists to make visible was silent whenever an unreadable one followed it;
+- **a skipped agent sweep says so.** Pre-setting the flag from the kernel's verdict skipped all three
+  stages with nothing in the log at all, which is the same "a warning that says nothing" cost taken
+  one step further;
+- **an orphaned prepared intent is reported like its sibling.** A dispatch intent whose *run* record
+  is gone was skipped in silence while one whose *instance* is gone was reported — two identical
+  half-applied deletions, one loud and one invisible. Both are reported now; removing the orphan is a
+  deletion transaction and stays recorded;
+- **the phase is written once**, passed into the recover callback, so the two events a sweep can
+  raise cannot name it differently;
+- **the scraper counts braces.** Two regexes had been wrong in opposite directions — one skipped a
+  single-line call and swallowed the block after it, the other truncated at the first `})` a nested
+  object introduces. A balanced construct is not a regular language, and the gate whose own comment
+  says "one regex short of checking nothing" should not be counting on one;
+- and the small ones: `requireCurrent` takes a read or its result rather than being handed
+  `Promise.resolve(read)`, and two doc comments that described the branch this work deleted.
+
+**Recorded, not fixed.** The latch stops a sweep at the first unreadable *read*, so records that
+sorted before it have already been written — a complete guarantee needs a pre-scan of every record
+before any write, which is a fourth full pass over the store. The test that demonstrates the
+guarantee gives its injected record an id that sorts first, deliberately, and says so. Owner: M6,
+with the startup-cost item, because they are the same trade.
+
 ### M6 — a second review, and three warnings that said `[redacted-string]` (`this commit`)
 
 - Gates: unit 8772 passed / 8772 total across 555 suites; `tsc --noEmit` clean; `npm run lint`

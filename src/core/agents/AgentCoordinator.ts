@@ -531,6 +531,18 @@ export class AgentCoordinator {
     }));
   }
 
+  /**
+   * The record that made the agent store read-only, or `null`.
+   *
+   * The same question `ExecutionLifecycleRegistry.getMigrationRequirement`
+   * answers for the execution store, and answered from the same kind of latch —
+   * so the composition asks rather than inferring it from an error it happened
+   * to catch.
+   */
+  migrationRequirement(): UnreadableControlRecordError | null {
+    return this.repositories.readability.requirement();
+  }
+
   async recoverPendingDispatches(
     port: AgentDispatchRecoveryPort,
     options: AgentRecoverySweepOptions = {},
@@ -627,14 +639,7 @@ export class AgentCoordinator {
       });
       if (settled) recovered.push(settled);
       } catch (error) {
-        // **Collected, unless the store itself is unreadable.** The per-record
-        // collection exists so one malformed record cannot stall every later
-        // one on every restart; a record this build cannot *read* is the other
-        // case entirely — D5's reverted build — and continuing past it would
-        // rewrite the records this build understands in a store a newer one
-        // owns.
-        if (error instanceof UnreadableControlRecordError) throw error;
-        failures.push(error);
+        collectSweepFailure(failures, error, options);
       }
     }
     reportSweepFailures(failures, options);
@@ -715,14 +720,7 @@ export class AgentCoordinator {
       });
       recovered.push(settled);
       } catch (error) {
-        // **Collected, unless the store itself is unreadable.** The per-record
-        // collection exists so one malformed record cannot stall every later
-        // one on every restart; a record this build cannot *read* is the other
-        // case entirely — D5's reverted build — and continuing past it would
-        // rewrite the records this build understands in a store a newer one
-        // owns.
-        if (error instanceof UnreadableControlRecordError) throw error;
-        failures.push(error);
+        collectSweepFailure(failures, error, options);
       }
     }
     reportSweepFailures(failures, options);
@@ -862,6 +860,11 @@ export class AgentCoordinator {
         });
         if (linkedRun) linked.push(linkedRun);
       } catch (error) {
+        // The same rule the other two sweeps take, and the reason this one was
+        // the odd one out: it turned an unreadable record into an ordinary
+        // issue code and kept linking, so the first stage of recovery went on
+        // writing into the store the other two now refuse to touch.
+        if (error instanceof UnreadableControlRecordError) throw error;
         issues.push({
           agentResultId: resultId,
           code: isResultReferenceError(error)
@@ -1004,17 +1007,15 @@ export class AgentCoordinator {
   private async settlePreparedDispatch(
     intentRecord: VersionedRecord<AgentDispatchIntentRecord>,
   ): Promise<AgentRunRecord | undefined> {
-    const read = await this.repositories.runs.read(intentRecord.payload.agentRunId);
-    if (read.kind === 'absent') {
-      // **An intent whose run is gone has nothing to settle.** A half-applied
-      // deletion or a hand-edited vault can leave one, and raising here would
-      // warn about the same orphan on every load with no path that ever
-      // resolves it — which is the cost this file's own report change cites.
-      // Skipped, as it was before this branch existed. Removing the orphan is a
-      // deletion transaction and is recorded rather than done here.
-      return undefined;
-    }
-    const runRecord = await requireCurrent(Promise.resolve(read));
+    // An intent whose run is gone is a half-applied deletion, and it is
+    // reported rather than skipped — the same answer its sibling gets, where
+    // the *instance* is the record that is gone. Both are orphans a vault can
+    // really hold, and a caller that hears about neither cannot clean up
+    // either. Removing one is a deletion transaction and is recorded rather
+    // than done here.
+    const runRecord = await requireCurrent(
+      this.repositories.runs.read(intentRecord.payload.agentRunId),
+    );
     return this.enqueue(runRecord.payload.agentInstanceId, async () => {
       const currentIntent = await requireCurrent(
         this.repositories.dispatchIntents.read(intentRecord.recordId),
@@ -1511,16 +1512,39 @@ function intersectPermissionBoundaries(
 
 
 /**
- * How a sweep says a record it could not read was skipped.
+ * How a sweep says a record it could not finish was skipped.
  *
- * The two sweeps collect per record on purpose — `listRecordIds` is sorted, so
+ * The sweeps collect per record on purpose — `listRecordIds` is sorted, so
  * throwing on the first bad one stalls every later one on every restart,
- * permanently. What that left was worse in a different way: a store with one
- * unreadable record and one readable one recovered "successfully" and said
- * nothing, forever, because the throw only fires when *nothing* came back.
+ * permanently. A caller that supplies no reporter is told about the first
+ * failure instead, whether or not other records recovered: silence as soon as
+ * *something* succeeded is how a store with one permanently unfinishable record
+ * reported a clean recovery on every load.
  */
 export interface AgentRecoverySweepOptions {
   readonly onFailure?: (error: unknown) => void;
+}
+
+/**
+ * Files one record's failure, or gives up on the store.
+ *
+ * The per-record collection exists so a single malformed record cannot stall
+ * every later one on every restart. A record this build cannot *read* is the
+ * other case entirely — D5's reverted build — and going on would rewrite the
+ * records this build understands in a store a newer one owns. What was already
+ * collected is reported on the way out, because a sweep that gives up still saw
+ * what it saw.
+ */
+function collectSweepFailure(
+  failures: unknown[],
+  error: unknown,
+  options: AgentRecoverySweepOptions,
+): void {
+  if (error instanceof UnreadableControlRecordError) {
+    reportSweepFailures(failures, options);
+    throw error;
+  }
+  failures.push(error);
 }
 
 function reportSweepFailures(
@@ -1574,7 +1598,7 @@ function write(
 }
 
 async function requireCurrent<T>(
-  read: Promise<VersionedRecordReadResult<T>>,
+  read: VersionedRecordReadResult<T> | Promise<VersionedRecordReadResult<T>>,
 ): Promise<VersionedRecord<T>> {
   const result = await read;
   if (result.kind === 'current' || result.kind === 'migrated') return result.record;

@@ -134,27 +134,76 @@ function readLogCallSites(): LogCallSite[] {
   for (const root of ROOTS) {
     for (const file of sourceFiles(root)) {
       const source = readFileSync(file, 'utf8');
-      // Up to the first `})`, not to a newline-indented one: a single-line
-      // call has no newline before its close, so the lazy match ran past it and
-      // swallowed the *next* block — hiding one event entirely and filing its
-      // keys under the call above.
-      for (const match of source.matchAll(/(?:recordDebugLog|report)\(\{([\s\S]*?)\}\)/g)) {
-        const block = match[1];
+      for (const block of logCallBlocks(source)) {
         const event = /event:\s*'([^']+)'/.exec(block)?.[1] ?? '(unnamed)';
-        const data = /data:\s*\{([^}]*)\}/.exec(block)?.[1] ?? '';
-        // Split rather than matched: requiring a delimiter after each name
-        // silently dropped the last key of every call site, which for `data: {
-        // modeId }` is the only key there is — and an empty list makes every
-        // assertion below pass without checking anything.
-        const dataKeys = data
-          .split(',')
-          .map(entry => /^\s*([A-Za-z_][A-Za-z0-9_]*)/.exec(entry)?.[1])
-          .filter((key): key is string => Boolean(key));
-        sites.push({ file: relative(process.cwd(), file), event, dataKeys });
+        sites.push({
+          file: relative(process.cwd(), file),
+          event,
+          dataKeys: dataKeysOf(block),
+        });
       }
     }
   }
   return sites;
+}
+
+/**
+ * The object literal each log call is made with, matched by counting braces.
+ *
+ * **Not a regular expression, twice over.** Lazily matching to a
+ * newline-indented `})` skipped a single-line call and swallowed the block
+ * after it — one event invisible, its keys filed under the call above.
+ * Lazily matching to the first `})` truncates instead, at the first conditional
+ * spread or nested call the object contains. Neither is a bug in the pattern:
+ * a balanced construct is not a regular language, and the gate whose comment
+ * says "one regex short of checking nothing" should not be counting on one.
+ */
+function logCallBlocks(source: string): string[] {
+  const blocks: string[] = [];
+  const opener = /(?:recordDebugLog|report)\(\{/g;
+  let match = opener.exec(source);
+  while (match) {
+    let depth = 1;
+    let index = match.index + match[0].length;
+    while (index < source.length && depth > 0) {
+      const character = source[index];
+      if (character === '{') depth += 1;
+      else if (character === '}') depth -= 1;
+      index += 1;
+    }
+    if (depth === 0) {
+      blocks.push(source.slice(match.index + match[0].length, index - 1));
+    }
+    opener.lastIndex = index;
+    match = opener.exec(source);
+  }
+  return blocks;
+}
+
+/** The keys of the call's `data` object, however deeply the object is written. */
+function dataKeysOf(block: string): string[] {
+  const marker = /data:\s*\{/.exec(block);
+  if (!marker) {
+    return [];
+  }
+  let depth = 1;
+  let index = marker.index + marker[0].length;
+  const start = index;
+  while (index < block.length && depth > 0) {
+    const character = block[index];
+    if (character === '{') depth += 1;
+    else if (character === '}') depth -= 1;
+    index += 1;
+  }
+  const data = block.slice(start, index - 1);
+  // Split rather than matched: requiring a delimiter after each name silently
+  // dropped the last key of every call site, which for `data: { modeId }` is
+  // the only key there is — and an empty list makes every assertion below pass
+  // without checking anything.
+  return data
+    .split(',')
+    .map(entry => /^\s*([A-Za-z_][A-Za-z0-9_]*)/.exec(entry)?.[1])
+    .filter((key): key is string => Boolean(key));
 }
 
 describe('diagnostic redaction (D7)', () => {
@@ -170,7 +219,7 @@ describe('diagnostic redaction (D7)', () => {
       expect.arrayContaining(['execution.cleanup.failed']),
     );
     expect([...new Set(sites.flatMap(site => site.dataKeys))].sort())
-      .toEqual(['code', 'modeId', 'phase', 'recordKind']);
+      .toEqual(['code', 'modeId', 'phase', 'reason', 'recordKind']);
   });
 
   it('writes every key it logs, instead of a row of redactions', () => {
@@ -202,6 +251,7 @@ describe('diagnostic redaction (D7)', () => {
       'agents.recovery.failed',
       'agents.recovery.incomplete',
       'agents.recovery.recordSkipped',
+      'agents.recovery.skipped',
       'execution.cleanup.failed',
       'execution.connection.lost',
       'execution.migrationRequired',
@@ -249,7 +299,7 @@ describe('diagnostic redaction (D7)', () => {
     // which kind of record a build cannot read, and which issue code a
     // result-link sweep collected. None of them can carry what a person typed.
     expect([...new Set(sites.flatMap(site => site.dataKeys))].sort())
-      .toEqual(['code', 'modeId', 'phase', 'recordKind']);
+      .toEqual(['code', 'modeId', 'phase', 'reason', 'recordKind']);
     const written = sanitizeDebugLogData({ modeId: 'Summarize my private note' });
 
     // Not redacted, because it is on the safe list — which is exactly why the

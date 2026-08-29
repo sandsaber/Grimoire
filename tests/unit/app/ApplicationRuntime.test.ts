@@ -10,7 +10,12 @@ import {
 } from '@/core/agents/AgentControlPaths';
 import { AgentControlTransactionCoordinator } from '@/core/agents/AgentControlTransactionCoordinator';
 import { AgentCoordinator } from '@/core/agents/AgentCoordinator';
-import { agentDispatchToken, agentInstanceId, agentRunId } from '@/core/agents/AgentIds';
+import {
+  agentDispatchToken,
+  agentInstanceId,
+  agentRunId,
+  nativeAgentAdoptionKey,
+} from '@/core/agents/AgentIds';
 import { AgentRepositories } from '@/core/agents/AgentRepositories';
 import { SessionStorage } from '@/core/bootstrap/SessionStorage';
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
@@ -333,6 +338,64 @@ describe('application runtime', () => {
     });
     expect((untouched as { record: { payload: { terminal?: unknown } } }).record.payload.terminal)
       .toBeUndefined();
+    runtime.dispose();
+  });
+
+  it('refuses a live write to a store it has declared read-only', async () => {
+    // **The half a per-sweep rethrow could not deliver.** D5 says the store
+    // opens read-only, and three stages that each decline to sweep leave the
+    // ordinary path untouched: a background agent observed during a turn writes
+    // an instance, a run and a result through the recorder, into the store the
+    // load just declared unreadable. The latch is on the repositories, so a
+    // write consults the same answer a sweep does.
+    const adapter = createDurableInMemoryVaultAdapter();
+    const storage = new VaultDurableStorage(adapter);
+    const repositories = new AgentRepositories(storage, monotonicClock());
+    const before = new AgentCoordinator(storage, {
+      now: monotonicClock(),
+      repositories,
+      scheduler: { setTimeout: () => 0, clearTimeout: () => undefined },
+    });
+    await before.prepareDispatch(dispatchCommand());
+    await storage.writeAtomic(
+      `${AGENT_DISPATCH_INTENTS_PATH}/adt-${'0'.repeat(32)}.json`,
+      JSON.stringify({
+        schemaVersion: 9_999,
+        recordId: `adt-${'0'.repeat(32)}`,
+        revision: 1,
+        updatedAt: 1,
+        payload: {},
+      }),
+    );
+
+    const runtime = createRuntime(jest.fn(), adapter);
+    await runtime.start();
+
+    expect(runtime.agents.migrationRequirement()).not.toBeNull();
+    // The write the recorder makes on the ordinary chat path, refused.
+    await expect(runtime.agents.adoptNativeAgent({
+      transactionId: `tx-${'9'.repeat(32)}`,
+      terminalTransactionId: `tx-${'a'.repeat(32)}`,
+      adoptionKey: nativeAgentAdoptionKey(`nad-${'b'.repeat(32)}`),
+      agentRunId: agentRunId(`agr-${'c'.repeat(32)}`),
+      providerId: 'claude',
+      definition: {
+        definitionId: 'claude-subagent',
+        revisionDigest: '0'.repeat(64),
+        source: 'provider-native',
+      },
+      rootOwner: { kind: 'conversation', ownerId: 'conversation-1' },
+      attachment: 'detached',
+      observation: 'terminal-only',
+      nativeAgentRef: 'native-1',
+      goalRef: 'goal-observed',
+      policyInputs: {
+        provider: { granted: [], approvable: [] },
+        workspace: { granted: [], approvable: [] },
+        root: { granted: [], approvable: [] },
+        definition: { requested: [], approvable: [] },
+      },
+    })).rejects.toThrow(/unreadable/i);
     runtime.dispose();
   });
 
