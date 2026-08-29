@@ -199,13 +199,14 @@ describe('chat projection attachment', () => {
       'addMessage',
       'showThinkingIndicator',
       'finalizeCurrentThinkingBlock',
-      'finalizeCurrentTextBlock',
       'appendText',
+      // The one place a text block closes: the tool card has to land after the
+      // prose that preceded it. Closing it before each stretch of prose is what
+      // cut an answer into one block per delta.
       'finalizeCurrentThinkingBlock',
       'finalizeCurrentTextBlock',
       'chunk:tool_use',
       'finalizeCurrentThinkingBlock',
-      'finalizeCurrentTextBlock',
       'appendText',
       'chunk:done',
       'hideThinkingIndicator',

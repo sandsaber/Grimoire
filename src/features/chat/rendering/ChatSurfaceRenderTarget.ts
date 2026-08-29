@@ -281,23 +281,36 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
     if (!message) {
       return;
     }
-    // A new index means the previous block is finished. The legacy controller
-    // decides this by watching the chunk type change; here the renderer has
-    // already decided it, which is the whole point of the index.
-    this.enqueue(() => this.deps.stream.finalizeCurrentThinkingBlock(message));
-    this.enqueue(() => this.deps.stream.finalizeCurrentTextBlock(message));
+    // A new index does not mean the open block is finished — it means the
+    // projection could not merge this item into the last one. Every backend
+    // emits the provider's own message *and* the text deltas of that same
+    // message, so a `provider-content` lands between two deltas on every turn
+    // and stops the merge; most of those payloads draw nothing. Closing the
+    // text block for one of them cut the answer at the delta boundary: the
+    // vault held `content` as "Привет! Чем могу…" and `contentBlocks` as
+    // "Прив", "ет! Ч" and the rest, each its own block with its own copy
+    // button. So each kind closes what it actually displaces, and a payload
+    // closes nothing until it is known to draw.
     this.open = { runId, index, kind: item.kind };
     this.deps.stream.noteTurnActivity();
     switch (item.kind) {
       case 'assistant-text':
+        this.enqueue(() => this.deps.stream.finalizeCurrentThinkingBlock(message));
         message.content += item.text;
         this.enqueue(() => this.deps.stream.appendText(item.text));
         return;
       case 'reasoning-text':
+        this.enqueue(() => this.deps.stream.finalizeCurrentTextBlock(message));
         this.enqueue(() => this.deps.stream.appendThinking(item.text));
         return;
       case 'provider-content': {
         const presented = this.deps.presentProviderContent(item.payload);
+        if (presented.length > 0) {
+          // Only now: a card has to land after the prose that preceded it, so
+          // the open blocks close ahead of it — and not one moment earlier.
+          this.enqueue(() => this.deps.stream.finalizeCurrentThinkingBlock(message));
+          this.enqueue(() => this.deps.stream.finalizeCurrentTextBlock(message));
+        }
         for (const content of presented) {
           this.enqueue(() => this.deps.stream.handleStreamChunk(content, message));
         }

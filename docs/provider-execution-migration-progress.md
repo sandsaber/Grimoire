@@ -10576,6 +10576,35 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### A live turn cut every answer into one block per delta (`this commit`)
+
+- Gates: unit 8946 passed / 8946 total across 562 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Found by the owner in the test vault, on every provider, on prose and on reasoning alike, and not
+  present on `main` — a regression this migration introduced.
+
+**What a saved conversation held.** `content` was the whole sentence; `contentBlocks` was three
+pieces of it, split mid-word at the delta boundaries, each its own block with its own copy button.
+So the answer was whole in the vault and cut on the screen, and it stayed cut when the conversation
+was reopened, because the blocks are what history draws from.
+
+**`openTurnBlock` treated a new index as "the open block is finished".** It is not: a new index means
+the projection could not merge this item into the last one. Every backend emits the provider's own
+message *and* the text deltas of that same message, so a `provider-content` item lands between two
+deltas on every turn — Claude emits one per SDK message, the ACP backends one per session update,
+config and resume outcome. That item stops the projection's text merge, and the finalize at the top
+of `openTurnBlock` then closed the text block for a payload that usually draws nothing at all.
+
+**Each kind now closes what it actually displaces.** Prose closes the reasoning block, reasoning
+closes the prose block, and a provider payload closes both — but only once it is known to draw
+something, which is why `presentProviderContent` now runs before the decision rather than after it.
+A card still lands after the prose it follows.
+
+Two tests hold it, and two more had to be rewritten because they asserted the old rule as a call
+order. The end-to-end attachment test is the one worth reading: its recorded sequence now shows
+`finalizeCurrentTextBlock` exactly once, ahead of the tool card, where it used to appear before every
+stretch of prose. Proven by restoring the unconditional finalize.
+
 ### The export backlog closed — 183 to 50, and the 50 are a decision (`this commit`)
 
 - Gates: unit 8944 passed / 8944 total across 562 suites; integration 156 passed / 156 run;

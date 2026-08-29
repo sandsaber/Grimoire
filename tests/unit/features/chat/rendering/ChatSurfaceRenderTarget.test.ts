@@ -205,17 +205,15 @@ describe('chat surface render target', () => {
     chat.clear();
 
     chat.target.openTurnBlock(RUN_ID, 0, { kind: 'assistant-text', text: 'first' });
-    chat.target.openTurnBlock(RUN_ID, 1, { kind: 'assistant-text', text: 'second' });
+    chat.target.openTurnBlock(RUN_ID, 1, { kind: 'reasoning-text', text: 'second' });
     chat.target.endTurn(RUN_ID, terminal());
 
     await drained(chat.target);
     expect(chat.methods()).toEqual([
       'finalizeCurrentThinkingBlock',
-      'finalizeCurrentTextBlock',
       'appendText',
-      'finalizeCurrentThinkingBlock',
       'finalizeCurrentTextBlock',
-      'appendText',
+      'appendThinking',
       'finishTurn',
       'hideThinkingIndicator',
       'stopTurnSilenceIndicator',
@@ -274,7 +272,7 @@ describe('chat surface render target', () => {
     expect(noted).toHaveLength(3);
   });
 
-  it('finalizes the open block before opening the next one', async () => {
+  it('closes the block the next one displaces, and only that one', async () => {
     const chat = harness();
     beginTurn(chat.target);
     chat.clear();
@@ -285,15 +283,60 @@ describe('chat surface render target', () => {
 
     await drained(chat.target);
     expect(chat.methods()).toEqual([
-      // The legacy controller decides "new block?" by watching the chunk type
-      // change; the index has already decided it here.
+      // Prose closes the reasoning block it replaces on screen and nothing
+      // else; reasoning closes the prose block. Closing both for every item is
+      // what cut an answer into one block per delta.
       'finalizeCurrentThinkingBlock',
-      'finalizeCurrentTextBlock',
       'appendText',
       'appendText',
-      'finalizeCurrentThinkingBlock',
       'finalizeCurrentTextBlock',
       'appendThinking',
+    ]);
+  });
+
+  it('does not break a sentence in two over a payload that draws nothing', async () => {
+    // Every backend emits the provider's own message *and* the text deltas of
+    // that same message, so a `provider-content` lands between two deltas on
+    // every turn. Most of those payloads draw nothing — a session config, a
+    // resume outcome, an SDK message whose text already arrived as deltas — and
+    // closing the open text block for one of them cuts the answer at the delta
+    // boundary. A saved conversation showed it: `content` held the whole
+    // sentence while `contentBlocks` held "Hel", "lo! Wh" and the rest, each
+    // its own block with its own copy button.
+    const chat = harness();
+    beginTurn(chat.target);
+    chat.clear();
+    chat.setPresented([]);
+
+    chat.target.openTurnBlock(RUN_ID, 0, { kind: 'assistant-text', text: 'Hel' });
+    chat.target.openTurnBlock(RUN_ID, 1, { kind: 'provider-content', payload: {} });
+    chat.target.openTurnBlock(RUN_ID, 2, { kind: 'assistant-text', text: 'lo!' });
+
+    await drained(chat.target);
+    // The rule, not the whole call list: the prose reaches the same open block.
+    // Closing the reasoning block is a no-op here and says nothing either way.
+    expect(chat.methods()).not.toContain('finalizeCurrentTextBlock');
+    expect(chat.methods().filter(method => method === 'appendText')).toHaveLength(2);
+  });
+
+  it('still closes the open text block when the payload does draw', async () => {
+    // The other half of the same rule: a payload that produces a card has to
+    // land after the prose that preceded it, so that block does close.
+    const chat = harness();
+    beginTurn(chat.target);
+    chat.clear();
+    chat.setPresented([{ type: 'tool_use', id: 'tool-1', name: 'Read', input: {} }]);
+
+    chat.target.openTurnBlock(RUN_ID, 0, { kind: 'assistant-text', text: 'Reading' });
+    chat.target.openTurnBlock(RUN_ID, 1, { kind: 'provider-content', payload: {} });
+
+    await drained(chat.target);
+    expect(chat.methods()).toEqual([
+      'finalizeCurrentThinkingBlock',
+      'appendText',
+      'finalizeCurrentThinkingBlock',
+      'finalizeCurrentTextBlock',
+      'handleStreamChunk',
     ]);
   });
 
