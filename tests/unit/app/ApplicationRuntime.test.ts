@@ -163,6 +163,32 @@ describe('application runtime', () => {
     runtime.dispose();
   });
 
+  it('builds no provider workspace that nothing has asked for', async () => {
+    // The plan asks M6 to confirm lazy provider initialization, and nothing
+    // measured it. A provider the user never opens must cost nothing at load,
+    // and `builtWorkspaceFor` is what can say so without building one.
+    const runtime = createRuntime();
+
+    await runtime.start();
+
+    const built = providerCatalog().ids()
+      .filter(providerId => runtime.builtWorkspaceFor(providerId) !== null);
+    // Codex is the one declared exception — `start` initializes its workspace
+    // because a synchronous `createRuntime` needs the slots to already exist —
+    // and it is excluded by name rather than by an empty expectation, so a
+    // second provider becoming eager fails here. Whether Codex's build has
+    // finished by the time `start` resolves is deliberately not asserted: it is
+    // dispatched without being awaited, and pinning that would test the
+    // scheduler rather than the laziness.
+    expect(built.filter(providerId => providerId !== 'codex')).toEqual([]);
+
+    // And the other half of the claim: asking builds it. Without this the
+    // assertion above would pass just as well for a lookup that never works.
+    await runtime.workspaceFor('claude');
+    expect(runtime.builtWorkspaceFor('claude')).not.toBeNull();
+    runtime.dispose();
+  });
+
   it('keeps the load alive when the kernel cannot start', async () => {
     // Every provider runs through the kernel, so a load that failed with it
     // would leave the user no settings tab to fix it from.

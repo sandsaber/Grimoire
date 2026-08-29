@@ -10494,6 +10494,37 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M6 — lazy provider initialization, measured (`this commit`)
+
+- Gates: unit 8757 passed / 8757 total across 554 suites; `tsc --noEmit` clean; `npm run lint`
+  clean.
+- Parity manifest: unchanged. Nothing deleted.
+
+**M6 asks for lazy provider initialization to be confirmed by measurement, and nothing measured it.**
+The claim was made when `ProviderWorkspaceHolder` landed — *"every provider is behind it; none of
+them exists until something asks"* — and it was true when written. What made it checkable is
+`builtWorkspaceFor`, which answers what is built without building anything, and it now is: a started
+`ApplicationRuntime` has built no provider workspace, and asking for one builds it.
+
+**Codex is the one eager provider, and the gate names it rather than expecting nothing.** `start`
+initializes Codex's workspace because a synchronous `createRuntime` needs the slots to already
+exist — the reason the holder's own entry gives. Excluding it by name is what makes a *second*
+provider becoming eager a failure; an empty expectation over a filtered list would have quietly
+covered that. Whether Codex's build has finished by the time `start` resolves is deliberately not
+asserted: it is dispatched without being awaited, and pinning that would test the scheduler.
+Proven by making Claude's workspace eager in `start`: the gate names it.
+
+**And the half that is still eager, measured rather than argued.** `main.ts` awaits
+`ProviderWorkspaceManager.initializeAll(providerCatalog().ids())` during load, so all nine legacy
+workspace services are built before the load finishes. That is the path `AGENTS.md` documents —
+*"the legacy workspace services that back some of those slots are built at load by
+`ProviderWorkspaceManager`"* — so it is the current design rather than a regression, and the plan's
+M5 line *"workspace initialization becomes lazy in the same step"* is satisfied for the execution
+compositions and not for the legacy manager. Recorded as a scope question for the owner: whether M6
+closes with two workspace notions, one lazy and one eager, or the legacy manager follows the holder.
+
+Open, unchanged: the `reconciliations` control store still has no production writer.
+
 ### M6 — an agent that was running when the process went away (`this commit`)
 
 - Gates: unit 8756 passed / 8756 total across 554 suites; `tsc --noEmit` clean; `npm run lint`
