@@ -10494,6 +10494,46 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M6 — an agent that was running when the process went away (`this commit`)
+
+- Gates: unit 8756 passed / 8756 total across 554 suites; `tsc --noEmit` clean; `npm run lint`
+  clean; `npm run build:release` clean, including the community-review checks and the bundle-load
+  and view-open smokes.
+- Parity manifest: unchanged. Nothing deleted.
+
+**The decision the previous entry left to the owner is taken, and it is the smaller of the two,
+because the larger one has no provider to serve.** `recoverPendingDispatches` and
+`recoverActiveRuns` now run at load beside `recoverResultLinks`, against a port that answers
+`unknown` with effects possible — which the coordinator turns into `indeterminate` /
+`effects-unknown`, the pair the execution registry already gives a run whose session did not reopen.
+
+What settles it is what the catalog says. Two providers declare background agents at all — Claude
+`progressObservation: 'full'`, Codex `'aggregate'`, the other seven `'none'` — and both run their
+agents inside a process this plugin owns. So an agent recorded as running when the plugin was last
+unloaded is not running now, and the only honest uncertainty left is whether it wrote anything
+first. `attachment: 'detached'` in `SubagentAgentRecorder` does not contradict this: its own comment
+says detached means *not cancelled with its parent*, the ones a person starts and walks away from —
+not that the agent outlives the process. A per-provider reconcile port stays the right answer for a
+provider whose agents do outlive it, and none does; building it now would be a port with no caller
+that could answer, and a port that guessed `accepted` would write a durable claim about work nobody
+observed.
+
+Three stages, each attempted on its own rather than in one `try`: links, then pending dispatches,
+then active runs. In that order, because a result that reached its run has already terminalized it
+and neither sweep should reconcile a finished run. Separately, because the coordinator itself
+collects per record for the reason its comments give — `listRecordIds` is sorted, so one malformed
+record would otherwise stall every later one on every restart, permanently — and a caller that gave
+up on the first failure would reintroduce exactly that.
+
+The test seeds a real dispatched run through a coordinator over the same vault adapter, builds the
+runtime over it, starts it, and reads the record back. Proven by deleting the `active-runs` stage:
+the run is still `running` with no terminal.
+
+**M5's exit-gate clause now holds in the composition**, not only in `AgentCoordinator.test.ts`: an
+agent that was running when the process went away is classified rather than left claiming to run.
+
+Open, unchanged: the `reconciliations` control store still has no production writer.
+
 ### M6 — the agent control store was never recovered at load (`this commit`)
 
 - Gates: unit 8755 passed / 8755 total across 554 suites; `tsc --noEmit` clean; `npm run lint`

@@ -84,6 +84,26 @@ export interface ApplicationRuntimeOptions {
   }): void;
 }
 
+/**
+ * What the composition can honestly say about an agent it did not start.
+ *
+ * Every provider that has background agents runs them inside a process this
+ * plugin owns, so an agent recorded as running when the plugin was last
+ * unloaded is not running now. What nothing here can say is whether it did
+ * anything first — it may have written files before its process went away — and
+ * `unknown` with effects possible is exactly that claim. The coordinator turns
+ * it into `indeterminate` / `effects-unknown`, the pair the execution registry
+ * already gives a run whose session did not reopen.
+ *
+ * A provider whose agents outlive the plugin would have to answer for itself,
+ * through a port of its own. None does today, and a port that guessed
+ * `accepted` here would write a durable claim about work nobody observed.
+ */
+const processBoundAgentRecovery = {
+  reconcile: async () => ({ kind: 'unknown' as const, effectsPossible: true }),
+  reconcileCancellation: async () => ({ kind: 'unknown' as const }),
+};
+
 export class ApplicationRuntime {
   readonly kernel: ExecutionKernelHost;
   readonly chat: ChatExecutionComposition;
@@ -342,27 +362,55 @@ export class ApplicationRuntime {
   /**
    * Finishes what the agent control store was owed, and says so when it cannot.
    *
-   * A failure here must not take the load down: the plugin is usable without
-   * it, and the records it could not finish are still there for the next start.
+   * Three stages, each attempted on its own: link the results that were written
+   * without reaching their run, settle the dispatches that were interrupted,
+   * and classify what still claims to be running. A failure in one must not
+   * skip the next, for the reason the coordinator collects per record rather
+   * than throwing on the first — one bad record would otherwise stall every
+   * later one on every restart. And none of them may take the load down: the
+   * plugin is usable without them, and what they could not finish is still
+   * there for the next start.
    */
   private async recoverAgentRecords(): Promise<void> {
+    const links = await this.attemptAgentRecovery(
+      'result-links',
+      () => this.agents.recoverResultLinks(),
+    );
+    if (links && links.issues.length > 0) {
+      this.options.report({
+        data: { issues: links.issues.length },
+        event: 'agents.recovery.incomplete',
+        level: 'warn',
+        scope: 'plugin',
+      });
+    }
+    // After the links, because a result that reached its run has already
+    // terminalized it, and neither sweep below should reconcile a finished run.
+    await this.attemptAgentRecovery(
+      'pending-dispatches',
+      () => this.agents.recoverPendingDispatches(processBoundAgentRecovery),
+    );
+    await this.attemptAgentRecovery(
+      'active-runs',
+      () => this.agents.recoverActiveRuns(processBoundAgentRecovery, processBoundAgentRecovery),
+    );
+  }
+
+  private async attemptAgentRecovery<T>(
+    stage: string,
+    recover: () => Promise<T>,
+  ): Promise<T | null> {
     try {
-      const recovery = await this.agents.recoverResultLinks();
-      if (recovery.issues.length > 0) {
-        this.options.report({
-          data: { issues: recovery.issues.length },
-          event: 'agents.recovery.incomplete',
-          level: 'warn',
-          scope: 'plugin',
-        });
-      }
+      return await recover();
     } catch (error) {
       this.options.report({
+        data: { stage },
         error,
         event: 'agents.recovery.failed',
         level: 'warn',
         scope: 'plugin',
       });
+      return null;
     }
   }
 

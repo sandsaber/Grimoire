@@ -123,6 +123,46 @@ describe('application runtime', () => {
     runtime.dispose();
   });
 
+  it('classifies an agent that was running when the process went away', async () => {
+    // M5's exit gate says agents survive restart with honest classification.
+    // The coordinator's tests prove it and the composition did not: nothing
+    // reconciled a run left `running`, so a background agent whose process died
+    // with the plugin kept claiming to run for the life of the vault.
+    const adapter = createDurableInMemoryVaultAdapter();
+    const storage = new VaultDurableStorage(adapter);
+    const repositories = new AgentRepositories(storage, monotonicClock());
+    const before = new AgentCoordinator(storage, {
+      now: monotonicClock(),
+      repositories,
+      scheduler: { setTimeout: () => 0, clearTimeout: () => undefined },
+    });
+    await before.prepareAndDispatch(dispatchCommand(), {
+      dispatch: async () => ({ kind: 'accepted', nativeAgentRef: 'native-agent-1' }),
+    });
+    expect(await repositories.runs.read(RUN_ID)).toMatchObject({
+      kind: 'current',
+      record: { payload: { state: 'running' } },
+    });
+
+    const runtime = createRuntime(jest.fn(), adapter);
+    await runtime.start();
+
+    // Indeterminate rather than interrupted: the agent may have written
+    // something before its process went away, and nothing here can say it did
+    // not. The same pair the execution registry gives a run whose session did
+    // not reopen.
+    expect(await repositories.runs.read(RUN_ID)).toMatchObject({
+      kind: 'current',
+      record: {
+        payload: {
+          state: 'indeterminate',
+          terminal: { kind: 'indeterminate', reason: 'effects-unknown' },
+        },
+      },
+    });
+    runtime.dispose();
+  });
+
   it('keeps the load alive when the kernel cannot start', async () => {
     // Every provider runs through the kernel, so a load that failed with it
     // would leave the user no settings tab to fix it from.
