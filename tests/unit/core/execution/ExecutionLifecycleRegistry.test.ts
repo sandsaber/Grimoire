@@ -1055,29 +1055,6 @@ describe('ExecutionLifecycleRegistry', () => {
 describe('ExecutionLifecycleRegistry — deleting a conversation', () => {
   const OTHER_OWNER = { kind: 'conversation' as const, ownerId: 'conversation-2' };
 
-  /**
-   * A crash that waits to be armed.
-   *
-   * The turn this deletion is about writes control transactions of its own, so
-   * an injector that fires on the first matching point crashes the setup rather
-   * than the thing under test.
-   */
-  function armableCrashAt(target: TransactionCrashPoint): {
-    readonly injector: (point: TransactionCrashPoint) => void;
-    arm(): void;
-  } {
-    let armed = false;
-    return {
-      injector: point => {
-        if (armed && point === target) {
-          armed = false;
-          throw new Error(`crash:${point}`);
-        }
-      },
-      arm: () => { armed = true; },
-    };
-  }
-
   /** One conversation's worth of records: a session, a run, and its terminal. */
   async function recordATurn(
     fixture: ReturnType<typeof createFixture>,
@@ -1356,6 +1333,246 @@ describe('ExecutionLifecycleRegistry — deleting a conversation', () => {
       .resolves.toMatchObject({ kind: 'absent' });
   });
 });
+
+describe('ExecutionLifecycleRegistry — crash injection at each durable boundary', () => {
+  it('converges an interrupted run start instead of leaving a session that names no run', async () => {
+    const storage = new TestDurableStorage();
+    const crash = armableCrashAt('after-step-effect:step-0');
+    const crashed = await startedFixture(storage, { crashInjector: crash.injector });
+    await crashed.registry.createSession(sessionCommand());
+    crash.arm();
+
+    await expect(crashed.registry.startRun(SESSION_ID, request(RUN_ID)))
+      .rejects.toThrow('crash:after-step-effect:step-0');
+    expect((await currentRecord(crashed.repositories.sessions.read(SESSION_ID))).payload.runIds)
+      .toEqual([RUN_ID]);
+    await expect(crashed.repositories.runs.read(RUN_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+
+    const restarted = createFixture(storage, { transactionOffset: 50, instanceOffset: 40 });
+    await restarted.registry.start();
+
+    // The run the session already names is written before anything classifies
+    // it. A session that survives naming a run with no record is a session
+    // whose deletion, recovery and disposal all read a run that is not there.
+    const run = await currentRecord(restarted.repositories.runs.read(RUN_ID));
+    expect(run.payload.terminal).toMatchObject({ kind: 'indeterminate' });
+  });
+
+  it('converges a terminal commit the process died half-way through', async () => {
+    const storage = new TestDurableStorage();
+    const crash = latchedCrashAt('after-step-effect:step-0');
+    const crashed = await startedFixture(storage, { crashInjector: crash.injector });
+    await startDefaultRun(crashed);
+    const delivery = runDelivery(crashed, RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    }, 'terminal-half-applied');
+    await settle(crashed.registry);
+    crash.latch();
+
+    await expect(crashed.registry.ingest(delivery))
+      .rejects.toThrow('crash:after-step-effect:step-0');
+    // The worst half to be left with: the session has already dropped the run
+    // from its live list and remembered the delivery as accepted, so a
+    // redelivery is deduplicated — while the run record still has no terminal.
+    const halfSession = await currentRecord(crashed.repositories.sessions.read(SESSION_ID));
+    expect(halfSession.payload.runIds).toEqual([]);
+    expect(halfSession.payload.acceptedEventIds).toContain('terminal-half-applied');
+    expect((await currentRecord(crashed.repositories.runs.read(RUN_ID))).payload.terminal)
+      .toBeUndefined();
+
+    const restarted = createFixture(storage, { transactionOffset: 90, instanceOffset: 60 });
+    await restarted.registry.start();
+
+    // The provider's terminal, not the `indeterminate` a restart hands a run
+    // nothing finished: the intent still owed the run write and paid it.
+    expect((await currentRecord(restarted.repositories.runs.read(RUN_ID))).payload.terminal)
+      .toMatchObject({ kind: 'succeeded', reason: 'completed' });
+  });
+
+  it('converges a gap that was applied to the session but not to every run it named', async () => {
+    const storage = new TestDurableStorage();
+    const crash = armableCrashAt('after-step-effect:step-0');
+    const crashed = await startedFixture(storage, {
+      recovery: 'snapshot',
+      crashInjector: crash.injector,
+    });
+    await startDefaultRun(crashed);
+    crashed.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    }, {
+      deliveryId: 'causal-terminal-2',
+      destination: 'session',
+      causal: { streamId: 'native-run-1', sequence: 2 },
+    });
+    await settle(crashed.registry);
+    crash.arm();
+
+    await expect(crashed.registry.flushGaps(SESSION_ID))
+      .rejects.toThrow('crash:after-step-effect:step-0');
+    expect((await currentRecord(crashed.repositories.sessions.read(SESSION_ID))).payload.status)
+      .toBe('recovering');
+    expect((await currentRecord(crashed.repositories.runs.read(RUN_ID))).payload.state)
+      .not.toBe('recovering');
+
+    await recoverControlTransactions(storage);
+
+    // The run the gap named reaches the state the session already claims for
+    // it. Left as it was, the next startup would find a session recovering a
+    // run that never entered recovery.
+    expect((await currentRecord(readRecords(storage).runs.read(RUN_ID))).payload.state)
+      .toBe('recovering');
+  });
+
+  it('converges a session event that reached one run but not the next', async () => {
+    const storage = new TestDurableStorage();
+    const crash = latchedCrashAt('after-step-effect:step-1');
+    const crashed = await startedFixture(storage, { crashInjector: crash.injector });
+    await crashed.registry.createSession(sessionCommand());
+    await crashed.registry.startRun(SESSION_ID, request(RUN_ID));
+    await crashed.registry.startRun(SESSION_ID, request(RUN_ID_2));
+    crashed.backend.emit(RUN_ID, { kind: 'thinking-activity' }, { deliveryId: 'activity-1' });
+    crashed.backend.emit(RUN_ID_2, { kind: 'thinking-activity' }, { deliveryId: 'activity-2' });
+    await settle(crashed.registry);
+    const delivery = sessionDelivery(crashed, { kind: 'connection-lost' }, 'session-half-applied');
+    crash.latch();
+
+    await expect(crashed.registry.ingest(delivery))
+      .rejects.toThrow('crash:after-step-effect:step-1');
+    expect((await currentRecord(crashed.repositories.runs.read(RUN_ID))).payload.state)
+      .toBe('disconnected');
+    expect((await currentRecord(crashed.repositories.runs.read(RUN_ID_2))).payload.state)
+      .not.toBe('disconnected');
+
+    await recoverControlTransactions(storage);
+
+    // One session event reaches every run it named, or none of them can be
+    // trusted: the second run is not less lost than the first.
+    expect((await currentRecord(readRecords(storage).runs.read(RUN_ID_2))).payload.state)
+      .toBe('disconnected');
+  });
+
+  it('recovers a half-applied event transaction inside the ingest that hit it', async () => {
+    const crash = armableCrashAt('after-step-effect:step-0');
+    const fixture = await startedFixture(undefined, { crashInjector: crash.injector });
+    await startDefaultRun(fixture);
+    const delivery = runDelivery(fixture, RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    }, 'terminal-recovered-in-place');
+    await settle(fixture.registry);
+    crash.arm();
+
+    // A storage fault that clears is not a dead process: the same call finishes
+    // the intent it started, and the caller is told the truth rather than an
+    // error it would have to reconcile itself.
+    await expect(fixture.registry.ingest(delivery)).resolves.toMatchObject({ kind: 'accepted' });
+    expect(fixture.registry.getRun(RUN_ID)?.terminal)
+      .toMatchObject({ kind: 'succeeded', reason: 'completed' });
+    expect((await currentRecord(fixture.repositories.runs.read(RUN_ID))).payload.terminal)
+      .toMatchObject({ kind: 'succeeded', reason: 'completed' });
+  });
+});
+
+function runDelivery(
+  fixture: ReturnType<typeof createFixture>,
+  id: RunId,
+  event: Parameters<DeterministicFakeBackend['emit']>[1],
+  deliveryId: string,
+) {
+  return fixture.backend.createDelivery(
+    requireNativeSession(fixture),
+    { kind: 'run', runId: id },
+    event,
+    { deliveryId },
+  );
+}
+
+function sessionDelivery(
+  fixture: ReturnType<typeof createFixture>,
+  event: Parameters<DeterministicFakeBackend['emit']>[1],
+  deliveryId: string,
+) {
+  return fixture.backend.createDelivery(
+    requireNativeSession(fixture),
+    { kind: 'session' },
+    event,
+    { deliveryId },
+  );
+}
+
+function requireNativeSession(fixture: ReturnType<typeof createFixture>) {
+  const session = fixture.backend.sessions.get(SESSION_ID);
+  if (!session) {
+    throw new Error('Expected a fake native session.');
+  }
+  return session;
+}
+
+/** A fresh reader over a store a crashed process left behind. */
+function readRecords(storage: DurableStorage): ExecutionControlRepositories {
+  let clock = 20_000;
+  return new ExecutionControlRepositories(storage, () => clock++);
+}
+
+/** What the next startup does before it reads anything: finish what was owed. */
+async function recoverControlTransactions(storage: DurableStorage): Promise<void> {
+  let clock = 10_000;
+  const now = () => clock++;
+  const repositories = new ExecutionControlRepositories(storage, now);
+  await new ExecutionControlTransactionCoordinator(storage, repositories, { now })
+    .recoverPending();
+}
+
+/**
+ * A crash that stays.
+ *
+ * The ingest path answers a failed commit by finishing the intent itself, so an
+ * injector that fires once is recovered from inside the same call. A process
+ * that died is the case this models, and it does not get that chance.
+ */
+function latchedCrashAt(target: TransactionCrashPoint): {
+  readonly injector: (point: TransactionCrashPoint) => void;
+  latch(): void;
+} {
+  let latched = false;
+  return {
+    injector: point => {
+      if (latched && point === target) {
+        throw new Error(`crash:${point}`);
+      }
+    },
+    latch: () => { latched = true; },
+  };
+}
+
+/**
+ * A crash that waits to be armed.
+ *
+ * The work these tests set up writes control transactions of its own, so an
+ * injector that fires on the first matching point crashes the setup rather
+ * than the thing under test.
+ */
+function armableCrashAt(target: TransactionCrashPoint): {
+  readonly injector: (point: TransactionCrashPoint) => void;
+  arm(): void;
+} {
+  let armed = false;
+  return {
+    injector: point => {
+      if (armed && point === target) {
+        armed = false;
+        throw new Error(`crash:${point}`);
+      }
+    },
+    arm: () => { armed = true; },
+  };
+}
 
 async function startedFixture(
   storage?: DurableStorage,

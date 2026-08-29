@@ -83,7 +83,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution, provider rows, and seam deletion | **Code complete; one exit-gate clause is a human step.** The chat surface is done. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design; bang-bash runs on the local-shell backend; **all nine providers execute their chat turns through the projection path**, and `InputController`'s generator branch is deleted with the turn-framing machinery it carried. `ApplicationRuntime` is the composition root. The durable agent domain is harvested from the v1 Phase 6 and dark, minus the work graphs M5 bans. Certification is account-bound and recorded per provider in `docs/chat-projection-flip-smoke-matrix.md`. **Eleven of the plan's twelve structural deletion searches are zero**, and all twelve are a gate rather than a shell command. The twelfth is 3 and names a design question rather than a milestone: `async_subagent_result` is a one-provider feature in a provider-neutral union, the durable records are downstream of it rather than able to replace it, and what moves it is a provider port for an out-of-band agent terminal or a second provider growing background agents. Both provider registries are deleted, all thirteen provider rows have moved, `src/core` names the plugin type nowhere, and the persistence barrier writes the session binding. Orchestrator workers are dispatched durable agents rather than tabs, and `AgentDispatchPort` has its first implementation. Of the exit gate's four clauses, two pass outright — the parity manifest, and the agent guarantees (retry preserving prior attempts, cancellation reconciled after restart, no approval exceeding a durable ancestor's ceiling), each with a named test. The searches clause is eleven of twelve, with the twelfth at 3 and argued rather than pending — **the owner's call to accept or reject, not a pass to claim**. The fourth is the full local gate plus trace parity, which pass, and the manual test-vault matrix, which is the owner's to run | `fa9cfbc` … `bd1083b` |
-| M6 — final hardening | Not started | — |
+| M6 — final hardening | **In progress** — crash injection at the execution kernel's durable boundaries is done; the agent-side boundaries and the rest of the list are open | this commit |
 
 ## Checkpoint entry template
 
@@ -10493,6 +10493,70 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### M6 — crash injection at the execution kernel's durable boundaries (`this commit`)
+
+- Gates: unit 8754 passed / 8754 total across 554 suites; integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean, including the
+  community-review source/CSS/dependency checks and the bundle-load and view-open smokes.
+- Parity manifest: unchanged. No inventory rows moved, nothing deleted.
+
+**M6 opens with the first item on its list, and the inventory came from the code rather than the
+plan.** The generic machinery already had a crash matrix — `TransactionIntentCoordinator` fires
+seven injection points and its own suite crashes at each of them — but a crash *point* is not a
+*boundary*. What M6 asks is whether each operation the product actually writes survives being
+interrupted. The registry commits through one funnel, `commitWrites`, reached from seven places
+(`startRun`, `appendReconciliation`, `applyEnvelope`, `applySessionEnvelope`, `applyGap`,
+`terminalizeRun`, `commitInteractionResolution`, and `updateSessionAndRun` behind two of those),
+plus one deletion funnel; everything else is a single-record update, which needs no intent because a
+compare-and-swap is already atomic. Two of the seven were covered — the event path at `before-intent`
+and at a partially applied batch — and the deletion funnel was covered at the M5 gate. Five tests
+were added.
+
+**The first two were written wrong, and the reason is worth keeping.** An `after-step-effect:step-0`
+injector that fires once does not fail an ingest: `applyAcceptedEnvelope` answers a failed commit by
+calling `recoverPending()` itself, finishes the intent it started, and returns `accepted`. So a
+one-shot injector models a storage fault that *clears* — real behaviour, and now asserted rather
+than assumed. Modelling a process that *died* needs a crash that stays, because a dead process never
+gets that second chance; hence `latchedCrashAt` beside the existing `armableCrashAt`, which is
+hoisted out of the deletion suite so both are shared.
+
+The five:
+
+- **an interrupted `startRun`** — the session names the run and the run has no record. The restart
+  still owes the run write, pays it, and the run is then classified. A session that survives naming
+  a run with no record is a session whose deletion, recovery and disposal all read a run that is not
+  there;
+- **a terminal commit the process died half-way through** — the worst half to be left with: the
+  session has already dropped the run from its live list and remembered the delivery id as accepted,
+  so a redelivery would be deduplicated, while the run record still has no terminal. The restart
+  produces the provider's `succeeded`, not the `indeterminate` a restart hands a run that nothing
+  finished;
+- **a gap applied to the session but not to every run it named** — otherwise the next startup finds
+  a session recovering a run that never entered recovery;
+- **a session event that reached one run but not the next** — one `connection-lost` names two runs,
+  and the second is not less lost than the first;
+- **a storage fault that clears inside the ingest that hit it** — the caller is told the truth
+  instead of an error it would have to reconcile itself.
+
+Each was proven by deleting the replay in `recoverPending`: all five fail, the four restart cases by
+reading a record that is absent or a state that never advanced.
+
+**One finding, recorded rather than fixed: the `reconciliations` control store has no production
+writer.** `write('reconciliations', …)` appears once, inside `appendReconciliation`, and
+`appendReconciliation` is called from two test files and nothing else. The record kind, its schema,
+its retention rule in the persistence decisions — evidence for an `indeterminate` run outlives
+everything but its conversation's deletion, so that the append-only rule stays enforceable — and its
+observer channel all exist. Nothing in the product produces late evidence about a run that already
+ended indeterminate: evidence gathered *at* recovery terminalizes the run directly and never lands
+here. Two consequences. The append-only rule is unenforced in the product. And the observer channel
+is the record's only route to a reader, by its own design note — so a reconciliation written durably
+and not published is invisible to the next start, because startup replays interactions and runs and
+not reconciliations. Owner: **M6**, as a decision rather than a patch — either a producer is named,
+or the store goes and the rule with it.
+
+Open, and next: the agent-side durable boundaries beyond the two crash tests in
+`AgentCoordinator.test.ts`, then the rest of M6's list.
 
 ### M5 — the subagent chunk vocabulary, 5 → 3 (`this commit`)
 
