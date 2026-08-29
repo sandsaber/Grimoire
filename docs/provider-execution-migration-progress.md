@@ -8279,6 +8279,39 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #107), at the M6 gate.
 
+### Where the session of 2026-08-29 ended (second half)
+
+**The `main`-fix recovery plan is closed. All four phases ran; item 13 is the gate that would have
+caught the whole thing.** Working tree clean, HEAD `78785319`, branch `providers-migration`,
+unpushed. Full gate green: unit 9029 / 9029 across 567 suites, integration 156, `tsc`, `lint`,
+`build:release`.
+
+- **Phase 1** restored Antigravity's print-mode series and rewrote its `AGENTS.md`.
+- **Phase 2** wired the three fixes that arrived dead: Claude's plan panel, Grok's per-model
+  reasoning levels, and session resume — both halves, the decision and the notice.
+- **Phase 3** settled item 11 without a code change (the race `main` serialized against is
+  structurally absent here) and fixed three of the eight defects the sync carried, while recording
+  two that turned out to be decisions rather than defects — including one my own sync review had
+  called a defect.
+- **Phase 4** turned the dead-export pass into a gate, proven against the pre-recovery tree.
+
+**Two things are open, and neither is a recovery item.**
+
+- **Claude's Refresh models / Refresh commands notices count the persisted list**, so a refresh
+  against a logged-out CLI reads "Model list refreshed: 12 models." The boolean the catalogs return
+  is not the signal: `ProviderModelCatalog.refreshModels` documents nothing about it, ten
+  implementations each invented a meaning, and **no caller reads it** — Claude's button, Grok's
+  button and `workspaceContextSlots` all await and discard. Claude's means "the list changed", so a
+  successful refresh that found the same models returns `false` and reporting failure from it would
+  be a new bug. The honest fix defines the boolean once in the shared contract as "the catalog now
+  holds what the CLI answered" and makes ten implementations agree — a contract change, and its own
+  commit, and it wants a decision before it is spent;
+- **the export baseline is a backlog of 183.** Several are real dead code the flip left —
+  `acpManagedSession.ts` entirely, `markAcpSessionLoadFailed`, which has no caller on `main` either.
+  A deletion pass over them is its own work.
+
+**Still the owner's:** the manual test-vault matrix, and pushing the branch.
+
 ### Where the session of 2026-08-29 ended
 
 **M5 and M6 are code complete. What is left of both is one human step and one decision that is not
