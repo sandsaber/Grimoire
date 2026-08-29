@@ -91,6 +91,7 @@ describe('OpenCode execution composition', () => {
   function createFakeAcp(options: {
     asksPermission?: boolean;
     offersEffort?: boolean;
+    sessionForgotten?: boolean;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
     sessionLoadRefusal?: string;
@@ -162,8 +163,25 @@ describe('OpenCode execution composition', () => {
               currentModeId: 'build',
             },
           }),
+          // What OpenCode answers when asked which sessions it still has. The
+          // conversation's own id is never in it: the point of the option is a
+          // session the agent has forgotten.
+          ...(options.sessionForgotten
+            ? { listSessions: async () => ({ sessions: [{ sessionId: 'acp-session-1' }] }) }
+            : {}),
           loadSession: async request => {
             loadRequests.push(request);
+            if (options.sessionForgotten) {
+              // The refusal OpenCode 1.18.18 actually sends for a session it
+              // does not have: nothing in the words says so, which is why the
+              // listing is asked for at all.
+              throw new JsonRpcErrorResponse(
+                'session/load',
+                -32603,
+                'Internal error: OpenCode service failure',
+                { service: 'session' },
+              );
+            }
             if (options.sessionIsGone) {
               throw new JsonRpcErrorResponse('session/load', -32603, 'session not found');
             }
@@ -268,6 +286,7 @@ describe('OpenCode execution composition', () => {
     asksPermission?: boolean;
     offersEffort?: boolean;
     plugin?: any;
+    sessionForgotten?: boolean;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
     sessionLoadRefusal?: string;
@@ -583,6 +602,66 @@ describe('OpenCode execution composition', () => {
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
 
     expect(runtime.getSessionId()).toBe('acp-session-1');
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('remembers that the session it resumed into was not the one it was asked for', async () => {
+    // The conversation's history is on screen and the agent has never seen it.
+    // Nothing else says so: the turn succeeds, the tab is bound to a live
+    // session, and the transcript above it reads as the agent's memory.
+    const { execution, host } = await createHarness({ sessionForgotten: true });
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({ id: 'conv-1', providerState: {}, sessionId: 'ses-forgotten' });
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(runtime.isSessionDropped()).toBe(true);
+    // Written into the conversation, because the tab that draws the notice is
+    // usually a later one than the tab that learned this.
+    expect(runtime.sessionBinding({
+      conversation: { id: 'conv-1' },
+      sessionInvalidated: false,
+    })?.providerState).toMatchObject({ sessionDropped: true });
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('carries a drop into the tab that opens the conversation next', async () => {
+    // The marker is read back on bind: the runtime that learned it is gone by
+    // the time anyone sees the thread again.
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+
+    runtime.syncConversationState({
+      id: 'conv-1',
+      providerState: { sessionDropped: true },
+      sessionId: null,
+    });
+
+    expect(runtime.isSessionDropped()).toBe(true);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('takes the marker back off once a resume succeeds', async () => {
+    // The notice comes down when the conversation has real memory again, which
+    // is the first turn that loads the session it was bound to.
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({
+      id: 'conv-1',
+      providerState: { sessionDropped: true },
+      sessionId: 'acp-session-saved',
+    });
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(runtime.isSessionDropped()).toBe(false);
+    expect(runtime.sessionBinding({
+      conversation: { id: 'conv-1' },
+      sessionInvalidated: false,
+    })?.providerState).not.toMatchObject({ sessionDropped: true });
     execution.dispose();
     await host.dispose();
   });

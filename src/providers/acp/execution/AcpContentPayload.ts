@@ -43,6 +43,18 @@ export type AcpContentPayload =
   | { readonly kind: 'prompt-result'; readonly response: AcpPromptResponse }
   | { readonly kind: 'session-config'; readonly session: AcpNewSessionResponse }
   /**
+   * What became of the saved session a dispatch tried to resume.
+   *
+   * `replaced` says the agent no longer had it and a fresh one took its place,
+   * which is the only way a conversation learns that the history on screen is
+   * no longer the agent's memory. `resumed` is the same fact answered the other
+   * way, and it is what takes the notice back down.
+   *
+   * On the content channel because that is what reaches the tab the run belongs
+   * to: a backend serves every tab, and the fact belongs to one conversation.
+   */
+  | { readonly kind: 'session-resume'; readonly outcome: 'resumed' | 'replaced' }
+  /**
    * What the agent said when it refused the turn.
    *
    * A fourth shape, and the one the flips lost: every legacy ACP runtime yielded

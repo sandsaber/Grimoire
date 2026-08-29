@@ -55,6 +55,15 @@ export interface MimocodeContentPresenterPorts {
    * the Safe/Plan/Auto the user picked, before the turn applies theirs.
    */
   readonly onSessionOpened?: (opening: MimocodeSessionOpening) => void;
+  /**
+   * What became of the saved session this turn tried to resume.
+   *
+   * Separate from `onSessionOpened`, which fires for every session however it
+   * was obtained: this one only fires when there was a saved session to resume,
+   * and it is the difference between a fresh conversation and one whose history
+   * the agent has forgotten.
+   */
+  readonly onSessionResume?: (outcome: 'resumed' | 'replaced') => void;
 }
 
 /**
@@ -160,6 +169,10 @@ export class MimocodeContentPresenter {
     }
     if (content?.kind === 'session-config') {
       return this.presentSessionConfig(content.session);
+    }
+    if (content?.kind === 'session-resume') {
+      this.ports.onSessionResume?.(content.outcome as 'resumed' | 'replaced');
+      return [];
     }
     if (content?.kind === 'turn-refused') {
       const message = content.message?.trim();

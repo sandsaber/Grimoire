@@ -31,6 +31,6 @@
   is settled by asking the agent through `session/list`, and a session it no longer lists
   soft-fails into a fresh one. `isMissingSessionError` overrides that decision and takes
   the whole probe, so a provider adds what its own CLI says and defers to the shared
-  question for everything else. What is still missing is the surface: no composition
-  implements the `sessionDropped` port, so `ExecutionChatRuntimeAdapter.isSessionDropped()`
-  is `false` and a conversation whose session was replaced resumes without the notice.
+  question for everything else. What is still missing here is the surface: this
+  provider implements no `sessionDropped` port, so a conversation whose session was
+  replaced resumes without the notice. OpenCode and MiMoCode are wired; this one is not.

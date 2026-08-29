@@ -97,6 +97,7 @@ describe('MiMoCode execution composition', () => {
   function createFakeAcp(options: {
     asksPermission?: boolean;
     offersEffort?: boolean;
+    sessionForgotten?: boolean;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
     sessionLoadRefusal?: string;
@@ -172,8 +173,25 @@ describe('MiMoCode execution composition', () => {
               currentModeId: 'build',
             },
           }),
+          // What MiMoCode answers when asked which sessions it still has. The
+          // conversation's own id is never in it: the point of the option is a
+          // session the agent has forgotten.
+          ...(options.sessionForgotten
+            ? { listSessions: async () => ({ sessions: [{ sessionId: 'acp-session-1' }] }) }
+            : {}),
           loadSession: async request => {
             loadRequests.push(request);
+            if (options.sessionForgotten) {
+              // A fork of OpenCode's CLI, and it refuses a session it does not
+              // have in the same words: nothing in them says so, which is why
+              // the listing is asked for at all.
+              throw new JsonRpcErrorResponse(
+                'session/load',
+                -32603,
+                'Internal error: MiMoCode service failure',
+                { service: 'session' },
+              );
+            }
             if (options.sessionIsGone) {
               throw new JsonRpcErrorResponse('session/load', -32603, 'session not found');
             }
@@ -281,6 +299,7 @@ describe('MiMoCode execution composition', () => {
     asksPermission?: boolean;
     offersEffort?: boolean;
     plugin?: any;
+    sessionForgotten?: boolean;
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
     sessionLoadRefusal?: string;
@@ -690,6 +709,60 @@ describe('MiMoCode execution composition', () => {
     // toolbar would flip from Plan to Auto-approve before the turn applied the
     // mode the tab is actually set to.
     expect(synced).toEqual([]);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('remembers that the session it resumed into was not the one it was asked for', async () => {
+    // The conversation's history is on screen and the agent has never seen it.
+    // Nothing else says so: the turn succeeds, the tab is bound to a live
+    // session, and the transcript above it reads as the agent's memory.
+    const { execution, host } = await createHarness({ sessionForgotten: true });
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({ id: 'conv-1', providerState: {}, sessionId: 'ses-forgotten' });
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(runtime.isSessionDropped()).toBe(true);
+    expect(runtime.sessionBinding({
+      conversation: { id: 'conv-1' },
+      sessionInvalidated: false,
+    })?.providerState).toMatchObject({ sessionDropped: true });
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('carries a drop into the tab that opens the conversation next', async () => {
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+
+    runtime.syncConversationState({
+      id: 'conv-1',
+      providerState: { sessionDropped: true },
+      sessionId: null,
+    });
+
+    expect(runtime.isSessionDropped()).toBe(true);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('takes the marker back off once a resume succeeds', async () => {
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({
+      id: 'conv-1',
+      providerState: { sessionDropped: true },
+      sessionId: 'acp-session-saved',
+    });
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(runtime.isSessionDropped()).toBe(false);
+    expect(runtime.sessionBinding({
+      conversation: { id: 'conv-1' },
+      sessionInvalidated: false,
+    })?.providerState).not.toMatchObject({ sessionDropped: true });
     execution.dispose();
     await host.dispose();
   });

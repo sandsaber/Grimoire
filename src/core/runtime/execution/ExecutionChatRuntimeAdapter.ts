@@ -623,10 +623,9 @@ export interface ExecutionChatRuntimeHostPorts extends ChatTurnEncoder, ChatSurf
    * from `consumeSessionInvalidation`, which is spent on persistence: the seam
    * the UI draws has to be answerable again on the next paint.
    *
-   * Optional, and no composition implements it yet — which is the honest state
-   * of `main`'s session-restart notice on this path. The fact exists, in
-   * `acpSessionResume`'s `sessionDropped` and in the `providerState` three
-   * providers write it to; what is missing is a composition reading it back.
+   * Optional. OpenCode and MiMoCode implement it, from the resume outcome the
+   * ACP backend reports on the content channel; a provider that never loses a
+   * session, or has not been wired, leaves it absent and the notice never draws.
    */
   sessionDropped?(): boolean;
   /**
@@ -867,7 +866,7 @@ export class ExecutionChatRuntimeAdapter {
     return this.session.consumeSessionInvalidation();
   }
 
-  /** See `sessionDropped` on the ports: repeatable, and unimplemented today. */
+  /** See `sessionDropped` on the ports: repeatable, and absent where unwired. */
   isSessionDropped(): boolean {
     return this.ports.sessionDropped?.() ?? false;
   }

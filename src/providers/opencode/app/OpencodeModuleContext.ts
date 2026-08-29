@@ -39,6 +39,14 @@ export interface OpencodeModuleContextPorts {
    * conversation is saved pointing at.
    */
   readonly databasePath: () => string | null;
+  /**
+   * Whether this tab's last resume replaced the conversation's saved session.
+   *
+   * Lives on the runtime rather than in the conversation because it is learned
+   * during a dispatch; it is written into `providerState` from here so the
+   * conversation still carries it when it is next opened.
+   */
+  readonly sessionDropped: () => boolean;
 }
 
 export function createOpencodeModuleContext(
@@ -87,6 +95,18 @@ export function createOpencodeModuleContext(
       // What this tab's last launch resolved comes first; the conversation's
       // own is what a tab that has not launched yet still knows.
       return ports.databasePath() ?? getOpencodeState(bound.providerState).databasePath ?? null;
+    },
+    readSessionDropped: conversationId => {
+      // `null` rather than `false` for a conversation this tab does not serve:
+      // the caller writes `providerState` whole, and "no opinion" has to be
+      // distinguishable from "not dropped" or the write would clear a marker
+      // this runtime knows nothing about.
+      if (!matching(conversation, conversationId)) {
+        return null;
+      }
+      // The runtime's own answer, which the adapter seeds from the
+      // conversation's stored marker when it binds one.
+      return ports.sessionDropped();
     },
     ...workspace,
     // The commands a live session announces need that session, and this

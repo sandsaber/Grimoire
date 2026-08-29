@@ -210,7 +210,10 @@ export class OpencodeExecution {
   private readonly workspaceHolder = new ProviderWorkspaceHolder(
     opencodeProviderModule.workspace,
     () => createOpencodeModuleContext(this.plugin, () => null,
-      { databasePath: () => runtimeOnly('databasePath') }),
+      {
+        databasePath: () => runtimeOnly('databasePath'),
+        sessionDropped: () => runtimeOnly('sessionDropped'),
+      }),
   );
 
   constructor(
@@ -327,6 +330,10 @@ export class OpencodeExecution {
     // What the last launch resolved for this tab, which is what the
     // conversation is saved pointing at.
     let databasePath: string | null = null;
+    // Whether the agent no longer had this conversation's saved session. Seeded
+    // from what the conversation carries, because the drop is learned during a
+    // dispatch and the tab that draws the notice is usually a later one.
+    let sessionDropped = false;
     const ownedSessions = new Set<string>();
     let sawTurnCost = false;
     const boundConversation = (): BoundConversation | null => conversation;
@@ -368,6 +375,9 @@ export class OpencodeExecution {
       onCurrentMode: currentModeId => this.settle(
         sessionConfig.syncSessionModeState({ currentModeId }),
       ),
+      // A resume that had to open a different session is what the conversation
+      // carries forward; one that succeeded is what takes the marker back off.
+      onSessionResume: outcome => { sessionDropped = outcome === 'replaced'; },
       onSessionOpened: opening => this.settle((async () => {
         // This tab is the one that answers for a write on this session.
         ownedSessions.add(opening.sessionId);
@@ -470,7 +480,15 @@ export class OpencodeExecution {
           databasePath = null;
         }
         conversation = next;
+        sessionDropped = getOpencodeState(next?.providerState).sessionDropped === true;
       },
+      /**
+       * Whether this conversation resumed into a session the agent had lost.
+       *
+       * Asked on every render rather than consumed, because the seam the UI
+       * draws has to be answerable again on the next paint.
+       */
+      sessionDropped: () => sessionDropped,
       /**
        * The provider's words for a turn that never started.
        *
@@ -546,6 +564,7 @@ export class OpencodeExecution {
     const contributions = opencodeProviderModule.runtimePorts(
       createOpencodeModuleContext(this.plugin, boundConversation, {
         databasePath: () => databasePath,
+        sessionDropped: () => sessionDropped,
       }),
     );
 

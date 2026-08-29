@@ -744,7 +744,12 @@ class ManagedAcpExecutionSession implements ExecutionSession {
           throw new Error('Managed ACP retry process termination was not confirmed.');
         }
         await this.ensureClient(invocation, true);
-        const reopened = await this.ensureSessionBinding(invocation, this.clientGeneration);
+        const reopened = await this.ensureSessionBinding(
+          invocation,
+          this.clientGeneration,
+          undefined,
+          outcome => run.presentSessionResume(outcome),
+        );
         // The reconnected session answers with its own configuration, and the
         // tab that is still open would otherwise keep the dead one's.
         if (reopened) run.presentSessionConfig(reopened);
@@ -882,6 +887,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
         // session is wrapped into a dispatch error there and the agent's words
         // do not survive the wrapping.
         error => run.presentTurnRefusal(error.message, 'session-load'),
+        outcome => run.presentSessionResume(outcome),
       );
     } catch (error) {
       if (error instanceof JsonRpcErrorResponse) {
@@ -895,6 +901,16 @@ class ManagedAcpExecutionSession implements ExecutionSession {
     invocation: ManagedAcpExecutionInvocation,
     generation: number,
     onLoadRefusal?: (error: JsonRpcErrorResponse) => void,
+    /**
+     * What became of the saved session this dispatch tried to resume.
+     *
+     * Reported through the run rather than through the backend context: a
+     * backend serves every tab, and the conversation carrying the consequence
+     * — its history is no longer the agent's memory — is the one this run
+     * belongs to. Silent when no load was attempted, which is a conversation
+     * that never had a session to lose.
+     */
+    onResume?: (outcome: 'resumed' | 'replaced') => void,
   ): Promise<AcpNewSessionResponse | undefined> {
     const client = this.client;
     if (!client) throw new ExecutionDispatchError('Managed ACP client is unavailable.', true);
@@ -916,6 +932,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
         }
         this.requireCurrentClient(client, generation);
         this.loadedSessionRef = target;
+        onResume?.('resumed');
         return { ...response, sessionId: target };
       } catch (error) {
         const missing = await (this.context.isMissingSessionError ?? isAcpSessionGone)({
@@ -940,6 +957,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
         }
         this.nativeSessionRef = undefined;
         this.loadedSessionRef = undefined;
+        onResume?.('replaced');
       }
     }
     if (!this.nativeSessionRef) {
@@ -1146,6 +1164,14 @@ class ManagedAcpExecutionRun implements ExecutionRun {
     this.emit({
       kind: 'provider-content',
       payload: { kind: 'session-config', session } satisfies AcpContentPayload,
+    });
+  }
+
+  presentSessionResume(outcome: 'resumed' | 'replaced'): void {
+    if (this.terminal) return;
+    this.emit({
+      kind: 'provider-content',
+      payload: { kind: 'session-resume', outcome } satisfies AcpContentPayload,
     });
   }
 

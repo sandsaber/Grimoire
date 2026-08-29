@@ -48,6 +48,7 @@ describe('OpenCode provider module', () => {
       resolveSessionId: () => 'acp-session',
       isPendingFork: () => false,
       readDatabasePath: () => '/vault/.opencode/opencode.db',
+      readSessionDropped: () => false,
       dispose: async () => undefined,
     };
   }

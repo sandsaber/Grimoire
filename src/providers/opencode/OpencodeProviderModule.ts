@@ -106,6 +106,11 @@ export interface OpencodeWorkspaceContext {
    * or neither is worth saving.
    */
   readDatabasePath(conversationId: string): string | null;
+  /**
+   * Whether this conversation's saved session was replaced by a fresh one,
+   * or `null` when this runtime is not bound to that conversation.
+   */
+  readSessionDropped(conversationId: string): boolean | null;
   dispose(): Promise<void>;
 }
 
@@ -352,12 +357,24 @@ OpencodeProviderSettings
       isPendingFork: conversationId => context.isPendingFork(conversationId),
       buildSessionPatch: input => {
         const databasePath = context.readDatabasePath(input.conversationId);
+        const sessionDropped = context.readSessionDropped(input.conversationId);
         return {
           sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
-          // Kept even when the session was invalidated, which is what the
-          // legacy runtime did and for the reason it recorded: the SQLite
-          // hydrate and `OPENCODE_DB` still resolve through it.
-          ...(databasePath ? { providerState: { databasePath } } : {}),
+          // Written whole whenever this runtime serves the conversation, and
+          // omitted entirely when it does not: the surface replaces
+          // `providerState` rather than merging it, so an omitted one leaves a
+          // stale drop marker standing and there would be no way to clear it.
+          // `databasePath` survives that because the context answers with the
+          // conversation's own when this tab has not resolved one — kept even
+          // when the session was invalidated, which is what the legacy runtime
+          // did and for the reason it recorded: the SQLite hydrate and
+          // `OPENCODE_DB` still resolve through it.
+          ...(sessionDropped === null ? {} : {
+            providerState: {
+              ...(databasePath ? { databasePath } : {}),
+              ...(sessionDropped ? { sessionDropped: true } : {}),
+            },
+          }),
         };
       },
     },

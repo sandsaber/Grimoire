@@ -10549,6 +10549,48 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Phase 2, 3b of 3 — the conversation says when the agent has forgotten it (`this commit`)
+
+- Gates: unit 9017 passed / 9017 total across 566 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Recovery plan item 10, second half.
+
+**The session-restart notice shipped its UI, its CSS and ten locale strings, and could never
+draw.** `ExecutionChatRuntimeAdapter.isSessionDropped()` returned a constant `false` because no
+composition implemented the port. With 3a in place the drop is now *decided* correctly and still
+said nothing: the turn succeeds, the tab is bound to a live session, and the transcript above it
+reads as the agent's memory when the agent has never seen it.
+
+**Where the fact had to travel was the whole design question.** A backend serves every tab and
+`ensureSessionBinding` runs per execution session, so a callback on the shared backend context
+cannot say which conversation lost its session — the first attempt here did exactly that and was
+wrong. The run is what knows: it already carries `presentTurnRefusal` and `presentSessionConfig` to
+the right tab. So the outcome is reported through the run, as a `session-resume` content payload
+beside the three that were already there, and the provider's presenter turns it into a port call.
+
+**Recorded, persisted, and cleared.** The composition holds the flag, seeds it from the
+conversation's `providerState` when it binds one — the tab that draws the notice is usually a later
+one than the tab that learned the drop — and writes it back through `buildSessionPatch`. Clearing
+needed one change to that patch: the surface replaces `providerState` rather than merging it, so a
+patch that omits the object leaves a stale marker standing with no way to remove it. It is now
+written whole whenever the runtime serves the conversation and omitted entirely when it does not,
+which is what `readSessionDropped` returning `null` rather than `false` distinguishes. `databasePath`
+survives that, because the context answers with the conversation's own when the tab has not resolved
+one.
+
+The marker comes off on the next resume that succeeds — the turn where the conversation has real
+memory again, which is what the chat contract means by the notice coming down as soon as a message
+joins the thread.
+
+**Wired for OpenCode and MiMoCode**, which mirror each other by their own instructions and are the
+two CLIs whose refusals say nothing at all. Six tests, three per provider, at composition level:
+a forgotten session leaves the flag set and the marker written; a conversation carrying the marker
+lights it before any turn; a successful resume takes it off. Proven by deleting each half in turn —
+the payload handling fails the first and third, the read-back fails the second.
+
+Gemini, Grok, Qwen and Kimi Code decide correctly and still draw nothing; their `AGENTS.md` files now
+say that rather than the paragraph they carried.
+
 ### Phase 2, 3a of 3 — a failed resume asks the agent instead of reading the error text (`this commit`)
 
 - Gates: unit 9011 passed / 9011 total across 566 suites; integration 156 passed / 156 run;

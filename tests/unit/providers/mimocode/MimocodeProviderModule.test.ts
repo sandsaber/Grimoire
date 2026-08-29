@@ -48,6 +48,7 @@ describe('MiMoCode provider module', () => {
       resolveSessionId: () => 'acp-session',
       isPendingFork: () => false,
       readDatabasePath: () => '/vault/.mimocode/mimocode.db',
+      readSessionDropped: () => false,
       dispose: async () => undefined,
     };
   }
