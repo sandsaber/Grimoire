@@ -101,10 +101,6 @@ export type ChatRuntimeConversationState = Pick<
   'sessionId' | 'providerState'
 >;
 
-export interface SessionUpdateResult {
-  updates: Partial<Conversation>;
-}
-
 export interface ChatRewindResult {
   canRewind: boolean;
   error?: string;

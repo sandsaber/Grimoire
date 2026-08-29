@@ -15,10 +15,6 @@
     "src/core/agents/AgentPolicy.ts": [
       "approveAgentPermission"
     ],
-    "src/core/agents/AgentSchemas.ts": [
-      "decodePermissionBoundary",
-      "decodePermissionRequest"
-    ],
     "src/core/context/ContextIngestionService.ts": [
       "ContextIngestionService",
       "MarkdownIngestor",
@@ -27,23 +23,11 @@
     "src/core/conversations/ConversationRepository.ts": [
       "RevisionConflictError"
     ],
-    "src/core/execution/ExecutionControlTransactionCoordinator.ts": [
-      "ExecutionControlRecord"
-    ],
-    "src/core/providers/types.ts": [
-      "AppCommandStorage",
-      "AppSkillStorage",
-      "ProviderWorkspaceCapabilities"
-    ],
     "src/core/runtime/QueuedTurn.ts": [
-      "cloneQueuedChatTurn",
       "mergeQueuedChatTurns"
     ],
     "src/core/runtime/execution/ExecutionChatRuntimeAdapter.ts": [
       "classifyForPresentation"
-    ],
-    "src/core/runtime/types.ts": [
-      "SessionUpdateResult"
     ],
     "src/core/security/ApprovalManager.ts": [
       "matchesRulePattern"
@@ -57,9 +41,7 @@
     "src/core/tools/toolNames.ts": [
       "isBashTool",
       "isFileTool",
-      "isMcpTool",
-      "isSubagentHiddenTool",
-      "isSubagentSpawnTool"
+      "isMcpTool"
     ],
     "src/core/types/index.ts": [
       "AskUserQuestionOption",
@@ -74,14 +56,12 @@
       "TabBarPosition"
     ],
     "src/features/chat/projections/ChatProjection.ts": [
-      "getActiveChatTurn",
       "hasMissingRequiredResult"
     ],
     "src/features/chat/rendering/ThinkingBlockRenderer.ts": [
       "appendThinkingContent"
     ],
     "src/features/chat/state/types.ts": [
-      "QueryOptions",
       "SubagentInfo"
     ],
     "src/features/chat/tabs/tabSettings.ts": [
@@ -116,9 +96,6 @@
     "src/providers/acp/history/sqliteModule.ts": [
       "loadNodeSqliteModule"
     ],
-    "src/providers/acp/types.ts": [
-      "AcpRole"
-    ],
     "src/providers/antigravity/execution/AntigravityExecutionBackend.ts": [
       "AntigravityResultCommitOutcome"
     ],
@@ -144,17 +121,9 @@
     "src/providers/claude/history/sdkSessionPaths.ts": [
       "locateSDKSession"
     ],
-    "src/providers/claude/runtime/ClaudeUserMessageFactory.ts": [
-      "buildClaudePromptWithImages"
-    ],
     "src/providers/claude/runtime/types.ts": [
-      "ClaudeEnsureReadyOptions",
-      "ClosePersistentQueryOptions",
       "createResponseHandler",
-      "isTurnCompleteMessage",
-      "MESSAGE_CHANNEL_CONFIG",
-      "PendingMessage",
-      "SessionState"
+      "isTurnCompleteMessage"
     ],
     "src/providers/claude/sdk/messages.ts": [
       "SDKMessage"
@@ -169,34 +138,14 @@
     "src/providers/codex/execution/NodeCodexExecutionProcess.ts": [
       "NodeCodexExecutionProcessFactory"
     ],
-    "src/providers/codex/normalization/codexSubagentNormalization.ts": [
-      "isCodexSubagentSpawnToolCall"
-    ],
     "src/providers/codex/runtime/codexAppServerTypes.ts": [
       "CommandExecutionApprovalResponse",
       "FileChangeApprovalResponse",
-      "InitializeParams",
-      "JsonRpcNotification",
-      "JsonRpcRequest",
-      "JsonRpcResponse",
       "PermissionsApprovalResponse",
-      "ReasoningSummaryPartAddedNotification",
-      "ServerRequestResolvedNotification",
-      "SkillsListParams",
-      "ThreadCompactStartParams",
-      "ThreadCompactStartResult",
-      "ThreadForkParams",
-      "ThreadRollbackParams",
-      "ThreadRollbackResult",
-      "ThreadStartedNotification",
-      "ThreadStatusChangedNotification",
-      "TurnInterruptParams",
-      "TurnStartedNotification",
       "TurnSteerParams",
       "UserInputResponse"
     ],
     "src/providers/codex/types/models.ts": [
-      "DEFAULT_CODEX_MINI_MODEL_LABEL",
       "DEFAULT_CODEX_PRIMARY_MODEL_LABEL"
     ],
     "src/providers/gemini/execution/GeminiInteractionBridge.ts": [
@@ -209,9 +158,6 @@
       "combineGrokRawModelSelection",
       "groupGrokDiscoveredModels"
     ],
-    "src/providers/grok/runtime/GrokRuntimeEnvironment.ts": [
-      "resolveGrokProviderAuthPath"
-    ],
     "src/providers/grok/runtime/grokDebugLog.ts": [
       "grokAuthPathExists",
       "summarizeGrokCliText"
@@ -219,9 +165,6 @@
     "src/providers/kimicode/models.ts": [
       "combineKimicodeRawModelSelection",
       "groupKimicodeDiscoveredModels"
-    ],
-    "src/providers/mimocode/history/MimocodeSessionErrorStore.ts": [
-      "loadLatestMimocodeSessionError"
     ],
     "src/providers/mimocode/models.ts": [
       "combineMimocodeRawModelSelection",
@@ -238,9 +181,6 @@
     "src/shared/icons.ts": [
       "CHECK_ICON_SVG",
       "MCP_ICON_SVG"
-    ],
-    "src/shared/modals/InstructionConfirmModal.ts": [
-      "InstructionDecision"
     ],
     "src/utils/context.ts": [
       "stripCurrentNoteContext"

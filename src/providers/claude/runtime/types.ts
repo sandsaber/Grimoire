@@ -1,10 +1,8 @@
 import type {
   PermissionMode as SDKPermissionMode,
   SDKMessage,
-  SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 
-import type { ChatRuntimeEnsureReadyOptions } from '../../../core/runtime/types';
 import {
   TOOL_TASK_CREATE,
   TOOL_TASK_GET,
@@ -13,7 +11,7 @@ import {
 } from '../../../core/tools/toolNames';
 import type { ImageAttachment, StreamChunk } from '../../../core/types';
 import type { PermissionMode } from '../../../core/types/settings';
-import type { ClaudeModel, EffortLevel } from '../types/models';
+import type { EffortLevel } from '../types/models';
 
 export interface TextContentBlock {
   type: 'text';
@@ -30,33 +28,6 @@ export interface ImageContentBlock {
 }
 
 export type UserContentBlock = TextContentBlock | ImageContentBlock;
-
-export const MESSAGE_CHANNEL_CONFIG = {
-  MAX_QUEUED_MESSAGES: 8, // Memory protection from rapid user input
-  MAX_MERGED_CHARS: 12000, // ~3k tokens — batch size under context limits
-} as const;
-
-export interface PendingTextMessage {
-  type: 'text';
-  content: string;
-}
-
-export interface PendingAttachmentMessage {
-  type: 'attachment';
-  message: SDKUserMessage;
-}
-
-export type PendingMessage = PendingTextMessage | PendingAttachmentMessage;
-
-export interface ClosePersistentQueryOptions {
-  preserveHandlers?: boolean;
-}
-
-export interface ClaudeEnsureReadyOptions extends ChatRuntimeEnsureReadyOptions {
-  externalContextPaths?: string[];
-  preserveHandlers?: boolean;
-  sessionId?: string;
-}
 
 export interface ResponseHandler {
   readonly id: string;
@@ -115,17 +86,6 @@ export interface PersistentQueryConfig {
   claudeCliPath: string;
   enableChrome: boolean;
   enableAutoMode: boolean;
-}
-
-export interface SessionState {
-  sessionId: string | null;
-  sessionModel: ClaudeModel | null;
-  pendingSessionModel: ClaudeModel | null;
-  wasInterrupted: boolean;
-  /** Set when SDK returns a different session ID than expected (context lost). */
-  needsHistoryRebuild: boolean;
-  /** Set when the current session is invalidated by SDK errors. */
-  sessionInvalidated: boolean;
 }
 
 export const UNSUPPORTED_SDK_TOOLS = [] as const;

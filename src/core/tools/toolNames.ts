@@ -56,21 +56,6 @@ export function isAgentLifecycleTool(name: string): boolean {
   return (AGENT_LIFECYCLE_TOOLS as readonly string[]).includes(name);
 }
 
-/** Tools that should be hidden from rendering when a provider subagent block is shown. */
-export const SUBAGENT_HIDDEN_TOOLS = [
-  TOOL_WAIT,
-  TOOL_WAIT_AGENT,
-  TOOL_CLOSE_AGENT,
-] as const;
-
-export function isSubagentSpawnTool(name: string): boolean {
-  return name === TOOL_SPAWN_AGENT;
-}
-
-export function isSubagentHiddenTool(name: string): boolean {
-  return (SUBAGENT_HIDDEN_TOOLS as readonly string[]).includes(name);
-}
-
 // These tools resolve via dedicated callbacks (not content-based), so their
 // tool_result should never be marked "blocked" based on result text.
 export const TOOLS_SKIP_BLOCKED_DETECTION = [

@@ -11,7 +11,6 @@ import type {
   AgentDispatchIntentRecord,
   AgentErrorSummary,
   AgentInstanceRecord,
-  AgentPermissionRequest,
   AgentResultProvenance,
   AgentResultRecord,
   AgentRunRecord,
@@ -20,7 +19,6 @@ import type {
   ChangedFileRef,
   CitationRef,
   EffectiveAgentPolicy,
-  PermissionBoundary,
 } from './AgentContracts';
 import {
   agentDispatchToken,
@@ -304,24 +302,6 @@ export const agentResultRecordSchema: RecordSchema<AgentResultRecord> = {
     };
   },
 };
-
-export function decodePermissionBoundary(value: unknown): PermissionBoundary {
-  const record = exactRecord(value, ['granted', 'approvable'], 'permission boundary');
-  const granted = decodePermissions(record.granted, 'granted permissions');
-  const approvable = decodePermissions(record.approvable, 'approvable permissions');
-  ensureDisjoint(granted, approvable, 'Permission boundary');
-  return { granted, approvable };
-}
-
-export function decodePermissionRequest(value: unknown): AgentPermissionRequest {
-  const record = exactRecord(value, ['requested', 'approvable'], 'permission request');
-  const requested = decodePermissions(record.requested, 'requested permissions');
-  const approvable = decodePermissions(record.approvable, 'definition approvable permissions');
-  if (approvable.some(permission => !requested.includes(permission))) {
-    throw new Error('Definition approvable permissions must be requested.');
-  }
-  return { requested, approvable };
-}
 
 function decodeDefinition(value: unknown): AgentDefinitionSnapshot {
   const record = exactRecord(value, ['definitionId', 'revisionDigest', 'source'], 'definition snapshot');

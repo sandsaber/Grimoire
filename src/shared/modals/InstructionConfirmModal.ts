@@ -12,8 +12,6 @@ import { Modal, TextAreaComponent } from 'obsidian';
 
 import { t } from '../../i18n/i18n';
 
-export type InstructionDecision = 'accept' | 'reject';
-
 type ModalState = 'loading' | 'clarification' | 'confirmation';
 
 export interface InstructionModalCallbacks {

@@ -315,22 +315,6 @@ export function reduceChatProjection(
 }
 
 /**
- * A reconciled outcome carries no text, and cannot.
- *
- * The first attempt's projection kept a materialized result per reconciliation,
- * because that attempt had a service that could resolve a `ResultRef` back to
- * an answer. Nothing on this branch can: every provider's sink commits a
- * reference without writing the answer, which is what D2 requires. The outcome
- * itself — succeeded, failed, cancelled — is on `run.reconciledOutcomes`, and
- * that is the whole of what later evidence establishes. The slot was carried
- * over in the harvest and is gone rather than waiting for a producer that the
- * persistence decisions forbid.
- */
-export function getActiveChatTurn(projection: ChatProjection): ChatTurnProjection | undefined {
-  return projection.turns.find(turn => turn.runId === projection.activeRunId);
-}
-
-/**
  * The answer as it has arrived so far, or `undefined` if none has.
  *
  * The two are different answers: a turn that said nothing gets no assistant

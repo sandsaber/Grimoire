@@ -9,7 +9,6 @@ export type AcpSessionConfigValueId = string;
 export type AcpToolCallId = string;
 export type AcpPermissionOptionId = string;
 export type AcpPositionEncodingKind = 'utf-16' | 'utf-32' | 'utf-8';
-export type AcpRole = 'assistant' | 'user';
 export type AcpStopReason = string;
 
 export interface AcpImplementation {

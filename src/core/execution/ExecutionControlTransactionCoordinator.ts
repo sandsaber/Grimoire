@@ -6,14 +6,6 @@ import {
 } from '../persistence/TransactionIntentCoordinator';
 import type { VersionedRecordReadResult } from '../persistence/VersionedRecord';
 import type {
-  ExecutionInteractionRecord,
-  ExecutionReconciliationRecord,
-  ExecutionRunRecord,
-  ExecutionSessionRecord,
-  SettingsTransitionRecord,
-  ShutdownCheckpointRecord,
-} from './ExecutionControlRecords';
-import type {
   AppendOnlyControlRepository,
   ExecutionControlRepositories,
   RevisionedControlRepository,
@@ -346,11 +338,3 @@ function stableSerialize(value: unknown): string {
   }
   return JSON.stringify(value);
 }
-
-export type ExecutionControlRecord =
-  | ExecutionSessionRecord
-  | ExecutionRunRecord
-  | ExecutionInteractionRecord
-  | ExecutionReconciliationRecord
-  | SettingsTransitionRecord
-  | ShutdownCheckpointRecord;

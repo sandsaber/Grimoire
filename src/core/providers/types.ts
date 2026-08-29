@@ -113,16 +113,6 @@ export interface AppMcpStorage {
   save(servers: ManagedMcpServer[]): Promise<void>;
 }
 
-export interface AppCommandStorage {
-  save(command: SlashCommand): Promise<void>;
-  delete(name: string): Promise<void>;
-}
-
-export interface AppSkillStorage {
-  save(skill: SlashCommand): Promise<void>;
-  delete(name: string): Promise<void>;
-}
-
 export interface AppAgentStorage {
   loadAll(): Promise<AgentDefinition[]>;
   load(agent: AgentDefinition): Promise<AgentDefinition | null>;
@@ -280,21 +270,6 @@ export type ProviderWorkspaceResourceKind =
   | 'agents'
   | 'mcp'
   | 'environment';
-
-export type ProviderWorkspaceInventoryAccess = 'managed' | 'readonly' | 'none';
-export type ProviderWorkspaceManagerAccess = 'managed' | 'guidance' | 'none';
-export type ProviderRuntimeCommandDiscovery = 'ephemeral' | 'active-session-only' | 'none';
-
-export interface ProviderWorkspaceResourceCapability {
-  inventory: ProviderWorkspaceInventoryAccess;
-  manager: ProviderWorkspaceManagerAccess;
-  runtimeCommandDiscovery?: ProviderRuntimeCommandDiscovery;
-}
-
-export type ProviderWorkspaceCapabilities = Record<
-  ProviderWorkspaceResourceKind,
-  ProviderWorkspaceResourceCapability
->;
 
 export interface ProviderConversationHistoryService {
   /**

@@ -10574,6 +10574,29 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### The export backlog, 2 of 3 — what nothing in the repo names (`this commit`)
+
+- Gates: unit 9023 passed / 9023 total across 566 suites; `tsc --noEmit` clean; `npm run lint` clean;
+  `npm run build:release` clean.
+- 130 unconsumed exports down to 90.
+
+**Fifty-four had no consumer in `src/` and no test either** — nothing in the repository named them at
+all. Removed by AST range rather than by regex, statement by statement with its doc comment, and only
+where **every** name a statement declares is dead: a `const a = 1, b = 2;` with one live half stays.
+
+The interesting part was what came after. Deleting an export makes what it alone referenced dead too,
+so this took three rounds to reach a fixpoint: `loadLatestMimocodeSessionError` took a SQLite reader,
+a query builder and a JSON parser with it; `isSubagentSpawnTool` took `SUBAGENT_HIDDEN_TOOLS`; the
+Claude runtime's pending-message union took both of its members. `tsc --noEmit` named each round's
+newly-unused imports, and the gate from the entry above named each round's newly-dead exports.
+
+**One test was rewritten rather than deleted.** `MimocodeSessionErrorStore`'s tests all entered
+through `extractMimocodeSessionError`, the row-array scan the deleted loader called — but two of the
+three behaviours they covered still ship, reached through the single-message function the history
+store actually uses. Deleting the file would have dropped live coverage; the tests now enter where
+production does. The third, matching an error to a parent message id across a batch of rows, went
+with the scan that needed it.
+
 ### The export backlog, 1 of 2 — the flip's leftovers (`this commit`)
 
 - Gates: unit 9024 passed / 9024 total across 566 suites; `tsc --noEmit` clean; `npm run lint` clean;
