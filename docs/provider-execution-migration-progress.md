@@ -8279,6 +8279,55 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
 
+### Where the session of 2026-08-29 ended
+
+**M5 and M6 are code complete. What is left of both is one human step and one decision that is not
+a code change.**
+
+**M5's last search closed, and it closed as a regression rather than a design.** The twelfth
+structural deletion search argued `async_subagent_result` was a one-provider feature in a
+provider-neutral union. Re-reading it against the code found the second provider had been there:
+`GrokChatRuntime` read xAI's `subagent_finished` off every session notification, Grok's flip did not
+carry it onto the kernel path, and a sweep deleted the orphaned normalizer as dead code — which is
+what made the loss invisible and left the consumer in `StreamController` unreachable while looking
+deliberate. Restored, and the row is retired by evidence: two providers emit the chunk, which is the
+architecture rule's own condition. Grok's smoke matrix has a row 22 for it, marked never run.
+
+**M6 ran its whole list.** Crash injection at each durable boundary on both sides; the seven named
+behaviours, each with a test; the sanitized recordings replayed end to end through the composition;
+lazy provider initialization measured; the privacy review; three independent architecture reviews.
+Six defects were found and fixed, four of them ones a user would have met:
+
+- the agent control store was **never recovered at load** — every reference to a recovery method in
+  the repository was a test, so a batch interrupted by a quit stayed half-applied for the life of the
+  vault and a result written but never linked left its agent running forever;
+- a run left `dispatching` or `running` by a quit kept claiming to run, which the conversation reads
+  as an agent still going. M5's *"agents survive restart with honest classification"* was true of the
+  coordinator and false of the product; it holds now;
+- a dispatch prepared and never sent was reached by **no sweep at all** — the state between
+  `prepareDispatch` and `dispatchPrepared`;
+- D5 was enforced on the execution store and unreachable on the agent one, then enforced as four
+  patches with two write paths uncovered, and is now one latch on the repositories that every write
+  consults.
+
+**The two things that are not code.** The manual test-vault matrix is the owner's, and so is the
+open-items list each entry above carries: the reconciled-result path has no producer in either
+domain, three sequential scans of the agent store run on every load, a provider answering
+`session/new` with an id the control schema refuses stalls its turn instead of failing it, one
+recovery protocol is written twice, and the D5 latch stops at the first unreadable read rather than
+before the first write.
+
+**And the thing that actually stands between this branch and a shipped migration.** `main` is
+**137 commits ahead** of `providers-migration` and a merge conflicts in **148 files** — among them
+every legacy `*ChatRuntime` this migration deleted, which main has gone on fixing. The standing rule
+says sync `main` in at every milestone gate; the last sync was 1.1.7 (`0f84b41`) at M0a, and M1
+through M6 did not. That is not a merge to perform on the way out of a session: it decides whether
+the deleted runtimes come back to be deleted again, or whether main's 137 commits are replayed onto
+the migrated shape instead. **Owner's call, and it is the next thing.**
+
+**Where to pick up.** The sync, with a decision about its shape. Everything else in M5 and M6 is
+either done or recorded with an owner.
+
 ### Where the session of 2026-08-28 ended
 
 **M5 is code complete. Eleven of the twelve structural deletion searches are zero**, and the twelfth
