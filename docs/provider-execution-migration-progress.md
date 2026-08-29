@@ -10494,6 +10494,49 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M6 — the seven behaviours, checked, and what "five of nine" actually meant (`this commit`)
+
+- Gates: unit 8770 passed / 8770 total across 555 suites; `tsc --noEmit` clean; `npm run lint`
+  clean.
+- Parity manifest: unchanged. Nothing deleted.
+
+**M6's verification list names seven behaviours. All seven have a test, and this is where each one
+is.** Written down because the list is the kind that gets marked done by reading it:
+
+- **duplicate** — `deduplicates cross-stream delivery and persists exactly one terminal`, and again
+  per provider in the shared conformance suite;
+- **gap** — `reconciles a causal gap through the snapshot port without applying across it`, with
+  `discards both occupants of a causal conflict` beside it;
+- **stale generation** — `rejects stale generations and session incarnations before deduplication`,
+  in the ingestor, plus `fences old emitters after instance rotation`;
+- **wrong session** — the conformance suite, for **every** backend that runs it: a delivery naming a
+  session nobody opened answers `unknown-session`;
+- **late terminal** — the same suite: a delivery after the terminal answers `ignored-post-terminal`;
+- **unload** — `closes admission synchronously and classifies unconfirmed work during bounded
+  shutdown`, `persists a shutdown checkpoint before a hung recovery port can settle`, and
+  `reconciles an incomplete shutdown checkpoint before accepting restored work`;
+- **uncertain dispatch** — `distinguishes side-effect-free dispatch rejection from lost
+  acknowledgement` for a run, and, since the entry above, `ends a dispatch that was written down and
+  never sent` for an agent.
+
+**Two of those seven live in a suite five of the nine providers run, which needed an answer rather
+than a note.** `defineExecutionBackendConformance` is the only suite that drives a provider *in the
+composition* — through the registry, not in isolation — and Antigravity, Claude, Codex, Grok and
+OpenCode have drivers for it. Reading that as "four uncovered" is wrong and reading it as "covered,
+they are all ACP" is worse.
+
+What is true is narrower and checkable: six providers extend `ManagedAcpExecutionBackend` with a
+body that is a constructor handing it a descriptor, so Grok's and OpenCode's drivers exercise every
+line the other four would — **for exactly as long as that stays true.**
+`executionConformanceCoverage` is that condition rather than that claim. It reads every provider's
+backend file and asserts: a backend with behaviour of its own has a driver; a managed-ACP wrapper is
+descriptor-only; and at least one wrapper is actually driven, because "interchangeable" is worth
+nothing if none of them is. Proven by giving Qwen's wrapper a method: the gate names the file.
+
+That is also the honest answer to the earlier question of whether to write four more 200-line
+drivers for the same class. Four copies of a suite over one implementation is not coverage; the
+condition under which one copy covers six is.
+
 ### M6 — the privacy review, and the gate that was reading half the path (`this commit`)
 
 - Gates: unit 8766 passed / 8766 total across 554 suites; `tsc --noEmit` clean; `npm run lint`
