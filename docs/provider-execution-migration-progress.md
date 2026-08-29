@@ -10549,6 +10549,62 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Phase 3 — three of the eight `main` carried, and two that turned out to be decisions (`this commit`)
+
+- Gates: unit 9022 passed / 9022 total across 566 suites; `tsc --noEmit` clean; `npm run lint` clean;
+  `npm run build:release` clean.
+- Recovery plan items 11 and 12.
+
+**Item 11 is settled without a code change, and the evidence is why.** `70ebb682` serialized `main`'s
+`ensureReady` against two callers reaching one runtime's shared process state at once — the send path
+and the slash-menu catalog. That race is structurally absent here: `ensureClient` has exactly two
+call sites, both on `ManagedAcpExecutionSession`, both reached only from the single active run's own
+dispatch or its recovery, and `createRun` rejects a second run while one is active. The slash menu
+runs against a separate metadata session in a separate process. The generation fence stays what it
+is — a guard for disposal and restart-fingerprint changes — rather than a substitute for a queue
+nothing can enter twice.
+
+**Item 12: three of the eight fixed here.** The rule that they want a pass upstream still holds —
+they exist on `main` — but this branch is what ships, and the branch policy is that this branch never
+merges back, so "upstream" fixes nothing a Grimoire user meets here.
+
+- **A refused command probe left a billed session running.** `probeRuntimeCommands` ends a
+  *successful* probe by calling `abortController.abort()` inside the loop, and
+  `conversation.supportedCommands()` throwing skips it — so an unauthenticated CLI left the throwaway
+  session live. This probe is not free: a measurement on 2026-08-26 isolated a percentage point of
+  the five-hour plan window to one dropdown open. The abort moved into a `finally`, which covers
+  every exit while the `catch` still reads the pre-abort signal and can still tell our own abort from
+  a real failure;
+- **a steer could end up in the queue and the composer both.** The turn's teardown returns a pending
+  steer to the head of the queue when the turn dies, and the steer's promise usually rejects right
+  after — because the turn died. The second restore then put the same follow-up in the composer, and
+  the user sent it twice. Guarded on identity, and the guard's answer decides whether the "steer
+  failed" notice is shown at all: a message the queue has already absorbed did not fail;
+- **`hasStreamingMathDelimiters` normalized before its cheap guard**, on the whole accumulated
+  message, on every stream frame. The normalizer's own check only asks for a backslash, so a fenced
+  code block full of them walked and paired the entire text per frame. The cheap test now runs first
+  on the raw string, and it has to ask for two things rather than one: a `$`, or a backslash before
+  one of the four `DELIMITER_KINDS` characters, since normalization is the other way a `$` appears.
+  Its test is an equivalence test and says so — a shortcut's contract is that it changed no answer.
+
+**Two of the eight are not defects, and saying so is the finding.**
+
+- `isGrokNativeModelId`'s widened prefix is answered by Phase 2's item 9, not by narrowing it. `git
+  log -L` on the predicate shows it was introduced by the same #95 series in the form it still has,
+  and `main` kept the static list deliberately as the pre-discovery fallback. Reading the levels the
+  session reports is the fix; the guess only survives until the first session;
+- **Antigravity's model cache has no TTL by design.** The code says so where it decides: "a settled
+  catalog is rediscovered only when its key changes or the caller asks; the picker that triggers
+  background refreshes must not spawn agy on a timer." `agy` is a process. The persisted list is
+  trusted under an unchanged key with **Refresh models** as the escape, which is a stated trade
+  rather than a lost guard. Recorded here because my own sync review called it a defect.
+
+**Two remain open**, both `main`'s: Claude's **Refresh models** / **Refresh commands** notices count
+the persisted list, and the boolean the catalogs return is not the signal to use — it means "the list
+changed", so a successful refresh that discovered the same models returns `false`. Reporting failure
+from it would be a new bug. An honest fix widens the shared catalog result, which is a contract
+change and its own commit.
+
 ### Phase 2 review — a re-sync could take the notice down before anyone saw it (`this commit`)
 
 - Gates: unit 9019 passed / 9019 total across 566 suites; `tsc --noEmit` clean; `npm run lint` clean.

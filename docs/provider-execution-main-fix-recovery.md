@@ -147,8 +147,17 @@ the only one where the product is plainly worse than `main`.
 
 **Phase 3 — decide rather than port.**
 
-11. Grok `ensureReady`: queue the loser or keep failing it. Queueing is the
-    better answer and it is a change to the shared ACP backend, not a Grok patch.
+11. ~~Grok `ensureReady`: queue the loser or keep failing it.~~ **Settled: keep
+    the fence, and no queueing.** `70ebb682` serialized against two callers —
+    the send path and the slash-menu catalog — reaching one runtime's shared
+    process state at once. That race is structurally absent here.
+    `ensureClient` has exactly two call sites (`ManagedAcpExecutionBackend`
+    lines 636 and 746), both on `ManagedAcpExecutionSession`, and both reached
+    only from the single active run's own dispatch or its recovery;
+    `createRun` refuses a second run while one is active. The slash menu runs
+    against a separate metadata session and a separate process. The generation
+    fence stays as what it is — a guard for disposal and restart-fingerprint
+    changes — rather than a substitute for a queue nothing can enter twice.
 12. The eight defects the sync carried in from `main` — they exist on `main` too
     and want a pass upstream.
 

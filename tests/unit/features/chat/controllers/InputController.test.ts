@@ -820,6 +820,22 @@ describe('InputController - Message Queue', () => {
       expect(deps.state.queue.isPaused).toBe(true);
     });
 
+    it('does not put a steer in the queue and the composer both', async () => {
+      // The turn's teardown returns a pending steer to the head of the queue
+      // when the turn dies, and the steer's own promise usually rejects right
+      // after — because the turn died. Restoring twice puts the same follow-up
+      // in the queue and in the composer, and the user sends it twice.
+      const message = queued('steered');
+      (controller as any).pendingSteerMessage = message;
+      (controller as any).restorePendingSteerMessageToQueue();
+
+      const restored = (controller as any).restoreQueuedMessageAfterSteerFailure(message);
+
+      expect(restored).toBe(false);
+      expect(deps.state.queue.size).toBe(1);
+      expect(deps.getInputEl().value).toBe('');
+    });
+
     it('does not lose the head when a resume is aborted by the guard', async () => {
       deps.state.queue.enqueue(queued('first'));
       // The window cancelStreaming() opens: Resume is live while the previous

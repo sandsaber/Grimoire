@@ -315,7 +315,21 @@ export function escapeMathDelimitersForStreaming(markdown: string): string {
   return result + markdown.slice(cursor);
 }
 
+/**
+ * Whether a transient streaming render has to escape math delimiters.
+ *
+ * The cheap test runs on the raw text, before normalization. Normalization can
+ * only introduce a `$` where a LaTeX delimiter opens one — `DELIMITER_KINDS` is
+ * exactly `\(`, `\)`, `\[`, `\]` — so text with neither a dollar nor one of
+ * those cannot produce math, and this is asked for the whole accumulated
+ * message on every stream frame. A fenced code block full of backslashes was
+ * enough to walk it, since the normalizer's own guard only asks for a backslash.
+ */
 export function hasStreamingMathDelimiters(markdown: string): boolean {
+  if (!markdown.includes('$') && !LATEX_DELIMITER_OPENER.test(markdown)) {
+    return false;
+  }
+
   const normalized = normalizeLatexDelimiters(markdown);
   if (!normalized.includes('$')) {
     return false;
@@ -323,3 +337,6 @@ export function hasStreamingMathDelimiters(markdown: string): boolean {
 
   return escapeMathDelimitersForStreaming(normalized) !== normalized;
 }
+
+/** A backslash before one of the four `DELIMITER_KINDS` characters. */
+const LATEX_DELIMITER_OPENER = /\\[()[\]]/;

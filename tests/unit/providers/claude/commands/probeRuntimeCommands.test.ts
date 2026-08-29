@@ -6,6 +6,7 @@ import { probeRuntimeCommands } from '@/providers/claude/commands/probeRuntimeCo
 const sdkMock = sdkModule as unknown as {
   setMockMessages: (messages: any[], options?: { appendResult?: boolean }) => void;
   setMockSupportedCommands: (commands: Array<{ name: string; description: string; argumentHint?: string }>) => void;
+  setMockSupportedCommandsError: (error: Error | null) => void;
   resetMockMessages: () => void;
   getLastOptions: () => sdkModule.Options | undefined;
 };
@@ -32,6 +33,21 @@ function createMockPlugin(settings: Record<string, unknown> = {}): GrimoirePlugi
 describe('probeRuntimeCommands', () => {
   beforeEach(() => {
     sdkMock.resetMockMessages();
+  });
+
+  it('cancels the billed session even when the CLI refuses to list its commands', async () => {
+    // This probe is not free: a measurement isolated a percentage point of the
+    // five-hour plan window to one dropdown open. The abort inside the loop is
+    // how a successful probe ends and is never reached when supportedCommands()
+    // throws, so an unauthenticated CLI left the throwaway session running.
+    sdkMock.setMockMessages([
+      { type: 'system', subtype: 'init', session_id: 'probe-session' },
+    ], { appendResult: false });
+    sdkMock.setMockSupportedCommandsError(new Error('Invalid API key'));
+
+    await expect(probeRuntimeCommands(createMockPlugin())).rejects.toThrow('Invalid API key');
+
+    expect(sdkMock.getLastOptions()?.abortController?.signal.aborted).toBe(true);
   });
 
   it('uses the same settingSources as the Claude runtime when user settings are disabled', async () => {

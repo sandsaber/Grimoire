@@ -1383,29 +1383,45 @@ export class InputController {
       this.clearPendingSteerState();
       this.updateQueueIndicator();
     } catch {
-      this.restoreQueuedMessageAfterSteerFailure(queuedMessage);
-      new Notice(t('chat.ui.queue.steerFailed'));
+      if (this.restoreQueuedMessageAfterSteerFailure(queuedMessage)) {
+        new Notice(t('chat.ui.queue.steerFailed'));
+      }
     }
   }
 
+  /**
+   * Returns a steer that did not land, unless something already has.
+   *
+   * The turn's own teardown puts a pending steer back on the head of the queue
+   * when the turn dies, and the steer's promise can reject after that — the
+   * rejection is usually *because* the turn died. Without the guard the same
+   * follow-up ends up in the queue and in the composer, and the user sends it
+   * twice. `false` says nothing was restored, so the caller can keep quiet
+   * rather than report a failure the queue has already absorbed.
+   */
   private restoreQueuedMessageAfterSteerFailure(
     message: QueuedMessage,
-  ): void {
+  ): boolean {
     const { state } = this.deps;
+    if (this.pendingSteerMessage !== message) {
+      this.updateQueueIndicator();
+      return false;
+    }
     this.clearPendingSteerState();
     if (state.cancelRequested) {
       this.updateQueueIndicator();
-      return;
+      return true;
     }
 
     if (state.isStreaming) {
       state.queue.unshift(message);
       this.updateQueueIndicator();
-      return;
+      return true;
     }
 
     this.restoreMessageToInput(message, { mergeWithComposer: true });
     this.updateQueueIndicator();
+    return true;
   }
 
 

@@ -104,5 +104,19 @@ describe('markdownMath', () => {
       expect(hasStreamingMathDelimiters('math \\(x\\)')).toBe(true);
       expect(hasStreamingMathDelimiters('unpaired \\( x')).toBe(false);
     });
+
+    it('answers the same for a backslash-heavy message with the cheap guard in front', () => {
+      // The guard exists for cost: this is asked for the whole accumulated
+      // message on every stream frame, and the normalizer's own check only asks
+      // for a backslash — so a code block full of them walked the entire text
+      // per frame. What a test can hold is that the shortcut did not change any
+      // answer, including the one that is only math after normalizing.
+      const backslashes = '```js\nconst re = /\\d+\\s\\w/;\n```\n'.repeat(200);
+
+      expect(hasStreamingMathDelimiters(backslashes)).toBe(false);
+      // The two shapes it must still see, one raw and one only after normalizing.
+      expect(hasStreamingMathDelimiters(`${backslashes}and $x$`)).toBe(true);
+      expect(hasStreamingMathDelimiters(`${backslashes}and \\(x\\)`)).toBe(true);
+    });
   });
 });
