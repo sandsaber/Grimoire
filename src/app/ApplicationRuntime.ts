@@ -340,6 +340,33 @@ export class ApplicationRuntime {
   }
 
   /**
+   * Finishes what the agent control store was owed, and says so when it cannot.
+   *
+   * A failure here must not take the load down: the plugin is usable without
+   * it, and the records it could not finish are still there for the next start.
+   */
+  private async recoverAgentRecords(): Promise<void> {
+    try {
+      const recovery = await this.agents.recoverResultLinks();
+      if (recovery.issues.length > 0) {
+        this.options.report({
+          data: { issues: recovery.issues.length },
+          event: 'agents.recovery.incomplete',
+          level: 'warn',
+          scope: 'plugin',
+        });
+      }
+    } catch (error) {
+      this.options.report({
+        error,
+        event: 'agents.recovery.failed',
+        level: 'warn',
+        scope: 'plugin',
+      });
+    }
+  }
+
+  /**
    * Opens the kernel's gate, then does the work that needs it open.
    *
    * A kernel that cannot start must not take the load down with it: every
@@ -355,6 +382,14 @@ export class ApplicationRuntime {
       this.options.report({ error, event: 'execution.start.failed', level: 'error', scope: 'plugin' });
       return;
     }
+    // The agent domain keeps a control store of its own, with the same intent
+    // machinery the kernel recovers at its gate — and nothing was calling it. A
+    // batch interrupted by a quit stayed half-applied for the life of the
+    // vault, and a result written but never linked left a background agent
+    // running forever, because the durable records are the only source of "is
+    // one running". Awaited, for the reason the kernel's own recovery is: what
+    // reads these records must not read a half-applied one.
+    await this.recoverAgentRecords();
     // After the gate is open, because it reaches provider services that expect
     // a started plugin, and nothing renders a Codex tab before it resolves.
     void this.codex.initializeWorkspace().catch(error => {

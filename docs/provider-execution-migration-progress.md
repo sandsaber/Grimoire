@@ -10494,6 +10494,59 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M6 — the agent control store was never recovered at load (`this commit`)
+
+- Gates: unit 8755 passed / 8755 total across 554 suites; `tsc --noEmit` clean; `npm run lint`
+  clean.
+- Parity manifest: unchanged. Nothing deleted.
+
+**Carrying the crash-injection sweep to the agent side found a defect, not a missing test.** The
+agent domain has the same intent machinery the kernel has, and three startup recovery entry points
+built for it — `recoverResultLinks`, `recoverPendingDispatches` and `recoverActiveRuns`. **The
+composition called none of them.** `AgentCoordinator` is constructed in `ApplicationRuntime` and
+used by `SubagentAgentRecorder`; every reference to a recovery method in the repository was a test.
+
+What that costs, in the store a user actually has:
+
+- a batch interrupted by a quit stays half-applied for the life of the vault. `adoptNativeAgent`
+  writes an instance and a run in one intent, so the window leaves an instance naming a run with no
+  record;
+- a result written but never linked leaves its agent running forever — and since the M5 change that
+  made the durable records the only source of "is one running", that is what the tab shows.
+
+The fix is one call at the composition root, awaited where the kernel's own recovery is awaited,
+wrapped so a failure reports and continues rather than taking the load down. The failing test is at
+`ApplicationRuntime` rather than on the coordinator, because the coordinator's recovery was already
+covered and correct: what was missing was the caller. It crashes a real coordinator over the same
+vault adapter at `after-step-effect:step-0`, builds the runtime over that adapter, and starts it.
+
+**And a larger finding this makes visible, which is the owner's to answer.** M5's exit gate has a
+clause reading *"agents survive view detach and restart with honest classification"*, and it was
+recorded as passing on the strength of named tests in `AgentCoordinator.test.ts`. Those tests are
+green and prove the coordinator. In the composition, the clause does not hold: nothing calls
+`recoverPendingDispatches` or `recoverActiveRuns`, so after a restart an agent run left
+`dispatching` or `running` keeps claiming to run, forever, and no reconciliation ever reaches it.
+`ApplicationRuntime.dispose` does not settle agents either, so an ordinary unload produces exactly
+that state.
+
+Both remaining methods need a port the composition does not have: a per-provider "did this dispatch
+take effect / is this agent still alive" query. `ConversationAgentDispatcher` implements
+`AgentDispatchPort` and has `dispatch` alone. There are two honest ways forward and they are
+different work:
+
+1. **a null port** — answer `unknown` with effects possible, which classifies a stale run
+   `indeterminate`, exactly as the execution registry classifies a run whose session did not reopen.
+   Small, and correct for a provider whose agents die with the process;
+2. **per-provider reconcile ports** — ask the provider. Correct for a detached agent under a
+   provider that keeps a daemon, and the only option that can answer `accepted` rather than
+   `unknown`.
+
+Recorded rather than chosen, because writing the wrong one writes a durable claim about work the
+user cannot see. Owner: **the owner**, then M6.
+
+Open, unchanged from the previous entry: the `reconciliations` control store still has no production
+writer.
+
 ### M6 — crash injection at the execution kernel's durable boundaries (`this commit`)
 
 - Gates: unit 8754 passed / 8754 total across 554 suites; integration 156 passed, 128 skipped;
