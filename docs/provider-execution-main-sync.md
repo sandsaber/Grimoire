@@ -55,6 +55,33 @@ chooses:
 | `70ebb682` | fix(grok): serialize concurrent ensureReady restarts |
 | `3a702bab` | feat(grok): key the effort picker on what the session reports, per model (#95) |
 
+## The two, answered
+
+Both are Grok's, and answering them is what the other 23 need too.
+
+**`70ebb682` — serialize concurrent `ensureReady` restarts.** The bug on `main` is that the send
+path and the slash-menu catalog call `ensureReady` milliseconds apart, each evaluates restart
+reasons against shared state, and a caller that evaluates mid-restart shuts the fresh process down
+and races its own start — surfacing "Failed to start Grok Build. Check the CLI path and login state"
+when both were fine. `main` serializes through a promise chain so exactly one cycle runs.
+
+The migrated path does **not** have that bug, and does not have `main`'s fix either.
+`ManagedAcpExecutionBackend.ensureClient` fences with a generation counter: two concurrent callers
+each bump it, and the loser finds `generation !== this.clientGeneration`, closes the client it
+opened, and throws a *side-effect-free* dispatch error. So no process is shut down under a healthy
+start and no misleading message is shown — but the losing caller **fails** where `main`'s fix would
+have queued it and let both succeed. In this composition that failure is classified `invalidated` /
+`pre-dispatch-rejected`, which is honest and retryable, and it is still a turn the user asked for
+that did not run. Queueing would be the better answer here too, and it is a change to the shared ACP
+backend rather than a port of Grok's diff.
+
+**`3a702bab` — key the effort picker on what the session reports, per model.** Partly present. Its
+sibling commits in the table below touch `GrokChatUIConfig`, which is live, and the branch's
+`GrokExecutionComposition` already takes `onModelChanged` with a `reasoningEffort` from the session
+and syncs session model state from it. What has to be checked is the half that lived in the deleted
+runtime: whether the reported levels reach `getReasoningOptions` per model, so a catalog model stops
+offering `xhigh` once Grok Build says otherwise.
+
 ## Touch both (23)
 
 Part of each applies directly; part landed on code that is gone.
