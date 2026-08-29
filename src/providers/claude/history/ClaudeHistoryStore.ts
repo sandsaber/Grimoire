@@ -16,45 +16,28 @@ import {
 } from './sdkMessageParsing';
 import {
   deleteSDKSession,
-  encodeVaultPathForSDK,
-  getSDKProjectsPath,
-  getSDKSessionPath,
-  isValidSessionId,
   locateSDKSessions,
   readSDKSession,
   readSDKSessionFile,
-  sdkSessionExists,
 } from './sdkSessionPaths';
 import {
   isValidAgentId,
-  loadSubagentFinalResult,
   loadSubagentToolCalls,
 } from './sdkSubagentSidecar';
 
 export type {
-  AsyncSubagentResult,
-  ResolvedAsyncStatus,
-  SDKNativeContentBlock,
-  SDKNativeMessage,
   SDKSessionLoadResult,
-  SDKSessionReadResult,
 } from './sdkHistoryTypes';
 export {
   collectAsyncSubagentResults,
   deleteSDKSession,
-  encodeVaultPathForSDK,
   extractXmlTag,
   filterActiveBranch,
-  getSDKProjectsPath,
-  getSDKSessionPath,
-  isValidSessionId,
-  loadSubagentFinalResult,
   loadSubagentToolCalls,
   locateSDKSessions,
   parseSDKMessageToChat,
   readSDKSession,
   readSDKSessionFile,
-  sdkSessionExists,
 };
 export {
   extractAgentIdFromToolUseResult,

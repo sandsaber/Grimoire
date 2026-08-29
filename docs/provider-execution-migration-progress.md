@@ -10574,6 +10574,32 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### The export backlog, 3 of 3 — the legacy ACP half, and its tests (`this commit`)
+
+- Gates: unit 8990 passed / 8990 total across 564 suites; `tsc --noEmit` clean; `npm run lint` clean;
+  `npm run build:release` clean.
+- 90 unconsumed exports down to 70.
+
+**Two more modules go whole.** `acpLifecycle.ts` — the lifecycle generation and its serialized
+cleanup — and `AcpSubprocess.ts`, the legacy process launcher, had no caller left: the managed client
+adapter launches through its own `processLauncher`, and the generation fence lives on the backend.
+
+**`acpSessionResume.ts` is half its size**, and what went is the half the module was named for.
+The wipe policy, the persist fields, the load-failure debug event and the four interface types they
+took between them were the legacy resume path's; the kernel path builds `providerState` in
+`buildSessionPatch` and decides a failed load with the two functions that stay. `acpApprovals.ts`
+keeps `mapAcpApprovalDecision`, which the auxiliary query uses, and loses the approval-option builder
+and the write-text approval beside it. The ACP `AGENTS.md` table described the modules by what is now
+gone; it now describes what is there, and says where the soft-fail actually happens.
+
+**Where a test's subject went, the test went with it — but only where its behaviour went too.**
+`acpSessionResume`'s five surviving tests are the ones about the decision; `acpApprovals` keeps its
+two on the mapping. Two Claude tests were repointed rather than deleted: `sdkSession`'s helpers had
+been reached through `ClaudeHistoryStore`'s re-export of them, and now import the modules that
+declare them, and `locateSDKSession` — a one-line wrapper over `locateSDKSessions` with no caller —
+became a helper in the test file that needed it, so the two behaviours it covered still run against
+the plural that production calls.
+
 ### The export backlog, 2 of 3 — what nothing in the repo names (`this commit`)
 
 - Gates: unit 9023 passed / 9023 total across 566 suites; `tsc --noEmit` clean; `npm run lint` clean;

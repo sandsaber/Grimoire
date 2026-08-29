@@ -77,22 +77,6 @@
       "DEFAULT_LOCALE",
       "getLocaleDisplayString"
     ],
-    "src/providers/acp/AcpSubprocess.ts": [
-      "AcpSubprocess"
-    ],
-    "src/providers/acp/acpApprovals.ts": [
-      "approveAcpWriteTextFile",
-      "buildAcpApprovalDecisionOptions"
-    ],
-    "src/providers/acp/acpLifecycle.ts": [
-      "isAcpLifecycleCurrent",
-      "runAcpLifecycleCleanup"
-    ],
-    "src/providers/acp/acpSessionResume.ts": [
-      "buildAcpPersistedSessionFields",
-      "buildAcpSessionLoadFailureDebugEvent",
-      "markAcpSessionLoadFailed"
-    ],
     "src/providers/acp/history/sqliteModule.ts": [
       "loadNodeSqliteModule"
     ],
@@ -104,22 +88,6 @@
     ],
     "src/providers/claude/ClaudeProviderModule.ts": [
       "ClaudeDiscoveredModel"
-    ],
-    "src/providers/claude/history/ClaudeHistoryStore.ts": [
-      "AsyncSubagentResult",
-      "encodeVaultPathForSDK",
-      "getSDKProjectsPath",
-      "getSDKSessionPath",
-      "isValidSessionId",
-      "loadSubagentFinalResult",
-      "ResolvedAsyncStatus",
-      "SDKNativeContentBlock",
-      "SDKNativeMessage",
-      "sdkSessionExists",
-      "SDKSessionReadResult"
-    ],
-    "src/providers/claude/history/sdkSessionPaths.ts": [
-      "locateSDKSession"
     ],
     "src/providers/claude/runtime/types.ts": [
       "createResponseHandler",

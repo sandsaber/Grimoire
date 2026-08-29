@@ -1,8 +1,4 @@
-import {
-  approveAcpWriteTextFile,
-  buildAcpApprovalDecisionOptions,
-  mapAcpApprovalDecision,
-} from '@/providers/acp/acpApprovals';
+import { mapAcpApprovalDecision } from '@/providers/acp/acpApprovals';
 
 describe('acpApprovals', () => {
   const options = [
@@ -32,52 +28,4 @@ describe('acpApprovals', () => {
     });
   });
 
-  it('builds decision options for the shared approval UI', () => {
-    expect(buildAcpApprovalDecisionOptions(options)).toEqual([
-      { label: 'Allow once', presentation: 'allow', value: 'allow-1' },
-      { label: 'Allow always', presentation: 'always', value: 'allow-all' },
-      { label: 'Reject', presentation: 'reject', value: 'reject-1' },
-    ]);
-  });
-
-  it('skips write approval in full-access mode', async () => {
-    const approvalCallback = jest.fn();
-    await expect(approveAcpWriteTextFile({
-      approvalCallback,
-      fullAccess: true,
-      providerLabel: 'OpenCode',
-      requestPath: 'a.md',
-      resolvedPath: '/vault/a.md',
-    })).resolves.toBeUndefined();
-    expect(approvalCallback).not.toHaveBeenCalled();
-  });
-
-  it('requires an allow decision for non-full-access writes', async () => {
-    await expect(approveAcpWriteTextFile({
-      approvalCallback: null,
-      fullAccess: false,
-      providerLabel: 'OpenCode',
-      requestPath: 'a.md',
-      resolvedPath: '/vault/a.md',
-    })).rejects.toThrow('OpenCode file write was not approved');
-
-    const deny = jest.fn().mockResolvedValue('deny');
-    await expect(approveAcpWriteTextFile({
-      approvalCallback: deny,
-      fullAccess: false,
-      providerLabel: 'OpenCode',
-      requestPath: 'a.md',
-      resolvedPath: '/vault/a.md',
-    })).rejects.toThrow('OpenCode file write was not approved');
-    expect(deny).toHaveBeenCalled();
-
-    const allow = jest.fn().mockResolvedValue('allow');
-    await expect(approveAcpWriteTextFile({
-      approvalCallback: allow,
-      fullAccess: false,
-      providerLabel: 'OpenCode',
-      requestPath: 'a.md',
-      resolvedPath: '/vault/a.md',
-    })).resolves.toBeUndefined();
-  });
 });

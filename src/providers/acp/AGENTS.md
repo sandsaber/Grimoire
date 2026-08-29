@@ -17,14 +17,15 @@ Shared building blocks for OpenCode-family / Grok-style managed CLIs (incrementa
 
 | Module | Responsibility |
 |--------|----------------|
-| `acpSessionResume.ts` | Failed `session/load` wipe policy, persist fields, debug events |
+| `acpSessionResume.ts` | Whether a failed `session/load` means the session is gone |
 
-On failed `session/load`, runtimes must soft-fail (invalidate live binding, keep
-history / native store paths, create a new session on the next turn) and log via
-debug helpers. Do **not** show a user-facing `Notice` for resume failure — the
-recovery is automatic and the toast only scares users.
-| `acpLifecycle.ts` | lifecycle generation + serialized cleanup promises |
-| `acpApprovals.ts` | permission decision mapping + write-text approval |
+On failed `session/load`, the kernel path soft-fails: `ManagedAcpExecutionBackend`
+asks `isAcpSessionGone`, drops the binding for a session the agent no longer has,
+and opens a fresh one in the same dispatch. Do **not** show a user-facing
+`Notice` for resume failure — the recovery is automatic and the toast only
+scares users. The conversation is told through the `sessionDropped` port, which
+draws the session-restart seam above the thread.
+| `acpApprovals.ts` | permission decision mapping |
 
 Provider runtimes should call these helpers instead of re-copying load/create/retry trees.
 

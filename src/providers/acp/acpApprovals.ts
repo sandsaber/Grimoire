@@ -1,4 +1,3 @@
-import type { ApprovalCallback, ApprovalDecisionOption } from '../../core/runtime/types';
 import type { ApprovalDecision } from '../../core/types';
 import type {
   AcpRequestPermissionRequest,
@@ -34,54 +33,6 @@ export function mapAcpApprovalDecision(
   }
 
   return { outcome: { outcome: 'cancelled' } };
-}
-
-export function buildAcpApprovalDecisionOptions(
-  options: readonly Pick<AcpPermissionOption, 'kind' | 'name' | 'optionId'>[],
-): ApprovalDecisionOption[] {
-  return options.map((option) => ({
-    label: option.name,
-    presentation: option.kind === 'allow_once'
-      ? 'allow'
-      : option.kind === 'allow_always'
-        ? 'always'
-        : 'reject',
-    value: option.optionId,
-  }));
-}
-
-/**
- * Require an explicit UI approval for ACP client-side writeTextFile calls when
- * the session is not in full-access mode.
- */
-export async function approveAcpWriteTextFile(params: {
-  approvalCallback: ApprovalCallback | null;
-  fullAccess: boolean;
-  providerLabel: string;
-  requestPath: string;
-  resolvedPath: string;
-}): Promise<void> {
-  if (params.fullAccess) {
-    return;
-  }
-
-  if (!params.approvalCallback) {
-    throw new Error(`${params.providerLabel} file write was not approved`);
-  }
-
-  const decision = await params.approvalCallback(
-    'write',
-    {
-      path: params.resolvedPath,
-      relativePath: params.requestPath,
-    },
-    `${params.providerLabel} wants to write ${params.requestPath}.`,
-    { decisionReason: 'File write permission required' },
-  );
-
-  if (decision !== 'allow' && decision !== 'allow-always') {
-    throw new Error(`${params.providerLabel} file write was not approved`);
-  }
 }
 
 function selectAcpPermissionOption(
