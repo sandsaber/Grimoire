@@ -390,13 +390,16 @@ export class ApplicationRuntime {
       'result-links',
       () => this.agents.recoverResultLinks(),
     );
-    if (links && links.issues.length > 0) {
+    // One report per distinct code, not a list and not a count. The code is
+    // the actionable part — one names a result whose run or instance does not
+    // exist, which no later start will ever link, and the other names a
+    // revision race that the next one will — and it has to arrive under a key
+    // the redactor lets through. A string inside an array is sanitized with no
+    // key at all, so a `codes: [...]` field reaches the log as two
+    // `[redacted-string]`s: less than the count it replaced.
+    for (const code of [...new Set((links?.issues ?? []).map(issue => issue.code))].sort()) {
       this.options.report({
-        // The codes, not only how many: one of them names a result whose run or
-        // instance does not exist, which no later start will ever link, and the
-        // other names a revision race that the next one will. A count alone
-        // repeats the same unactionable warning on every load.
-        data: { codes: [...new Set(links.issues.map(issue => issue.code))].sort() },
+        data: { code },
         event: 'agents.recovery.incomplete',
         level: 'warn',
         scope: 'plugin',
@@ -426,10 +429,16 @@ export class ApplicationRuntime {
     );
   }
 
-  /** One record a sweep could not read, named rather than counted. */
-  private reportAgentRecordSkipped(stage: string, error: unknown): void {
+  /**
+   * One record a sweep could not read, named rather than counted.
+   *
+   * `phase` rather than `stage`, because the redactor's safe-key list decides
+   * which names survive to the file and `stage` is not on it — a warning whose
+   * only content is `[redacted-string]` is a warning that says nothing.
+   */
+  private reportAgentRecordSkipped(phase: string, error: unknown): void {
     this.options.report({
-      data: { stage },
+      data: { phase },
       error,
       event: 'agents.recovery.recordSkipped',
       level: 'warn',
@@ -440,9 +449,12 @@ export class ApplicationRuntime {
   /**
    * Runs one recovery stage, and decides whether the next one may run.
    *
-   * Three refusals rather than one. **A disposed runtime writes nothing**: the
-   * load and the unload race by construction, and a departing instance settling
-   * agent records is the dual ownership this composition exists to prevent.
+   * Three refusals rather than one. **A disposed runtime starts no further
+   * stage** — the load and the unload race by construction, and a departing
+   * instance settling agent records is the dual ownership this composition
+   * exists to prevent. Between stages rather than between records: the sweeps
+   * take no cancellation signal, so an unload that lands mid-sweep is not
+   * stopped by this, and giving them one is a change to their contract.
    * **An unreadable record stops the rest**, because D5 says a store this build
    * cannot read opens read-only — the kernel's own start already answers that
    * way for the execution store, and continuing to sweep the agent store would
@@ -451,7 +463,7 @@ export class ApplicationRuntime {
    * one bad record must not stall every later one on every restart.
    */
   private async attemptAgentRecovery<T>(
-    stage: string,
+    phase: string,
     recover: () => Promise<T>,
   ): Promise<T | null> {
     if (this.disposed || this.agentStoreUnreadable) {
@@ -463,7 +475,7 @@ export class ApplicationRuntime {
       if (error instanceof UnreadableControlRecordError) {
         this.agentStoreUnreadable = true;
         this.options.report({
-          data: { recordKind: error.recordKind, stage },
+          data: { phase, recordKind: error.recordKind },
           error,
           event: 'agents.migrationRequired',
           level: 'error',
@@ -472,7 +484,7 @@ export class ApplicationRuntime {
         return null;
       }
       this.options.report({
-        data: { stage },
+        data: { phase },
         error,
         event: 'agents.recovery.failed',
         level: 'warn',
@@ -511,6 +523,15 @@ export class ApplicationRuntime {
     // independently, and the load that survives a dead kernel so the user has a
     // settings tab is exactly the one that would otherwise never finish an
     // agent batch again.
+    //
+    // **And after the kernel's D5 verdict, not before it is read.** A store the
+    // kernel opened read-only is a vault a newer build wrote, and the two
+    // stores are almost always the same generation — so sweeping the agent
+    // records while the execution ones are correctly untouched would rewrite
+    // exactly what D5 protects, one directory over.
+    if (this.kernel.migrationRequirement()) {
+      this.agentStoreUnreadable = true;
+    }
     await this.recoverAgentRecords();
     if (!kernelStarted) {
       return;

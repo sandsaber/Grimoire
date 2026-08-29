@@ -134,7 +134,11 @@ function readLogCallSites(): LogCallSite[] {
   for (const root of ROOTS) {
     for (const file of sourceFiles(root)) {
       const source = readFileSync(file, 'utf8');
-      for (const match of source.matchAll(/(?:recordDebugLog|report)\(\{([\s\S]*?)\n\s*\}\)/g)) {
+      // Up to the first `})`, not to a newline-indented one: a single-line
+      // call has no newline before its close, so the lazy match ran past it and
+      // swallowed the *next* block — hiding one event entirely and filing its
+      // keys under the call above.
+      for (const match of source.matchAll(/(?:recordDebugLog|report)\(\{([\s\S]*?)\}\)/g)) {
         const block = match[1];
         const event = /event:\s*'([^']+)'/.exec(block)?.[1] ?? '(unnamed)';
         const data = /data:\s*\{([^}]*)\}/.exec(block)?.[1] ?? '';
@@ -166,7 +170,23 @@ describe('diagnostic redaction (D7)', () => {
       expect.arrayContaining(['execution.cleanup.failed']),
     );
     expect([...new Set(sites.flatMap(site => site.dataKeys))].sort())
-      .toEqual(['codes', 'modeId', 'recordKind', 'stage']);
+      .toEqual(['code', 'modeId', 'phase', 'recordKind']);
+  });
+
+  it('writes every key it logs, instead of a row of redactions', () => {
+    // **The half the key list could not check.** Naming the keys says a person
+    // decided what goes under them; it does not say the redactor lets them
+    // through. Three of the four here did not — `stage`, `recordKind` and a
+    // `codes` array whose items are sanitized with no key at all — so warnings
+    // whose whole content was the key arrived as `[redacted-string]`, on every
+    // load, from the recovery that exists to say what it could not finish.
+    const probe = 'not-user-content';
+    const keys = [...new Set(sites.flatMap(site => site.dataKeys))];
+    const written = sanitizeDebugLogData(
+      Object.fromEntries(keys.map(key => [key, probe])),
+    );
+
+    expect(keys.filter(key => written[key] !== probe)).toEqual([]);
   });
 
   it('names every event the execution path logs', () => {
@@ -189,6 +209,7 @@ describe('diagnostic redaction (D7)', () => {
       'execution.setMode.refused',
       'execution.shutdown.failed',
       'execution.start.failed',
+      'execution.workspace.failed',
     ]);
   });
 
@@ -224,11 +245,11 @@ describe('diagnostic redaction (D7)', () => {
     // anything a person typed. Adding one is a decision, and this is where it
     // gets made rather than noticed.
     // Four across the whole execution path, and each is a name rather than a
-    // value: which mode was refused, which recovery stage skipped a record,
-    // which kind of record a build cannot read, and which issue codes a
+    // value: which mode was refused, which recovery phase skipped a record,
+    // which kind of record a build cannot read, and which issue code a
     // result-link sweep collected. None of them can carry what a person typed.
     expect([...new Set(sites.flatMap(site => site.dataKeys))].sort())
-      .toEqual(['codes', 'modeId', 'recordKind', 'stage']);
+      .toEqual(['code', 'modeId', 'phase', 'recordKind']);
     const written = sanitizeDebugLogData({ modeId: 'Summarize my private note' });
 
     // Not redacted, because it is on the safe list — which is exactly why the

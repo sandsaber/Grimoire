@@ -10494,6 +10494,69 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M6 — a second review, and three warnings that said `[redacted-string]` (`this commit`)
+
+- Gates: unit 8772 passed / 8772 total across 555 suites; `tsc --noEmit` clean; `npm run lint`
+  clean; `npm run build:release` clean.
+- Parity manifest: unchanged. Nothing deleted.
+
+**A second independent review of the four commits above returned twelve findings. All twelve held**,
+and three of them are about the entry two above this one — the privacy work — which is the useful
+part: the fix and the gate that was meant to check it were both wrong in the same direction.
+
+**The three that made the logs worse.** `sanitizeDebugLogData` redacts a string unless its key is on
+a safe list, and it sanitizes array items **with no key at all**. So the previous entry's
+"improvement" — replacing `data: { issues: 2 }` with `data: { codes: [...] }` — reached the log as
+two `[redacted-string]`s, strictly less than the count it replaced. `stage` is not on the safe list
+either, so the reporter that exists to *name the stage* wrote `[redacted-string]`; and `recordKind`
+was not on it, which had been true since before this milestone. Now: one report per distinct `code`,
+`phase` in place of `stage` — both already safe names — and `recordKind` added to the list, because
+its two values are a schema verdict and never user content.
+
+**And the gate could not have caught any of it**, which is the finding under the finding. It
+enumerated the keys the path logs, which says a person decided what goes under them; it never asked
+whether the redactor lets them through. It does now: every key the execution path logs is written
+with a probe value and has to come back unchanged. Three of the four failed on the first run.
+
+**A fourth was the scraper.** The widened regex matched from `report({` to the first
+newline-indented `})`, so a *single-line* call had no close to find and its match ran on into the
+next block — hiding `execution.workspace.failed` entirely and filing its keys under the call above.
+Twelve events, not eleven.
+
+**On the agent side, D5 was enforced in one place and unreachable in the other.**
+`AgentCoordinator`'s own `requireCurrent` raised a plain `Error` for a `future` or `corrupt` record
+where the execution store raises `UnreadableControlRecordError` — and the composition decides
+read-only by that type. So every unreadable agent record was filed as an ordinary per-record failure
+and the sweep carried on terminalizing the records it *could* read, in a store a newer build wrote.
+It raises the shared error now, the sweeps rethrow it rather than collecting it, and the composition
+also stops before it starts when the kernel has already opened the execution store read-only —
+because the two stores are almost always the same generation, and rewriting one while protecting the
+other is not a smaller mistake. Two tests: a record nothing can finish is reported and the load
+continues; a record this build cannot read stops the sweep and leaves the run it would have
+rewritten exactly as it was.
+
+The rest, each fixed: a prepared intent whose run record is gone was raising on every load with no
+path that resolves it, and is skipped as it was before the branch existed; `reportSweepFailures` had
+two contracts and production only ever took one, so it has one now — report them, or the first is
+thrown, never silence because something else succeeded; a dead cast reassigning the report mock in
+one test and a live one in another that only worked because of it; and the disposal comment, which
+claimed more than a stage-boundary check can deliver and now says where the check is and what it
+does not stop.
+
+**Recorded, not fixed.** Two copies of the read-relock-recheck protocol now live in
+`recoverPendingDispatches` — the prepared branch and the dispatching one — and they already differ
+in what they return. One helper parameterised by the expected status would carry both. Owner: M6, a
+refactor rather than a behaviour change.
+
+**And the M6 list item that is not done.** A replay harness that drives each recorded exchange
+through the real managed-ACP backend into a real registry was built and is **not committed**: Gemini
+and MiMoCode complete their recorded turn and reach `succeeded`, and OpenCode and Grok reach
+`interrupted` / `recovery-exhausted-safe` — the run's event stream ends before the recorded prompt
+answer arrives, and the registry recovers it. Whether that is the harness or the composition is not
+established, and shipping either a red suite or a suite narrowed to the two that pass would be worse
+than saying so: a gate over the subset that agrees with it is the failure this milestone has already
+found twice. Owner: M6, with the harness kept out of the tree until the two are diagnosed.
+
 ### M6 — the reconciled-result path has no producer, in either domain (`this commit`)
 
 - Gates: unchanged from the entry below; this is a verification result and a record, with no code

@@ -712,6 +712,7 @@ describe('AgentCoordinator', () => {
       scheduler: inertScheduler(),
     });
     let asked = 0;
+    const refusals: unknown[] = [];
     const recovered = await restarted.recoverActiveRuns(
       {
         // The first is answered with a status and a reason the terminal policy
@@ -722,8 +723,14 @@ describe('AgentCoordinator', () => {
           : { kind: 'terminal' as const, status: 'succeeded' as const, reason: 'completed' as const }),
       },
       { reconcileCancellation: async () => ({ kind: 'unknown' as const, effectsPossible: false }) },
+      // The reporter is what a caller now uses to hear about the record that
+      // could not be finished. Without one the first failure is thrown, which
+      // is the only other honest answer: silence as soon as *something*
+      // recovered is how a permanent per-record stall reported a clean run.
+      { onFailure: failure => refusals.push(failure) },
     );
 
+    expect(refusals).toHaveLength(1);
     expect(asked).toBe(2);
     expect(recovered).toHaveLength(1);
     expect(recovered[0]).toMatchObject({ state: 'succeeded' });

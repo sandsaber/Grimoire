@@ -1,6 +1,10 @@
 import type { ExecutionOwner, RunTerminalReason } from '../execution/ExecutionContracts';
 import type { DurableStorage } from '../persistence/DurableStorage';
-import type { VersionedRecord, VersionedRecordReadResult } from '../persistence/VersionedRecord';
+import {
+  UnreadableControlRecordError,
+  type VersionedRecord,
+  type VersionedRecordReadResult,
+} from '../persistence/VersionedRecord';
 import { RevisionConflictError } from '../persistence/VersionedRepository';
 import type { ProviderId } from '../types/provider';
 import type {
@@ -623,10 +627,17 @@ export class AgentCoordinator {
       });
       if (settled) recovered.push(settled);
       } catch (error) {
+        // **Collected, unless the store itself is unreadable.** The per-record
+        // collection exists so one malformed record cannot stall every later
+        // one on every restart; a record this build cannot *read* is the other
+        // case entirely — D5's reverted build — and continuing past it would
+        // rewrite the records this build understands in a store a newer one
+        // owns.
+        if (error instanceof UnreadableControlRecordError) throw error;
         failures.push(error);
       }
     }
-    reportSweepFailures(failures, recovered, options);
+    reportSweepFailures(failures, options);
     return recovered;
   }
 
@@ -704,10 +715,17 @@ export class AgentCoordinator {
       });
       recovered.push(settled);
       } catch (error) {
+        // **Collected, unless the store itself is unreadable.** The per-record
+        // collection exists so one malformed record cannot stall every later
+        // one on every restart; a record this build cannot *read* is the other
+        // case entirely — D5's reverted build — and continuing past it would
+        // rewrite the records this build understands in a store a newer one
+        // owns.
+        if (error instanceof UnreadableControlRecordError) throw error;
         failures.push(error);
       }
     }
-    reportSweepFailures(failures, recovered, options);
+    reportSweepFailures(failures, options);
     return recovered;
   }
 
@@ -986,9 +1004,17 @@ export class AgentCoordinator {
   private async settlePreparedDispatch(
     intentRecord: VersionedRecord<AgentDispatchIntentRecord>,
   ): Promise<AgentRunRecord | undefined> {
-    const runRecord = await requireCurrent(
-      this.repositories.runs.read(intentRecord.payload.agentRunId),
-    );
+    const read = await this.repositories.runs.read(intentRecord.payload.agentRunId);
+    if (read.kind === 'absent') {
+      // **An intent whose run is gone has nothing to settle.** A half-applied
+      // deletion or a hand-edited vault can leave one, and raising here would
+      // warn about the same orphan on every load with no path that ever
+      // resolves it — which is the cost this file's own report change cites.
+      // Skipped, as it was before this branch existed. Removing the orphan is a
+      // deletion transaction and is recorded rather than done here.
+      return undefined;
+    }
+    const runRecord = await requireCurrent(Promise.resolve(read));
     return this.enqueue(runRecord.payload.agentInstanceId, async () => {
       const currentIntent = await requireCurrent(
         this.repositories.dispatchIntents.read(intentRecord.recordId),
@@ -1499,23 +1525,20 @@ export interface AgentRecoverySweepOptions {
 
 function reportSweepFailures(
   failures: readonly unknown[],
-  recovered: readonly AgentRunRecord[],
   options: AgentRecoverySweepOptions,
 ): void {
   if (failures.length === 0) {
     return;
   }
-  if (options.onFailure) {
-    for (const failure of failures) {
-      options.onFailure(failure);
-    }
-    return;
-  }
-  if (recovered.length === 0) {
-    // No reporter and nothing came back: the caller learns why rather than
-    // being told there was nothing to recover. Kept for the callers that pass
-    // no reporter, which is every test that predates one.
+  if (!options.onFailure) {
+    // **One contract, not two.** A caller with no reporter learns about the
+    // first failure whether or not other records recovered; the alternative —
+    // silent as soon as anything succeeded — is exactly how a store with one
+    // permanently unfinishable record reported a clean recovery on every load.
     throw failures[0];
+  }
+  for (const failure of failures) {
+    options.onFailure(failure);
   }
 }
 
@@ -1555,8 +1578,18 @@ async function requireCurrent<T>(
 ): Promise<VersionedRecord<T>> {
   const result = await read;
   if (result.kind === 'current' || result.kind === 'migrated') return result.record;
-  if (result.kind === 'future') throw new Error(`Record "${result.recordId}" requires migration.`);
-  if (result.kind === 'corrupt') throw new Error(`Record "${result.recordId}" is corrupt: ${result.error}`);
+  // The same error the execution store raises, not a plain one. D5 says a store
+  // this build cannot read opens read-only and is reported, and the composition
+  // decides that by the error's type — so a plain `Error` here made the agent
+  // half of D5 unreachable: every unreadable record was filed as an ordinary
+  // per-record failure and the sweep carried on terminalizing the records it
+  // *could* read, in a store a newer build wrote.
+  if (result.kind === 'future') {
+    throw new UnreadableControlRecordError('future', `record "${result.recordId}"`);
+  }
+  if (result.kind === 'corrupt') {
+    throw new UnreadableControlRecordError('corrupt', `record "${result.recordId}": ${result.error}`);
+  }
   throw new Error('Required agent record is absent.');
 }
 

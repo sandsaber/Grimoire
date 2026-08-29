@@ -4,7 +4,10 @@ import { createDurableInMemoryVaultAdapter } from '@test/helpers/inMemoryVaultAd
 
 import { ApplicationRuntime } from '@/app/ApplicationRuntime';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
-import { AGENT_RUNS_PATH } from '@/core/agents/AgentControlPaths';
+import {
+  AGENT_DISPATCH_INTENTS_PATH,
+  AGENT_INSTANCES_PATH,
+} from '@/core/agents/AgentControlPaths';
 import { AgentControlTransactionCoordinator } from '@/core/agents/AgentControlTransactionCoordinator';
 import { AgentCoordinator } from '@/core/agents/AgentCoordinator';
 import { agentDispatchToken, agentInstanceId, agentRunId } from '@/core/agents/AgentIds';
@@ -237,7 +240,6 @@ describe('application runtime', () => {
     const report = jest.fn();
     const runtime = createRuntime(report, adapter);
     jest.spyOn(runtime.kernel, 'start').mockRejectedValue(new Error('startup recovery failed'));
-    (runtime as unknown as { options: { report: jest.Mock } }).options.report = report;
 
     await runtime.start();
 
@@ -254,9 +256,8 @@ describe('application runtime', () => {
   it('names a record a sweep could not read instead of reporting a clean recovery', async () => {
     // Both sweeps collect per record so one bad record cannot stall every later
     // one on every restart — and both threw only when *nothing* came back, so a
-    // store with one unreadable record beside one readable one recovered
-    // "successfully" and said nothing, on every load, while the record it could
-    // not read kept its run non-terminal.
+    // store with one unfinishable record beside one finishable one recovered
+    // "successfully" and said nothing, on every load.
     const adapter = createDurableInMemoryVaultAdapter();
     const storage = new VaultDurableStorage(adapter);
     const repositories = new AgentRepositories(storage, monotonicClock());
@@ -266,10 +267,9 @@ describe('application runtime', () => {
       scheduler: { setTimeout: () => 0, clearTimeout: () => undefined },
     });
     await before.prepareDispatch(dispatchCommand());
-    await storage.writeAtomic(
-      `${AGENT_RUNS_PATH}/agr-${'9'.repeat(32)}.json`,
-      JSON.stringify({ schemaVersion: 2, revision: 1, updatedAt: 1, payload: { broken: true } }),
-    );
+    // A half-applied deletion, which is a state the store can really be in: the
+    // run and its intent are there and the instance that owns them is not.
+    await storage.remove(`${AGENT_INSTANCES_PATH}/${INSTANCE_ID}.json`);
 
     const report = jest.fn();
     const runtime = createRuntime(report, adapter);
@@ -277,13 +277,62 @@ describe('application runtime', () => {
 
     expect(report).toHaveBeenCalledWith(expect.objectContaining({
       event: 'agents.recovery.recordSkipped',
+      data: { phase: 'pending-dispatches' },
     }));
-    // And the readable one was still recovered: the point of collecting per
-    // record is that the bad one does not take the rest with it.
-    expect(await repositories.runs.read(RUN_ID)).toMatchObject({
-      kind: 'current',
-      record: { payload: { terminal: { kind: 'interrupted' } } },
+    // And the load carried on: a record nothing could finish is not a store
+    // nothing can read.
+    expect(report).not.toHaveBeenCalledWith(expect.objectContaining({
+      event: 'agents.migrationRequired',
+    }));
+    runtime.dispose();
+  });
+
+  it('stops sweeping a store this build cannot read, rather than rewriting it', async () => {
+    // D5, on the agent store. The execution store has answered this way since
+    // the kernel landed — an unreadable record opens the store read-only and is
+    // reported — and the agent half was unreachable, because its own
+    // `requireCurrent` raised a plain error that the composition filed as an
+    // ordinary per-record failure. The sweep then carried on terminalizing
+    // every record it *could* read, in a store a newer build wrote.
+    const adapter = createDurableInMemoryVaultAdapter();
+    const storage = new VaultDurableStorage(adapter);
+    const repositories = new AgentRepositories(storage, monotonicClock());
+    const before = new AgentCoordinator(storage, {
+      now: monotonicClock(),
+      repositories,
+      scheduler: { setTimeout: () => 0, clearTimeout: () => undefined },
     });
+    await before.prepareDispatch(dispatchCommand());
+    // Sorted first, so the sweep meets it before the record it would otherwise
+    // rewrite — which is the whole assertion.
+    await storage.writeAtomic(
+      `${AGENT_DISPATCH_INTENTS_PATH}/adt-${'0'.repeat(32)}.json`,
+      JSON.stringify({
+        schemaVersion: 9_999,
+        recordId: `adt-${'0'.repeat(32)}`,
+        revision: 1,
+        updatedAt: 1,
+        payload: {},
+      }),
+    );
+
+    const report = jest.fn();
+    const runtime = createRuntime(report, adapter);
+    await runtime.start();
+
+    expect(report).toHaveBeenCalledWith(expect.objectContaining({
+      event: 'agents.migrationRequired',
+      data: { phase: 'pending-dispatches', recordKind: 'future' },
+    }));
+    // Untouched: the run this build understands is left exactly as the build
+    // that wrote it left it.
+    const untouched = await repositories.runs.read(RUN_ID);
+    expect(untouched).toMatchObject({
+      kind: 'current',
+      record: { payload: { state: 'dispatching' } },
+    });
+    expect((untouched as { record: { payload: { terminal?: unknown } } }).record.payload.terminal)
+      .toBeUndefined();
     runtime.dispose();
   });
 
@@ -316,11 +365,10 @@ describe('application runtime', () => {
   it('keeps the load alive when the kernel cannot start', async () => {
     // Every provider runs through the kernel, so a load that failed with it
     // would leave the user no settings tab to fix it from.
-    const runtime = createRuntime();
+    const report = jest.fn();
+    const runtime = createRuntime(report);
     const failure = new Error('startup recovery failed');
     jest.spyOn(runtime.kernel, 'start').mockRejectedValue(failure);
-    const report = jest.fn();
-    (runtime as unknown as { options: { report: jest.Mock } }).options.report = report;
 
     await expect(runtime.start()).resolves.toBeUndefined();
 
