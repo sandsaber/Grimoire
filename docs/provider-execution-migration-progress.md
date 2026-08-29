@@ -8297,10 +8297,12 @@ unpushed. Full gate green: unit 9029 / 9029 across 567 suites, integration 156, 
 
 **Two things are open, and neither is a recovery item.**
 
-- ~~Claude's refresh notices count the persisted list.~~ **Done, in the entry below.**
-- **the export baseline is a backlog of 183.** Several are real dead code the flip left —
-  `acpManagedSession.ts` entirely, `markAcpSessionLoadFailed`, which has no caller on `main` either.
-  A deletion pass over them is its own work.
+- ~~Claude's refresh notices count the persisted list.~~ **Done.**
+- ~~The export baseline is a backlog of 183.~~ **Down to 50, and the 50 are a decision** rather than a
+  queue: the baseline's own note sorts them into recorded orphans with an owner, exports that exist
+  for a test and say so, shapes kept as protocol documentation, and helpers that may be lost wiring.
+  Read `presentationParityManifest.ts` before acting on any of them — one deletion was already
+  restored for that reason.
 
 **Still the owner's:** the manual test-vault matrix, and pushing the branch.
 
