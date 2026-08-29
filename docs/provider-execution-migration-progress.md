@@ -10549,6 +10549,44 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Phase 2, 2 of 3 — Grok's effort picker reads what the session reported (`this commit`)
+
+- Gates: unit 9009 passed / 9009 total across 566 suites; `tsc --noEmit` clean; `npm run lint`
+  clean.
+- Recovery plan item 9.
+
+**`readGrokAcpModelThinkingOptions` arrived with the sync and had no caller.** `main` wired it in
+`GrokChatRuntime.syncSessionModelState` (#95) — a file this branch deletes — so the merge kept the
+reader, kept its nine tests, and dropped the one line that called it. The picker was back to what
+that fix was written to end: `thought_level` speaks for the active model alone, so every other model
+fell back to a list derived from its id, and `isGrokNativeModelId` matches every `grok-` prefix.
+grok-4.5 was therefore offered `xhigh`, which Grok Build refuses for it.
+
+Wired at the same place, adapted to where the payload now arrives. `main` threaded the levels in as
+a new `modelThinkingOptions` parameter read at both call sites; here `syncSessionModelState` already
+receives the raw payload, so the reader is called on it directly — one line instead of three edits,
+same input. It has to read the raw `params.models`: `normalizeGrokAcpSessionModels` keeps an id and
+a name, and the levels ride in each model's `_meta`.
+
+Precedence is `main`'s, including the part that is easy to lose: the `thought_level` option still
+wins for the active model, because it is the live state of this session rather than a description of
+the catalog — but an **absent** option no longer deletes that model's levels when the session did
+report them. `session/new` carries the per-model levels and no `thought_level` option at all, so the
+delete would have discarded exactly what was just learnt. With nothing describing the model, a stale
+list is still forgotten.
+
+**The static list stays the pre-discovery fallback, and `isGrokNativeModelId` is unchanged.** The
+recovery plan said to narrow it back; there is nothing to narrow back to — `git log -L` on the
+predicate shows it was introduced by the same #95 series in the prefix form it still has, and `main`
+deliberately kept the guess as the answer for a model no session has described yet. Reading the
+report is the fix; the guess only survives until the first session.
+
+**Three tests, in the state's own file, driven from the recorded `session/new` payload** rather than
+from the merged map `main` asserted on — so they cover the path from `_meta` to settings, not only
+the merge. Proven by replacing the call with `{}`: the two wiring tests fail. The third, which holds
+the stale-list drop, passes either way by design — it guards the behaviour this change must not
+break.
+
 ### Phase 2, 1 of 3 — Claude's plan panel is connected, and two defects with it (`this commit`)
 
 - Gates: unit 9006 passed / 9006 total across 566 suites; `tsc --noEmit` clean; `npm run lint`

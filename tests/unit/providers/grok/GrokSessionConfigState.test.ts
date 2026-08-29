@@ -437,6 +437,136 @@ describe('Grok session configuration state', () => {
     expect(plugin.settings.model).toBe('grok:grok-4.6');
   });
 
+  /**
+   * Shape taken from a live `session/new` response: Grok Build states the levels
+   * for every model it offers, in each model's `_meta`, and grok-4.5's list is
+   * one level shorter than grok-4.6's.
+   */
+  const LIVE_SESSION_MODELS = {
+    availableModels: [
+      {
+        modelId: 'grok-4.6',
+        name: 'Grok 4.6',
+        _meta: {
+          supportsReasoningEffort: true,
+          reasoningEffort: 'xhigh',
+          reasoningEfforts: [
+            { id: 'xhigh', value: 'xhigh', label: 'Extra High Effort', default: false },
+            { id: 'high', value: 'high', label: 'High Effort', default: true },
+            { id: 'medium', value: 'medium', label: 'Medium Effort', default: false },
+            { id: 'low', value: 'low', label: 'Low Effort', default: false },
+          ],
+        },
+      },
+      {
+        modelId: 'grok-4.5',
+        name: 'Grok 4.5',
+        _meta: {
+          supportsReasoningEffort: true,
+          reasoningEffort: 'high',
+          reasoningEfforts: [
+            { id: 'high', value: 'high', label: 'High Effort', default: true },
+            { id: 'medium', value: 'medium', label: 'Medium Effort', default: false },
+            { id: 'low', value: 'low', label: 'Low Effort', default: false },
+          ],
+        },
+      },
+    ],
+    currentModelId: 'grok-4.6',
+  };
+
+  function createModelReportingPlugin(grokConfig: Record<string, unknown> = {}): any {
+    return createMockPlugin({
+      settings: {
+        model: 'grok:grok-4.6',
+        providerConfigs: {
+          grok: {
+            discoveredModels: [],
+            preferredThinkingByModel: {},
+            visibleModels: [],
+            ...grokConfig,
+          },
+        },
+        settingsProvider: 'grok',
+      },
+    });
+  }
+
+  it('records the reasoning levels each available model reports, not only the active one', async () => {
+    // `thought_level` speaks for the active model alone, so a picker fed only by
+    // it has to guess every other model from its id - and the guess is wrong
+    // whenever two native models differ.
+    const plugin = createModelReportingPlugin();
+    const state = createState(plugin);
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('grok');
+
+    await state.syncSessionModelState({ models: LIVE_SESSION_MODELS });
+
+    const thinkingOptions = getGrokProviderSettings(plugin.settings).thinkingOptionsByModel;
+    expect(thinkingOptions['grok-4.6'].map((variant) => variant.value)).toEqual([
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+    ]);
+    // grok-4.5 was never the active model, and it must still not be offered a
+    // level Grok Build refuses for it.
+    expect(thinkingOptions['grok-4.5'].map((variant) => variant.value)).toEqual([
+      'low',
+      'medium',
+      'high',
+    ]);
+  });
+
+  it('lets the live thought-level option override the reported levels for the active model', async () => {
+    const plugin = createModelReportingPlugin();
+    const state = createState(plugin);
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('grok');
+
+    await state.syncSessionModelState({
+      configOptions: [
+        {
+          category: 'thought_level',
+          currentValue: 'high',
+          id: 'effort',
+          name: 'Effort',
+          options: [
+            { name: 'High', value: 'high' },
+            { name: 'Low', value: 'low' },
+          ],
+          type: 'select',
+        },
+      ],
+      models: LIVE_SESSION_MODELS,
+    });
+
+    // The option describes this session as it is now, the report describes the
+    // catalog, so the session wins where they disagree.
+    expect(getGrokProviderSettings(plugin.settings).thinkingOptionsByModel['grok-4.6']
+      .map((variant) => variant.value)).toEqual(['low', 'high']);
+    // A model the option says nothing about keeps what the session reported.
+    expect(getGrokProviderSettings(plugin.settings).thinkingOptionsByModel['grok-4.5']
+      .map((variant) => variant.value)).toEqual(['low', 'medium', 'high']);
+  });
+
+  it('still forgets a stale level list when nothing in the session describes the model', async () => {
+    const plugin = createModelReportingPlugin({
+      discoveredModels: [{ label: 'Grok 4.6', rawId: 'grok-4.6' }],
+      thinkingOptionsByModel: { 'grok-4.6': [{ label: 'Extra high', value: 'xhigh' }] },
+      visibleModels: ['grok-4.6'],
+    });
+    const state = createState(plugin);
+    jest.spyOn(modelRouting, 'resolveSettingsProviderId').mockReturnValue('grok');
+
+    // No `_meta` and no thought_level option: nothing here describes the model,
+    // which is the case the stale list still has to be dropped in.
+    await state.syncSessionModelState({
+      models: { availableModels: [{ modelId: 'grok-4.6', name: 'Grok 4.6' }], currentModelId: 'grok-4.6' },
+    });
+
+    expect(getGrokProviderSettings(plugin.settings).thinkingOptionsByModel['grok-4.6']).toBeUndefined();
+  });
+
   it('syncs detached ACP thought-level options into Grok Build provider state', async () => {
     const refreshModelSelector = jest.fn();
     const plugin = createMockPlugin({

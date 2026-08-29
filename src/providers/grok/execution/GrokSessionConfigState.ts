@@ -23,6 +23,7 @@ import {
   isGrokModelSelectionId,
   normalizeGrokDiscoveredModels,
   normalizeGrokModelVariants,
+  normalizeGrokThinkingOptionsByModel,
   resolveGrokBaseModelRawId,
 } from '@/providers/grok/models';
 import {
@@ -39,7 +40,10 @@ import {
 } from '@/providers/grok/runtime/GrokModelsCache';
 import { resolveManagedGrokHomePath } from '@/providers/grok/runtime/GrokPaths';
 import { buildGrokRuntimeEnv } from '@/providers/grok/runtime/GrokRuntimeEnvironment';
-import { normalizeGrokAcpSessionModels } from '@/providers/grok/runtime/normalizeGrokAcpSessionState';
+import {
+  normalizeGrokAcpSessionModels,
+  readGrokAcpModelThinkingOptions,
+} from '@/providers/grok/runtime/normalizeGrokAcpSessionState';
 import {
   getGrokProviderSettings,
   updateGrokProviderSettings,
@@ -304,11 +308,27 @@ export class GrokSessionConfigState {
       : null;
     this.currentSessionEffortValues = new Set(currentThinkingOptions.map((option) => option.value));
 
-    const nextThinkingOptionsByModel = { ...currentSettings.thinkingOptionsByModel };
+    // The agent reports the levels for every available model, so one session
+    // makes the picker exact for models the user has not opened yet. Read from
+    // the raw payload rather than the normalized models above, which keep only
+    // an id and a name while the levels ride in each model's `_meta`.
+    const acpModelThinkingOptions = normalizeGrokThinkingOptionsByModel(
+      readGrokAcpModelThinkingOptions(params.models),
+      discoveredModels,
+    );
+    const nextThinkingOptionsByModel = {
+      ...currentSettings.thinkingOptionsByModel,
+      ...acpModelThinkingOptions,
+    };
     if (currentBaseRawModelId) {
       if (currentThinkingOptions.length > 0) {
+        // The `thought_level` option still wins for the active model: it is the
+        // live state of this session rather than a description of the catalog.
         nextThinkingOptionsByModel[currentBaseRawModelId] = currentThinkingOptions;
-      } else {
+      } else if (!acpModelThinkingOptions[currentBaseRawModelId]) {
+        // Dropping a stale list stays the behaviour when nothing describes this
+        // model, but session/new carries the per-model levels without any
+        // thought_level option, so a report must not be deleted as if absent.
         delete nextThinkingOptionsByModel[currentBaseRawModelId];
       }
     }
