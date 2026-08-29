@@ -1,3 +1,8 @@
+> **Executed.** `main` was merged into `providers-migration` at the M6 gate — `dc8389d`, PR #107 —
+> and the migration journal's entry for it records what was carried, what was resolved as a deletion,
+> and the one thing recorded rather than ported. This file is kept as the method: regenerate it
+> before the next sync rather than reading these numbers as current.
+
 # Syncing `main` into `providers-migration`
 
 The migration branch's standing rule is that milestones are **not** merged to `main`, and that the

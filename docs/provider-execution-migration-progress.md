@@ -34,7 +34,7 @@ Journal rules that keep this true:
 
 - Migration branch: `providers-migration`
 - Baseline: `main` at 1.1.6 (`b08e4bd`)
-- Last synced with `main`: 1.1.7 (`0f84b41`), merged at the M0a gate
+- Last synced with `main`: `dc8389d` (PR #107), merged at the M6 gate; the previous sync was 1.1.7 (`0f84b41`) at M0a
 - M0a, M0b (for the four proof providers), M1, M2-proofs, and M2-adapter are complete; M2-flips is in
   progress. The status table below carries the checkpoint commits; the **Current blocker** section at
   the bottom is the single resume pointer and overrides anything above it.
@@ -8277,7 +8277,7 @@ Gates: unit 535 suites / 8,438 tests, integration 5 / 156, typecheck, `eslint`, 
 **Single resume pointer. Everything below this line is the current state; nothing above it
 overrides it.**
 
-Active branch: `providers-migration`. Last synced with `main`: 1.1.7 (`0f84b41`).
+Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #107), at the M6 gate.
 
 ### Where the session of 2026-08-29 ended
 
@@ -8322,16 +8322,16 @@ recovery protocol is written twice, the D5 latch stops at the first unreadable r
 before the first write, a replayed delete batch can remove a record this build cannot read, and that
 latch is a second copy of the registry's where one `ControlStoreReadability` would serve both.
 
-**And the thing that actually stands between this branch and a shipped migration.** `main` is
-**137 commits ahead** of `providers-migration` and a merge conflicts in **148 files** — among them
-every legacy `*ChatRuntime` this migration deleted, which main has gone on fixing. The standing rule
-says sync `main` in at every milestone gate; the last sync was 1.1.7 (`0f84b41`) at M0a, and M1
-through M6 did not. That is not a merge to perform on the way out of a session: it decides whether
-the deleted runtimes come back to be deleted again, or whether main's 137 commits are replayed onto
-the migrated shape instead. **Owner's call, and it is the next thing.** [`provider-execution-main-sync.md`](provider-execution-main-sync.md) turns it into a decision with a size: 76 of the 137 touch no source, 34 touch only files that still exist, and **25 are the decision surface** — 2 that land entirely on code this migration deleted and 23 that land on both. Two more add features this branch does not have at all. For each of those 33 the question is not whether to take the diff but whether the migrated path has the same bug, which is the rule `AGENTS.md` already states about the frozen path.
+**The `main` sync is done.** It was 137 commits, and the entry above records what it cost: 43
+conflicted files, 26 of them resolved as the deletions this migration made, and the model-catalog
+cache, the message queue, the Windows quoting and Antigravity's vault skills carried onto the
+migrated shape rather than taken as diffs. The whole gate is green on the merged branch. One thing
+`main` has that this branch does not is recorded rather than faked: the session-restart notice's UI
+arrived and its source did not. [`provider-execution-main-sync.md`](provider-execution-main-sync.md) turns it into a decision with a size: 76 of the 137 touch no source, 34 touch only files that still exist, and **25 are the decision surface** — 2 that land entirely on code this migration deleted and 23 that land on both. Two more add features this branch does not have at all. For each of those 33 the question is not whether to take the diff but whether the migrated path has the same bug, which is the rule `AGENTS.md` already states about the frozen path.
 
-**Where to pick up.** The sync, with a decision about its shape. Everything else in M5 and M6 is
-either done or recorded with an owner.
+**Where to pick up.** The manual test-vault matrix, which is the owner's, and the open items each
+entry above owns — the largest being the session-restart notice, which needs one provider's
+composition to answer `sessionDropped`.
 
 ### Where the session of 2026-08-28 ended
 
@@ -10547,6 +10547,60 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### The `main` sync, executed (`this commit`)
+
+- Gates: unit 8962 passed / 8962 total across 562 suites; integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Last synced with `main`: `dc8389d` (PR #107). The previous sync was 1.1.7 (`0f84b41`), at the M0a
+  gate; M1 through M6 did not sync, which is why this one was 137 commits.
+
+**The standing rule's mitigation, finally run.** It was sized in
+[`provider-execution-main-sync.md`](provider-execution-main-sync.md) first, because 137 commits and
+148 conflicted paths is not a number anyone can act on. The merge itself conflicts in **43** files:
+26 are files this migration deleted and `main` went on fixing, resolved as deletions, and 17 needed a
+person. What is left after that is the question `AGENTS.md` already states about the frozen path —
+not whether to take the diff, but **whether the migrated path has the same bug**.
+
+**Carried onto the migrated shape:**
+
+- **the model-catalog refresh cache, for every provider.** `main` built it against the legacy
+  runtimes; its machinery is new files that merge cleanly, and what needed porting was each
+  provider's catalog — Gemini's and Qwen's keep the isolated metadata session this branch replaced a
+  whole chat runtime with. **The `force` flag is plumbed through `ProviderModelsPort`**, because the
+  migrated path has two callers where `main` had one indirection: the settings surface is the user
+  asking, and the tab's background top-up is not. Without that distinction the cache would have been
+  bypassed by exactly the caller it exists to stop;
+- **the fingerprints those caches key on** — persisted, decoded, and registered as known settings
+  keys, so a codec that files them as unknown does not quietly drop them on the next write;
+- **`main`'s message queue, with this branch's projection cancel.** A cancel now pauses the queue and
+  returns an unlanded steer to its head rather than emptying it into the composer, *and* stops the
+  run through the kernel. Two tests moved with it: one that read the retired single slot, and one
+  that asserted the composer was repopulated;
+- **Antigravity's vault skills in the slash menu**, with the capability change moved to the catalog,
+  where this branch keeps workspace capabilities;
+- **the Windows `cmd.exe` argument quoting, beside the fish-shell forwarding fix.** Both are launch
+  fixes for different shells and the conflict was only that they landed in the same place;
+- **both CI jobs**: this branch's cross-platform execution matrix, which `executionPlatformCoverage`
+  reads, and `main`'s non-blocking Windows unit job.
+
+**Recorded rather than carried: `main`'s session-restart notice.** Its UI arrived with the merge and
+its *source* did not. The fact exists — `acpSessionResume` computes `sessionDropped`, and three
+providers write it into `providerState` — so what is missing is a composition reading it back.
+`ExecutionChatRuntimeAdapter` has an optional `sessionDropped` port for it, unimplemented, and the
+adapter answers `isSessionDropped()` from it. **A user on this branch does not get the notice yet.**
+Owner: whoever wires the first provider's composition to it.
+
+**Two housekeeping resolutions worth naming.** Three Antigravity modules the flip orphaned came back
+with the merge and are deleted again, with their tests — the parity gate is what caught them. And
+three comments `main` wrote naming `ProviderWorkspaceRegistry.initialize()` are corrected rather than
+left to raise a deletion gate's count: the class is gone, and a comment describing it is a comment
+describing nothing.
+
+**One correction to the inventory that sized this.** Its first pass asked only whether a file exists
+on this branch, which gives the same answer for a file the migration deleted and a file `main`
+added — it counted a new message-queue feature as a fix to deleted code. Classified against the merge
+base instead, the decision surface was 25 commits and two features, not 33.
 
 ### M6 — the latch was in the wrong place, and a read is not a verdict (`this commit`)
 
