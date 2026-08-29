@@ -55,6 +55,11 @@ export function buildAntigravityPrintArgs(spec: AntigravityPrintArgsSpec): strin
   if (spec.model) {
     args.push('--model', spec.model);
   }
+  // Told to stop just under Grimoire's own ceiling, so the CLI ends itself with
+  // a structured result frame rather than being killed from outside (#70).
+  if (spec.capabilities?.printTimeout) {
+    args.push('--print-timeout', ANTIGRAVITY_PRINT_TIMEOUT_FLAG_VALUE);
+  }
   if (usesAntigravityStreamJson(spec)) {
     // No `--print`: the prompt is a line on stdin, and passing both is what
     // `agy` refuses. The transcript never touches argv, which is the point —

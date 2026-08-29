@@ -10549,6 +10549,37 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Recovery 3 of 6 — a long turn is not a hung one (`this commit`)
+
+- Gates: unit 8987 passed / 8987 total across 563 suites; integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Recovery plan item 4, both halves, and the flag from item 1 that had to wait for them.
+
+**The fixed five-minute kill is gone.** This branch armed one timer at
+`timeoutMs ?? 5 * 60_000` and terminated whatever was still running when it fired. `agy` emits
+frames at step transitions rather than continuously, so a healthy tool call keeps both pipes quiet —
+one measured at about five minutes in the wild — and that timer ended those runs on the clock (#70).
+
+Three things in place of it:
+
+- **an inactivity clock**, ten minutes, restarted by every sign of life. Ten rather than five is
+  `main`'s own correction after the measurement above;
+- **an absolute ceiling**, thirty minutes, which is the backstop for a run that never ends at all.
+  The two are separate fields now, because they answer different questions and one number could not;
+- **`--print-timeout 29m`** when the probe says the CLI knows the flag — just under the ceiling, so
+  `agy` ends itself with a structured result frame instead of being killed from outside.
+
+**What counts as a sign of life.** Every byte on either pipe, and — the half that matters for a
+silent tool call — **the run's own log file growing**. `agy` keeps appending to it throughout, which
+is the only thing that separates a long call from a hang. The poll is fifteen seconds, injectable for
+tests, `unref`'d so it never keeps a process alive, and takes its timers from `window` because a
+timer from the wrong global dies with a popout the user closes mid-turn.
+
+**The test asserts the refresh replaces rather than adds.** Counting a run's armed timers before and
+after a sign of life is the difference between a working refresh and one that leaves the original
+deadline armed beside a new one — which is the same bug wearing the fix's clothes. Proven by removing
+the `clearTimeout` from the refresh: the count goes up and the test fails.
+
 ### Recovery 2 of 6 — the transcript leaves argv (`this commit`)
 
 - Gates: unit 8985 passed / 8985 total across 563 suites; `tsc --noEmit` clean; `npm run lint`

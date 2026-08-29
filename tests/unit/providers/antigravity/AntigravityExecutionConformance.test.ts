@@ -47,7 +47,7 @@ function createDriver(
     resultSink,
     scheduler,
     sessionInstanceIdFactory: () => sessionInstanceId(`si-${'1'.repeat(32)}`),
-    timeoutMs: 100,
+    inactivityTimeoutMs: 100,
     gracefulTerminationMs: 10,
     forcedTerminationMs: 10,
   });

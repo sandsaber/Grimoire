@@ -134,6 +134,42 @@ describe('AntigravityPrintProcessRunner', () => {
     expect(streamed).toEqual(['par', 'tial']);
   });
 
+  it('counts a growing log as a sign of life, and asks agy to stop before we do', async () => {
+    // **The only signal a silent tool call gives.** `agy` emits frames on step
+    // transitions rather than continuously, so a healthy call — one measured at
+    // about five minutes in the wild — keeps both pipes quiet while its log
+    // keeps growing (#70). Without this, the run reads as hung.
+    const child = new FakeManagedChild();
+    const transport = new FakeTransport(child);
+    const activity: string[] = [];
+    let poll: (() => void) | undefined;
+    const sizes = [0, 0, 512, 512];
+    const runner = new AntigravityPrintProcessRunner({
+      transport,
+      createLogPath: () => '/tmp/antigravity.log',
+      removeLog: jest.fn().mockResolvedValue(undefined),
+      setPoll: (callback) => { poll = callback; return 1; },
+      clearPoll: () => undefined,
+      logSize: async () => sizes.shift() ?? 512,
+    });
+
+    const handle = runner.start({
+      ...INVOCATION,
+      cliCapabilities: { addDir: false, printTimeout: true, streamJson: false },
+    }, { onActivity: () => activity.push('alive') });
+    poll?.();
+    poll?.();
+    poll?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    child.exit.resolve({ code: 0 });
+    await handle.completed;
+
+    // Once, for the poll that saw growth — not for the two that saw none.
+    expect(activity).toEqual(['alive']);
+    expect(transport.specs[0]?.args).toEqual(expect.arrayContaining(['--print-timeout', '29m']));
+  });
+
   it('signals a combined byte overflow instead of silently truncating provider output', async () => {
     const child = new FakeManagedChild({
       stdout: ['123', '4567'],
@@ -195,7 +231,7 @@ describe('AntigravityPrintProcessRunner', () => {
       resultSink,
       scheduler: new ImmediateScheduler(),
       sessionInstanceIdFactory: () => sessionInstanceId(`si-${'a'.repeat(32)}`),
-      timeoutMs: 1_000,
+      inactivityTimeoutMs: 1_000,
       gracefulTerminationMs: 1,
       forcedTerminationMs: 1,
     });

@@ -81,7 +81,13 @@ export interface AntigravityProcessHandle {
 /** What the backend wants told to it while the run is still open. */
 export interface AntigravityProcessRunnerHooks {
   readonly onAssistantText?: (text: string) => void;
+  /** Any sign the run is alive: a byte on a pipe, or its log file growing. */
+  readonly onActivity?: () => void;
 }
+
+/** See `inactivityTimeoutMs`; ten minutes is `main`'s measured answer (#70). */
+export const ANTIGRAVITY_INACTIVITY_TIMEOUT_MS = 10 * 60_000;
+export const ANTIGRAVITY_ABSOLUTE_TIMEOUT_MS = 30 * 60_000;
 
 export interface AntigravityProcessRunner {
   /** Returns durable process-tree ownership synchronously. */
@@ -114,7 +120,17 @@ export interface AntigravityExecutionBackendContext {
   readonly scheduler: AntigravityScheduler;
   readonly sessionInstanceIdFactory: () => SessionInstanceId;
   readonly now?: () => number;
-  readonly timeoutMs?: number;
+  /**
+   * How long a run may stay silent before it is treated as hung.
+   *
+   * Inactivity, not duration: `agy` emits frames on step transitions rather
+   * than continuously, and a healthy tool call can legitimately keep the pipes
+   * quiet for minutes — one measured at about five in the wild (#70). The
+   * ceiling below is the backstop for a run that never ends at all.
+   */
+  readonly inactivityTimeoutMs?: number;
+  /** The absolute ceiling for one request, however active it stays. */
+  readonly absoluteTimeoutMs?: number;
   readonly gracefulTerminationMs?: number;
   readonly forcedTerminationMs?: number;
   readonly resultCommitTimeoutMs?: number;
@@ -131,7 +147,14 @@ export class AntigravityExecutionBackend implements ExecutionBackend {
   private disposing = false;
 
   constructor(private readonly context: AntigravityExecutionBackendContext) {
-    requirePositive(context.timeoutMs ?? 5 * 60_000, 'Antigravity timeout');
+    requirePositive(
+      context.inactivityTimeoutMs ?? ANTIGRAVITY_INACTIVITY_TIMEOUT_MS,
+      'Antigravity inactivity timeout',
+    );
+    requirePositive(
+      context.absoluteTimeoutMs ?? ANTIGRAVITY_ABSOLUTE_TIMEOUT_MS,
+      'Antigravity absolute timeout',
+    );
     requirePositive(
       context.gracefulTerminationMs ?? 2_000,
       'Antigravity graceful termination timeout',
@@ -250,6 +273,7 @@ class AntigravityExecutionRun implements ExecutionRun {
   private terminal = false;
   private cancellation: CancellationReason | undefined;
   private timeoutHandle: unknown;
+  private absoluteTimeoutHandle: unknown;
   private terminationPromise: Promise<void> | undefined;
   private outcome: AntigravityProcessOutcome | undefined;
   private resultCommit: Promise<ResultCommitSettlement> | undefined;
@@ -320,13 +344,15 @@ class AntigravityExecutionRun implements ExecutionRun {
     }
     try {
       const process = this.context.processRunner.start(invocation, {
+        onActivity: () => this.armInactivityTimeout(),
         onAssistantText: text => this.publishStreamedText(text),
       });
       this.process = process;
       void process.outputLimitExceeded.then(() => this.requestTermination('output-limit'));
-      this.timeoutHandle = this.context.scheduler.setTimeout(() => {
+      this.armInactivityTimeout();
+      this.absoluteTimeoutHandle = this.context.scheduler.setTimeout(() => {
         void this.requestTermination('timeout');
-      }, this.context.timeoutMs ?? 5 * 60_000);
+      }, this.context.absoluteTimeoutMs ?? ANTIGRAVITY_ABSOLUTE_TIMEOUT_MS);
       await process.started;
       if (this.cancellation) {
         await this.requestTermination('cancel');
@@ -597,7 +623,31 @@ class AntigravityExecutionRun implements ExecutionRun {
     this.publish(delivery);
   }
 
+  /**
+   * Restarts the silence clock.
+   *
+   * Called for every sign of life the runner sees — a byte on either pipe, and
+   * the run's own log file growing, which is the only signal a silent tool call
+   * gives. A run that keeps working is never cut by this; only the absolute
+   * ceiling ends it.
+   */
+  private armInactivityTimeout(): void {
+    if (this.terminal) {
+      return;
+    }
+    if (this.timeoutHandle !== undefined) {
+      this.context.scheduler.clearTimeout(this.timeoutHandle);
+    }
+    this.timeoutHandle = this.context.scheduler.setTimeout(() => {
+      void this.requestTermination('timeout');
+    }, this.context.inactivityTimeoutMs ?? ANTIGRAVITY_INACTIVITY_TIMEOUT_MS);
+  }
+
   private clearTimeout(): void {
+    if (this.absoluteTimeoutHandle !== undefined) {
+      this.context.scheduler.clearTimeout(this.absoluteTimeoutHandle);
+      this.absoluteTimeoutHandle = undefined;
+    }
     if (this.timeoutHandle !== undefined) {
       this.context.scheduler.clearTimeout(this.timeoutHandle);
       this.timeoutHandle = undefined;

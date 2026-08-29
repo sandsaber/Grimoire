@@ -19,6 +19,7 @@ import {
   type AntigravityProcessHandle,
   type AntigravityProcessOutcome,
   type AntigravityProcessRunner,
+  type AntigravityProcessRunnerHooks,
   type AntigravityResultCommitOutcome,
   type AntigravityScheduler,
 } from '@/providers/antigravity/execution/AntigravityExecutionBackend';
@@ -391,6 +392,38 @@ describe('AntigravityExecutionBackend', () => {
     ]));
   });
 
+  it('does not cut a run that keeps showing signs of life', async () => {
+    // **Inactivity, not duration.** `agy` emits frames on step transitions
+    // rather than continuously, so a healthy tool call keeps the pipes quiet
+    // for minutes — and the fixed five-minute kill this replaces ended those
+    // runs on the clock (#70). Every sign of life restarts the silence clock;
+    // only the absolute ceiling ends a run that keeps going forever.
+    const fixture = createFixture();
+    const process = fixture.runner.enqueue();
+    const session = await createSession(fixture.backend);
+    const run = session.createRun(request(RUN_ID));
+    const events = collectEvents(run);
+    await flushPromises();
+
+    // Two timers guard the run: the silence clock and the absolute ceiling.
+    const armed = fixture.scheduler.pending();
+    fixture.runner.hooks?.onActivity?.();
+
+    // Still two. A refresh that only *added* a timer would leave the old one
+    // armed, and the run would still be cut at the original deadline — which is
+    // exactly the bug, dressed as a fix.
+    expect(fixture.scheduler.pending()).toBe(armed);
+    process.complete({ exitCode: 0, stdout: 'answer', stderr: '' });
+    await flushPromises();
+
+    await expect(events).resolves.not.toContainEqual(
+      expect.objectContaining({
+        event: expect.objectContaining({ kind: 'terminal', reason: 'timeout' }),
+      }),
+    );
+    await fixture.backend.dispose();
+  });
+
   it('starts the timeout before readiness and owns cleanup through backend disposal', async () => {
     const fixture = createFixture();
     const process = fixture.runner.enqueue({ readiness: 'pending' });
@@ -464,7 +497,7 @@ function createFixture(options: FixtureOptions = {}) {
     scheduler,
     sessionInstanceIdFactory: () => sessionInstanceId(`si-${'d'.repeat(32)}`),
     now: () => ++clock,
-    timeoutMs: 100,
+    inactivityTimeoutMs: 100,
     gracefulTerminationMs: 10,
     forcedTerminationMs: 10,
     resultCommitTimeoutMs: 10,
@@ -514,8 +547,14 @@ class FakeProcessRunner implements AntigravityProcessRunner {
     return process;
   }
 
-  start(invocation: AntigravityInvocation): AntigravityProcessHandle {
+  hooks: AntigravityProcessRunnerHooks | undefined;
+
+  start(
+    invocation: AntigravityInvocation,
+    hooks?: AntigravityProcessRunnerHooks,
+  ): AntigravityProcessHandle {
     this.invocations.push(invocation);
+    this.hooks = hooks;
     if (this.startError) {
       throw this.startError;
     }
@@ -650,6 +689,11 @@ class ManualScheduler implements AntigravityScheduler {
 
   fireNext(): void {
     this.callbacks.shift()?.();
+  }
+
+  /** How many timers are armed; the silence clock is one of them. */
+  pending(): number {
+    return this.callbacks.length;
   }
 
   fireAll(): void {

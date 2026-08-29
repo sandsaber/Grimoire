@@ -54,6 +54,17 @@ export interface AntigravityProcessTransport {
 
 export interface AntigravityPrintProcessRunnerOptions {
   readonly transport: AntigravityProcessTransport;
+  /**
+   * How often the run's log file is measured for growth.
+   *
+   * The only sign of life a silent tool call gives: `agy` keeps appending to
+   * its own log while the pipes stay quiet, so a growing log is the difference
+   * between a long call and a hang (#70).
+   */
+  readonly livenessPollMs?: number;
+  readonly setPoll?: (callback: () => void, intervalMs: number) => unknown;
+  readonly clearPoll?: (handle: unknown) => void;
+  readonly logSize?: (logFilePath: string) => Promise<number>;
   /** Combined stdout, stderr, and recovered-result byte ceiling. */
   readonly outputByteLimit?: number;
   readonly createLogPath?: () => string;
@@ -122,12 +133,54 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
       void child.sendInput(formatAntigravityUserEvent(invocation.prompt)).catch(() => undefined);
     }
     const outputLimit = new OutputLimitMonitor(this.options.outputByteLimit ?? 64_000);
+    const stopLiveness = hooks.onActivity
+      ? this.watchLogLiveness(logFilePath, hooks.onActivity)
+      : () => undefined;
     return {
       started: child.started,
-      completed: this.observeCompletion(child, invocation, logFilePath, outputLimit, parser),
+      completed: this.observeCompletion(child, invocation, logFilePath, outputLimit, parser, hooks)
+        .finally(stopLiveness),
       outputLimitExceeded: outputLimit.exceeded,
       confirmTerminated: () => child.confirmTerminated(),
       terminate: mode => child.terminate(mode),
+    };
+  }
+
+  /**
+   * Reports the run's log file growing as a sign of life.
+   *
+   * `agy` emits frames on step transitions rather than continuously, so a
+   * single long tool call keeps both pipes silent — one measured at about five
+   * minutes in the wild. The log keeps growing throughout, which is what tells
+   * a long call apart from a hang (#70).
+   */
+  private watchLogLiveness(logFilePath: string, onActivity: () => void): () => void {
+    // `window`, per the popout-window rule: a timer from the wrong global stops
+    // when that window closes, and this one has to outlive a popout the user
+    // shuts while a turn is running.
+    const setPoll = this.options.setPoll
+      ?? ((callback, intervalMs) => window.setInterval(callback, intervalMs));
+    const clearPoll = this.options.clearPoll
+      ?? ((handle: unknown) => window.clearInterval(handle as number));
+    const readSize = this.options.logSize ?? logSize;
+    let lastSize = 0;
+    let stopped = false;
+    const handle = setPoll(() => {
+      void readSize(logFilePath).then((size) => {
+        if (stopped || size <= lastSize) {
+          return;
+        }
+        lastSize = size;
+        onActivity();
+      }).catch(() => undefined);
+    }, this.options.livenessPollMs ?? 15_000);
+    // Never a reason to keep the process alive: the poll exists to notice a
+    // living run, not to outlive one. `unref` is absent in the renderer, which
+    // is why it is called optionally rather than assumed.
+    (handle as { unref?: () => void } | undefined)?.unref?.();
+    return () => {
+      stopped = true;
+      clearPoll(handle);
     };
   }
 
@@ -136,15 +189,19 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
     invocation: AntigravityInvocation,
     logFilePath: string,
     outputLimit: OutputLimitMonitor,
-    parser?: AntigravityStreamJsonParser,
+    parser: AntigravityStreamJsonParser | undefined,
+    hooks: AntigravityProcessRunnerHooks,
   ): Promise<AntigravityProcessOutcome> {
     const stdout = new LimitedBytes(outputLimit);
     const stderr = new LimitedBytes(outputLimit);
+    const onActivity = hooks.onActivity;
     try {
       const [exit] = await Promise.all([
         child.exited,
-        parser ? consumeFrames(child.stdout, parser, outputLimit) : consume(child.stdout, stdout),
-        consume(child.stderr, stderr),
+        parser
+          ? consumeFrames(child.stdout, parser, outputLimit, onActivity)
+          : consume(child.stdout, stdout, onActivity),
+        consume(child.stderr, stderr, onActivity),
       ]);
       // **The frame, not the pipe.** In stream-json the answer is one field of
       // the last `result` frame, and the frames around it are progress this
@@ -243,8 +300,13 @@ class LimitedBytes {
   }
 }
 
-async function consume(stream: AsyncIterable<Uint8Array>, output: LimitedBytes): Promise<void> {
+async function consume(
+  stream: AsyncIterable<Uint8Array>,
+  output: LimitedBytes,
+  onActivity?: () => void,
+): Promise<void> {
   for await (const chunk of stream) {
+    onActivity?.();
     output.append(chunk);
   }
 }
@@ -259,9 +321,11 @@ async function consumeFrames(
   stream: AsyncIterable<Uint8Array>,
   parser: AntigravityStreamJsonParser,
   outputLimit: OutputLimitMonitor,
+  onActivity?: () => void,
 ): Promise<void> {
   const decoder = new TextDecoder('utf8');
   for await (const chunk of stream) {
+    onActivity?.();
     if (!outputLimit.consume(chunk.byteLength)) {
       return;
     }
@@ -271,6 +335,10 @@ async function consumeFrames(
 
 function removeLog(logFilePath: string): Promise<void> {
   return fs.unlink(logFilePath);
+}
+
+function logSize(logFilePath: string): Promise<number> {
+  return fs.stat(logFilePath).then(stats => stats.size);
 }
 
 function requirePositive(value: number, label: string): void {
