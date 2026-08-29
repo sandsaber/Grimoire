@@ -5,6 +5,12 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 
 import type { ChatRuntimeEnsureReadyOptions } from '../../../core/runtime/types';
+import {
+  TOOL_TASK_CREATE,
+  TOOL_TASK_GET,
+  TOOL_TASK_LIST,
+  TOOL_TASK_UPDATE,
+} from '../../../core/tools/toolNames';
 import type { ImageAttachment, StreamChunk } from '../../../core/types';
 import type { PermissionMode } from '../../../core/types/settings';
 import type { ClaudeModel, EffortLevel } from '../types/models';
@@ -123,6 +129,24 @@ export interface SessionState {
 }
 
 export const UNSUPPORTED_SDK_TOOLS = [] as const;
+
+/**
+ * Built-in tools the sdk stopped offering by default. Since 0.3.233 the task
+ * tracking tools are out of the default surface on Opus 4.8, Sonnet 5, Fable 5
+ * and newer, so a run that names none of them can never track a plan. Naming
+ * them in `allowedTools` re-enables the whole group without replacing the rest
+ * of the default surface, which is what setting `tools` would do.
+ *
+ * Verified against Claude Code 2.1.233: naming even one of these turns the
+ * group back on, and `allowedTools` does NOT re-add anything past a
+ * restricting `tools` list.
+ */
+export const OPT_IN_BUILTIN_TOOLS = [
+  TOOL_TASK_CREATE,
+  TOOL_TASK_GET,
+  TOOL_TASK_LIST,
+  TOOL_TASK_UPDATE,
+] as const;
 
 /** Built-in subagents that don't apply to Obsidian context. */
 export const DISABLED_BUILTIN_SUBAGENTS = [

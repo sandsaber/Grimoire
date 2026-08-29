@@ -407,6 +407,8 @@
         "historyPartial": "이 대화의 일부를 불러오지 못해 이전 메시지 일부가 누락되었을 수 있습니다.",
         "historyUnreadable": "이 대화의 이전 메시지를 읽지 못해 이후 내용이 불완전할 수 있습니다.",
         "conversationCompacted": "대화 압축됨",
+        "sessionRestarted": "새 세션",
+        "sessionRestartedHint": "에이전트가 이전 세션을 복원하지 못해 이 대화는 새 세션에서 계속됩니다. 위의 메시지는 해당 컨텍스트에 없습니다. 여전히 필요한 내용은 다시 알려주거나 새 탭에서 시작하세요.",
         "completed": "완료됨",
         "duration": "* {flavor} · {duration}",
         "copied": "복사됨!",
@@ -543,7 +545,14 @@
       "queue": {
         "steering": "방향 전환 중...",
         "steerNow": "지금 방향 전환",
-        "steerFailed": "대기 중인 Codex 메시지의 방향을 전환하지 못했습니다. 메시지는 계속 사용할 수 있습니다."
+        "steerFailed": "대기 중인 Codex 메시지의 방향을 전환하지 못했습니다. 메시지는 계속 사용할 수 있습니다.",
+        "count": "대기 중: {count}",
+        "resume": "계속",
+        "clearAll": "모두 지우기",
+        "editItem": "대기 중인 메시지 편집",
+        "removeItem": "대기 중인 메시지 삭제",
+        "pausedFailed": "대기열 보류됨: 턴이 오류로 종료되었습니다",
+        "pausedCancelled": "대기열 보류됨: 턴이 중지되었습니다"
       },
       "instructions": {
         "added": "사용자 지정 시스템 프롬프트에 지침을 추가했습니다",
@@ -572,7 +581,8 @@
         "orphaned": "연결 끊김",
         "inProgress": "진행 중",
         "errorUpper": "오류",
-        "doneUpper": "완료"
+        "doneUpper": "완료",
+        "antigravityWorking": "Antigravity 작업 중 — {seconds}초"
       },
       "subagent": {
         "task": "하위 에이전트 작업",
@@ -850,6 +860,18 @@
       "desc": "추가 Claude 모델 ID를 선택기에 한 줄에 하나씩 추가합니다. 환경의 모델 재정의는 계속 선택기를 대체합니다.",
       "placeholder": "claude-opus-4-6\nclaude-opus-4-6[1m]\nclaude-opus-4-5-20251101"
     },
+    "refreshModels": {
+      "name": "모델 새로 고침",
+      "desc": "Claude Code에 현재 모델 목록을 요청합니다. 그 외에는 CLI나 환경이 바뀔 때만 Grimoire가 다시 확인합니다.",
+      "button": "새로 고침",
+      "done": "모델 목록을 새로 고쳤습니다: 모델 {count}개."
+    },
+    "refreshCommands": {
+      "name": "명령 새로 고침",
+      "desc": "Claude Code에 현재 명령 및 스킬 목록을 요청합니다. 그렇지 않으면 Grimoire는 CLI나 그 환경이 바뀔 때까지 기존 목록을 재사용합니다.",
+      "button": "새로 고침",
+      "done": "명령 목록을 새로 고쳤습니다: {count}개."
+    },
     "respectProjectSettings": {
       "name": "Claude Code 설정 준수",
       "desc": "Claude Code 사용자 및 프로젝트 설정의 모델과 환경을 사용합니다. MiniMax, Z.ai 및 다른 Anthropic 호환 게이트웨이의 사용자 지정 모델을 사용할 수 있습니다. Grimoire의 명시적 선택은 계속 우선합니다."
@@ -1115,6 +1137,7 @@
       "disabledDesc": "이 설정을 사용하고 모델 선택기에 해당 모델을 표시하려면 위에서 이 제공업체를 활성화하세요.",
       "fallbackDesc": "{provider} 제공업체입니다.",
       "loadModelsFailed": "제공업체 모델을 로드할 수 없습니다.",
+      "loadCommandsFailed": "제공업체 명령을 로드할 수 없습니다.",
       "contextWindowLabel": "{model}의 컨텍스트 창"
     },
     "providerModelPicker": {

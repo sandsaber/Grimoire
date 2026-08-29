@@ -12,12 +12,12 @@ import {
 } from '../../../../src/providers/opencode/runtime/OpencodeLaunchArtifacts';
 
 describe('buildOpencodeManagedConfig', () => {
-  it('pins OpenCode build, Auto-approve, safe, and plan prompts to the managed prompt file', () => {
-    expect(buildOpencodeManagedConfig({}, '/vault/.grimoire/opencode/system.md', 'Test User')).toEqual({
+  it('pins OpenCode build, Auto-approve, safe, and plan prompts to the managed prompt text', () => {
+    expect(buildOpencodeManagedConfig({}, 'Managed system prompt.', 'Test User')).toEqual({
       $schema: 'https://opencode.ai/config.json',
       agent: {
         build: {
-          prompt: '{file:/vault/.grimoire/opencode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         [OPENCODE_FULL_ACCESS_MODE_ID]: {
           mode: 'primary',
@@ -25,7 +25,7 @@ describe('buildOpencodeManagedConfig', () => {
             plan_enter: 'allow',
             question: 'allow',
           },
-          prompt: '{file:/vault/.grimoire/opencode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         [OPENCODE_SAFE_MODE_ID]: {
           mode: 'primary',
@@ -36,10 +36,10 @@ describe('buildOpencodeManagedConfig', () => {
             question: 'allow',
             write: 'ask',
           },
-          prompt: '{file:/vault/.grimoire/opencode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         plan: {
-          prompt: '{file:/vault/.grimoire/opencode/system.md}',
+          prompt: 'Managed system prompt.',
         },
       },
       username: 'Test User',
@@ -49,7 +49,7 @@ describe('buildOpencodeManagedConfig', () => {
   it('can create a dedicated aux agent and default it for the process', () => {
     expect(buildOpencodeManagedConfig(
       {},
-      '/vault/.grimoire/opencode/auxiliary/system.md',
+      'Aux system prompt.',
       undefined,
       [{
         definition: {
@@ -71,7 +71,7 @@ describe('buildOpencodeManagedConfig', () => {
             '*': 'deny',
             read: 'allow',
           },
-          prompt: '{file:/vault/.grimoire/opencode/auxiliary/system.md}',
+          prompt: 'Aux system prompt.',
         },
       },
       default_agent: 'grimoire-aux-readonly',
@@ -96,7 +96,7 @@ describe('buildOpencodeManagedConfig', () => {
         },
       },
       username: 'Existing',
-    }, '/vault/.grimoire/opencode/system.md')).toEqual({
+    }, 'Managed system prompt.')).toEqual({
       $schema: 'https://opencode.ai/config.json',
       agent: {
         build: {
@@ -105,7 +105,7 @@ describe('buildOpencodeManagedConfig', () => {
             bash: 'ask',
             edit: 'ask',
           },
-          prompt: '{file:/vault/.grimoire/opencode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         [OPENCODE_FULL_ACCESS_MODE_ID]: {
           mode: 'primary',
@@ -113,7 +113,7 @@ describe('buildOpencodeManagedConfig', () => {
             plan_enter: 'allow',
             question: 'allow',
           },
-          prompt: '{file:/vault/.grimoire/opencode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         [OPENCODE_SAFE_MODE_ID]: {
           mode: 'primary',
@@ -124,10 +124,10 @@ describe('buildOpencodeManagedConfig', () => {
             question: 'allow',
             write: 'ask',
           },
-          prompt: '{file:/vault/.grimoire/opencode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         plan: {
-          prompt: '{file:/vault/.grimoire/opencode/system.md}',
+          prompt: 'Managed system prompt.',
         },
       },
       default_agent: 'build',
@@ -175,8 +175,8 @@ describe('prepareOpencodeLaunchArtifacts', () => {
 
     expect(result.configPath).toBe(path.join(tmpRoot, '.grimoire', 'opencode', 'config.json'));
     expect(result.systemPromptPath).toBe(path.join(tmpRoot, '.grimoire', 'opencode', 'system.md'));
-    expect(result.configContent).toContain(`"prompt": "{file:${result.systemPromptPath}}"`);
-    const generatedConfig = JSON.parse(await fs.readFile(result.configPath, 'utf8'));
+    expect(result.configContent).not.toContain('{file:');
+    const generatedConfig = JSON.parse(result.configContent);
     expect(generatedConfig).toMatchObject({
       default_agent: 'build',
       providers: {
@@ -186,10 +186,11 @@ describe('prepareOpencodeLaunchArtifacts', () => {
       },
       username: 'Test User',
     });
+    const systemPromptFile = await fs.readFile(result.systemPromptPath, 'utf8');
     expect(generatedConfig.agent).toMatchObject({
       build: {
         model: 'openai/gpt-5',
-        prompt: `{file:${result.systemPromptPath}}`,
+        prompt: systemPromptFile,
       },
       [OPENCODE_FULL_ACCESS_MODE_ID]: {
         mode: 'primary',
@@ -197,7 +198,7 @@ describe('prepareOpencodeLaunchArtifacts', () => {
           plan_enter: 'allow',
           question: 'allow',
         },
-        prompt: `{file:${result.systemPromptPath}}`,
+        prompt: systemPromptFile,
       },
       [OPENCODE_SAFE_MODE_ID]: {
         mode: 'primary',
@@ -207,10 +208,10 @@ describe('prepareOpencodeLaunchArtifacts', () => {
           plan_enter: 'allow',
           question: 'allow',
         },
-        prompt: `{file:${result.systemPromptPath}}`,
+        prompt: systemPromptFile,
       },
       plan: {
-        prompt: `{file:${result.systemPromptPath}}`,
+        prompt: systemPromptFile,
       },
     });
   });

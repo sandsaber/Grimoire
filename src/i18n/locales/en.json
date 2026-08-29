@@ -407,6 +407,8 @@
         "historyPartial": "Part of this conversation could not be loaded, so some earlier messages may be missing.",
         "historyUnreadable": "This conversation's earlier messages could not be read, so what follows may be incomplete.",
         "conversationCompacted": "Conversation compacted",
+        "sessionRestarted": "New session",
+        "sessionRestartedHint": "The agent could not restore the previous session, so this conversation continues in a new one. The messages above are not in its context - repeat anything it still needs, or start fresh in a new tab.",
         "completed": "Baked",
         "duration": "* {flavor} for {duration}",
         "copied": "Copied!",
@@ -543,7 +545,14 @@
       "queue": {
         "steering": "Steering...",
         "steerNow": "Steer Now",
-        "steerFailed": "Failed to steer the queued Codex message. It is still available."
+        "steerFailed": "Failed to steer the queued Codex message. It is still available.",
+        "count": "Queued: {count}",
+        "resume": "Resume",
+        "clearAll": "Clear all",
+        "editItem": "Edit queued message",
+        "removeItem": "Discard queued message",
+        "pausedFailed": "Queue held: the turn ended with an error",
+        "pausedCancelled": "Queue held: the turn was stopped"
       },
       "instructions": {
         "added": "Instruction added to custom system prompt",
@@ -572,7 +581,8 @@
         "orphaned": "Orphaned",
         "inProgress": "in progress",
         "errorUpper": "ERROR",
-        "doneUpper": "DONE"
+        "doneUpper": "DONE",
+        "antigravityWorking": "Antigravity is working — {seconds}s"
       },
       "subagent": {
         "task": "Subagent task",
@@ -850,6 +860,18 @@
       "desc": "Append additional Claude model IDs to the picker, one per line. Environment model overrides still replace the picker.",
       "placeholder": "claude-opus-4-6\nclaude-opus-4-6[1m]\nclaude-opus-4-5-20251101"
     },
+    "refreshModels": {
+      "name": "Refresh models",
+      "desc": "Ask Claude Code for its current model list. Grimoire otherwise re-checks only when the CLI or its environment changes.",
+      "button": "Refresh",
+      "done": "Model list refreshed: {count} models."
+    },
+    "refreshCommands": {
+      "name": "Refresh commands",
+      "desc": "Ask Claude Code for its current command and skill list. Grimoire otherwise reuses the list it already has until the CLI or its environment changes.",
+      "button": "Refresh",
+      "done": "Command list refreshed: {count} commands."
+    },
     "respectProjectSettings": {
       "name": "Respect Claude Code settings",
       "desc": "Use model and env from Claude Code user and project settings. This enables custom models from providers such as MiniMax, Z.ai, and other Anthropic-compatible gateways. Grimoire settings still override explicit choices."
@@ -1115,6 +1137,7 @@
       "disabledDesc": "Enable this provider above to use these settings and show its models in the model selector.",
       "fallbackDesc": "{provider} provider.",
       "loadModelsFailed": "Could not load provider models.",
+      "loadCommandsFailed": "Could not load provider commands.",
       "contextWindowLabel": "Context window for {model}"
     },
     "providerModelPicker": {

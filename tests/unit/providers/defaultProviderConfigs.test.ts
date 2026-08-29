@@ -14,6 +14,9 @@ const DEFAULT_CONFIG_KEYS: Record<string, readonly string[]> = {
       'cliPath',
       'cliPathsByHost',
       'customModels',
+      'discoveredCommands',
+      'discoveredCommandsFingerprint',
+      'discoveredModelsFingerprint',
       'discoveredModels',
       'enableBangBash',
       'enableChrome',
@@ -101,6 +104,7 @@ const DEFAULT_CONFIG_KEYS: Record<string, readonly string[]> = {
     gemini: [
       'cliPath',
       'cliPathsByHost',
+      'discoveredModelsFingerprint',
       'enabled',
       'environmentHash',
       'environmentVariables',
@@ -111,6 +115,7 @@ const DEFAULT_CONFIG_KEYS: Record<string, readonly string[]> = {
     qwen: [
       'cliPath',
       'cliPathsByHost',
+      'discoveredModelsFingerprint',
       'effortLevel',
       'enabled',
       'environmentHash',

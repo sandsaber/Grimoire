@@ -93,7 +93,7 @@ export async function prepareOpencodeLaunchArtifacts(
   const configContent = `${JSON.stringify(
     buildOpencodeManagedConfig(
       baseConfig,
-      systemPromptPath,
+      systemPrompt,
       params.userName ?? params.settings?.userName,
       params.managedAgents,
       params.defaultAgentId,
@@ -132,7 +132,7 @@ async function ensureOpencodeDatabaseDirectory(databasePath: string | null): Pro
 
 export function buildOpencodeManagedConfig(
   baseConfig: Record<string, unknown>,
-  systemPromptPath: string,
+  systemPrompt: string,
   userName?: string,
   managedAgents: readonly OpencodeManagedAgentConfig[] = DEFAULT_OPENCODE_MANAGED_AGENT_CONFIGS,
   defaultAgentId?: string,
@@ -159,7 +159,10 @@ export function buildOpencodeManagedConfig(
     nextAgents[agentConfig.id] = {
       ...existingAgent,
       ...(isPlainObject(agentConfig.definition) ? agentConfig.definition : {}),
-      prompt: `{file:${systemPromptPath}}`,
+      // The prompt is inlined rather than referenced via `{file:...}`: file
+      // references resolve relative to the config file, which does not exist
+      // when the config travels as OPENCODE_CONFIG_CONTENT.
+      prompt: systemPrompt,
     };
   }
 

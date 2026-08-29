@@ -35,6 +35,19 @@ npm run build:release
 Set `OBSIDIAN_VAULT` in `.env.local` if you want builds copied into a local test
 vault. Do not commit local vault paths, credentials, transcripts, or debug artifacts.
 
+`.gitattributes` pins the working tree to LF, which keeps `npm run build:release`
+byte-reproducible across platforms. It only governs new checkouts, so a clone made
+before that file existed keeps its original line endings — on Windows that means a
+CRLF working copy whose release bundle does not match the published asset. Re-read
+the tree once in an existing clone:
+
+```bash
+git rm --cached -r .
+git reset --hard
+```
+
+`git ls-files --eol` should then report `w/lf` for every text file.
+
 ## Architecture
 
 The plugin shell is provider-neutral. Provider adapters wrap external tools such as

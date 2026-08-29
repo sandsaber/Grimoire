@@ -117,3 +117,87 @@ jobs:
       - name: Verify host process ownership
         shell: bash
         run: npm run test -- --selectProjects integration --runInBand --testPathPatterns "tests[\\/]integration[\\/]app[\\/]execution"
+
+  windows-unit:
+    # Only the test step is non-blocking. The unit suite still has known
+    # Windows-only failures, so this job records the current count rather than
+    # gating merges on it: the step summary shows the gap on every run and the
+    # uploaded log names the failing tests to work from. Setup still fails the
+    # job outright — a Windows install that stops working is a real break, not
+    # a known gap. Drop `continue-on-error` and make the check required once
+    # the count reaches zero. Linux owns the lockfile, audit, and
+    # release-artifact gates; this job covers only what is platform-dependent.
+    name: windows-unit (non-blocking)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22.22.2
+          cache: 'npm'
+
+      # .npmrc relies on npm 12 behavior (`min-release-age`,
+      # `strict-allow-scripts`), so the pin is not optional here either. On
+      # Windows `--prefix` puts npm.cmd in the prefix directory itself rather
+      # than in a bin/ subdirectory.
+      - name: Install isolated npm 12.0.2
+        shell: bash
+        run: |
+          npm install --global --prefix "${RUNNER_TEMP}/npm-12.0.2" npm@12.0.2 --ignore-scripts --no-audit --no-fund
+          echo "${RUNNER_TEMP}/npm-12.0.2" >> "${GITHUB_PATH}"
+
+      - name: Verify npm version
+        shell: bash
+        run: test "$(npm --version)" = "12.0.2"
+
+      - name: Install dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Unit tests
+        id: unit
+        continue-on-error: true
+        shell: bash
+        run: npm run test -- --selectProjects unit 2>&1 | tee windows-unit.log
+
+      - name: Summarize Windows results
+        if: always()
+        shell: bash
+        run: |
+          suites="$(grep -E '^Test Suites:' windows-unit.log | tail -1 || true)"
+          tests="$(grep -E '^Tests:' windows-unit.log | tail -1 || true)"
+          {
+            echo "## Windows unit suite"
+            echo
+            echo "Outcome: \`${{ steps.unit.outcome }}\` (non-blocking)"
+            echo
+            if [ -n "${tests}" ]; then
+              echo "- ${suites}"
+              echo "- ${tests}"
+            else
+              echo "Jest printed no summary line. The run likely failed before"
+              echo "the suite started — see the \`windows-unit-log\` artifact."
+            fi
+            failures="$(grep -E '^[[:space:]]+● ' windows-unit.log | sort -u || true)"
+            if [ -n "${failures}" ]; then
+              echo
+              echo "<details><summary>Failing tests</summary>"
+              echo
+              echo '```text'
+              echo "${failures}" | head -200
+              echo '```'
+              echo
+              echo "</details>"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload Windows unit log
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-unit-log
+          path: windows-unit.log
+          if-no-files-found: warn

@@ -22,6 +22,12 @@ export interface GeminiMode {
 export interface PersistedGeminiProviderSettings {
   cliPath: string;
   cliPathsByHost: HostnameCliPaths;
+  /**
+   * Digest of the catalog cache key `discoveredModels` was discovered under.
+   * Written together with the list by ACP discovery; any new writer must pass
+   * both, or a later load will trust a list the configuration no longer matches.
+   */
+  discoveredModelsFingerprint: string;
   enabled: boolean;
   environmentHash: string;
   environmentVariables: string;
@@ -38,6 +44,7 @@ export interface GeminiProviderSettings extends PersistedGeminiProviderSettings 
 export const DEFAULT_GEMINI_PROVIDER_SETTINGS: Readonly<PersistedGeminiProviderSettings> = Object.freeze({
   cliPath: '',
   cliPathsByHost: {},
+  discoveredModelsFingerprint: '',
   enabled: false,
   environmentHash: '',
   environmentVariables: '',
@@ -176,6 +183,9 @@ export function getGeminiProviderSettings(settings: Record<string, unknown>): Ge
       ?? DEFAULT_GEMINI_PROVIDER_SETTINGS.cliPath,
     cliPathsByHost,
     discoveredModels: normalizeGeminiDiscoveredModels(config.discoveredModels),
+    discoveredModelsFingerprint: typeof config.discoveredModelsFingerprint === 'string'
+      ? config.discoveredModelsFingerprint
+      : DEFAULT_GEMINI_PROVIDER_SETTINGS.discoveredModelsFingerprint,
     enabled: (config.enabled as boolean | undefined)
       ?? DEFAULT_GEMINI_PROVIDER_SETTINGS.enabled,
     environmentHash: (config.environmentHash as string | undefined)
@@ -232,6 +242,9 @@ export function updateGeminiProviderSettings(
     cliPath: nextCliPath,
     cliPathsByHost: nextCliPathsByHost,
     discoveredModels: normalizeGeminiDiscoveredModels(updates.discoveredModels ?? current.discoveredModels),
+    discoveredModelsFingerprint: typeof updates.discoveredModelsFingerprint === 'string'
+      ? updates.discoveredModelsFingerprint
+      : current.discoveredModelsFingerprint,
     modelAliases: nextModelAliases,
     selectedMode: typeof updates.selectedMode === 'string'
       ? updates.selectedMode.trim()
@@ -244,6 +257,7 @@ export function updateGeminiProviderSettings(
     cliPath: next.cliPath,
     cliPathsByHost: next.cliPathsByHost,
     discoveredModels: next.discoveredModels,
+    discoveredModelsFingerprint: next.discoveredModelsFingerprint,
     enabled: next.enabled,
     environmentHash: next.environmentHash,
     environmentVariables: next.environmentVariables,

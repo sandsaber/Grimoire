@@ -12,12 +12,12 @@ import {
 } from '../../../../src/providers/kimicode/runtime/KimicodeLaunchArtifacts';
 
 describe('buildKimicodeManagedConfig', () => {
-  it('pins Kimi Code build, Auto-approve, safe, and plan prompts to the managed prompt file', () => {
-    expect(buildKimicodeManagedConfig({}, '/vault/.grimoire/kimicode/system.md', 'Test User')).toEqual({
+  it('pins Kimi Code build, Auto-approve, safe, and plan prompts to the managed prompt text', () => {
+    expect(buildKimicodeManagedConfig({}, 'Managed system prompt.', 'Test User')).toEqual({
       $schema: 'https://kimicode.ai/config.json',
       agent: {
         build: {
-          prompt: '{file:/vault/.grimoire/kimicode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         [KIMICODE_FULL_ACCESS_MODE_ID]: {
           mode: 'primary',
@@ -25,7 +25,7 @@ describe('buildKimicodeManagedConfig', () => {
             plan_enter: 'allow',
             question: 'allow',
           },
-          prompt: '{file:/vault/.grimoire/kimicode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         [KIMICODE_SAFE_MODE_ID]: {
           mode: 'primary',
@@ -36,10 +36,10 @@ describe('buildKimicodeManagedConfig', () => {
             question: 'allow',
             write: 'ask',
           },
-          prompt: '{file:/vault/.grimoire/kimicode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         plan: {
-          prompt: '{file:/vault/.grimoire/kimicode/system.md}',
+          prompt: 'Managed system prompt.',
         },
       },
       username: 'Test User',
@@ -49,7 +49,7 @@ describe('buildKimicodeManagedConfig', () => {
   it('can create a dedicated aux agent and default it for the process', () => {
     expect(buildKimicodeManagedConfig(
       {},
-      '/vault/.grimoire/kimicode/auxiliary/system.md',
+      'Aux system prompt.',
       undefined,
       [{
         definition: {
@@ -71,7 +71,7 @@ describe('buildKimicodeManagedConfig', () => {
             '*': 'deny',
             read: 'allow',
           },
-          prompt: '{file:/vault/.grimoire/kimicode/auxiliary/system.md}',
+          prompt: 'Aux system prompt.',
         },
       },
       default_agent: 'grimoire-aux-readonly',
@@ -96,7 +96,7 @@ describe('buildKimicodeManagedConfig', () => {
         },
       },
       username: 'Existing',
-    }, '/vault/.grimoire/kimicode/system.md')).toEqual({
+    }, 'Managed system prompt.')).toEqual({
       $schema: 'https://kimicode.ai/config.json',
       agent: {
         build: {
@@ -105,7 +105,7 @@ describe('buildKimicodeManagedConfig', () => {
             bash: 'ask',
             edit: 'ask',
           },
-          prompt: '{file:/vault/.grimoire/kimicode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         [KIMICODE_FULL_ACCESS_MODE_ID]: {
           mode: 'primary',
@@ -113,7 +113,7 @@ describe('buildKimicodeManagedConfig', () => {
             plan_enter: 'allow',
             question: 'allow',
           },
-          prompt: '{file:/vault/.grimoire/kimicode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         [KIMICODE_SAFE_MODE_ID]: {
           mode: 'primary',
@@ -124,10 +124,10 @@ describe('buildKimicodeManagedConfig', () => {
             question: 'allow',
             write: 'ask',
           },
-          prompt: '{file:/vault/.grimoire/kimicode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         plan: {
-          prompt: '{file:/vault/.grimoire/kimicode/system.md}',
+          prompt: 'Managed system prompt.',
         },
       },
       default_agent: 'build',
@@ -175,8 +175,9 @@ describe('prepareKimicodeLaunchArtifacts', () => {
 
     expect(result.configPath).toBe(path.join(tmpRoot, '.grimoire', 'kimicode', 'config.json'));
     expect(result.systemPromptPath).toBe(path.join(tmpRoot, '.grimoire', 'kimicode', 'system.md'));
-    expect(result.configContent).toContain(`"prompt": "{file:${result.systemPromptPath}}"`);
-    const generatedConfig = JSON.parse(await fs.readFile(result.configPath, 'utf8'));
+    expect(result.configContent).not.toContain('{file:');
+    const generatedConfig = JSON.parse(result.configContent);
+    const systemPromptFile = await fs.readFile(result.systemPromptPath, 'utf8');
     expect(generatedConfig).toMatchObject({
       default_agent: 'build',
       providers: {
@@ -189,7 +190,7 @@ describe('prepareKimicodeLaunchArtifacts', () => {
     expect(generatedConfig.agent).toMatchObject({
       build: {
         model: 'openai/gpt-5',
-        prompt: `{file:${result.systemPromptPath}}`,
+        prompt: systemPromptFile,
       },
       [KIMICODE_FULL_ACCESS_MODE_ID]: {
         mode: 'primary',
@@ -197,7 +198,7 @@ describe('prepareKimicodeLaunchArtifacts', () => {
           plan_enter: 'allow',
           question: 'allow',
         },
-        prompt: `{file:${result.systemPromptPath}}`,
+        prompt: systemPromptFile,
       },
       [KIMICODE_SAFE_MODE_ID]: {
         mode: 'primary',
@@ -207,10 +208,10 @@ describe('prepareKimicodeLaunchArtifacts', () => {
           plan_enter: 'allow',
           question: 'allow',
         },
-        prompt: `{file:${result.systemPromptPath}}`,
+        prompt: systemPromptFile,
       },
       plan: {
-        prompt: `{file:${result.systemPromptPath}}`,
+        prompt: systemPromptFile,
       },
     });
   });

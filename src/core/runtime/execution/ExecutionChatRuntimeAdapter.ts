@@ -617,6 +617,19 @@ export interface ExecutionChatRuntimeHostPorts extends ChatTurnEncoder, ChatSurf
   /** Provider-native session id, read from the session snapshot at M5. */
   currentSessionId(): string | null;
   /**
+   * Whether this conversation's saved session could not be resumed.
+   *
+   * **Asked on every render, so it does not clear.** That is what separates it
+   * from `consumeSessionInvalidation`, which is spent on persistence: the seam
+   * the UI draws has to be answerable again on the next paint.
+   *
+   * Optional, and no composition implements it yet — which is the honest state
+   * of `main`'s session-restart notice on this path. The fact exists, in
+   * `acpSessionResume`'s `sessionDropped` and in the `providerState` three
+   * providers write it to; what is missing is a composition reading it back.
+   */
+  sessionDropped?(): boolean;
+  /**
    * The conversation this runtime is now bound to, as the caller supplied it.
    *
    * Absent for a provider with nothing per-conversation to track. Present for
@@ -852,6 +865,11 @@ export class ExecutionChatRuntimeAdapter {
 
   consumeSessionInvalidation(): boolean {
     return this.session.consumeSessionInvalidation();
+  }
+
+  /** See `sessionDropped` on the ports: repeatable, and unimplemented today. */
+  isSessionDropped(): boolean {
+    return this.ports.sessionDropped?.() ?? false;
   }
 
   async *query(

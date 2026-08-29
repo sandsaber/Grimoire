@@ -2295,7 +2295,10 @@ export class GrimoireSettingTab extends PluginSettingTab {
     // cannot fail is a guard nobody can test, which is how one survives long
     // enough to be mistaken for a rule.
     const workspace = await this.plugin.getApplicationRuntimeOrNull?.()?.workspaceFor(providerId);
-    await workspace?.models?.refresh();
+    // `force`, because this is the user asking: enabling a provider is an
+    // explicit action, and `main`'s catalog cache exists to keep the *other*
+    // caller — a model dropdown opening — from booting a CLI on its own.
+    await workspace?.models?.refresh({ force: true });
   }
 
   private renderMaxTabsSetting(container: HTMLElement): void {

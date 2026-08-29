@@ -76,13 +76,18 @@ export function normalizeGrokLaunchReasoningEffort(
     : null;
 }
 
-export function isGrokNativeBuildModelId(rawModelId: string): boolean {
-  const normalized = rawModelId.trim();
-  if (!normalized) {
+/**
+ * Native xAI model ids, as opposed to third-party catalog ids such as
+ * `anthropic/...`. Matched case-insensitively, like every other prefix test in
+ * this file, so a catalog that reports `Grok-4.6` is still recognised.
+ */
+export function isGrokNativeModelId(rawModelId: string): boolean {
+  const normalized = rawModelId.trim().toLowerCase();
+  if (!normalized || normalized.includes('/')) {
     return false;
   }
 
-  return normalized === 'grok-build' || normalized.startsWith('grok-composer-');
+  return normalized === GROK_SYNTHETIC_MODEL_ID || normalized.startsWith('grok-');
 }
 
 export function encodeGrokModelId(rawModelId: string): string {
@@ -170,20 +175,50 @@ export function normalizeGrokModelVariants(value: unknown): GrokModelVariant[] {
   return dedupeGrokVariants(variants);
 }
 
+/**
+ * Model ids reach this from the agent and from persisted settings, so they are
+ * untrusted keys: `__proto__` would replace this object's prototype instead of
+ * adding an entry.
+ */
+const UNSAFE_MODEL_ID_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 export function normalizeGrokThinkingOptionsByModel(
   value: unknown,
-  discoveredModels: GrokDiscoveredModel[] = [],
+  discoveredModels: GrokDiscoveredModel[] | Set<string> = [],
 ): GrokThinkingOptionsByModel {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
   }
 
+  // Built once rather than per key: resolveGrokBaseModelRawId would otherwise
+  // rebuild it for every entry, and this map now holds a whole catalog.
+  const discoveredRawIds = discoveredModels instanceof Set
+    ? discoveredModels
+    : new Set(discoveredModels.map((model) => model.rawId));
+
   const normalized: GrokThinkingOptionsByModel = {};
+  const exactRawIds = new Set<string>();
   for (const [rawId, variants] of Object.entries(value as Record<string, unknown>)) {
-    const normalizedRawId = resolveGrokBaseModelRawId(rawId.trim(), discoveredModels);
+    const trimmedRawId = rawId.trim();
+    if (UNSAFE_MODEL_ID_KEYS.has(trimmedRawId)) {
+      continue;
+    }
+
+    const normalizedRawId = resolveGrokBaseModelRawId(trimmedRawId, discoveredRawIds);
     const normalizedVariants = normalizeGrokModelVariants(variants);
     if (!normalizedRawId || normalizedVariants.length === 0) {
       continue;
+    }
+
+    // A variant id collapses onto its base, so `grok-4.6/high` must not
+    // overwrite what `grok-4.6` itself reported - otherwise iteration order
+    // decides which list the picker gets.
+    const isExact = normalizedRawId === trimmedRawId;
+    if (!isExact && exactRawIds.has(normalizedRawId)) {
+      continue;
+    }
+    if (isExact) {
+      exactRawIds.add(normalizedRawId);
     }
 
     normalized[normalizedRawId] = normalizedVariants;

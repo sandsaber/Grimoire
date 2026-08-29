@@ -1,0 +1,12 @@
+# Git for Windows ships core.autocrlf=true in its system config, so a default
+# Windows clone materializes every tracked text file with CRLF while the index
+# stores LF. Source read through the ES and CSS parsers is normalized on the way
+# into the bundle, but esbuild.config.mjs reads CHANGELOG.md as raw text and
+# injects it through `define`, so a CRLF checkout ships those bytes inside the
+# embedded changelog string and `npm run build:release` on Windows produces a
+# main.js that differs from the ubuntu-latest release build at an identical
+# commit and toolchain. Pin the working tree to LF for everyone.
+#
+# A fixture that must carry literal CRLF bytes needs its own `-text` rule below;
+# otherwise this line normalizes it away on checkout.
+* text=auto eol=lf

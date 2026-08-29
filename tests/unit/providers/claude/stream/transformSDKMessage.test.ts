@@ -1,5 +1,6 @@
 import { buildSDKMessage } from '@test/helpers/sdkMessages';
 
+import { createClaudeTaskPlanState } from '@/providers/claude/stream/claudeTaskPlanState';
 import {
   createTransformStreamState,
   createTransformUsageState,
@@ -9,6 +10,72 @@ import {
 const msg = buildSDKMessage;
 
 describe('transformSDKMessage', () => {
+  describe('task plan replay', () => {
+    it('replays the accumulated task plan as a TodoWrite chunk', () => {
+      const taskPlanState = createClaudeTaskPlanState();
+
+      const createChunks = [...transformSDKMessage(
+        msg({
+          type: 'assistant',
+          message: {
+            content: [{
+              type: 'tool_use',
+              id: 'call-1',
+              name: 'TaskCreate',
+              input: { subject: 'Run tests', description: 'Run them', activeForm: 'Running tests' },
+            }],
+          },
+        }),
+        { taskPlanState },
+      )];
+
+      // The create alone has no task id yet, so only the real call is emitted.
+      expect(createChunks.filter((chunk) => chunk.type === 'tool_use')).toHaveLength(1);
+
+      const resultChunks = [...transformSDKMessage(
+        msg({
+          type: 'user',
+          tool_use_result: { task: { id: 't1', subject: 'Run tests' } },
+          message: {
+            content: [{ type: 'tool_result', tool_use_id: 'call-1', content: 'created' }],
+          },
+        }),
+        { taskPlanState },
+      )];
+
+      expect(resultChunks).toContainEqual({
+        type: 'tool_use',
+        id: 'claude-task-plan',
+        name: 'TodoWrite',
+        input: { todos: [{ content: 'Run tests', activeForm: 'Running tests', status: 'pending' }] },
+      });
+
+      // Without a result the plan entry renders as running forever.
+      expect(resultChunks).toContainEqual({
+        type: 'tool_result',
+        id: 'claude-task-plan',
+        content: 'Plan updated',
+        isError: false,
+      });
+    });
+
+    it('leaves the plan alone without a task plan state', () => {
+      const chunks = [...transformSDKMessage(msg({
+        type: 'assistant',
+        message: {
+          content: [{
+            type: 'tool_use',
+            id: 'call-1',
+            name: 'TaskCreate',
+            input: { subject: 'Run tests', description: 'Run them' },
+          }],
+        },
+      }))];
+
+      expect(chunks.every((chunk) => chunk.type !== 'tool_use' || chunk.name !== 'TodoWrite')).toBe(true);
+    });
+  });
+
   describe('system messages', () => {
     it('yields session_init event for init subtype with session_id', () => {
       const message = msg({

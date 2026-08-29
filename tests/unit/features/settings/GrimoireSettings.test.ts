@@ -79,6 +79,17 @@ function renderDeclarativeSettings(
   return { group, settingEl };
 }
 
+/**
+ * The version row and its What's new action live on the About tab. General
+ * builds one too and `renderGeneralHub` strips it again, so the whole-tree
+ * lookup these tests used to do finds the copy that is deliberately gone.
+ */
+function renderAboutHub(tab: GrimoireSettingTab): any {
+  const container = createMockEl('div');
+  (tab as unknown as { renderAboutHub: (el: unknown) => void }).renderAboutHub(container);
+  return container;
+}
+
 describe('GrimoireSettingTab general tab settings', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -99,16 +110,27 @@ describe('GrimoireSettingTab general tab settings', () => {
     expect(container.querySelector('.grimoire-theme-card')).toBeNull();
   });
 
-  it('renders the plugin version and permanent what\'s new action in settings', () => {
+  it('renders the plugin version and permanent what\'s new action on About', () => {
     const plugin = createSettingsPlugin();
     const app = createSettingsApp();
     const tab = new GrimoireSettingTab(app, plugin);
-    const { settingEl } = renderDeclarativeSettings(tab);
+    const container = renderAboutHub(tab);
 
-    const versionEl = settingEl.querySelector('.grimoire-settings-version-row');
+    const versionEl = container.querySelector('.grimoire-settings-version-row');
     expect(collectText(versionEl)).toContain('Version');
     expect(collectText(versionEl)).toContain('Grimoire v9.8.7-test');
     expect(versionEl?.querySelector('.grimoire-settings-whats-new')?.textContent).toBe('What\'s new');
+  });
+
+  it('does not leave a second version row on the General hub', () => {
+    const plugin = createSettingsPlugin();
+    const tab = new GrimoireSettingTab(createSettingsApp(), plugin);
+    const container = createMockEl('div');
+    (tab as any).containerEl = createMockEl('div');
+
+    (tab as any).renderGeneralHub(container);
+
+    expect(container.querySelector('.grimoire-settings-version-row')).toBeNull();
   });
 
   it('keeps the custom settings page searchable without inheriting the outer setting-group styles', () => {
@@ -142,9 +164,9 @@ describe('GrimoireSettingTab general tab settings', () => {
     const plugin = createSettingsPlugin();
     const app = createSettingsApp();
     const tab = new GrimoireSettingTab(app, plugin);
-    const { settingEl } = renderDeclarativeSettings(tab);
+    const container = renderAboutHub(tab);
 
-    const button = settingEl.querySelector('.grimoire-settings-whats-new');
+    const button = container.querySelector('.grimoire-settings-whats-new');
     button?.dispatchEvent('click');
     await Promise.resolve();
     await Promise.resolve();
@@ -164,9 +186,9 @@ describe('GrimoireSettingTab general tab settings', () => {
     const plugin = createSettingsPlugin();
     const app = createSettingsApp();
     const tab = new GrimoireSettingTab(app, plugin);
-    const { settingEl } = renderDeclarativeSettings(tab);
+    const container = renderAboutHub(tab);
 
-    const button = settingEl.querySelector('.grimoire-settings-whats-new');
+    const button = container.querySelector('.grimoire-settings-whats-new');
     button?.dispatchEvent('click');
     await Promise.resolve();
     await Promise.resolve();

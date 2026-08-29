@@ -1745,6 +1745,24 @@ describe('MessageRenderer', () => {
     );
   });
 
+  it('renderContent rewrites latex math delimiters into the dollar form Obsidian renders', async () => {
+    const { MarkdownRenderer } = await import('obsidian');
+    const { renderer } = createRenderer();
+    const el = createMockEl();
+
+    await renderer.renderContent(
+      el,
+      'Since \\((x,y)\\neq(0,0)\\):\n\\[\nd^2 = 3 - 2\\sqrt2\n\\]'
+    );
+
+    expect(MarkdownRenderer.renderMarkdown).toHaveBeenCalledWith(
+      'Since $(x,y)\\neq(0,0)$:\n$$\nd^2 = 3 - 2\\sqrt2\n$$',
+      el,
+      '',
+      expect.anything()
+    );
+  });
+
   it('renderContent separates prose from following pipe tables before markdown rendering', async () => {
     const { MarkdownRenderer } = await import('obsidian');
     const { renderer } = createRenderer();
@@ -2593,6 +2611,71 @@ describe('MessageRenderer', () => {
         undefined,
         expect.any(Function)
       );
+    });
+  });
+
+  // ============================================
+  // Session restart notice
+  // ============================================
+
+  describe('session restart notice', () => {
+    it('marks the end of the thread with the label and what it means', () => {
+      const { renderer, messagesEl } = createRenderer();
+
+      renderer.renderSessionRestartNotice();
+
+      const noticeEl = messagesEl.querySelector('.grimoire-session-restart-notice');
+      expect(noticeEl).not.toBeNull();
+      expect(noticeEl.querySelector('.grimoire-compact-boundary-label').textContent)
+        .toBe('New session');
+      expect(noticeEl.querySelector('.grimoire-session-restart-notice-hint').textContent)
+        .toContain('not in its context');
+    });
+
+    it('shows a single notice however often the check re-runs', () => {
+      const { renderer, messagesEl } = createRenderer();
+
+      renderer.renderSessionRestartNotice();
+      renderer.renderSessionRestartNotice();
+
+      expect(messagesEl.querySelectorAll('.grimoire-session-restart-notice')).toHaveLength(1);
+    });
+
+    it('takes the notice down once a turn answers it', () => {
+      const { renderer, messagesEl } = createRenderer();
+      renderer.renderSessionRestartNotice();
+
+      renderer.addMessage({
+        id: 'm1',
+        role: 'user',
+        content: 'carry on',
+        timestamp: Date.now(),
+      });
+
+      expect(messagesEl.querySelector('.grimoire-session-restart-notice')).toBeNull();
+    });
+
+    it('clears on request, and stays cleared', () => {
+      const { renderer, messagesEl } = createRenderer();
+      renderer.renderSessionRestartNotice();
+
+      renderer.clearSessionRestartNotice();
+      renderer.clearSessionRestartNotice();
+
+      expect(messagesEl.querySelector('.grimoire-session-restart-notice')).toBeNull();
+    });
+
+    it('does not reach for a notice the thread re-render already dropped', () => {
+      const { renderer, messagesEl } = createRenderer();
+      renderer.renderSessionRestartNotice();
+      const staleEl = messagesEl.querySelector('.grimoire-session-restart-notice');
+      const removeSpy = jest.spyOn(staleEl, 'remove');
+
+      renderer.renderMessages([], () => 'hi');
+      renderer.renderSessionRestartNotice();
+
+      expect(removeSpy).not.toHaveBeenCalled();
+      expect(messagesEl.querySelectorAll('.grimoire-session-restart-notice')).toHaveLength(1);
     });
   });
 });

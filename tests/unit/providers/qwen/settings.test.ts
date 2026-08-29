@@ -5,6 +5,24 @@ import {
 } from '@/providers/qwen/settings';
 
 describe('Qwen provider settings', () => {
+  it('defaults the discovery fingerprint to an empty string and ignores a non-string', () => {
+    expect(getQwenProviderSettings({}).discoveredModelsFingerprint).toBe('');
+    expect(getQwenProviderSettings({
+      providerConfigs: { qwen: { discoveredModelsFingerprint: 42 } },
+    }).discoveredModelsFingerprint).toBe('');
+  });
+
+  it('round-trips the discovery fingerprint and keeps it across unrelated updates', () => {
+    const settings: Record<string, unknown> = {};
+    updateQwenProviderSettings(settings, { discoveredModelsFingerprint: 'abc12345' });
+
+    expect((settings as any).providerConfigs.qwen.discoveredModelsFingerprint).toBe('abc12345');
+
+    updateQwenProviderSettings(settings, { environmentHash: 'API_KEY=new' });
+
+    expect(getQwenProviderSettings(settings).discoveredModelsFingerprint).toBe('abc12345');
+  });
+
   it('is disabled by default and falls back to qwen from PATH', () => {
     const settings = getQwenProviderSettings({});
 

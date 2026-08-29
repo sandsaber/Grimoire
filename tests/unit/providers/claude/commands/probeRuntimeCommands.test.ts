@@ -72,4 +72,20 @@ describe('probeRuntimeCommands', () => {
     expect(options?.extraArgs).toEqual({ chrome: null });
   });
 
+  it('records why it gave up when no CLI path is resolved', async () => {
+    const recordDebugLog = jest.fn();
+    const plugin = createMockPlugin();
+    (plugin as unknown as { recordDebugLog: jest.Mock }).recordDebugLog = recordDebugLog;
+    jest.mocked(plugin.getResolvedProviderCliPath).mockReturnValue(null);
+
+    const commands = await probeRuntimeCommands(plugin);
+
+    expect(commands).toEqual([]);
+    expect(recordDebugLog).toHaveBeenCalledWith({
+      data: { providerId: 'claude', reason: 'no_cli_path' },
+      event: 'commandCatalog.probe.skipped',
+      level: 'debug',
+      scope: 'provider.claude',
+    });
+  });
 });

@@ -10,6 +10,7 @@ const sdkMock = sdkModule as unknown as {
   getQueryCallCount: () => number;
   resetMockMessages: () => void;
   setMockMessages: (messages: unknown[], options?: { appendResult?: boolean }) => void;
+  setMockSupportedCommands: (commands: Array<{ name: string; description: string; argumentHint?: string }>) => void;
   setMockSupportedModels: (models: unknown[]) => void;
 };
 
@@ -243,5 +244,37 @@ describe('createClaudeWorkspaceServices', () => {
     expect(requestUrl).not.toHaveBeenCalled();
     expect(getClaudeProviderSettings(settings).discoveredModels).toEqual([]);
     expect(plugin.saveSettings).not.toHaveBeenCalled();
+  });
+  it('gives the command catalog a cache so a reload does not pay for a probe', async () => {
+    const settings: Record<string, unknown> = {};
+    updateClaudeProviderSettings(settings, { enabled: true });
+    const plugin = {
+      app: { vault: { adapter: { basePath: '/vault' } } },
+      getActiveEnvironmentVariables: jest.fn().mockReturnValue(''),
+      getResolvedProviderCliPath: jest.fn().mockReturnValue('/mock/claude'),
+      recordDebugLog: jest.fn(),
+      saveSettings: jest.fn().mockResolvedValue(undefined),
+      settings,
+    };
+    sdkMock.setMockMessages([{ type: 'system', subtype: 'init' }], { appendResult: false });
+    sdkMock.setMockSupportedCommands([
+      { name: 'commit', description: 'Create a commit', argumentHint: '' },
+    ]);
+
+    const services = await createClaudeWorkspaceServices(plugin as any, createVaultAdapter() as any);
+    await services.commandCatalog.refresh();
+
+    expect(getClaudeProviderSettings(settings).discoveredCommands).toEqual([
+      {
+        argumentHint: '',
+        content: '',
+        description: 'Create a commit',
+        id: 'sdk:commit',
+        name: 'commit',
+        source: 'sdk',
+      },
+    ]);
+    expect(getClaudeProviderSettings(settings).discoveredCommandsFingerprint).toMatch(/^[0-9a-f]{8}$/);
+    expect(plugin.saveSettings).toHaveBeenCalled();
   });
 });

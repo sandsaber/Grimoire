@@ -1,11 +1,12 @@
 import type {
-  ProviderAgentMention,
+ProviderAgentMention,
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandsPort,
   ProviderHistoryHydration,
   ProviderMcpPort,
   ProviderModelDescriptor,
+  ProviderModelRefreshOptions,
   ProviderModule,
   ProviderSettingsCodec,
   ProviderUsageSnapshot,
@@ -75,14 +76,15 @@ import { geminiChatUIConfig } from './ui/GeminiChatUIConfig';
  */
 
 const KNOWN_SETTINGS_FIELDS = new Set([
-  'cliPath',
   'cliPathsByHost',
+  'discoveredModelsFingerprint',
   'enabled',
   'environmentHash',
   'environmentVariables',
   'modelAliases',
   'selectedMode',
   'visibleModels',
+'cliPath',
 ]);
 
 export interface GeminiWorkspaceContext {
@@ -90,7 +92,9 @@ export interface GeminiWorkspaceContext {
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
-  refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
+  refreshModels(
+    options?: ProviderModelRefreshOptions,
+  ): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   mcpPort(): ProviderMcpPort;
@@ -230,6 +234,11 @@ export const geminiSettingsCodec: ProviderSettingsCodec<GeminiProviderSettings> 
     // a stale catalogue outlive the process that produced it. The persisted
     // interface draws the same line.
     const persisted: PersistedGeminiProviderSettings = {
+      // Persisted with the rest: the fingerprint is what tells the next
+      // load whether the catalogue it is holding was discovered under the
+      // same key, and a fingerprint that does not outlive the process
+      // makes every start rediscover.
+      discoveredModelsFingerprint: value.discoveredModelsFingerprint,
       cliPath: value.cliPath.trim(),
       cliPathsByHost: normalizeStringMap(value.cliPathsByHost),
       enabled: value.enabled,
@@ -295,7 +304,7 @@ GeminiProviderSettings
         },
         models: {
           list: () => context.listModels(),
-          refresh: () => context.refreshModels(),
+          refresh: options => context.refreshModels(options),
         },
         usage: {
           cached: () => context.cachedPlanUsage(),
@@ -375,6 +384,9 @@ function createDefaultSettings(): GeminiProviderSettings {
 function decodeSettings(record: Readonly<Record<string, unknown>>): GeminiProviderSettings {
   const defaults = createDefaultSettings();
   return {
+    discoveredModelsFingerprint: typeof record.discoveredModelsFingerprint === 'string'
+      ? record.discoveredModelsFingerprint
+      : defaults.discoveredModelsFingerprint,
     cliPath: typeof record.cliPath === 'string' ? record.cliPath.trim() : defaults.cliPath,
     cliPathsByHost: normalizeStringMap(record.cliPathsByHost),
     enabled: typeof record.enabled === 'boolean' ? record.enabled : defaults.enabled,

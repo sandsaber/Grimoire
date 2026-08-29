@@ -9,6 +9,7 @@ import {
   GROK_SYNTHETIC_MODEL_ID,
   groupGrokDiscoveredModels,
   isGrokModelSelectionId,
+  isGrokNativeModelId,
   resolveGrokBaseModelRawId,
   splitGrokModelLabel,
 } from '../../../../src/providers/grok/models';
@@ -21,6 +22,22 @@ describe('Grok Build model identity', () => {
     expect(decodeGrokModelId(GROK_SYNTHETIC_MODEL_ID)).toBeNull();
     expect(isGrokModelSelectionId('grok:anthropic/claude-sonnet-4')).toBe(true);
     expect(isGrokModelSelectionId('claude-sonnet-4')).toBe(false);
+  });
+
+  it('treats catalog Grok models as native xAI ids', () => {
+    expect(isGrokNativeModelId('grok-4.6')).toBe(true);
+    expect(isGrokNativeModelId('grok-4.5')).toBe(true);
+    expect(isGrokNativeModelId('grok-build')).toBe(true);
+    expect(isGrokNativeModelId('grok-composer-2.5-fast')).toBe(true);
+    expect(isGrokNativeModelId('anthropic/claude-sonnet-4')).toBe(false);
+    expect(isGrokNativeModelId('minimax-token-plan/minimax-m2')).toBe(false);
+  });
+
+  it('recognises a native id whatever case the catalog reports it in', () => {
+    expect(isGrokNativeModelId('Grok-4.6')).toBe(true);
+    expect(isGrokNativeModelId('GROK-4.6')).toBe(true);
+    expect(isGrokNativeModelId('Grok')).toBe(true);
+    expect(isGrokNativeModelId('Anthropic/Claude-Sonnet-4')).toBe(false);
   });
 });
 
@@ -265,6 +282,92 @@ describe('grokChatUIConfig', () => {
       'grok:grok-build',
       settings,
     )).toBe('high');
+  });
+
+  it('exposes xhigh effort for catalog Grok models such as grok-4.6', () => {
+    const settings = {
+      model: 'grok:grok-4.6',
+      providerConfigs: {
+        grok: {
+          discoveredModels: [
+            { label: 'Grok 4.6', rawId: 'grok-4.6' },
+            { label: 'Grok 4.5', rawId: 'grok-4.5' },
+          ],
+          visibleModels: ['grok-4.6', 'grok-4.5'],
+          thinkingOptionsByModel: {},
+        },
+      },
+    };
+
+    expect(grokChatUIConfig.getReasoningOptions(
+      'grok:grok-4.6',
+      settings,
+    )).toEqual([
+      { label: 'Low', value: 'low' },
+      { label: 'Medium', value: 'medium' },
+      { label: 'High', value: 'high' },
+      { label: 'Extra high', value: 'xhigh' },
+    ]);
+    expect(grokChatUIConfig.getReasoningOptions(
+      'grok:grok-4.5',
+      settings,
+    )).toEqual([
+      { label: 'Low', value: 'low' },
+      { label: 'Medium', value: 'medium' },
+      { label: 'High', value: 'high' },
+      { label: 'Extra high', value: 'xhigh' },
+    ]);
+    expect(grokChatUIConfig.getDefaultReasoningValue(
+      'grok:grok-4.6',
+      settings,
+    )).toBe('high');
+  });
+
+  it('offers the native levels for the bare Grok Build entry on a fresh vault', () => {
+    // Nothing discovered yet, so the model picker shows only the synthetic
+    // `grok` option - the state where a static list is all there is.
+    const settings = { model: 'grok', providerConfigs: { grok: {} } };
+
+    expect(grokChatUIConfig.getReasoningOptions('grok', settings)
+      .map((option) => option.value)).toEqual(['low', 'medium', 'high', 'xhigh']);
+    expect(grokChatUIConfig.getDefaultReasoningValue('grok', settings)).toBe('high');
+  });
+
+  it('drops xhigh for a catalog model once Grok Build reports its own levels', () => {
+    const settings = {
+      model: 'grok:grok-4.5',
+      providerConfigs: {
+        grok: {
+          discoveredModels: [
+            { label: 'Grok 4.6', rawId: 'grok-4.6' },
+            { label: 'Grok 4.5', rawId: 'grok-4.5' },
+          ],
+          visibleModels: ['grok-4.6', 'grok-4.5'],
+          // What a live session/new reports: grok-4.5 has no xhigh, grok-4.6 does.
+          thinkingOptionsByModel: {
+            'grok-4.5': [
+              { label: 'Low', value: 'low' },
+              { label: 'Medium', value: 'medium' },
+              { label: 'High', value: 'high' },
+            ],
+            'grok-4.6': [
+              { label: 'Low', value: 'low' },
+              { label: 'Medium', value: 'medium' },
+              { label: 'High', value: 'high' },
+              { label: 'Extra high', value: 'xhigh' },
+            ],
+          },
+        },
+      },
+    };
+
+    // The reported list wins over the static one the picker falls back to
+    // before any session has run.
+    expect(grokChatUIConfig.getReasoningOptions('grok:grok-4.5', settings)
+      .map((option) => option.value)).toEqual(['low', 'medium', 'high']);
+    expect(grokChatUIConfig.getReasoningOptions('grok:grok-4.6', settings)
+      .map((option) => option.value)).toEqual(['low', 'medium', 'high', 'xhigh']);
+    expect(grokChatUIConfig.getDefaultReasoningValue('grok:grok-4.5', settings)).toBe('high');
   });
 
   it('keeps at least three Grok Build effort choices before thought-level discovery finishes', () => {

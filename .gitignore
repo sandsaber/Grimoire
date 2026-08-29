@@ -87,6 +87,7 @@ test-results/
 sandbox/
 dev
 .worktrees/
+worktrees/
 .context/
 
 # Lock files (uncomment based on package manager)

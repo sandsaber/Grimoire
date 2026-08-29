@@ -25,16 +25,36 @@ function mapSdkCommands(sdkCommands: SDKSlashCommand[]): SlashCommand[] {
 /**
  * Probes the Claude SDK locally to discover available commands and skills.
  *
- * Fires a throwaway query with an empty prompt — the SDK emits a system/init
- * event from local config parsing alone (no API call, no cost). The probe
- * captures that event, calls supportedCommands() for full metadata, then aborts.
+ * Fires a throwaway query with an empty prompt, waits for the system/init event,
+ * calls supportedCommands() for full metadata, then aborts.
+ *
+ * This is not free. A measurement on 2026-08-26 isolated a one percentage point
+ * step of the five-hour plan window to the first dropdown open after a plugin
+ * load, with a clean baseline before it. Treat every call as billed: the caller
+ * is expected to reuse a cached list and to pace retries.
  */
 export async function probeRuntimeCommands(plugin: GrimoirePlugin): Promise<SlashCommand[]> {
   const vaultPath = getVaultPath(plugin.app);
-  if (!vaultPath) return [];
+  if (!vaultPath) {
+    plugin.recordDebugLog?.({
+      data: { providerId: 'claude', reason: 'no_vault_path' },
+      event: 'commandCatalog.probe.skipped',
+      level: 'debug',
+      scope: 'provider.claude',
+    });
+    return [];
+  }
 
   const cliPath = plugin.getResolvedProviderCliPath('claude');
-  if (!cliPath) return [];
+  if (!cliPath) {
+    plugin.recordDebugLog?.({
+      data: { providerId: 'claude', reason: 'no_cli_path' },
+      event: 'commandCatalog.probe.skipped',
+      level: 'debug',
+      scope: 'provider.claude',
+    });
+    return [];
+  }
 
   const customEnv = parseEnvironmentVariables(
     plugin.getActiveEnvironmentVariables('claude')
@@ -69,16 +89,21 @@ export async function probeRuntimeCommands(plugin: GrimoirePlugin): Promise<Slas
 
     for await (const event of conversation) {
       if (event.type === 'system' && event.subtype === 'init') {
-        try {
-          const sdkCommands: SDKSlashCommand[] = await conversation.supportedCommands();
-          commands = mapSdkCommands(sdkCommands);
-        } catch { /* best-effort */ }
+        const sdkCommands: SDKSlashCommand[] = await conversation.supportedCommands();
+        commands = mapSdkCommands(sdkCommands);
         abortController.abort();
         break;
       }
     }
-  } catch {
-    // Probe is best-effort; swallow abort errors.
+  } catch (error) {
+    // The abort above is how this probe ends on success, so its rejection is
+    // not a failure. Anything else - an absent CLI, a session that is not
+    // authenticated - is the very condition that paces later attempts, and
+    // reporting it as "found nothing" is what left it indistinguishable in the
+    // logs from a CLI that genuinely has no commands.
+    if (!abortController.signal.aborted) {
+      throw error;
+    }
   }
 
   return commands;

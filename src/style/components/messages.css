@@ -565,6 +565,19 @@
   white-space: nowrap;
 }
 
+/* Session restart notice: the seam where a saved session could not be resumed */
+.grimoire-session-restart-notice {
+  margin: 4px 0 2px;
+}
+
+.grimoire-session-restart-notice-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 0 4px;
+  text-align: center;
+}
+
 .grimoire-container--chat-window .grimoire-messages {
   gap: 14px;
   padding: 0;

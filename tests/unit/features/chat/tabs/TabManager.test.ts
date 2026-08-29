@@ -274,6 +274,7 @@ function createMockTabData(overrides: Record<string, any> = {}): any {
       save: jest.fn().mockResolvedValue(undefined),
       switchTo: jest.fn().mockResolvedValue(undefined),
       initializeWelcome: jest.fn(),
+      refreshSessionRestartNotice: jest.fn(),
     },
     inputController: {
       handleApprovalRequest: jest.fn(),
@@ -1315,6 +1316,7 @@ describe('TabManager - Persistence', () => {
         controllers: {
           conversationController: {
             initializeWelcome: jest.fn(),
+            refreshSessionRestartNotice: jest.fn(),
             save: jest.fn().mockResolvedValue(undefined),
             switchTo,
           },
@@ -2856,6 +2858,7 @@ describe('TabManager - forkInCurrentTab', () => {
             save: jest.fn().mockResolvedValue(undefined),
             switchTo: mockSwitchTo,
             initializeWelcome: jest.fn(),
+            refreshSessionRestartNotice: jest.fn(),
           },
           inputController: { handleApprovalRequest: jest.fn() },
         },
@@ -2927,6 +2930,7 @@ describe('TabManager - forkInCurrentTab', () => {
             save: jest.fn().mockResolvedValue(undefined),
             switchTo: mockSwitchTo,
             initializeWelcome: jest.fn(),
+            refreshSessionRestartNotice: jest.fn(),
           },
           inputController: { handleApprovalRequest: jest.fn() },
         },
@@ -3279,6 +3283,7 @@ describe('TabManager - handleForkRequest (modal dispatch)', () => {
             save: jest.fn().mockResolvedValue(undefined),
             switchTo: mockSwitchTo,
             initializeWelcome: jest.fn(),
+            refreshSessionRestartNotice: jest.fn(),
           },
           inputController: { handleApprovalRequest: jest.fn() },
         },

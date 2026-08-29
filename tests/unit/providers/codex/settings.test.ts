@@ -34,6 +34,28 @@ describe('codex settings', () => {
     expect(settings.wslDistroOverride).toBe(DEFAULT_CODEX_PROVIDER_SETTINGS.wslDistroOverride);
   });
 
+  it('defaults the discovery fingerprint to an empty string and ignores a non-string', () => {
+    expect(getCodexProviderSettings({}).discoveredModelsFingerprint).toBe('');
+    expect(getCodexProviderSettings({
+      providerConfigs: { codex: { discoveredModelsFingerprint: 42 } },
+    }).discoveredModelsFingerprint).toBe('');
+  });
+
+  it('keeps the discovery fingerprint when unrelated settings are updated', () => {
+    const settings: Record<string, unknown> = {
+      providerConfigs: {
+        codex: {
+          discoveredModels: [{ id: 'gpt-5.5', label: 'GPT-5.5' }],
+          discoveredModelsFingerprint: 'abc12345',
+        },
+      },
+    };
+
+    updateCodexProviderSettings(settings, { environmentHash: 'OPENAI_API_KEY=new' });
+
+    expect(getCodexProviderSettings(settings).discoveredModelsFingerprint).toBe('abc12345');
+  });
+
   it('normalizes invalid installationMethod and wslDistroOverride values', () => {
     const settings = getCodexProviderSettings({
       providerConfigs: {

@@ -5,6 +5,7 @@ import type {
   ProviderCommandsPort,
   ProviderMcpPort,
   ProviderModelDescriptor,
+  ProviderModelRefreshOptions,
   ProviderUsageSnapshot,
 } from '../../core/providers/ProviderModule';
 import type {
@@ -110,7 +111,9 @@ export interface WorkspaceContextSlots {
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   refreshAgentMentions(): Promise<void>;
-  refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
+  refreshModels(
+    options?: ProviderModelRefreshOptions,
+  ): Promise<readonly ProviderModelDescriptor[]>;
 }
 
 export function createWorkspaceContextSlots(
@@ -223,8 +226,9 @@ export function createWorkspaceContextSlots(
       await services()?.refreshAgentMentions?.();
     },
 
-    refreshModels: async () => {
+    refreshModels: async (options) => {
       await services()?.modelCatalog?.refreshModels({
+        ...(options?.force ? { force: true } : {}),
         plugin,
         settings: plugin.settings,
       });

@@ -370,15 +370,30 @@ body.grimoire-dragging-ns {
   flex: 0 0 auto;
 }
 
-/* Composer queue status row (queued follow-up preview + steer action) */
+/* Composer queue status rows (queued follow-ups + per-row actions) */
 .grimoire-input-queue-row {
   display: none;
+  flex-direction: column;
+  align-items: stretch;
   font-size: 12px;
   color: var(--text-muted);
   font-style: normal;
+  gap: 4px;
+  padding: 0 2px 8px 2px;
+}
+
+.grimoire-queue-indicator-header,
+.grimoire-queue-indicator-item {
+  display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 2px 8px 2px;
+  min-width: 0;
+}
+
+.grimoire-queue-indicator-index {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
 }
 
 .grimoire-queue-indicator-text {
@@ -481,6 +496,17 @@ body.grimoire-dragging-ns {
 
 .grimoire-container--chat-window .grimoire-input-queue-row {
   padding: 0;
+}
+
+/* Thin separator line between the queue list and the composer input.
+   Mirrors the composer frame: neutral line at rest, accent border on focus. */
+.grimoire-input-queue-row.grimoire-visible-flex + .grimoire-input-wrapper {
+  border-top: 1px solid var(--grimoire-line-2, var(--background-modifier-border-hover, rgba(128, 128, 128, 0.3)));
+  padding-top: 8px;
+}
+
+.grimoire-input-queue-row.grimoire-visible-flex + .grimoire-input-wrapper:focus-within {
+  border-top-color: var(--grimoire-accent-line);
 }
 
 .grimoire-container--chat-window .grimoire-input-nav-row {

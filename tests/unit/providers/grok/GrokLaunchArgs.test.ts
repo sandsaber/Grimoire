@@ -33,5 +33,11 @@ describe('GrokLaunchArgs', () => {
       'high',
       'stdio',
     ]);
+    expect(buildGrokAgentProcessArgs('xhigh')).toEqual([
+      'agent',
+      '--reasoning-effort',
+      'xhigh',
+      'stdio',
+    ]);
   });
 });

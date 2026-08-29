@@ -1,6 +1,7 @@
 import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 import type { SlashCommand } from '@/core/types';
 import { ClaudeCommandCatalog } from '@/providers/claude/commands/ClaudeCommandCatalog';
+import type { RuntimeCommandCacheRecord } from '@/providers/claude/commands/ClaudeRuntimeCommandCacheStore';
 import { SkillStorage } from '@/providers/claude/storage/SkillStorage';
 import { SlashCommandStorage } from '@/providers/claude/storage/SlashCommandStorage';
 
@@ -40,7 +41,28 @@ function createMockAdapter(files: Record<string, string> = {}): VaultFileAdapter
   } as unknown as VaultFileAdapter;
 }
 
+function createCacheStore(record: RuntimeCommandCacheRecord | null, fingerprint = 'fp-current') {
+  let current = record;
+  return {
+    clear: jest.fn(async () => { current = null; }),
+    currentFingerprint: jest.fn(() => fingerprint),
+    read: jest.fn(() => current),
+    write: jest.fn(async (value: RuntimeCommandCacheRecord) => { current = value; }),
+  };
+}
+
+const CACHED_COMMANDS: SlashCommand[] = [
+  { id: 'sdk:commit', name: 'commit', description: 'Create git commit', content: '', source: 'sdk' },
+];
+
 describe('ClaudeCommandCatalog', () => {
+  // Restored here rather than at the end of each body: a failing assertion
+  // above the restore would leave Date.now pinned for every later test in this
+  // file and turn one regression into a cascade.
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   describe('listDropdownEntries', () => {
     it('returns SDK runtime commands as ProviderCommandEntry', async () => {
       const adapter = createMockAdapter({});
@@ -378,4 +400,423 @@ Deploy`,
     });
   });
 
+  // `getDropdownConfig` was a method on this catalog and is a declaration on
+  // the provider module now — `ProviderModule`'s own comment says why. The
+  // module's tests cover it; a catalog test asserting it would be asserting a
+  // method that no longer exists.
+  describe('runtime command cache', () => {
+    it('serves a cached list without probing when the fingerprint matches', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore({ commands: CACHED_COMMANDS, fingerprint: 'fp-current' });
+      const probe = jest.fn(async () => CACHED_COMMANDS);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+
+      const entries = await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(probe).not.toHaveBeenCalled();
+      expect(entries.map(entry => entry.name)).toEqual(['commit']);
+    });
+
+    it('probes when the cached fingerprint no longer matches', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore({ commands: CACHED_COMMANDS, fingerprint: 'fp-stale' });
+      const probe = jest.fn(async (): Promise<SlashCommand[]> => [
+        { id: 'sdk:review', name: 'review', description: 'Review code', content: '', source: 'sdk' },
+      ]);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+
+      const entries = await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(probe).toHaveBeenCalledTimes(1);
+      expect(entries.map(entry => entry.name)).toEqual(['review']);
+      expect(cache.write).toHaveBeenCalledWith({
+        commands: [
+          { id: 'sdk:review', name: 'review', description: 'Review code', content: '', source: 'sdk' },
+        ],
+        fingerprint: 'fp-current',
+      });
+    });
+
+    it('probes exactly once on a cold start with no cache', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore(null);
+      const probe = jest.fn(async () => CACHED_COMMANDS);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(probe).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps working when the cache write is rejected', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore(null);
+      cache.write.mockRejectedValue(new Error('disk full'));
+      const probe = jest.fn(async () => CACHED_COMMANDS);
+      const recordEvent = jest.fn();
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache, recordEvent },
+      );
+
+      const entries = await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(entries.map(entry => entry.name)).toEqual(['commit']);
+      expect(recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+        event: 'commandCatalog.cache.writeFailed',
+        level: 'warn',
+      }));
+    });
+
+    it('behaves exactly as before when no deps are supplied', async () => {
+      const adapter = createMockAdapter({});
+      const probe = jest.fn(async () => CACHED_COMMANDS);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+      );
+
+      const first = await catalog.listDropdownEntries({ includeBuiltIns: false });
+      const second = await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(probe).toHaveBeenCalledTimes(1);
+      expect(first.map(entry => entry.name)).toEqual(['commit']);
+      expect(second.map(entry => entry.name)).toEqual(['commit']);
+    });
+
+    it('falls back to today behaviour when the fingerprint cannot be computed', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore({ commands: CACHED_COMMANDS, fingerprint: 'fp-current' });
+      cache.currentFingerprint.mockImplementation(() => { throw new Error('binary is gone'); });
+      const probe = jest.fn(async (): Promise<SlashCommand[]> => [
+        { id: 'sdk:review', name: 'review', description: 'Review code', content: '', source: 'sdk' },
+      ]);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+
+      const entries = await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(probe).toHaveBeenCalledTimes(1);
+      expect(entries.map(entry => entry.name)).toEqual(['review']);
+    });
+
+    it('still paces empty probes when the fingerprint cannot be computed', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore(null);
+      cache.currentFingerprint.mockImplementation(() => { throw new Error('binary is gone'); });
+      const probe = jest.fn(async (): Promise<SlashCommand[]> => []);
+      jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      // Without a key to record under, nothing would ever be skipped - and the
+      // dropdown reopens on every keystroke, each one a billed session.
+      expect(probe).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not file a list under a configuration that changed while it was discovered', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore(null);
+      const probe = jest.fn(async (): Promise<SlashCommand[]> => [
+        { id: 'sdk:review', name: 'review', content: '', source: 'sdk' },
+      ]);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+      // The user edits the environment, or a CLI upgrade lands, while the
+      // probe is in flight.
+      cache.currentFingerprint
+        .mockReturnValueOnce('fp-before')
+        .mockReturnValue('fp-after');
+
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      // Filing it under 'fp-after' would serve the previous configuration's
+      // commands forever, since the record never expires.
+      expect(cache.write).not.toHaveBeenCalled();
+    });
+    it('adds vault skills that the cached list has never seen', async () => {
+      const adapter = createMockAdapter({
+        '.claude/skills/fresh-skill/SKILL.md': `---
+description: Made today
+---
+Body`,
+      });
+      const cache = createCacheStore({ commands: CACHED_COMMANDS, fingerprint: 'fp-current' });
+      const probe = jest.fn(async () => CACHED_COMMANDS);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+
+      const entries = await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(probe).not.toHaveBeenCalled();
+      expect(entries.map(entry => entry.name).sort()).toEqual(['commit', 'fresh-skill']);
+    });
+
+    it('lets the vault version win a name collision with the cached list', async () => {
+      const adapter = createMockAdapter({
+        '.claude/commands/commit.md': `---
+description: Vault version
+---
+Vault body`,
+      });
+      const cache = createCacheStore({ commands: CACHED_COMMANDS, fingerprint: 'fp-current' });
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        jest.fn(async () => CACHED_COMMANDS),
+        { cache },
+      );
+
+      const entries = await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].name).toBe('commit');
+      expect(entries[0].isEditable).toBe(true);
+      expect(entries[0].scope).toBe('vault');
+    });
+
+    it('does not merge a list that came from a live session', async () => {
+      const adapter = createMockAdapter({
+        '.claude/skills/fresh-skill/SKILL.md': `---
+description: Made today
+---
+Body`,
+      });
+      const cache = createCacheStore(null);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        jest.fn(async () => CACHED_COMMANDS),
+        { cache },
+      );
+
+      catalog.setRuntimeCommands(CACHED_COMMANDS);
+      const entries = await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(entries.map(entry => entry.name)).toEqual(['commit']);
+    });
+    it('persists a list handed over by a live session', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore(null);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        jest.fn(),
+        { cache },
+      );
+
+      catalog.setRuntimeCommands(CACHED_COMMANDS);
+      await Promise.resolve();
+
+      expect(cache.write).toHaveBeenCalledWith({
+        commands: CACHED_COMMANDS,
+        fingerprint: 'fp-current',
+      });
+    });
+
+    it('does not drop the cache when the runtime list is reset to empty', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore({ commands: CACHED_COMMANDS, fingerprint: 'fp-current' });
+      const probe = jest.fn(async () => CACHED_COMMANDS);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+
+      // TabManager clears the list on a blank tab that skips warmup.
+      catalog.setRuntimeCommands([]);
+      const entries = await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(cache.clear).not.toHaveBeenCalled();
+      expect(probe).not.toHaveBeenCalled();
+      expect(entries.map(entry => entry.name)).toEqual(['commit']);
+    });
+    it('does not repeat an empty probe within the retry window', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore(null);
+      const probe = jest.fn(async (): Promise<SlashCommand[]> => []);
+      jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+      jest.spyOn(Date, 'now').mockReturnValue(1_000_000 + 9 * 60 * 1000);
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(probe).toHaveBeenCalledTimes(1);
+    });
+
+    it('probes again once the retry window has passed', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore(null);
+      const probe = jest.fn(async (): Promise<SlashCommand[]> => []);
+      jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+      jest.spyOn(Date, 'now').mockReturnValue(1_000_000 + 10 * 60 * 1000 + 1);
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(probe).toHaveBeenCalledTimes(2);
+    });
+
+    it('throttles after a probe that threw, not only after an empty one', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore(null);
+      const probe = jest.fn(async (): Promise<SlashCommand[]> => { throw new Error('no cli'); });
+      jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      expect(probe).toHaveBeenCalledTimes(1);
+    });
+    it('clears the cache and forces exactly one probe on refresh', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore({ commands: CACHED_COMMANDS, fingerprint: 'fp-current' });
+      const probe = jest.fn(async (): Promise<SlashCommand[]> => [
+        { id: 'sdk:review', name: 'review', description: 'Review code', content: '', source: 'sdk' },
+      ]);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+
+      await catalog.refresh();
+
+      expect(probe).toHaveBeenCalledTimes(1);
+      // Replaced by discovery rather than destroyed first, so the persisted
+      // list is the new one and never passes through empty.
+      expect(cache.clear).not.toHaveBeenCalled();
+      expect(cache.write).toHaveBeenCalledWith({
+        commands: [
+          { id: 'sdk:review', name: 'review', description: 'Review code', content: '', source: 'sdk' },
+        ],
+        fingerprint: 'fp-current',
+      });
+      const entries = await catalog.listDropdownEntries({ includeBuiltIns: false });
+      expect(entries.map(entry => entry.name)).toEqual(['review']);
+    });
+
+    it('keeps the working list when a refresh discovers nothing', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore({ commands: CACHED_COMMANDS, fingerprint: 'fp-current' });
+      const probe = jest.fn(async (): Promise<SlashCommand[]> => []);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+
+      await catalog.refresh();
+
+      // A CLI that is momentarily broken or logged out must not cost the user
+      // the list they had, leave the dropdown on vault entries only, and then
+      // throttle every retry for ten minutes.
+      const entries = await catalog.listDropdownEntries({ includeBuiltIns: false });
+      expect(entries.map(entry => entry.name)).toEqual(['commit']);
+      expect(cache.clear).not.toHaveBeenCalled();
+    });
+
+    it('keeps a command and a skill that share a name apart', async () => {
+      const adapter = createMockAdapter({
+        '.claude/commands/deploy.md': '---\ndescription: Deploy it\n---\nRun the deploy.',
+        '.claude/skills/deploy/SKILL.md': '---\nname: deploy\ndescription: Deploy skill\n---\nSteps.',
+      });
+      const cache = createCacheStore({ commands: CACHED_COMMANDS, fingerprint: 'fp-current' });
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        undefined,
+        { cache },
+      );
+
+      const merged = await catalog.listDropdownEntries({ includeBuiltIns: false });
+      const vaultOnly = await catalog.listVaultEntries();
+
+      // Both files are real and separately editable, so the merged view must
+      // not drop one of them.
+      expect(merged.filter(entry => entry.name === 'deploy')).toHaveLength(
+        vaultOnly.filter(entry => entry.name === 'deploy').length,
+      );
+    });
+
+    it('refreshes through a throttled empty window', async () => {
+      const adapter = createMockAdapter({});
+      const cache = createCacheStore(null);
+      const probe = jest.fn(async (): Promise<SlashCommand[]> => []);
+      jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      const catalog = new ClaudeCommandCatalog(
+        new SlashCommandStorage(adapter),
+        new SkillStorage(adapter),
+        probe,
+        { cache },
+      );
+
+      await catalog.listDropdownEntries({ includeBuiltIns: false });
+      await catalog.refresh();
+
+      expect(probe).toHaveBeenCalledTimes(2);
+    });
+  });
 });

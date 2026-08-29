@@ -206,7 +206,8 @@ describe('utils.ts', () => {
       process.env[envKey] = '/tmp/grimoire-test';
 
       try {
-        expect(normalizePathForFilesystem(`$${envKey}/notes/file.md`)).toBe('/tmp/grimoire-test/notes/file.md');
+        expect(normalizePathForFilesystem(`$${envKey}/notes/file.md`))
+          .toBe(path.normalize('/tmp/grimoire-test/notes/file.md'));
       } finally {
         if (originalValue === undefined) {
           delete process.env[envKey];
@@ -232,9 +233,10 @@ describe('utils.ts', () => {
     });
 
     it('handles non-existent environment variables', () => {
-      // Non-existent env vars should be left as-is
-      expect(normalizePathForFilesystem('$NONEXISTENT/path')).toBe('$NONEXISTENT/path');
-      expect(normalizePathForFilesystem('%NONEXISTENT%/path')).toBe('%NONEXISTENT%/path');
+      // Non-existent env vars are left as-is; only the separators are
+      // normalized for the host platform.
+      expect(normalizePathForFilesystem('$NONEXISTENT/path')).toBe(path.normalize('$NONEXISTENT/path'));
+      expect(normalizePathForFilesystem('%NONEXISTENT%/path')).toBe(path.normalize('%NONEXISTENT%/path'));
     });
 
     it('handles mixed path separators', () => {
@@ -457,6 +459,8 @@ describe('utils.ts', () => {
     });
   });
 
+  const describeOnPosix = process.platform === 'win32' ? describe.skip : describe;
+
   describe('findClaudeCLIPath', () => {
     const originalPlatform = process.platform;
     let originalEnv: NodeJS.ProcessEnv;
@@ -472,7 +476,18 @@ describe('utils.ts', () => {
       process.env = originalEnv;
     });
 
-    describe('on Unix/macOS', () => {
+    // Overriding process.platform does not redirect the `path` module, which
+    // stays bound to the host, so POSIX resolution cannot be exercised from a
+    // Windows runner: path.join would still produce `\`-separated candidates
+    // that the POSIX fixtures below can never match. Skipped rather than
+    // early-returned so the run reports them as skipped instead of passed.
+    //
+    // The whole block is skipped, not just the four cases that fail on
+    // Windows. The other two pass there only vacuously: both assert a null
+    // result, and on Windows this POSIX branch is unreachable, so they would
+    // return null no matter what the resolver did. Keeping them running would
+    // add two green lights that cannot measure a regression.
+    describeOnPosix('on Unix/macOS', () => {
       beforeEach(() => {
         Object.defineProperty(process, 'platform', { value: 'darwin' });
       });
@@ -492,6 +507,7 @@ describe('utils.ts', () => {
         expect(findClaudeCLIPath()).toBe('/home/test/.local/bin/claude');
       });
 
+      // Vacuous on Windows — see the note on describeOnPosix above.
       it('should return null when Claude CLI is not found', () => {
         jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
         jest.spyOn(fs, 'existsSync').mockReturnValue(false);
@@ -521,6 +537,7 @@ describe('utils.ts', () => {
         expect(findClaudeCLIPath(customPath)).toBe('/home/test/bin/claude');
       });
 
+      // Vacuous on Windows — see the note on describeOnPosix above.
       it('should not return a directory path even if it exists', () => {
         jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
         const dirPath = path.join('/home/test', '.local', 'bin', 'claude');

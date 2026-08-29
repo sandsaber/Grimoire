@@ -86,23 +86,47 @@ export function getCodexModelDiscoveryState(
   };
 }
 
+export interface CodexModelDiscoveryUpdates {
+  discoveredModels?: CodexDiscoveredModel[];
+  discoveredModelsFingerprint?: string;
+}
+
+/**
+ * Persists a discovery result and the digest of the configuration it ran under.
+ *
+ * Returns whether persisted discovery state changed, so the caller knows to
+ * save. A run that finds the same models under a new CLI still changes the
+ * digest, which is the point: without that write the next load would compare
+ * the previous configuration's digest and rediscover on every start.
+ */
 export function updateCodexModelDiscoveryState(
   settings: Record<string, unknown>,
-  updates: Partial<CodexModelDiscoveryState>,
+  updates: CodexModelDiscoveryUpdates,
 ): boolean {
   const state = ensureDiscoveryState(settings);
+  const config = getProviderConfig(settings, 'codex');
   const nextDiscoveredModels = 'discoveredModels' in updates
     ? normalizeCodexDiscoveredModels(updates.discoveredModels)
     : state.discoveredModels;
+  const currentFingerprint = typeof config.discoveredModelsFingerprint === 'string'
+    ? config.discoveredModelsFingerprint
+    : '';
+  const nextFingerprint = typeof updates.discoveredModelsFingerprint === 'string'
+    ? updates.discoveredModelsFingerprint
+    : currentFingerprint;
 
-  if (sameDiscoveredModels(state.discoveredModels, nextDiscoveredModels)) {
+  if (
+    sameDiscoveredModels(state.discoveredModels, nextDiscoveredModels)
+    && nextFingerprint === currentFingerprint
+  ) {
     return false;
   }
 
   state.discoveredModels = cloneDiscoveredModels(nextDiscoveredModels);
   setProviderConfig(settings, 'codex', {
-    ...getProviderConfig(settings, 'codex'),
+    ...config,
     discoveredModels: cloneDiscoveredModels(nextDiscoveredModels),
+    discoveredModelsFingerprint: nextFingerprint,
   });
   return true;
 }

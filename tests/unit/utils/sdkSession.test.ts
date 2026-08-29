@@ -1,6 +1,7 @@
 import { existsSync } from 'fs';
 import * as fsPromises from 'fs/promises';
 import * as os from 'os';
+import * as path from 'path';
 
 import {
   collectAsyncSubagentResults,
@@ -32,36 +33,51 @@ const mockExistsSync = existsSync as jest.MockedFunction<typeof existsSync>;
 const mockFsPromises = fsPromises as jest.Mocked<typeof fsPromises>;
 const mockOs = os as jest.Mocked<typeof os>;
 
+const isWindows = process.platform === 'win32';
+// Absolute and platform-native so path.resolve is a no-op. A POSIX literal
+// picks up the runner's current drive on Windows, which then leaks into every
+// encoded project directory name and into every path built from it.
+const FS_ROOT = isWindows ? 'C:\\' : '/';
+const HOME_DIR = path.join(FS_ROOT, 'Users', 'test');
+const VAULT_PATH = path.join(HOME_DIR, 'vault');
+const PROJECTS_DIR = path.join(HOME_DIR, '.claude', 'projects');
+// encodeVaultPathForSDK replaces every non-alphanumeric character, so the
+// drive prefix is the only part of the encoded name that varies by platform.
+const ENCODED_ROOT = isWindows ? 'C--' : '-';
+const ENCODED_VAULT = `${ENCODED_ROOT}Users-test-vault`;
+
 describe('sdkSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockOs.homedir.mockReturnValue('/Users/test');
+    mockOs.homedir.mockReturnValue(HOME_DIR);
   });
 
   describe('encodeVaultPathForSDK', () => {
     it('encodes vault path by replacing all non-alphanumeric chars with dash', () => {
-      const encoded = encodeVaultPathForSDK('/Users/test/vault');
+      const encoded = encodeVaultPathForSDK(VAULT_PATH);
       // SDK replaces ALL non-alphanumeric characters with `-`
-      expect(encoded).toBe('-Users-test-vault');
+      expect(encoded).toBe(ENCODED_VAULT);
     });
 
     it('handles paths with spaces and special characters', () => {
-      const encoded = encodeVaultPathForSDK("/Users/test/My Vault's~Data");
-      expect(encoded).toBe('-Users-test-My-Vault-s-Data');
+      const encoded = encodeVaultPathForSDK(path.join(HOME_DIR, "My Vault's~Data"));
+      expect(encoded).toBe(`${ENCODED_ROOT}Users-test-My-Vault-s-Data`);
     });
 
     it('handles Unicode characters (Chinese, Japanese, etc.)', () => {
       // Unicode characters should be replaced with `-` to match SDK behavior
-      const encoded = encodeVaultPathForSDK('/Volumes/[Work]弘毅之鹰/学习/东京大学/2025年 秋');
+      const encoded = encodeVaultPathForSDK(
+        path.join(FS_ROOT, 'Volumes', '[Work]弘毅之鹰', '学习', '东京大学', '2025年 秋'),
+      );
       // All non-alphanumeric (including Chinese, brackets) become `-`
-      expect(encoded).toBe('-Volumes--Work--------------2025---');
+      expect(encoded).toBe(`${ENCODED_ROOT}Volumes--Work--------------2025---`);
       // Verify only ASCII alphanumeric and dash remain
       expect(encoded).toMatch(/^[a-zA-Z0-9-]+$/);
     });
 
     it('handles brackets and other special characters', () => {
-      const encoded = encodeVaultPathForSDK('/Users/test/[my-vault](notes)');
-      expect(encoded).toBe('-Users-test--my-vault--notes-');
+      const encoded = encodeVaultPathForSDK(path.join(HOME_DIR, '[my-vault](notes)'));
+      expect(encoded).toBe(`${ENCODED_ROOT}Users-test--my-vault--notes-`);
       expect(encoded).not.toContain('[');
       expect(encoded).not.toContain(']');
       expect(encoded).not.toContain('(');
@@ -69,15 +85,15 @@ describe('sdkSession', () => {
     });
 
     it('produces consistent encoding', () => {
-      const path1 = '/Users/test/my-vault';
+      const path1 = path.join(HOME_DIR, 'my-vault');
       const encoded1 = encodeVaultPathForSDK(path1);
       const encoded2 = encodeVaultPathForSDK(path1);
       expect(encoded1).toBe(encoded2);
     });
 
     it('produces different encodings for different paths', () => {
-      const encoded1 = encodeVaultPathForSDK('/Users/test/vault1');
-      const encoded2 = encodeVaultPathForSDK('/Users/test/vault2');
+      const encoded1 = encodeVaultPathForSDK(path.join(HOME_DIR, 'vault1'));
+      const encoded2 = encodeVaultPathForSDK(path.join(HOME_DIR, 'vault2'));
       expect(encoded1).not.toBe(encoded2);
     });
 
@@ -99,7 +115,7 @@ describe('sdkSession', () => {
   describe('getSDKProjectsPath', () => {
     it('returns path under home directory', () => {
       const projectsPath = getSDKProjectsPath();
-      expect(projectsPath).toBe('/Users/test/.claude/projects');
+      expect(projectsPath).toBe(PROJECTS_DIR);
     });
   });
 
@@ -133,19 +149,19 @@ describe('sdkSession', () => {
 
   describe('getSDKSessionPath', () => {
     it('constructs correct session file path', () => {
-      const sessionPath = getSDKSessionPath('/Users/test/vault', 'session-123');
-      expect(sessionPath).toContain('.claude/projects');
+      const sessionPath = getSDKSessionPath(VAULT_PATH, 'session-123');
+      expect(sessionPath).toContain(path.join('.claude', 'projects'));
       expect(sessionPath).toContain('session-123.jsonl');
     });
 
     it('throws error for path traversal attempts', () => {
-      expect(() => getSDKSessionPath('/Users/test/vault', '../etc/passwd')).toThrow('Invalid session ID');
-      expect(() => getSDKSessionPath('/Users/test/vault', 'foo/../bar')).toThrow('Invalid session ID');
-      expect(() => getSDKSessionPath('/Users/test/vault', 'session/subdir')).toThrow('Invalid session ID');
+      expect(() => getSDKSessionPath(VAULT_PATH, '../etc/passwd')).toThrow('Invalid session ID');
+      expect(() => getSDKSessionPath(VAULT_PATH, 'foo/../bar')).toThrow('Invalid session ID');
+      expect(() => getSDKSessionPath(VAULT_PATH, 'session/subdir')).toThrow('Invalid session ID');
     });
 
     it('throws error for empty session ID', () => {
-      expect(() => getSDKSessionPath('/Users/test/vault', '')).toThrow('Invalid session ID');
+      expect(() => getSDKSessionPath(VAULT_PATH, '')).toThrow('Invalid session ID');
     });
   });
 
@@ -153,7 +169,7 @@ describe('sdkSession', () => {
     it('returns true when session file exists', () => {
       mockExistsSync.mockReturnValue(true);
 
-      const exists = sdkSessionExists('/Users/test/vault', 'session-abc');
+      const exists = sdkSessionExists(VAULT_PATH, 'session-abc');
 
       expect(exists).toBe(true);
     });
@@ -161,7 +177,7 @@ describe('sdkSession', () => {
     it('returns false when session file does not exist', () => {
       mockExistsSync.mockReturnValue(false);
 
-      const exists = sdkSessionExists('/Users/test/vault', 'session-xyz');
+      const exists = sdkSessionExists(VAULT_PATH, 'session-xyz');
 
       expect(exists).toBe(false);
     });
@@ -171,7 +187,7 @@ describe('sdkSession', () => {
         throw new Error('Permission denied');
       });
 
-      const exists = sdkSessionExists('/Users/test/vault', 'session-err');
+      const exists = sdkSessionExists(VAULT_PATH, 'session-err');
 
       expect(exists).toBe(false);
     });
@@ -182,17 +198,17 @@ describe('sdkSession', () => {
       mockExistsSync.mockReturnValue(true);
       mockFsPromises.unlink.mockResolvedValue(undefined);
 
-      await deleteSDKSession('/Users/test/vault', 'session-abc');
+      await deleteSDKSession(VAULT_PATH, 'session-abc');
 
       expect(mockFsPromises.unlink).toHaveBeenCalledWith(
-        '/Users/test/.claude/projects/-Users-test-vault/session-abc.jsonl'
+        path.join(PROJECTS_DIR, ENCODED_VAULT, 'session-abc.jsonl')
       );
     });
 
     it('does nothing when session file does not exist', async () => {
       mockExistsSync.mockReturnValue(false);
 
-      await deleteSDKSession('/Users/test/vault', 'nonexistent');
+      await deleteSDKSession(VAULT_PATH, 'nonexistent');
 
       expect(mockFsPromises.unlink).not.toHaveBeenCalled();
     });
@@ -202,11 +218,11 @@ describe('sdkSession', () => {
       mockFsPromises.unlink.mockRejectedValue(new Error('Permission denied'));
 
       // Should not throw
-      await expect(deleteSDKSession('/Users/test/vault', 'session-err')).resolves.toBeUndefined();
+      await expect(deleteSDKSession(VAULT_PATH, 'session-err')).resolves.toBeUndefined();
     });
 
     it('does nothing for invalid session ID', async () => {
-      await deleteSDKSession('/Users/test/vault', '../invalid');
+      await deleteSDKSession(VAULT_PATH, '../invalid');
 
       expect(mockFsPromises.unlink).not.toHaveBeenCalled();
     });
@@ -216,7 +232,7 @@ describe('sdkSession', () => {
     it('returns empty result when file does not exist', async () => {
       mockExistsSync.mockReturnValue(false);
 
-      const result = await readSDKSession('/Users/test/vault', 'nonexistent');
+      const result = await readSDKSession(VAULT_PATH, 'nonexistent');
 
       expect(result.messages).toEqual([]);
       expect(result.skippedLines).toBe(0);
@@ -230,7 +246,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a1","message":{"content":"Hi there"}}',
       ].join('\n'));
 
-      const result = await readSDKSession('/Users/test/vault', 'session-1');
+      const result = await readSDKSession(VAULT_PATH, 'session-1');
 
       expect(result.messages).toHaveLength(2);
       expect(result.messages[0].type).toBe('user');
@@ -246,7 +262,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a1","message":{"content":"Hi"}}',
       ].join('\n'));
 
-      const result = await readSDKSession('/Users/test/vault', 'session-2');
+      const result = await readSDKSession(VAULT_PATH, 'session-2');
 
       expect(result.messages).toHaveLength(2);
       expect(result.skippedLines).toBe(1);
@@ -261,7 +277,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a1","message":{"content":"Response"}}',
       ].join('\n'));
 
-      const result = await readSDKSession('/Users/test/vault', 'session-3');
+      const result = await readSDKSession(VAULT_PATH, 'session-3');
 
       expect(result.messages).toHaveLength(2);
     });
@@ -270,7 +286,7 @@ describe('sdkSession', () => {
       mockExistsSync.mockReturnValue(true);
       mockFsPromises.readFile.mockRejectedValue(new Error('Read error'));
 
-      const result = await readSDKSession('/Users/test/vault', 'session-err');
+      const result = await readSDKSession(VAULT_PATH, 'session-err');
 
       expect(result.messages).toEqual([]);
       expect(result.error).toBe('Read error');
@@ -286,13 +302,13 @@ describe('sdkSession', () => {
       ].join('\n'));
 
       const toolCalls = await loadSubagentToolCalls(
-        '/Users/test/vault',
+        VAULT_PATH,
         'session-abc',
         'a123'
       );
 
       expect(mockFsPromises.readFile).toHaveBeenCalledWith(
-        '/Users/test/.claude/projects/-Users-test-vault/session-abc/subagents/agent-a123.jsonl',
+        path.join(PROJECTS_DIR, ENCODED_VAULT, 'session-abc', 'subagents', 'agent-a123.jsonl'),
         'utf-8'
       );
       expect(toolCalls).toHaveLength(1);
@@ -314,7 +330,7 @@ describe('sdkSession', () => {
       );
 
       const toolCalls = await loadSubagentToolCalls(
-        '/Users/test/vault',
+        VAULT_PATH,
         'session-abc',
         'a123'
       );
@@ -324,7 +340,7 @@ describe('sdkSession', () => {
 
     it('returns empty when agent id is invalid', async () => {
       const toolCalls = await loadSubagentToolCalls(
-        '/Users/test/vault',
+        VAULT_PATH,
         'session-abc',
         '../bad-agent'
       );
@@ -343,14 +359,14 @@ describe('sdkSession', () => {
       ].join('\n'));
 
       const result = await loadSubagentFinalResult(
-        '/Users/test/vault',
+        VAULT_PATH,
         'session-abc',
         'a123'
       );
 
       expect(result).toBe('Final answer');
       expect(mockFsPromises.readFile).toHaveBeenCalledWith(
-        '/Users/test/.claude/projects/-Users-test-vault/session-abc/subagents/agent-a123.jsonl',
+        path.join(PROJECTS_DIR, ENCODED_VAULT, 'session-abc', 'subagents', 'agent-a123.jsonl'),
         'utf-8'
       );
     });
@@ -363,7 +379,7 @@ describe('sdkSession', () => {
       ].join('\n'));
 
       const result = await loadSubagentFinalResult(
-        '/Users/test/vault',
+        VAULT_PATH,
         'session-abc',
         'a123'
       );
@@ -375,14 +391,14 @@ describe('sdkSession', () => {
       mockExistsSync.mockReturnValue(false);
 
       const missing = await loadSubagentFinalResult(
-        '/Users/test/vault',
+        VAULT_PATH,
         'session-abc',
         'a123'
       );
       expect(missing).toBeNull();
 
       const invalid = await loadSubagentFinalResult(
-        '/Users/test/vault',
+        VAULT_PATH,
         'session-abc',
         '../bad-agent'
       );
@@ -873,7 +889,7 @@ describe('sdkSession', () => {
         '{"type":"user","uuid":"u2","timestamp":"2024-01-15T10:02:00Z","message":{"content":"Thanks"}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-full');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-full');
 
       // Should have 3 messages (system skipped)
       expect(result.messages).toHaveLength(3);
@@ -893,7 +909,7 @@ describe('sdkSession', () => {
         '{"type":"user","uuid":"u2","timestamp":"2024-01-15T10:02:00Z","message":{"content":"Third"}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-unordered');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-unordered');
 
       expect(result.messages[0].content).toBe('First');
       expect(result.messages[1].content).toBe('Second');
@@ -903,7 +919,7 @@ describe('sdkSession', () => {
     it('returns empty result when session does not exist', async () => {
       mockExistsSync.mockReturnValue(false);
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'nonexistent');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'nonexistent');
 
       expect(result.messages).toEqual([]);
     });
@@ -917,7 +933,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a2","timestamp":"2024-01-15T10:03:00Z","message":{"content":[{"type":"text","text":"I found 10 results about cats."}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-cross-tool');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-cross-tool');
 
       // Should have 2 messages (tool_result-only user skipped, assistant messages merged)
       expect(result.messages).toHaveLength(2);
@@ -938,7 +954,7 @@ describe('sdkSession', () => {
         '{"type":"user","uuid":"u1","timestamp":"2024-01-15T10:02:00Z","toolUseResult":{},"message":{"content":[{"type":"tool_result","tool_use_id":"ask-1","content":"\\"Color?\\"=\\"Blue\\""}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-ask-result-fallback');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-ask-result-fallback');
 
       expect(result.messages).toHaveLength(1);
       expect(result.messages[0].toolCalls).toHaveLength(1);
@@ -953,7 +969,7 @@ describe('sdkSession', () => {
         '{"type":"user","uuid":"u2","timestamp":"2024-01-15T10:02:00Z","toolUseResult":{},"message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"done"}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-skip-tool-result');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-skip-tool-result');
 
       // Should have 2 messages (tool_result user skipped)
       expect(result.messages).toHaveLength(2);
@@ -972,7 +988,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a2","timestamp":"2024-01-15T10:03:00Z","message":{"content":[{"type":"text","text":"Committing the changes now."}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-skip-skill');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-skip-skill');
 
       // Should have 2 messages: user query, merged assistant (tool_use + text merged together)
       // Skill prompt injection (u3) and tool result (u2) should be skipped
@@ -993,7 +1009,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a1","timestamp":"2024-01-15T10:01:00Z","message":{"content":[{"type":"text","text":"Hi there!"}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-skip-meta');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-skip-meta');
 
       // Should have 2 messages (meta message u2 skipped)
       expect(result.messages).toHaveLength(2);
@@ -1015,7 +1031,7 @@ describe('sdkSession', () => {
         '{"type":"user","uuid":"u4","timestamp":"2024-01-15T10:02:11Z","message":{"content":"<local-command-stdout>Compacted </local-command-stdout>"}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-compact');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-compact');
 
       // Should have: user "Hello", assistant "Hi!", user "/compact", assistant compact_boundary
       // Meta (u2), stdout (u4) should be skipped
@@ -1039,7 +1055,7 @@ describe('sdkSession', () => {
         '{"type":"user","uuid":"u3","timestamp":"2024-01-15T10:02:01Z","message":{"content":"<local-command-stderr>Error: Compaction canceled.</local-command-stderr>"}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-compact-cancel');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-compact-cancel');
 
       // Compact cancellation stderr should appear as interrupt, not be filtered
       const interruptMsg = result.messages.find(m => m.isInterrupt);
@@ -1055,7 +1071,7 @@ describe('sdkSession', () => {
         '{"type":"user","uuid":"u2","timestamp":"2024-01-15T10:02:01Z","message":{"content":"## Context\\n<local-command-stderr>Error: Compaction canceled.</local-command-stderr>"}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-compact-quoted-cancel');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-compact-quoted-cancel');
 
       expect(result.messages).toHaveLength(2);
       expect(result.messages.some(m => m.isInterrupt)).toBe(false);
@@ -1072,7 +1088,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a3","timestamp":"2024-01-15T10:03:01Z","message":{"content":[{"type":"tool_use","id":"t1","name":"Skill","input":{"skill":"md2docx"}}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-slash-cmd');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-slash-cmd');
 
       // user "Hello", assistant "Hi!", user "/md2docx", assistant with Skill tool
       // META (u3) should be skipped; "(no content)" text should be filtered
@@ -1092,7 +1108,7 @@ describe('sdkSession', () => {
         '{"type":"user","uuid":"u1","timestamp":"2024-01-15T10:01:00Z","toolUseResult":{},"message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"Command not found","is_error":true}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-error-result');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-error-result');
 
       expect(result.messages).toHaveLength(1);
       expect(result.messages[0].toolCalls![0].status).toBe('error');
@@ -1103,7 +1119,7 @@ describe('sdkSession', () => {
       mockExistsSync.mockReturnValue(true);
       mockFsPromises.readFile.mockRejectedValue(new Error('Disk failure'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-disk-err');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-disk-err');
 
       expect(result.messages).toEqual([]);
       expect(result.error).toBe('Disk failure');
@@ -1116,7 +1132,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a2","timestamp":"2024-01-15T10:00:01Z","message":{"content":[{"type":"tool_use","id":"t2","name":"Write","input":{"path":"b.ts"}}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-merge-tools');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-merge-tools');
 
       // Consecutive assistant messages should merge into one
       expect(result.messages).toHaveLength(1);
@@ -1134,7 +1150,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a1-last","parentUuid":"a1-mid","timestamp":"2024-01-15T10:00:03Z","message":{"content":[{"type":"text","text":"Done!"}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-merge-uuid');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-merge-uuid');
 
       expect(result.messages).toHaveLength(2);
       const assistant = result.messages[1];
@@ -1441,7 +1457,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a2","timestamp":"2024-01-15T10:00:01Z","message":{"content":[{"type":"thinking","thinking":"hmm"},{"type":"text","text":"Result here"}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-merge-blocks');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-merge-blocks');
 
       expect(result.messages).toHaveLength(1);
       // Merged: tool call from first + content blocks from both
@@ -1458,7 +1474,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a2","timestamp":"2024-01-15T10:00:01Z","message":{"content":[{"type":"text","text":"Here is the result"}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-merge-empty-target');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-merge-empty-target');
 
       expect(result.messages).toHaveLength(1);
       expect(result.messages[0].content).toBe('Here is the result');
@@ -1481,7 +1497,7 @@ describe('sdkSession', () => {
         }),
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-multi-images');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-multi-images');
 
       expect(result.messages).toHaveLength(1);
       expect(result.messages[0].images).toHaveLength(2);
@@ -1519,7 +1535,7 @@ describe('sdkSession', () => {
         }),
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-agent-result');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-agent-result');
 
       // The Agent tool call should have extracted text, not JSON.stringify'd array
       const assistantMsg = result.messages.find(m => m.role === 'assistant' && m.toolCalls?.length);
@@ -1918,7 +1934,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a1","parentUuid":"u1","timestamp":"2024-01-15T10:01:00Z","message":{"content":[{"type":"text","text":"Hi!"}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-no-resume');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-no-resume');
 
       expect(result.messages).toHaveLength(2);
     });
@@ -1932,7 +1948,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a2","parentUuid":"u2","timestamp":"2024-01-15T10:03:00Z","message":{"content":[{"type":"text","text":"More response"}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-truncate', 'a1');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-truncate', 'a1');
 
       // Should only have u1 and a1 (truncated at a1)
       expect(result.messages).toHaveLength(2);
@@ -1951,7 +1967,7 @@ describe('sdkSession', () => {
         '{"type":"assistant","uuid":"a3","parentUuid":"u3","timestamp":"2024-01-15T10:05:00Z","message":{"content":[{"type":"text","text":"New response"}]}}',
       ].join('\n'));
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-branched');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-branched');
 
       // Should have: u1 "Hello", a1 "Hi!", u3 "New branch", a3 "New response"
       // Old branch (u2, a2) should be excluded
@@ -2170,7 +2186,7 @@ describe('sdkSession', () => {
         return '';
       });
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-async-hydrate');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-async-hydrate');
 
       // Should have: user message, merged assistant with Task tool, assistant follow-up
       expect(result.messages.length).toBeGreaterThanOrEqual(2);
@@ -2206,7 +2222,7 @@ describe('sdkSession', () => {
         return '';
       });
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-async-error-flag');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-async-error-flag');
 
       const assistantMsg = result.messages.find(m => m.role === 'assistant' && m.toolCalls?.some(tc => tc.name === 'Task'));
       const taskToolCall = assistantMsg!.toolCalls!.find(tc => tc.name === 'Task')!;
@@ -2234,7 +2250,7 @@ describe('sdkSession', () => {
         return '';
       });
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-no-queue-op');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-no-queue-op');
 
       const assistantMsg = result.messages.find(m => m.toolCalls?.some(tc => tc.name === 'Task'));
       const taskToolCall = assistantMsg!.toolCalls!.find(tc => tc.name === 'Task')!;
@@ -2262,7 +2278,7 @@ describe('sdkSession', () => {
         return '';
       });
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-async-launch-error-flag');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-async-launch-error-flag');
 
       const assistantMsg = result.messages.find(m => m.toolCalls?.some(tc => tc.name === 'Task'));
       const taskToolCall = assistantMsg!.toolCalls!.find(tc => tc.name === 'Task')!;
@@ -2289,7 +2305,7 @@ describe('sdkSession', () => {
         return '';
       });
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-queue-success');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-queue-success');
 
       const assistantMsg = result.messages.find(m => m.toolCalls?.some(tc => tc.name === 'Task'));
       const taskToolCall = assistantMsg!.toolCalls!.find(tc => tc.name === 'Task')!;
@@ -2315,7 +2331,7 @@ describe('sdkSession', () => {
         return '';
       });
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-sync-task');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-sync-task');
 
       const assistantMsg = result.messages.find(m => m.toolCalls?.some(tc => tc.name === 'Task'));
       const taskToolCall = assistantMsg!.toolCalls!.find(tc => tc.name === 'Task')!;
@@ -2328,7 +2344,7 @@ describe('sdkSession', () => {
       mockExistsSync.mockReturnValue(true);
       mockFsPromises.readFile.mockImplementation(async (filePath: any) => {
         const p = String(filePath);
-        if (p.includes('subagents/agent-ae5eb9a.jsonl')) {
+        if (p.includes(path.join('subagents', 'agent-ae5eb9a.jsonl'))) {
           return [
             '{"type":"assistant","timestamp":"2024-01-15T10:02:00Z","message":{"content":[{"type":"tool_use","id":"sub-tool-1","name":"Grep","input":{"pattern":"TODO"}}]}}',
             '{"type":"user","timestamp":"2024-01-15T10:02:01Z","message":{"content":[{"type":"tool_result","tool_use_id":"sub-tool-1","content":"3 matches found"}]}}',
@@ -2345,7 +2361,7 @@ describe('sdkSession', () => {
         return '';
       });
 
-      const result = await loadSDKSessionMessages('/Users/test/vault', 'session-sidecar');
+      const result = await loadSDKSessionMessages(VAULT_PATH, 'session-sidecar');
 
       const assistantMsg = result.messages.find(m => m.toolCalls?.some(tc => tc.name === 'Task'));
       const taskToolCall = assistantMsg!.toolCalls!.find(tc => tc.name === 'Task')!;

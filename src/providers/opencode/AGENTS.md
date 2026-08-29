@@ -18,6 +18,7 @@
 
 ## Session resume
 
-- Persist both `sessionId` and `providerState.databasePath` after turns.
-- On ACP `session/load`, invalidate only when the JSON-RPC response explicitly says the session is missing. Log the missing session via debug and **keep** `databasePath` so SQLite hydrate and `OPENCODE_DB` still resolve. Transport, authentication, and configuration errors must propagate without clearing the live or persisted binding.
+- Persist `sessionId`, `providerState.databasePath`, and `providerState.sessionDropped` after turns.
+- On ACP `session/load` failure, decide with `isAcpSessionGone`: it asks the agent through `session/list` rather than reading the answer out of the error text, which OpenCode does not put there. A session the agent no longer lists is soft-failed into a fresh one; anything else - transport, authentication, configuration, or an agent that cannot list - propagates with the live and persisted binding intact. Log the failure via debug and **keep** `databasePath` so SQLite hydrate and `OPENCODE_DB` still resolve.
+- A dropped session is recorded in `providerState.sessionDropped` and read back on load, because the in-memory flag is consumed by the first save. Never replay the transcript into a replacement session: history bootstrap is for a cold resume that never held a session id.
 - Use shared helpers in `src/providers/acp/acpSessionResume.ts` rather than inventing a fourth wipe policy.

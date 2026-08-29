@@ -1,5 +1,5 @@
 import type {
-  ProviderAgentMention,
+ProviderAgentMention,
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandDescriptor,
@@ -7,6 +7,7 @@ import type {
   ProviderHistoryHydration,
   ProviderMcpPort,
   ProviderModelDescriptor,
+  ProviderModelRefreshOptions,
   ProviderModule,
   ProviderSettingsCodec,
   ProviderUsageSnapshot,
@@ -102,7 +103,9 @@ export interface KimicodeWorkspaceContext {
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
-  refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
+  refreshModels(
+    options?: ProviderModelRefreshOptions,
+  ): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   mcpPort(): ProviderMcpPort;
@@ -304,7 +307,7 @@ KimicodeProviderSettings
         },
         models: {
           list: () => context.listModels(),
-          refresh: () => context.refreshModels(),
+          refresh: options => context.refreshModels(options),
         },
         usage: {
           cached: () => context.cachedPlanUsage(),

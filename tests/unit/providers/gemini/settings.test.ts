@@ -5,6 +5,24 @@ import {
 } from '@/providers/gemini/settings';
 
 describe('Gemini provider settings', () => {
+  it('defaults the discovery fingerprint to an empty string and ignores a non-string', () => {
+    expect(getGeminiProviderSettings({}).discoveredModelsFingerprint).toBe('');
+    expect(getGeminiProviderSettings({
+      providerConfigs: { gemini: { discoveredModelsFingerprint: 42 } },
+    }).discoveredModelsFingerprint).toBe('');
+  });
+
+  it('round-trips the discovery fingerprint and keeps it across unrelated updates', () => {
+    const settings: Record<string, unknown> = {};
+    updateGeminiProviderSettings(settings, { discoveredModelsFingerprint: 'abc12345' });
+
+    expect((settings as any).providerConfigs.gemini.discoveredModelsFingerprint).toBe('abc12345');
+
+    updateGeminiProviderSettings(settings, { environmentHash: 'API_KEY=new' });
+
+    expect(getGeminiProviderSettings(settings).discoveredModelsFingerprint).toBe('abc12345');
+  });
+
   it('is disabled by default and falls back to gemini from PATH', () => {
     const settings = getGeminiProviderSettings({});
 

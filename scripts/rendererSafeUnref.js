@@ -1,3 +1,8 @@
+// The exit-handler call in the two expression patterns below matches any method
+// name: the sdk swapped its tracked-process Set for a tracker object between
+// 0.3.229 and 0.3.233, turning `set.delete(child)` into `tracker.untrack(child)`.
+// The surrounding kill-timer body is what actually pins these matches, so a
+// rename there must not silently drop the patch and fail the build instead.
 const UNSAFE_TIMER_UNREF_PATTERNS = [
   {
     name: 'claude-sdk-process-transport-close-win32',
@@ -95,7 +100,7 @@ const UNSAFE_TIMER_UNREF_PATTERNS = [
   },
   {
     name: 'claude-sdk-process-transport-close-win32-minified-expression',
-    pattern: /setTimeout\(\(([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*)\)=>\{if\(\1\.exitCode!==null\)\{\2\(\);return\}if\(process\.platform==="win32"\)\{setTimeout\(\(([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*)\)=>\{\3\.exitCode===null&&\3\.kill\("SIGKILL"\),\4\(\)\},5e3,\1,\2\)\.unref\(\);return\}\1\.kill\("SIGTERM"\),setTimeout\(([A-Za-z_$][A-Za-z0-9_$]*)=>\{\5\.exitCode===null&&\5\.kill\("SIGKILL"\)\},5e3,\1\)\.unref\(\),\2\(\)\},([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*)\)\.unref\(\),\7\.once\("exit",(\(\)=>[A-Za-z_$][A-Za-z0-9_$]*\.delete\(\7\))\)/g,
+    pattern: /setTimeout\(\(([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*)\)=>\{if\(\1\.exitCode!==null\)\{\2\(\);return\}if\(process\.platform==="win32"\)\{setTimeout\(\(([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*)\)=>\{\3\.exitCode===null&&\3\.kill\("SIGKILL"\),\4\(\)\},5e3,\1,\2\)\.unref\(\);return\}\1\.kill\("SIGTERM"\),setTimeout\(([A-Za-z_$][A-Za-z0-9_$]*)=>\{\5\.exitCode===null&&\5\.kill\("SIGKILL"\)\},5e3,\1\)\.unref\(\),\2\(\)\},([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*)\)\.unref\(\),\7\.once\("exit",(\(\)=>[A-Za-z_$][A-Za-z0-9_$]*\.[A-Za-z_$][A-Za-z0-9_$]*\(\7\))\)/g,
     replacement: (
       _match,
       _processParam,
@@ -132,7 +137,7 @@ const UNSAFE_TIMER_UNREF_PATTERNS = [
   },
   {
     name: 'claude-sdk-process-transport-close-signal-code-minified-expression',
-    pattern: /setTimeout\(\(([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*)\)=>\{if\(\1\.exitCode!==null\|\|\1\.signalCode!=null\)\{\2\(\);return\}if\(process\.platform==="win32"\)\{setTimeout\(\(([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*)\)=>\{\3\.exitCode===null&&\3\.kill\("SIGKILL"\),\4\(\)\},5e3,\1,\2\)\.unref\(\);return\}\1\.kill\("SIGTERM"\),setTimeout\(([A-Za-z_$][A-Za-z0-9_$]*)=>\{\5\.exitCode===null&&\5\.kill\("SIGKILL"\)\},5e3,\1\)\.unref\(\),\2\(\)\},([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*)\)\.unref\(\),\7\.once\("exit",(\(\)=>[A-Za-z_$][A-Za-z0-9_$]*\.delete\(\7\))\)/g,
+    pattern: /setTimeout\(\(([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*)\)=>\{if\(\1\.exitCode!==null\|\|\1\.signalCode!=null\)\{\2\(\);return\}if\(process\.platform==="win32"\)\{setTimeout\(\(([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*)\)=>\{\3\.exitCode===null&&\3\.kill\("SIGKILL"\),\4\(\)\},5e3,\1,\2\)\.unref\(\);return\}\1\.kill\("SIGTERM"\),setTimeout\(([A-Za-z_$][A-Za-z0-9_$]*)=>\{\5\.exitCode===null&&\5\.kill\("SIGKILL"\)\},5e3,\1\)\.unref\(\),\2\(\)\},([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*),([A-Za-z_$][A-Za-z0-9_$]*)\)\.unref\(\),\7\.once\("exit",(\(\)=>[A-Za-z_$][A-Za-z0-9_$]*\.[A-Za-z_$][A-Za-z0-9_$]*\(\7\))\)/g,
     replacement: (
       _match,
       _processParam,

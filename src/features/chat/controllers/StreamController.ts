@@ -1828,6 +1828,18 @@ export class StreamController {
 
     // If indicator already exists, just re-append it to the bottom
     if (state.thinkingEl) {
+      // An override names what is actually happening right now, so it has to
+      // reach an indicator that is already up - which is the usual case once a
+      // turn is running. Only the label is replaced; the elapsed-time hint that
+      // follows it keeps counting.
+      if (overrideText) {
+        // The label is the first span; the elapsed-time hint that follows it
+        // keeps counting and must not be replaced.
+        const labelEl = state.thinkingEl.children[0] as HTMLElement | undefined;
+        if (typeof labelEl?.setText === 'function') {
+          labelEl.setText(overrideText);
+        }
+      }
       state.currentContentEl.appendChild(state.thinkingEl);
       this.deps.updateQueueIndicator();
       return;

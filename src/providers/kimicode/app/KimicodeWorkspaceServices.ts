@@ -33,20 +33,21 @@ export interface KimicodeWorkspaceServices extends ProviderWorkspaceServices {
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
 function createKimicodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
-  const initialSettings = getKimicodeProviderSettings(plugin.settings ?? {});
+  // Not seeded from the persisted settings. The discovered list lives in memory
+  // only, so anything present at construction came from a legacy persisted field
+  // or an earlier runtime in this process - neither discovered under a key this
+  // cache watched, and a seed would pin it for the rest of the process. The
+  // first refresh boots the runtime once and every later one reuses it.
   const refreshCache = new ProviderModelCatalogRefreshCache(MODEL_CATALOG_CACHE_TTL_MS);
-  if (initialSettings.discoveredModels.length > 0) {
-    refreshCache.seed(buildKimicodeModelCatalogCacheKey(initialSettings));
-  }
 
   return {
     isAvailable(settings) {
       return getKimicodeProviderSettings(settings).enabled;
     },
-    async refreshModels({ settings }) {
+    async refreshModels({ force, settings }) {
       const currentSettings = getKimicodeProviderSettings(settings);
       const cacheKey = buildKimicodeModelCatalogCacheKey(currentSettings);
-      if (refreshCache.isFresh(cacheKey, currentSettings.discoveredModels.length > 0)) {
+      if (!force && refreshCache.isFresh(cacheKey, currentSettings.discoveredModels.length > 0)) {
         plugin.recordDebugLog?.({
           data: {
             modelCount: currentSettings.discoveredModels.length,
@@ -63,6 +64,7 @@ function createKimicodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalo
 
       return refreshCache.refresh({
         fingerprint: cacheKey,
+        force,
         hasCachedModels: currentSettings.discoveredModels.length > 0,
         load: async () => {
           const before = JSON.stringify(currentSettings.discoveredModels);

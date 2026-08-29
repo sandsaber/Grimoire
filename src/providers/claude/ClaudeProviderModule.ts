@@ -1,5 +1,5 @@
 import type {
-  ProviderAgentMention,
+ProviderAgentMention,
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandDescriptor,
@@ -7,6 +7,7 @@ import type {
   ProviderHistoryHydration,
   ProviderMcpPort,
   ProviderModelDescriptor,
+  ProviderModelRefreshOptions,
   ProviderModule,
   ProviderRewindOutcome,
   ProviderRewindRequest,
@@ -62,7 +63,10 @@ const KNOWN_SETTINGS_FIELDS = new Set([
   'cliPath',
   'cliPathsByHost',
   'customModels',
+  'discoveredCommands',
+  'discoveredCommandsFingerprint',
   'discoveredModels',
+  'discoveredModelsFingerprint',
   'enableBangBash',
   'enableChrome',
   'enabled',
@@ -81,7 +85,9 @@ export interface ClaudeWorkspaceContext {
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
-  refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
+  refreshModels(
+    options?: ProviderModelRefreshOptions,
+  ): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   mcpPort(): ProviderMcpPort;
@@ -227,6 +233,12 @@ export const claudeSettingsCodec: ProviderSettingsCodec<ClaudeProviderSettings> 
       cliPath: value.cliPath.trim(),
       cliPathsByHost: { ...normalizeStringMap(value.cliPathsByHost) },
       customModels: value.customModels,
+      // Persisted, per `main`'s command- and model-cache work: the list and the
+      // key it was discovered under have to outlive the process, or every start
+      // spends a probe rediscovering what it already had.
+      discoveredCommands: value.discoveredCommands,
+      discoveredCommandsFingerprint: value.discoveredCommandsFingerprint,
+      discoveredModelsFingerprint: value.discoveredModelsFingerprint,
       discoveredModels: normalizeClaudeDiscoveredModels(value.discoveredModels)
         .map(model => ({ ...model })),
       enableBangBash: value.enableBangBash,
@@ -311,7 +323,7 @@ ClaudeProviderSettings
         },
         models: {
           list: () => context.listModels(),
-          refresh: () => context.refreshModels(),
+          refresh: options => context.refreshModels(options),
         },
         usage: {
           cached: () => context.cachedPlanUsage(),
@@ -405,6 +417,9 @@ function createDefaultSettings(): ClaudeProviderSettings {
     ...DEFAULT_CLAUDE_PROVIDER_SETTINGS,
     cliPathsByHost: {},
     discoveredModels: [],
+    discoveredModelsFingerprint: '',
+    discoveredCommands: [],
+    discoveredCommandsFingerprint: '',
     projectSettingsSnapshot: { ...DEFAULT_CLAUDE_PROVIDER_SETTINGS.projectSettingsSnapshot },
   };
 }
@@ -412,6 +427,15 @@ function createDefaultSettings(): ClaudeProviderSettings {
 function decodeSettings(record: Readonly<Record<string, unknown>>): ClaudeProviderSettings {
   const defaults = createDefaultSettings();
   return {
+    discoveredCommands: Array.isArray(record.discoveredCommands)
+      ? record.discoveredCommands as ClaudeProviderSettings['discoveredCommands']
+      : defaults.discoveredCommands,
+    discoveredCommandsFingerprint: typeof record.discoveredCommandsFingerprint === 'string'
+      ? record.discoveredCommandsFingerprint
+      : defaults.discoveredCommandsFingerprint,
+    discoveredModelsFingerprint: typeof record.discoveredModelsFingerprint === 'string'
+      ? record.discoveredModelsFingerprint
+      : defaults.discoveredModelsFingerprint,
     enabled: typeof record.enabled === 'boolean' ? record.enabled : defaults.enabled,
     cliPath: typeof record.cliPath === 'string' ? record.cliPath.trim() : defaults.cliPath,
     cliPathsByHost: normalizeStringMap(record.cliPathsByHost),

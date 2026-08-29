@@ -1,7 +1,8 @@
 import type {
-  ProviderCapabilityDescriptor,
+ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderModelDescriptor,
+  ProviderModelRefreshOptions,
   ProviderModule,
   ProviderSettingsCodec,
   ProviderWorkspaceSlots,
@@ -81,7 +82,9 @@ const KNOWN_SETTINGS_FIELDS = new Set([
 
 export interface AntigravityWorkspaceContext {
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
-  refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
+  refreshModels(
+    options?: ProviderModelRefreshOptions,
+  ): Promise<readonly ProviderModelDescriptor[]>;
   renderSettingsTab(host: unknown): void;
 }
 
@@ -149,7 +152,10 @@ const antigravityCapabilities: ProviderCapabilityDescriptor = {
   security: { enforcement: 'grimoire' },
   reasoningControl: { kind: 'none' },
   workspace: {
-    skills: { inventory: 'none', manager: 'none' },
+    // `readonly`, since `main`'s vault-skills fix: the slash menu lists the
+    // vault's own skills for this provider, which the CLI has no surface of its
+    // own for — read, never written.
+    skills: { inventory: 'readonly', manager: 'none' },
     commands: { inventory: 'none', manager: 'none' },
     agents: { inventory: 'none', manager: 'none' },
     mcp: { inventory: 'none', manager: 'none' },
@@ -248,7 +254,7 @@ AntigravityProviderSettings
         },
         models: {
           list: () => context.listModels(),
-          refresh: () => context.refreshModels(),
+          refresh: options => context.refreshModels(options),
         },
         settingsPresentation: { render: host => context.renderSettingsTab(host) },
       };

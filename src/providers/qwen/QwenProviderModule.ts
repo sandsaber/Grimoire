@@ -1,5 +1,5 @@
 import type {
-  ProviderAgentMention,
+ProviderAgentMention,
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandDescriptor,
@@ -7,6 +7,7 @@ import type {
   ProviderHistoryHydration,
   ProviderMcpPort,
   ProviderModelDescriptor,
+  ProviderModelRefreshOptions,
   ProviderModule,
   ProviderSettingsCodec,
   ProviderUsageSnapshot,
@@ -79,8 +80,8 @@ import { qwenChatUIConfig } from './ui/QwenChatUIConfig';
  */
 
 const KNOWN_SETTINGS_FIELDS = new Set([
-  'cliPath',
   'cliPathsByHost',
+  'discoveredModelsFingerprint',
   'effortLevel',
   'enabled',
   'environmentHash',
@@ -88,6 +89,7 @@ const KNOWN_SETTINGS_FIELDS = new Set([
   'modelAliases',
   'selectedMode',
   'visibleModels',
+'cliPath',
 ]);
 
 export interface QwenWorkspaceContext {
@@ -96,7 +98,9 @@ export interface QwenWorkspaceContext {
   listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
   refreshAgentMentions(): Promise<void>;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
-  refreshModels(): Promise<readonly ProviderModelDescriptor[]>;
+  refreshModels(
+    options?: ProviderModelRefreshOptions,
+  ): Promise<readonly ProviderModelDescriptor[]>;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
   mcpPort(): ProviderMcpPort;
@@ -220,6 +224,11 @@ export const qwenSettingsCodec: ProviderSettingsCodec<QwenProviderSettings> = {
     // discovery state refreshed from the CLI, and writing them here would make
     // a stale catalogue outlive the process that produced it.
     const persisted: PersistedQwenProviderSettings = {
+      // Persisted with the rest: the fingerprint is what tells the next
+      // load whether the catalogue it is holding was discovered under the
+      // same key, and a fingerprint that does not outlive the process
+      // makes every start rediscover.
+      discoveredModelsFingerprint: value.discoveredModelsFingerprint,
       cliPath: value.cliPath.trim(),
       cliPathsByHost: normalizeStringMap(value.cliPathsByHost),
       effortLevel: normalizeQwenEffortLevel(value.effortLevel),
@@ -290,7 +299,7 @@ QwenProviderSettings
         },
         models: {
           list: () => context.listModels(),
-          refresh: () => context.refreshModels(),
+          refresh: options => context.refreshModels(options),
         },
         usage: {
           cached: () => context.cachedPlanUsage(),
@@ -367,6 +376,9 @@ function createDefaultSettings(): QwenProviderSettings {
 function decodeSettings(record: Readonly<Record<string, unknown>>): QwenProviderSettings {
   const defaults = createDefaultSettings();
   return {
+    discoveredModelsFingerprint: typeof record.discoveredModelsFingerprint === 'string'
+      ? record.discoveredModelsFingerprint
+      : defaults.discoveredModelsFingerprint,
     cliPath: typeof record.cliPath === 'string' ? record.cliPath.trim() : defaults.cliPath,
     cliPathsByHost: normalizeStringMap(record.cliPathsByHost),
     effortLevel: normalizeQwenEffortLevel(record.effortLevel),

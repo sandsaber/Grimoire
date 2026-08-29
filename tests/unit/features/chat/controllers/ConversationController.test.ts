@@ -68,6 +68,8 @@ function createMockDeps(overrides: Partial<ConversationControllerDeps> = {}): Co
     state,
     renderer: {
       renderMessages: jest.fn().mockReturnValue(createMockEl()),
+      renderSessionRestartNotice: jest.fn(),
+      clearSessionRestartNotice: jest.fn(),
     } as any,
     subagentManager: {
       orphanAllActive: jest.fn(),
@@ -137,7 +139,7 @@ describe('ConversationController', () => {
   describe('Queue Management', () => {
     describe('Creating new conversation', () => {
       it('should clear queued message on new conversation', async () => {
-        deps.state.queuedMessage = { content: 'test', images: undefined, editorContext: null, canvasContext: null };
+        deps.state.queue.enqueue({ content: 'test', images: undefined, editorContext: null, canvasContext: null });
         deps.state.isStreaming = false;
 
         await controller.createNew();
@@ -211,7 +213,7 @@ describe('ConversationController', () => {
     describe('Switching conversations', () => {
       it('should clear queued message on conversation switch', async () => {
         deps.state.currentConversationId = 'old-conv';
-        deps.state.queuedMessage = { content: 'test', images: undefined, editorContext: null, canvasContext: null };
+        deps.state.queue.enqueue({ content: 'test', images: undefined, editorContext: null, canvasContext: null });
 
         await controller.switchTo('new-conv');
 
@@ -2579,5 +2581,119 @@ describe('ConversationController - Rewind', () => {
 
       expect(dismissFn).toHaveBeenCalled();
     });
+  });
+});
+
+describe('ConversationController - session restart notice', () => {
+  function createDroppedSessionDeps(options: {
+    dropped: boolean;
+    messages: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number }>;
+  }) {
+    const conversation = {
+      id: 'conv-dropped',
+      title: 'Dropped',
+      messages: options.messages,
+      sessionId: null,
+      providerId: 'opencode',
+      providerState: { sessionDropped: options.dropped },
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    const deps = createMockDeps({
+      getAgentService: () => ({
+        providerId: 'opencode',
+        getSessionId: jest.fn().mockReturnValue(null),
+        consumeSessionInvalidation: jest.fn().mockReturnValue(false),
+        isSessionDropped: jest.fn().mockReturnValue(options.dropped),
+        buildSessionUpdates: jest.fn().mockReturnValue({ updates: {} }),
+        syncConversationState: jest.fn(),
+      }) as any,
+    });
+    (deps.plugin.getConversationById as jest.Mock).mockResolvedValue(conversation);
+    deps.state.currentConversationId = conversation.id;
+    return { conversation, deps };
+  }
+
+  const someMessages = [
+    { id: 'm1', role: 'user' as const, content: 'first', timestamp: Date.now() },
+    { id: 'm2', role: 'assistant' as const, content: 'reply', timestamp: Date.now() },
+  ];
+
+  it('marks the seam when a restored conversation lost its session', async () => {
+    const { deps } = createDroppedSessionDeps({ dropped: true, messages: someMessages });
+    const controller = new ConversationController(deps);
+
+    await controller.loadActive();
+
+    expect(deps.renderer.renderSessionRestartNotice).toHaveBeenCalled();
+  });
+
+  it('says nothing when the session was resumed', async () => {
+    const { deps } = createDroppedSessionDeps({ dropped: false, messages: someMessages });
+    const controller = new ConversationController(deps);
+
+    await controller.loadActive();
+
+    expect(deps.renderer.renderSessionRestartNotice).not.toHaveBeenCalled();
+    expect(deps.renderer.clearSessionRestartNotice).toHaveBeenCalled();
+  });
+
+  it('stays quiet on an empty thread, where no history can mislead', async () => {
+    const { deps } = createDroppedSessionDeps({ dropped: true, messages: [] });
+    const controller = new ConversationController(deps);
+
+    await controller.loadActive();
+
+    expect(deps.renderer.renderSessionRestartNotice).not.toHaveBeenCalled();
+  });
+
+  it('re-checks after warmup, which is where the drop is usually first found', async () => {
+    const { deps } = createDroppedSessionDeps({ dropped: true, messages: someMessages });
+    const controller = new ConversationController(deps);
+    await controller.loadActive();
+    (deps.renderer.renderSessionRestartNotice as jest.Mock).mockClear();
+
+    controller.refreshSessionRestartNotice();
+
+    expect(deps.renderer.renderSessionRestartNotice).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not redraw the thread mid-turn', async () => {
+    const { deps } = createDroppedSessionDeps({ dropped: true, messages: someMessages });
+    const controller = new ConversationController(deps);
+    await controller.loadActive();
+    (deps.renderer.renderSessionRestartNotice as jest.Mock).mockClear();
+    deps.state.isStreaming = true;
+
+    controller.refreshSessionRestartNotice();
+
+    expect(deps.renderer.renderSessionRestartNotice).not.toHaveBeenCalled();
+  });
+
+  it('leaves providers that always resume alone', async () => {
+    const deps = createMockDeps({
+      getAgentService: () => ({
+        providerId: 'claude',
+        getSessionId: jest.fn().mockReturnValue('session-1'),
+        consumeSessionInvalidation: jest.fn().mockReturnValue(false),
+        buildSessionUpdates: jest.fn().mockReturnValue({ updates: {} }),
+        syncConversationState: jest.fn(),
+      }) as any,
+    });
+    (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
+      id: 'conv-claude',
+      title: 'Claude',
+      messages: someMessages,
+      sessionId: 'session-1',
+      providerId: 'claude',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    deps.state.currentConversationId = 'conv-claude';
+    const controller = new ConversationController(deps);
+
+    await controller.loadActive();
+
+    expect(deps.renderer.renderSessionRestartNotice).not.toHaveBeenCalled();
   });
 });

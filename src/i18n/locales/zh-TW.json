@@ -407,6 +407,8 @@
         "historyPartial": "此對話的一部分無法載入，因此可能缺少部分早期訊息。",
         "historyUnreadable": "無法讀取此對話的早期訊息，因此後續內容可能不完整。",
         "conversationCompacted": "對話已壓縮",
+        "sessionRestarted": "新工作階段",
+        "sessionRestartedHint": "代理無法還原先前的工作階段，因此這段對話會在新的工作階段中繼續。上方的訊息不在它的脈絡中——請重述仍然需要的內容，或在新分頁中重新開始。",
         "completed": "已完成",
         "duration": "* {flavor}，持續 {duration}",
         "copied": "已複製！",
@@ -543,7 +545,14 @@
       "queue": {
         "steering": "正在引導…",
         "steerNow": "立即引導",
-        "steerFailed": "無法引導佇列中的 Codex 訊息，該訊息仍可使用。"
+        "steerFailed": "無法引導佇列中的 Codex 訊息，該訊息仍可使用。",
+        "count": "佇列中：{count}",
+        "resume": "繼續",
+        "clearAll": "全部清除",
+        "editItem": "編輯佇列中的訊息",
+        "removeItem": "捨棄佇列中的訊息",
+        "pausedFailed": "佇列已暫停：本回合以錯誤結束",
+        "pausedCancelled": "佇列已暫停：本回合已被停止"
       },
       "instructions": {
         "added": "已將指示加入自訂系統提示",
@@ -572,7 +581,8 @@
         "orphaned": "孤立",
         "inProgress": "進行中",
         "errorUpper": "錯誤",
-        "doneUpper": "完成"
+        "doneUpper": "完成",
+        "antigravityWorking": "Antigravity 正在處理 — {seconds} 秒"
       },
       "subagent": {
         "task": "子代理工作",
@@ -850,6 +860,18 @@
       "desc": "每行將一個額外的 Claude 模型 ID 加入選擇器。環境中的模型覆寫仍會取代選擇器。",
       "placeholder": "claude-opus-4-6\nclaude-opus-4-6[1m]\nclaude-opus-4-5-20251101"
     },
+    "refreshModels": {
+      "name": "重新整理模型",
+      "desc": "向 Claude Code 請求目前的模型清單。否則 Grimoire 僅在 CLI 或其環境變更時重新檢查。",
+      "button": "重新整理",
+      "done": "模型清單已重新整理：共 {count} 個模型。"
+    },
+    "refreshCommands": {
+      "name": "重新整理命令",
+      "desc": "向 Claude Code 要求目前的命令與技能清單。否則 Grimoire 會沿用既有清單，直到 CLI 或其環境變更為止。",
+      "button": "重新整理",
+      "done": "命令清單已更新：{count} 條命令。"
+    },
     "respectProjectSettings": {
       "name": "遵循 Claude Code 設定",
       "desc": "使用 Claude Code 使用者與專案設定中的模型和環境變數。這可啟用 MiniMax、Z.ai 及其他 Anthropic 相容閘道提供的自訂模型；Grimoire 的明確選擇仍優先。"
@@ -1115,6 +1137,7 @@
       "disabledDesc": "在上方啟用此提供者，以使用這些設定並在模型選擇器顯示其模型。",
       "fallbackDesc": "{provider} 提供者。",
       "loadModelsFailed": "無法載入提供者模型。",
+      "loadCommandsFailed": "無法載入提供者命令。",
       "contextWindowLabel": "{model} 的脈絡視窗"
     },
     "providerModelPicker": {

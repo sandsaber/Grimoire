@@ -407,6 +407,8 @@
         "historyPartial": "Ein Teil dieser Unterhaltung konnte nicht geladen werden, daher fehlen möglicherweise frühere Nachrichten.",
         "historyUnreadable": "Die früheren Nachrichten dieser Unterhaltung konnten nicht gelesen werden, daher ist das Folgende möglicherweise unvollständig.",
         "conversationCompacted": "Unterhaltung komprimiert",
+        "sessionRestarted": "Neue Sitzung",
+        "sessionRestartedHint": "Der Agent konnte die vorherige Sitzung nicht wiederherstellen, daher wird diese Unterhaltung in einer neuen fortgesetzt. Die Nachrichten oben sind nicht in ihrem Kontext - wiederhole, was weiterhin gebraucht wird, oder beginne neu in einem neuen Tab.",
         "completed": "Fertig",
         "duration": "* {flavor} für {duration}",
         "copied": "Kopiert!",
@@ -543,7 +545,14 @@
       "queue": {
         "steering": "Wird gesteuert ...",
         "steerNow": "Jetzt steuern",
-        "steerFailed": "Die wartende Codex-Nachricht konnte nicht gesteuert werden. Sie ist weiterhin verfügbar."
+        "steerFailed": "Die wartende Codex-Nachricht konnte nicht gesteuert werden. Sie ist weiterhin verfügbar.",
+        "count": "In Warteschlange: {count}",
+        "resume": "Fortsetzen",
+        "clearAll": "Alle löschen",
+        "editItem": "Nachricht in der Warteschlange bearbeiten",
+        "removeItem": "Nachricht aus der Warteschlange entfernen",
+        "pausedFailed": "Warteschlange angehalten: Der Zug endete mit einem Fehler",
+        "pausedCancelled": "Warteschlange angehalten: Der Zug wurde gestoppt"
       },
       "instructions": {
         "added": "Anweisung zum benutzerdefinierten Systemprompt hinzugefügt",
@@ -572,7 +581,8 @@
         "orphaned": "Verwaist",
         "inProgress": "in Bearbeitung",
         "errorUpper": "FEHLER",
-        "doneUpper": "FERTIG"
+        "doneUpper": "FERTIG",
+        "antigravityWorking": "Antigravity arbeitet – {seconds} s"
       },
       "subagent": {
         "task": "Subagent-Aufgabe",
@@ -850,6 +860,18 @@
       "desc": "Zusätzliche Claude-Modell-IDs zur Auswahl hinzufügen, eine pro Zeile. Modellüberschreibungen aus der Umgebung ersetzen die Auswahl weiterhin.",
       "placeholder": "claude-opus-4-6\nclaude-opus-4-6[1m]\nclaude-opus-4-5-20251101"
     },
+    "refreshModels": {
+      "name": "Modelle aktualisieren",
+      "desc": "Fragt Claude Code nach der aktuellen Modellliste. Sonst prüft Grimoire nur erneut, wenn sich die CLI oder ihre Umgebung ändert.",
+      "button": "Aktualisieren",
+      "done": "Modellliste aktualisiert: {count} Modelle."
+    },
+    "refreshCommands": {
+      "name": "Befehle aktualisieren",
+      "desc": "Claude Code nach seiner aktuellen Befehls- und Skill-Liste fragen. Andernfalls verwendet Grimoire die vorhandene Liste weiter, bis sich die CLI oder ihre Umgebung ändert.",
+      "button": "Aktualisieren",
+      "done": "Befehlsliste aktualisiert: {count} Befehle."
+    },
     "respectProjectSettings": {
       "name": "Claude-Code-Einstellungen berücksichtigen",
       "desc": "Modell und Umgebung aus den Benutzer- und Projekteinstellungen von Claude Code verwenden. Dadurch werden benutzerdefinierte Modelle von Anbietern wie MiniMax, Z.ai und anderen Anthropic-kompatiblen Gateways ermöglicht. Grimoire-Einstellungen überschreiben weiterhin explizite Auswahlmöglichkeiten."
@@ -1115,6 +1137,7 @@
       "disabledDesc": "Aktiviere diesen Anbieter oben, um diese Einstellungen zu verwenden und seine Modelle in der Modellauswahl anzuzeigen.",
       "fallbackDesc": "{provider}-Anbieter.",
       "loadModelsFailed": "Anbietermodelle konnten nicht geladen werden.",
+      "loadCommandsFailed": "Anbieterbefehle konnten nicht geladen werden.",
       "contextWindowLabel": "Kontextfenster für {model}"
     },
     "providerModelPicker": {

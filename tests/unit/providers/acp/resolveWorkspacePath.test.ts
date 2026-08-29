@@ -4,16 +4,21 @@ import * as path from 'node:path';
 
 import { resolveWorkspacePath } from '@/providers/acp/resolveWorkspacePath';
 
-const CWD = '/tmp/grimoire-test-vault';
+// Resolved rather than written as a literal: resolveWorkspacePath runs every
+// input through path.resolve, so on Windows the workspace root carries the
+// current drive and separators the POSIX literal never would.
+const CWD = path.resolve('/tmp/grimoire-test-vault');
 
 describe('resolveWorkspacePath', () => {
   describe('when containment is enforced (safe/plan mode)', () => {
     it('resolves a relative path inside the workspace', () => {
-      expect(resolveWorkspacePath(CWD, 'notes/today.md')).toBe(`${CWD}/notes/today.md`);
+      expect(resolveWorkspacePath(CWD, 'notes/today.md')).toBe(path.join(CWD, 'notes', 'today.md'));
     });
 
     it('allows an absolute path that stays inside the workspace', () => {
-      expect(resolveWorkspacePath(CWD, `${CWD}/notes/today.md`)).toBe(`${CWD}/notes/today.md`);
+      const inside = path.join(CWD, 'notes', 'today.md');
+
+      expect(resolveWorkspacePath(CWD, inside)).toBe(inside);
     });
 
     it('allows the workspace root itself', () => {
@@ -66,12 +71,13 @@ describe('resolveWorkspacePath', () => {
 
   describe('when containment is disabled (active / full_access mode)', () => {
     it('returns an absolute path outside the workspace unchanged', () => {
-      expect(resolveWorkspacePath(CWD, '/etc/hosts', { allowOutsideWorkspace: true })).toBe('/etc/hosts');
+      expect(resolveWorkspacePath(CWD, '/etc/hosts', { allowOutsideWorkspace: true }))
+        .toBe(path.resolve('/etc/hosts'));
     });
 
     it('returns an escaping relative path resolved against the workspace', () => {
       expect(resolveWorkspacePath(CWD, '../sibling/file.md', { allowOutsideWorkspace: true })).toBe(
-        '/tmp/sibling/file.md',
+        path.join(path.dirname(CWD), 'sibling', 'file.md'),
       );
     });
   });

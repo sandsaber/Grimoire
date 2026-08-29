@@ -109,6 +109,31 @@ export class ConversationController {
     return this.deps.getAgentService?.() ?? null;
   }
 
+  /**
+   * Re-checks whether the saved session survived. Warmup resolves after the
+   * thread is already on screen, and that is where a drop is usually first
+   * discovered, so the render that happened on load cannot be the only one.
+   */
+  refreshSessionRestartNotice(): void {
+    if (this.deps.state.isStreaming) return;
+    this.updateSessionRestartNotice();
+  }
+
+  /**
+   * Draws the seam when the runtime could not resume this conversation's saved
+   * session. Only meaningful with messages on screen: an empty thread has no
+   * history that could be mistaken for the agent's memory.
+   */
+  private updateSessionRestartNotice(): void {
+    const { renderer, state } = this.deps;
+    const dropped = this.getAgentService()?.isSessionDropped?.() ?? false;
+    if (dropped && state.messages.length > 0) {
+      renderer.renderSessionRestartNotice();
+    } else {
+      renderer.clearSessionRestartNotice();
+    }
+  }
+
   // ============================================
   // Conversation Lifecycle
   // ============================================
@@ -435,6 +460,7 @@ export class ConversationController {
 
     const welcomeEl = renderer.renderMessages(state.messages, () => this.getGreeting());
     this.deps.setWelcomeEl(welcomeEl);
+    this.updateSessionRestartNotice();
     this.updateWelcomeVisibility();
 
     const filesChanged = result.filesChanged?.length ?? 0;
@@ -592,6 +618,7 @@ export class ConversationController {
       plugin.getHistoryHydration(conversation.id),
     );
     this.deps.setWelcomeEl(welcomeEl);
+    this.updateSessionRestartNotice();
   }
 
   /**

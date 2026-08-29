@@ -407,6 +407,8 @@
         "historyPartial": "Une partie de cette conversation n'a pas pu être chargée ; certains messages antérieurs peuvent donc manquer.",
         "historyUnreadable": "Les messages antérieurs de cette conversation n'ont pas pu être lus ; la suite peut donc être incomplète.",
         "conversationCompacted": "Conversation compactée",
+        "sessionRestarted": "Nouvelle session",
+        "sessionRestartedHint": "L'agent n'a pas pu restaurer la session précédente, cette conversation se poursuit donc dans une nouvelle. Les messages ci-dessus ne sont pas dans son contexte - répétez ce qui reste nécessaire, ou repartez de zéro dans un nouvel onglet.",
         "completed": "Terminé",
         "duration": "* {flavor} pendant {duration}",
         "copied": "Copié !",
@@ -543,7 +545,14 @@
       "queue": {
         "steering": "Orientation…",
         "steerNow": "Orienter maintenant",
-        "steerFailed": "Impossible d’orienter le message Codex en attente. Il reste disponible."
+        "steerFailed": "Impossible d’orienter le message Codex en attente. Il reste disponible.",
+        "count": "En file d'attente : {count}",
+        "resume": "Reprendre",
+        "clearAll": "Tout effacer",
+        "editItem": "Modifier le message en file d'attente",
+        "removeItem": "Supprimer le message en file d'attente",
+        "pausedFailed": "File d'attente suspendue : le tour s'est terminé par une erreur",
+        "pausedCancelled": "File d'attente suspendue : le tour a été interrompu"
       },
       "instructions": {
         "added": "Instruction ajoutée à l’invite système personnalisée",
@@ -572,7 +581,8 @@
         "orphaned": "Orphelin",
         "inProgress": "en cours",
         "errorUpper": "ERREUR",
-        "doneUpper": "TERMINÉ"
+        "doneUpper": "TERMINÉ",
+        "antigravityWorking": "Antigravity travaille — {seconds} s"
       },
       "subagent": {
         "task": "Tâche de sous-agent",
@@ -850,6 +860,18 @@
       "desc": "Ajoutez des ID de modèles Claude au sélecteur, un par ligne. Les substitutions de modèle de l'environnement remplacent toujours le sélecteur.",
       "placeholder": "claude-opus-4-6\nclaude-opus-4-6[1m]\nclaude-opus-4-5-20251101"
     },
+    "refreshModels": {
+      "name": "Actualiser les modèles",
+      "desc": "Demande à Claude Code sa liste de modèles actuelle. Sinon, Grimoire ne revérifie que lorsque la CLI ou son environnement change.",
+      "button": "Actualiser",
+      "done": "Liste des modèles actualisée : {count} modèles."
+    },
+    "refreshCommands": {
+      "name": "Actualiser les commandes",
+      "desc": "Demander à Claude Code sa liste actuelle de commandes et de compétences. Sinon, Grimoire réutilise la liste dont il dispose jusqu'à ce que la CLI ou son environnement change.",
+      "button": "Actualiser",
+      "done": "Liste des commandes actualisée : {count} commandes."
+    },
     "respectProjectSettings": {
       "name": "Respecter les paramètres de Claude Code",
       "desc": "Utilisez le modèle et l'environnement des paramètres utilisateur et projet de Claude Code. Cela active les modèles personnalisés de MiniMax, Z.ai et d'autres passerelles compatibles Anthropic. Les choix explicites de Grimoire restent prioritaires."
@@ -1115,6 +1137,7 @@
       "disabledDesc": "Activez ce fournisseur ci-dessus pour utiliser ces paramètres et afficher ses modèles dans le sélecteur.",
       "fallbackDesc": "Fournisseur {provider}.",
       "loadModelsFailed": "Impossible de charger les modèles du fournisseur.",
+      "loadCommandsFailed": "Impossible de charger les commandes du fournisseur.",
       "contextWindowLabel": "Fenêtre de contexte pour {model}"
     },
     "providerModelPicker": {

@@ -61,6 +61,27 @@ function createCatalog(adapter: ReturnType<typeof createAdapter>) {
   });
 }
 
+function createContentOnlyCatalog(adapter: ReturnType<typeof createAdapter>) {
+  return new VaultSkillCommandCatalog(adapter, {
+    providerId: 'kimicode',
+    roots: [
+      {
+        id: 'agents',
+        path: '.agents/skills',
+        editable: false,
+        allowContentOnlySkills: true,
+        deriveDescriptionFromBody: true,
+      },
+    ],
+    dropdown: {
+      triggerChars: ['/'],
+      builtInPrefix: '/',
+      commandPrefix: '/',
+      skillPrefix: '/',
+    },
+  });
+}
+
 describe('VaultSkillCommandCatalog', () => {
   it('lists directory and flat project skills with their real source paths', async () => {
     const adapter = createAdapter({
@@ -309,5 +330,51 @@ describe('VaultSkillCommandCatalog', () => {
 
     expect(adapter.write).not.toHaveBeenCalled();
     expect(adapter.files.get('.kimi-code/skills/review/SKILL.md')).toContain('Original body.');
+  });
+
+  it('lists content-only skills with a derived description when the root allows them', async () => {
+    const adapter = createAdapter({
+      '.agents/skills/review/SKILL.md': 'Review the current changes\nbefore merging.',
+    });
+
+    const entries = await createContentOnlyCatalog(adapter).listVaultEntries();
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      name: 'review',
+      description: 'Review the current changes before merging.',
+    });
+  });
+
+  it('rejects content-only skills on roots that do not allow them', async () => {
+    const adapter = createAdapter({
+      '.kimi-code/skills/review/SKILL.md': 'Review the current changes.',
+    });
+
+    const entries = await createCatalog(adapter).listVaultEntries();
+
+    expect(entries).toEqual([]);
+  });
+
+  it('rejects content-only skills that look like frontmatter or are empty', async () => {
+    const adapter = createAdapter({
+      '.agents/skills/broken/SKILL.md': '---\nname: broken\nmetadata: [one\n---\n\nBroken.',
+      '.agents/skills/empty/SKILL.md': '   ',
+    });
+
+    const entries = await createContentOnlyCatalog(adapter).listVaultEntries();
+
+    expect(entries).toEqual([]);
+  });
+
+  it('keeps the description undefined without frontmatter unless the root derives it', async () => {
+    const adapter = createAdapter({
+      '.kimi-code/skills/review/SKILL.md': '---\nname: review\n---\n\nReview it.',
+    });
+
+    const entries = await createCatalog(adapter).listVaultEntries();
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.description).toBeUndefined();
   });
 });

@@ -93,7 +93,7 @@ export async function prepareMimocodeLaunchArtifacts(
   const configContent = `${JSON.stringify(
     buildMimocodeManagedConfig(
       baseConfig,
-      systemPromptPath,
+      systemPrompt,
       params.userName ?? params.settings?.userName,
       params.managedAgents,
       params.defaultAgentId,
@@ -132,7 +132,7 @@ async function ensureMimocodeDatabaseDirectory(databasePath: string | null): Pro
 
 export function buildMimocodeManagedConfig(
   baseConfig: Record<string, unknown>,
-  systemPromptPath: string,
+  systemPrompt: string,
   userName?: string,
   managedAgents: readonly MimocodeManagedAgentConfig[] = DEFAULT_MIMOCODE_MANAGED_AGENT_CONFIGS,
   defaultAgentId?: string,
@@ -159,7 +159,10 @@ export function buildMimocodeManagedConfig(
     nextAgents[agentConfig.id] = {
       ...existingAgent,
       ...(isPlainObject(agentConfig.definition) ? agentConfig.definition : {}),
-      prompt: `{file:${systemPromptPath}}`,
+      // The prompt is inlined rather than referenced via `{file:...}`: file
+      // references resolve relative to the config file, which does not exist
+      // when the config travels as MIMOCODE_CONFIG_CONTENT.
+      prompt: systemPrompt,
     };
   }
 

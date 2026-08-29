@@ -330,6 +330,24 @@ describe('QueryOptionsBuilder', () => {
   });
 
   describe('buildPersistentQueryOptions', () => {
+    it('names the task tools so a plan can be tracked at all', () => {
+      // The sdk dropped the task tools from its default surface in 0.3.233, so
+      // a run that names none of them can never track a plan. allowedTools
+      // re-enables the group without replacing the rest of the default tools.
+      const ctx = {
+        ...createMockContext(),
+        abortController: new AbortController(),
+        hooks: {},
+      };
+
+      const options = QueryOptionsBuilder.buildPersistentQueryOptions(ctx);
+
+      expect(options.allowedTools).toEqual(
+        expect.arrayContaining(['TaskCreate', 'TaskGet', 'TaskList', 'TaskUpdate']),
+      );
+      expect(options.tools).toBeUndefined();
+    });
+
     it('maps full_access to bypassPermissions', () => {
       const ctx = {
         ...createMockContext({
@@ -669,6 +687,40 @@ describe('QueryOptionsBuilder', () => {
   });
 
   describe('buildColdStartQueryOptions', () => {
+    it('names the task tools on a cold start too', () => {
+      const ctx = {
+        ...createMockContext(),
+        abortController: new AbortController(),
+        hooks: {},
+        mcpMentions: new Set<string>(),
+        hasEditorContext: false,
+      };
+
+      const options = QueryOptionsBuilder.buildColdStartQueryOptions(ctx);
+
+      expect(options.allowedTools).toContain('TaskCreate');
+    });
+
+    it('keeps naming the task tools when a slash command restricts the tool set', () => {
+      // A restricting command replaces the base surface through the tools
+      // option. Verified against Claude Code 2.1.233: allowedTools does not
+      // re-add anything past that list, so such a command deliberately gives
+      // up plan tracking - this only pins that Grimoire still names them.
+      const ctx = {
+        ...createMockContext(),
+        abortController: new AbortController(),
+        hooks: {},
+        mcpMentions: new Set<string>(),
+        hasEditorContext: false,
+        allowedTools: ['Read', 'Grep'],
+      };
+
+      const options = QueryOptionsBuilder.buildColdStartQueryOptions(ctx);
+
+      expect(options.tools).toEqual(expect.arrayContaining(['Read', 'Grep']));
+      expect(options.allowedTools).toContain('TaskCreate');
+    });
+
     it('includes MCP servers when available', () => {
       const mcpManager = createMockMcpManager();
       mcpManager.getActiveServers.mockReturnValue({

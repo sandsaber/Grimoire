@@ -4,6 +4,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # obsidian's peer dependencies pin the exact CodeMirror versions the app
+      # bundles, so these bumps always fail npm ci with ERESOLVE (#56)
+      - dependency-name: "@codemirror/*"
   - package-ecosystem: github-actions
     directory: /
     schedule:

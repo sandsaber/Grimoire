@@ -30,6 +30,12 @@ export interface CodexProviderSettings {
   cliPathsByHost: HostnameCliPaths;
   customModels: string;
   discoveredModels: CodexDiscoveredModel[];
+  /**
+   * Digest of the catalog cache key `discoveredModels` was discovered under.
+   * Written together with the list by discovery; any new writer must pass both,
+   * or a later load will trust a list the configuration no longer matches.
+   */
+  discoveredModelsFingerprint: string;
   reasoningSummary: CodexReasoningSummary;
   environmentVariables: string;
   environmentHash: string;
@@ -45,6 +51,7 @@ export const DEFAULT_CODEX_PROVIDER_SETTINGS: Readonly<CodexProviderSettings> = 
   cliPathsByHost: {},
   customModels: '',
   discoveredModels: [],
+  discoveredModelsFingerprint: '',
   reasoningSummary: 'detailed',
   environmentVariables: '',
   environmentHash: '',
@@ -143,6 +150,9 @@ export function getCodexProviderSettings(
     customModels: (config.customModels as string | undefined)
       ?? DEFAULT_CODEX_PROVIDER_SETTINGS.customModels,
     discoveredModels: normalizeCodexDiscoveredModels(config.discoveredModels),
+    discoveredModelsFingerprint: typeof config.discoveredModelsFingerprint === 'string'
+      ? config.discoveredModelsFingerprint
+      : DEFAULT_CODEX_PROVIDER_SETTINGS.discoveredModelsFingerprint,
     reasoningSummary: (config.reasoningSummary as CodexReasoningSummary | undefined)
       ?? (settings.codexReasoningSummary as CodexReasoningSummary | undefined)
       ?? DEFAULT_CODEX_PROVIDER_SETTINGS.reasoningSummary,
@@ -226,6 +236,7 @@ export function updateCodexProviderSettings(
     cliPathsByHost: next.cliPathsByHost,
     customModels: next.customModels,
     discoveredModels: next.discoveredModels,
+    discoveredModelsFingerprint: next.discoveredModelsFingerprint,
     reasoningSummary: next.reasoningSummary,
     environmentVariables: next.environmentVariables,
     environmentHash: next.environmentHash,

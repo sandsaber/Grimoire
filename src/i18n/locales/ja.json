@@ -407,6 +407,8 @@
         "historyPartial": "この会話の一部を読み込めなかったため、以前のメッセージが欠けている可能性があります。",
         "historyUnreadable": "この会話の以前のメッセージを読み取れなかったため、以降の内容は不完全な可能性があります。",
         "conversationCompacted": "会話を圧縮しました",
+        "sessionRestarted": "新しいセッション",
+        "sessionRestartedHint": "エージェントが前のセッションを復元できなかったため、この会話は新しいセッションで続きます。上のメッセージはそのコンテキストに含まれていません。必要な内容は伝え直すか、新しいタブで始めてください。",
         "completed": "完了",
         "duration": "* {flavor}、{duration}",
         "copied": "コピーしました！",
@@ -543,7 +545,14 @@
       "queue": {
         "steering": "操作中...",
         "steerNow": "今すぐ操作",
-        "steerFailed": "キュー内のCodexメッセージを操作できませんでした。メッセージは引き続き利用できます。"
+        "steerFailed": "キュー内のCodexメッセージを操作できませんでした。メッセージは引き続き利用できます。",
+        "count": "キュー内: {count}",
+        "resume": "再開",
+        "clearAll": "すべてクリア",
+        "editItem": "キュー内のメッセージを編集",
+        "removeItem": "キュー内のメッセージを破棄",
+        "pausedFailed": "キューを保留中: ターンがエラーで終了しました",
+        "pausedCancelled": "キューを保留中: ターンが停止されました"
       },
       "instructions": {
         "added": "カスタムシステムプロンプトに指示を追加しました",
@@ -572,7 +581,8 @@
         "orphaned": "孤立",
         "inProgress": "進行中",
         "errorUpper": "エラー",
-        "doneUpper": "完了"
+        "doneUpper": "完了",
+        "antigravityWorking": "Antigravity が処理中 — {seconds} 秒"
       },
       "subagent": {
         "task": "サブエージェントタスク",
@@ -850,6 +860,18 @@
       "desc": "追加の Claude モデル ID を1行に1つずつ選択肢へ追加します。環境のモデル上書きは引き続き選択肢を置き換えます。",
       "placeholder": "claude-opus-4-6\nclaude-opus-4-6[1m]\nclaude-opus-4-5-20251101"
     },
+    "refreshModels": {
+      "name": "モデルを更新",
+      "desc": "Claude Code に現在のモデル一覧を問い合わせます。通常、Grimoire は CLI やその環境が変わったときにのみ再確認します。",
+      "button": "更新",
+      "done": "モデル一覧を更新しました：{count} 件のモデル。"
+    },
+    "refreshCommands": {
+      "name": "コマンドを更新",
+      "desc": "Claude Code に現在のコマンドとスキルの一覧を問い合わせます。通常 Grimoire は、CLI やその環境が変わるまで既存の一覧を再利用します。",
+      "button": "更新",
+      "done": "コマンド一覧を更新しました: {count} 件。"
+    },
     "respectProjectSettings": {
       "name": "Claude Code の設定を尊重",
       "desc": "Claude Code のユーザーおよびプロジェクト設定からモデルと環境を使用します。MiniMax、Z.ai、その他の Anthropic 互換ゲートウェイのカスタムモデルを有効にします。Grimoire の明示的な設定は引き続き優先されます。"
@@ -1115,6 +1137,7 @@
       "disabledDesc": "上でこのプロバイダーを有効にすると、これらの設定とモデル選択を使用できます。",
       "fallbackDesc": "{provider}プロバイダー。",
       "loadModelsFailed": "プロバイダーモデルを読み込めませんでした。",
+      "loadCommandsFailed": "プロバイダーコマンドを読み込めませんでした。",
       "contextWindowLabel": "{model}のコンテキストウィンドウ"
     },
     "providerModelPicker": {

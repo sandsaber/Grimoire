@@ -1122,6 +1122,22 @@ describe('StreamController - Text Content', () => {
       expect(deps.state.flavorTimerInterval).not.toBeNull();
     });
 
+    it('applies a new override to an indicator that is already showing', () => {
+      deps.state.responseStartTime = performance.now();
+
+      controller.showThinkingIndicator('Antigravity is working — 15s');
+      jest.advanceTimersByTime(500);
+      const label = (): string | undefined =>
+        (deps.state.thinkingEl?.children[0] as HTMLElement | undefined)?.textContent ?? undefined;
+      expect(label()).toBe('Antigravity is working — 15s');
+
+      // The indicator is already up for the rest of the turn, so an override
+      // that never reached it would freeze at its first value.
+      controller.showThinkingIndicator('Antigravity is working — 30s');
+
+      expect(label()).toBe('Antigravity is working — 30s');
+    });
+
     it('should clear timer interval when hiding thinking indicator', () => {
       deps.state.responseStartTime = performance.now();
 

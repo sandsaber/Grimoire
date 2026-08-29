@@ -4,6 +4,7 @@ import {
   buildAcpSessionLoadFailureDebugEvent,
   clearAcpManagedSessionState,
   isAcpMissingSessionError,
+  isAcpSessionGone,
   markAcpSessionLoadFailed,
 } from '@/providers/acp/acpSessionResume';
 
@@ -50,6 +51,7 @@ describe('acpSessionResume', () => {
       sessionInvalidated: true,
     })).toEqual({
       databasePath: '/old/opencode.db',
+      sessionDropped: true,
       sessionId: null,
     });
 
@@ -60,8 +62,102 @@ describe('acpSessionResume', () => {
       sessionInvalidated: false,
     })).toEqual({
       databasePath: '/new/opencode.db',
+      sessionDropped: false,
       sessionId: 'session-2',
     });
+  });
+
+  describe('isAcpSessionGone', () => {
+    // Captured from the shipped CLIs by loading a session id they never had.
+    // None of them says so in the error, which is the whole reason the listing
+    // is consulted; they are kept verbatim so a CLI that starts answering
+    // properly shows up here as a change.
+    const REAL_LOAD_FAILURES: Array<[string, JsonRpcErrorResponse]> = [
+      ['MiMoCode 0.1.13', new JsonRpcErrorResponse('session/load', -32603, 'Internal error', {})],
+      ['OpenCode 1.18.18', new JsonRpcErrorResponse(
+        'session/load',
+        -32603,
+        'Internal error: OpenCode service failure',
+        { service: 'session' },
+      )],
+    ];
+
+    it.each(REAL_LOAD_FAILURES)('asks the agent when %s does not say why the load failed', async (_label, error) => {
+      expect(isAcpMissingSessionError(error)).toBe(false);
+
+      await expect(isAcpSessionGone({
+        error,
+        listSessions: async () => ({ sessions: [{ sessionId: 'other-session' }] }),
+        sessionId: 'session-1',
+      })).resolves.toBe(true);
+
+      await expect(isAcpSessionGone({
+        error,
+        listSessions: async () => ({ sessions: [{ sessionId: 'session-1' }] }),
+        sessionId: 'session-1',
+      })).resolves.toBe(false);
+    });
+
+    it('recognises a session the agent does name, without spending a listing', async () => {
+      const listSessions = jest.fn();
+
+      await expect(isAcpSessionGone({
+        error: new JsonRpcErrorResponse('session/load', -32602, 'Invalid params: Unknown sessionId: session-1', {}),
+        listSessions,
+        sessionId: 'session-1',
+      })).resolves.toBe(true);
+      expect(listSessions).not.toHaveBeenCalled();
+    });
+
+    it('keeps the binding when the agent cannot list sessions', async () => {
+      await expect(isAcpSessionGone({
+        error: new JsonRpcErrorResponse('session/load', -32000, 'Authentication failed'),
+        listSessions: async () => { throw new JsonRpcErrorResponse('session/list', -32601, 'Method not found'); },
+        sessionId: 'session-1',
+      })).resolves.toBe(false);
+    });
+
+    it('keeps the binding when the failure was not the agent answering', async () => {
+      const listSessions = jest.fn();
+
+      await expect(isAcpSessionGone({
+        error: new Error('write EPIPE'),
+        listSessions,
+        sessionId: 'session-1',
+      })).resolves.toBe(false);
+      expect(listSessions).not.toHaveBeenCalled();
+    });
+  });
+
+  it('carries a dropped session across saves until a replacement is persisted', () => {
+    // The first save consumes the in-memory flag, so every later save reports
+    // false; the marker has to keep the answer until a real session lands.
+    const afterDrop = buildAcpPersistedSessionFields({
+      conversationDatabasePath: '/old/opencode.db',
+      currentDatabasePath: null,
+      sessionId: null,
+      sessionInvalidated: true,
+    });
+    expect(afterDrop.sessionDropped).toBe(true);
+
+    const afterSecondSave = buildAcpPersistedSessionFields({
+      conversationDatabasePath: '/old/opencode.db',
+      conversationSessionDropped: afterDrop.sessionDropped,
+      currentDatabasePath: null,
+      sessionId: null,
+      sessionInvalidated: false,
+    });
+    expect(afterSecondSave.sessionDropped).toBe(true);
+
+    const afterReplacement = buildAcpPersistedSessionFields({
+      conversationDatabasePath: '/old/opencode.db',
+      conversationSessionDropped: true,
+      currentDatabasePath: null,
+      sessionId: 'session-2',
+      sessionInvalidated: false,
+    });
+    expect(afterReplacement.sessionDropped).toBe(false);
+    expect(afterReplacement.sessionId).toBe('session-2');
   });
 
   it('builds a structured debug event for session load failures', () => {

@@ -12,6 +12,7 @@ import type {
 import type { BrowserSelectionContext } from '../../../utils/browser';
 import type { CanvasSelectionContext } from '../../../utils/canvas';
 import type { EditorSelectionContext } from '../../../utils/editor';
+import type { MessageQueue } from '../queue/MessageQueue';
 import type { ThinkingBlockState } from '../rendering/ThinkingBlockRenderer';
 import type { WriteEditState } from '../rendering/WriteEditRenderer';
 
@@ -63,8 +64,8 @@ export interface ChatStateData {
   // Conversation identity
   currentConversationId: string | null;
 
-  // Queued message
-  queuedMessage: QueuedMessage | null;
+  // Queued follow-ups waiting for the running turn to finish
+  queue: MessageQueue;
 
   // Active streaming DOM state
   currentContentEl: HTMLElement | null;

@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 
+import { toAgyArgs } from '@test/helpers/antigravityLaunchShape';
+
 import {
   discoverAntigravityModels,
   parseAntigravityModels,
@@ -47,10 +49,7 @@ function createMockChildProcess(): any {
 
 function getSpawnedAgyArgs(): string[] {
   const [, args] = mockedSpawn.mock.calls[0] as [string, string[]];
-  if (args[0] === '-lc' && args[1] === 'exec "$0" "$@"') {
-    return args.slice(3);
-  }
-  return args;
+  return toAgyArgs(args);
 }
 
 describe('AntigravityModelDiscovery', () => {
@@ -85,16 +84,19 @@ describe('AntigravityModelDiscovery', () => {
 
     try {
       const resultPromise = discoverAntigravityModels(plugin);
-      const spawnArgs = mockedSpawn.mock.calls[0][1] as string[];
+      const spawnArgs = getSpawnedAgyArgs();
       const logFileArgIndex = spawnArgs.indexOf('--log-file');
-      const logFilePath = logFileArgIndex >= 0 ? spawnArgs[logFileArgIndex + 1] : '';
-      if (logFilePath) {
-        await fs.mkdir(appDataDir, { recursive: true });
-        await fs.writeFile(logFilePath, `I0620 common.go:156] CLI app data directory: ${appDataDir}`);
-        await fs.writeFile(path.join(appDataDir, 'settings.json'), JSON.stringify({
-          model: 'Claude 4.5 Sonnet',
-        }));
-      }
+      // Without the log file the recovery falls back to the real Antigravity
+      // app-data directory of whoever runs the suite, so a missing path has to
+      // fail here rather than silently turn this into a test of the host's own
+      // settings.json.
+      expect(logFileArgIndex).toBeGreaterThanOrEqual(0);
+      const logFilePath = spawnArgs[logFileArgIndex + 1];
+      await fs.mkdir(appDataDir, { recursive: true });
+      await fs.writeFile(logFilePath, `I0620 common.go:156] CLI app data directory: ${appDataDir}`);
+      await fs.writeFile(path.join(appDataDir, 'settings.json'), JSON.stringify({
+        model: 'Claude 4.5 Sonnet',
+      }));
       proc.emit('exit', 0, null);
 
       await expect(resultPromise).resolves.toEqual([
@@ -108,8 +110,6 @@ describe('AntigravityModelDiscovery', () => {
         { label: 'Claude Opus 4.6 (Thinking)', rawId: 'Claude Opus 4.6 (Thinking)' },
         { label: 'GPT-OSS 120B (Medium)', rawId: 'GPT-OSS 120B (Medium)' },
       ]);
-      expect(logFileArgIndex).toBeGreaterThanOrEqual(0);
-      expect(logFilePath).toBeTruthy();
       expect(getSpawnedAgyArgs()).toEqual(expect.arrayContaining([
         '--log-file',
         logFilePath,

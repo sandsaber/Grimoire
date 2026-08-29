@@ -48,6 +48,7 @@ export interface MockElement {
   createSpan: (opts?: { cls?: string; text?: string }) => MockElement;
   createEl: (tag: string, opts?: { cls?: string; text?: string; attr?: Record<string, string> }) => MockElement;
   createSvg: (tag: string, opts?: { cls?: string; attr?: Record<string, string> }) => MockElement;
+  __setParent: (parent: MockElement | null) => void;
   appendChild: (child: any) => any;
   insertBefore: (el: MockElement, ref: MockElement | null) => void;
   firstChild: MockElement | null;
@@ -126,6 +127,16 @@ const DISPLAY_CLASSES = new Set([
 
 export function createMockEl(tag = 'div'): any {
   const children: MockElement[] = [];
+  let parentEl: MockElement | null = null;
+
+  // Re-parenting detaches first, the way appendChild does in a real DOM: a node
+  // lives under exactly one parent, so remove() can find and splice itself out.
+  const adopt = (child: any, index?: number): void => {
+    child?.remove?.();
+    if (index === undefined) children.push(child);
+    else children.splice(index, 0, child);
+    child?.__setParent?.(element);
+  };
   const classes = new Set<string>();
   const attributes = new Map<string, string>();
   const eventListeners = new Map<string, Array<(...args: any[]) => void>>();
@@ -308,14 +319,14 @@ export function createMockEl(tag = 'div'): any {
           child.setAttribute(name, value);
         }
       }
-      children.push(child);
+      adopt(child);
       return child;
     },
     createSpan(opts?: { cls?: string; text?: string }) {
       const child = createMockEl('span');
       if (opts?.cls) child.addClass(opts.cls);
       if (opts?.text) child.textContent = opts.text;
-      children.push(child);
+      adopt(child);
       return child;
     },
     createEl(tagName: string, opts?: { cls?: string; text?: string; attr?: Record<string, string> }) {
@@ -327,7 +338,7 @@ export function createMockEl(tag = 'div'): any {
           child.setAttribute(name, value);
         }
       }
-      children.push(child);
+      adopt(child);
       return child;
     },
     createSvg(tagName: string, opts?: { cls?: string; attr?: Record<string, string> }) {
@@ -338,19 +349,28 @@ export function createMockEl(tag = 'div'): any {
           child.setAttribute(name, value);
         }
       }
-      children.push(child);
+      adopt(child);
       return child;
     },
 
-    appendChild(child: any) { children.push(child); return child; },
-    insertBefore(el: MockElement, _ref: MockElement | null) { children.unshift(el); },
+    /** Internal: keeps the parent link in sync so remove() can detach. */
+    __setParent(next: MockElement | null) { parentEl = next; },
+    appendChild(child: any) { adopt(child); return child; },
+    insertBefore(el: MockElement, _ref: MockElement | null) { adopt(el, 0); },
     get firstChild() { return children[0] || null; },
-    remove() {},
+    remove() {
+      const parent = parentEl;
+      parentEl = null;
+      if (!parent) return;
+      const idx = parent.children.indexOf(element);
+      if (idx !== -1) parent.children.splice(idx, 1);
+    },
     detach() {
       element.remove();
       return element;
     },
     empty() {
+      for (const child of children) child.__setParent?.(null);
       children.length = 0;
       element.innerHTML = '';
       textContent = '';

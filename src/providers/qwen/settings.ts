@@ -22,6 +22,12 @@ export interface QwenMode {
 export interface PersistedQwenProviderSettings {
   cliPath: string;
   cliPathsByHost: HostnameCliPaths;
+  /**
+   * Digest of the catalog cache key `discoveredModels` was discovered under.
+   * Written together with the list by ACP discovery; any new writer must pass
+   * both, or a later load will trust a list the configuration no longer matches.
+   */
+  discoveredModelsFingerprint: string;
   enabled: boolean;
   environmentHash: string;
   environmentVariables: string;
@@ -42,6 +48,7 @@ export interface QwenProviderSettings extends PersistedQwenProviderSettings {
 export const DEFAULT_QWEN_PROVIDER_SETTINGS: Readonly<PersistedQwenProviderSettings> = Object.freeze({
   cliPath: '',
   cliPathsByHost: {},
+  discoveredModelsFingerprint: '',
   enabled: false,
   environmentHash: '',
   environmentVariables: '',
@@ -187,6 +194,9 @@ export function getQwenProviderSettings(settings: Record<string, unknown>): Qwen
       ?? DEFAULT_QWEN_PROVIDER_SETTINGS.cliPath,
     cliPathsByHost,
     discoveredModels: normalizeQwenDiscoveredModels(config.discoveredModels),
+    discoveredModelsFingerprint: typeof config.discoveredModelsFingerprint === 'string'
+      ? config.discoveredModelsFingerprint
+      : DEFAULT_QWEN_PROVIDER_SETTINGS.discoveredModelsFingerprint,
     enabled: (config.enabled as boolean | undefined)
       ?? DEFAULT_QWEN_PROVIDER_SETTINGS.enabled,
     environmentHash: (config.environmentHash as string | undefined)
@@ -244,6 +254,9 @@ export function updateQwenProviderSettings(
     cliPath: nextCliPath,
     cliPathsByHost: nextCliPathsByHost,
     discoveredModels: normalizeQwenDiscoveredModels(updates.discoveredModels ?? current.discoveredModels),
+    discoveredModelsFingerprint: typeof updates.discoveredModelsFingerprint === 'string'
+      ? updates.discoveredModelsFingerprint
+      : current.discoveredModelsFingerprint,
     effortLevel: normalizeQwenEffortLevel(updates.effortLevel ?? current.effortLevel),
     modelAliases: nextModelAliases,
     selectedMode: typeof updates.selectedMode === 'string'
@@ -257,6 +270,7 @@ export function updateQwenProviderSettings(
     cliPath: next.cliPath,
     cliPathsByHost: next.cliPathsByHost,
     discoveredModels: next.discoveredModels,
+    discoveredModelsFingerprint: next.discoveredModelsFingerprint,
     enabled: next.enabled,
     environmentHash: next.environmentHash,
     environmentVariables: next.environmentVariables,

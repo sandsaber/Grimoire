@@ -1,12 +1,13 @@
+import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
+import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
-import type {
-  ProviderWorkspaceRegistration,
-} from '../../../providers/shared/providerHostContracts';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
+  ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from '../../../providers/shared/providerHostContracts';
+import { AntigravityCommandCatalog } from '../commands/AntigravityCommandCatalog';
 import { ANTIGRAVITY_FALLBACK_DISCOVERED_MODELS } from '../models';
 import { antigravityCliResolver } from '../runtime/AntigravityCliResolver';
 import { discoverAntigravityModels } from '../runtime/AntigravityModelDiscovery';
@@ -16,14 +17,13 @@ import { antigravityPlanUsageStore } from './AntigravityPlanUsageStore';
 
 export interface AntigravityWorkspaceServices extends ProviderWorkspaceServices {
   cliResolver: ProviderCliResolver;
+  commandCatalog: ProviderCommandCatalog;
   modelCatalog: ProviderModelCatalog;
 }
 
 function createAntigravityCliResolver(): ProviderCliResolver {
   return antigravityCliResolver();
 }
-
-const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
 function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
   const initialSettings = getAntigravityProviderSettings(plugin.settings ?? {});
@@ -34,18 +34,22 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
     isAvailable(settings) {
       return getAntigravityProviderSettings(settings).enabled;
     },
-    async refreshModels({ settings }) {
+    async refreshModels({ force, settings }) {
       const currentSettings = getAntigravityProviderSettings(settings);
       const cacheKey = buildAntigravityModelCatalogCacheKey(currentSettings);
       if (currentSettings.discoveredModels.length > 0 && lastRefreshAt === 0) {
         lastRefreshAt = Date.now();
         lastRefreshCacheKey = cacheKey;
       }
+      // A settled catalog is rediscovered only when its key changes or the
+      // caller asks; the picker that triggers background refreshes must not
+      // spawn agy on a timer.
       const cacheAgeMs = lastRefreshAt > 0 ? Date.now() - lastRefreshAt : Number.POSITIVE_INFINITY;
       if (
-        currentSettings.discoveredModels.length > 0
+        !force
+        && currentSettings.discoveredModels.length > 0
         && cacheKey === lastRefreshCacheKey
-        && cacheAgeMs < MODEL_CATALOG_CACHE_TTL_MS
+        && lastRefreshAt > 0
       ) {
         plugin.recordDebugLog?.({
           data: {
@@ -53,7 +57,6 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
             modelCount: currentSettings.discoveredModels.length,
             providerId: 'antigravity',
             reason: 'cache_fresh',
-            ttlMs: MODEL_CATALOG_CACHE_TTL_MS,
           },
           event: 'modelCatalog.refresh.skipped',
           level: 'debug',
@@ -158,9 +161,13 @@ function buildAntigravityModelCatalogCacheKey(settings: ReturnType<typeof getAnt
   });
 }
 
-export async function createAntigravityWorkspaceServices(plugin: GrimoirePlugin): Promise<AntigravityWorkspaceServices> {
+export async function createAntigravityWorkspaceServices(
+  plugin: GrimoirePlugin,
+  vaultAdapter: VaultFileAdapter,
+): Promise<AntigravityWorkspaceServices> {
   return {
     cliResolver: createAntigravityCliResolver(),
+    commandCatalog: new AntigravityCommandCatalog(vaultAdapter),
     modelCatalog: createAntigravityModelCatalog(plugin),
     usageProvider: antigravityPlanUsageStore,
     settingsTabRenderer: antigravitySettingsTabRenderer,
@@ -168,7 +175,7 @@ export async function createAntigravityWorkspaceServices(plugin: GrimoirePlugin)
 }
 
 export const antigravityWorkspaceRegistration: ProviderWorkspaceRegistration<AntigravityWorkspaceServices> = {
-  initialize: async ({ plugin }) => createAntigravityWorkspaceServices(plugin),
+  initialize: async ({ plugin, vaultAdapter }) => createAntigravityWorkspaceServices(plugin, vaultAdapter),
 };
 
 export function maybeGetAntigravityWorkspaceServices(

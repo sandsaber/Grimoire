@@ -23,6 +23,7 @@ import {
 import { createCustomSpawnFunction } from './customSpawn';
 import {
   DISABLED_BUILTIN_SUBAGENTS,
+  OPT_IN_BUILTIN_TOOLS,
   type PersistentQueryConfig,
   UNSUPPORTED_SDK_TOOLS,
 } from './types';
@@ -149,6 +150,7 @@ export class QueryOptionsBuilder {
       ...UNSUPPORTED_SDK_TOOLS,
       ...DISABLED_BUILTIN_SUBAGENTS,
     ];
+    options.allowedTools = [...OPT_IN_BUILTIN_TOOLS];
 
     QueryOptionsBuilder.applyPermissionMode(
       options,
@@ -201,6 +203,7 @@ export class QueryOptionsBuilder {
       ...UNSUPPORTED_SDK_TOOLS,
       ...DISABLED_BUILTIN_SUBAGENTS,
     ];
+    options.allowedTools = [...OPT_IN_BUILTIN_TOOLS];
 
     QueryOptionsBuilder.applyPermissionMode(
       options,

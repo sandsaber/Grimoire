@@ -1,3 +1,4 @@
+import { hashCatalogFingerprint } from '../../../core/providers/catalogFingerprint';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
 import type { HomeFileAdapter } from '../../../core/storage/HomeFileAdapter';
@@ -14,6 +15,10 @@ import type {
 import { getVaultPath } from '../../../utils/path';
 import { CodexAgentMentionProvider } from '../agents/CodexAgentMentionProvider';
 import { CodexSkillCatalog } from '../commands/CodexSkillCatalog';
+import {
+  buildCodexModelCatalogFingerprint,
+  resolveCodexModelCatalogFingerprint,
+} from '../modelCatalogFingerprint';
 import { updateCodexModelDiscoveryState } from '../modelDiscoveryState';
 import { codexCliResolver } from '../runtime/CodexCliResolver';
 import { CodexModelListingService } from '../runtime/CodexModelListingService';
@@ -43,16 +48,56 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
   const initialSettings = getCodexProviderSettings(plugin.settings ?? {});
   const refreshCache = new ProviderModelCatalogRefreshCache(MODEL_CATALOG_CACHE_TTL_MS);
   if (initialSettings.discoveredModels.length > 0) {
-    refreshCache.seed(buildCodexModelCatalogFingerprint(plugin, initialSettings));
+    // The resolved CLI path is part of the fingerprint but is not available
+    // here: this catalog is built inside createCodexWorkspaceServices, which runs
+    // before the workspace manager publishes the services, and it assigns
+    // this.services[providerId] only after that resolves - until then
+    // getResolvedProviderCliPath returns null and an eager seed would be filed
+    // under settings.cliPath while every later refresh looks it up under the
+    // resolved path. Hold the seed back until the path is known.
+    const initialEnvironmentVariables = plugin.getActiveEnvironmentVariables?.('codex')
+      ?? initialSettings.environmentVariables;
+    if (plugin.getResolvedProviderCliPath?.('codex') == null) {
+      refreshCache.seedOnFirstRefresh(() => buildCodexModelCatalogFingerprint(
+        initialSettings,
+        plugin.getResolvedProviderCliPath?.('codex') ?? initialSettings.cliPath,
+        initialEnvironmentVariables,
+      ));
+    } else {
+      refreshCache.seed(
+        resolveCodexModelCatalogFingerprint(plugin, initialSettings),
+        initialSettings.discoveredModelsFingerprint,
+      );
+    }
   }
   return {
     isAvailable(settings) {
       return getCodexProviderSettings(settings).enabled;
     },
-    async refreshModels({ settings }) {
+    async refreshModels({ force, settings }) {
       const currentSettings = getCodexProviderSettings(settings);
-      const fingerprint = buildCodexModelCatalogFingerprint(plugin, currentSettings);
-      if (refreshCache.isFresh(fingerprint, currentSettings.discoveredModels.length > 0)) {
+      const fingerprint = resolveCodexModelCatalogFingerprint(plugin, currentSettings);
+      const appliedDeferredSeed = refreshCache.applyDeferredSeed(
+        fingerprint,
+        currentSettings.discoveredModels.length > 0,
+        currentSettings.discoveredModelsFingerprint,
+      );
+      if (appliedDeferredSeed && !force) {
+        plugin.recordDebugLog?.({
+          data: {
+            modelCount: currentSettings.discoveredModels.length,
+            providerId: 'codex',
+            reason: 'seeded_on_first_use',
+            ttlMs: MODEL_CATALOG_CACHE_TTL_MS,
+          },
+          event: 'modelCatalog.refresh.skipped',
+          level: 'debug',
+          scope: 'provider.codex',
+        });
+        return false;
+      }
+
+      if (!force && refreshCache.isFresh(fingerprint, currentSettings.discoveredModels.length > 0)) {
         plugin.recordDebugLog?.({
           data: {
             modelCount: currentSettings.discoveredModels.length,
@@ -69,6 +114,7 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
 
       return refreshCache.refresh({
         fingerprint,
+        force,
         hasCachedModels: currentSettings.discoveredModels.length > 0,
         load: async () => {
       plugin.recordDebugLog?.({
@@ -91,7 +137,10 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
           return false;
         }
 
-        const changed = updateCodexModelDiscoveryState(settings, { discoveredModels: models });
+        const changed = updateCodexModelDiscoveryState(settings, {
+          discoveredModels: models,
+          discoveredModelsFingerprint: hashCatalogFingerprint(fingerprint),
+        });
         if (changed) {
           await plugin.saveSettings?.();
         }
@@ -123,19 +172,6 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
       });
     },
   };
-}
-
-function buildCodexModelCatalogFingerprint(
-  plugin: GrimoirePlugin,
-  settings: ReturnType<typeof getCodexProviderSettings>,
-): string {
-  return JSON.stringify({
-    cliPath: plugin.getResolvedProviderCliPath?.('codex') ?? settings.cliPath,
-    cliPathsByHost: settings.cliPathsByHost,
-    environmentHash: settings.environmentHash,
-    environmentVariables: plugin.getActiveEnvironmentVariables?.('codex')
-      ?? settings.environmentVariables,
-  });
 }
 
 export async function createCodexWorkspaceServices(

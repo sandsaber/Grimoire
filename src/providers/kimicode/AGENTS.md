@@ -18,5 +18,6 @@
 
 ## Session resume
 
-- Persist both `sessionId` and `providerState.databasePath` after turns.
-- Invalidate only when `session/load` explicitly reports a missing session. Preserve `databasePath`; propagate transport, authentication, and configuration errors without clearing the binding.
+- Persist `sessionId`, `providerState.databasePath`, and `providerState.sessionDropped` after turns.
+- On `session/load` failure, decide with `isAcpSessionGone`: it asks the agent through `session/list` rather than reading the answer out of the error text, which Kimi Code does not put there. A session the agent no longer lists is soft-failed into a fresh one; anything else - transport, authentication, configuration, or an agent that cannot list - propagates with the binding intact. Preserve `databasePath`.
+- A dropped session is recorded in `providerState.sessionDropped` and read back on load, because the in-memory flag is consumed by the first save. Never replay the transcript into a replacement session: history bootstrap is for a cold resume that never held a session id.

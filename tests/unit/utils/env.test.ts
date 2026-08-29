@@ -1216,7 +1216,14 @@ describe('getExtraBinaryPaths (Windows branches)', () => {
   });
 });
 
-describe('Obsidian CLI path integration', () => {
+// getEnhancedPath composes with path.join and path.delimiter, which stay bound
+// to the host no matter what process.platform is overridden to. On a Windows
+// runner these macOS- and Linux-specific expectations would be comparing
+// `\`-joined candidates against a `;`-delimited string, so they are skipped
+// rather than rewritten into an assertion about neither platform.
+const describeOnPosix = isWindows ? describe.skip : describe;
+
+describeOnPosix('Obsidian CLI path integration', () => {
   const originalPlatform = process.platform;
   const originalExecPath = process.execPath;
   const originalEnv = { ...process.env };

@@ -1,10 +1,10 @@
 import type { UsageInfo } from '../../../core/types';
+import { MessageQueue } from '../queue/MessageQueue';
 import type {
   ChatMessage,
   ChatStateCallbacks,
   ChatStateData,
   PendingToolCall,
-  QueuedMessage,
   ThinkingBlockState,
   TodoItem,
   WriteEditState,
@@ -20,7 +20,7 @@ function createInitialState(): ChatStateData {
     isSwitchingConversation: false,
     hasPendingConversationSave: false,
     currentConversationId: null,
-    queuedMessage: null,
+    queue: new MessageQueue(),
     currentContentEl: null,
     currentTextEl: null,
     currentTextContent: '',
@@ -162,15 +162,11 @@ export class ChatState {
   }
 
   // ============================================
-  // Queued Message
+  // Queued Follow-ups
   // ============================================
 
-  get queuedMessage(): QueuedMessage | null {
-    return this.state.queuedMessage;
-  }
-
-  set queuedMessage(value: QueuedMessage | null) {
-    this.state.queuedMessage = value;
+  get queue(): MessageQueue {
+    return this.state.queue;
   }
 
   // ============================================
@@ -408,7 +404,7 @@ export class ChatState {
     this.clearMessages();
     this.resetStreamingState();
     this.clearMaps();
-    this.state.queuedMessage = null;
+    this.state.queue.takeAll();
     this.usage = null;
     this.currentTodos = null;
     this.autoScrollEnabled = true;

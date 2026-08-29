@@ -406,7 +406,20 @@ export interface ProviderCliResolutionPort {
 
 export interface ProviderModelsPort {
   list(): Promise<readonly ProviderModelDescriptor[]>;
-  refresh(): Promise<readonly ProviderModelDescriptor[]>;
+  refresh(options?: ProviderModelRefreshOptions): Promise<readonly ProviderModelDescriptor[]>;
+}
+
+/**
+ * Whether a refresh is the user asking, or a surface keeping itself current.
+ *
+ * Both reach `refresh`, and until this existed a provider could not tell them
+ * apart: a settled catalog was rediscovered for every model dropdown that
+ * opened, which for the CLI-backed providers means booting the CLI. `force` is
+ * set by an explicit action — enabling a provider, the refresh button — and
+ * left unset by the tab's background top-up.
+ */
+export interface ProviderModelRefreshOptions {
+  readonly force?: boolean;
 }
 
 export interface ProviderModelDescriptor {

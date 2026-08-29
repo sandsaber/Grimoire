@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { Setting } from 'obsidian';
+import { Notice, Setting } from 'obsidian';
 
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { renderEnvironmentSettingsSection } from '../../../features/settings/ui/EnvironmentSettingsSection';
@@ -168,6 +168,43 @@ export const claudeSettingsTabRenderer: ProviderSettingsTabRenderer = {
 
     new Setting(container).setName(t('settings.models')).setHeading();
 
+    // Background picker refreshes never re-probe a settled catalog, so this is
+    // the one place a user can ask for the SDK's current list on demand - for
+    // example after a CLI upgrade that Grimoire's binary fingerprint missed.
+    new Setting(container)
+      .setName(t('settings.refreshModels.name'))
+      .setDesc(t('settings.refreshModels.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.refreshModels.button'))
+          .onClick(async () => {
+            const catalog = claudeWorkspace?.modelCatalog;
+            if (!catalog) {
+              return;
+            }
+
+            button.setDisabled(true);
+            try {
+              await catalog.refreshModels({
+                force: true,
+                plugin: context.plugin,
+                settings: settingsBag,
+              });
+              const modelCount = getClaudeProviderSettings(settingsBag).discoveredModels.length;
+              if (modelCount === 0) {
+                new Notice(t('settings.provider.loadModelsFailed'));
+                return;
+              }
+              context.refreshModelSelectors();
+              new Notice(t('settings.refreshModels.done', { count: modelCount }));
+            } catch {
+              new Notice(t('settings.provider.loadModelsFailed'));
+            } finally {
+              button.setDisabled(false);
+            }
+          });
+      });
+
     new Setting(container)
       .setName(t('settings.customModels.name'))
       .setDesc(t('settings.customModels.desc'))
@@ -244,6 +281,34 @@ export const claudeSettingsTabRenderer: ProviderSettingsTabRenderer = {
       context.plugin.app,
       claudeWorkspace.commandCatalog,
     );
+
+    // The dropdown reuses a persisted list and never re-probes on its own, so
+    // this is the one place a user can ask the SDK for the current one - after
+    // installing a plugin's commands, or once a CLI upgrade the binary
+    // fingerprint missed has changed what the SDK can see.
+    new Setting(slashCommandsSection)
+      .setName(t('settings.refreshCommands.name'))
+      .setDesc(t('settings.refreshCommands.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.refreshCommands.button'))
+          .onClick(async () => {
+            button.setDisabled(true);
+            try {
+              await claudeWorkspace.commandCatalog.refresh();
+              const commandCount = getClaudeProviderSettings(settingsBag).discoveredCommands.length;
+              if (commandCount === 0) {
+                new Notice(t('settings.provider.loadCommandsFailed'));
+                return;
+              }
+              new Notice(t('settings.refreshCommands.done', { count: commandCount }));
+            } catch {
+              new Notice(t('settings.provider.loadCommandsFailed'));
+            } finally {
+              button.setDisabled(false);
+            }
+          });
+      });
 
     context.renderHiddenProviderCommandSetting(slashCommandsSection, 'claude', {
       name: t('settings.hiddenSlashCommands.name'),

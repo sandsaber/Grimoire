@@ -18,7 +18,10 @@ import { scheduleAnimationFrame } from '../../../utils/animationFrame';
 import { formatDurationMmSs } from '../../../utils/date';
 import { hasProcessableWikilink, processFileLinks, registerFileLinkHandler } from '../../../utils/fileLink';
 import { replaceImageEmbedsWithHtml } from '../../../utils/imageEmbed';
-import { escapeMathDelimitersForStreaming } from '../../../utils/markdownMath';
+import {
+  escapeMathDelimitersForStreaming,
+  normalizeLatexDelimiters,
+} from '../../../utils/markdownMath';
 import { findRewindContext } from '../rewind';
 import { renderVaultSearchSources } from '../ui/VaultSearchSources';
 import { getAssistantResponseProviderLabel } from '../utils/assistantResponseMetadata';
@@ -167,6 +170,7 @@ export class MessageRenderer {
   private getCapabilities: () => ProviderCapabilities;
   private forkCallback?: (messageId: string) => Promise<void>;
   private liveMessageEls = new Map<string, HTMLElement>();
+  private sessionRestartNoticeEl: HTMLElement | null = null;
   private scrollOptions: MessageRendererScrollOptions;
 
   constructor(
@@ -207,6 +211,39 @@ export class MessageRenderer {
   /** Sets the messages container element. */
   setMessagesEl(el: HTMLElement): void {
     this.messagesEl = el;
+    this.sessionRestartNoticeEl = null;
+  }
+
+  /**
+   * Marks the end of the thread as the seam where a saved session was lost.
+   *
+   * The messages above stay on screen and read like a conversation the agent
+   * remembers, which is the part that misleads: it is starting from nothing.
+   * Rendered before the user types, because after a turn has been spent the
+   * warning has already cost what it was meant to save.
+   */
+  renderSessionRestartNotice(): void {
+    this.clearSessionRestartNotice();
+
+    const noticeEl = this.messagesEl.createDiv({ cls: 'grimoire-session-restart-notice' });
+    const boundaryEl = noticeEl.createDiv({ cls: 'grimoire-compact-boundary' });
+    boundaryEl.createSpan({
+      cls: 'grimoire-compact-boundary-label',
+      text: t('chat.ui.messages.sessionRestarted'),
+    });
+    noticeEl.createDiv({
+      cls: 'grimoire-session-restart-notice-hint',
+      text: t('chat.ui.messages.sessionRestartedHint'),
+    });
+
+    this.sessionRestartNoticeEl = noticeEl;
+    this.scrollToBottom();
+  }
+
+  /** Removes the session-restart notice if one is currently shown. */
+  clearSessionRestartNotice(): void {
+    this.sessionRestartNoticeEl?.remove();
+    this.sessionRestartNoticeEl = null;
   }
 
   private getSubagentLifecycleAdapter(toolName?: string) {
@@ -222,6 +259,10 @@ export class MessageRenderer {
    * Returns the message element for content updates.
    */
   addMessage(msg: ChatMessage): HTMLElement {
+    // The notice advises what to do about a session that is about to be
+    // replaced; once a turn starts, that has been answered.
+    this.clearSessionRestartNotice();
+
     // Render images above message bubble for user messages
     if (msg.role === 'user' && msg.images && msg.images.length > 0) {
       this.renderMessageImages(this.messagesEl, msg.images);
@@ -328,6 +369,7 @@ export class MessageRenderer {
   ): HTMLElement {
     this.messagesEl.empty();
     this.liveMessageEls.clear();
+    this.sessionRestartNoticeEl = null;
 
     // Recreate welcome element after clearing
     const newWelcomeEl = this.messagesEl.createDiv({ cls: 'grimoire-welcome' });
@@ -968,10 +1010,11 @@ export class MessageRenderer {
     el.empty();
 
     try {
+      const normalizedMarkdown = normalizeLatexDelimiters(markdown);
       const renderMarkdown = normalizePipeTablesForMarkdown(
         options?.deferMath
-          ? escapeMathDelimitersForStreaming(markdown)
-          : markdown
+          ? escapeMathDelimitersForStreaming(normalizedMarkdown)
+          : normalizedMarkdown
       );
       // Normalize embeds before MarkdownRenderer consumes them.
       const processedMarkdown = replaceImageEmbedsWithHtml(

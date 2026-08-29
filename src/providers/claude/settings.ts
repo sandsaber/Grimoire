@@ -4,7 +4,7 @@ import {
   getRuntimeEnvironmentText,
   getRuntimeEnvironmentVariables,
 } from '../../core/providers/providerEnvironment';
-import type { HostnameCliPaths, PermissionMode } from '../../core/types/settings';
+import type { HostnameCliPaths, PermissionMode, SlashCommand } from '../../core/types/settings';
 import {
   getHostnameKey,
   getLegacyHostnameKey,
@@ -29,6 +29,9 @@ export interface ClaudeProviderSettings {
   respectProjectSettings: boolean;
   projectSettingsSnapshot: ClaudeCodeProjectSettingsSnapshot;
   discoveredModels: ClaudeDiscoveredModel[];
+  discoveredCommands: SlashCommand[];
+  discoveredCommandsFingerprint: string;
+  discoveredModelsFingerprint: string;
 }
 
 export interface ClaudeDiscoveredModel {
@@ -67,6 +70,9 @@ export const DEFAULT_CLAUDE_PROVIDER_SETTINGS: Readonly<ClaudeProviderSettings> 
   respectProjectSettings: true,
   projectSettingsSnapshot: DEFAULT_CLAUDE_CODE_PROJECT_SETTINGS_SNAPSHOT,
   discoveredModels: [],
+  discoveredCommands: [],
+  discoveredCommandsFingerprint: '',
+  discoveredModelsFingerprint: '',
 });
 
 function normalizeHostnameCliPaths(value: unknown): HostnameCliPaths {
@@ -101,6 +107,49 @@ function normalizeStringMap(value: unknown): Record<string, string> {
     }
   }
   return result;
+}
+
+/**
+ * Persisted SDK commands are narrowed to the shape the probe produces. Anything
+ * else a settings file happens to hold is dropped rather than trusted: the list
+ * is replayed into the command dropdown, and a malformed entry would surface
+ * there as a broken command.
+ */
+export function normalizeClaudeDiscoveredCommands(value: unknown): SlashCommand[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const commands: SlashCommand[] = [];
+  const seen = new Set<string>();
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      continue;
+    }
+
+    const candidate = entry as Record<string, unknown>;
+    // Trimmed and deduplicated like the discovered models below: a hand-edited
+    // or sync-merged settings file can carry `" commit "`, which would insert
+    // as `/ commit `, or the same id twice, which would show as two identical
+    // dropdown rows.
+    const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
+    const name = typeof candidate.name === 'string' ? candidate.name.trim() : '';
+    if (!id || !name || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+
+    commands.push({
+      content: typeof candidate.content === 'string' ? candidate.content : '',
+      id,
+      name,
+      source: 'sdk',
+      ...(typeof candidate.description === 'string' ? { description: candidate.description } : {}),
+      ...(typeof candidate.argumentHint === 'string' ? { argumentHint: candidate.argumentHint } : {}),
+    });
+  }
+
+  return commands;
 }
 
 export function normalizeClaudeDiscoveredModels(value: unknown): ClaudeDiscoveredModel[] {
@@ -266,6 +315,13 @@ export function getClaudeProviderSettings(
       config.projectSettingsSnapshot,
     ),
     discoveredModels: normalizeClaudeDiscoveredModels(config.discoveredModels),
+    discoveredCommands: normalizeClaudeDiscoveredCommands(config.discoveredCommands),
+    discoveredCommandsFingerprint: typeof config.discoveredCommandsFingerprint === 'string'
+      ? config.discoveredCommandsFingerprint
+      : DEFAULT_CLAUDE_PROVIDER_SETTINGS.discoveredCommandsFingerprint,
+    discoveredModelsFingerprint: typeof config.discoveredModelsFingerprint === 'string'
+      ? config.discoveredModelsFingerprint
+      : DEFAULT_CLAUDE_PROVIDER_SETTINGS.discoveredModelsFingerprint,
   };
 }
 

@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.1.10 - 2026-08-25
+
+### Improved
+
+- Stopped the Gemini and Qwen model pickers from launching their CLI every time the dropdown opens. Discovery booted the real CLI over ACP and created a session on each open, which stalled the menu for seconds and flashed a console window on Windows; both providers now reuse the cached catalog like Codex and OpenCode already did, and rediscover immediately when the resolved CLI path or environment changes.
+
+### Fixed
+
+- Stopped Claude from starting a billable Claude Code session on every plugin load just to list models. The ten-minute throttle lived only in memory and nothing seeded it from the catalog already on disk, so each start probed again even with no Claude tab open (#84).
+- Restored the plan panel in Claude chats. Claude Code 2.1.233 retired the TodoWrite tool in favour of incremental task tracking, so plans silently stopped appearing - nothing errored, the panel simply never filled. Grimoire now follows the task calls and rebuilds the plan from them.
+- Updated the Claude Agent SDK to 0.3.233.
+
+## 1.1.9 - 2026-08-22
+
+### Fixed
+
+- Fixed Antigravity turns failing with `spawn ENAMETOOLONG` on Windows once the conversation grew past roughly 32k characters: when `agy` supports it, the prompt now travels over stdin as stream-json instead of one oversized command-line argument (#69).
+- Stopped Antigravity from killing healthy turns at the five-minute mark: the print run now follows a 10-minute inactivity timer refreshed by CLI output and `agy` log-file growth, with a 30-minute absolute ceiling and `--print-timeout 29m` so the CLI self-terminates with a structured result first (#70).
+- Kept a fully streamed Antigravity answer even when `agy` flags a run-level error after the agent has already responded — refused tool arguments, stale task kills, scheduler conflicts, and cancellations now surface as a trailing warning note instead of discarding the reply.
+- Fixed OpenCode, MiMoCode, and Kimi Code being fully broken on Windows (empty model list, no chat turns): a file-based `OPENCODE_CONFIG`-style env var makes the CLIs' ACP mode hang or crash, so the managed config now travels as config content only and the system prompt is inlined into the config.
+
+## 1.1.8 - 2026-08-20
+
+### Fixed
+
+- Fixed Antigravity on Windows hanging until timeout with no output when the CLI resolves to a `.cmd`/`.bat` wrapper or a bare command name: the multi-line print prompt now reaches `agy` intact through an explicitly quoted `cmd.exe` invocation instead of Node's unquoted `shell: true`.
+- Added the vault root to the Antigravity agent workspace: Grimoire probes `agy --help` once for `--add-dir` support and passes `--add-dir <vault>` to `agy --print`, so the agent works directly on your notes and `.cmd` wrapper workarounds are no longer needed.
+- Honored Stop while Antigravity is still starting up: a cancelled turn now ends immediately instead of launching the CLI anyway and running to completion.
+- Made Antigravity vault skills appear in the slash menu and expand reliably when invoked, instead of silently passing the raw `/skill` text to the model.
+- Serialized concurrent Grok Build runtime restarts so rapidly opening chats no longer races the agent startup and interrupts the first turn.
+
 ## 1.1.7 - 2026-08-15
 
 ### Improved

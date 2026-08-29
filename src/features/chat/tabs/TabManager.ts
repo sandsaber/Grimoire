@@ -1088,6 +1088,9 @@ export class TabManager implements TabManagerInterface {
       if (this.providerCommandWarmups.get(tab.id)?.promise === warmup) {
         this.providerCommandWarmups.delete(tab.id);
       }
+      // Warmup is where a stale session is usually first found to be
+      // unloadable, and it lands after the thread has already been rendered.
+      tab.controllers.conversationController?.refreshSessionRestartNotice();
     });
     this.providerCommandWarmups.set(tab.id, {
       key: context.cacheKey,

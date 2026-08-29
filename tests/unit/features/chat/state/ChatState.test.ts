@@ -47,7 +47,7 @@ describe('ChatState', () => {
       expect(state.isCreatingConversation).toBe(false);
       expect(state.isSwitchingConversation).toBe(false);
       expect(state.currentConversationId).toBeNull();
-      expect(state.queuedMessage).toBeNull();
+      expect(state.queue.size).toBe(0);
       expect(state.currentContentEl).toBeNull();
       expect(state.currentTextEl).toBeNull();
       expect(state.currentTextContent).toBe('');
@@ -173,13 +173,16 @@ describe('ChatState', () => {
   });
 
   describe('queued message', () => {
-    it('stores and retrieves queued message', () => {
+    it('stores and retrieves queued messages in order', () => {
       const chatState = new ChatState();
-      const queued = { content: 'queued', editorContext: null, canvasContext: null };
+      const first = { content: 'first', editorContext: null, canvasContext: null };
+      const second = { content: 'second', editorContext: null, canvasContext: null };
 
-      chatState.queuedMessage = queued;
+      chatState.queue.enqueue(first);
+      chatState.queue.enqueue(second);
 
-      expect(chatState.queuedMessage).toBe(queued);
+      expect(chatState.queue.items[0]).toBe(first);
+      expect(chatState.queue.items[1]).toBe(second);
     });
   });
 
@@ -457,7 +460,7 @@ describe('ChatState', () => {
       chatState.cancelRequested = true;
       chatState.currentContentEl = {} as HTMLElement;
       chatState.toolCallElements.set('a', {} as HTMLElement);
-      chatState.queuedMessage = { content: 'queued', editorContext: null, canvasContext: null };
+      chatState.queue.enqueue({ content: 'queued', editorContext: null, canvasContext: null });
       chatState.usage = { inputTokens: 100, outputTokens: 50 } as any;
       chatState.currentTodos = [{ content: 'Test', status: 'pending' as const, activeForm: 'Testing' }];
       // autoScrollEnabled defaults to true, set to false first so reset triggers change
@@ -475,7 +478,7 @@ describe('ChatState', () => {
       expect(chatState.toolCallElements.size).toBe(0);
       expect(chatState.writeEditStates.size).toBe(0);
       expect(chatState.pendingTools.size).toBe(0);
-      expect(chatState.queuedMessage).toBeNull();
+      expect(chatState.queue.size).toBe(0);
       expect(chatState.usage).toBeNull();
       expect(chatState.currentTodos).toBeNull();
       expect(chatState.autoScrollEnabled).toBe(true);

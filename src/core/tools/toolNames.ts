@@ -18,6 +18,13 @@ export const TOOL_SUBAGENT_LEGACY = 'Task' as const;
 // Kept as an alias while the internal codebase is still named around "Task".
 export const TOOL_TASK = TOOL_SUBAGENT;
 export const TOOL_TODO_WRITE = 'TodoWrite' as const;
+// Task tracking replaced TodoWrite in Claude Code 2.1.233. Grimoire still renders
+// plans through TOOL_TODO_WRITE, so provider adapters fold these into that shape.
+export const TOOL_TASK_CREATE = 'TaskCreate' as const;
+export const TOOL_TASK_GET = 'TaskGet' as const;
+export const TOOL_TASK_LIST = 'TaskList' as const;
+export const TOOL_TASK_UPDATE = 'TaskUpdate' as const;
+
 export const TOOL_TOOL_SEARCH = 'ToolSearch' as const;
 export const TOOL_WEB_FETCH = 'WebFetch' as const;
 export const TOOL_WEB_SEARCH = 'WebSearch' as const;

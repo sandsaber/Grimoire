@@ -21,6 +21,7 @@
 - `ToolCallRenderer`, `ThinkingBlockRenderer`, `WriteEditRenderer`, `DiffRenderer`, and `SubagentRenderer` own specialized render surfaces. Todo lists are parsed by `core/tools/todo` and presented through `rendering/todoUtils.ts`.
 - Keep provider-specific tool normalization in provider code. Chat rendering should consume normalized `ToolCallInfo` and related shared types.
 - Long tool outputs and tables must remain readable in the chat column. Prefer contained scrolling/truncation over widening the chat.
+- The session-restart notice marks the end of the thread when a provider could not resume its saved session, so the history above is not mistaken for the agent's memory. Ask the runtime through the neutral `isSessionDropped()`; never read `providerState` from feature code. It is drawn before the user types - after a turn has been spent the warning has already cost what it was meant to save - and comes down as soon as a message joins the thread.
 
 ## Auto-Scroll
 

@@ -12,12 +12,12 @@ import {
 } from '../../../../src/providers/mimocode/runtime/MimocodeLaunchArtifacts';
 
 describe('buildMimocodeManagedConfig', () => {
-  it('pins MiMoCode build, Auto-approve, safe, and plan prompts to the managed prompt file', () => {
-    expect(buildMimocodeManagedConfig({}, '/vault/.grimoire/mimocode/system.md', 'Test User')).toEqual({
+  it('pins MiMoCode build, Auto-approve, safe, and plan prompts to the managed prompt text', () => {
+    expect(buildMimocodeManagedConfig({}, 'Managed system prompt.', 'Test User')).toEqual({
       $schema: 'https://mimocode.ai/config.json',
       agent: {
         build: {
-          prompt: '{file:/vault/.grimoire/mimocode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         [MIMOCODE_FULL_ACCESS_MODE_ID]: {
           mode: 'primary',
@@ -25,7 +25,7 @@ describe('buildMimocodeManagedConfig', () => {
             plan_enter: 'allow',
             question: 'allow',
           },
-          prompt: '{file:/vault/.grimoire/mimocode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         [MIMOCODE_SAFE_MODE_ID]: {
           mode: 'primary',
@@ -36,10 +36,10 @@ describe('buildMimocodeManagedConfig', () => {
             question: 'allow',
             write: 'ask',
           },
-          prompt: '{file:/vault/.grimoire/mimocode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         plan: {
-          prompt: '{file:/vault/.grimoire/mimocode/system.md}',
+          prompt: 'Managed system prompt.',
         },
       },
       username: 'Test User',
@@ -49,7 +49,7 @@ describe('buildMimocodeManagedConfig', () => {
   it('can create a dedicated aux agent and default it for the process', () => {
     expect(buildMimocodeManagedConfig(
       {},
-      '/vault/.grimoire/mimocode/auxiliary/system.md',
+      'Aux system prompt.',
       undefined,
       [{
         definition: {
@@ -71,7 +71,7 @@ describe('buildMimocodeManagedConfig', () => {
             '*': 'deny',
             read: 'allow',
           },
-          prompt: '{file:/vault/.grimoire/mimocode/auxiliary/system.md}',
+          prompt: 'Aux system prompt.',
         },
       },
       default_agent: 'grimoire-aux-readonly',
@@ -96,7 +96,7 @@ describe('buildMimocodeManagedConfig', () => {
         },
       },
       username: 'Existing',
-    }, '/vault/.grimoire/mimocode/system.md')).toEqual({
+    }, 'Managed system prompt.')).toEqual({
       $schema: 'https://mimocode.ai/config.json',
       agent: {
         build: {
@@ -105,7 +105,7 @@ describe('buildMimocodeManagedConfig', () => {
             bash: 'ask',
             edit: 'ask',
           },
-          prompt: '{file:/vault/.grimoire/mimocode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         [MIMOCODE_FULL_ACCESS_MODE_ID]: {
           mode: 'primary',
@@ -113,7 +113,7 @@ describe('buildMimocodeManagedConfig', () => {
             plan_enter: 'allow',
             question: 'allow',
           },
-          prompt: '{file:/vault/.grimoire/mimocode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         [MIMOCODE_SAFE_MODE_ID]: {
           mode: 'primary',
@@ -124,10 +124,10 @@ describe('buildMimocodeManagedConfig', () => {
             question: 'allow',
             write: 'ask',
           },
-          prompt: '{file:/vault/.grimoire/mimocode/system.md}',
+          prompt: 'Managed system prompt.',
         },
         plan: {
-          prompt: '{file:/vault/.grimoire/mimocode/system.md}',
+          prompt: 'Managed system prompt.',
         },
       },
       default_agent: 'build',
@@ -175,8 +175,8 @@ describe('prepareMimocodeLaunchArtifacts', () => {
 
     expect(result.configPath).toBe(path.join(tmpRoot, '.grimoire', 'mimocode', 'config.json'));
     expect(result.systemPromptPath).toBe(path.join(tmpRoot, '.grimoire', 'mimocode', 'system.md'));
-    expect(result.configContent).toContain(`"prompt": "{file:${result.systemPromptPath}}"`);
-    const generatedConfig = JSON.parse(await fs.readFile(result.configPath, 'utf8'));
+    expect(result.configContent).not.toContain('{file:');
+    const generatedConfig = JSON.parse(result.configContent);
     expect(generatedConfig).toMatchObject({
       default_agent: 'build',
       providers: {
@@ -186,10 +186,11 @@ describe('prepareMimocodeLaunchArtifacts', () => {
       },
       username: 'Test User',
     });
+    const systemPromptFile = await fs.readFile(result.systemPromptPath, 'utf8');
     expect(generatedConfig.agent).toMatchObject({
       build: {
         model: 'openai/gpt-5',
-        prompt: `{file:${result.systemPromptPath}}`,
+        prompt: systemPromptFile,
       },
       [MIMOCODE_FULL_ACCESS_MODE_ID]: {
         mode: 'primary',
@@ -197,7 +198,7 @@ describe('prepareMimocodeLaunchArtifacts', () => {
           plan_enter: 'allow',
           question: 'allow',
         },
-        prompt: `{file:${result.systemPromptPath}}`,
+        prompt: systemPromptFile,
       },
       [MIMOCODE_SAFE_MODE_ID]: {
         mode: 'primary',
@@ -207,10 +208,10 @@ describe('prepareMimocodeLaunchArtifacts', () => {
           plan_enter: 'allow',
           question: 'allow',
         },
-        prompt: `{file:${result.systemPromptPath}}`,
+        prompt: systemPromptFile,
       },
       plan: {
-        prompt: `{file:${result.systemPromptPath}}`,
+        prompt: systemPromptFile,
       },
     });
   });

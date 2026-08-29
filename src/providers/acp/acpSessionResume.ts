@@ -32,17 +32,29 @@ export interface AcpSessionLoadFailureContext {
 
 export interface AcpPersistedSessionUpdateInput {
   conversationDatabasePath?: string | null;
+  /** What the conversation already recorded, so the marker survives a save. */
+  conversationSessionDropped?: boolean;
   currentDatabasePath?: string | null;
   sessionId: string | null;
   sessionInvalidated: boolean;
 }
 
-const MISSING_SESSION_REASON_PATTERN = /^(?:invalid[_ -]?session(?:[_ -]?id)?|missing[_ -]?session|session[_ -]?(?:missing|not[_ -]?found|unknown))$/i;
+/**
+ * `session`, as the CLIs actually spell it: plural in "no previous sessions",
+ * camel-cased in "Unknown sessionId". A bare `\bsession\b` matches neither.
+ */
+const SESSION_TOKEN = String.raw`session(?:s|[_ -]?ids?|[_ -]?id)?`;
+const GONE_TOKEN = String.raw`(?:does not exist|missing|not[_ -]?found|unknown|no previous|expired|no longer (?:exists|available))`;
+
+const MISSING_SESSION_REASON_PATTERN = new RegExp(
+  String.raw`^(?:invalid[_ -]?${SESSION_TOKEN}|missing[_ -]?${SESSION_TOKEN}|${SESSION_TOKEN}[_ -]?(?:missing|not[_ -]?found|unknown|expired))$`,
+  'i',
+);
 const MISSING_SESSION_MESSAGE_PATTERNS = [
-  /\bsession\b.{0,80}\b(?:does not exist|missing|not found|unknown)\b/i,
-  /\b(?:missing|no|unknown)\b.{0,40}\bsession\b/i,
-  /\bcould not find\b.{0,40}\bsession\b/i,
-  /\binvalid session(?: id)?\b/i,
+  new RegExp(String.raw`\b${SESSION_TOKEN}\b.{0,80}\b${GONE_TOKEN}\b`, 'i'),
+  new RegExp(String.raw`\b(?:missing|no|unknown|not[_ -]?found)\b.{0,40}\b${SESSION_TOKEN}\b`, 'i'),
+  new RegExp(String.raw`\bcould not find\b.{0,40}\b${SESSION_TOKEN}\b`, 'i'),
+  new RegExp(String.raw`\binvalid ${SESSION_TOKEN}\b`, 'i'),
 ];
 
 /**
@@ -63,6 +75,62 @@ export function isAcpMissingSessionError(error: unknown): boolean {
     return MISSING_SESSION_REASON_PATTERN.test(normalized)
       || MISSING_SESSION_MESSAGE_PATTERNS.some(pattern => pattern.test(normalized));
   });
+}
+
+export interface AcpSessionListing {
+  sessions?: Array<{ sessionId?: string | null } | null> | null;
+}
+
+export interface AcpSessionGoneProbe {
+  /** The error `session/load` rejected with. */
+  error: unknown;
+  /** Asks the agent which sessions it still has. */
+  listSessions: () => Promise<AcpSessionListing>;
+  /** The session id the failed load was for. */
+  sessionId: string;
+}
+
+/**
+ * Whether a failed `session/load` means the session is gone.
+ *
+ * Error text alone cannot answer this. Every managed CLI we ship against
+ * reports a missing session as a generic internal error - OpenCode and MiMoCode
+ * as a bare `-32603 Internal error`, with nothing in `data` to key on - so the
+ * message patterns above recognise none of them. Reading the wrong answer out
+ * of that text is expensive in both directions: treat a live session as gone
+ * and the conversation silently loses its context, treat a gone session as live
+ * and every turn retries a dead id.
+ *
+ * So we ask instead. `session/list` is part of the same ACP surface and the
+ * agent has already answered on this connection, which is what makes the extra
+ * round trip safe to spend here: it only happens on a load that already failed.
+ * An agent without the method, or one that fails to answer, leaves us where we
+ * started - the binding is kept and the original error propagates, so a
+ * recoverable failure stays recoverable.
+ */
+export async function isAcpSessionGone(probe: AcpSessionGoneProbe): Promise<boolean> {
+  if (isAcpMissingSessionError(probe.error)) {
+    return true;
+  }
+  // A transport failure says nothing about the session, and there is no live
+  // connection left to ask on.
+  if (!(probe.error instanceof JsonRpcErrorResponse)) {
+    return false;
+  }
+
+  let listing: AcpSessionListing;
+  try {
+    listing = await probe.listSessions();
+  } catch {
+    return false;
+  }
+
+  const sessions = listing?.sessions;
+  if (!Array.isArray(sessions)) {
+    return false;
+  }
+
+  return !sessions.some(entry => entry?.sessionId === probe.sessionId);
 }
 
 function collectDiagnosticStrings(...values: unknown[]): string[] {
@@ -126,22 +194,29 @@ export function buildAcpPersistedSessionFields(
   input: AcpPersistedSessionUpdateInput,
 ): {
   databasePath?: string;
+  sessionDropped: boolean;
   sessionId: string | null;
 } {
   const databasePath = input.currentDatabasePath
     ?? input.conversationDatabasePath
     ?? null;
+  const sessionId = input.sessionInvalidated && !input.sessionId
+    ? null
+    : input.sessionId;
 
-  if (input.sessionInvalidated && !input.sessionId) {
-    return {
-      ...(databasePath ? { databasePath } : {}),
-      sessionId: null,
-    };
-  }
+  // "We had a session and lost it" has to outlive the runtime that learned it.
+  // The in-memory flag is consumed by the first save, and saves happen on tab
+  // close and on quit - so without a persisted marker a drop that nobody
+  // answered yet reads as a first-ever send on the next launch, and the whole
+  // transcript gets replayed into a fresh session. The marker clears itself the
+  // moment a real session id is persisted again.
+  const sessionDropped = !sessionId
+    && (input.sessionInvalidated || input.conversationSessionDropped === true);
 
   return {
     ...(databasePath ? { databasePath } : {}),
-    sessionId: input.sessionId,
+    sessionDropped,
+    sessionId,
   };
 }
 

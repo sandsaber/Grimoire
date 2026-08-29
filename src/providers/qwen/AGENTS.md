@@ -33,3 +33,8 @@ qwen --acp
 ```
 
 Custom CLI paths are stored per host under `providerConfigs.qwen.cliPathsByHost`. If no custom path exists, Grimoire launches `qwen` from PATH.
+
+## Session resume
+
+- On `session/load` failure, decide with `isAcpSessionGone` rather than treating any failure as proof the session is gone. Qwen Code names a missing session in the error (`-32002 Resource not found: session:<id>`) and also answers `session/list`, so both paths are available; anything unrecognised - transport, authentication, configuration - propagates with the binding intact.
+- A dropped session is recorded in `providerState.sessionDropped` and read back on load, because the in-memory flag is consumed by the first save. Never replay the transcript into a replacement session: history bootstrap is for a cold resume that never held a session id.

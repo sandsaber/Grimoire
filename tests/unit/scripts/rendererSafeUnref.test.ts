@@ -165,6 +165,27 @@ describe('rendererSafeUnref helpers', () => {
     expect(findUnsafeTimerUnrefSites(result.contents)).toEqual([]);
   });
 
+  it('patches the signalCode shape after the sdk renamed its process tracker call', () => {
+    // 0.3.233 swapped the tracked-process Set for a tracker object, so the exit
+    // handler now calls .untrack() where it used to call .delete().
+    const input = [
+      'a&&!a.killed&&a.exitCode===null&&a.signalCode==null?(setTimeout((m,f)=>{',
+      'if(m.exitCode!==null||m.signalCode!=null){f();return}',
+      'if(process.platform==="win32"){setTimeout((g,v)=>{g.exitCode===null&&g.kill("SIGKILL"),v()},5e3,m,f).unref();return}',
+      'm.kill("SIGTERM"),setTimeout(g=>{g.exitCode===null&&g.kill("SIGKILL")},5e3,m).unref(),f()',
+      '},sut,a,s).unref(),a.once("exit",()=>v0.untrack(a))):a&&(v0.untrack(a),s())',
+    ].join('');
+
+    const result = patchRendererUnsafeUnrefSites(input);
+
+    expect(result.appliedPatches).toEqual([
+      { name: 'claude-sdk-process-transport-close-signal-code-minified-expression', count: 1 },
+    ]);
+    expect(result.contents).toContain('processKillTimer.unref?.();');
+    expect(result.contents).toContain('a.once("exit",()=>v0.untrack(a));');
+    expect(findUnsafeTimerUnrefSites(result.contents)).toEqual([]);
+  });
+
   it('patches minified MCP stdio close waits', () => {
     const input = [
       'await Promise.race([r,new Promise(i=>setTimeout(i,2e3).unref())]);',
