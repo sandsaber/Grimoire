@@ -19,6 +19,11 @@ import { listUnconsumedExports } from '@test/helpers/exportConsumers';
  * A consumer in `tests/` does not count, and neither does an export the module
  * only offers so a test can reach code it also uses itself. What is left is the
  * symbol nothing ships.
+ *
+ * **The baseline is not a delete list.** Read its `_note` before acting on an
+ * entry, and check `presentationParityManifest.ts` first: an orphan recorded
+ * there has an owner and a reason, and deleting one is undoing someone's
+ * decision rather than removing dead code.
  */
 describe('unconsumed exports', () => {
   it('adds no export that nothing in src takes', () => {

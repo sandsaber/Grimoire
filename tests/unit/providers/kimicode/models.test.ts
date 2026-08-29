@@ -1,15 +1,9 @@
 import {
   buildKimicodeBaseModels,
-  combineKimicodeRawModelSelection,
   decodeKimicodeModelId,
   encodeKimicodeModelId,
-  extractKimicodeModelVariantValue,
-  getKimicodeModelVariants,
-  groupKimicodeDiscoveredModels,
   isKimicodeModelSelectionId,
-  KIMICODE_DEFAULT_THINKING_LEVEL,
   KIMICODE_SYNTHETIC_MODEL_ID,
-  resolveKimicodeBaseModelRawId,
   splitKimicodeModelLabel,
 } from '../../../../src/providers/kimicode/models';
 import { kimicodeChatUIConfig } from '../../../../src/providers/kimicode/ui/KimicodeChatUIConfig';
@@ -71,34 +65,6 @@ describe('Kimi Code base model derivation', () => {
         ],
       },
     ]);
-  });
-
-  it('extracts and combines thinking variants from discovered model ids', () => {
-    expect(resolveKimicodeBaseModelRawId(
-      'anthropic/claude-sonnet-4/high',
-      discoveredModels,
-    )).toBe('anthropic/claude-sonnet-4');
-    expect(extractKimicodeModelVariantValue(
-      'anthropic/claude-sonnet-4/high',
-      discoveredModels,
-    )).toBe('high');
-    expect(getKimicodeModelVariants(
-      'anthropic/claude-sonnet-4',
-      discoveredModels,
-    )).toEqual([
-      { label: 'High', value: 'high' },
-      { label: 'Max', value: 'max' },
-    ]);
-    expect(combineKimicodeRawModelSelection(
-      'anthropic/claude-sonnet-4',
-      'high',
-      discoveredModels,
-    )).toBe('anthropic/claude-sonnet-4/high');
-    expect(combineKimicodeRawModelSelection(
-      'anthropic/claude-sonnet-4',
-      KIMICODE_DEFAULT_THINKING_LEVEL,
-      discoveredModels,
-    )).toBe('anthropic/claude-sonnet-4');
   });
 });
 
@@ -277,29 +243,5 @@ describe('Kimi Code discovered model grouping', () => {
       modelLabel: 'standalone-model',
       providerLabel: 'Other',
     });
-  });
-
-  it('groups discovered models by provider label', () => {
-    expect(groupKimicodeDiscoveredModels([
-      { label: 'Google/Gemini 2.5 Flash', rawId: 'google/gemini-2.5-flash' },
-      { label: 'Anthropic/Claude Sonnet 4', rawId: 'anthropic/claude-sonnet-4' },
-      { label: 'Google/Gemini 2.5 Pro', rawId: 'google/gemini-2.5-pro' },
-    ])).toEqual([
-      {
-        models: [
-          { label: 'Anthropic/Claude Sonnet 4', rawId: 'anthropic/claude-sonnet-4' },
-        ],
-        providerKey: 'anthropic',
-        providerLabel: 'Anthropic',
-      },
-      {
-        models: [
-          { label: 'Google/Gemini 2.5 Flash', rawId: 'google/gemini-2.5-flash' },
-          { label: 'Google/Gemini 2.5 Pro', rawId: 'google/gemini-2.5-pro' },
-        ],
-        providerKey: 'google',
-        providerLabel: 'Google',
-      },
-    ]);
   });
 });

@@ -10574,6 +10574,34 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### The export backlog closed — 183 to 50, and the 50 are a decision (`this commit`)
+
+- Gates: unit 8944 passed / 8944 total across 562 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- The last mechanical pass, and the reason the rest stays.
+
+**Twenty more went**: the last three `normalizeApprovalInput` re-exports, the per-provider
+`combineXRawModelSelection` / `groupXDiscoveredModels` pair across four providers, the three tool-set
+predicates in `toolNames` and the arrays only they read, the tab-count constants re-exported from a
+module that already had them, and the two shared icon constants. Each took its tests with it, and
+each round of deletion made the next round's dead code visible — `groupXDiscoveredModels` took
+`getXModelVariants` and the group type with it, `isBashTool` took `BASH_TOOLS`.
+
+**One deletion was wrong and is restored, which is the finding.** `src/i18n/constants.ts` has no
+production consumer, and `presentationParityManifest.ts` already **records** it as an intentional
+orphan owned by staged i18n work outside this migration. The parity gate caught it — "lists only
+modules that exist" went red — and the module is back. Two more of the remaining backlog are recorded
+there the same way: `ContextIngestionService` and `acp/history/sqliteModule`. A gate that reports
+"nothing names this" is not a gate that says "delete this", and the manifest is where the difference
+is written down.
+
+**So the pass stops here, and the baseline says why.** Its note now sorts the fifty into four kinds:
+recorded orphans with an owner; exports that exist so a test can reach them and say so in their own
+doc comment (`classifyForPresentation`, `resetAntigravityCliCapabilitiesCache`); shapes — barrel
+re-exports and the Codex wire types kept as protocol documentation; and helpers with no caller that
+may be lost wiring rather than dead code. This migration has already found one of the last kind — a
+normalizer deleted as dead that two providers needed — so each of those wants a reader, not a sweep.
+
 ### The export backlog, 3 of 3 — the legacy ACP half, and its tests (`this commit`)
 
 - Gates: unit 8990 passed / 8990 total across 564 suites; `tsc --noEmit` clean; `npm run lint` clean;

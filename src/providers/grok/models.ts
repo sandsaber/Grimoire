@@ -19,12 +19,6 @@ export interface GrokBaseModel {
   variants: GrokModelVariant[];
 }
 
-export interface GrokDiscoveredModelGroup {
-  models: GrokDiscoveredModel[];
-  providerKey: string;
-  providerLabel: string;
-}
-
 export const GROK_SYNTHETIC_MODEL_ID = 'grok';
 export const GROK_DEFAULT_THINKING_LEVEL = 'default';
 export const GROK_NATIVE_THINKING_DEFAULT = 'high';
@@ -273,29 +267,6 @@ export function extractGrokModelVariantValue(
   return variant || null;
 }
 
-export function combineGrokRawModelSelection(
-  baseRawId: string | null | undefined,
-  thinkingLevel: string | null | undefined,
-  discoveredModels: GrokDiscoveredModel[],
-): string | null {
-  const normalizedBaseRawId = baseRawId?.trim();
-  if (!normalizedBaseRawId) {
-    return null;
-  }
-
-  const variant = thinkingLevel?.trim();
-  if (!variant || variant === GROK_DEFAULT_THINKING_LEVEL) {
-    return normalizedBaseRawId;
-  }
-
-  const supportedVariants = new Set(
-    getGrokModelVariants(normalizedBaseRawId, discoveredModels).map((entry) => entry.value),
-  );
-  return supportedVariants.has(variant)
-    ? `${normalizedBaseRawId}/${variant}`
-    : normalizedBaseRawId;
-}
-
 export function splitGrokModelLabel(
   label: string,
   rawId?: string,
@@ -458,15 +429,6 @@ export function buildGrokBaseModels(
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
-export function getGrokModelVariants(
-  rawId: string,
-  models: GrokDiscoveredModel[],
-): GrokModelVariant[] {
-  const baseRawId = resolveGrokBaseModelRawId(rawId, models);
-  return buildGrokBaseModels(models)
-    .find((model) => model.rawId === baseRawId)?.variants ?? [];
-}
-
 function formatGrokThinkingLevelLabel(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -478,42 +440,6 @@ function formatGrokThinkingLevelLabel(value: string): string {
   }
 
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
-}
-
-export function groupGrokDiscoveredModels(
-  models: GrokDiscoveredModel[],
-): GrokDiscoveredModelGroup[] {
-  const groups = new Map<string, GrokDiscoveredModelGroup>();
-  for (const model of buildGrokBaseModels(models)) {
-    const { providerLabel } = splitGrokModelLabel(model.label || model.rawId, model.rawId);
-    const providerKey = providerLabel.toLowerCase();
-    const existing = groups.get(providerKey);
-    if (existing) {
-      existing.models.push({
-        ...(model.description ? { description: model.description } : {}),
-        label: model.label,
-        rawId: model.rawId,
-      });
-      continue;
-    }
-
-    groups.set(providerKey, {
-      models: [{
-        ...(model.description ? { description: model.description } : {}),
-        label: model.label,
-        rawId: model.rawId,
-      }],
-      providerKey,
-      providerLabel,
-    });
-  }
-
-  return Array.from(groups.values())
-    .map((group) => ({
-      ...group,
-      models: [...group.models].sort((left, right) => left.label.localeCompare(right.label)),
-    }))
-    .sort((left, right) => left.providerLabel.localeCompare(right.providerLabel));
 }
 
 function dedupeGrokVariants(variants: GrokModelVariant[]): GrokModelVariant[] {

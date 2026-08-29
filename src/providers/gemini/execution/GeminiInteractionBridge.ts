@@ -1,7 +1,6 @@
 import { AcpApprovalPresenter } from '@/providers/acp/execution/AcpApprovalPresenter';
 import {
   AcpPermissionBridge,
-  normalizeApprovalInput,
 } from '@/providers/acp/execution/AcpPermissionBridge';
 import { buildGeminiPermissionPresentation } from '@/providers/gemini/execution/GeminiPermissionPresentation';
 
@@ -31,4 +30,3 @@ export class GeminiInteractionBridge extends AcpPermissionBridge {
 /** How an opened Gemini approval reaches the surface. */
 export class GeminiInteractionPresenter extends AcpApprovalPresenter {}
 
-export { normalizeApprovalInput };

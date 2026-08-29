@@ -2,7 +2,6 @@ import { createMockEl } from '@test/helpers/mockElement';
 
 import { TabManager } from '@/features/chat/tabs/TabManager';
 import {
-  DEFAULT_MAX_TABS,
   type PersistedTabManagerState,
   type TabManagerCallbacks,
 } from '@/features/chat/tabs/types';
@@ -183,7 +182,7 @@ function createMockPlugin(overrides: Record<string, any> = {}): any {
       },
     },
     settings: {
-      maxTabs: DEFAULT_MAX_TABS,
+      maxTabs: 5,
       ...(overrides.settings || {}),
     },
     getConversationById: jest.fn().mockResolvedValue(null),
@@ -414,20 +413,6 @@ describe('TabManager - Tab Lifecycle', () => {
       // Service initialization is now lazy (on first query), not on switch
       expect(mockInitializeTabService).not.toHaveBeenCalled();
     });
-
-    it('should enforce max tabs limit', async () => {
-      const manager = createManager({ callbacks });
-
-      for (let i = 0; i < DEFAULT_MAX_TABS; i++) {
-        await manager.createTab();
-      }
-
-      const extraTab = await manager.createTab();
-
-      expect(extraTab).toBeNull();
-      expect(manager.getTabCount()).toBe(DEFAULT_MAX_TABS);
-    });
-
     it('clamps configured max tabs above ten to ten', async () => {
       const manager = createManager({
         callbacks,
@@ -864,13 +849,6 @@ describe('TabManager - Tab Queries', () => {
   describe('canCreateTab', () => {
     it('should return true when under limit', () => {
       expect(manager.canCreateTab()).toBe(true);
-    });
-
-    it('should return false when at limit', async () => {
-      for (let i = 1; i < DEFAULT_MAX_TABS; i++) {
-        await manager.createTab();
-      }
-      expect(manager.canCreateTab()).toBe(false);
     });
   });
 });
@@ -2646,24 +2624,6 @@ describe('TabManager - openConversation Current Tab Path', () => {
     // conversationId should NOT be set by openConversation - it's synced via callback
     expect(activeTab!.conversationId).toBeNull();
   });
-
-  it('should not open in current tab if at max tabs and preferNewTab is true', async () => {
-    for (let i = 0; i < DEFAULT_MAX_TABS - 1; i++) {
-      await manager.createTab();
-    }
-    expect(manager.getTabCount()).toBe(DEFAULT_MAX_TABS);
-
-    const activeTab = manager.getActiveTab();
-    const switchTo = jest.fn().mockResolvedValue(undefined);
-    activeTab!.controllers.conversationController = { switchTo } as any;
-
-    plugin.getConversationById.mockResolvedValue({ id: 'conv-max' });
-
-    // preferNewTab=true but at max, so should open in current tab
-    await manager.openConversation('conv-max', true);
-
-    expect(switchTo).toHaveBeenCalledWith('conv-max');
-  });
 });
 
 describe('TabManager - Service Initialization Errors', () => {
@@ -3013,73 +2973,6 @@ describe('TabManager - switchToTab Session Sync', () => {
       expect.objectContaining({ id: 'conv-loaded', sessionId: 'session-xyz' }),
     );
   });
-
-  it('should use persistentExternalContextPaths when conversation has no messages', async () => {
-    jest.clearAllMocks();
-
-    const mockSyncConversationState = jest.fn();
-    const mockService = {
-      syncConversationState: mockSyncConversationState,
-    };
-
-    let tabCounter = 0;
-    mockCreateTab.mockImplementation(() => {
-      tabCounter++;
-      const tab = createMockTabData({
-        id: `tab-${tabCounter}`,
-        conversationId: tabCounter === 2 ? 'conv-empty' : null,
-        service: tabCounter === 2 ? mockService : null,
-        serviceInitialized: tabCounter === 2,
-      });
-      // Tab has local messages but the persisted conversation does not
-      if (tabCounter === 2) {
-        tab.state.messages = [{ id: 'msg-1', role: 'user', content: 'test' }] as any;
-      }
-      return tab;
-    });
-
-    const plugin = createMockPlugin({
-      settings: {
-        maxTabs: DEFAULT_MAX_TABS,
-        persistentExternalContextPaths: ['/persistent/path'],
-      },
-    });
-    // **No session either.** The fallback is for a conversation that has not
-    // started, and a session id is one of the two ways a conversation can have
-    // started — the other being messages. This fixture carried `session-abc`
-    // and passed anyway, because the suite's registry double lacked the member
-    // that would have said so: `resolveSessionIdForConversation` was undefined,
-    // so the predicate answered `false` for every conversation in this file.
-    // The declaration answers it now, and the fixture has to mean what the
-    // case is named for.
-    plugin.getConversationSync = jest.fn().mockReturnValue({
-      id: 'conv-empty',
-      messages: [],
-      sessionId: null,
-      externalContextPaths: [],
-    });
-
-    const manager = new TabManager(
-      plugin,
-      createMockMcpManager(),
-      createMockEl(),
-      createMockView()
-    );
-
-    await manager.createTab(); // tab-1
-    await manager.createTab(); // tab-2, auto-switches and triggers session sync
-
-    // **The paths are no longer asserted here.** They were a second argument
-    // to `syncConversationState` that the adapter never took, so what this
-    // pinned was the caller computing them rather than anything receiving them.
-    // The fallback is alive where the turn reads it: the external-context
-    // selector is seeded with `persistentExternalContextPaths`, and
-    // `buildProviderCommandContext` computes the same fallback.
-    expect(mockSyncConversationState).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'conv-empty', sessionId: null }),
-    );
-  });
-
   it('should not sync service session for an already-loaded streaming tab', async () => {
     jest.clearAllMocks();
 

@@ -1,7 +1,6 @@
 import { AcpApprovalPresenter } from '@/providers/acp/execution/AcpApprovalPresenter';
 import {
   AcpPermissionBridge,
-  normalizeApprovalInput,
 } from '@/providers/acp/execution/AcpPermissionBridge';
 import type { ManagedAcpPreparedInteraction } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
 import type { AcpRequestPermissionRequest } from '@/providers/acp/types';
@@ -114,4 +113,3 @@ function readAnswers(payload: unknown): Record<string, string | string[]> | null
 /** How an opened Qwen approval reaches the surface. */
 export class QwenInteractionPresenter extends AcpApprovalPresenter {}
 
-export { normalizeApprovalInput };

@@ -1,11 +1,24 @@
 {
   "_note": [
     "Exports no other module in src/ takes: the baseline this gate holds the line at.",
-    "Generated once, from the tree at the commit that added the gate. It is a backlog,",
-    "not an endorsement - several entries are genuinely dead code that wants deleting,",
-    "and most of the rest are port and wire-shape types consumed structurally rather",
-    "than by name. What the gate is for is the entry that is NOT here: a symbol added",
-    "with tests and no caller, which is what the main sync produced three times.",
+    "What the gate is for is the entry that is NOT here: a symbol added with tests and",
+    "no caller, which is what the main sync produced three times.",
+    "",
+    "The 50 left are what a deletion pass decided to keep, and they fall in four kinds.",
+    "1. Recorded orphans with an owner. ContextIngestionService, i18n/constants and",
+    "   acp/history/sqliteModule are in tests/unit/architecture/presentationParityManifest.ts",
+    "   with a reason and an owner outside this migration. Check that manifest before",
+    "   deleting anything here - one of them was deleted and restored for this reason.",
+    "2. Exported so a test can reach them, deliberately. classifyForPresentation says so",
+    "   in its own doc comment; resetAntigravityCliCapabilitiesCache is how a test isolates",
+    "   a module cache. Removing either makes a test worse, not the source better.",
+    "3. Shapes: types re-exported by a barrel, and the Codex app-server wire types kept as",
+    "   documentation of a protocol. Deletable, and each needs a reader who knows whether",
+    "   the shape is still the wire's.",
+    "4. Helpers with no caller that may be lost wiring rather than dead code. This",
+    "   migration has already found one of those - a normalizer deleted as dead that two",
+    "   providers needed - so each wants reading, not a sweep.",
+    "",
     "Removing an entry is always allowed. Adding one needs a reason in the commit."
   ],
   "modules": {
@@ -38,11 +51,6 @@
     "src/core/tools/toolInput.ts": [
       "getPathFromToolInput"
     ],
-    "src/core/tools/toolNames.ts": [
-      "isBashTool",
-      "isFileTool",
-      "isMcpTool"
-    ],
     "src/core/types/index.ts": [
       "AskUserQuestionOption",
       "ChatTurnFailureChunk",
@@ -67,11 +75,6 @@
     "src/features/chat/tabs/tabSettings.ts": [
       "hasStartedConversation",
       "TabCreateOptions"
-    ],
-    "src/features/chat/tabs/types.ts": [
-      "DEFAULT_MAX_TABS",
-      "MAX_TABS",
-      "MIN_TABS"
     ],
     "src/i18n/constants.ts": [
       "DEFAULT_LOCALE",
@@ -116,39 +119,9 @@
     "src/providers/codex/types/models.ts": [
       "DEFAULT_CODEX_PRIMARY_MODEL_LABEL"
     ],
-    "src/providers/gemini/execution/GeminiInteractionBridge.ts": [
-      "normalizeApprovalInput"
-    ],
-    "src/providers/grok/execution/GrokInteractionBridge.ts": [
-      "normalizeApprovalInput"
-    ],
-    "src/providers/grok/models.ts": [
-      "combineGrokRawModelSelection",
-      "groupGrokDiscoveredModels"
-    ],
     "src/providers/grok/runtime/grokDebugLog.ts": [
       "grokAuthPathExists",
       "summarizeGrokCliText"
-    ],
-    "src/providers/kimicode/models.ts": [
-      "combineKimicodeRawModelSelection",
-      "groupKimicodeDiscoveredModels"
-    ],
-    "src/providers/mimocode/models.ts": [
-      "combineMimocodeRawModelSelection",
-      "groupMimocodeDiscoveredModels",
-      "resolveMimocodeUnsupportedModelFallback"
-    ],
-    "src/providers/opencode/models.ts": [
-      "combineOpencodeRawModelSelection",
-      "groupOpencodeDiscoveredModels"
-    ],
-    "src/providers/qwen/execution/QwenInteractionBridge.ts": [
-      "normalizeApprovalInput"
-    ],
-    "src/shared/icons.ts": [
-      "CHECK_ICON_SVG",
-      "MCP_ICON_SVG"
     ],
     "src/utils/context.ts": [
       "stripCurrentNoteContext"

@@ -19,12 +19,6 @@ export interface MimocodeBaseModel {
   variants: MimocodeModelVariant[];
 }
 
-export interface MimocodeDiscoveredModelGroup {
-  models: MimocodeDiscoveredModel[];
-  providerKey: string;
-  providerLabel: string;
-}
-
 export const MIMOCODE_SYNTHETIC_MODEL_ID = 'mimocode';
 export const MIMOCODE_DEFAULT_THINKING_LEVEL = 'default';
 
@@ -199,47 +193,6 @@ export function extractMimocodeModelVariantValue(
   return variant || null;
 }
 
-export function combineMimocodeRawModelSelection(
-  baseRawId: string | null | undefined,
-  thinkingLevel: string | null | undefined,
-  discoveredModels: MimocodeDiscoveredModel[],
-): string | null {
-  const normalizedBaseRawId = baseRawId?.trim();
-  if (!normalizedBaseRawId) {
-    return null;
-  }
-
-  const variant = thinkingLevel?.trim();
-  if (!variant || variant === MIMOCODE_DEFAULT_THINKING_LEVEL) {
-    return normalizedBaseRawId;
-  }
-
-  const supportedVariants = new Set(
-    getMimocodeModelVariants(normalizedBaseRawId, discoveredModels).map((entry) => entry.value),
-  );
-  return supportedVariants.has(variant)
-    ? `${normalizedBaseRawId}/${variant}`
-    : normalizedBaseRawId;
-}
-
-export function resolveMimocodeUnsupportedModelFallback(
-  rawModelId: string,
-  availableRawModelIds: Iterable<string>,
-): string | null {
-  const available = new Set(Array.from(availableRawModelIds, value => value.trim()));
-  const reportedRawId = rawModelId.trim();
-  const normalizedRawId = available.has(reportedRawId)
-    ? reportedRawId
-    : Array.from(available).find(value => value.endsWith(`/${reportedRawId}`)) ?? reportedRawId;
-  const fallbackCandidates = [
-    normalizedRawId.replace(/-ultraspeed$/i, ''),
-  ];
-
-  return fallbackCandidates.find(candidate => (
-    candidate !== normalizedRawId && available.has(candidate)
-  )) ?? null;
-}
-
 export function splitMimocodeModelLabel(label: string): {
   modelLabel: string;
   providerLabel: string;
@@ -306,15 +259,6 @@ export function buildMimocodeBaseModels(
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
-export function getMimocodeModelVariants(
-  rawId: string,
-  models: MimocodeDiscoveredModel[],
-): MimocodeModelVariant[] {
-  const baseRawId = resolveMimocodeBaseModelRawId(rawId, models);
-  return buildMimocodeBaseModels(models)
-    .find((model) => model.rawId === baseRawId)?.variants ?? [];
-}
-
 function formatMimocodeThinkingLevelLabel(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -326,42 +270,6 @@ function formatMimocodeThinkingLevelLabel(value: string): string {
   }
 
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
-}
-
-export function groupMimocodeDiscoveredModels(
-  models: MimocodeDiscoveredModel[],
-): MimocodeDiscoveredModelGroup[] {
-  const groups = new Map<string, MimocodeDiscoveredModelGroup>();
-  for (const model of buildMimocodeBaseModels(models)) {
-    const { providerLabel } = splitMimocodeModelLabel(model.label || model.rawId);
-    const providerKey = providerLabel.toLowerCase();
-    const existing = groups.get(providerKey);
-    if (existing) {
-      existing.models.push({
-        ...(model.description ? { description: model.description } : {}),
-        label: model.label,
-        rawId: model.rawId,
-      });
-      continue;
-    }
-
-    groups.set(providerKey, {
-      models: [{
-        ...(model.description ? { description: model.description } : {}),
-        label: model.label,
-        rawId: model.rawId,
-      }],
-      providerKey,
-      providerLabel,
-    });
-  }
-
-  return Array.from(groups.values())
-    .map((group) => ({
-      ...group,
-      models: [...group.models].sort((left, right) => left.label.localeCompare(right.label)),
-    }))
-    .sort((left, right) => left.providerLabel.localeCompare(right.providerLabel));
 }
 
 function dedupeMimocodeVariants(variants: MimocodeModelVariant[]): MimocodeModelVariant[] {

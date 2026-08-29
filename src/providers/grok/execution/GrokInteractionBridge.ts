@@ -1,7 +1,6 @@
 import { AcpApprovalPresenter } from '@/providers/acp/execution/AcpApprovalPresenter';
 import {
   AcpPermissionBridge,
-  normalizeApprovalInput,
 } from '@/providers/acp/execution/AcpPermissionBridge';
 import { buildGrokPermissionPresentation } from '@/providers/grok/execution/GrokPermissionPresentation';
 
@@ -30,4 +29,3 @@ export class GrokInteractionBridge extends AcpPermissionBridge {
 /** How an opened Grok approval reaches the surface. */
 export class GrokInteractionPresenter extends AcpApprovalPresenter {}
 
-export { normalizeApprovalInput };

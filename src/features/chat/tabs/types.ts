@@ -41,12 +41,7 @@ import type { NavigationSidebar } from '../ui/NavigationSidebar';
 import type { RelevantNotesView } from '../ui/RelevantNotesView';
 import type { StatusPanel } from '../ui/StatusPanel';
 
-export {
-  DEFAULT_MAX_TABS,
-  MAX_TABS,
-  MIN_TABS,
-  normalizeMaxTabs,
-} from '../../../core/types/settings';
+export { normalizeMaxTabs } from '../../../core/types/settings';
 
 /**
  * Minimal interface for the GrimoireView methods used by TabManager and Tab.

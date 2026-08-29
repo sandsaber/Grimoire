@@ -1,16 +1,10 @@
 import {
   buildGrokBaseModels,
-  combineGrokRawModelSelection,
   decodeGrokModelId,
   encodeGrokModelId,
-  extractGrokModelVariantValue,
-  getGrokModelVariants,
-  GROK_DEFAULT_THINKING_LEVEL,
   GROK_SYNTHETIC_MODEL_ID,
-  groupGrokDiscoveredModels,
   isGrokModelSelectionId,
   isGrokNativeModelId,
-  resolveGrokBaseModelRawId,
   splitGrokModelLabel,
 } from '../../../../src/providers/grok/models';
 import { grokChatUIConfig } from '../../../../src/providers/grok/ui/GrokChatUIConfig';
@@ -88,34 +82,6 @@ describe('Grok Build base model derivation', () => {
         ],
       },
     ]);
-  });
-
-  it('extracts and combines thinking variants from discovered model ids', () => {
-    expect(resolveGrokBaseModelRawId(
-      'anthropic/claude-sonnet-4/high',
-      discoveredModels,
-    )).toBe('anthropic/claude-sonnet-4');
-    expect(extractGrokModelVariantValue(
-      'anthropic/claude-sonnet-4/high',
-      discoveredModels,
-    )).toBe('high');
-    expect(getGrokModelVariants(
-      'anthropic/claude-sonnet-4',
-      discoveredModels,
-    )).toEqual([
-      { label: 'High', value: 'high' },
-      { label: 'Max', value: 'max' },
-    ]);
-    expect(combineGrokRawModelSelection(
-      'anthropic/claude-sonnet-4',
-      'high',
-      discoveredModels,
-    )).toBe('anthropic/claude-sonnet-4/high');
-    expect(combineGrokRawModelSelection(
-      'anthropic/claude-sonnet-4',
-      GROK_DEFAULT_THINKING_LEVEL,
-      discoveredModels,
-    )).toBe('anthropic/claude-sonnet-4');
   });
 });
 
@@ -421,69 +387,5 @@ describe('Grok Build discovered model grouping', () => {
       modelLabel: '2.5 Fast',
       providerLabel: 'Composer',
     });
-  });
-
-  it('groups discovered models by provider label', () => {
-    expect(groupGrokDiscoveredModels([
-      { label: 'Grok Build', rawId: 'grok-build' },
-      { label: 'Grok Composer 2.5 Fast', rawId: 'grok-composer-2.5-fast' },
-      { label: 'Google/Gemini 2.5 Flash', rawId: 'google/gemini-2.5-flash' },
-      { label: 'Anthropic/Claude Sonnet 4', rawId: 'anthropic/claude-sonnet-4' },
-      { label: 'Google/Gemini 2.5 Pro', rawId: 'google/gemini-2.5-pro' },
-    ])).toEqual([
-      {
-        models: [
-          { label: 'Anthropic/Claude Sonnet 4', rawId: 'anthropic/claude-sonnet-4' },
-        ],
-        providerKey: 'anthropic',
-        providerLabel: 'Anthropic',
-      },
-      {
-        models: [
-          { label: 'Grok Composer 2.5 Fast', rawId: 'grok-composer-2.5-fast' },
-        ],
-        providerKey: 'composer',
-        providerLabel: 'Composer',
-      },
-      {
-        models: [
-          { label: 'Google/Gemini 2.5 Flash', rawId: 'google/gemini-2.5-flash' },
-          { label: 'Google/Gemini 2.5 Pro', rawId: 'google/gemini-2.5-pro' },
-        ],
-        providerKey: 'google',
-        providerLabel: 'Google',
-      },
-      {
-        models: [
-          { label: 'Grok Build', rawId: 'grok-build' },
-        ],
-        providerKey: 'grok build',
-        providerLabel: 'Grok Build',
-      },
-    ]);
-  });
-
-  it('groups slash-separated discovered models by provider label', () => {
-    expect(groupGrokDiscoveredModels([
-      { label: 'Google/Gemini 2.5 Flash', rawId: 'google/gemini-2.5-flash' },
-      { label: 'Anthropic/Claude Sonnet 4', rawId: 'anthropic/claude-sonnet-4' },
-      { label: 'Google/Gemini 2.5 Pro', rawId: 'google/gemini-2.5-pro' },
-    ])).toEqual([
-      {
-        models: [
-          { label: 'Anthropic/Claude Sonnet 4', rawId: 'anthropic/claude-sonnet-4' },
-        ],
-        providerKey: 'anthropic',
-        providerLabel: 'Anthropic',
-      },
-      {
-        models: [
-          { label: 'Google/Gemini 2.5 Flash', rawId: 'google/gemini-2.5-flash' },
-          { label: 'Google/Gemini 2.5 Pro', rawId: 'google/gemini-2.5-pro' },
-        ],
-        providerKey: 'google',
-        providerLabel: 'Google',
-      },
-    ]);
   });
 });

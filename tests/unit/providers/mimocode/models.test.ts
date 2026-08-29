@@ -1,16 +1,9 @@
 import {
   buildMimocodeBaseModels,
-  combineMimocodeRawModelSelection,
   decodeMimocodeModelId,
   encodeMimocodeModelId,
-  extractMimocodeModelVariantValue,
-  getMimocodeModelVariants,
-  groupMimocodeDiscoveredModels,
   isMimocodeModelSelectionId,
-  MIMOCODE_DEFAULT_THINKING_LEVEL,
   MIMOCODE_SYNTHETIC_MODEL_ID,
-  resolveMimocodeBaseModelRawId,
-  resolveMimocodeUnsupportedModelFallback,
   splitMimocodeModelLabel,
 } from '../../../../src/providers/mimocode/models';
 import { mimocodeChatUIConfig } from '../../../../src/providers/mimocode/ui/MimocodeChatUIConfig';
@@ -73,54 +66,9 @@ describe('MiMoCode base model derivation', () => {
       },
     ]);
   });
-
-  it('extracts and combines thinking variants from discovered model ids', () => {
-    expect(resolveMimocodeBaseModelRawId(
-      'anthropic/claude-sonnet-4/high',
-      discoveredModels,
-    )).toBe('anthropic/claude-sonnet-4');
-    expect(extractMimocodeModelVariantValue(
-      'anthropic/claude-sonnet-4/high',
-      discoveredModels,
-    )).toBe('high');
-    expect(getMimocodeModelVariants(
-      'anthropic/claude-sonnet-4',
-      discoveredModels,
-    )).toEqual([
-      { label: 'High', value: 'high' },
-      { label: 'Max', value: 'max' },
-    ]);
-    expect(combineMimocodeRawModelSelection(
-      'anthropic/claude-sonnet-4',
-      'high',
-      discoveredModels,
-    )).toBe('anthropic/claude-sonnet-4/high');
-    expect(combineMimocodeRawModelSelection(
-      'anthropic/claude-sonnet-4',
-      MIMOCODE_DEFAULT_THINKING_LEVEL,
-      discoveredModels,
-    )).toBe('anthropic/claude-sonnet-4');
-  });
 });
 
 describe('MiMoCode unsupported model fallback', () => {
-  it('falls back from an unavailable ultraspeed plan model to the visible base model', () => {
-    expect(resolveMimocodeUnsupportedModelFallback(
-      'xiaomi/mimo-v2.5-pro-ultraspeed',
-      ['xiaomi/mimo-v2.5-pro', 'xiaomi/mimo-v2.5-pro-ultraspeed'],
-    )).toBe('xiaomi/mimo-v2.5-pro');
-    expect(resolveMimocodeUnsupportedModelFallback(
-      'mimo-v2.5-pro-ultraspeed',
-      ['xiaomi/mimo-v2.5-pro', 'xiaomi/mimo-v2.5-pro-ultraspeed'],
-    )).toBe('xiaomi/mimo-v2.5-pro');
-  });
-
-  it('does not invent a fallback that is absent from the model catalog', () => {
-    expect(resolveMimocodeUnsupportedModelFallback(
-      'xiaomi/mimo-v2.5-pro-ultraspeed',
-      ['xiaomi/mimo-v2.5-pro-ultraspeed'],
-    )).toBeNull();
-  });
 });
 
 describe('mimocodeChatUIConfig', () => {
@@ -298,29 +246,5 @@ describe('MiMoCode discovered model grouping', () => {
       modelLabel: 'standalone-model',
       providerLabel: 'Other',
     });
-  });
-
-  it('groups discovered models by provider label', () => {
-    expect(groupMimocodeDiscoveredModels([
-      { label: 'Google/Gemini 2.5 Flash', rawId: 'google/gemini-2.5-flash' },
-      { label: 'Anthropic/Claude Sonnet 4', rawId: 'anthropic/claude-sonnet-4' },
-      { label: 'Google/Gemini 2.5 Pro', rawId: 'google/gemini-2.5-pro' },
-    ])).toEqual([
-      {
-        models: [
-          { label: 'Anthropic/Claude Sonnet 4', rawId: 'anthropic/claude-sonnet-4' },
-        ],
-        providerKey: 'anthropic',
-        providerLabel: 'Anthropic',
-      },
-      {
-        models: [
-          { label: 'Google/Gemini 2.5 Flash', rawId: 'google/gemini-2.5-flash' },
-          { label: 'Google/Gemini 2.5 Pro', rawId: 'google/gemini-2.5-pro' },
-        ],
-        providerKey: 'google',
-        providerLabel: 'Google',
-      },
-    ]);
   });
 });

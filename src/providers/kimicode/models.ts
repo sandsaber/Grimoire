@@ -19,12 +19,6 @@ export interface KimicodeBaseModel {
   variants: KimicodeModelVariant[];
 }
 
-export interface KimicodeDiscoveredModelGroup {
-  models: KimicodeDiscoveredModel[];
-  providerKey: string;
-  providerLabel: string;
-}
-
 export const KIMICODE_SYNTHETIC_MODEL_ID = 'kimicode';
 export const KIMICODE_DEFAULT_THINKING_LEVEL = 'default';
 
@@ -199,29 +193,6 @@ export function extractKimicodeModelVariantValue(
   return variant || null;
 }
 
-export function combineKimicodeRawModelSelection(
-  baseRawId: string | null | undefined,
-  thinkingLevel: string | null | undefined,
-  discoveredModels: KimicodeDiscoveredModel[],
-): string | null {
-  const normalizedBaseRawId = baseRawId?.trim();
-  if (!normalizedBaseRawId) {
-    return null;
-  }
-
-  const variant = thinkingLevel?.trim();
-  if (!variant || variant === KIMICODE_DEFAULT_THINKING_LEVEL) {
-    return normalizedBaseRawId;
-  }
-
-  const supportedVariants = new Set(
-    getKimicodeModelVariants(normalizedBaseRawId, discoveredModels).map((entry) => entry.value),
-  );
-  return supportedVariants.has(variant)
-    ? `${normalizedBaseRawId}/${variant}`
-    : normalizedBaseRawId;
-}
-
 export function splitKimicodeModelLabel(label: string): {
   modelLabel: string;
   providerLabel: string;
@@ -288,15 +259,6 @@ export function buildKimicodeBaseModels(
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
-export function getKimicodeModelVariants(
-  rawId: string,
-  models: KimicodeDiscoveredModel[],
-): KimicodeModelVariant[] {
-  const baseRawId = resolveKimicodeBaseModelRawId(rawId, models);
-  return buildKimicodeBaseModels(models)
-    .find((model) => model.rawId === baseRawId)?.variants ?? [];
-}
-
 function formatKimicodeThinkingLevelLabel(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -308,42 +270,6 @@ function formatKimicodeThinkingLevelLabel(value: string): string {
   }
 
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
-}
-
-export function groupKimicodeDiscoveredModels(
-  models: KimicodeDiscoveredModel[],
-): KimicodeDiscoveredModelGroup[] {
-  const groups = new Map<string, KimicodeDiscoveredModelGroup>();
-  for (const model of buildKimicodeBaseModels(models)) {
-    const { providerLabel } = splitKimicodeModelLabel(model.label || model.rawId);
-    const providerKey = providerLabel.toLowerCase();
-    const existing = groups.get(providerKey);
-    if (existing) {
-      existing.models.push({
-        ...(model.description ? { description: model.description } : {}),
-        label: model.label,
-        rawId: model.rawId,
-      });
-      continue;
-    }
-
-    groups.set(providerKey, {
-      models: [{
-        ...(model.description ? { description: model.description } : {}),
-        label: model.label,
-        rawId: model.rawId,
-      }],
-      providerKey,
-      providerLabel,
-    });
-  }
-
-  return Array.from(groups.values())
-    .map((group) => ({
-      ...group,
-      models: [...group.models].sort((left, right) => left.label.localeCompare(right.label)),
-    }))
-    .sort((left, right) => left.providerLabel.localeCompare(right.providerLabel));
 }
 
 function dedupeKimicodeVariants(variants: KimicodeModelVariant[]): KimicodeModelVariant[] {
