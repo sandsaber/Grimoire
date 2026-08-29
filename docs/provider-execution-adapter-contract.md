@@ -1,10 +1,16 @@
 # Presentation Adapter Contract
 
-The M0a specification of the seam every provider flip depends on. It maps every member of the
-existing `ChatRuntime` contract ([`ChatRuntime.ts`](../src/core/runtime/ChatRuntime.ts)) onto the new
-execution lifecycle, so the mapping is settled on paper before any backend is ported. The v1
-attempt discovered its seam problems during the cutover; that is the failure this document exists to
-prevent.
+> **Historical, and deliberately kept.** `ChatRuntime` is deleted and so is the file this document
+> linked to; every mapping below has landed. It is retained because it is the record of *why* each
+> member became what it became — a question that comes back every time a provider needs something
+> the adapter does not expose. For what the contract is **now**, read
+> `ExecutionChatRuntimeAdapter` and its ports; the paragraph about feature freeze and joint deletion
+> describes a state that has already happened.
+
+The M0a specification of the seam every provider flip depended on. It maps every member of the
+`ChatRuntime` contract onto the execution lifecycle, so the mapping was settled on paper before any
+backend was ported. The v1 attempt discovered its seam problems during the cutover; that is the
+failure this document existed to prevent.
 
 Canon: [`provider-execution-migration-plan.md`](provider-execution-migration-plan.md). This
 document is subordinate to it and to
@@ -21,9 +27,10 @@ either lack them or re-implement core policy locally, and both are stop conditio
 Dependency direction is strict and one-way: the adapter imports the new lifecycle; the new core
 never imports `ChatRuntime`.
 
-The adapter is under feature freeze from the day it exists. No new capability may be exposed
-through `ChatRuntime`. New capabilities land as projections or capability ports. The adapter and the
-old contract are deleted together at the M5 seam-deletion checkpoint.
+The adapter was under feature freeze from the day it existed. No new capability was exposed through
+`ChatRuntime`; new capabilities land as projections or capability ports, which is still the rule.
+The old contract was deleted at the M5 seam-deletion checkpoint and the adapter outlived it, because
+what the two shared was the mapping and only one of them faced the kernel.
 
 ## Contract size
 

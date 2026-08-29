@@ -10549,6 +10549,41 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Recovery 6 of 6 — the documentation says what is true (`this commit`)
+
+- Gates: unit 9002 passed / 9002 total across 565 suites; `npm run lint` clean;
+  `npm run build:release` clean. No source change beyond comments.
+
+**Phase 1 closes with the half that is not code.** Antigravity's `AGENTS.md` described
+`--add-dir`, the stdin protocol and the capability probe as current behaviour throughout the window
+where none of them existed — and named a module the sync had deleted. Those three are true again as
+of the five commits above, so what needed correcting was the *names*, not the claims:
+`AntigravityChatRuntime` expands nothing (it is gone; `AntigravityVaultSkills` does, from the
+resolver), and the probe is described where it now runs. The tool-card rule is written down for the
+first time, because until this week nothing drew one.
+
+**Then the wider pass, which found three things worth more than the Antigravity file.**
+
+- **The roadmap was telling contributors to build the deleted shape.** Its status banner said this
+  was the "current, pre-migration" path and that the checklist produces a `registration.ts` +
+  `*ChatRuntime` provider — code that no longer exists. Someone following it would have written a
+  provider the codebase cannot load. It now says the migration is done, names what a provider
+  actually is, and its file list is the post-migration one;
+- **`CONTRIBUTING.md` told them to register through both deleted registries.** It names the catalog
+  and the two `ApplicationRuntime` accessors instead;
+- **the adapter contract read as current** and linked to `ChatRuntime.ts`, which is deleted — a
+  broken link in the first paragraph. It carries a historical banner now and keeps everything else,
+  because it is the record of *why* each member became what it became, and that question comes back
+  every time a provider wants something the adapter does not expose.
+
+**And one addition to the roadmap's test checklist**, earned this week rather than reasoned:
+**assert the wiring, not only the module.** Every defect this recovery found had green module tests
+— the skill expansion, the content presenter, the `force` flag — and each was caught only by an
+assertion on what the backend is launched with or what chunks a tab receives.
+
+Every link in every markdown file now resolves; the one that did not pointed at `BangBashService`,
+deleted by the migration the paragraph was arguing for.
+
 ### Recovery 5 of 6, second half — an `agy` tool call gets a card (`this commit`)
 
 - Gates: unit 9002 passed / 9002 total across 565 suites; integration 156 passed, 128 skipped;
