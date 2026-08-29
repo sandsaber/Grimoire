@@ -8330,8 +8330,9 @@ migrated shape rather than taken as diffs. The whole gate is green on the merged
 arrived and its source did not. [`provider-execution-main-sync.md`](provider-execution-main-sync.md) turns it into a decision with a size: 76 of the 137 touch no source, 34 touch only files that still exist, and **25 are the decision surface** — 2 that land entirely on code this migration deleted and 23 that land on both. Two more add features this branch does not have at all. For each of those 33 the question is not whether to take the diff but whether the migrated path has the same bug, which is the rule `AGENTS.md` already states about the frozen path.
 
 **Where to pick up.** The manual test-vault matrix, which is the owner's, and the open items each
-entry above owns — the largest being the session-restart notice, which needs one provider's
-composition to answer `sessionDropped`.
+entry above owns. Two are worth naming: the session-restart notice needs one provider's composition
+to answer `sessionDropped`, and the eight defects the sync carried in from `main` are listed in the
+review entry — they exist on `main` too, so they want a pass upstream rather than a patch here.
 
 ### Where the session of 2026-08-28 ended
 
