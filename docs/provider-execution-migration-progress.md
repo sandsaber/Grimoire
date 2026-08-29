@@ -10549,6 +10549,20 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Phase 2 review — a re-sync could take the notice down before anyone saw it (`this commit`)
+
+- Gates: unit 9019 passed / 9019 total across 566 suites; `tsc --noEmit` clean; `npm run lint` clean.
+- Found while reading 3b back, before the review agents answered.
+
+`syncConversation` seeded `sessionDropped` from the conversation's `providerState` on **every**
+call, not only when the conversation changed. Every re-sync of the same conversation hands back the
+stored object — a tab reactivating (`TabManager`), a settings change rebuilding the binding
+(`main.ts`), a tab init (`Tab.ts`) — so a drop this runtime had just learned was overwritten by what
+the stored object said, which is `false` until the save lands. Seeded on a conversation change only:
+within one conversation, what the dispatch learned is newer than what the object carries.
+
+Held by a test in both providers, proven by moving the assignment back out of the branch.
+
 ### Phase 2, 3b of 3 — the conversation says when the agent has forgotten it (`this commit`)
 
 - Gates: unit 9017 passed / 9017 total across 566 suites; integration 156 passed / 156 run;

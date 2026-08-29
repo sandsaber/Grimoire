@@ -627,6 +627,24 @@ describe('OpenCode execution composition', () => {
     await host.dispose();
   });
 
+  it('does not forget a drop when the same conversation is synced again', async () => {
+    // A tab reactivating, or a settings change rebuilding the binding, hands
+    // back the stored conversation object. What this runtime learned during the
+    // dispatch is newer than what that object says, and re-seeding from it
+    // would take the notice down before anyone saw it.
+    const { execution, host } = await createHarness({ sessionForgotten: true });
+    const runtime = execution.createRuntime();
+    const bound = { id: 'conv-1', providerState: {}, sessionId: 'ses-forgotten' };
+    runtime.syncConversationState(bound);
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+    runtime.syncConversationState(bound);
+
+    expect(runtime.isSessionDropped()).toBe(true);
+    execution.dispose();
+    await host.dispose();
+  });
+
   it('carries a drop into the tab that opens the conversation next', async () => {
     // The marker is read back on bind: the runtime that learned it is gone by
     // the time anyone sees the thread again.

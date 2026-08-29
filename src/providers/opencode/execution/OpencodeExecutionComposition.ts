@@ -478,9 +478,13 @@ export class OpencodeExecution {
           // Another conversation is another database as often as not, and the
           // last one's would send this turn to a session that is not in it.
           databasePath = null;
+          // Seeded only when the conversation changes. A re-sync of the same
+          // one — a tab reactivating, a settings change rebuilding the binding —
+          // hands back the stored object, and what this runtime learned during a
+          // dispatch is newer than what that object says.
+          sessionDropped = getOpencodeState(next?.providerState).sessionDropped === true;
         }
         conversation = next;
-        sessionDropped = getOpencodeState(next?.providerState).sessionDropped === true;
       },
       /**
        * Whether this conversation resumed into a session the agent had lost.
