@@ -40,7 +40,7 @@ import type {
 import { adoptedAgentInstanceId } from './AgentIds';
 import type { AgentPolicyInputs } from './AgentPolicy';
 import { resolveEffectiveAgentPolicy } from './AgentPolicy';
-import { AgentRepositories } from './AgentRepositories';
+import { AgentRepositories, type AgentStoreReadability } from './AgentRepositories';
 import { agentResultRecordSchema } from './AgentSchemas';
 
 export interface PrepareAgentDispatchCommand {
@@ -469,7 +469,7 @@ export class AgentCoordinator {
         requireMatchingAdoption(existing.record.payload, command);
         return existing.record.payload;
       }
-      if (existing.kind !== 'absent') await requireCurrent(Promise.resolve(existing));
+      if (existing.kind !== 'absent') await requireCurrent(existing);
       const timestamp = this.now();
       const inheritsCancellation = command.attachment === 'attached'
         && !!parentRun
@@ -543,12 +543,38 @@ export class AgentCoordinator {
     return this.repositories.readability.requirement();
   }
 
+  /**
+   * Finishes what the transaction journal owed, and latches if it cannot read
+   * it.
+   *
+   * The journal is a repository of its own, reached through the transaction
+   * coordinator rather than through `AgentRepositories` — so an intent a newer
+   * build wrote raises the shared error from somewhere the store's own latch
+   * never sees. Declared here, where it is caught, so the writes downstream
+   * consult the same answer the sweeps do.
+   */
+  private async recoverTransactions(): Promise<void> {
+    try {
+      await this.transactions.recoverPending();
+    } catch (error) {
+      if (error instanceof UnreadableControlRecordError) {
+        this.repositories.readability.declare(error);
+      }
+      throw error;
+    }
+  }
+
+  /** Declares a verdict this coordinator could not reach on its own. */
+  declareMigrationRequired(error: UnreadableControlRecordError): void {
+    this.repositories.readability.declare(error);
+  }
+
   async recoverPendingDispatches(
     port: AgentDispatchRecoveryPort,
-    options: AgentRecoverySweepOptions = {},
+    options: AgentRecoverySweepOptions,
   ): Promise<AgentRunRecord[]> {
     this.requireControlScheduler();
-    await this.transactions.recoverPending();
+    await this.recoverTransactions();
     const recovered: AgentRunRecord[] = [];
     // **One bad record must not strand every later one.** `listRecordIds` is
     // sorted, so a record that throws throws first on every restart and nothing
@@ -639,7 +665,7 @@ export class AgentCoordinator {
       });
       if (settled) recovered.push(settled);
       } catch (error) {
-        collectSweepFailure(failures, error, options);
+        collectSweepFailure(failures, error, options, this.repositories.readability);
       }
     }
     reportSweepFailures(failures, options);
@@ -649,10 +675,10 @@ export class AgentCoordinator {
   async recoverActiveRuns(
     port: AgentRunRecoveryPort,
     cancellationPort: AgentCancellationRecoveryPort,
-    options: AgentRecoverySweepOptions = {},
+    options: AgentRecoverySweepOptions,
   ): Promise<AgentRunRecord[]> {
     this.requireControlScheduler();
-    await this.transactions.recoverPending();
+    await this.recoverTransactions();
     const recovered: AgentRunRecord[] = [];
     // Per record, for the reason `recoverPendingDispatches` is: `listRecordIds`
     // is sorted, so one malformed answer stalls every later run on every
@@ -720,7 +746,7 @@ export class AgentCoordinator {
       });
       recovered.push(settled);
       } catch (error) {
-        collectSweepFailure(failures, error, options);
+        collectSweepFailure(failures, error, options, this.repositories.readability);
       }
     }
     reportSweepFailures(failures, options);
@@ -840,7 +866,7 @@ export class AgentCoordinator {
   }
 
   async recoverResultLinks(): Promise<AgentResultLinkRecoveryReport> {
-    await this.transactions.recoverPending();
+    await this.recoverTransactions();
     const linked: AgentRunRecord[] = [];
     const issues: AgentResultLinkRecoveryReport['issues'][number][] = [];
     for (const resultId of await this.repositories.results.listRecordIds()) {
@@ -863,8 +889,14 @@ export class AgentCoordinator {
         // The same rule the other two sweeps take, and the reason this one was
         // the odd one out: it turned an unreadable record into an ordinary
         // issue code and kept linking, so the first stage of recovery went on
-        // writing into the store the other two now refuse to touch.
-        if (error instanceof UnreadableControlRecordError) throw error;
+        // writing into the store the other two now refuse to touch. The issues
+        // gathered before it go with it, deliberately: they name results this
+        // build could not link, and a store that has just opened read-only is
+        // one where nothing can act on them.
+        if (error instanceof UnreadableControlRecordError) {
+          this.repositories.readability.declare(error);
+          throw error;
+        }
         issues.push({
           agentResultId: resultId,
           code: isResultReferenceError(error)
@@ -1522,7 +1554,17 @@ function intersectPermissionBoundaries(
  * reported a clean recovery on every load.
  */
 export interface AgentRecoverySweepOptions {
-  readonly onFailure?: (error: unknown) => void;
+  /**
+   * Required, so a sweep has one contract instead of two.
+   *
+   * Optional, it had two and production only ever took one: a reporter-less
+   * caller was answered by a throw, which discarded every record the sweep had
+   * already settled and — once `collectSweepFailure` reported on its way out —
+   * could replace the D5 error with an ordinary one. Every caller supplies a
+   * reporter now, which is also what makes "one bad record must not stall the
+   * rest" sayable without a second rule for how the caller hears about it.
+   */
+  readonly onFailure: (error: unknown) => void;
 }
 
 /**
@@ -1539,8 +1581,10 @@ function collectSweepFailure(
   failures: unknown[],
   error: unknown,
   options: AgentRecoverySweepOptions,
+  readability: AgentStoreReadability,
 ): void {
   if (error instanceof UnreadableControlRecordError) {
+    readability.declare(error);
     reportSweepFailures(failures, options);
     throw error;
   }
@@ -1551,16 +1595,6 @@ function reportSweepFailures(
   failures: readonly unknown[],
   options: AgentRecoverySweepOptions,
 ): void {
-  if (failures.length === 0) {
-    return;
-  }
-  if (!options.onFailure) {
-    // **One contract, not two.** A caller with no reporter learns about the
-    // first failure whether or not other records recovered; the alternative —
-    // silent as soon as anything succeeded — is exactly how a store with one
-    // permanently unfinishable record reported a clean recovery on every load.
-    throw failures[0];
-  }
   for (const failure of failures) {
     options.onFailure(failure);
   }

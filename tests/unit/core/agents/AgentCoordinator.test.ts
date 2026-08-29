@@ -5,6 +5,7 @@ import type {
   AgentDispatchPort,
   AgentResultRecord,
 } from '@/core/agents/AgentContracts';
+import { AGENT_INSTANCES_PATH } from '@/core/agents/AgentControlPaths';
 import { AgentControlTransactionCoordinator } from '@/core/agents/AgentControlTransactionCoordinator';
 import {
   type AdoptNativeAgentCommand,
@@ -107,6 +108,41 @@ describe('AgentCoordinator', () => {
     });
   });
 
+  it('does not open read-only because a card refresh stepped over a record', async () => {
+    // **The correction the D5 latch needed.** Latching inside every read made a
+    // routine `listOwnedAgents` — which steps over an unreadable record on
+    // purpose, because a card that cannot draw one agent still draws the rest —
+    // freeze every agent write for the rest of the session. A genuinely running
+    // agent could then never be terminalized, and the conversation would report
+    // it running forever: the defect the recovery work had just fixed, arriving
+    // through the fix for a different one. Recovery declares the store
+    // read-only; a read never does.
+    const storage = new TestDurableStorage();
+    const coordinator = new AgentCoordinator(storage, { now: monotonicClock() });
+    await coordinator.prepareAndDispatch(rootCommand(), acceptedPort());
+    await storage.writeAtomic(
+      `${AGENT_INSTANCES_PATH}/agi-${'9'.repeat(32)}.json`,
+      JSON.stringify({
+        schemaVersion: 9_999,
+        recordId: `agi-${'9'.repeat(32)}`,
+        revision: 1,
+        updatedAt: 1,
+        payload: {},
+      }),
+    );
+
+    const owned = await coordinator.listOwnedAgents(rootCommand().rootOwner);
+
+    expect(owned).toHaveLength(1);
+    expect(coordinator.migrationRequirement()).toBeNull();
+    // And the store is still writable, which is the half that matters.
+    await expect(coordinator.appendResult(resultRecord({
+      agentResultId: agentResultId(`ares-${'e'.repeat(32)}`),
+      status: 'succeeded',
+      finalText: 'Written after a read that stepped over a record',
+    }))).resolves.toMatchObject({ state: 'succeeded' });
+  });
+
   it('safely resumes a prepared dispatch after a crash before provider side effects', async () => {
     const storage = new TestDurableStorage();
     const repositories = new AgentRepositories(storage, monotonicClock());
@@ -190,7 +226,7 @@ describe('AgentCoordinator', () => {
       kind: 'accepted' as const,
       nativeAgentRef: 'native-agent-after-restart',
     }));
-    const recovered = await restarted.recoverPendingDispatches({ reconcile });
+    const recovered = await restarted.recoverPendingDispatches({ reconcile }, sweepOptions());
 
     expect(reconcile).toHaveBeenCalledTimes(1);
     expect(recovered).toEqual([
@@ -235,7 +271,7 @@ describe('AgentCoordinator', () => {
         markReconcileStarted();
         return new Promise(() => undefined);
       },
-    });
+    }, sweepOptions());
     await reconcileStarted;
 
     const completed = await restarted.appendResult(resultRecord({
@@ -349,7 +385,7 @@ describe('AgentCoordinator', () => {
     });
     const recovered = await restarted.recoverPendingDispatches({
       reconcile: async () => ({ kind: 'unknown', effectsPossible: false }),
-    });
+    }, sweepOptions());
 
     expect(recovered).toHaveLength(1);
     expect(recovered[0]).toMatchObject({
@@ -727,7 +763,7 @@ describe('AgentCoordinator', () => {
       // could not be finished. Without one the first failure is thrown, which
       // is the only other honest answer: silence as soon as *something*
       // recovered is how a permanent per-record stall reported a clean run.
-      { onFailure: failure => refusals.push(failure) },
+      sweepOptions(refusals),
     );
 
     expect(refusals).toHaveLength(1);
@@ -969,6 +1005,7 @@ describe('AgentCoordinator', () => {
     const recovered = await restarted.recoverActiveRuns(
       { reconcile },
       { reconcileCancellation },
+      sweepOptions(),
     );
 
     expect(reconcile).not.toHaveBeenCalled();
@@ -1053,6 +1090,7 @@ describe('AgentCoordinator', () => {
     const recovered = await restarted.recoverActiveRuns(
       { reconcile: jest.fn() },
       { reconcileCancellation },
+      sweepOptions(),
     );
     expect(reconcileCancellation).toHaveBeenCalledTimes(2);
     expect(recovered).toHaveLength(2);
@@ -1134,6 +1172,7 @@ describe('AgentCoordinator', () => {
           return new Promise(() => undefined);
         },
       },
+      sweepOptions(),
     );
     await started;
 
@@ -1175,6 +1214,7 @@ describe('AgentCoordinator', () => {
     const recovered = await restarted.recoverActiveRuns(
       { reconcile: jest.fn() },
       { reconcileCancellation: async () => ({ kind: 'cancelled' }) },
+      sweepOptions(),
     );
     expect(recovered).toEqual([
       expect.objectContaining({ agentRunId: child.agentRunId, state: 'cancelled' }),
@@ -1331,6 +1371,17 @@ function acceptedPort(): AgentDispatchPort {
 
 function tx(hex: string): string {
   return `tx-${hex.repeat(32)}`;
+}
+
+/**
+ * The reporter every sweep takes, for a test that does not read it.
+ *
+ * Required rather than optional so a sweep has one contract: a reporter-less
+ * caller used to be answered by a throw, which discarded every record the sweep
+ * had already settled.
+ */
+function sweepOptions(collected: unknown[] = []): { onFailure: (error: unknown) => void } {
+  return { onFailure: error => collected.push(error) };
 }
 
 function monotonicClock(): () => number {

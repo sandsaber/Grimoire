@@ -382,14 +382,18 @@ export class ApplicationRuntime {
    * plugin is usable without them, and what they could not finish is still
    * there for the next start.
    */
-  private async recoverAgentRecords(executionStoreReadOnly: boolean): Promise<void> {
-    if (executionStoreReadOnly) {
-      // Said rather than skipped in silence. The two stores are almost always
-      // the same generation, so a kernel that opened its store read-only is a
-      // vault a newer build wrote — and sweeping the agent records beside it
-      // would rewrite exactly what D5 protects, one directory over. A user who
-      // sees only `execution.migrationRequired` has no way to learn that agent
-      // runs were left non-terminal too.
+  private async recoverAgentRecords(): Promise<void> {
+    const executionStore = this.kernel.migrationRequirement();
+    if (executionStore) {
+      // **Declared on the agent store, not just used to skip its sweeps.** The
+      // two stores are almost always the same generation, so a kernel that
+      // opened its store read-only is a vault a newer build wrote — and the
+      // earlier version of this only stopped the *sweeps*, leaving the live
+      // path free to write: a background agent observed during the next turn
+      // went on adding an instance, a run and a dispatch intent to the store
+      // three lines of comment claimed D5 was protecting. Declaring it means
+      // the writes and the sweeps consult one answer.
+      this.agents.declareMigrationRequired(executionStore);
       this.options.report({
         data: { reason: 'execution-store-read-only' },
         event: 'agents.recovery.skipped',
@@ -466,9 +470,10 @@ export class ApplicationRuntime {
    * stopped by this, and giving them one is a change to their contract.
    * **A read-only store starts none either**, asked of the store itself rather
    * than remembered here — so the answer the stages consult is the same one
-   * every write consults, and a stage cannot be added that forgets to ask. **Anything else is reported and the
-   * next stage still runs**, for the reason the coordinator collects per record:
-   * one bad record must not stall every later one on every restart.
+   * every write consults, and a stage cannot be added that forgets to ask.
+   * **Anything else is reported and the next stage still runs**, for the reason
+   * the coordinator collects per record: one bad record must not stall every
+   * later one on every restart.
    */
   private async attemptAgentRecovery<T>(
     phase: string,
@@ -536,7 +541,7 @@ export class ApplicationRuntime {
     // stores are almost always the same generation — so sweeping the agent
     // records while the execution ones are correctly untouched would rewrite
     // exactly what D5 protects, one directory over.
-    await this.recoverAgentRecords(this.kernel.migrationRequirement() !== null);
+    await this.recoverAgentRecords();
     if (!kernelStarted) {
       return;
     }

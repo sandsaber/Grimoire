@@ -1,7 +1,8 @@
 import { validateControlRecordPayload } from '../persistence/ControlRecordPayloadPolicy';
 import type { DurableStorage } from '../persistence/DurableStorage';
+import type {
+  UnreadableControlRecordError} from '../persistence/VersionedRecord';
 import {
-  UnreadableControlRecordError,
   type VersionedRecord,
   type VersionedRecordReadResult,
 } from '../persistence/VersionedRecord';
@@ -44,22 +45,19 @@ import {
 export class AgentStoreReadability {
   private unreadable: UnreadableControlRecordError | null = null;
 
-  /** Passes a read through, remembering it if the build cannot understand it. */
-  observe<TRecord>(
-    result: VersionedRecordReadResult<TRecord>,
-  ): VersionedRecordReadResult<TRecord> {
-    if (result.kind === 'future') {
-      this.unreadable ??= new UnreadableControlRecordError(
-        'future',
-        `record "${result.recordId}" uses schema version ${result.schemaVersion}`,
-      );
-    } else if (result.kind === 'corrupt') {
-      this.unreadable ??= new UnreadableControlRecordError(
-        'corrupt',
-        `record "${result.recordId}": ${result.error}`,
-      );
-    }
-    return result;
+  /**
+   * Records that recovery met something this build cannot read.
+   *
+   * **Declared by recovery, not by every read** — the correction this class
+   * needed. Latching inside `read` made a routine card refresh, which steps
+   * over an unreadable record on purpose, freeze every agent write for the rest
+   * of the session: a genuinely running agent could then never be terminalized,
+   * which is the defect the commits before this one had just fixed. The
+   * execution store's latch is set by startup recovery and nothing else, and so
+   * is this one.
+   */
+  declare(error: UnreadableControlRecordError): void {
+    this.unreadable ??= error;
   }
 
   /** The record that made the store read-only, or `null` while it is writable. */
@@ -67,16 +65,15 @@ export class AgentStoreReadability {
     return this.unreadable;
   }
 
-  private requireWritable(): void {
-    if (this.unreadable) {
-      throw this.unreadable;
-    }
-  }
-
-  /** Runs a write, or refuses it because the store is read-only. */
+  /**
+   * Runs a write, or refuses it because the store is read-only.
+   *
+   * Rejects rather than throwing: both repositories declare `Promise`-returning
+   * methods that are not `async`, so a synchronous throw would walk past a
+   * `.catch` the caller had every right to expect to hold it.
+   */
   guard<T>(write: () => Promise<T>): Promise<T> {
-    this.requireWritable();
-    return write();
+    return this.unreadable ? Promise.reject(this.unreadable) : write();
   }
 }
 
@@ -115,8 +112,8 @@ export class MutableAgentRepository<TRecord> {
     };
   }
 
-  async read(recordId: string): Promise<VersionedRecordReadResult<TRecord>> {
-    return this.readability.observe(await this.records.read(recordId));
+  read(recordId: string): Promise<VersionedRecordReadResult<TRecord>> {
+    return this.records.read(recordId);
   }
 
   listRecordIds(): Promise<string[]> {
@@ -173,8 +170,8 @@ export class AppendOnlyAgentRepository<TRecord> {
     private readonly readability: AgentStoreReadability,
   ) {}
 
-  async read(recordId: string): Promise<VersionedRecordReadResult<TRecord>> {
-    return this.readability.observe(await this.records.read(recordId));
+  read(recordId: string): Promise<VersionedRecordReadResult<TRecord>> {
+    return this.records.read(recordId);
   }
 
   listRecordIds(): Promise<string[]> {

@@ -10543,6 +10543,64 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M6 — the latch was in the wrong place, and a read is not a verdict (`this commit`)
+
+- Gates: unit 8779 passed / 8779 total across 556 suites; `tsc --noEmit` clean; `npm run lint`
+  clean; `npm run build:release` clean.
+- Parity manifest: unchanged. Nothing deleted.
+
+**A fourth review of the commit below returned fifteen findings, and the first one matters more than
+the fix it reviewed.** The latch was set inside `read`. Two of this coordinator's reads are
+deliberately tolerant — `listOwnedAgents` steps over a record it cannot draw, because a card that
+loses one agent still shows the rest, and `deleteOwnedRecords` steps over one it cannot parse. Under
+a latch on `read`, **a routine card refresh made the store read-only for the rest of the session**:
+`terminalizeRun`, `linkResultUnlocked` and `appendResult` all began throwing, so a genuinely running
+agent could never be terminalized and the conversation reported it running forever — the exact defect
+three commits earlier had fixed, arriving through the fix for a different one. `deleteOwnedRecords`
+could latch mid-scan and then abort its own delete, leaving D3/D4 unmet and a pending intent behind.
+
+The execution store's latch is set by startup recovery and by nothing else, and this one is now the
+same: `declare`, called where recovery catches the shared error, and never from a read. A test holds
+it — a corrupt instance record, a card refresh that steps over it, and a write that still succeeds —
+and it fails when the latch is put back on `read`.
+
+**Two places the verdict could not reach, both now covered.** The transaction journal is a
+repository of its own, so an intent a newer build wrote raised the shared error from somewhere the
+store's latch never saw: all three stages threw, each was reported, and the store stayed writable.
+`recoverTransactions` declares it where it is caught. And a kernel that opened the *execution* store
+read-only used to skip the agent sweeps while leaving the agent store writable — so the next turn's
+background agent wrote into the store the comment three lines above claimed D5 was protecting. The
+composition declares it now, rather than using it to skip.
+
+**The sweeps have one contract.** `onFailure` is required. Optional, it had two and production only
+ever took one: a reporter-less caller was answered by a throw, which discarded every record the sweep
+had already settled and — once `collectSweepFailure` reported on its way out — could replace the D5
+error with an ordinary revision conflict, so the log said `agents.recovery.failed` for a store that
+had just opened read-only.
+
+**And the scraper counts braces without counting what is not code.** It skips strings, template
+literals and comments now, because one `'schema-{'` in a log line would have made the block swallow
+the call after it. Its `data:` marker is anchored, so a `metadata: {` earlier in the same call cannot
+answer for it, and a spread inside `data` is kept as `...`, which no safe-key list matches — so a key
+smuggled in through one fails the gate rather than hiding from it. Proven by adding
+`...(code ? { promptSummary: code } : {})` to a real call site.
+
+**Three recorded rather than fixed, each with its reason.**
+
+- `recoverPending` applies a whole pending batch before any sweep reads anything, so a replayed
+  `agent-control-delete` can remove a record this build cannot read — `VersionedRepository`
+  compare-and-swaps on the raw bytes it could not decode. That is a hazard the *execution* store
+  shares, and the fix belongs in `VersionedRepository`, not in one caller;
+- `recoverResultLinks` discards the issues it had gathered when it meets an unreadable record. They
+  name results this build could not link, and a store that has just opened read-only is one where
+  nothing can act on them — but the sibling sweeps report what they collected on the way out, and
+  the asymmetry is real;
+- **the latch is a second copy of the registry's.** `ExecutionLifecycleRegistry` holds the same
+  field and the same accessor over the same union. A `ControlStoreReadability` in
+  `src/core/persistence/`, beside `UnreadableControlRecordError`, would be one mechanism for both
+  stores — and is the shape to reach for the next time either needs a change. Owner: M6 or
+  post-migration.
+
 ### M6 — D5 on the agent store, as one mechanism instead of four (`this commit`)
 
 - Gates: unit 8778 passed / 8778 total across 556 suites; `tsc --noEmit` clean; `npm run lint`

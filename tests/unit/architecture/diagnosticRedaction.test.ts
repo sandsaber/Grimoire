@@ -163,46 +163,96 @@ function logCallBlocks(source: string): string[] {
   const opener = /(?:recordDebugLog|report)\(\{/g;
   let match = opener.exec(source);
   while (match) {
-    let depth = 1;
-    let index = match.index + match[0].length;
-    while (index < source.length && depth > 0) {
-      const character = source[index];
-      if (character === '{') depth += 1;
-      else if (character === '}') depth -= 1;
-      index += 1;
+    const end = matchingBrace(source, match.index + match[0].length);
+    if (end !== null) {
+      blocks.push(source.slice(match.index + match[0].length, end));
+      opener.lastIndex = end;
+    } else {
+      opener.lastIndex = match.index + match[0].length;
     }
-    if (depth === 0) {
-      blocks.push(source.slice(match.index + match[0].length, index - 1));
-    }
-    opener.lastIndex = index;
     match = opener.exec(source);
   }
   return blocks;
 }
 
+/**
+ * Where the object opened at `start` closes, skipping what is not code.
+ *
+ * A counter that does not skip quoted and commented spans is fragile in the
+ * same way the two regexes were: one `'schema-{'` in a log line and the block
+ * swallows the call after it, hiding an event and filing its keys under this
+ * one. `null` when the braces never balance, so an unparsable call is left out
+ * rather than made to eat its neighbours.
+ */
+function matchingBrace(source: string, start: number): number | null {
+  let depth = 1;
+  let index = start;
+  while (index < source.length) {
+    const character = source[index];
+    const pair = source.slice(index, index + 2);
+    if (pair === '//') {
+      index = source.indexOf('\n', index);
+      if (index === -1) return null;
+      continue;
+    }
+    if (pair === '/*') {
+      const close = source.indexOf('*/', index + 2);
+      if (close === -1) return null;
+      index = close + 2;
+      continue;
+    }
+    if (character === "'" || character === '"' || character === '`') {
+      index = endOfString(source, index);
+      if (index === -1) return null;
+      continue;
+    }
+    if (character === '{') depth += 1;
+    else if (character === '}') {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+    index += 1;
+  }
+  return null;
+}
+
+/** The index after the string literal opening at `start`. */
+function endOfString(source: string, start: number): number {
+  const quote = source[start];
+  let index = start + 1;
+  while (index < source.length) {
+    const character = source[index];
+    if (character === '\\') {
+      index += 2;
+      continue;
+    }
+    if (character === quote) return index + 1;
+    index += 1;
+  }
+  return -1;
+}
+
 /** The keys of the call's `data` object, however deeply the object is written. */
 function dataKeysOf(block: string): string[] {
-  const marker = /data:\s*\{/.exec(block);
+  // Anchored at the start of a property, so a `metadata: {` earlier in the call
+  // does not answer for `data`.
+  const marker = /(?:^|[\s,{])data:\s*\{/.exec(block);
   if (!marker) {
     return [];
   }
-  let depth = 1;
-  let index = marker.index + marker[0].length;
-  const start = index;
-  while (index < block.length && depth > 0) {
-    const character = block[index];
-    if (character === '{') depth += 1;
-    else if (character === '}') depth -= 1;
-    index += 1;
+  const start = marker.index + marker[0].length;
+  const end = matchingBrace(block, start);
+  if (end === null) {
+    return [];
   }
-  const data = block.slice(start, index - 1);
   // Split rather than matched: requiring a delimiter after each name silently
   // dropped the last key of every call site, which for `data: { modeId }` is
   // the only key there is — and an empty list makes every assertion below pass
-  // without checking anything.
-  return data
+  // without checking anything. A spread is kept as `...`, which no safe-key
+  // list matches, so a key smuggled in through one fails rather than hides.
+  return block.slice(start, end)
     .split(',')
-    .map(entry => /^\s*([A-Za-z_][A-Za-z0-9_]*)/.exec(entry)?.[1])
+    .map(entry => /^\s*(\.\.\.|[A-Za-z_][A-Za-z0-9_]*)/.exec(entry)?.[1])
     .filter((key): key is string => Boolean(key));
 }
 
