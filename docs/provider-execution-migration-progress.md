@@ -83,7 +83,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution, provider rows, and seam deletion | **Code complete; one exit-gate clause is a human step.** The chat surface is done. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design; bang-bash runs on the local-shell backend; **all nine providers execute their chat turns through the projection path**, and `InputController`'s generator branch is deleted with the turn-framing machinery it carried. `ApplicationRuntime` is the composition root. The durable agent domain is harvested from the v1 Phase 6 and dark, minus the work graphs M5 bans. Certification is account-bound and recorded per provider in `docs/chat-projection-flip-smoke-matrix.md`. **Eleven of the plan's twelve structural deletion searches are zero**, and all twelve are a gate rather than a shell command. **The twelfth is retired by evidence**: it went from 3 to 4 when the second provider it was waiting for turned out to be a regression rather than a future — Grok's flip lost xAI's `subagent_finished`, and restoring it makes `async_subagent_result` a two-provider chunk, which is the architecture rule's own condition for a contract living in core. Both provider registries are deleted, all thirteen provider rows have moved, `src/core` names the plugin type nowhere, and the persistence barrier writes the session binding. Orchestrator workers are dispatched durable agents rather than tabs, and `AgentDispatchPort` has its first implementation. Of the exit gate's four clauses, two pass outright — the parity manifest, and the agent guarantees (retry preserving prior attempts, cancellation reconciled after restart, no approval exceeding a durable ancestor's ceiling), each with a named test. The searches clause is eleven of twelve zero and the twelfth retired by evidence rather than by argument. **What is left of M5 is the manual test-vault matrix, which is the owner's to run**, and Grok's smoke row 22, which needs a live subagent. The fourth is the full local gate plus trace parity, which pass, and the manual test-vault matrix, which is the owner's to run | `fa9cfbc` … `bd1083b` |
-| M6 — final hardening | **In progress.** Crash injection is done at the execution kernel's durable boundaries and on the agent side, where it found that the agent control store was never recovered at load and that an agent left running by a quit kept claiming to run — both fixed, so M5's "agents survive restart with honest classification" now holds in the composition. Lazy provider initialization is measured, with Codex named as the one eager exception and the legacy workspace manager recorded as still eager at load. An independent review of those commits returned eleven findings, ten of which held and are fixed — the largest being a run left `dispatching` by a quit between prepare and dispatch, which no sweep reached. Open: the sanitized traces are not replayed through the final composition, the `reconciliations` control store has no production writer, and the privacy, architecture-review, and manual test-vault items have not started | `fe96ca5`, `9ec2072`, `62359ee`, this commit |
+| M6 — final hardening | **In progress.** Crash injection is done at the execution kernel's durable boundaries and on the agent side, where it found that the agent control store was never recovered at load and that an agent left running by a quit kept claiming to run — both fixed, so M5's "agents survive restart with honest classification" now holds in the composition. Lazy provider initialization is measured, with Codex named as the one eager exception and the legacy workspace manager recorded as still eager at load. An independent review of those commits returned eleven findings, ten of which held and are fixed — the largest being a run left `dispatching` by a quit between prepare and dispatch, which no sweep reached. The sanitized traces now reach four presenters and the gate says which; the seven named behaviours each have a test; the privacy review widened the redaction gate to the composition root, which it had never read. Open: the reconciled-result path has no producer in either domain, three sequential scans of the agent store run on every load, and the manual test-vault matrix is the owner's | `fe96ca5`, `9ec2072`, `62359ee`, this commit |
 
 ## Checkpoint entry template
 
@@ -10493,6 +10493,40 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### M6 — the reconciled-result path has no producer, in either domain (`this commit`)
+
+- Gates: unchanged from the entry below; this is a verification result and a record, with no code
+  change.
+- Parity manifest: unchanged.
+
+**M6 asks for the reconciled result UI to be verified. Verification says it cannot run**, and the
+same hole exists in both domains, which is why it is one finding rather than two.
+
+- **The execution store.** `write('reconciliations', …)` appears once, inside
+  `appendReconciliation`, and `appendReconciliation` is called from two test files and nothing else.
+  Its retention rule is in the persistence decisions — evidence for an `indeterminate` run outlives
+  everything but its conversation's deletion, so the append-only rule stays enforceable — and its
+  observer channel is, by its own design note, the record's only route to a reader. So a
+  reconciliation written durably and not published is invisible to the next start.
+- **The agent store.** `AgentResultRecord.provenance.kind` has three values and production writes
+  one: `SubagentAgentRecorder` records `provider-native`. Nothing writes `reconciled`, which is the
+  value `linkResultUnlocked` accepts only for a run already `indeterminate` and files under
+  `observedResultIds` rather than `resultIds` — the whole distinction between what an agent
+  answered and what was later established about it.
+
+**What is missing in both is a producer of late evidence**, and it is the same producer the twelfth
+structural search named: a provider port for an out-of-band terminal. Evidence gathered *at*
+recovery terminalizes its run directly and never lands in either store; nothing asks a provider,
+later, what became of a run or an agent that ended `indeterminate`. The machinery downstream of that
+question is built, tested and unreachable — which is exactly the dark-machinery shape this migration
+exists to unwind, arrived at from the other direction.
+
+**Recorded rather than built, and the reason is the same one that settled the port question two
+entries ago**: the shape is unproven, and building a producer without a provider that can answer
+would write durable claims nobody observed. What has changed since that entry is that there are now
+three consumers waiting on the same port, which is the argument for designing it. Owner: the owner,
+then M6 or post-migration.
 
 ### M6 — the seven behaviours, checked, and what "five of nine" actually meant (`this commit`)
 
