@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
+import type {
+  AgentCancellationRecoveryPort,
+  AgentDispatchRecoveryPort,
+  AgentRunRecoveryPort,
+} from '@/core/agents/AgentContracts';
 import { AgentCoordinator } from '@/core/agents/AgentCoordinator';
 import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
+import { UnreadableControlRecordError } from '@/core/persistence/VersionedRecord';
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import type { ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
 import type { AppSessionStorage } from '@/core/providers/types';
@@ -99,7 +105,9 @@ export interface ApplicationRuntimeOptions {
  * through a port of its own. None does today, and a port that guessed
  * `accepted` here would write a durable claim about work nobody observed.
  */
-const processBoundAgentRecovery = {
+const processBoundAgentRecovery: AgentDispatchRecoveryPort
+  & AgentRunRecoveryPort
+  & AgentCancellationRecoveryPort = {
   reconcile: async () => ({ kind: 'unknown' as const, effectsPossible: true }),
   reconcileCancellation: async () => ({ kind: 'unknown' as const }),
 };
@@ -300,6 +308,12 @@ export class ApplicationRuntime {
     }
   }
 
+  /** Set by `dispose`, so a stage that has not started does not start. */
+  private disposed = false;
+
+  /** D5: a store this build cannot read is not swept further. */
+  private agentStoreUnreadable = false;
+
   workspaceFor(providerId: ProviderId): Promise<ProviderWorkspaceSlots> {
     const composition = this.compositionFor(providerId);
     if (!composition) {
@@ -378,7 +392,11 @@ export class ApplicationRuntime {
     );
     if (links && links.issues.length > 0) {
       this.options.report({
-        data: { issues: links.issues.length },
+        // The codes, not only how many: one of them names a result whose run or
+        // instance does not exist, which no later start will ever link, and the
+        // other names a revision race that the next one will. A count alone
+        // repeats the same unactionable warning on every load.
+        data: { codes: [...new Set(links.issues.map(issue => issue.code))].sort() },
         event: 'agents.recovery.incomplete',
         level: 'warn',
         scope: 'plugin',
@@ -386,23 +404,73 @@ export class ApplicationRuntime {
     }
     // After the links, because a result that reached its run has already
     // terminalized it, and neither sweep below should reconcile a finished run.
+    // Each takes a reporter rather than relying on the throw: both sweeps
+    // collect per record, and both only throw when *nothing* came back — so a
+    // store with one unreadable record beside one readable one recovered
+    // "successfully" and said nothing, on every load, while the record it could
+    // not read kept its run non-terminal.
     await this.attemptAgentRecovery(
       'pending-dispatches',
-      () => this.agents.recoverPendingDispatches(processBoundAgentRecovery),
+      () => this.agents.recoverPendingDispatches(
+        processBoundAgentRecovery,
+        { onFailure: error => this.reportAgentRecordSkipped('pending-dispatches', error) },
+      ),
     );
     await this.attemptAgentRecovery(
       'active-runs',
-      () => this.agents.recoverActiveRuns(processBoundAgentRecovery, processBoundAgentRecovery),
+      () => this.agents.recoverActiveRuns(
+        processBoundAgentRecovery,
+        processBoundAgentRecovery,
+        { onFailure: error => this.reportAgentRecordSkipped('active-runs', error) },
+      ),
     );
   }
 
+  /** One record a sweep could not read, named rather than counted. */
+  private reportAgentRecordSkipped(stage: string, error: unknown): void {
+    this.options.report({
+      data: { stage },
+      error,
+      event: 'agents.recovery.recordSkipped',
+      level: 'warn',
+      scope: 'plugin',
+    });
+  }
+
+  /**
+   * Runs one recovery stage, and decides whether the next one may run.
+   *
+   * Three refusals rather than one. **A disposed runtime writes nothing**: the
+   * load and the unload race by construction, and a departing instance settling
+   * agent records is the dual ownership this composition exists to prevent.
+   * **An unreadable record stops the rest**, because D5 says a store this build
+   * cannot read opens read-only — the kernel's own start already answers that
+   * way for the execution store, and continuing to sweep the agent store would
+   * terminalize runs a newer build wrote. **Anything else is reported and the
+   * next stage still runs**, for the reason the coordinator collects per record:
+   * one bad record must not stall every later one on every restart.
+   */
   private async attemptAgentRecovery<T>(
     stage: string,
     recover: () => Promise<T>,
   ): Promise<T | null> {
+    if (this.disposed || this.agentStoreUnreadable) {
+      return null;
+    }
     try {
       return await recover();
     } catch (error) {
+      if (error instanceof UnreadableControlRecordError) {
+        this.agentStoreUnreadable = true;
+        this.options.report({
+          data: { recordKind: error.recordKind, stage },
+          error,
+          event: 'agents.migrationRequired',
+          level: 'error',
+          scope: 'plugin',
+        });
+        return null;
+      }
       this.options.report({
         data: { stage },
         error,
@@ -424,11 +492,12 @@ export class ApplicationRuntime {
    * rather than half-doing it.
    */
   async start(): Promise<void> {
+    let kernelStarted = true;
     try {
       await this.kernel.start();
     } catch (error) {
       this.options.report({ error, event: 'execution.start.failed', level: 'error', scope: 'plugin' });
-      return;
+      kernelStarted = false;
     }
     // The agent domain keeps a control store of its own, with the same intent
     // machinery the kernel recovers at its gate — and nothing was calling it. A
@@ -437,7 +506,15 @@ export class ApplicationRuntime {
     // running forever, because the durable records are the only source of "is
     // one running". Awaited, for the reason the kernel's own recovery is: what
     // reads these records must not read a half-applied one.
+    //
+    // **Before the kernel's failure returns, not after.** The two stores fail
+    // independently, and the load that survives a dead kernel so the user has a
+    // settings tab is exactly the one that would otherwise never finish an
+    // agent batch again.
     await this.recoverAgentRecords();
+    if (!kernelStarted) {
+      return;
+    }
     // After the gate is open, because it reaches provider services that expect
     // a started plugin, and nothing renders a Codex tab before it resolves.
     void this.codex.initializeWorkspace().catch(error => {
@@ -473,6 +550,7 @@ export class ApplicationRuntime {
    * reported rather than propagated.
    */
   dispose(): void {
+    this.disposed = true;
     void this.localShell.dispose();
     // Added when it acquired something to release: print mode keeps no session
     // and no daemon, so this composition had no `dispose` and the application

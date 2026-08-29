@@ -4,6 +4,7 @@ import { createDurableInMemoryVaultAdapter } from '@test/helpers/inMemoryVaultAd
 
 import { ApplicationRuntime } from '@/app/ApplicationRuntime';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
+import { AGENT_RUNS_PATH } from '@/core/agents/AgentControlPaths';
 import { AgentControlTransactionCoordinator } from '@/core/agents/AgentControlTransactionCoordinator';
 import { AgentCoordinator } from '@/core/agents/AgentCoordinator';
 import { agentDispatchToken, agentInstanceId, agentRunId } from '@/core/agents/AgentIds';
@@ -116,10 +117,65 @@ describe('application runtime', () => {
     const runtime = createRuntime(jest.fn(), adapter);
     await runtime.start();
 
+    // Both halves: the batch the crash left owed is finished, and the run it
+    // wrote is then classified rather than left `dispatching`. The intent is
+    // still `prepared`, which is proof the provider was never called — so the
+    // honest ending is the side-effect-free one.
     expect(await repositories.runs.read(RUN_ID)).toMatchObject({
       kind: 'current',
-      record: { payload: { agentInstanceId: INSTANCE_ID, state: 'dispatching' } },
+      record: {
+        payload: {
+          agentInstanceId: INSTANCE_ID,
+          state: 'interrupted',
+          terminal: { kind: 'interrupted', reason: 'recovery-exhausted-safe' },
+        },
+      },
     });
+    runtime.dispose();
+  });
+
+  it('ends a dispatch that was written down and never sent', async () => {
+    // The state no sweep reached: `prepareDispatch` succeeded and the process
+    // went away before `dispatchPrepared`. `recoverPendingDispatches` looked
+    // only at intents already `dispatching` and `recoverActiveRuns` only at
+    // runs already `running`, so this run stayed non-terminal for the life of
+    // the vault — and a conversation with a non-terminal agent is one that
+    // never stops reporting an agent as running.
+    const adapter = createDurableInMemoryVaultAdapter();
+    const storage = new VaultDurableStorage(adapter);
+    const repositories = new AgentRepositories(storage, monotonicClock());
+    const before = new AgentCoordinator(storage, {
+      now: monotonicClock(),
+      repositories,
+      scheduler: { setTimeout: () => 0, clearTimeout: () => undefined },
+    });
+    await before.prepareDispatch(dispatchCommand());
+    expect(await repositories.runs.read(RUN_ID)).toMatchObject({
+      kind: 'current',
+      record: { payload: { state: 'dispatching' } },
+    });
+
+    const runtime = createRuntime(jest.fn(), adapter);
+    await runtime.start();
+
+    expect(await repositories.runs.read(RUN_ID)).toMatchObject({
+      kind: 'current',
+      record: {
+        payload: {
+          state: 'interrupted',
+          terminal: { kind: 'interrupted', reason: 'recovery-exhausted-safe' },
+        },
+      },
+    });
+    // And the conversation stops reporting an agent that never started, read
+    // with the predicate the tab uses: a non-terminal owned agent is what
+    // `hasRunningDurableSubagents` answers `true` from.
+    const owned = await runtime.agents.listOwnedAgents({
+      kind: 'conversation',
+      ownerId: 'conversation-1',
+    });
+    expect(owned).toHaveLength(1);
+    expect(owned.filter(agent => !agent.terminal)).toEqual([]);
     runtime.dispose();
   });
 
@@ -159,6 +215,74 @@ describe('application runtime', () => {
           terminal: { kind: 'indeterminate', reason: 'effects-unknown' },
         },
       },
+    });
+    runtime.dispose();
+  });
+
+  it('recovers the agent store even when the kernel cannot start', async () => {
+    // The two stores fail independently. Putting agent recovery behind the
+    // kernel's early return meant the load that deliberately survives a dead
+    // kernel — so the user has a settings tab to fix it from — was also the one
+    // that would never finish an agent batch again.
+    const adapter = createDurableInMemoryVaultAdapter();
+    const storage = new VaultDurableStorage(adapter);
+    const repositories = new AgentRepositories(storage, monotonicClock());
+    const before = new AgentCoordinator(storage, {
+      now: monotonicClock(),
+      repositories,
+      scheduler: { setTimeout: () => 0, clearTimeout: () => undefined },
+    });
+    await before.prepareDispatch(dispatchCommand());
+
+    const report = jest.fn();
+    const runtime = createRuntime(report, adapter);
+    jest.spyOn(runtime.kernel, 'start').mockRejectedValue(new Error('startup recovery failed'));
+    (runtime as unknown as { options: { report: jest.Mock } }).options.report = report;
+
+    await runtime.start();
+
+    expect(report).toHaveBeenCalledWith(expect.objectContaining({
+      event: 'execution.start.failed',
+    }));
+    expect(await repositories.runs.read(RUN_ID)).toMatchObject({
+      kind: 'current',
+      record: { payload: { terminal: { kind: 'interrupted' } } },
+    });
+    runtime.dispose();
+  });
+
+  it('names a record a sweep could not read instead of reporting a clean recovery', async () => {
+    // Both sweeps collect per record so one bad record cannot stall every later
+    // one on every restart — and both threw only when *nothing* came back, so a
+    // store with one unreadable record beside one readable one recovered
+    // "successfully" and said nothing, on every load, while the record it could
+    // not read kept its run non-terminal.
+    const adapter = createDurableInMemoryVaultAdapter();
+    const storage = new VaultDurableStorage(adapter);
+    const repositories = new AgentRepositories(storage, monotonicClock());
+    const before = new AgentCoordinator(storage, {
+      now: monotonicClock(),
+      repositories,
+      scheduler: { setTimeout: () => 0, clearTimeout: () => undefined },
+    });
+    await before.prepareDispatch(dispatchCommand());
+    await storage.writeAtomic(
+      `${AGENT_RUNS_PATH}/agr-${'9'.repeat(32)}.json`,
+      JSON.stringify({ schemaVersion: 2, revision: 1, updatedAt: 1, payload: { broken: true } }),
+    );
+
+    const report = jest.fn();
+    const runtime = createRuntime(report, adapter);
+    await runtime.start();
+
+    expect(report).toHaveBeenCalledWith(expect.objectContaining({
+      event: 'agents.recovery.recordSkipped',
+    }));
+    // And the readable one was still recovered: the point of collecting per
+    // record is that the bad one does not take the rest with it.
+    expect(await repositories.runs.read(RUN_ID)).toMatchObject({
+      kind: 'current',
+      record: { payload: { terminal: { kind: 'interrupted' } } },
     });
     runtime.dispose();
   });

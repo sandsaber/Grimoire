@@ -527,7 +527,10 @@ export class AgentCoordinator {
     }));
   }
 
-  async recoverPendingDispatches(port: AgentDispatchRecoveryPort): Promise<AgentRunRecord[]> {
+  async recoverPendingDispatches(
+    port: AgentDispatchRecoveryPort,
+    options: AgentRecoverySweepOptions = {},
+  ): Promise<AgentRunRecord[]> {
     this.requireControlScheduler();
     await this.transactions.recoverPending();
     const recovered: AgentRunRecord[] = [];
@@ -539,6 +542,22 @@ export class AgentCoordinator {
     for (const intentId of await this.repositories.dispatchIntents.listRecordIds()) {
       try {
       const intentRecord = await requireCurrent(this.repositories.dispatchIntents.read(intentId));
+      if (intentRecord.payload.status === 'prepared') {
+        // **Prepared and never started.** `dispatchPrepared` writes
+        // `dispatching` in a transaction of its own *before* it calls the
+        // provider, and `recoverPending` above has already replayed any such
+        // write that was owed — so an intent still at `prepared` is proof that
+        // nothing was dispatched. Nothing to ask the port about, and nothing to
+        // resume: a dispatch the user requested in a process that is gone is
+        // not one to launch behind their back at the next start.
+        //
+        // Left alone it was the one non-terminal state no sweep reached, and
+        // the run stayed `dispatching` for the life of the vault — which the
+        // conversation reads as an agent still running, forever.
+        const settled = await this.settlePreparedDispatch(intentRecord);
+        if (settled) recovered.push(settled);
+        continue;
+      }
       if (intentRecord.payload.status !== 'dispatching') continue;
       const runRecord = await requireCurrent(this.repositories.runs.read(intentRecord.payload.agentRunId));
       const snapshot = await this.enqueue(runRecord.payload.agentInstanceId, async () => {
@@ -607,17 +626,14 @@ export class AgentCoordinator {
         failures.push(error);
       }
     }
-    if (recovered.length === 0 && failures.length > 0) {
-      // Nothing came back and something threw: the caller learns why rather
-      // than being told there was nothing to recover.
-      throw failures[0];
-    }
+    reportSweepFailures(failures, recovered, options);
     return recovered;
   }
 
   async recoverActiveRuns(
     port: AgentRunRecoveryPort,
     cancellationPort: AgentCancellationRecoveryPort,
+    options: AgentRecoverySweepOptions = {},
   ): Promise<AgentRunRecord[]> {
     this.requireControlScheduler();
     await this.transactions.recoverPending();
@@ -691,9 +707,7 @@ export class AgentCoordinator {
         failures.push(error);
       }
     }
-    if (recovered.length === 0 && failures.length > 0) {
-      throw failures[0];
-    }
+    reportSweepFailures(failures, recovered, options);
     return recovered;
   }
 
@@ -958,6 +972,47 @@ export class AgentCoordinator {
     const currentRun = await requireCurrent(this.repositories.runs.read(run.agentRunId));
     const currentIntent = await requireCurrent(this.repositories.dispatchIntents.read(intent.dispatchToken));
     return this.settleDispatch(currentInstance, currentRun, currentIntent, outcome);
+  }
+
+  /**
+   * Ends a dispatch that was written down and never sent.
+   *
+   * `recovered-safe` rather than a rejection or an unknown, for the reason
+   * `settleDispatch` gives: the provider never said anything, and the record
+   * establishes that nothing could have happened. That is `interrupted` with
+   * `recovery-exhausted-safe`, the same pair `recoverActiveRuns` writes for the
+   * identical evidence.
+   */
+  private async settlePreparedDispatch(
+    intentRecord: VersionedRecord<AgentDispatchIntentRecord>,
+  ): Promise<AgentRunRecord | undefined> {
+    const runRecord = await requireCurrent(
+      this.repositories.runs.read(intentRecord.payload.agentRunId),
+    );
+    return this.enqueue(runRecord.payload.agentInstanceId, async () => {
+      const currentIntent = await requireCurrent(
+        this.repositories.dispatchIntents.read(intentRecord.recordId),
+      );
+      if (currentIntent.payload.status !== 'prepared') return undefined;
+      const currentRun = await requireCurrent(
+        this.repositories.runs.read(currentIntent.payload.agentRunId),
+      );
+      if (currentRun.payload.terminal) {
+        return this.settleTerminalDispatchIntent(currentIntent, currentRun, {
+          kind: 'unknown',
+          effectsPossible: false,
+        });
+      }
+      const instanceRecord = await requireCurrent(
+        this.repositories.instances.read(currentRun.payload.agentInstanceId),
+      );
+      return this.settleDispatch(
+        instanceRecord,
+        currentRun,
+        currentIntent,
+        { kind: 'recovered-safe' },
+      );
+    });
   }
 
   private async settleDispatch(
@@ -1428,6 +1483,41 @@ function intersectPermissionBoundaries(
   return { granted, approvable };
 }
 
+
+/**
+ * How a sweep says a record it could not read was skipped.
+ *
+ * The two sweeps collect per record on purpose — `listRecordIds` is sorted, so
+ * throwing on the first bad one stalls every later one on every restart,
+ * permanently. What that left was worse in a different way: a store with one
+ * unreadable record and one readable one recovered "successfully" and said
+ * nothing, forever, because the throw only fires when *nothing* came back.
+ */
+export interface AgentRecoverySweepOptions {
+  readonly onFailure?: (error: unknown) => void;
+}
+
+function reportSweepFailures(
+  failures: readonly unknown[],
+  recovered: readonly AgentRunRecord[],
+  options: AgentRecoverySweepOptions,
+): void {
+  if (failures.length === 0) {
+    return;
+  }
+  if (options.onFailure) {
+    for (const failure of failures) {
+      options.onFailure(failure);
+    }
+    return;
+  }
+  if (recovered.length === 0) {
+    // No reporter and nothing came back: the caller learns why rather than
+    // being told there was nothing to recover. Kept for the callers that pass
+    // no reporter, which is every test that predates one.
+    throw failures[0];
+  }
+}
 
 function createIntent(
   command: Pick<PrepareAgentDispatchCommand,

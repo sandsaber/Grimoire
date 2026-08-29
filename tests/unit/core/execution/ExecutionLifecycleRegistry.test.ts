@@ -1520,7 +1520,15 @@ function readRecords(storage: DurableStorage): ExecutionControlRepositories {
   return new ExecutionControlRepositories(storage, () => clock++);
 }
 
-/** What the next startup does before it reads anything: finish what was owed. */
+/**
+ * What the next startup does before it reads anything: finish what was owed.
+ *
+ * Called directly rather than through `registry.start()` by the two tests whose
+ * boundary a full restart cannot discriminate: startup terminalizes every
+ * non-terminal run it finds, so a batch that converged and a batch that did not
+ * both end `indeterminate`. That the startup path performs this recovery at all
+ * is what the two restart tests above prove; these two prove what it converges.
+ */
 async function recoverControlTransactions(storage: DurableStorage): Promise<void> {
   let clock = 10_000;
   const now = () => clock++;

@@ -8,8 +8,10 @@ import type { AcpSessionNotification } from '@/providers/acp/types';
 import { ClaudePlanUsageStore } from '@/providers/claude/app/ClaudePlanUsageStore';
 import { ClaudeContentPresenter } from '@/providers/claude/execution/ClaudeContentPresenter';
 import { CODEX_EXECUTION_NOTIFICATION_METHODS } from '@/providers/codex/runtime/CodexExecutionConnection';
+import { GeminiContentPresenter } from '@/providers/gemini/execution/GeminiContentPresenter';
 import { GrokContentPresenter } from '@/providers/grok/execution/GrokContentPresenter';
 import { GROK_SESSION_NOTIFICATION_METHODS } from '@/providers/grok/runtime/GrokSessionNotifications';
+import { MimocodeContentPresenter } from '@/providers/mimocode/execution/MimocodeContentPresenter';
 import { OpencodeContentPresenter } from '@/providers/opencode/execution/OpencodeContentPresenter';
 
 /**
@@ -93,7 +95,28 @@ const UNMODELLED_BY_PROVIDER: Readonly<Record<string, readonly string[]>> = {
    * that dropped one again turns this row red.
    */
   grok: [],
+  /**
+   * Filled by whichever of Gemini's three the presenter does not draw.
+   *
+   * The recording carries `agent_message_chunk`, `agent_thought_chunk` and
+   * `available_commands_update`; the first two are the shared ACP vocabulary
+   * and the third is the one Gemini's ports have no callback for.
+   */
+  gemini: [],
+  /** MiMoCode's two, both of which wave 7's content surface consumes. */
+  mimocode: [],
 };
+
+/**
+ * The providers whose recorded session-update vocabulary is replayed below.
+ *
+ * Kimi Code's and Qwen Code's recordings observe none — their machines are
+ * not logged in, so `session/new` is refused before a turn — and Antigravity
+ * speaks no ACP at all. Those are answers, and the assertion that reads this
+ * list is what turns a fifth recording arriving with a vocabulary into a
+ * failure rather than a silence.
+ */
+const SESSION_UPDATE_REPLAYS: readonly string[] = ['gemini', 'grok', 'mimocode', 'opencode'];
 
 /**
  * Grok's vendor methods, beside the one ACP method it also speaks.
@@ -222,7 +245,7 @@ describe('wire vocabulary coverage', () => {
     // before anything consumes it, so a source search for `usage_update` would
     // report a gap that is closed and would miss one that opens.
     const consumed = new Set<string>(
-      readOpencodeSessionUpdates(recording).flatMap(notification => {
+      readAcpSessionUpdates(recording).flatMap(notification => {
         const effects: string[] = [];
         const presenter = new OpencodeContentPresenter({
           displayModel: () => 'model',
@@ -242,6 +265,72 @@ describe('wire vocabulary coverage', () => {
     const missing = observed.filter(update => !consumed.has(update)).sort();
 
     expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.opencode].sort());
+  });
+
+  it('records every Gemini session update nothing draws the surface from', () => {
+    const recording = recordings.find(entry => entry.providerId === 'gemini');
+    const observed = recording?.sessionUpdatesObserved ?? [];
+    const consumed = new Set<string>(
+      readAcpSessionUpdates(recording).flatMap(notification => {
+        const effects: string[] = [];
+        const presenter = new GeminiContentPresenter({
+          displayModel: () => 'model',
+          onConfigOptions: () => effects.push('config'),
+          onCost: () => effects.push('cost'),
+          onCurrentMode: () => effects.push('mode'),
+          onSessionOpened: () => effects.push('session'),
+        });
+        const chunks = presenter.present({ kind: 'session-update', notification });
+        const modelled = new AcpSessionUpdateNormalizer()
+          .normalize(notification.update).type !== 'unsupported';
+        return drawsASurface(chunks, effects, modelled)
+          ? [notification.update.sessionUpdate]
+          : [];
+      }),
+    );
+    const missing = observed.filter(update => !consumed.has(update)).sort();
+
+    expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.gemini].sort());
+  });
+
+  it('records every MiMoCode session update nothing draws the surface from', () => {
+    const recording = recordings.find(entry => entry.providerId === 'mimocode');
+    const observed = recording?.sessionUpdatesObserved ?? [];
+    const consumed = new Set<string>(
+      readAcpSessionUpdates(recording).flatMap(notification => {
+        const effects: string[] = [];
+        const presenter = new MimocodeContentPresenter({
+          displayModel: () => 'model',
+          onCommands: () => effects.push('commands'),
+          onConfigOptions: () => effects.push('config'),
+          onCost: () => effects.push('cost'),
+          onCurrentMode: () => effects.push('mode'),
+          onSessionOpened: () => effects.push('session'),
+        });
+        const chunks = presenter.present({ kind: 'session-update', notification });
+        const modelled = new AcpSessionUpdateNormalizer()
+          .normalize(notification.update).type !== 'unsupported';
+        return drawsASurface(chunks, effects, modelled)
+          ? [notification.update.sessionUpdate]
+          : [];
+      }),
+    );
+    const missing = observed.filter(update => !consumed.has(update)).sort();
+
+    expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.mimocode].sort());
+  });
+
+  it('replays every recording that observed session updates', () => {
+    // **The gate that says what this file covers.** Four providers are replayed
+    // above, and a fifth recording arriving with a vocabulary and no block
+    // would otherwise be filed as covered by nothing at all — which is the
+    // failure mode this whole file exists to prevent, one level up.
+    const withVocabulary = recordings
+      .filter(recording => (recording.sessionUpdatesObserved ?? []).length > 0)
+      .map(recording => recording.providerId)
+      .sort();
+
+    expect(withVocabulary).toEqual([...SESSION_UPDATE_REPLAYS].sort());
   });
 
   it('records every Grok session update nothing draws the surface from', () => {
@@ -362,8 +451,8 @@ function readGrokSessionUpdates(
   });
 }
 
-/** The `session/update` notifications the recording actually carried. */
-function readOpencodeSessionUpdates(
+/** The `session/update` notifications a recording actually carried. */
+function readAcpSessionUpdates(
   recording: WireRecording | undefined,
 ): AcpSessionNotification[] {
   return (recording?.exchange ?? []).flatMap(entry => {

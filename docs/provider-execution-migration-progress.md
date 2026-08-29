@@ -83,7 +83,7 @@ decoding, Grok transcript recovery) before its checkpoint is recorded below.
 | M3 — one validated provider inventory, and an owner for provider workspaces | **Complete**, at a revised scope the owner approved: the catalog owns provider identity, ordering, enablement, capability gating, environment-key ownership, shipped defaults and preloaded context files, and a workspace manager owns both halves of the workspace lifecycle. The thirteen remaining rows are re-implementations rather than moves and went to M5 with their consumers, along with registry deletion, lazy initialization, the generation fence and the settings transaction coordinator | `0dd3580`, `928a3c9`, `6cf0045`, `6a4d341`, `99aee54`, `5d17e85`, `6b822c5`, `9ea3e1c`, `5175d37`, `11750e8`, this commit |
 | M4 — revisioned persistence in production | **Complete** — conversation writes go through the record store and carry only what the writer changed, and history hydration answers a typed outcome that the conversation itself now shows | `4cf12a1`, `77f896d`, this commit |
 | M5 — presentation evolution, provider rows, and seam deletion | **Code complete; one exit-gate clause is a human step.** The chat surface is done. Auxiliary work runs on the kernel for every provider except Claude's, which is cold by design; bang-bash runs on the local-shell backend; **all nine providers execute their chat turns through the projection path**, and `InputController`'s generator branch is deleted with the turn-framing machinery it carried. `ApplicationRuntime` is the composition root. The durable agent domain is harvested from the v1 Phase 6 and dark, minus the work graphs M5 bans. Certification is account-bound and recorded per provider in `docs/chat-projection-flip-smoke-matrix.md`. **Eleven of the plan's twelve structural deletion searches are zero**, and all twelve are a gate rather than a shell command. **The twelfth is retired by evidence**: it went from 3 to 4 when the second provider it was waiting for turned out to be a regression rather than a future — Grok's flip lost xAI's `subagent_finished`, and restoring it makes `async_subagent_result` a two-provider chunk, which is the architecture rule's own condition for a contract living in core. Both provider registries are deleted, all thirteen provider rows have moved, `src/core` names the plugin type nowhere, and the persistence barrier writes the session binding. Orchestrator workers are dispatched durable agents rather than tabs, and `AgentDispatchPort` has its first implementation. Of the exit gate's four clauses, two pass outright — the parity manifest, and the agent guarantees (retry preserving prior attempts, cancellation reconciled after restart, no approval exceeding a durable ancestor's ceiling), each with a named test. The searches clause is eleven of twelve zero and the twelfth retired by evidence rather than by argument. **What is left of M5 is the manual test-vault matrix, which is the owner's to run**, and Grok's smoke row 22, which needs a live subagent. The fourth is the full local gate plus trace parity, which pass, and the manual test-vault matrix, which is the owner's to run | `fa9cfbc` … `bd1083b` |
-| M6 — final hardening | **In progress.** Crash injection is done at the execution kernel's durable boundaries and on the agent side, where it found that the agent control store was never recovered at load and that an agent left running by a quit kept claiming to run — both fixed, so M5's "agents survive restart with honest classification" now holds in the composition. Lazy provider initialization is measured, with Codex named as the one eager exception and the legacy workspace manager recorded as still eager at load. Open: the sanitized traces are not replayed through the final composition, the `reconciliations` control store has no production writer, and the privacy, architecture-review, and manual test-vault items have not started | `fe96ca5`, `9ec2072`, `62359ee`, this commit |
+| M6 — final hardening | **In progress.** Crash injection is done at the execution kernel's durable boundaries and on the agent side, where it found that the agent control store was never recovered at load and that an agent left running by a quit kept claiming to run — both fixed, so M5's "agents survive restart with honest classification" now holds in the composition. Lazy provider initialization is measured, with Codex named as the one eager exception and the legacy workspace manager recorded as still eager at load. An independent review of those commits returned eleven findings, ten of which held and are fixed — the largest being a run left `dispatching` by a quit between prepare and dispatch, which no sweep reached. Open: the sanitized traces are not replayed through the final composition, the `reconciliations` control store has no production writer, and the privacy, architecture-review, and manual test-vault items have not started | `fe96ca5`, `9ec2072`, `62359ee`, this commit |
 
 ## Checkpoint entry template
 
@@ -10493,6 +10493,89 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### M6 — an independent review of the agent recovery, and the state no sweep reached (`this commit`)
+
+- Gates: unit 8766 passed / 8766 total across 554 suites; `tsc --noEmit` clean; `npm run lint`
+  clean; `npm run build:release` clean.
+- Parity manifest: unchanged. Nothing deleted.
+
+**A review of the five commits above returned eleven findings. Ten held; the eleventh was a fair
+observation about a claim that was already accurate.** The most serious one is why this entry exists.
+
+**The state no sweep reached.** `prepareDispatch` writes the run at `state: 'dispatching'` and its
+intent at `status: 'prepared'`; `dispatchPrepared` flips the intent to `dispatching` in a
+transaction of its own *before* it calls the provider. The load-time sweeps added two commits ago
+look at intents already `dispatching` and runs already `running` — so a process that went away
+between the two left a run that **neither** reached, non-terminal for the life of the vault. And a
+conversation with a non-terminal agent is one `hasRunningDurableSubagents` answers `true` for on
+every read, forever, now that the durable records are the only source of "is one running". The
+previous entry claimed M5's exit-gate clause held in the composition; it held for three of the four
+non-terminal states.
+
+The fix is the one the records already prove: an intent still `prepared` after `recoverPending` has
+replayed what was owed is proof the provider was never called, so the run is settled `recovered-safe`
+— `interrupted` / `recovery-exhausted-safe`, the pair `settleDispatch` already writes for exactly
+that evidence. Not resumed: a dispatch requested in a process that is gone is not one to launch
+behind the user's back at the next start.
+
+The other nine, each fixed here:
+
+- **agent recovery ran only when the kernel started.** It sat behind the early `return` that keeps
+  the load alive when the kernel cannot open its gate — so the load that deliberately survives a
+  dead kernel, to leave the user a settings tab, was also the one that would never finish an agent
+  batch again. The two stores fail independently, and the sweep now runs before that return;
+- **no unload guard.** `onload` is async and `onunload` neither waits for it nor is withheld, so a
+  departing instance could settle agent records while the next load builds a second coordinator over
+  the same store — the dual ownership this composition exists to prevent. `dispose` sets a flag the
+  stages check;
+- **D5 was enforced for one store and not the other.** An `UnreadableControlRecordError` from the
+  agent store was caught as an ordinary warning and the next sweep ran anyway, writing into a store
+  a newer build wrote. It now stops the remaining stages and is reported as a migration requirement;
+- **per-record failures were unreportable by construction.** Both sweeps collect per record so one
+  bad record cannot stall every later one on every restart — and both threw only when *nothing* came
+  back, so a store with one unreadable record beside one readable one recovered "successfully" and
+  said nothing, on every load. They take a reporter now, and the composition names the stage;
+- **the result-link warning counted issues instead of naming them.** One code means a result whose
+  run does not exist, which no later start will ever link; the other means a revision race the next
+  one will. The codes are reported;
+- **the recovery port had no type annotation**, so it was checked only structurally at its two call
+  sites, and not as a fresh object literal — no excess-property check either. Annotated with the
+  three port types it implements;
+- and three about the tests and the record: the two crash tests that recover through the coordinator
+  rather than a restart now say why (a full restart terminalizes every non-terminal run, so it
+  cannot discriminate a converged batch from an unconverged one — which is what the two restart
+  tests beside them prove); the M6 row's claim about the exit-gate clause is true as of this commit
+  rather than the last one; and `createFixture` resetting its clock to 1 on a restart, so a restarted
+  registry stamps timestamps below the ones it is recovering, is recorded rather than changed — it
+  is the file's existing shape and changing it belongs with the fixture, not with a behaviour fix.
+
+**The one that did not hold as stated.** The review read the journal's "each was proven by deleting
+the replay in `recoverPending`" as a claim that all five exercise `registry.start()`. They do not,
+and the claim did not say they do — deleting the replay fails all five, which is what was written
+and what was run. The coverage point underneath it is fair and is answered by the comment above.
+
+**Beside the review, one M6 list item moved: the sanitized traces now reach four presenters instead
+of two.** `wireVocabularyCoverage` replayed OpenCode's and Grok's recorded `session/update` streams
+through their presenters and grepped nothing for the other ACP providers, so Gemini's three updates
+and MiMoCode's two were covered by no assertion at all. Both are replayed now, both come back with
+an empty unmodelled list, and Gemini's `available_commands_update` is drawn by the shared normalizer
+rather than by a port of its own — which is correct and documented twice: `supportsProviderCommands`
+is false for this provider and the presenter names the drop rather than defaulting into it.
+
+**And the gate now says what it covers.** A recording that observes session updates and has no
+replay block would previously have been filed as covered by nothing; a list of the four replayed
+providers is asserted against the recordings that have a vocabulary, so a fifth arriving is a
+failure rather than a silence. Kimi Code's and Qwen Code's recordings observe none — their machines
+are not logged in — and Antigravity speaks no ACP; those are answers, and the assertion says so.
+
+**Not fixed, recorded: three sequential full scans of the agent store on every load.** Each stage
+calls `recoverPending()` — three listings of the transaction namespace — and the two sweeps walk
+every run and every result record, including the terminal ones. On a vault with a few hundred agent
+records that is thousands of sequential reads before the view is registered. It is awaited on
+purpose, for the reason the kernel's own recovery is; making it cheap is a change to the
+coordinator's contract (a listing that can answer "only the non-terminal ones"), not to its caller.
+Owner: M6, with the startup measurement.
 
 ### M5 — the twelfth search was a lost feature, not a design question (`this commit`)
 
