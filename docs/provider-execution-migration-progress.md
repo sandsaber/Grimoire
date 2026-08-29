@@ -8279,6 +8279,44 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #107), at the M6 gate.
 
+### Where the session of 2026-08-29 ended (third half)
+
+**Everything that was code is done and pushed.** HEAD `fc278650` on `providers-migration`, working
+tree clean, remote in step. Full gate green: unit 8946 / 8946 across 562 suites, integration 156,
+`tsc`, `lint`, `build:release`. The build is installed in the test vault
+(`OBSIDIAN_VAULT`, plugin version 1.1.10).
+
+Closed since the second half: the shared catalog-refresh contract, the export backlog (183 to 50,
+with the 50 sorted and reasoned rather than queued), and one live defect the owner found in the
+vault — a turn cutting every answer into one block per delta, on every provider, on prose and
+reasoning alike.
+
+**Next session starts with the live matrix, and it is runnable here.** All nine CLIs are installed on
+this machine, and each smoke file is gated by its own flag:
+
+```bash
+GRIMOIRE_CLAUDE_LIVE=1 npm run test -- --selectProjects integration
+```
+
+…and the same for `GRIMOIRE_CODEX_LIVE`, `GRIMOIRE_ANTIGRAVITY_LIVE`, `GRIMOIRE_OPENCODE_LIVE`,
+`GRIMOIRE_GROK_LIVE`, `GRIMOIRE_QWEN_LIVE`, `GRIMOIRE_GEMINI_LIVE`, `GRIMOIRE_KIMICODE_LIVE`,
+`GRIMOIRE_MIMOCODE_LIVE`. What each account can answer is recorded and has not changed: Antigravity
+is the only one whose automated half fully passes, Gemini answers about one turn per day before
+`429`, MiMoCode's account cannot generate, and Kimi Code and Qwen are unauthenticated. A run is still
+worth spending — two Gemini runs found three defects, two of them shipped.
+
+**The first thing to do there is not a fresh run but a widened one.** Today's block-splitting fix is
+held by unit tests at the render target and through the attachment, and the live smoke harness would
+not have caught it: it stubs `appendText`, so nothing in it reads `contentBlocks`. A live turn that
+asserts the answer arrives as **one** text block is the end-to-end proof this fix does not have yet,
+and it is the same seam that hid the defect for the whole migration.
+
+**What is not mine to run.** Launching Obsidian and looking at the column is the owner's step — I can
+verify the bundle loads and opens `grimoire-view` headlessly, which `build:release` already does, and
+I can drive the real composition through the projection, but I cannot see the rendered view. The
+conversations already saved with split blocks stay split in history: the blocks are the stored data,
+and this fix changes what is written from here on rather than what is already in the vault.
+
 ### Where the session of 2026-08-29 ended (second half)
 
 **The `main`-fix recovery plan is closed. All four phases ran; item 13 is the gate that would have
