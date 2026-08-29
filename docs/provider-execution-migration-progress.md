@@ -10548,26 +10548,39 @@ does not stop.
 in what they return. One helper parameterised by the expected status would carry both. Owner: M6, a
 refactor rather than a behaviour change.
 
-**And the M6 list item that is not done, with what the attempt established.** A replay harness that
-drives each recorded exchange through the real managed-ACP backend into a real registry was built
-and is **not committed**. Two of the four recordings that carry a turn — Gemini's and MiMoCode's —
-complete it and reach `succeeded`. OpenCode's and Grok's stall until the run timeout.
+**And the last M6 list item, closed: the recorded traffic now runs through the composition.**
+`providerTraceReplay` replays each recorded exchange end to end — the recorded `session/new` answer
+opens the session, the recorded notifications arrive in the order they arrived, the recorded
+`session/prompt` answer ends the turn — through the real managed-ACP backend into a real lifecycle
+registry, and then through the provider's own presenter. Four of the nine recordings carry a turn;
+Kimi Code's and Qwen Code's stop at `session/new` because those machines are not logged in, and
+Antigravity speaks no ACP. The count is asserted, so a recording that grows a turn cannot be left
+out quietly.
 
-It already found one defect, in itself, which is why the rest is recorded rather than concluded: the
-harness registered a *stub* recovery port where every provider's composition registers
-`recovery: backend`. A stub that answers `stopped-safe` was asked a question the backend answers
+It cost two false starts, and both are worth keeping.
+
+**The harness registered a stub recovery port** where every provider's composition registers
+`recovery: backend`. A stub answering `stopped-safe` was asked a question the backend answers
 `running`, so a stream that paused between two recorded notifications was reconciled as a run that
 had stopped — and the replay reported `interrupted` for turns the provider had completed. A harness
-that does not mirror the composition measures itself, again.
+that does not mirror the composition measures itself, which is the third time this migration has
+found that shape.
 
-With that fixed, what is known about the two that stall: swapping the recorded traffic between a
-passing and a failing provider does not move the result, and neither does swapping the backend
-class — so it is neither the recording alone nor the wrapper alone. The two that complete carry four
-or fewer notifications after the prompt and produce no `output-delta`; the two that stall carry five
-and thirty-three and produce one. That is a lead about the transient output channel and the result
-commit, not a conclusion, and it is worth more written down than a suite narrowed to the providers
-that agree with it — which is the failure this milestone has already found twice. Owner: M6, with
-the harness kept out of the tree until the stall is diagnosed.
+**Then two of the four still stalled, and the cause was in the recordings.** OpenCode's and Grok's
+were sanitized by replacing the session id with the literal `<session-id>`; Gemini's and MiMoCode's
+carry real ids. `optionalIdentifier` in the session schema refuses a value starting with `<`, so
+replaying the marker gives the composition a native session ref it cannot write — and the turn does
+not fail, it **hangs** until its run timeout. The replay substitutes a valid id, marker for marker,
+so what runs is the recorded shape with an id the product can hold.
+
+That hang is the finding underneath: **a provider that answers `session/new` with an id the control
+schema refuses produces a turn that stalls rather than one that says what happened.** No CLI is
+likely to send one — this was a sanitizer's doing — but the composition already knows how to say
+"this turn never started and here is what to do", and this path does not reach it. Recorded rather
+than built: it is a behaviour change, and it belongs with the classification work rather than with a
+test. Owner: M6, or post-migration.
+
+Proven by making the backend read every stop reason as a cancellation: four of the five fail.
 
 ### M6 — the reconciled-result path has no producer, in either domain (`this commit`)
 
