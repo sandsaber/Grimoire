@@ -41,7 +41,7 @@ import type {
 } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
 import type GrimoirePlugin from '@/main';
-import { isAcpMissingSessionError, JsonRpcErrorResponse } from '@/providers/acp';
+import { isAcpSessionGone, JsonRpcErrorResponse } from '@/providers/acp';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import { AcpWorkspaceFileSystem } from '@/providers/acp/execution/AcpWorkspaceFileSystem';
@@ -366,11 +366,15 @@ export class GrokExecution {
       // kernel reads it as a hard failure and refuses the turn, where the
       // legacy resume policy dropped the binding and created a session. Only
       // for `session/load`: the same code from a prompt is a real error.
-      isMissingSessionError: error => (
-        isAcpMissingSessionError(error)
-        || (error instanceof JsonRpcErrorResponse
-          && (error.method === 'session/load' || error.method === 'loadSession')
-          && readErrorCode(error.data) === 'FS_NOT_FOUND')
+      //
+      // Everything else defers to the shared decision, which also asks the
+      // agent through `session/list` — this adds what Grok says, it does not
+      // replace the question.
+      isMissingSessionError: probe => (
+        (probe.error instanceof JsonRpcErrorResponse
+          && (probe.error.method === 'session/load' || probe.error.method === 'loadSession')
+          && readErrorCode(probe.error.data) === 'FS_NOT_FOUND')
+        || isAcpSessionGone(probe)
       ),
       resultCommitTimeoutMs: 2_000,
       recoveryTimeoutMs: 2_000,

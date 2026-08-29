@@ -42,7 +42,10 @@ import {
   settleResultCommit,
 } from '@/core/execution/ResultCommit';
 import { JsonRpcErrorResponse } from '@/providers/acp/AcpJsonRpcTransport';
-import { isAcpMissingSessionError } from '@/providers/acp/acpSessionResume';
+import {
+  type AcpSessionGoneProbe,
+  isAcpSessionGone,
+} from '@/providers/acp/acpSessionResume';
 import { AcpSpawnError } from '@/providers/acp/AcpSpawnError';
 import type {
   AcpContentPayload,
@@ -250,7 +253,19 @@ export interface ManagedAcpExecutionBackendContext {
   readonly recoveryTimeoutMs: number;
   readonly runTimeoutMs: number;
   readonly maxResultBytes: number;
-  readonly isMissingSessionError?: (error: unknown) => boolean;
+  /**
+   * Whether a failed `session/load` means the saved session is gone.
+   *
+   * Takes the whole probe rather than the error alone, and may answer
+   * asynchronously, because the answer is not always in the text: the shared
+   * default asks the agent through `session/list` when its words say nothing.
+   * A provider overrides this only to add what its own CLI says — Grok names a
+   * missing session `FS_NOT_FOUND` — and should still defer to the default for
+   * everything else.
+   */
+  readonly isMissingSessionError?: (
+    probe: AcpSessionGoneProbe,
+  ) => boolean | Promise<boolean>;
 }
 
 interface PendingInteraction {
@@ -903,7 +918,19 @@ class ManagedAcpExecutionSession implements ExecutionSession {
         this.loadedSessionRef = target;
         return { ...response, sessionId: target };
       } catch (error) {
-        const missing = (this.context.isMissingSessionError ?? isAcpMissingSessionError)(error);
+        const missing = await (this.context.isMissingSessionError ?? isAcpSessionGone)({
+          error,
+          // The listing is only ever asked for on a load that already failed,
+          // which is what makes the extra round trip affordable. An agent
+          // without the method leaves the error text as the only evidence.
+          listSessions: async () => {
+            if (!client.listSessions) {
+              throw new Error('Managed ACP client cannot list sessions.');
+            }
+            return client.listSessions();
+          },
+          sessionId: target,
+        });
         if (!missing) {
           // Only where the agent itself answered. A transport that died has no
           // words, and inventing some would be worse than the sentence the

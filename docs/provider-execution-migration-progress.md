@@ -10549,6 +10549,48 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Phase 2, 3a of 3 — a failed resume asks the agent instead of reading the error text (`this commit`)
+
+- Gates: unit 9011 passed / 9011 total across 566 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Recovery plan item 10, first half.
+
+**`isAcpSessionGone` had no caller, and the seam it was written for could not hold it.**
+`ManagedAcpExecutionBackend` classified a failed `session/load` with the text-matching
+`isAcpMissingSessionError`, and `isMissingSessionError` was a synchronous predicate over the error
+alone while the helper is `async` and needs the session id and a way to ask. Six provider
+`AGENTS.md` files described the intended behaviour and then said, in an identical paragraph, that it
+was not this branch's.
+
+Every managed CLI we ship against reports a missing session as a generic internal error — OpenCode
+and MiMoCode as a bare `-32603 Internal error` with nothing in `data` to key on — so the text
+patterns recognised none of them, and a resume that should have soft-failed into a fresh session
+failed the turn instead. Reading the wrong answer out of that text costs in both directions: a live
+session treated as gone loses the conversation's context silently, a gone one treated as live
+retries a dead id every turn.
+
+**So the decision asks.** `isAcpSessionGone` is now the backend's default: the text patterns first,
+then — only for an error the agent itself answered, and only on a load that already failed —
+`session/list`, which is what makes the extra round trip affordable. The override is widened to take
+the whole probe and to answer asynchronously, so a provider adds what its own CLI says and defers to
+the shared question for the rest. Grok's `FS_NOT_FOUND` rule is rewritten that way rather than
+replacing the question.
+
+`ManagedAcpClient` gains an optional `listSessions`, implemented by the adapter over the connection
+method that already existed. Optional because not every agent has it — Gemini CLI does not — and an
+agent that cannot answer leaves the error text as the only evidence, which lands where we started:
+the binding is kept and a recoverable failure stays recoverable.
+
+**Three tests, from the recorded refusals.** A bare `Internal error` for a session the agent no
+longer lists is replaced; the same words from an agent that still lists it keep the binding; an
+agent without the method keeps it too. Proven by restoring the old default — the first fails, and
+the other two pass by design, since they hold the behaviour this must not change.
+
+**The notice is still not wired**, which is the second half of this item: no composition implements
+the `sessionDropped` port, so `isSessionDropped()` is `false` and a conversation whose session was
+replaced resumes without saying so. The six provider docs now say exactly that instead of the
+paragraph they carried.
+
 ### Phase 2, 2 of 3 — Grok's effort picker reads what the session reported (`this commit`)
 
 - Gates: unit 9009 passed / 9009 total across 566 suites; `tsc --noEmit` clean; `npm run lint`

@@ -117,6 +117,10 @@ class AcpManagedClientAdapter implements ManagedAcpClient {
     return this.connection.setModel(request);
   }
 
+  listSessions(request: Parameters<AcpClientConnection['listSessions']>[0] = {}) {
+    return this.connection.listSessions(request);
+  }
+
   vendorRequest(method: string, params: unknown): Promise<unknown> {
     return this.transport.request(method, params);
   }

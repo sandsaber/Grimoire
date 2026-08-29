@@ -23,10 +23,11 @@
 - A dropped session is recorded in `providerState.sessionDropped` and read back on load, because the in-memory flag is consumed by the first save. Never replay the transcript into a replacement session: history bootstrap is for a cold resume that never held a session id.
 - Use shared helpers in `src/providers/acp/acpSessionResume.ts` rather than inventing a fourth wipe policy.
 
-- **Not wired on the kernel path yet.** `isAcpSessionGone` has no caller in `src/`:
-  `ManagedAcpExecutionBackend` still classifies a failed `session/load` with the
-  text-matching `isAcpMissingSessionError`, and the seam it would plug into
-  (`isMissingSessionError`) is a synchronous predicate while the helper is `async`.
-  So a `session/load` that answers a bare `Internal error` still fails the turn rather
-  than soft-failing into a fresh session. The bullet above describes the intended
-  behaviour, not this branch's — see the `main` sync entry in the migration journal.
+- **The decision is wired; the notice is not.** `ManagedAcpExecutionBackend` asks
+  `isAcpSessionGone` on every failed `session/load`, so a refusal whose words say nothing
+  is settled by asking the agent through `session/list`, and a session it no longer lists
+  soft-fails into a fresh one. `isMissingSessionError` overrides that decision and takes
+  the whole probe, so a provider adds what its own CLI says and defers to the shared
+  question for everything else. What is still missing is the surface: no composition
+  implements the `sessionDropped` port, so `ExecutionChatRuntimeAdapter.isSessionDropped()`
+  is `false` and a conversation whose session was replaced resumes without the notice.

@@ -13,6 +13,8 @@ import {
   sessionInstanceId,
 } from '@/core/execution/ExecutionIds';
 import type { ResultCommitOutcome } from '@/core/execution/ResultCommit';
+import { JsonRpcErrorResponse } from '@/providers/acp/AcpJsonRpcTransport';
+import type { AcpSessionGoneProbe } from '@/providers/acp/acpSessionResume';
 import { AcpSpawnError } from '@/providers/acp/AcpSpawnError';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import {
@@ -196,7 +198,7 @@ describe('OpencodeExecutionBackend', () => {
 
   it('replaces only an explicitly missing saved session and retains transient bindings', async () => {
     const missing = createFixture({
-      isMissingSessionError: error => error instanceof Error && error.message === 'missing-session',
+      isMissingSessionError: probe => probe.error instanceof Error && probe.error.message === 'missing-session',
     });
     missing.client.loadError = new Error('missing-session');
     const missingSession = await createSession(missing.backend, 'deleted-session');
@@ -223,6 +225,55 @@ describe('OpencodeExecutionBackend', () => {
       `session/load:${transient.client.loadRequests[0].sessionId}`,
       ...summarizeEvents(rejected).filter(entry => entry.startsWith('terminal:')),
     ]).toEqual(trace.cases.transientLoadFailure);
+  });
+
+  it('asks the agent which sessions it still has when the refusal says nothing', async () => {
+    // What OpenCode and MiMoCode actually answer for a session they no longer
+    // have: a bare internal error with nothing in it to key on. Reading the
+    // wrong answer out of that text is expensive both ways - a live session
+    // treated as gone loses the context silently, a gone one treated as live
+    // retries a dead id every turn - so the decision is a question, not a guess.
+    const forgotten = createFixture();
+    forgotten.client.loadError = new JsonRpcErrorResponse('session/load', -32603, 'Internal error');
+    forgotten.client.listedSessions = ['some-other-session'];
+    const forgottenSession = await createSession(forgotten.backend, 'deleted-session');
+    const replacement = collectEvents(forgottenSession.createRun(request('1')));
+    await waitFor(() => forgotten.client.promptRequests.length === 1);
+    forgotten.client.emit(agentText('native-session', 'replacement'));
+    forgotten.client.completePrompt({ stopReason: 'end_turn' });
+
+    expectTerminal(await replacement, 'succeeded', 'completed');
+    expect(forgotten.client.listSessionCalls).toBe(1);
+    expect(forgotten.client.newRequests).toHaveLength(1);
+    expect(forgottenSession.getSnapshot().nativeSessionRef).toBe('native-session');
+
+    // The same words, from an agent that still lists the session: whatever went
+    // wrong, it was not the session going missing, and the binding is kept.
+    const kept = createFixture();
+    kept.client.loadError = new JsonRpcErrorResponse('session/load', -32603, 'Internal error');
+    kept.client.listedSessions = ['saved-session'];
+    const keptSession = await createSession(kept.backend, 'saved-session');
+    const rejected = await collectEvents(keptSession.createRun(request('1')));
+
+    expectTerminal(rejected, 'invalidated', 'pre-dispatch-rejected');
+    expect(kept.client.listSessionCalls).toBe(1);
+    expect(kept.client.newRequests).toHaveLength(0);
+    expect(keptSession.getSnapshot().nativeSessionRef).toBe('saved-session');
+  });
+
+  it('keeps the binding when the agent cannot answer which sessions it has', async () => {
+    // Gemini CLI has no session listing. An agent that cannot be asked leaves
+    // the error text as the only evidence, and text that says nothing is not
+    // evidence the session is gone - so a recoverable failure stays recoverable.
+    const fixture = createFixture();
+    fixture.client.loadError = new JsonRpcErrorResponse('session/load', -32603, 'Internal error');
+    const session = await createSession(fixture.backend, 'saved-session');
+
+    const rejected = await collectEvents(session.createRun(request('1')));
+
+    expectTerminal(rejected, 'invalidated', 'pre-dispatch-rejected');
+    expect(fixture.client.newRequests).toHaveLength(0);
+    expect(session.getSnapshot().nativeSessionRef).toBe('saved-session');
   });
 
   it('retries a closed transport only before observable output', async () => {
@@ -1024,7 +1075,7 @@ function createFixture(options: {
     onClientLost(): void;
   };
   readonly reconciliation?: RunRecoveryEvidence;
-  readonly isMissingSessionError?: (error: unknown) => boolean;
+  readonly isMissingSessionError?: (probe: AcpSessionGoneProbe) => boolean | Promise<boolean>;
   readonly maxResultBytes?: number;
   readonly resultStore?: (input: { readonly output: string }) => Promise<ResultCommitOutcome>;
   readonly recoverOutput?: () => Promise<string | null>;
@@ -1136,6 +1187,9 @@ class FakeManagedAcpClient implements ManagedAcpClient {
   readonly lossListeners = new Set<(error?: Error) => void>();
   permissionHandler?: ManagedAcpClientFactoryInput['requestPermission'];
   loadError?: Error;
+  /** What `session/list` answers, or undefined for an agent without the method. */
+  listedSessions?: string[];
+  listSessionCalls = 0;
   closeCalls = 0;
   closeOutcome: 'confirmed' | 'unconfirmed' = 'confirmed';
   closeOutcomes: Array<'confirmed' | 'unconfirmed'> = [];
@@ -1155,6 +1209,13 @@ class FakeManagedAcpClient implements ManagedAcpClient {
     this.loadRequests.push(request);
     if (this.loadError) throw this.loadError;
     return { sessionId: request.sessionId, ...this.openingConfiguration() };
+  }
+  async listSessions() {
+    this.listSessionCalls += 1;
+    // No list configured stands for an agent without the method: the probe is
+    // left with the error text, which is the fallback the helper documents.
+    if (!this.listedSessions) throw new Error('session/list unsupported');
+    return { sessions: this.listedSessions.map(sessionId => ({ sessionId })) };
   }
   private openingConfiguration() {
     return this.newSessionConfigOptions

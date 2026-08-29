@@ -1,5 +1,7 @@
 import type { Unsubscribe } from '@/core/execution/ExecutionContracts';
 import type {
+  AcpListSessionsRequest,
+  AcpListSessionsResponse,
   AcpLoadSessionRequest,
   AcpLoadSessionResponse,
   AcpNewSessionRequest,
@@ -45,6 +47,15 @@ export interface ManagedAcpClient {
    * agents have nothing to ask.
    */
   vendorRequest?(method: string, params: unknown): Promise<unknown>;
+  /**
+   * The sessions the agent still has, where it answers the question.
+   *
+   * Asked only after a `session/load` has already failed, to tell a session the
+   * agent has forgotten from a load that failed for some other reason. Optional
+   * because not every agent has the method — Gemini CLI does not — and an agent
+   * that cannot answer leaves the failure classified by its error text alone.
+   */
+  listSessions?(request?: AcpListSessionsRequest): Promise<AcpListSessionsResponse>;
   cancel(sessionId: string): void;
   onSessionNotification(listener: (notification: AcpSessionNotification) => void): Unsubscribe;
   onConnectionLost(listener: (error?: Error) => void): Unsubscribe;
