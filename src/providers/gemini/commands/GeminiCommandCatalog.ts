@@ -8,6 +8,7 @@ import {
   VaultSkillCommandCatalog,
   type VaultSkillStorageAdapter,
 } from '../../../core/providers/commands/VaultSkillCommandCatalog';
+import type { ProviderCatalogRefreshOutcome } from '../../../core/providers/ProviderModelCatalogRefreshCache';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type { SlashCommand } from '../../../core/types';
 import { isRecord } from '../../../utils/records';
@@ -105,8 +106,10 @@ export class GeminiCommandCatalog implements ProviderCommandCatalog {
     return '.gemini/skills';
   }
 
-  async refresh(): Promise<void> {
-    // Vault resources are read fresh for each request.
+  async refresh(): Promise<ProviderCatalogRefreshOutcome> {
+    // Vault resources are read fresh for each request, so there is nothing to
+    // reach and nothing that can fail.
+    return 'refreshed';
   }
 
   private async listCommands(): Promise<ProviderCommandEntry[]> {

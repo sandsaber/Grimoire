@@ -198,7 +198,7 @@ describe('createClaudeWorkspaceServices', () => {
       settings,
     });
 
-    expect(changed).toBe(true);
+    expect(changed).toBe('refreshed');
     expect(requestUrl).toHaveBeenCalledWith({
       url: 'https://api.anthropic.com/v1/models?limit=1000',
       headers: {
@@ -240,7 +240,7 @@ describe('createClaudeWorkspaceServices', () => {
       settings,
     });
 
-    expect(changed).toBe(false);
+    expect(changed).toBe('failed');
     expect(requestUrl).not.toHaveBeenCalled();
     expect(getClaudeProviderSettings(settings).discoveredModels).toEqual([]);
     expect(plugin.saveSettings).not.toHaveBeenCalled();

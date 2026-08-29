@@ -185,7 +185,7 @@ describe('Antigravity provider registration', () => {
 
     const changed = await services.modelCatalog.refreshModels({ plugin: {} as any, settings });
 
-    expect(changed).toBe(false);
+    expect(changed).toBe('skipped');
     expect(discoverAntigravityModels).not.toHaveBeenCalled();
     expect(recordDebugLog).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
@@ -223,10 +223,10 @@ describe('Antigravity provider registration', () => {
 
       // Past the former ten-minute window, with no reload in between.
       jest.advanceTimersByTime(60 * 60 * 1000);
-      await expect(services.modelCatalog.refreshModels({ plugin, settings })).resolves.toBe(false);
+      await expect(services.modelCatalog.refreshModels({ plugin, settings })).resolves.toBe('skipped');
       expect(discoverAntigravityModels).not.toHaveBeenCalled();
 
-      await expect(services.modelCatalog.refreshModels({ force: true, plugin, settings })).resolves.toBe(true);
+      await expect(services.modelCatalog.refreshModels({ force: true, plugin, settings })).resolves.toBe('refreshed');
       expect(discoverAntigravityModels).toHaveBeenCalledTimes(1);
     } finally {
       jest.useRealTimers();

@@ -94,7 +94,7 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
           level: 'debug',
           scope: 'provider.codex',
         });
-        return false;
+        return 'skipped';
       }
 
       if (!force && refreshCache.isFresh(fingerprint, currentSettings.discoveredModels.length > 0)) {
@@ -109,7 +109,7 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
           level: 'debug',
           scope: 'provider.codex',
         });
-        return false;
+        return 'skipped';
       }
 
       return refreshCache.refresh({
@@ -134,7 +134,7 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
             level: 'debug',
             scope: 'provider.codex',
           });
-          return false;
+          return 'failed';
         }
 
         const changed = updateCodexModelDiscoveryState(settings, {
@@ -154,7 +154,9 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
           level: 'info',
           scope: 'provider.codex',
         });
-        return changed;
+        // The CLI answered, so this is a refresh whatever `changed` says: a
+        // list that came back identical is a successful refresh, not a failed one.
+        return 'refreshed';
       } catch (error) {
         plugin.recordDebugLog?.({
           data: {

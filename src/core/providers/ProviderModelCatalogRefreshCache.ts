@@ -1,15 +1,30 @@
 import { seedFingerprintMatches } from './catalogFingerprint';
 
+/**
+ * What became of a catalog refresh.
+ *
+ * The contract used to be a bare `boolean` that documented nothing, so ten
+ * implementations each invented a meaning — most of them "the list changed" —
+ * and no caller read it. The settings buttons had to guess success from the
+ * *persisted* list instead, which still holds the previous values when a
+ * refresh fails: a refresh against a logged-out CLI reported "12 models".
+ *
+ * Three states, because success and failure are not the whole question. A
+ * refresh that was never asked is not a refresh that failed, and a provider
+ * that answered with the same list it gave last time did not fail either.
+ */
+export type ProviderCatalogRefreshOutcome = 'refreshed' | 'skipped' | 'failed';
+
 export interface ProviderModelCatalogRefreshRequest {
   fingerprint: string;
   force?: boolean;
   hasCachedModels: boolean;
-  load: () => Promise<boolean>;
+  load: () => Promise<ProviderCatalogRefreshOutcome>;
 }
 
 interface PendingRefresh {
   fingerprint: string;
-  promise: Promise<boolean>;
+  promise: Promise<ProviderCatalogRefreshOutcome>;
 }
 
 /**
@@ -110,9 +125,9 @@ export class ProviderModelCatalogRefreshCache {
     return hasCachedModels || this.now() - this.lastSuccessfulRefreshAt < this.ttlMs;
   }
 
-  refresh(request: ProviderModelCatalogRefreshRequest): Promise<boolean> {
+  refresh(request: ProviderModelCatalogRefreshRequest): Promise<ProviderCatalogRefreshOutcome> {
     if (!request.force && this.isFresh(request.fingerprint, request.hasCachedModels)) {
-      return Promise.resolve(false);
+      return Promise.resolve('skipped');
     }
     if (this.pending?.fingerprint === request.fingerprint) {
       return this.pending.promise;
@@ -120,12 +135,15 @@ export class ProviderModelCatalogRefreshCache {
 
     const generation = this.refreshGeneration + 1;
     this.refreshGeneration = generation;
-    const promise = request.load().then((changed) => {
+    // The fingerprint is marked fresh whatever the load answered, which is the
+    // pacing this cache exists for: an attempt that found nothing must not be
+    // repeated on the next dropdown open, since it costs a CLI spawn either way.
+    const promise = request.load().then((outcome) => {
       if (generation === this.refreshGeneration) {
         this.freshFingerprint = request.fingerprint;
         this.lastSuccessfulRefreshAt = this.now();
       }
-      return changed;
+      return outcome;
     }).finally(() => {
       if (this.pending?.promise === promise) {
         this.pending = null;

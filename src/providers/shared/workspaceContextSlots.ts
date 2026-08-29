@@ -174,9 +174,12 @@ export function createWorkspaceContextSlots(
         await services()?.commandCatalog?.listDropdownEntries(options) ?? []
       ),
       listVaultEntries: async () => await services()?.commandCatalog?.listVaultEntries() ?? [],
-      refresh: async () => {
-        await services()?.commandCatalog?.refresh();
-      },
+      refresh: async () => (
+        // No catalog is not a failed refresh — it is a provider with nothing to
+        // refresh, and reporting failure would put a notice on a surface that
+        // never asked for one.
+        await services()?.commandCatalog?.refresh() ?? 'skipped'
+      ),
       saveVaultEntry: async entry => {
         await services()?.commandCatalog?.saveVaultEntry(entry);
       },

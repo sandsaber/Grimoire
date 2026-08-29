@@ -89,7 +89,7 @@ function createQwenModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
           level: 'debug',
           scope: 'provider.qwen',
         });
-        return false;
+        return 'skipped';
       }
 
       if (!force && refreshCache.isFresh(fingerprint, hasCachedModels)) {
@@ -104,7 +104,7 @@ function createQwenModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
           level: 'debug',
           scope: 'provider.qwen',
         });
-        return false;
+        return 'skipped';
       }
 
       return refreshCache.refresh({
@@ -112,13 +112,15 @@ function createQwenModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
         force,
         hasCachedModels,
         load: async () => {
-          const before = JSON.stringify(getQwenProviderSettings(settings).discoveredModels);
           // One isolated session, opened and closed. Building a whole chat
           // runtime to get here was the only thing that runtime did for this
           // surface: open a session and read its reply.
-          await plugin.getQwenExecution().metadata.discoverMetadata();
-          const after = JSON.stringify(getQwenProviderSettings(settings).discoveredModels);
-          return before !== after;
+          //
+          // Its answer is whether the agent said anything, which is the question
+          // the surface asks. Whether the *list* changed is a different one, and a
+          // refresh that returns the same models did not fail.
+          const loaded = await plugin.getQwenExecution().metadata.discoverMetadata();
+          return loaded ? 'refreshed' : 'failed';
         },
       });
     },

@@ -34,12 +34,12 @@ describe('createMimocodeWorkspaceServices', () => {
 
     const services = await createMimocodeWorkspaceServices(plugin as any, vaultAdapter as any);
     expect(services.usageProvider).toBeDefined();
-    const changed = await services.modelCatalog?.refreshModels({
+    const outcome = await services.modelCatalog?.refreshModels({
       plugin: plugin as any,
       settings,
     });
 
-    expect(changed).toBe(true);
+    expect(outcome).toBe('refreshed');
     expect(discoverMetadata).toHaveBeenCalledTimes(1);
     expect(getMimocodeProviderSettings(settings).discoveredModels).toEqual([
       { label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' },
@@ -79,13 +79,13 @@ describe('createMimocodeWorkspaceServices', () => {
       plugin: plugin as any,
       settings,
     });
-    const reused = await services.modelCatalog?.refreshModels({
+    const skipped = await services.modelCatalog?.refreshModels({
       plugin: plugin as any,
       settings,
     });
 
-    expect(discovered).toBe(true);
-    expect(reused).toBe(false);
+    expect(discovered).toBe('refreshed');
+    expect(skipped).toBe('skipped');
     expect(discoverMetadata).toHaveBeenCalledTimes(1);
     expect(plugin.recordDebugLog).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
@@ -139,12 +139,12 @@ describe('createMimocodeWorkspaceServices', () => {
     };
 
     const services = await createMimocodeWorkspaceServices(plugin as any, vaultAdapter as any);
-    const changed = await services.modelCatalog?.refreshModels({
+    const outcome = await services.modelCatalog?.refreshModels({
       plugin: plugin as any,
       settings,
     });
 
-    expect(changed).toBe(true);
+    expect(outcome).toBe('refreshed');
     expect(discoverMetadata).toHaveBeenCalledTimes(1);
     expect(getMimocodeProviderSettings(settings).discoveredModels).toEqual([
       { label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' },

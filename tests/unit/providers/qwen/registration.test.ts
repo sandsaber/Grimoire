@@ -56,8 +56,8 @@ describe('Qwen provider registration', () => {
   it('refreshes Qwen model discovery through the isolated metadata session', async () => {
     // The catalog used to build a whole chat runtime to ask this. What that
     // runtime was doing for it — opening a session and reading its reply — is
-    // now one isolated session, and the catalog's answer is still the narrower
-    // question it always asked: did the *model list* change.
+    // now one isolated session, and the catalog answers the question the
+    // surfaces actually ask: did the agent answer, not did the list change.
     const settings: Record<string, unknown> = {};
     updateQwenProviderSettings(settings, { enabled: true });
     const discoverMetadata = jest.fn(async () => {
@@ -79,19 +79,22 @@ describe('Qwen provider registration', () => {
       vaultAdapter: {} as any,
     });
 
-    const changed = await services.modelCatalog?.refreshModels({
+    const outcome = await services.modelCatalog?.refreshModels({
       plugin: plugin as any,
       settings,
     });
 
-    expect(changed).toBe(true);
+    expect(outcome).toBe('refreshed');
     expect(discoverMetadata).toHaveBeenCalledTimes(1);
     expect(getQwenProviderSettings(settings).discoveredModels).toEqual([
       { label: 'Qwen 3 Pro', rawId: 'qwen-3-pro' },
     ]);
   });
 
-  it('reports no change when the session named the models the vault already had', async () => {
+  it('does not ask again for a catalog the vault already has', async () => {
+    // Named for the answer it used to give — "no change" — which hid what it
+    // actually exercises: a settled catalog is never asked, so the agent here
+    // is never reached. Discovery boots a CLI, and this is the guard on that.
     const settings: Record<string, unknown> = {};
     updateQwenProviderSettings(settings, {
       discoveredModels: [{ label: 'Qwen 3 Pro', rawId: 'qwen-3-pro' }],
@@ -112,6 +115,6 @@ describe('Qwen provider registration', () => {
     await expect(services.modelCatalog?.refreshModels({
       plugin: plugin as any,
       settings,
-    })).resolves.toBe(false);
+    })).resolves.toBe('skipped');
   });
 });

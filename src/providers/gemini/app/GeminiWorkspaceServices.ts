@@ -89,7 +89,7 @@ function createGeminiModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog 
           level: 'debug',
           scope: 'provider.gemini',
         });
-        return false;
+        return 'skipped';
       }
 
       if (!force && refreshCache.isFresh(fingerprint, hasCachedModels)) {
@@ -104,7 +104,7 @@ function createGeminiModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog 
           level: 'debug',
           scope: 'provider.gemini',
         });
-        return false;
+        return 'skipped';
       }
 
       return refreshCache.refresh({
@@ -116,13 +116,11 @@ function createGeminiModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog 
           // runtime to get here was the only thing that runtime did for this
           // surface: open a session and read its reply.
           //
-          // Its answer was whether anything was learned; what this reports is
-          // whether the *model list* changed, which is the narrower question
-          // and the one the legacy code asked.
-          const before = JSON.stringify(getGeminiProviderSettings(settings).discoveredModels);
-          await plugin.getGeminiExecution().metadata.discoverMetadata();
-          const after = JSON.stringify(getGeminiProviderSettings(settings).discoveredModels);
-          return before !== after;
+          // Its answer is whether the agent said anything, which is the question
+          // the surface asks. Whether the *list* changed is a different one, and a
+          // refresh that returns the same models did not fail.
+          const loaded = await plugin.getGeminiExecution().metadata.discoverMetadata();
+          return loaded ? 'refreshed' : 'failed';
         },
       });
     },

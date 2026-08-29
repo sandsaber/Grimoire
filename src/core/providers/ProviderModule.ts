@@ -3,6 +3,7 @@ import type { Conversation, SlashCommand } from '../types';
 import type { ManagedMcpServer } from '../types/mcp';
 import type { ProviderId } from '../types/provider';
 import type { ProviderCommandEntry } from './commands/ProviderCommandEntry';
+import type { ProviderCatalogRefreshOutcome } from './ProviderModelCatalogRefreshCache';
 import type {
   ProviderRuntimeCommandLoaderContext,
   ProviderSubagentLifecycleAdapter,
@@ -317,7 +318,8 @@ export interface ProviderCommandsPort {
   defaultVaultStoragePath?(): string | null;
   /** Hands the catalog the commands a live session has just reported. */
   setRuntimeCommands(commands: SlashCommand[]): void;
-  refresh(): Promise<void>;
+  /** See `ProviderCommandCatalog.refresh`: whether the source answered. */
+  refresh(): Promise<ProviderCatalogRefreshOutcome>;
 }
 
 /**

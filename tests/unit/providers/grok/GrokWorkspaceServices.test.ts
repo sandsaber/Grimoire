@@ -68,7 +68,7 @@ describe('createGrokWorkspaceServices', () => {
       settings,
     });
 
-    expect(changed).toBe(true);
+    expect(changed).toBe('refreshed');
     expect(discoverGrokModelsFromCliMock).toHaveBeenCalled();
     expect(discoverMetadata).not.toHaveBeenCalled();
     expect(getGrokProviderSettings(settings).discoveredModels).toEqual([
@@ -124,7 +124,7 @@ describe('createGrokWorkspaceServices', () => {
       models: [{ label: 'Grok 4.6', rawId: 'grok-4.6' }],
     });
 
-    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+    await expect(Promise.all([first, second])).resolves.toEqual(['refreshed', 'refreshed']);
     expect(discoverGrokModelsFromCliMock).toHaveBeenCalledTimes(1);
     expect(plugin.recordDebugLog).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
@@ -162,7 +162,7 @@ describe('createGrokWorkspaceServices', () => {
       settings,
     });
 
-    expect(changed).toBe(true);
+    expect(changed).toBe('refreshed');
     expect(discoverMetadata).toHaveBeenCalledTimes(1);
     expect(getGrokProviderSettings(settings).discoveredModels).toEqual([
       { label: 'OpenAI/GPT-5.6', rawId: 'openai/gpt-5.6' },

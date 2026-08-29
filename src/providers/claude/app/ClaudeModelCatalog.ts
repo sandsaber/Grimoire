@@ -4,6 +4,7 @@ import {
   hashCatalogFingerprint,
   seedFingerprintMatches,
 } from '../../../core/providers/catalogFingerprint';
+import type { ProviderCatalogRefreshOutcome } from '../../../core/providers/ProviderModelCatalogRefreshCache';
 import type GrimoirePlugin from '../../../main';
 import type { ProviderModelCatalog } from '../../../providers/shared/providerHostContracts';
 import {
@@ -98,7 +99,7 @@ async function fetchClaudeModelsFromAnthropicApi(
 
 export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
   const refreshAttemptsByKey = new Map<string, number>();
-  const refreshesByKey = new Map<string, Promise<boolean>>();
+  const refreshesByKey = new Map<string, Promise<ProviderCatalogRefreshOutcome>>();
 
   // The attempt log only lives in memory, so every plugin load would otherwise
   // probe again on the first picker that is built - and probing starts a full
@@ -176,7 +177,7 @@ export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelC
             level: 'debug',
             scope: 'provider.claude',
           });
-          return false;
+          return 'skipped';
         }
       }
 
@@ -195,7 +196,7 @@ export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelC
           level: 'debug',
           scope: 'provider.claude',
         });
-        return false;
+        return 'skipped';
       }
 
       const inFlightRefresh = refreshesByKey.get(cacheKey);
@@ -212,7 +213,7 @@ export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelC
             discoveredModels = await fetchClaudeModelsFromAnthropicApi(envVars);
           }
           if (discoveredModels.length === 0) {
-            return false;
+            return 'failed';
           }
 
           const latestSettings = getClaudeProviderSettings(settings);
@@ -221,7 +222,10 @@ export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelC
             plugin.getResolvedProviderCliPath?.('claude') ?? '',
           );
           if (latestCacheKey !== cacheKey) {
-            return false;
+            // The configuration moved while the probe ran, so this answer is
+            // for a CLI nobody is pointed at any more. Nothing was refreshed
+            // for the caller that asked.
+            return 'failed';
           }
 
           // Record which key produced this list, so a later load can tell
@@ -252,7 +256,9 @@ export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelC
             level: changed ? 'info' : 'debug',
             scope: 'provider.claude',
           });
-          return changed;
+          // The CLI answered and the catalog holds that answer, which is a
+          // refresh whether or not the list is the same one as before.
+          return 'refreshed';
         } catch (error) {
           plugin.recordDebugLog?.({
             data: {
@@ -263,7 +269,7 @@ export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelC
             level: 'warn',
             scope: 'provider.claude',
           });
-          return false;
+          return 'failed';
         } finally {
           refreshAttemptsByKey.set(cacheKey, Date.now());
           refreshesByKey.delete(cacheKey);

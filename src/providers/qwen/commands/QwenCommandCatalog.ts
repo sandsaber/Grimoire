@@ -1,6 +1,7 @@
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
 import { VaultSkillCommandCatalog, type VaultSkillStorageAdapter } from '../../../core/providers/commands/VaultSkillCommandCatalog';
+import type { ProviderCatalogRefreshOutcome } from '../../../core/providers/ProviderModelCatalogRefreshCache';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type { SlashCommand } from '../../../core/types';
 import { parseFrontmatter } from '../../../utils/frontmatter';
@@ -65,7 +66,10 @@ export class QwenCommandCatalog implements ProviderCommandCatalog {
   }
 
   defaultVaultStoragePath(): string { return '.qwen/skills'; }
-  async refresh(): Promise<void> { await this.skills.refresh(); }
+  async refresh(): Promise<ProviderCatalogRefreshOutcome> {
+    await this.skills.refresh();
+    return 'refreshed';
+  }
 
   private async loadCommands(): Promise<ProviderCommandEntry[]> {
     if (!this.adapter) return [];

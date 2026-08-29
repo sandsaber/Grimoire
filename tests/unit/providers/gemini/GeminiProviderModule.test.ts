@@ -27,7 +27,7 @@ describe('Gemini provider module', () => {
         saveVaultEntry: async () => undefined,
         deleteVaultEntry: async () => undefined,
         setRuntimeCommands: () => undefined,
-        refresh: async () => undefined,
+        refresh: async () => 'refreshed' as const,
       }),
       listAgentMentions: async () => [{ id: 'planner', label: 'Planner' , source: 'vault' as const }],
       refreshAgentMentions: async () => undefined,

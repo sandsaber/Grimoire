@@ -1,6 +1,7 @@
 import type { SharedAppStorage } from '../../core/bootstrap/storage';
 import type { McpServerManager } from '../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../core/providers/commands/ProviderCommandCatalog';
+import type { ProviderCatalogRefreshOutcome } from '../../core/providers/ProviderModelCatalogRefreshCache';
 import type {
   AgentMentionProvider,
   AppMcpStorage,
@@ -143,7 +144,23 @@ export interface ProviderModelCatalogRefreshContext {
 
 export interface ProviderModelCatalog {
   isAvailable?(settings: Record<string, unknown>): boolean;
-  refreshModels(context: ProviderModelCatalogRefreshContext): Promise<boolean>;
+  /**
+   * Rediscovers the provider's models, and says what became of the attempt.
+   *
+   * `refreshed` means the provider answered and the catalog now holds that
+   * answer — including when the answer is the same list as before, which is a
+   * successful refresh and not a failed one. `failed` means it was asked and did
+   * not answer usably. `skipped` means it was never asked, because the catalog
+   * was settled and the caller did not `force`.
+   *
+   * A surface that reports success must read this rather than count the
+   * persisted list: that list still holds the previous values when a refresh
+   * fails, which is how a refresh against a logged-out CLI came to report
+   * "Model list refreshed: 12 models."
+   */
+  refreshModels(
+    context: ProviderModelCatalogRefreshContext,
+  ): Promise<ProviderCatalogRefreshOutcome>;
 }
 
 export interface ProviderPlanUsageContext {

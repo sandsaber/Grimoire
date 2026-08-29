@@ -1,4 +1,5 @@
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
+import type { ProviderCatalogRefreshOutcome } from '../../../core/providers/ProviderModelCatalogRefreshCache';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
 import type {
@@ -29,7 +30,7 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
   const initialSettings = getAntigravityProviderSettings(plugin.settings ?? {});
   let lastRefreshAt = initialSettings.discoveredModels.length > 0 ? Date.now() : 0;
   let lastRefreshCacheKey = buildAntigravityModelCatalogCacheKey(initialSettings);
-  let refreshPromise: Promise<boolean> | null = null;
+  let refreshPromise: Promise<ProviderCatalogRefreshOutcome> | null = null;
   return {
     isAvailable(settings) {
       return getAntigravityProviderSettings(settings).enabled;
@@ -62,7 +63,7 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
           level: 'debug',
           scope: 'provider.antigravity',
         });
-        return false;
+        return 'skipped';
       }
 
       if (refreshPromise) {
@@ -102,7 +103,9 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
             level: 'warn',
             scope: 'provider.antigravity',
           });
-          return false;
+          // The CLI said nothing and the list on screen is the one from before,
+          // so nothing was refreshed however healthy the catalog looks.
+          return 'failed';
         }
         const usingFallbackModels = cliDiscoveredModels.length === 0;
         const discoveredModels = usingFallbackModels
@@ -129,7 +132,11 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
           level: usingFallbackModels ? 'warn' : 'info',
           scope: 'provider.antigravity',
         });
-        return changed;
+        // The fallback list counts as a refresh: on Windows `agy models` can
+        // answer empty on a healthy CLI, the seeded Pro list is what the picker
+        // is meant to show there, and a user who can now choose a model was not
+        // failed. The `warn` above is where that substitution is recorded.
+        return 'refreshed';
       })();
 
       try {

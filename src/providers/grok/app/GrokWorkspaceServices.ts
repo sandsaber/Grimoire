@@ -1,5 +1,6 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
+import type { ProviderCatalogRefreshOutcome } from '../../../core/providers/ProviderModelCatalogRefreshCache';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
 import type {
@@ -37,7 +38,7 @@ export interface GrokWorkspaceServices extends ProviderWorkspaceServices {
 }
 
 function createGrokModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
-  let pendingRefresh: Promise<boolean> | null = null;
+  let pendingRefresh: Promise<ProviderCatalogRefreshOutcome> | null = null;
 
   return {
     isAvailable(settings) {
@@ -69,7 +70,7 @@ function createGrokModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
 async function refreshGrokModelCatalog(
   plugin: GrimoirePlugin,
   settings: Record<string, unknown>,
-): Promise<boolean> {
+): Promise<ProviderCatalogRefreshOutcome> {
   const before = JSON.stringify(getGrokProviderSettings(settings).discoveredModels);
   plugin.recordDebugLog?.({
     data: {
@@ -95,6 +96,9 @@ async function refreshGrokModelCatalog(
   }
 
   let changed = applyGrokNativeModelCatalog(settings, catalog);
+  // Two different questions, and only the second one is what a surface reports.
+  // A catalog that came back identical to the one on screen still came back.
+  let answered = catalog.models.length > 0;
   if (catalog.models.length === 0) {
     // The managed home had no catalog to read, so the models are asked for the
     // only other way there is: one isolated session, opened and closed. What
@@ -102,6 +106,7 @@ async function refreshGrokModelCatalog(
     const loaded = await plugin.getGrokExecution().metadata.discoverMetadata();
     const after = JSON.stringify(getGrokProviderSettings(settings).discoveredModels);
     changed = loaded && before !== after;
+    answered = loaded;
   }
 
   if (changed) {
@@ -121,7 +126,7 @@ async function refreshGrokModelCatalog(
     level: changed ? 'info' : 'debug',
     scope: 'provider.grok',
   });
-  return changed;
+  return answered ? 'refreshed' : 'failed';
 }
 
 export async function createGrokWorkspaceServices(

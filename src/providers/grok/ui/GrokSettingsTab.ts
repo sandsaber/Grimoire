@@ -551,15 +551,18 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
       try {
         const catalog = maybeGetGrokWorkspaceServices(context.plugin)?.modelCatalog;
         if (catalog) {
-          await catalog.refreshModels({
+          // The catalog's own answer, not the length of the persisted list: that
+          // list still holds the previous models when a refresh fails, so a
+          // failed refresh looked like a successful one.
+          modelCatalogLoadFailed = await catalog.refreshModels({
             force: true,
             plugin: context.plugin,
             settings: settingsBag,
-          });
+          }) === 'failed';
         } else {
-          await context.plugin.getGrokExecution().metadata.discoverMetadata();
+          modelCatalogLoadFailed = !await context.plugin.getGrokExecution()
+            .metadata.discoverMetadata();
         }
-        modelCatalogLoadFailed = getGrokProviderSettings(settingsBag).discoveredModels.length === 0;
         if (!modelCatalogLoadFailed) {
           context.refreshModelSelectors();
         }

@@ -59,7 +59,7 @@ function createKimicodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalo
           level: 'debug',
           scope: 'provider.kimicode',
         });
-        return false;
+        return 'skipped';
       }
 
       return refreshCache.refresh({
@@ -67,12 +67,14 @@ function createKimicodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalo
         force,
         hasCachedModels: currentSettings.discoveredModels.length > 0,
         load: async () => {
-          const before = JSON.stringify(currentSettings.discoveredModels);
           // One isolated session, opened and closed: what the legacy runtime
           // was doing here was opening a session and reading its reply.
+          //
+          // Its answer is whether the agent said anything, which is the question
+          // the surface asks. Whether the *list* changed is a different one, and
+          // a refresh that returns the same models did not fail.
           const loaded = await plugin.getKimicodeExecution().metadata.discoverMetadata();
-          const after = JSON.stringify(getKimicodeProviderSettings(settings).discoveredModels);
-          return loaded && before !== after;
+          return loaded ? 'refreshed' : 'failed';
         },
       });
     },

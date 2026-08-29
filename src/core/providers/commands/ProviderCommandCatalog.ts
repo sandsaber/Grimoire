@@ -1,4 +1,5 @@
 import type { SlashCommand } from '../../types';
+import type { ProviderCatalogRefreshOutcome } from '../ProviderModelCatalogRefreshCache';
 import type { ProviderCommandDropdown } from '../ProviderModule';
 import type { ProviderId } from '../types';
 import type { ProviderCommandEntry } from './ProviderCommandEntry';
@@ -21,5 +22,12 @@ export interface ProviderCommandCatalog {
   deleteVaultEntry(entry: ProviderCommandEntry): Promise<void>;
   setRuntimeCommands(commands: SlashCommand[]): void;
   defaultVaultStoragePath?(): string | null;
-  refresh(): Promise<void>;
+  /**
+   * Re-reads the catalog's source, and says whether it answered.
+   *
+   * A catalog backed by the vault always answers. One that probes a CLI —
+   * Claude's — can find nothing and keep the list it had, which is what makes
+   * the list's own length useless as evidence of success.
+   */
+  refresh(): Promise<ProviderCatalogRefreshOutcome>;
 }

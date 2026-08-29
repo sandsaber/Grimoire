@@ -185,16 +185,20 @@ export const claudeSettingsTabRenderer: ProviderSettingsTabRenderer = {
 
             button.setDisabled(true);
             try {
-              await catalog.refreshModels({
+              // What the catalog says, not what the settings hold. The persisted
+              // list still has the previous models when a refresh fails, so
+              // counting it reported "Model list refreshed: 12 models" for a
+              // refresh against a logged-out CLI.
+              const outcome = await catalog.refreshModels({
                 force: true,
                 plugin: context.plugin,
                 settings: settingsBag,
               });
-              const modelCount = getClaudeProviderSettings(settingsBag).discoveredModels.length;
-              if (modelCount === 0) {
+              if (outcome === 'failed') {
                 new Notice(t('settings.provider.loadModelsFailed'));
                 return;
               }
+              const modelCount = getClaudeProviderSettings(settingsBag).discoveredModels.length;
               context.refreshModelSelectors();
               new Notice(t('settings.refreshModels.done', { count: modelCount }));
             } catch {
@@ -295,12 +299,14 @@ export const claudeSettingsTabRenderer: ProviderSettingsTabRenderer = {
           .onClick(async () => {
             button.setDisabled(true);
             try {
-              await claudeWorkspace.commandCatalog.refresh();
-              const commandCount = getClaudeProviderSettings(settingsBag).discoveredCommands.length;
-              if (commandCount === 0) {
+              // Same as the models button above: a probe that found nothing
+              // restores the list it had, so the list cannot report on itself.
+              const outcome = await claudeWorkspace.commandCatalog.refresh();
+              if (outcome === 'failed') {
                 new Notice(t('settings.provider.loadCommandsFailed'));
                 return;
               }
+              const commandCount = getClaudeProviderSettings(settingsBag).discoveredCommands.length;
               new Notice(t('settings.refreshCommands.done', { count: commandCount }));
             } catch {
               new Notice(t('settings.provider.loadCommandsFailed'));

@@ -8297,15 +8297,7 @@ unpushed. Full gate green: unit 9029 / 9029 across 567 suites, integration 156, 
 
 **Two things are open, and neither is a recovery item.**
 
-- **Claude's Refresh models / Refresh commands notices count the persisted list**, so a refresh
-  against a logged-out CLI reads "Model list refreshed: 12 models." The boolean the catalogs return
-  is not the signal: `ProviderModelCatalog.refreshModels` documents nothing about it, ten
-  implementations each invented a meaning, and **no caller reads it** — Claude's button, Grok's
-  button and `workspaceContextSlots` all await and discard. Claude's means "the list changed", so a
-  successful refresh that found the same models returns `false` and reporting failure from it would
-  be a new bug. The honest fix defines the boolean once in the shared contract as "the catalog now
-  holds what the CLI answered" and makes ten implementations agree — a contract change, and its own
-  commit, and it wants a decision before it is spent;
+- ~~Claude's refresh notices count the persisted list.~~ **Done, in the entry below.**
 - **the export baseline is a backlog of 183.** Several are real dead code the flip left —
   `acpManagedSession.ts` entirely, `markAcpSessionLoadFailed`, which has no caller on `main` either.
   A deletion pass over them is its own work.
@@ -10581,6 +10573,43 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### A refresh button now says what the refresh did (`this commit`)
+
+- Gates: unit 9033 passed / 9033 total across 567 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- The last of the eight defects the `main` sync carried, and the one that needed a contract change.
+
+**A refresh against a logged-out CLI said "Model list refreshed: 12 models."** Claude's two settings
+buttons counted `discoveredModels` / `discoveredCommands` *after* the call, and both lists still hold
+the previous values when a refresh fails — Claude's command catalog restores the old list on purpose,
+so that the dropdown stays usable, which is exactly why its length is evidence of the refresh
+*before* this one. Grok's button had the same shape.
+
+**The boolean the catalogs returned was not the signal to switch to.** `ProviderModelCatalog.refreshModels`
+documented nothing about it; ten implementations each invented a meaning, most of them "the list
+changed"; and **no caller anywhere read it** — the two buttons and `workspaceContextSlots` all
+awaited and discarded. So a successful refresh that found the same models returned `false`, and
+reporting failure from that would have been a new bug on top of the old one.
+
+**Defined once, and three states rather than two.** `ProviderCatalogRefreshOutcome` is
+`refreshed | skipped | failed`: the provider answered and the catalog holds that answer — including
+when the answer is the list it already had; nothing was asked, because the catalog was settled and
+the caller did not force; or it was asked and did not answer usably. Success and failure are not the
+whole question, and a refresh that was never made is neither.
+
+Ten model catalogs and five command catalogs now say which. The mapping was a decision per provider
+rather than a rename — Qwen and Gemini were **discarding** `discoverMetadata()`'s own answer and
+comparing list JSON, so the signal had to be recovered; Grok computed one value for two questions and
+now separates "the catalog answered" from "the list changed", which still decides the save; and
+Antigravity's Windows fallback counts as `refreshed`, because a seeded Pro list is what the picker is
+meant to show there and a user who can now choose a model was not failed.
+
+**Two tests, one per button, proven by putting the old counting back.** Two more tests changed name:
+`reports no change when the session named the models the vault already had` asserted a value that no
+longer exists, and reading it showed the name had never been right — a settled catalog is never
+asked, so the agent in that test was never reached. It is now `does not ask again for a catalog the
+vault already has`, which is what it always tested.
 
 ### Phase 2 reviewed — two shipped capabilities with no test, and a trap I opened (`this commit`)
 
