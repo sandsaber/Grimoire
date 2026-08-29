@@ -1,11 +1,6 @@
 import { AcpPermissionBridge } from '@/providers/acp/execution/AcpPermissionBridge';
 import { buildOpencodePermissionPresentation } from '@/providers/opencode/execution/OpencodePermissionPresentation';
 
-export type {
-  AcpApprovalOption as OpencodeApprovalOption,
-  AcpApprovalOptionPresentation as OpencodeApprovalOptionPresentation,
-  AcpPermissionPresentation as OpencodeInteractionPresentation,
-} from '@/providers/acp/execution/AcpPermissionBridge';
 
 /**
  * OpenCode's permission requests, as interactions the kernel can carry.

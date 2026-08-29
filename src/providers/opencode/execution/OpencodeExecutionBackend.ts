@@ -33,12 +33,7 @@ export type OpencodeExecutionBackendContext =
   Omit<ManagedAcpExecutionBackendContext, 'descriptor'>;
 
 export type {
-  ManagedAcpAuxiliaryPort as OpencodeAuxiliaryPort,
   ManagedAcpExecutionDynamicApplier as OpencodeExecutionDynamicApplier,
   ManagedAcpExecutionInvocation as OpencodeExecutionInvocation,
-  ManagedAcpExecutionRequestResolver as OpencodeExecutionRequestResolver,
   ManagedAcpExecutionResultSink as OpencodeExecutionResultSink,
-  ManagedAcpExecutionScheduler as OpencodeExecutionScheduler,
-  ManagedAcpInteractionBridge as OpencodeInteractionBridge,
-  ManagedAcpPreparedInteraction as OpencodePreparedInteraction,
 } from '@/providers/acp/execution/ManagedAcpExecutionBackend';

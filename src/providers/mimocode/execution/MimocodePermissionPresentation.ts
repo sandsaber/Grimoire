@@ -19,7 +19,6 @@
  * Re-exported rather than repeated: it is the protocol's shape, not this
  * provider's, and the legacy runtime imports it from here.
  */
-export { normalizeApprovalInput } from '@/providers/acp/execution/AcpPermissionBridge';
 
 /** What the approval prompt says, for one permission request. */
 export interface MimocodePermissionPresentation {

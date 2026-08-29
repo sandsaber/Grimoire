@@ -23,8 +23,12 @@ On failed `session/load`, runtimes must soft-fail (invalidate live binding, keep
 history / native store paths, create a new session on the next turn) and log via
 debug helpers. Do **not** show a user-facing `Notice` for resume failure — the
 recovery is automatic and the toast only scares users.
-| `acpManagedSession.ts` | ensureReady load/create phase plan, transport-close retry gates, ensureReadyForQuery |
 | `acpLifecycle.ts` | lifecycle generation + serialized cleanup promises |
 | `acpApprovals.ts` | permission decision mapping + write-text approval |
 
 Provider runtimes should call these helpers instead of re-copying load/create/retry trees.
+
+The load/create phase plan, the transport-close retry gates and `ensureReadyForQuery` are **not**
+here any more: `ManagedAcpExecutionBackend` owns all three on the kernel path — `ensureClient`,
+`ensureSessionBinding`, and the single-attempt retry in `recover` — and the helper module they used
+to live in went with the legacy runtimes that called it.

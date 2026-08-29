@@ -38,12 +38,7 @@ export type QwenExecutionBackendContext =
   Omit<ManagedAcpExecutionBackendContext, 'descriptor'>;
 
 export type {
-  ManagedAcpAuxiliaryPort as QwenAuxiliaryPort,
   ManagedAcpExecutionDynamicApplier as QwenExecutionDynamicApplier,
   ManagedAcpExecutionInvocation as QwenExecutionInvocation,
-  ManagedAcpExecutionRequestResolver as QwenExecutionRequestResolver,
   ManagedAcpExecutionResultSink as QwenExecutionResultSink,
-  ManagedAcpExecutionScheduler as QwenExecutionScheduler,
-  ManagedAcpInteractionBridge as QwenInteractionBridgePort,
-  ManagedAcpPreparedInteraction as QwenPreparedInteraction,
 } from '@/providers/acp/execution/ManagedAcpExecutionBackend';

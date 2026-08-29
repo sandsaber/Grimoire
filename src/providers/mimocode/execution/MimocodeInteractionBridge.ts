@@ -3,11 +3,6 @@ import {
   buildMimocodePermissionPresentation,
 } from '@/providers/mimocode/execution/MimocodePermissionPresentation';
 
-export type {
-  AcpApprovalOption as MimocodeApprovalOption,
-  AcpApprovalOptionPresentation as MimocodeApprovalOptionPresentation,
-  AcpPermissionPresentation as MimocodeInteractionPresentation,
-} from '@/providers/acp/execution/AcpPermissionBridge';
 
 /**
  * MiMoCode's permission requests, as interactions the kernel can carry.

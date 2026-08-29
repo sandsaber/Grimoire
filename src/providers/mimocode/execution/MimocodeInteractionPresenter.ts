@@ -1,8 +1,5 @@
 import { AcpApprovalPresenter } from '@/providers/acp/execution/AcpApprovalPresenter';
 
-export type {
-  AcpApprovalCallbacks as MimocodeInteractionCallbacks,
-} from '@/providers/acp/execution/AcpApprovalPresenter';
 
 /**
  * How an opened MiMoCode approval reaches the surface.

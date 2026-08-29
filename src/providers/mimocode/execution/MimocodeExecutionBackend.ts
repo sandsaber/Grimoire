@@ -36,12 +36,7 @@ export type MimocodeExecutionBackendContext =
   Omit<ManagedAcpExecutionBackendContext, 'descriptor'>;
 
 export type {
-  ManagedAcpAuxiliaryPort as MimocodeAuxiliaryPort,
   ManagedAcpExecutionDynamicApplier as MimocodeExecutionDynamicApplier,
   ManagedAcpExecutionInvocation as MimocodeExecutionInvocation,
-  ManagedAcpExecutionRequestResolver as MimocodeExecutionRequestResolver,
   ManagedAcpExecutionResultSink as MimocodeExecutionResultSink,
-  ManagedAcpExecutionScheduler as MimocodeExecutionScheduler,
-  ManagedAcpInteractionBridge as MimocodeInteractionBridge,
-  ManagedAcpPreparedInteraction as MimocodePreparedInteraction,
 } from '@/providers/acp/execution/ManagedAcpExecutionBackend';

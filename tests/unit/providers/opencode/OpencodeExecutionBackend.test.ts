@@ -24,6 +24,10 @@ import {
   ManagedAcpTerminationUnconfirmedError,
 } from '@/providers/acp/execution/ManagedAcpClient';
 import type {
+  ManagedAcpExecutionScheduler,
+  ManagedAcpPreparedInteraction,
+} from '@/providers/acp/execution/ManagedAcpExecutionBackend';
+import type {
   AcpPromptResponse,
   AcpRequestPermissionRequest,
   AcpSessionNotification,
@@ -31,8 +35,6 @@ import type {
 import {
   OpencodeExecutionBackend,
   type OpencodeExecutionInvocation,
-  type OpencodeExecutionScheduler,
-  type OpencodePreparedInteraction,
 } from '@/providers/opencode/execution/OpencodeExecutionBackend';
 
 describe('OpencodeExecutionBackend', () => {
@@ -444,7 +446,7 @@ describe('OpencodeExecutionBackend', () => {
   });
 
   it('cancels a permission prepared after its bounded request already failed closed', async () => {
-    const preparation = deferred<OpencodePreparedInteraction>();
+    const preparation = deferred<ManagedAcpPreparedInteraction>();
     const cancel = jest.fn(async () => ({ outcome: { outcome: 'cancelled' as const } }));
     const fixture = createFixture({ interactionPrepare: () => preparation.promise });
     const session = await createSession(fixture.backend);
@@ -1085,7 +1087,7 @@ function createFixture(options: {
   }) => void;
   readonly onReconcile?: (query: RunRecoveryQuery) => RunRecoveryEvidence | null;
   readonly dynamicApply?: () => Promise<void>;
-  readonly interactionPrepare?: () => Promise<OpencodePreparedInteraction>;
+  readonly interactionPrepare?: () => Promise<ManagedAcpPreparedInteraction>;
   readonly auxiliaryExecute?: (requestRef: string, signal: AbortSignal) => Promise<string>;
   readonly auxiliaryDispose?: () => Promise<void>;
   readonly auxiliaryRelease?: (retentionKey: string) => Promise<void>;
@@ -1272,7 +1274,7 @@ class FakeManagedAcpClient implements ManagedAcpClient {
   }
 }
 
-class FakeScheduler implements OpencodeExecutionScheduler {
+class FakeScheduler implements ManagedAcpExecutionScheduler {
   private readonly tasks = new Map<object, () => void>();
   setTimeout(callback: () => void): object {
     const handle = {};

@@ -1,6 +1,6 @@
+import { normalizeApprovalInput } from '@/providers/acp/execution/AcpPermissionBridge';
 import {
   buildKimicodePermissionPresentation,
-  normalizeApprovalInput,
 } from '@/providers/kimicode/execution/KimicodePermissionPresentation';
 
 /**

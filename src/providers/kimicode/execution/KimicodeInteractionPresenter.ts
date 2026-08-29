@@ -1,8 +1,5 @@
 import { AcpApprovalPresenter } from '@/providers/acp/execution/AcpApprovalPresenter';
 
-export type {
-  AcpApprovalCallbacks as KimicodeInteractionCallbacks,
-} from '@/providers/acp/execution/AcpApprovalPresenter';
 
 /**
  * How an opened Kimi Code approval reaches the surface.

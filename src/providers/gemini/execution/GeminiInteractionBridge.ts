@@ -5,13 +5,6 @@ import {
 } from '@/providers/acp/execution/AcpPermissionBridge';
 import { buildGeminiPermissionPresentation } from '@/providers/gemini/execution/GeminiPermissionPresentation';
 
-export type {
-  AcpApprovalCallbacks as GeminiInteractionCallbacks,
-} from '@/providers/acp/execution/AcpApprovalPresenter';
-export type {
-  AcpApprovalOption as GeminiApprovalOption,
-  AcpPermissionPresentation as GeminiInteractionPresentation,
-} from '@/providers/acp/execution/AcpPermissionBridge';
 
 /**
  * Gemini's permission requests, as interactions the kernel can carry.

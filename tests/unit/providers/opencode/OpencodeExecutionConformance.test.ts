@@ -14,6 +14,7 @@ import type {
   ManagedAcpClient,
   ManagedAcpClientFactoryInput,
 } from '@/providers/acp/execution/ManagedAcpClient';
+import type { ManagedAcpExecutionScheduler } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
 import type {
   AcpPromptResponse,
   AcpSessionNotification,
@@ -21,7 +22,6 @@ import type {
 import {
   OpencodeExecutionBackend,
   type OpencodeExecutionInvocation,
-  type OpencodeExecutionScheduler,
 } from '@/providers/opencode/execution/OpencodeExecutionBackend';
 
 defineExecutionBackendConformance('OpenCode managed ACP', createDriver);
@@ -161,7 +161,7 @@ function agentText(text: string): AcpSessionNotification {
   };
 }
 
-class ConformanceScheduler implements OpencodeExecutionScheduler {
+class ConformanceScheduler implements ManagedAcpExecutionScheduler {
   private readonly tasks = new Map<object, () => void>();
   setTimeout(callback: () => void): object {
     const handle = {};

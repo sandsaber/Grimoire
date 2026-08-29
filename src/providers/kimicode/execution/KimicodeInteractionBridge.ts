@@ -3,11 +3,6 @@ import {
   buildKimicodePermissionPresentation,
 } from '@/providers/kimicode/execution/KimicodePermissionPresentation';
 
-export type {
-  AcpApprovalOption as KimicodeApprovalOption,
-  AcpApprovalOptionPresentation as KimicodeApprovalOptionPresentation,
-  AcpPermissionPresentation as KimicodeInteractionPresentation,
-} from '@/providers/acp/execution/AcpPermissionBridge';
 
 /**
  * Kimi Code's permission requests, as interactions the kernel can carry.

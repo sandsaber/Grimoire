@@ -36,12 +36,7 @@ export type KimicodeExecutionBackendContext =
   Omit<ManagedAcpExecutionBackendContext, 'descriptor'>;
 
 export type {
-  ManagedAcpAuxiliaryPort as KimicodeAuxiliaryPort,
   ManagedAcpExecutionDynamicApplier as KimicodeExecutionDynamicApplier,
   ManagedAcpExecutionInvocation as KimicodeExecutionInvocation,
-  ManagedAcpExecutionRequestResolver as KimicodeExecutionRequestResolver,
   ManagedAcpExecutionResultSink as KimicodeExecutionResultSink,
-  ManagedAcpExecutionScheduler as KimicodeExecutionScheduler,
-  ManagedAcpInteractionBridge as KimicodeInteractionBridge,
-  ManagedAcpPreparedInteraction as KimicodePreparedInteraction,
 } from '@/providers/acp/execution/ManagedAcpExecutionBackend';

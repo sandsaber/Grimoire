@@ -1,8 +1,5 @@
 import { AcpApprovalPresenter } from '@/providers/acp/execution/AcpApprovalPresenter';
 
-export type {
-  AcpApprovalCallbacks as OpencodeInteractionCallbacks,
-} from '@/providers/acp/execution/AcpApprovalPresenter';
 
 /**
  * How an opened OpenCode approval reaches the surface.

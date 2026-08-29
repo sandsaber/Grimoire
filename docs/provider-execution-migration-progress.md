@@ -10574,6 +10574,28 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### The export backlog, 1 of 2 — the flip's leftovers (`this commit`)
+
+- Gates: unit 9024 passed / 9024 total across 566 suites; `tsc --noEmit` clean; `npm run lint` clean;
+  `npm run build:release` clean.
+- 183 unconsumed exports down to 130.
+
+**`acpManagedSession.ts` is gone whole.** Its four entry points — the ensureReady load/create phase
+plan, the transport-close retry gate, `bindAcpManagedSession`, `runAcpEnsureReadyForQuery` — had no
+caller in `src/`, and the only thing importing the module was the ACP barrel's `export *`.
+`ManagedAcpExecutionBackend` owns all three jobs on the kernel path (`ensureClient`,
+`ensureSessionBinding`, and the single-attempt retry in `recover`), so the helper went with the
+legacy runtimes that called it. `src/providers/acp/AGENTS.md` still told the next contributor to call
+it instead of re-copying load/create/retry trees; it now says where those live.
+
+**Forty-nine provider-named re-exports of shared ACP types, aliasing nothing anyone used.** Each ACP
+provider's `*ExecutionBackend.ts` re-exported the managed backend's ports under its own name —
+`OpencodeAuxiliaryPort`, `QwenPreparedInteraction`, and so on — and each `*InteractionBridge.ts` did
+the same for the approval shapes. Five of each block had no consumer; the aliases beside them that
+*are* used stayed. Four tests reached for an alias, which is what kept them looking alive: they now
+take the shared name they were always aliases of, which is also what a reader of those tests needs to
+know.
+
 ### A refresh button now says what the refresh did (`this commit`)
 
 - Gates: unit 9033 passed / 9033 total across 567 suites; integration 156 passed / 156 run;

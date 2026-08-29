@@ -12,13 +12,6 @@ import {
 } from '@/providers/qwen/execution/QwenAskUserQuestion';
 import { buildQwenPermissionPresentation } from '@/providers/qwen/execution/QwenPermissionPresentation';
 
-export type {
-  AcpApprovalCallbacks as QwenInteractionCallbacks,
-} from '@/providers/acp/execution/AcpApprovalPresenter';
-export type {
-  AcpApprovalOption as QwenApprovalOption,
-  AcpPermissionPresentation as QwenInteractionPresentation,
-} from '@/providers/acp/execution/AcpPermissionBridge';
 
 /**
  * Qwen's permission requests, as interactions the kernel can carry.

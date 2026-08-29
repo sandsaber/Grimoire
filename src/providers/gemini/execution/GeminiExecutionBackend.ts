@@ -35,12 +35,7 @@ export type GeminiExecutionBackendContext =
   Omit<ManagedAcpExecutionBackendContext, 'descriptor'>;
 
 export type {
-  ManagedAcpAuxiliaryPort as GeminiAuxiliaryPort,
   ManagedAcpExecutionDynamicApplier as GeminiExecutionDynamicApplier,
   ManagedAcpExecutionInvocation as GeminiExecutionInvocation,
-  ManagedAcpExecutionRequestResolver as GeminiExecutionRequestResolver,
   ManagedAcpExecutionResultSink as GeminiExecutionResultSink,
-  ManagedAcpExecutionScheduler as GeminiExecutionScheduler,
-  ManagedAcpInteractionBridge as GeminiInteractionBridgePort,
-  ManagedAcpPreparedInteraction as GeminiPreparedInteraction,
 } from '@/providers/acp/execution/ManagedAcpExecutionBackend';

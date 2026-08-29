@@ -1,6 +1,6 @@
+import { normalizeApprovalInput } from '@/providers/acp/execution/AcpPermissionBridge';
 import {
   buildMimocodePermissionPresentation,
-  normalizeApprovalInput,
 } from '@/providers/mimocode/execution/MimocodePermissionPresentation';
 
 /**

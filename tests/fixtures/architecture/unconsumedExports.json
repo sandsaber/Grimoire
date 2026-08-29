@@ -85,8 +85,8 @@
       "SubagentInfo"
     ],
     "src/features/chat/tabs/tabSettings.ts": [
-      "TabCreateOptions",
-      "hasStartedConversation"
+      "hasStartedConversation",
+      "TabCreateOptions"
     ],
     "src/features/chat/tabs/types.ts": [
       "DEFAULT_MAX_TABS",
@@ -107,12 +107,6 @@
     "src/providers/acp/acpLifecycle.ts": [
       "isAcpLifecycleCurrent",
       "runAcpLifecycleCleanup"
-    ],
-    "src/providers/acp/acpManagedSession.ts": [
-      "bindAcpManagedSession",
-      "planAcpEnsureReadySessionPhase",
-      "runAcpEnsureReadyForQuery",
-      "shouldRetryAcpClosedTransport"
     ],
     "src/providers/acp/acpSessionResume.ts": [
       "buildAcpPersistedSessionFields",
@@ -136,16 +130,16 @@
     ],
     "src/providers/claude/history/ClaudeHistoryStore.ts": [
       "AsyncSubagentResult",
-      "ResolvedAsyncStatus",
-      "SDKNativeContentBlock",
-      "SDKNativeMessage",
-      "SDKSessionReadResult",
       "encodeVaultPathForSDK",
       "getSDKProjectsPath",
       "getSDKSessionPath",
       "isValidSessionId",
       "loadSubagentFinalResult",
-      "sdkSessionExists"
+      "ResolvedAsyncStatus",
+      "SDKNativeContentBlock",
+      "SDKNativeMessage",
+      "sdkSessionExists",
+      "SDKSessionReadResult"
     ],
     "src/providers/claude/history/sdkSessionPaths.ts": [
       "locateSDKSession"
@@ -156,11 +150,11 @@
     "src/providers/claude/runtime/types.ts": [
       "ClaudeEnsureReadyOptions",
       "ClosePersistentQueryOptions",
+      "createResponseHandler",
+      "isTurnCompleteMessage",
       "MESSAGE_CHANNEL_CONFIG",
       "PendingMessage",
-      "SessionState",
-      "createResponseHandler",
-      "isTurnCompleteMessage"
+      "SessionState"
     ],
     "src/providers/claude/sdk/messages.ts": [
       "SDKMessage"
@@ -205,23 +199,10 @@
       "DEFAULT_CODEX_MINI_MODEL_LABEL",
       "DEFAULT_CODEX_PRIMARY_MODEL_LABEL"
     ],
-    "src/providers/gemini/execution/GeminiExecutionBackend.ts": [
-      "GeminiAuxiliaryPort",
-      "GeminiExecutionRequestResolver",
-      "GeminiExecutionScheduler",
-      "GeminiInteractionBridgePort",
-      "GeminiPreparedInteraction"
-    ],
     "src/providers/gemini/execution/GeminiInteractionBridge.ts": [
-      "GeminiApprovalOption",
-      "GeminiInteractionCallbacks",
-      "GeminiInteractionPresentation",
       "normalizeApprovalInput"
     ],
     "src/providers/grok/execution/GrokInteractionBridge.ts": [
-      "GrokApprovalOption",
-      "GrokInteractionCallbacks",
-      "GrokInteractionPresentation",
       "normalizeApprovalInput"
     ],
     "src/providers/grok/models.ts": [
@@ -235,45 +216,9 @@
       "grokAuthPathExists",
       "summarizeGrokCliText"
     ],
-    "src/providers/kimicode/execution/KimicodeExecutionBackend.ts": [
-      "KimicodeAuxiliaryPort",
-      "KimicodeExecutionRequestResolver",
-      "KimicodeExecutionScheduler",
-      "KimicodeInteractionBridge",
-      "KimicodePreparedInteraction"
-    ],
-    "src/providers/kimicode/execution/KimicodeInteractionBridge.ts": [
-      "KimicodeApprovalOption",
-      "KimicodeApprovalOptionPresentation",
-      "KimicodeInteractionPresentation"
-    ],
-    "src/providers/kimicode/execution/KimicodeInteractionPresenter.ts": [
-      "KimicodeInteractionCallbacks"
-    ],
-    "src/providers/kimicode/execution/KimicodePermissionPresentation.ts": [
-      "normalizeApprovalInput"
-    ],
     "src/providers/kimicode/models.ts": [
       "combineKimicodeRawModelSelection",
       "groupKimicodeDiscoveredModels"
-    ],
-    "src/providers/mimocode/execution/MimocodeExecutionBackend.ts": [
-      "MimocodeAuxiliaryPort",
-      "MimocodeExecutionRequestResolver",
-      "MimocodeExecutionScheduler",
-      "MimocodeInteractionBridge",
-      "MimocodePreparedInteraction"
-    ],
-    "src/providers/mimocode/execution/MimocodeInteractionBridge.ts": [
-      "MimocodeApprovalOption",
-      "MimocodeApprovalOptionPresentation",
-      "MimocodeInteractionPresentation"
-    ],
-    "src/providers/mimocode/execution/MimocodeInteractionPresenter.ts": [
-      "MimocodeInteractionCallbacks"
-    ],
-    "src/providers/mimocode/execution/MimocodePermissionPresentation.ts": [
-      "normalizeApprovalInput"
     ],
     "src/providers/mimocode/history/MimocodeSessionErrorStore.ts": [
       "loadLatestMimocodeSessionError"
@@ -283,39 +228,11 @@
       "groupMimocodeDiscoveredModels",
       "resolveMimocodeUnsupportedModelFallback"
     ],
-    "src/providers/opencode/execution/OpencodeExecutionBackend.ts": [
-      "OpencodeAuxiliaryPort",
-      "OpencodeExecutionRequestResolver",
-      "OpencodeExecutionScheduler",
-      "OpencodeInteractionBridge",
-      "OpencodePreparedInteraction"
-    ],
-    "src/providers/opencode/execution/OpencodeInteractionBridge.ts": [
-      "OpencodeApprovalOption",
-      "OpencodeApprovalOptionPresentation",
-      "OpencodeInteractionPresentation"
-    ],
-    "src/providers/opencode/execution/OpencodeInteractionPresenter.ts": [
-      "OpencodeInteractionCallbacks"
-    ],
-    "src/providers/opencode/execution/OpencodePermissionPresentation.ts": [
-      "normalizeApprovalInput"
-    ],
     "src/providers/opencode/models.ts": [
       "combineOpencodeRawModelSelection",
       "groupOpencodeDiscoveredModels"
     ],
-    "src/providers/qwen/execution/QwenExecutionBackend.ts": [
-      "QwenAuxiliaryPort",
-      "QwenExecutionRequestResolver",
-      "QwenExecutionScheduler",
-      "QwenInteractionBridgePort",
-      "QwenPreparedInteraction"
-    ],
     "src/providers/qwen/execution/QwenInteractionBridge.ts": [
-      "QwenApprovalOption",
-      "QwenInteractionCallbacks",
-      "QwenInteractionPresentation",
       "normalizeApprovalInput"
     ],
     "src/shared/icons.ts": [
