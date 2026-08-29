@@ -78,9 +78,17 @@ export interface AntigravityProcessHandle {
   terminate(mode: 'graceful' | 'forced'): Promise<'confirmed' | 'unconfirmed'>;
 }
 
+/** What the backend wants told to it while the run is still open. */
+export interface AntigravityProcessRunnerHooks {
+  readonly onAssistantText?: (text: string) => void;
+}
+
 export interface AntigravityProcessRunner {
   /** Returns durable process-tree ownership synchronously. */
-  start(invocation: AntigravityInvocation): AntigravityProcessHandle;
+  start(
+    invocation: AntigravityInvocation,
+    hooks?: AntigravityProcessRunnerHooks,
+  ): AntigravityProcessHandle;
 }
 
 export interface AntigravityResultSink {
@@ -249,6 +257,9 @@ class AntigravityExecutionRun implements ExecutionRun {
   private committedResult: ResultRef | undefined;
   private committedOutput: string | undefined;
   private resultPublished = false;
+  private runStarted = false;
+  private streamedText = false;
+  private readonly pendingStreamedText: string[] = [];
 
   constructor(
     private readonly request: ExecutionRequest,
@@ -308,7 +319,9 @@ class AntigravityExecutionRun implements ExecutionRun {
       return;
     }
     try {
-      const process = this.context.processRunner.start(invocation);
+      const process = this.context.processRunner.start(invocation, {
+        onAssistantText: text => this.publishStreamedText(text),
+      });
       this.process = process;
       void process.outputLimitExceeded.then(() => this.requestTermination('output-limit'));
       this.timeoutHandle = this.context.scheduler.setTimeout(() => {
@@ -320,6 +333,8 @@ class AntigravityExecutionRun implements ExecutionRun {
         return;
       }
       this.emit({ kind: 'run-started' });
+      this.runStarted = true;
+      this.flushStreamedText();
       const outcome = await process.completed;
       this.outcome = outcome;
       await this.terminationPromise;
@@ -495,12 +510,42 @@ class AntigravityExecutionRun implements ExecutionRun {
     this.publishCommittedResult(result);
   }
 
+  /**
+   * Publishes answer text while the run is still open.
+   *
+   * Held until `run-started`, because that is the event a reader opens the turn
+   * on: a delta that arrives first belongs to a run the kernel has not been
+   * told about yet. Print mode never needed this — it answers in one piece —
+   * and stream-json is what made the piece arrive in pieces (#69).
+   */
+  private publishStreamedText(text: string): void {
+    if (this.terminal || !text) {
+      return;
+    }
+    this.streamedText = true;
+    if (!this.runStarted) {
+      this.pendingStreamedText.push(text);
+      return;
+    }
+    this.emit({ kind: 'output-delta', channel: 'assistant', text });
+  }
+
+  private flushStreamedText(): void {
+    const pending = this.pendingStreamedText.splice(0);
+    for (const text of pending) {
+      this.emit({ kind: 'output-delta', channel: 'assistant', text });
+    }
+  }
+
   private publishCommittedResult(result: ResultRef): void {
     if (this.terminal || this.resultPublished) {
       return;
     }
     this.resultPublished = true;
-    if (this.committedOutput) {
+    // Nothing more to say when it was said as it arrived. The durable result is
+    // still the whole answer — the streamed pieces are transient, and a second
+    // copy of the same text is what a reader would draw twice.
+    if (this.committedOutput && !this.streamedText) {
       // Print mode answers in one piece, so this is the whole turn rather than
       // a delta. It is still the transient event, because the durable copy is
       // the committed result and a second one in the control store is what D2

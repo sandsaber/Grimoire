@@ -10549,6 +10549,44 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Recovery 2 of 6 — the transcript leaves argv (`this commit`)
+
+- Gates: unit 8985 passed / 8985 total across 563 suites; `tsc --noEmit` clean; `npm run lint`
+  clean; `npm run build:release` clean.
+- Recovery plan item 2, and the half of item 5 that needs no presenter.
+
+**`AntigravityStreamJson` is back, and the prompt no longer travels in argv.** When the probe says
+the CLI advertises it, the launch is `--input-format stream-json --output-format stream-json` with
+**no `--print`** — `agy` refuses the two together, which is what makes them exclusive rather than
+additive — and the prompt goes down stdin as one NDJSON user event. Windows `CreateProcess` rejects
+a command line past ~32767 characters, which a growing conversation reached as `spawn ENAMETOOLONG`
+(#69).
+
+**stdin existed all along; nothing asked for it.** `NodeLocalShellProcessAdapter` already takes
+`stdin: 'pipe'` and hands back a writable, and the Antigravity transport neither requested nor
+exposed it. It does now, as `sendInput(text)` — one method rather than a stream, so a provider
+contract learns no Node vocabulary, and it writes and closes in one call because an `agy` waiting on
+a stdin that never ends waits out the whole run timeout.
+
+**The answer comes from the frame, not from the pipe.** In stream-json the answer is one field of
+the last `result`, and everything around it is progress this turn has already published.
+Accumulating the pipe instead would spend the output ceiling on NDJSON envelopes and lose the head of
+a long answer to the cap — which is the reason the parser exists rather than a tail buffer. The bytes
+are still charged against the ceiling, so a run that floods the pipe still reaches the limit.
+
+**And the answer arrives in pieces.** The parser's `onEvent` reaches the backend as
+`onAssistantText`, which publishes `output-delta` while the run is open. Two details that are not
+decoration: the deltas are **held until `run-started`**, because that is the event a reader opens
+the turn on and a delta before it belongs to a run the kernel has not been told about; and the final
+whole-answer delta is **suppressed when text was streamed**, or the reader would draw the same
+answer twice. The durable result is unchanged — it is still the whole answer, committed once.
+
+The test's frame shapes are the parser's own, which were verified against a live capture: a first
+attempt used plausible spellings (`step`, a top-level `response`) and parsed nothing.
+
+Proven by making `usesAntigravityStreamJson` return `false`: the launch, the stdin write, the framed
+answer and the streamed pieces fail together.
+
 ### Recovery 1 of 6 — the capability probe, and the vault `agy` was never told about (`this commit`)
 
 - Gates: unit 8984 passed / 8984 total across 563 suites; `tsc --noEmit` clean; `npm run lint`

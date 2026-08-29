@@ -5,9 +5,15 @@ import type {
   AntigravityProcessHandle,
   AntigravityProcessOutcome,
   AntigravityProcessRunner,
+  AntigravityProcessRunnerHooks,
 } from '../execution/AntigravityExecutionBackend';
-import { buildAntigravityPrintArgs } from './AntigravityPrintProtocol';
+import { buildAntigravityPrintArgs, usesAntigravityStreamJson } from './AntigravityPrintProtocol';
 import { buildAntigravityProcessLaunch } from './AntigravityProcessLaunch';
+import {
+  type AntigravityStreamJsonParser,
+  createAntigravityStreamJsonParser,
+  formatAntigravityUserEvent,
+} from './AntigravityStreamJson';
 import {
   type AntigravityTranscriptRecoveryResult,
   createAntigravityPrintLogPath,
@@ -20,10 +26,20 @@ export interface AntigravityProcessTransportSpec {
   readonly cwd: string;
   readonly environment: Readonly<Record<string, string | undefined>>;
   readonly shell: boolean;
+  /** `pipe` when the prompt travels on stdin rather than in argv. */
+  readonly stdin?: 'pipe' | 'ignore';
 }
 
 export interface AntigravityManagedChildProcess {
   readonly started: Promise<void>;
+  /**
+   * Writes the whole of stdin and closes it.
+   *
+   * One method rather than a stream, so a provider contract learns no Node
+   * vocabulary: the protocol sends exactly one line and then EOF, and anything
+   * that needs more than that needs a different contract, not a wider one.
+   */
+  sendInput?(text: string): Promise<void>;
   readonly stdout: AsyncIterable<Uint8Array>;
   readonly stderr: AsyncIterable<Uint8Array>;
   readonly exited: Promise<{ readonly code: number | null; readonly signal?: string }>;
@@ -55,19 +71,23 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
     requirePositive(options.outputByteLimit ?? 64_000, 'Antigravity output limit');
   }
 
-  start(invocation: AntigravityInvocation): AntigravityProcessHandle {
+  start(
+    invocation: AntigravityInvocation,
+    hooks: AntigravityProcessRunnerHooks = {},
+  ): AntigravityProcessHandle {
     const logFilePath = (this.options.createLogPath ?? createAntigravityPrintLogPath)();
-    const args = buildAntigravityPrintArgs({
+    const spec = {
       ...(invocation.addDirPath ? { addDirPath: invocation.addDirPath } : {}),
       ...(invocation.cliCapabilities ? { capabilities: invocation.cliCapabilities } : {}),
       logFilePath,
       model: invocation.model,
       permissionMode: invocation.permissionMode,
       prompt: invocation.prompt,
-    });
+    };
+    const streamJson = usesAntigravityStreamJson(spec);
     const launch = buildAntigravityProcessLaunch(
       invocation.command,
-      args,
+      buildAntigravityPrintArgs(spec),
       { ...invocation.environment },
     );
     const child = this.options.transport.launch({
@@ -76,11 +96,35 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
       cwd: invocation.cwd,
       environment: invocation.environment,
       shell: launch.shell,
+      ...(streamJson ? { stdin: 'pipe' as const } : {}),
     });
+    const parser = streamJson
+      ? createAntigravityStreamJsonParser({
+        ...(hooks.onAssistantText
+          ? {
+            onEvent: (event) => {
+              if (event.type === 'text') {
+                hooks.onAssistantText?.(event.text);
+              }
+            },
+          }
+          : {}),
+      })
+      : undefined;
+    if (streamJson) {
+      if (!child.sendInput) {
+        throw new Error('Antigravity stream-json launch requires a transport that pipes stdin.');
+      }
+      // Not awaited: the handle is returned synchronously, and a prompt that
+      // cannot be written is a failed run rather than a failed launch — the
+      // process is already owned, so it has to be terminated through the
+      // ordinary path rather than left behind by a throw from here.
+      void child.sendInput(formatAntigravityUserEvent(invocation.prompt)).catch(() => undefined);
+    }
     const outputLimit = new OutputLimitMonitor(this.options.outputByteLimit ?? 64_000);
     return {
       started: child.started,
-      completed: this.observeCompletion(child, invocation, logFilePath, outputLimit),
+      completed: this.observeCompletion(child, invocation, logFilePath, outputLimit, parser),
       outputLimitExceeded: outputLimit.exceeded,
       confirmTerminated: () => child.confirmTerminated(),
       terminate: mode => child.terminate(mode),
@@ -92,15 +136,32 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
     invocation: AntigravityInvocation,
     logFilePath: string,
     outputLimit: OutputLimitMonitor,
+    parser?: AntigravityStreamJsonParser,
   ): Promise<AntigravityProcessOutcome> {
     const stdout = new LimitedBytes(outputLimit);
     const stderr = new LimitedBytes(outputLimit);
     try {
       const [exit] = await Promise.all([
         child.exited,
-        consume(child.stdout, stdout),
+        parser ? consumeFrames(child.stdout, parser, outputLimit) : consume(child.stdout, stdout),
         consume(child.stderr, stderr),
       ]);
+      // **The frame, not the pipe.** In stream-json the answer is one field of
+      // the last `result` frame, and the frames around it are progress this
+      // turn has already published. Accumulating the pipe instead would spend
+      // the byte ceiling on NDJSON envelopes and lose the head of a long answer
+      // to the cap.
+      if (parser) {
+        parser.end();
+        const result = parser.getResult();
+        return {
+          exitCode: exit.code,
+          ...(exit.signal ? { signal: exit.signal } : {}),
+          stdout: result?.response ?? '',
+          stderr: result?.error ? `${stderr.value()}${result.error}` : stderr.value(),
+          ...(outputLimit.didExceed ? { outputLimitExceeded: true } : {}),
+        };
+      }
       const stdoutText = stdout.value();
       const transcript = exit.code === 0 && !stdoutText && !outputLimit.didExceed
         ? await (this.options.recoverTranscript ?? recoverAntigravityPrintTranscriptBounded)(
@@ -185,6 +246,26 @@ class LimitedBytes {
 async function consume(stream: AsyncIterable<Uint8Array>, output: LimitedBytes): Promise<void> {
   for await (const chunk of stream) {
     output.append(chunk);
+  }
+}
+
+/**
+ * Feeds NDJSON to the parser, charging the ceiling for what arrives.
+ *
+ * The bytes are still counted: a run that floods the pipe has to reach the
+ * output limit whether or not the flood parses.
+ */
+async function consumeFrames(
+  stream: AsyncIterable<Uint8Array>,
+  parser: AntigravityStreamJsonParser,
+  outputLimit: OutputLimitMonitor,
+): Promise<void> {
+  const decoder = new TextDecoder('utf8');
+  for await (const chunk of stream) {
+    if (!outputLimit.consume(chunk.byteLength)) {
+      return;
+    }
+    parser.write(decoder.decode(chunk, { stream: true }));
   }
 }
 

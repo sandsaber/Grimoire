@@ -88,6 +88,52 @@ describe('AntigravityPrintProcessRunner', () => {
     expect(transport.specs[0]?.args).not.toContain('--add-dir');
   });
 
+  it('sends the prompt on stdin and reads the answer out of the result frame', async () => {
+    // **`agy` refuses `--print` with `--input-format stream-json`**, so the two
+    // shapes are exclusive: the transcript leaves argv entirely, which is what
+    // survives a conversation past the Windows command-line limit (#69). And
+    // the answer is one field of the last frame — accumulating the pipe would
+    // spend the byte ceiling on NDJSON envelopes.
+    const child = new FakeManagedChild({
+      // The frame shapes are the parser's own, which were verified against a
+      // live `agy --output-format stream-json` capture — not a plausible
+      // spelling: `step_update` carries the step under its own name, and the
+      // answer is `result.response`.
+      stdout: [
+        '{"event":"step_update","step_update":{"step_type":"text","text_delta":"par"}}\n',
+        '{"event":"step_update","step_update":{"step_type":"text","text_delta":"tial"}}\n',
+        '{"event":"result","result":{"status":"ok","response":"partial answer","error":null}}\n',
+      ],
+    });
+    const transport = new FakeTransport(child);
+    const streamed: string[] = [];
+    const runner = new AntigravityPrintProcessRunner({
+      transport,
+      createLogPath: () => '/tmp/antigravity.log',
+      removeLog: jest.fn().mockResolvedValue(undefined),
+    });
+
+    const handle = runner.start({
+      ...INVOCATION,
+      cliCapabilities: { addDir: false, printTimeout: false, streamJson: true },
+    }, { onAssistantText: text => streamed.push(text) });
+    child.exit.resolve({ code: 0 });
+    const outcome = await handle.completed;
+
+    expect(transport.specs[0]?.args).toEqual(expect.arrayContaining([
+      '--input-format', 'stream-json', '--output-format', 'stream-json',
+    ]));
+    expect(transport.specs[0]?.args).not.toContain('--print');
+    expect(transport.specs[0]?.stdin).toBe('pipe');
+    expect(child.stdinWrites).toEqual([
+      expect.stringContaining('"event":"user"'),
+    ]);
+    expect(outcome.stdout).toBe('partial answer');
+    // And the pieces reached the caller while the run was still open, rather
+    // than only as the finished whole.
+    expect(streamed).toEqual(['par', 'tial']);
+  });
+
   it('signals a combined byte overflow instead of silently truncating provider output', async () => {
     const child = new FakeManagedChild({
       stdout: ['123', '4567'],
@@ -219,7 +265,12 @@ class FakeManagedChild implements AntigravityManagedChildProcess {
   readonly exited: Promise<{ readonly code: number | null; readonly signal?: string }>;
   readonly exit = deferred<{ readonly code: number | null; readonly signal?: string }>();
   readonly terminationModes: Array<'graceful' | 'forced'> = [];
+  readonly stdinWrites: string[] = [];
   confirmed = true;
+
+  async sendInput(text: string): Promise<void> {
+    this.stdinWrites.push(text);
+  }
 
   constructor(output: { readonly stdout?: string[]; readonly stderr?: string[] } = {}) {
     this.stdout = chunks(output.stdout ?? []);

@@ -28,6 +28,7 @@ export class NodeAntigravityProcessTransport implements AntigravityProcessTransp
       arguments: [...spec.args],
       cwd: spec.cwd,
       environment: definedEnvironment(spec.environment),
+      ...(spec.stdin === 'pipe' ? { stdin: 'pipe' as const } : {}),
       terminationKind: this.platform === 'windows'
         ? 'windows-process-tree'
         : 'posix-process-group',
@@ -37,6 +38,23 @@ export class NodeAntigravityProcessTransport implements AntigravityProcessTransp
     });
     return {
       started: child.started,
+      ...(child.stdin
+        ? {
+          sendInput: async (text: string) => {
+            // Written and closed in one call: the protocol sends one line and
+            // then EOF, and an `agy` waiting on a stdin that never ends waits
+            // for the whole run timeout.
+            const stdin = child.stdin;
+            if (!stdin) {
+              return;
+            }
+            await new Promise<void>((resolve, reject) => {
+              stdin.write(text, error => (error ? reject(error) : resolve()));
+            });
+            stdin.end();
+          },
+        }
+        : {}),
       stdout: child.stdout,
       stderr: child.stderr,
       exited: child.exited.then(exit => ({ code: exit.code })),
