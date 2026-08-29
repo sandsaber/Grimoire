@@ -10549,6 +10549,38 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Recovery 5 of 6 — `/skill` means something again (`this commit`)
+
+- Gates: unit 8994 passed / 8994 total across 564 suites; `tsc --noEmit` clean; `npm run lint`
+  clean; `npm run build:release` clean.
+- Recovery plan item 6, its first half. Tool-card normalization follows, and needs a presenter this
+  provider does not have yet.
+
+**`agy --print` resolves no slash commands.** Every other provider resolves an invocation through
+its own session; print mode has no session to resolve it in, so `/researcher what changed?` reached
+the CLI as that literal text and the agent was left to guess (#58). The expansion is restored as
+`AntigravityVaultSkills` — the skill's body, the words that followed it, and the context tail
+preserved untouched.
+
+**Three deliberate narrowings from the version it came from.** The source is the one method it needs
+rather than the whole command catalog, because a text transform that could also delete a vault entry
+is a wider thing than it looks. It is reached through the workspace services rather than the deleted
+global registry. And a vault that cannot be listed sends the prompt as the person typed it: failing
+a turn over a skill lookup is a worse answer than sending the literal text.
+
+**The test that mattered was not the module's.** Its four cases passed while the composition called
+nothing — deleting the call from `resolveInvocation` left the whole suite green, which is exactly
+the shape this recovery exists to fix. The assertion that holds it is on `runner.invocations[0]`:
+the prompt the CLI is actually launched with.
+
+**And the capability probe became injectable, because it had to be.** The real one spawns
+`agy --help`, and since the last commit every composition test that resolved an invocation was
+reaching for a binary to find out it is absent. Stubbed in the harness now; what the flags do is
+tested where they are used.
+
+Proven by deleting the expansion from the resolver: the composition test fails and the module's four
+do not.
+
 ### Recovery 4 of 6 — an answer the user watched arrive is not discarded (`this commit`)
 
 - Gates: unit 8989 passed / 8989 total across 563 suites; `tsc --noEmit` clean; `npm run lint`

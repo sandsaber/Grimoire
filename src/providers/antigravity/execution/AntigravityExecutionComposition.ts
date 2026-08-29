@@ -22,6 +22,7 @@ import { t } from '@/i18n/i18n';
 import type GrimoirePlugin from '@/main';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
 import { createAntigravityModuleContext } from '@/providers/antigravity/app/AntigravityModuleContext';
+import { maybeGetAntigravityWorkspaceServices } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
 import {
   AntigravityExecutionBackend,
   type AntigravityExecutionBackendContext,
@@ -42,6 +43,7 @@ import {
   buildAntigravityPromptText,
 } from '@/providers/antigravity/runtime/AntigravityPromptComposer';
 import { buildAntigravityRuntimeEnv } from '@/providers/antigravity/runtime/AntigravityRuntimeEnvironment';
+import { expandAntigravityVaultSkillInvocation } from '@/providers/antigravity/runtime/AntigravityVaultSkills';
 import { getAntigravityProviderSettings } from '@/providers/antigravity/settings';
 import { getVaultPath } from '@/utils/path';
 
@@ -78,6 +80,13 @@ export class AntigravityExecution {
   constructor(
     private readonly plugin: GrimoirePlugin,
     private readonly registry: ExecutionLifecycleRegistry,
+    /**
+     * How the CLI's advertised flags are read, injectable for the same reason
+     * the process runner is: the real one spawns `agy --help`, and a unit suite
+     * that resolves an invocation should not reach for a binary to find out
+     * that it is absent.
+     */
+    private readonly probeCapabilities = probeAntigravityCliCapabilities,
   ) {}
 
   /**
@@ -241,7 +250,7 @@ export class AntigravityExecution {
     // process. Cached per CLI command by the prober, and fail-closed for a
     // launch it could not read — an older `agy` fails on a flag it does not
     // know, so an unread probe has to mean "send nothing extra".
-    const cliCapabilities = await probeAntigravityCliCapabilities(command, environment);
+    const cliCapabilities = await this.probeCapabilities(command, environment);
     plugin.recordDebugLog?.({
       data: {
         addDir: cliCapabilities.addDir,
@@ -264,7 +273,13 @@ export class AntigravityExecution {
       // lives, because `agy --print` exposes no approval hook and anything short
       // of full access must be refused before a process exists.
       permissionMode: antigravityPermissionMode(plugin),
-      prompt: request.prompt,
+      // Expanded here rather than where the request was composed: reading the
+      // vault is asynchronous and the composer is a pure text transform, and
+      // this is already the place that resolves ambient state at dispatch.
+      prompt: await expandAntigravityVaultSkillInvocation(
+        request.prompt,
+        maybeGetAntigravityWorkspaceServices(plugin)?.commandCatalog ?? null,
+      ),
     };
   }
 }

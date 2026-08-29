@@ -90,7 +90,13 @@ describe('Antigravity execution composition', () => {
       storage: new TestDurableStorage(),
       scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
     });
-    const execution = new AntigravityExecution(plugin, host.registry);
+    const execution = new AntigravityExecution(
+      plugin,
+      host.registry,
+      // Stubbed, so resolving an invocation does not reach for `agy --help` to
+      // find out it is absent. What the flags do is tested where they are used.
+      async () => ({ addDir: false, printTimeout: false, streamJson: false }),
+    );
     const runner = new FakeRunner();
     host.registerBackend({ backend: execution.createBackend(runner) });
     await host.start();
@@ -274,6 +280,30 @@ describe('Antigravity execution composition', () => {
       { type: 'error', content: expect.stringContaining('Safe mode is unavailable') },
     ]);
     expect(runtime.consumeTurnMetadata().wasSent).toBe(false);
+  });
+
+  it('expands a vault skill before the CLI ever sees the invocation', async () => {
+    // `agy --print` resolves no slash commands, so without this the literal
+    // text `/researcher` reaches the agent and it is left to guess (#58). The
+    // assertion is on the invocation because that is the thing the CLI is
+    // launched with — a module test cannot say whether anything calls it.
+    const plugin = createPlugin();
+    plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceServicesFor: () => ({
+        commandCatalog: {
+          listVaultEntries: async () => [
+            { name: 'researcher', content: 'Answer with citations.' },
+          ],
+        },
+      }),
+    });
+    const { runtime, runner } = await createTurnHarness(plugin);
+
+    await drain(runtime.query(turn('/researcher what changed?')));
+
+    expect(runner.invocations[0]?.prompt).toContain('Answer with citations.');
+    expect(runner.invocations[0]?.prompt).toContain('what changed?');
+    expect(runner.invocations[0]?.prompt.startsWith('/researcher')).toBe(false);
   });
 
   it('reads settings when the run dispatches, not when the turn was queued', async () => {
