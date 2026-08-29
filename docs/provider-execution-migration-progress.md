@@ -8323,7 +8323,7 @@ every legacy `*ChatRuntime` this migration deleted, which main has gone on fixin
 says sync `main` in at every milestone gate; the last sync was 1.1.7 (`0f84b41`) at M0a, and M1
 through M6 did not. That is not a merge to perform on the way out of a session: it decides whether
 the deleted runtimes come back to be deleted again, or whether main's 137 commits are replayed onto
-the migrated shape instead. **Owner's call, and it is the next thing.**
+the migrated shape instead. **Owner's call, and it is the next thing.** [`provider-execution-main-sync.md`](provider-execution-main-sync.md) turns it into a decision with a size: 76 of the 137 touch no source, 34 touch only files that still exist, and **25 are the decision surface** — 2 that land entirely on code this migration deleted and 23 that land on both. Two more add features this branch does not have at all. For each of those 33 the question is not whether to take the diff but whether the migrated path has the same bug, which is the rule `AGENTS.md` already states about the frozen path.
 
 **Where to pick up.** The sync, with a decision about its shape. Everything else in M5 and M6 is
 either done or recorded with an owner.
