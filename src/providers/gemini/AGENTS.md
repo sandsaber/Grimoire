@@ -33,3 +33,11 @@ Custom CLI paths are stored per host under `providerConfigs.gemini.cliPathsByHos
 
 - On `session/load` failure, decide with `isAcpSessionGone` rather than treating any failure as proof the session is gone. Gemini CLI reports a missing session as `-32603 Internal error` with `data.details` naming the reason, which the shared message patterns recognise; it exposes no session listing, so anything unrecognised - transport, authentication, configuration - propagates with the binding intact.
 - A dropped session is recorded in `providerState.sessionDropped` and read back on load, because the in-memory flag is consumed by the first save. Never replay the transcript into a replacement session: history bootstrap is for a cold resume that never held a session id.
+
+- **Not wired on the kernel path yet.** `isAcpSessionGone` has no caller in `src/`:
+  `ManagedAcpExecutionBackend` still classifies a failed `session/load` with the
+  text-matching `isAcpMissingSessionError`, and the seam it would plug into
+  (`isMissingSessionError`) is a synchronous predicate while the helper is `async`.
+  So a `session/load` that answers a bare `Internal error` still fails the turn rather
+  than soft-failing into a fresh session. The bullet above describes the intended
+  behaviour, not this branch's — see the `main` sync entry in the migration journal.

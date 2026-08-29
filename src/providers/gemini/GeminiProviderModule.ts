@@ -1,5 +1,5 @@
 import type {
-ProviderAgentMention,
+  ProviderAgentMention,
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandsPort,
@@ -76,6 +76,7 @@ import { geminiChatUIConfig } from './ui/GeminiChatUIConfig';
  */
 
 const KNOWN_SETTINGS_FIELDS = new Set([
+  'cliPath',
   'cliPathsByHost',
   'discoveredModelsFingerprint',
   'enabled',
@@ -84,7 +85,6 @@ const KNOWN_SETTINGS_FIELDS = new Set([
   'modelAliases',
   'selectedMode',
   'visibleModels',
-'cliPath',
 ]);
 
 export interface GeminiWorkspaceContext {

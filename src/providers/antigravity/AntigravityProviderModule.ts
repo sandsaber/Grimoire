@@ -1,5 +1,5 @@
 import type {
-ProviderCapabilityDescriptor,
+  ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderModelDescriptor,
   ProviderModelRefreshOptions,

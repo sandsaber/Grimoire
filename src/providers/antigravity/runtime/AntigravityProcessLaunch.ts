@@ -95,6 +95,7 @@ function quoteWindowsArgument(value: string): string {
     .replace(/(\\+)$/, '$1$1');
   return `"${prepared}"`;
 }
+
 function canLaunchDirectlyOnWindows(command: string): boolean {
   const lowerCommand = command.toLowerCase();
   return lowerCommand.endsWith('.exe');

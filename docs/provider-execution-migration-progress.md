@@ -10548,6 +10548,64 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### The sync, reviewed — two defects it introduced and eight it carried (`this commit`)
+
+- Gates: unit 8963 passed / 8963 total across 562 suites; integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+
+**A review of the merge returned fourteen findings. Two were the merge's own, and both are fixed.**
+
+- **Antigravity's module context dropped the `force` flag.** Every other provider builds its slots by
+  spreading the workspace context; Antigravity writes each member out, and its `refreshModels` was
+  `() => workspace.refreshModels()`. **TypeScript cannot see this**: a zero-argument function is
+  assignable to a one-optional-argument signature. So the flag the settings surface sets — the only
+  caller that is the user asking — was discarded, and since `main`'s change also replaced
+  Antigravity's cache TTL with "has it ever refreshed", an install with a persisted catalog would
+  never have rediscovered again. A gate holds it now, and it reads **every** module context from
+  disk rather than the eight-entry list beside it: that list omits Antigravity, which is exactly
+  where this went wrong. Proven by putting the zero-argument form back;
+- **scripted edits left artifacts in nine provider modules** — a de-indented first import member, and
+  `'cliPath'` re-added unindented at the end of a set that is otherwise alphabetical. `eslint` is
+  clean on all of it, so nothing in the gate would ever have said so.
+
+**Two the merge carried, fixed here because they are cheap and user-facing.**
+
+- **The extracted queue indicator hardcoded English.** `⌙ Steering:` and `⌙ Queued:` were literals
+  where the renderer it replaced read `t('chat.ui.messages.steeringPrefix')` and `queuedPrefix` —
+  keys that are still translated in all ten locales, beside new queue strings that *are* translated.
+  A German user would have read "⌙ Queued:" next to "Warteschlange angehalten";
+- **six provider `AGENTS.md` files now instruct the next contributor wrongly.** They say a failed
+  `session/load` is decided by `isAcpSessionGone`, and that helper has no caller in `src/`: the
+  managed ACP backend still classifies with the text-matching `isAcpMissingSessionError`, and the
+  seam it would plug into is a synchronous predicate while the helper is `async`. Each file now says
+  so, under the bullet that describes the intent.
+
+**Eight are `main`'s own, and they are recorded rather than fixed here — they exist on `main` too, and
+a sync is not the place to fix the branch it syncs from.** In rough order of what a user would meet:
+
+- Claude's new **Refresh models / Refresh commands** buttons report success by counting the persisted
+  list, which still holds the previous values when a refresh fails — so a refresh against a
+  logged-out CLI reads "Model list refreshed: 12 models." Both handlers discard the boolean the
+  catalog returns, which is the only honest signal there is;
+- `isGrokNativeModelId` widened to any `grok-` prefix, so a session that reported no per-model levels
+  offers `xhigh` for `grok-4.5` — a level the same diff's comment says that model refuses;
+- `probeRuntimeCommands` lost the inner `try`/`catch` around `supportedCommands()`, so a throw there
+  skips `abort()` and leaves a billed throwaway session uncancelled — and throttles command
+  discovery for ten minutes;
+- Antigravity's model cache lost its TTL and gained no persisted fingerprint, so a persisted
+  catalogue is trusted for the life of the process with no key to invalidate it;
+- `restoreQueuedMessageAfterSteerFailure` has no guard against the pending steer having already been
+  returned to the queue, so a steer that rejects after the turn's `finally` can leave the same
+  follow-up in both the queue and the composer — two turns where the old single slot merged them;
+- Claude's task-plan ledger collapses "no plan yet" and "plan is now empty" into `null`, so deleting
+  the last task leaves it on screen; and its result loop hands one message's `tool_use_result` to
+  every `tool_result` block in that message, which mis-files a batched pair;
+- `hasStreamingMathDelimiters` runs a full normalize pass before its cheap `includes('$')` guard, on
+  the whole accumulated message, on every stream frame.
+
+Owner for all eight: whoever takes them upstream. They are listed here because this branch now
+carries them, and a reader who meets one should not have to rediscover that it arrived with the sync.
+
 ### The `main` sync, executed (`this commit`)
 
 - Gates: unit 8962 passed / 8962 total across 562 suites; integration 156 passed, 128 skipped;

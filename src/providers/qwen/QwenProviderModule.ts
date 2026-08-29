@@ -1,5 +1,5 @@
 import type {
-ProviderAgentMention,
+  ProviderAgentMention,
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandDescriptor,
@@ -80,6 +80,7 @@ import { qwenChatUIConfig } from './ui/QwenChatUIConfig';
  */
 
 const KNOWN_SETTINGS_FIELDS = new Set([
+  'cliPath',
   'cliPathsByHost',
   'discoveredModelsFingerprint',
   'effortLevel',
@@ -89,7 +90,6 @@ const KNOWN_SETTINGS_FIELDS = new Set([
   'modelAliases',
   'selectedMode',
   'visibleModels',
-'cliPath',
 ]);
 
 export interface QwenWorkspaceContext {

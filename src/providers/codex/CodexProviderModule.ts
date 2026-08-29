@@ -1,5 +1,5 @@
 import type {
-ProviderAgentMention,
+  ProviderAgentMention,
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandsPort,

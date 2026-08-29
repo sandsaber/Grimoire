@@ -28,7 +28,11 @@ export function createAntigravityModuleContext(
 
   return {
     listModels: () => workspace.listModels(),
-    refreshModels: () => workspace.refreshModels(),
+    // The options are forwarded, not dropped. A zero-argument function is
+    // assignable to a one-optional-argument signature, so nothing here
+    // fails to compile when it silently discards `force` — and the only
+    // caller that sets it is the user asking for a rediscovery.
+    refreshModels: options => workspace.refreshModels(options),
     renderSettingsTab: host => {
       const rendered = host as {
         container: HTMLElement;

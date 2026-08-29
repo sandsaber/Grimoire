@@ -1,5 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
+
+const PROVIDERS_ROOT = resolve(process.cwd(), 'src/providers');
 
 /**
  * How much of each provider's module context is real.
@@ -107,6 +109,35 @@ describe('provider module context wiring', () => {
       'opencode: 1',
       'qwen: 0',
     ]);
+  });
+
+  it('forwards what a model refresh was asked for instead of dropping it', () => {
+    // **A narrow rule, and it says so.** It covers one slot, because one slot
+    // is where this went wrong: a context wrote `refreshModels: () =>
+    // workspace.refreshModels()`, and a zero-argument function is assignable to
+    // a one-optional-argument signature, so nothing failed to compile while the
+    // `force` flag was silently discarded. The only caller that sets it is the
+    // user asking for a rediscovery, and the provider it was dropped for could
+    // then never rediscover at all.
+    // Read from disk rather than from `CONTEXTS` above, which lists eight of
+    // the nine — Antigravity is measured separately there, and Antigravity is
+    // the one this went wrong in. A rule over a subset reads exactly like a
+    // rule over everything.
+    const contexts = readdirSync(PROVIDERS_ROOT, { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .flatMap(entry => {
+        const appRoot = join(PROVIDERS_ROOT, entry.name, 'app');
+        if (!existsSync(appRoot)) return [];
+        return readdirSync(appRoot)
+          .filter(file => file.endsWith('ModuleContext.ts'))
+          .map(file => join(appRoot, file));
+      });
+    const offenders = contexts
+      .filter(path => /refreshModels:\s*\(\)\s*=>/.test(readFileSync(path, 'utf8')))
+      .map(path => relative(process.cwd(), path));
+
+    expect(contexts).toHaveLength(9);
+    expect(offenders).toEqual([]);
   });
 
   it('leaves no provider stubbing a member Codex has written', () => {
