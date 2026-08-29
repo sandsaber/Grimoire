@@ -16,6 +16,7 @@ import type {
   AcpUsage,
   AcpUsageUpdate,
 } from '@/providers/acp/types';
+import { normalizeGrokSubagentFinishedUpdate } from '@/providers/grok/normalization/grokSubagentNormalization';
 import { createGrokToolStreamAdapter } from '@/providers/grok/normalization/grokToolNormalization';
 import type { ProviderCostValue } from '@/providers/shared/ProviderSpendUsageStore';
 
@@ -99,7 +100,10 @@ export interface GrokContentPresenterPorts {
  *   in integer ticks. The runtime this replaces reads a cost off Grok's session
  *   log instead — and for a turn like the recorded one there is no cost record
  *   there to read, only these ticks;
- * - **`model_changed`** is how a session says the model moved under the tab.
+ * - **`model_changed`** is how a session says the model moved under the tab;
+ * - **`subagent_finished`** is how a background subagent says it ended without
+ *   anyone polling for it. The legacy runtime read this and the flip did not
+ *   carry it, so a subagent that finished on its own kept rendering as running.
  */
 export class GrokContentPresenter {
   private readonly normalizer = new AcpSessionUpdateNormalizer();
@@ -263,6 +267,10 @@ export class GrokContentPresenter {
    * replacement for it.
    */
   private presentVendorUpdate(update: Record<string, unknown>): readonly StreamChunk[] | undefined {
+    const subagentFinished = normalizeGrokSubagentFinishedUpdate(update);
+    if (subagentFinished) {
+      return [subagentFinished];
+    }
     switch (update.sessionUpdate) {
       case 'response_completed':
         this.promptUsage = readResponseUsage(update.usage);

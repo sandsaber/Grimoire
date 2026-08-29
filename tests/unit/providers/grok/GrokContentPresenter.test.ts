@@ -66,6 +66,33 @@ describe('Grok content presenter', () => {
     return presenter.present({ kind: 'session-update', notification });
   }
 
+  it('completes a subagent that finished out of band', () => {
+    // The one assertion here not taken from the recording, and it says why: the
+    // recording covers `initialize`, `session/new` and `session/prompt`, and no
+    // subagent ran in it. The shape is the shipped runtime's, which read this
+    // off every session notification until Grok's flip stopped carrying it —
+    // and a subagent that finishes while nothing polls the wait tool has no
+    // other way to complete its block.
+    const { presenter } = createPresenter();
+
+    const chunks = present(presenter, {
+      sessionId: 'session-1',
+      update: {
+        output: 'Finished report',
+        sessionUpdate: 'subagent_finished',
+        status: 'completed',
+        subagent_id: 'agent-1',
+      },
+    } as unknown as AcpSessionNotification);
+
+    expect(chunks).toEqual([{
+      agentId: 'agent-1',
+      result: 'Finished report',
+      status: 'completed',
+      type: 'async_subagent_result',
+    }]);
+  });
+
   it('reports the tokens only response_completed carries', () => {
     const { presenter } = createPresenter();
     const notification = updateOf('response_completed');

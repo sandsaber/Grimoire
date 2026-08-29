@@ -10494,6 +10494,50 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### M5 — the twelfth search was a lost feature, not a design question (`this commit`)
+
+- Gates: unit 8760 passed / 8760 total across 554 suites; `tsc --noEmit` clean; `npm run lint`
+  clean; `npm run build:release` clean.
+- Parity manifest: unchanged. Nothing deleted; one behaviour restored.
+
+**The last structural deletion search argued itself from a fact that had stopped being true.** The
+row said `async_subagent_result` is a one-provider feature in a provider-neutral union — Claude the
+only `progressObservation: 'full'` in the catalog, and the only emitter — so what would move it is a
+provider port for an out-of-band agent terminal, *or a second provider growing background agents*.
+
+Re-reading it against the code, for the third time this migration, found the second provider had
+already been there. `GrokChatRuntime` called `normalizeGrokSubagentExtensionNotification` on every
+session notification, turning xAI's `subagent_finished` into exactly this chunk. **Grok's flip
+deleted the runtime and did not carry that call onto the kernel path.** Eight days later a sweep
+deleted the now-importerless normalizer as "dead code the flips were meant to take with them" — and
+that is what made the loss invisible, because from then on the only evidence was a consumer in
+`StreamController` that could never fire: `handleProviderLifecycleAsyncSubagentResult` needs a
+`subagentLifecycle` adapter, which only Codex and Grok declare, and a chunk, which only Claude sent.
+An unreachable consumer that looks deliberate is worse than a missing one.
+
+**What a user lost.** Grok's subagents complete two ways: by the wait tool answering, and by the
+agent saying so on its own channel. Only the first survived the flip, so a subagent that finished
+while nothing polled `get_command_or_subagent_output` kept rendering as running until the turn
+ended.
+
+**Restored on `GrokContentPresenter`**, beside the three vendor updates already there, from the
+shipped runtime rather than from a recording — and the difference is stated rather than hidden. The
+wire recording covers `initialize`, `session/new` and `session/prompt`; no subagent ran in it, so
+the field spellings (`subagent_id` / `subagentId`, `output` / `result` / `error`, and the six status
+words) are what shipped, not what was observed. That is row 22 of Grok's smoke matrix, added here
+and marked **never run**, which is where it gets confirmed.
+
+**The row is now retired by evidence rather than driven to zero, and the count went up on purpose:
+three to four.** Two providers emit the chunk, which is both this row's own `closedBy` clause and
+the architecture rule's condition for a contract living in core — "at least two providers need the
+behaviour". The four files are the union member, its two emitters and its consumer. A provider port
+for an out-of-band agent terminal is still the shape that would move it, and it is now worth
+designing, because it would have two implementations to answer to instead of one.
+
+**Both of the last two rows closed the same way**: by re-reading a recorded blocker against the
+code. One had written a type where it meant a fact; this one had written a missing feature where it
+meant a design.
+
 ### M6 — lazy provider initialization, measured (`this commit`)
 
 - Gates: unit 8757 passed / 8757 total across 554 suites; `tsc --noEmit` clean; `npm run lint`

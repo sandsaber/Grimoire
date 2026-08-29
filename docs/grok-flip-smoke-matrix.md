@@ -23,6 +23,7 @@ these rows are for.
 | the answer it never sent | Grok finishes turns whose final message never reaches ACP, with the answer written to that log |
 | billing over the live transport | the plan indicator is `x.ai/billing`, asked of the running process — no ACP method answers it |
 | questions of its own | `ask_user_question` is a server request with its own answer shape, outside the kernel's interactions |
+| subagents that end without being asked | `subagent_finished` arrives on the vendor channel; a subagent nobody polls has no other way to complete its block |
 | rewind is gone | the live record advertised it and the runtime always refused; the flip removes the dead button |
 
 ## The matrix
@@ -53,6 +54,7 @@ client. Rows 18–21 are what five surfaces ask when nobody is in a conversation
 | 19 | Slash commands list in a blank tab | the session's own commands appear in the composer |
 | 20 | The spend indicator moves | after a turn, from the ticks Grok reports and from the log when it reports none |
 | 21 | No rewind button appears | the affordance the flip removed is gone, and nothing else lost a button |
+| 22 | A subagent that finishes on its own completes its block | spawn one, do not poll `get_command_or_subagent_output`, and let it end: the block stops rendering as running and shows its result. **Never run.** This is the row for `subagent_finished`, which the legacy runtime read and the flip lost; the field spellings restored with it are the shipped runtime's, not the recording's — no subagent ran in the recording |
 
 ## The half that runs itself
 

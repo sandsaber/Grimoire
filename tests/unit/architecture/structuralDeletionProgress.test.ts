@@ -287,23 +287,31 @@ const SEARCHES: readonly DeletionSearch[] = [
     // belonging to something else, so the ownership is a field and the two
     // variants are deleted.
     //
-    // **What is left is `async_subagent_result` in three files, and it is a
-    // product question rather than a leftover.** It says a background agent
-    // finished, and Claude is the only provider that has one — the only
-    // `progressObservation: 'full'` in the catalog, and the only emitter. So a
-    // one-provider feature sits in a provider-neutral union, which the root
-    // instructions say belongs in core only when two providers need it. It
-    // cannot be replaced by the durable records, which are *downstream* of it:
-    // this chunk is what tells the manager an agent ended, and the recorder
-    // writes the record from that. What would move it is a provider port for an
-    // out-of-band agent terminal, and the slot Codex and Grok fill —
-    // `subagentLifecycle` — is not it: that adapter recognizes tool *names*,
-    // and a terminal notification is not one.
+    // **Four, and the count going up is the finding.** This row argued
+    // `async_subagent_result` was a one-provider feature in a provider-neutral
+    // union: Claude the only `progressObservation: 'full'` in the catalog, and
+    // the only emitter. The second half was true only because Grok's emitter
+    // had been lost. `GrokChatRuntime` read xAI's `subagent_finished` off every
+    // session notification; Grok's flip did not carry it onto the kernel path,
+    // and the orphaned normalizer was swept eight days later as dead code —
+    // which is what made the loss invisible, and what left the consumer in
+    // `StreamController` unreachable while looking deliberate.
+    //
+    // Restored on `GrokContentPresenter`, the chunk has two emitters. That is
+    // this row's own `closedBy` clause met, and it is the architecture rule's
+    // condition for a contract belonging in core: at least two providers need
+    // the behaviour. **Retired by evidence rather than driven to zero.** The
+    // four files are the union member, its two emitters, and its consumer.
+    //
+    // A provider port for an out-of-band agent terminal is still the shape that
+    // would move it, and it is now worth designing: it has two implementations
+    // to answer to instead of one.
     what: 'StreamChunk and the subagent chunk vocabulary',
     pattern: /\bChatTurnLifecycleChunk\b|async_subagent_result|subagent_tool_(use|result)/,
-    files: 3,
-    closedBy: 'a provider port for an out-of-band agent terminal, or a second '
-      + 'provider growing background agents — the shape is unproven with one',
+    files: 4,
+    closedBy: 'retired — the second provider this row asked for turned out to '
+      + 'be a regression rather than a future, and restoring it makes the union '
+      + 'member what the architecture rule allows in core',
   },
   {
     what: 'the registries',
@@ -381,17 +389,19 @@ describe('structural deletion progress', () => {
     // Printed by being asserted, like the live-matrix summary: a reader who
     // wants "what is left" reads this line rather than eleven assertions.
     expect(remaining.map(search => `${search.what}: ${search.files}`)).toEqual([
-      'StreamChunk and the subagent chunk vocabulary: 3',
+      'StreamChunk and the subagent chunk vocabulary: 4',
     ]);
-    // **Eleven of twelve are zero.** The one that is not is not blocked, and
-    // its entry says why: three of its four patterns name the subagent chunk
-    // vocabulary, which is `ChatContentItem` — Claude's transform emits those
-    // and `StreamController` draws them — and durable agents cannot take them
-    // over, because an `AgentResultRecord` carries no tool calls.
+    // **Eleven of twelve are zero, and the twelfth is retired rather than
+    // pending.** It went from three to four on purpose: its entry says why, and
+    // the short version is that the row's own argument — one provider, so the
+    // union member does not belong in core — rested on an emitter that had been
+    // lost at Grok's flip and then swept as dead code. Restoring it gives the
+    // chunk the two providers the architecture rule asks for.
     //
-    // The row above it closed by re-reading its own recorded blocker and
-    // finding a type where it had written a fact, which is worth remembering
-    // the next time this list looks finished.
+    // Both of the last two rows closed by re-reading a recorded blocker against
+    // the code: one had written a type where it meant a fact, and this one had
+    // written a missing feature where it meant a design. Worth remembering the
+    // next time this list looks finished.
     expect(SEARCHES).toHaveLength(remaining.length + 11);
   });
 });

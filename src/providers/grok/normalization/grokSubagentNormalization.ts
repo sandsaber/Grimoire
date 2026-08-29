@@ -1,5 +1,5 @@
 import type { ProviderSubagentLifecycleAdapter } from '../../../core/providers/types';
-import type { SubagentInfo, ToolCallInfo } from '../../../core/types';
+import type { StreamChunk, SubagentInfo, ToolCallInfo } from '../../../core/types';
 import { isRecord } from '../../../utils/records';
 
 export const GROK_SUBAGENT_SPAWN_TOOL = 'spawn_subagent';
@@ -240,6 +240,57 @@ export function buildGrokSubagentInfo(
     ...(spawnResult.agentId ? { agentId: spawnResult.agentId } : {}),
   };
 }
+
+/**
+ * xAI's out-of-band "this subagent finished" update, as a shared chunk.
+ *
+ * **Restored, not written.** `GrokChatRuntime` read this off every session
+ * notification, and Grok's flip did not carry it onto the kernel path; the
+ * orphaned normalizer was then swept as dead code, which is what made the loss
+ * invisible. Without it a subagent that finishes while nothing is polling the
+ * wait tool never completes its block — the tab keeps rendering it as running
+ * until the turn ends.
+ *
+ * The session is matched by the caller: the presenter is given only the
+ * notifications for the session the connection is bound to.
+ *
+ * The field spellings are the shipped runtime's, not a recording's — the wire
+ * recording covers `initialize`, `session/new` and `session/prompt`, and no
+ * subagent ran in it. Confirming them is the Grok live harness's job.
+ */
+export function normalizeGrokSubagentFinishedUpdate(
+  update: unknown,
+): Extract<StreamChunk, { type: 'async_subagent_result' }> | null {
+  if (!isRecord(update) || update.sessionUpdate !== 'subagent_finished') {
+    return null;
+  }
+  const agentId = firstString(update.subagent_id, update.subagentId);
+  const rawStatus = firstString(update.status)?.toLowerCase();
+  if (!agentId || !rawStatus) {
+    return null;
+  }
+  const status = SUBAGENT_FINISHED_STATUSES[rawStatus];
+  if (!status) {
+    return null;
+  }
+  const result = firstString(update.output, update.result, update.error);
+  return {
+    agentId,
+    ...(result !== undefined ? { result } : {}),
+    status,
+    type: 'async_subagent_result',
+  };
+}
+
+/** What xAI calls an ending, mapped onto the two the chunk has. */
+const SUBAGENT_FINISHED_STATUSES: Readonly<Record<string, 'completed' | 'error'>> = {
+  canceled: 'error',
+  cancelled: 'error',
+  completed: 'completed',
+  error: 'error',
+  failed: 'error',
+  success: 'completed',
+};
 
 export const grokSubagentLifecycleAdapter: ProviderSubagentLifecycleAdapter = {
   isHiddenTool(name): boolean {
