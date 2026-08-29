@@ -63,8 +63,17 @@ describe('Antigravity execution composition', () => {
     hang = false;
     private release: ((outcome: AntigravityProcessOutcome) => void) | undefined;
 
-    start(invocation: AntigravityInvocation): AntigravityProcessHandle {
+    /** Steps a run reports before it answers, in the parser's own shapes. */
+    toolSteps: unknown[] = [];
+
+    start(
+      invocation: AntigravityInvocation,
+      hooks?: { onToolStep?: (step: unknown) => void },
+    ): AntigravityProcessHandle {
       this.invocations.push(invocation);
+      for (const step of this.toolSteps) {
+        hooks?.onToolStep?.(step);
+      }
       const completed = this.hang
         ? new Promise<AntigravityProcessOutcome>(resolve => { this.release = resolve; })
         : Promise.resolve(this.outcome);
@@ -280,6 +289,37 @@ describe('Antigravity execution composition', () => {
       { type: 'error', content: expect.stringContaining('Safe mode is unavailable') },
     ]);
     expect(runtime.consumeTurnMetadata().wasSent).toBe(false);
+  });
+
+  it('draws an agy tool call as the card every other provider gets', async () => {
+    // The vocabulary is translated inside the provider — `run_command` is Bash,
+    // `CommandLine` is `command` — because the shared renderer keys its icon,
+    // header and diff off the neutral names and must not learn a second set
+    // (#96). Asserted on the chunks a tab receives, since a presenter nothing
+    // calls presents nothing.
+    const { runtime, runner } = await createTurnHarness(createPlugin());
+    runner.toolSteps = [
+      {
+        type: 'tool_start',
+        stepId: 'step-1',
+        toolName: 'run_command',
+        input: { CommandLine: 'ls -la' },
+      },
+      { type: 'tool_end', stepId: 'step-1', toolName: 'run_command', output: 'total 0' },
+    ];
+
+    const chunks = await drain(runtime.query(turn('list the folder')));
+
+    expect(chunks).toContainEqual({
+      type: 'tool_use',
+      id: 'step-1',
+      name: 'Bash',
+      // Both keys: the neutral one the renderer reads, and `agy`'s own, which
+      // is what its transcripts and logs show — dropping it would make a card
+      // impossible to line up against the CLI's own output.
+      input: { CommandLine: 'ls -la', command: 'ls -la' },
+    });
+    expect(chunks).toContainEqual({ type: 'tool_result', id: 'step-1', content: 'total 0' });
   });
 
   it('expands a vault skill before the CLI ever sees the invocation', async () => {

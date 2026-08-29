@@ -23,6 +23,7 @@ import type GrimoirePlugin from '@/main';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
 import { createAntigravityModuleContext } from '@/providers/antigravity/app/AntigravityModuleContext';
 import { maybeGetAntigravityWorkspaceServices } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
+import { AntigravityContentPresenter } from '@/providers/antigravity/execution/AntigravityContentPresenter';
 import {
   AntigravityExecutionBackend,
   type AntigravityExecutionBackendContext,
@@ -196,6 +197,10 @@ export class AntigravityExecution {
         });
       },
       describeFailure: reason => describeAntigravityFailure(plugin, reason),
+      // One presenter per runtime, because a tool card belongs to the tab that
+      // opened it. It holds nothing across turns — print mode has no session —
+      // so this is a translator rather than a state machine.
+      presentProviderContent: payload => new AntigravityContentPresenter().present(payload),
     };
     return new ExecutionChatRuntimeAdapter(
       {

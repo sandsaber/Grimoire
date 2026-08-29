@@ -91,6 +91,8 @@ export interface AntigravityProcessHandle {
 /** What the backend wants told to it while the run is still open. */
 export interface AntigravityProcessRunnerHooks {
   readonly onAssistantText?: (text: string) => void;
+  /** A tool call starting or ending, opaque to the backend that forwards it. */
+  readonly onToolStep?: (step: unknown) => void;
   /** Any sign the run is alive: a byte on a pipe, or its log file growing. */
   readonly onActivity?: () => void;
 }
@@ -294,6 +296,7 @@ class AntigravityExecutionRun implements ExecutionRun {
   private runStarted = false;
   private streamedText = false;
   private readonly pendingStreamedText: string[] = [];
+  private readonly pendingToolSteps: unknown[] = [];
 
   constructor(
     private readonly request: ExecutionRequest,
@@ -356,6 +359,7 @@ class AntigravityExecutionRun implements ExecutionRun {
       const process = this.context.processRunner.start(invocation, {
         onActivity: () => this.armInactivityTimeout(),
         onAssistantText: text => this.publishStreamedText(text),
+        onToolStep: step => this.publishToolStep(step),
       });
       this.process = process;
       void process.outputLimitExceeded.then(() => this.requestTermination('output-limit'));
@@ -598,7 +602,30 @@ class AntigravityExecutionRun implements ExecutionRun {
     this.emit({ kind: 'output-delta', channel: 'assistant', text });
   }
 
+  /**
+   * Publishes a tool step for the surface to draw a card from.
+   *
+   * Held until `run-started` for the reason the text is: the turn a card
+   * belongs to has to exist before the card does. Opaque here — what a step
+   * means is the presenter's question, and the backend's job is only to get it
+   * out in order.
+   */
+  private publishToolStep(step: unknown): void {
+    if (this.terminal) {
+      return;
+    }
+    if (!this.runStarted) {
+      this.pendingToolSteps.push(step);
+      return;
+    }
+    this.emit({ kind: 'provider-content', payload: step });
+  }
+
   private flushStreamedText(): void {
+    const pendingSteps = this.pendingToolSteps.splice(0);
+    for (const step of pendingSteps) {
+      this.emit({ kind: 'provider-content', payload: step });
+    }
     const pending = this.pendingStreamedText.splice(0);
     for (const text of pending) {
       this.emit({ kind: 'output-delta', channel: 'assistant', text });

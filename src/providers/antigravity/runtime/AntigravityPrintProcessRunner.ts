@@ -111,15 +111,13 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
     });
     const parser = streamJson
       ? createAntigravityStreamJsonParser({
-        ...(hooks.onAssistantText
-          ? {
-            onEvent: (event) => {
-              if (event.type === 'text') {
-                hooks.onAssistantText?.(event.text);
-              }
-            },
+        onEvent: (event) => {
+          if (event.type === 'text') {
+            hooks.onAssistantText?.(event.text);
+            return;
           }
-          : {}),
+          hooks.onToolStep?.(event);
+        },
       })
       : undefined;
     if (streamJson) {

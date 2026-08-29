@@ -10549,6 +10549,36 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Recovery 5 of 6, second half — an `agy` tool call gets a card (`this commit`)
+
+- Gates: unit 9002 passed / 9002 total across 565 suites; integration 156 passed, 128 skipped;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+
+**This provider had no content presenter at all.** The tool steps the parser has been producing
+since recovery 2 reached the runner and stopped there: the backend had nowhere to put them, and the
+adapter's `presentProviderContent` port — which every ACP provider fills — was simply not set for
+Antigravity. So a `agy` run that read three files and ran a command drew nothing but its answer.
+
+Four pieces, and each was missing:
+
+- **`antigravityToolNormalization` is restored**, having been deleted twice for the same wrong
+  reason as the other two. `run_command` becomes `Bash` and `CommandLine` becomes `command`, so an
+  `agy` call gets the same card as any other provider's — the shared renderer keys its icon, header
+  and diff off the neutral names and must not learn a second set (#96). The native key is kept
+  beside the neutral one, deliberately: `agy`'s own argument names are what its transcripts show,
+  and a card that cannot be lined up against the CLI's output is harder to trust;
+- **`AntigravityContentPresenter`**, whose whole vocabulary is two shapes — a call starting and the
+  same call ending. Everything else this provider says is the answer, and the answer travels on the
+  transient channel as it arrives. There is no session, no plan and no interaction to present:
+  print mode has none of them;
+- **the backend forwards the steps** as `provider-content`, opaque to it — what a step means is the
+  presenter's question — and holds them until `run-started` for the same reason the text is held:
+  the turn a card belongs to has to exist before the card does;
+- **the port is set**, which is the part that could not be assumed. Removing that one line leaves
+  every other Antigravity suite green, so the assertion is on the chunks a tab receives.
+
+Proven by removing `presentProviderContent`: the composition test fails and nothing else does.
+
 ### Recovery 5 of 6 — `/skill` means something again (`this commit`)
 
 - Gates: unit 8994 passed / 8994 total across 564 suites; `tsc --noEmit` clean; `npm run lint`
