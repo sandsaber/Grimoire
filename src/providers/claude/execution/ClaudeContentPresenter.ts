@@ -3,6 +3,7 @@ import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { ChatTurnMetadata } from '../../../core/runtime/types';
 import type { StreamChunk } from '../../../core/types';
 import { isContextWindowEvent, isSessionInitEvent, isStreamChunk } from '../sdk/typeGuards';
+import { createClaudeTaskPlanState } from '../stream/claudeTaskPlanState';
 import {
   createTransformStreamState,
   createTransformUsageState,
@@ -57,6 +58,14 @@ export interface ClaudeContentPresenterPorts {
 export class ClaudeContentPresenter {
   private readonly streamState = createTransformStreamState();
   private readonly usageState = createTransformUsageState();
+  /**
+   * The plan the SDK's task tools build, per conversation.
+   *
+   * Beside the other two rather than per turn: a plan spans a conversation the
+   * way a task list does, and the tool that creates an entry and the one that
+   * completes it are usually different turns.
+   */
+  private taskPlanState = createClaudeTaskPlanState();
   private sessionId: string | undefined;
   private metadata: ChatTurnMetadata = {};
   private bufferedUsage: Extract<StreamChunk, { type: 'usage' }> | undefined;
@@ -108,6 +117,9 @@ export class ClaudeContentPresenter {
     this.sessionId = undefined;
     this.metadata = {};
     this.bufferedUsage = undefined;
+    // A new conversation starts with no plan. Carrying the ledger over would
+    // show one conversation's tasks in another.
+    this.taskPlanState = createClaudeTaskPlanState();
     this.beginTurn();
   }
 
@@ -218,6 +230,7 @@ export class ClaudeContentPresenter {
         ? { resolvedContextWindow: settings.resolvedContextWindow }
         : {}),
       streamState: this.streamState,
+      taskPlanState: this.taskPlanState,
       usageState: this.usageState,
     };
   }

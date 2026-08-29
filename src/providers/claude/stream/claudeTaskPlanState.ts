@@ -38,6 +38,8 @@ export interface ClaudeTaskPlanState {
   pendingCreates: Map<string, { content: string; activeForm: string }>;
   /** Insertion-ordered task ledger. */
   tasks: Map<string, TodoItem>;
+  /** Whether a plan has ever been published, which is what makes empty sayable. */
+  published: boolean;
 }
 
 export function createClaudeTaskPlanState(): ClaudeTaskPlanState {
@@ -45,6 +47,7 @@ export function createClaudeTaskPlanState(): ClaudeTaskPlanState {
     toolNamesById: new Map(),
     pendingCreates: new Map(),
     tasks: new Map(),
+    published: false,
   };
 }
 
@@ -69,11 +72,23 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 /** Full plan, or null when there is nothing the panel could render. */
+/**
+ * The plan as it stands, or `null` when there has never been one.
+ *
+ * **An empty plan is not the absence of a plan.** Deleting the last task, or a
+ * `TaskList` that comes back empty, leaves a ledger with nothing in it — and
+ * collapsing that to `null` meant the caller published nothing and the task the
+ * user just deleted stayed on screen.
+ */
 function snapshot(state: ClaudeTaskPlanState): TodoItem[] | null {
   const todos = [...state.tasks.values()].filter(
     (task) => task.content.length > 0 && task.activeForm.length > 0,
   );
-  return todos.length > 0 ? todos.map((task) => ({ ...task })) : null;
+  if (todos.length > 0) {
+    state.published = true;
+    return todos.map((task) => ({ ...task }));
+  }
+  return state.published ? [] : null;
 }
 
 function upsertTask(

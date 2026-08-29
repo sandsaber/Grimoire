@@ -9,8 +9,91 @@ import {
 
 const msg = buildSDKMessage;
 
+/** A `TaskCreate` on `call-1`, which is what a result has to answer. */
+function seedCreate(state: ReturnType<typeof createClaudeTaskPlanState>) {
+  const drained = [...transformSDKMessage(
+    msg({
+      type: 'assistant',
+      message: {
+        content: [{
+          type: 'tool_use',
+          id: 'call-1',
+          name: 'TaskCreate',
+          input: { subject: 'Run tests', description: 'Run them', activeForm: 'Running tests' },
+        }],
+      },
+    }),
+    { taskPlanState: state },
+  )];
+  // Drained, not discarded: the generator has to run for the create to be
+  // recorded, and naming the result is what says that is the point.
+  expect(drained.length).toBeGreaterThan(0);
+  return state;
+}
+
 describe('transformSDKMessage', () => {
   describe('task plan replay', () => {
+    it('says the plan is empty rather than saying nothing', () => {
+      // **An empty plan is not the absence of a plan.** Collapsing both to
+      // `null` meant the caller published nothing when the last task was
+      // deleted, and the task the user had just removed stayed on screen.
+      const taskPlanState = createClaudeTaskPlanState();
+      const created = [...transformSDKMessage(
+        msg({
+          type: 'user',
+          tool_use_result: { task: { id: 't1', subject: 'Run tests', activeForm: 'Running' } },
+          message: { content: [{ type: 'tool_result', tool_use_id: 'call-1', content: 'created' }] },
+        }),
+        { taskPlanState: seedCreate(taskPlanState) },
+      )];
+      expect(created.some(chunk => chunk.type === 'tool_use' && chunk.name === 'TodoWrite'))
+        .toBe(true);
+
+      const deleted = [...transformSDKMessage(
+        msg({
+          type: 'assistant',
+          message: {
+            content: [{
+              type: 'tool_use',
+              id: 'call-2',
+              name: 'TaskUpdate',
+              input: { taskId: 't1', status: 'deleted' },
+            }],
+          },
+        }),
+        { taskPlanState },
+      )];
+
+      const plan = deleted.find(chunk => chunk.type === 'tool_use' && chunk.name === 'TodoWrite');
+      expect(plan).toBeDefined();
+      expect(plan && 'input' in plan ? plan.input : undefined).toEqual({ todos: [] });
+    });
+
+    it('files no task from a message that batched two tool results', () => {
+      // `tool_use_result` is one object on the message while the content array
+      // can carry several results — Claude batches parallel results into one
+      // user message. Handing that payload to every id filed a create's answer
+      // under whichever call came second, and consumed the pending create on
+      // the way. Nothing can say which id it belongs to, so nothing is filed.
+      const taskPlanState = createClaudeTaskPlanState();
+      const chunks = [...transformSDKMessage(
+        msg({
+          type: 'user',
+          tool_use_result: { task: { id: 't1', subject: 'Run tests' } },
+          message: {
+            content: [
+              { type: 'tool_result', tool_use_id: 'call-1', content: 'created' },
+              { type: 'tool_result', tool_use_id: 'call-2', content: 'read a file' },
+            ],
+          },
+        }),
+        { taskPlanState: seedCreate(taskPlanState) },
+      )];
+
+      expect(chunks.some(chunk => chunk.type === 'tool_use' && chunk.name === 'TodoWrite'))
+        .toBe(false);
+    });
+
     it('replays the accumulated task plan as a TodoWrite chunk', () => {
       const taskPlanState = createClaudeTaskPlanState();
 

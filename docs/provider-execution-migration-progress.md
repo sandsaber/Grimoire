@@ -10549,6 +10549,40 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Phase 2, 1 of 3 — Claude's plan panel is connected, and two defects with it (`this commit`)
+
+- Gates: unit 9006 passed / 9006 total across 566 suites; `tsc --noEmit` clean; `npm run lint`
+  clean; `npm run build:release` clean.
+- Recovery plan item 8.
+
+**`claudeTaskPlanState` arrived with the sync and was wired to nothing.**
+`transformSDKMessage` takes an optional `taskPlanState` and builds the plan panel from the SDK's
+task tools only when handed a ledger; `ClaudeContentPresenter.transformOptions()` supplied
+`streamState` and `usageState` and not that one. So `TaskCreate` and `TaskUpdate` went by and no
+panel was ever rebuilt.
+
+The ledger lives beside the other two, per conversation rather than per turn — a plan spans a
+conversation the way a task list does, and the tool that creates an entry and the one that completes
+it are usually different turns — and is dropped when the conversation is.
+
+**Two defects would have shipped with it**, both from the review of the sync, both fixed here rather
+than left in a feature that was about to start running:
+
+- **an empty plan is not the absence of a plan.** `snapshot` returned `null` for both, and the
+  emitter treats `null` as "nothing to say" — so deleting the last task, or a `TaskList` that comes
+  back empty, left the task the user had just removed on screen. `null` now means "there has never
+  been a plan" and `[]` means "the plan is empty", which is published;
+- **one payload, so one block.** `tool_use_result` is a single object on the message while the
+  content array can carry several results — Claude batches parallel tool results into one user
+  message — and the loop handed that payload to every id in turn. A `TaskCreate`'s answer was filed
+  under whichever call came second, consuming the pending create on the way. With more than one
+  result present, nothing can say which id the payload belongs to, so nothing is recorded.
+
+**The test that holds the wiring is the presenter's, and it is a new file.** The ledger's own tests
+pass whether or not anything supplies one, which is the whole shape of this recovery. Proven by
+removing `taskPlanState` from `transformOptions`: the presenter test fails and the ledger's
+seventy-seven do not.
+
 ### Recovery 6 of 6 — the documentation says what is true (`this commit`)
 
 - Gates: unit 9002 passed / 9002 total across 565 suites; `npm run lint` clean;
