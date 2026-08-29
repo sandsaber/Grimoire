@@ -35,6 +35,7 @@ import {
 } from '@/providers/antigravity/execution/AntigravityRequestStore';
 import { NodeAntigravityProcessTransport } from '@/providers/antigravity/execution/NodeAntigravityProcessTransport';
 import { decodeAntigravityModelId } from '@/providers/antigravity/models';
+import { probeAntigravityCliCapabilities } from '@/providers/antigravity/runtime/AntigravityCliCapabilities';
 import { AntigravityPrintProcessRunner } from '@/providers/antigravity/runtime/AntigravityPrintProcessRunner';
 import {
   buildAntigravityPrintPrompt,
@@ -233,10 +234,31 @@ export class AntigravityExecution {
       throw new Error('Antigravity is disabled.');
     }
     const command = plugin.getResolvedProviderCliPath('antigravity') ?? 'agy';
+    const environment = buildAntigravityRuntimeEnv(plugin.settings, command);
+    const vaultPath = getVaultPath(plugin.app);
+    // Probed here, with the rest of what a launch reads at dispatch time. The
+    // runner cannot: it hands back a handle synchronously, and a probe is a
+    // process. Cached per CLI command by the prober, and fail-closed for a
+    // launch it could not read — an older `agy` fails on a flag it does not
+    // know, so an unread probe has to mean "send nothing extra".
+    const cliCapabilities = await probeAntigravityCliCapabilities(command, environment);
+    plugin.recordDebugLog?.({
+      data: {
+        addDir: cliCapabilities.addDir,
+        printTimeout: cliCapabilities.printTimeout,
+        providerId: 'antigravity',
+        streamJson: cliCapabilities.streamJson,
+      },
+      event: 'antigravity.capabilities.probed',
+      level: 'debug',
+      scope: 'provider.antigravity',
+    });
     return {
       command,
-      cwd: getVaultPath(plugin.app) ?? process.cwd(),
-      environment: buildAntigravityRuntimeEnv(plugin.settings, command),
+      cliCapabilities,
+      cwd: vaultPath ?? process.cwd(),
+      ...(vaultPath ? { addDirPath: vaultPath } : {}),
+      environment,
       model: request.model,
       // Reported as configured, not normalized: the backend is where fail-closed
       // lives, because `agy --print` exposes no approval hook and anything short

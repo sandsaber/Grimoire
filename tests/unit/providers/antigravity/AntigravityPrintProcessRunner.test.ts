@@ -40,6 +40,54 @@ describe('AntigravityPrintProcessRunner', () => {
     expect(removeLog).toHaveBeenCalledWith('/tmp/antigravity.log');
   });
 
+  it('admits the vault only when the CLI says it knows the flag', async () => {
+    // **`agy` scopes its workspace to what it was told about, not to where it
+    // was started** (#67), so the vault has to be named — and an older build
+    // treats an unknown flag as an argument and fails the run on it. Both
+    // halves are the test: sent when advertised, absent when not.
+    const advertised = new FakeTransport(new FakeManagedChild());
+    const legacy = new FakeTransport(new FakeManagedChild());
+
+    for (const [transport, addDir] of [[advertised, true], [legacy, false]] as const) {
+      const runner = new AntigravityPrintProcessRunner({
+        transport,
+        createLogPath: () => '/tmp/antigravity.log',
+        removeLog: jest.fn().mockResolvedValue(undefined),
+      });
+      const handle = runner.start({
+        ...INVOCATION,
+        addDirPath: '/vault',
+        cliCapabilities: { addDir, printTimeout: false, streamJson: false },
+      });
+      (transport.child as FakeManagedChild).exit.resolve({ code: 0 });
+      await handle.completed;
+    }
+
+    expect(advertised.specs[0]?.args).toEqual(expect.arrayContaining(['--add-dir', '/vault']));
+    expect(legacy.specs[0]?.args).not.toContain('--add-dir');
+  });
+
+  it('sends no vault to add when there is no vault', async () => {
+    // `cwd` falls back to the process directory, and a fallback is not a vault:
+    // adding it would widen the agent's workspace to wherever Obsidian was
+    // started from.
+    const transport = new FakeTransport(new FakeManagedChild());
+    const runner = new AntigravityPrintProcessRunner({
+      transport,
+      createLogPath: () => '/tmp/antigravity.log',
+      removeLog: jest.fn().mockResolvedValue(undefined),
+    });
+
+    const handle = runner.start({
+      ...INVOCATION,
+      cliCapabilities: { addDir: true, printTimeout: false, streamJson: false },
+    });
+    (transport.child as FakeManagedChild).exit.resolve({ code: 0 });
+    await handle.completed;
+
+    expect(transport.specs[0]?.args).not.toContain('--add-dir');
+  });
+
   it('signals a combined byte overflow instead of silently truncating provider output', async () => {
     const child = new FakeManagedChild({
       stdout: ['123', '4567'],
@@ -156,7 +204,7 @@ const INVOCATION: AntigravityInvocation = {
 class FakeTransport {
   readonly specs: AntigravityProcessTransportSpec[] = [];
 
-  constructor(private readonly child: AntigravityManagedChildProcess) {}
+  constructor(readonly child: AntigravityManagedChildProcess) {}
 
   launch(spec: AntigravityProcessTransportSpec): AntigravityManagedChildProcess {
     this.specs.push(spec);

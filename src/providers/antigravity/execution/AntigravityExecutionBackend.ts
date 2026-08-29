@@ -32,6 +32,26 @@ export interface AntigravityInvocation {
   readonly model: string | null;
   readonly permissionMode: string;
   readonly prompt: string;
+  /**
+   * The vault root, where there is one, for the flag that admits it.
+   *
+   * Separate from `cwd`, which falls back to the process directory: a fallback
+   * is not a vault, and telling the agent to add it would widen its workspace
+   * to wherever Obsidian happened to be started from.
+   */
+  readonly addDirPath?: string | null;
+  /**
+   * What this `agy` build advertises, probed once per CLI command.
+   *
+   * Structural rather than imported, so the execution module keeps no
+   * dependency on the runtime one. Absent means "nothing advertised", which is
+   * the same fail-closed answer the probe gives for a launch it could not read.
+   */
+  readonly cliCapabilities?: {
+    readonly addDir: boolean;
+    readonly printTimeout: boolean;
+    readonly streamJson: boolean;
+  };
 }
 
 export interface AntigravityRequestResolver {

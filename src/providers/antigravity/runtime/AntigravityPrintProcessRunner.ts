@@ -58,6 +58,8 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
   start(invocation: AntigravityInvocation): AntigravityProcessHandle {
     const logFilePath = (this.options.createLogPath ?? createAntigravityPrintLogPath)();
     const args = buildAntigravityPrintArgs({
+      ...(invocation.addDirPath ? { addDirPath: invocation.addDirPath } : {}),
+      ...(invocation.cliCapabilities ? { capabilities: invocation.cliCapabilities } : {}),
       logFilePath,
       model: invocation.model,
       permissionMode: invocation.permissionMode,

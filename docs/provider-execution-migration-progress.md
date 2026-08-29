@@ -10549,6 +10549,40 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Recovery 1 of 6 — the capability probe, and the vault `agy` was never told about (`this commit`)
+
+- Gates: unit 8984 passed / 8984 total across 563 suites; `tsc --noEmit` clean; `npm run lint`
+  clean; `npm run build:release` clean.
+- Recovery plan: [`provider-execution-main-fix-recovery.md`](provider-execution-main-fix-recovery.md),
+  phase 1, items 1 and 3. Item 2 (stdin) follows, and item 4 (`--print-timeout`) moves with the
+  backend's timers, because sending the flag while Grimoire still kills at five minutes would be
+  worse than not sending it.
+
+**`AntigravityCliCapabilities` is back, and this time something calls it.** It was deleted twice: by
+the flip that stopped calling it, and again during the `main` sync when the parity gate reported it
+unreachable and that was read as "orphaned" rather than "the behaviour went missing and left this
+behind". Restored from the merge unchanged — it depends only on `buildAntigravityProcessLaunch`,
+which is still here — with its nineteen tests.
+
+**Probed in the resolver, not in the runner.** `resolveInvocation` is where this composition already
+reads everything ambient, on the reasoning that a turn queued before a settings change must launch
+the CLI configured *now*; a capability is the same kind of fact. The runner cannot do it: it hands
+back a handle synchronously and a probe is a process. The result rides on the invocation as a
+structural type rather than an imported one, so the execution module keeps no dependency on the
+runtime module.
+
+**And `--add-dir <vault>` is sent again** (#67), which is the first thing the probe buys back.
+`agy` scopes its workspace to what it was told about rather than to the directory it was started in,
+so without the flag the agent could not see the vault at all. Two halves, both tested: sent when the
+CLI advertises it, and **absent when it does not** — an older build treats an unknown flag as an
+argument and fails the run on it, which is why this is probed rather than assumed.
+
+**The path is not `cwd`.** `cwd` falls back to the process directory when there is no vault, and a
+fallback is not a vault: adding it would widen the agent's workspace to wherever Obsidian was
+started from. `addDirPath` is carried separately and is absent when the vault is.
+
+Proven by deleting the `--add-dir` branch: the advertised half of the test fails.
+
 ### The sync, reviewed — two defects it introduced and eight it carried (`this commit`)
 
 - Gates: unit 8963 passed / 8963 total across 562 suites; integration 156 passed, 128 skipped;
