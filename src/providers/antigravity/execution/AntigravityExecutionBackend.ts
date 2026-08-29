@@ -65,6 +65,16 @@ export interface AntigravityProcessOutcome {
   readonly stderr: string;
   readonly transcriptOutput?: string;
   readonly outputLimitExceeded?: boolean;
+  /**
+   * The status and complaint from the run's own `result` frame, where there was
+   * one.
+   *
+   * Carried rather than folded into `stderr`, because the classification below
+   * has to tell "the CLI reported a problem" apart from "the CLI printed to
+   * stderr": only the first can be true of a run that answered completely.
+   */
+  readonly resultStatus?: string;
+  readonly resultError?: string;
 }
 
 export interface AntigravityProcessHandle {
@@ -478,16 +488,48 @@ class AntigravityExecutionRun implements ExecutionRun {
     }
   }
 
+  /**
+   * The answer, with the CLI's own complaint appended where there is one.
+   *
+   * A trailing note rather than a failure: the answer is real and the user
+   * watched it arrive, and a complaint the CLI made afterwards is information
+   * about the CLI rather than about the reply. Bounded, because the field is
+   * the CLI's and nothing here decides how long it is.
+   */
+  private answerWithCliNotice(outcome: AntigravityProcessOutcome): string {
+    const answer = outcome.stdout;
+    if (outcome.resultStatus !== 'ERROR' || !answer.trim()) {
+      return answer;
+    }
+    const detail = outcome.resultError?.trim().replace(/\s+/g, ' ') ?? '';
+    // Said in the answer rather than in a debug log. `main` logged it as well,
+    // and this backend has no diagnostics port to log through — but the note
+    // below is the same information reaching the person who asked, which is
+    // where it is actually useful.
+    if (!detail) {
+      return answer;
+    }
+    return `${answer}\n\n> Warning: Antigravity CLI reported an error after this answer: ${detail.slice(0, 500)}`;
+  }
+
   private async finishFromOutcome(outcome: AntigravityProcessOutcome): Promise<void> {
     if (outcome.exitCode === null) {
       this.finish('interrupted', 'known-process-exit');
       return;
     }
-    if (outcome.exitCode !== 0) {
+    // **A complete answer outranks the exit code**, and only a framed one can
+    // be known to be complete: in stream-json the `text_delta` frames sum
+    // exactly to `result.response`, so a non-empty response is the whole reply
+    // rather than however much arrived before something went wrong. `agy`
+    // reports tool-permission bookkeeping failures *after* the agent has
+    // finished, and throwing the answer away over that is the user losing work
+    // they already watched arrive (#69).
+    const framedAnswer = outcome.resultStatus === undefined ? '' : outcome.stdout.trim();
+    if (outcome.exitCode !== 0 && !framedAnswer) {
       this.finish('failed', 'nonzero-exit');
       return;
     }
-    const stdout = outcome.stdout.trim();
+    const stdout = this.answerWithCliNotice(outcome).trim();
     const transcript = outcome.transcriptOutput?.trim() ?? '';
     const output = stdout || transcript;
     if (!output) {

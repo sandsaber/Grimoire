@@ -203,6 +203,60 @@ describe('AntigravityExecutionBackend', () => {
       ]);
   });
 
+  it('keeps an answer the user already watched arrive when agy complains afterwards', async () => {
+    // **A complete answer outranks the exit code**, and only a framed one can
+    // be known complete: in stream-json the `text_delta` frames sum exactly to
+    // `result.response`. `agy` reports tool-permission bookkeeping failures
+    // *after* the agent has finished, and discarding the reply over that is the
+    // user losing work they watched arrive (#69). The complaint rides along as
+    // a note instead.
+    const fixture = createFixture();
+    const process = fixture.runner.enqueue();
+    const session = await createSession(fixture.backend);
+    const run = session.createRun(request(RUN_ID));
+    const events = collectEvents(run);
+    await flushPromises();
+
+    process.complete({
+      exitCode: 1,
+      stdout: 'the finished answer',
+      stderr: '',
+      resultStatus: 'ERROR',
+      resultError: 'tool permission bookkeeping   failed',
+    });
+
+    await expect(events).resolves.toContainEqual(
+      expect.objectContaining({
+        event: { kind: 'terminal', terminal: 'succeeded', reason: 'completed' },
+      }),
+    );
+    expect(fixture.resultSink.inputs[0]?.output).toBe(
+      'the finished answer\n\n> Warning: Antigravity CLI reported an error after this answer: '
+      + 'tool permission bookkeeping failed',
+    );
+    await fixture.backend.dispose();
+  });
+
+  it('still fails a nonzero exit that produced no framed answer', async () => {
+    // The other half of the rule above: without a `result` frame there is
+    // nothing that can be known to be complete, so the exit code decides.
+    const fixture = createFixture();
+    const process = fixture.runner.enqueue();
+    const session = await createSession(fixture.backend);
+    const run = session.createRun(request(RUN_ID));
+    const events = collectEvents(run);
+    await flushPromises();
+
+    process.complete({ exitCode: 1, stdout: 'partial print output', stderr: '' });
+
+    await expect(events).resolves.toContainEqual(
+      expect.objectContaining({
+        event: { kind: 'terminal', terminal: 'failed', reason: 'nonzero-exit' },
+      }),
+    );
+    await fixture.backend.dispose();
+  });
+
   it('maps spawn failure, nonzero exit, and output limits without exposing stderr', async () => {
     const spawnFailure = createFixture();
     spawnFailure.runner.startError = new Error('missing agy');

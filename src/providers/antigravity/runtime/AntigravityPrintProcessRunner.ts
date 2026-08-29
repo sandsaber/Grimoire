@@ -215,7 +215,13 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
           exitCode: exit.code,
           ...(exit.signal ? { signal: exit.signal } : {}),
           stdout: result?.response ?? '',
-          stderr: result?.error ? `${stderr.value()}${result.error}` : stderr.value(),
+          stderr: stderr.value(),
+          // Carried as its own fields rather than folded into `stderr`: the
+          // backend has to tell "the CLI reported a problem" apart from "the
+          // CLI printed to stderr", and only the first can be true of a run
+          // that answered completely.
+          ...(result ? { resultStatus: result.status } : {}),
+          ...(result?.error ? { resultError: result.error } : {}),
           ...(outputLimit.didExceed ? { outputLimitExceeded: true } : {}),
         };
       }

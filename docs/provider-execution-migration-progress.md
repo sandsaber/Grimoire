@@ -10549,6 +10549,36 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Recovery 4 of 6 — an answer the user watched arrive is not discarded (`this commit`)
+
+- Gates: unit 8989 passed / 8989 total across 563 suites; `tsc --noEmit` clean; `npm run lint`
+  clean; `npm run build:release` clean.
+- Recovery plan item 5, the half that needs no presenter.
+
+**A complete answer outranks the exit code.** `finishFromOutcome` mapped any non-zero exit to
+`failed` / `nonzero-exit` and threw the output away with it. `agy` reports tool-permission
+bookkeeping failures *after* the agent has finished, so the run that just streamed a whole reply
+could exit non-zero and the person who watched it arrive would be shown a failure instead (#69).
+
+**Only a framed answer can be known to be complete**, which is what makes this safe to do at all: in
+stream-json the `text_delta` frames sum exactly to `result.response`, so a non-empty response is the
+whole reply rather than however much arrived before something went wrong. Without a `result` frame —
+plain print mode — there is nothing that can be known, and the exit code still decides. Both halves
+are tested.
+
+**The complaint rides along as a note.** `> Warning: Antigravity CLI reported an error after this
+answer: …`, bounded, whitespace collapsed. Said in the answer rather than in a debug log: `main`
+logged it as well, and this backend has no diagnostics port — but the note is the same information
+reaching the person who asked, which is where it is useful.
+
+**And the frame's status stopped being smuggled through `stderr`.** The runner folded `result.error`
+into the stderr string, which meant the backend could not tell "the CLI reported a problem" from
+"the CLI printed to stderr" — and only the first can be true of a run that answered completely. Two
+fields on the outcome now say it plainly.
+
+Proven by restoring the unconditional non-zero-exit branch: the answer is discarded and the test
+fails.
+
 ### Recovery 3 of 6 — a long turn is not a hung one (`this commit`)
 
 - Gates: unit 8987 passed / 8987 total across 563 suites; integration 156 passed, 128 skipped;
