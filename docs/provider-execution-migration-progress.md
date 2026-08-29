@@ -10548,14 +10548,26 @@ does not stop.
 in what they return. One helper parameterised by the expected status would carry both. Owner: M6, a
 refactor rather than a behaviour change.
 
-**And the M6 list item that is not done.** A replay harness that drives each recorded exchange
-through the real managed-ACP backend into a real registry was built and is **not committed**: Gemini
-and MiMoCode complete their recorded turn and reach `succeeded`, and OpenCode and Grok reach
-`interrupted` / `recovery-exhausted-safe` — the run's event stream ends before the recorded prompt
-answer arrives, and the registry recovers it. Whether that is the harness or the composition is not
-established, and shipping either a red suite or a suite narrowed to the two that pass would be worse
-than saying so: a gate over the subset that agrees with it is the failure this milestone has already
-found twice. Owner: M6, with the harness kept out of the tree until the two are diagnosed.
+**And the M6 list item that is not done, with what the attempt established.** A replay harness that
+drives each recorded exchange through the real managed-ACP backend into a real registry was built
+and is **not committed**. Two of the four recordings that carry a turn — Gemini's and MiMoCode's —
+complete it and reach `succeeded`. OpenCode's and Grok's stall until the run timeout.
+
+It already found one defect, in itself, which is why the rest is recorded rather than concluded: the
+harness registered a *stub* recovery port where every provider's composition registers
+`recovery: backend`. A stub that answers `stopped-safe` was asked a question the backend answers
+`running`, so a stream that paused between two recorded notifications was reconciled as a run that
+had stopped — and the replay reported `interrupted` for turns the provider had completed. A harness
+that does not mirror the composition measures itself, again.
+
+With that fixed, what is known about the two that stall: swapping the recorded traffic between a
+passing and a failing provider does not move the result, and neither does swapping the backend
+class — so it is neither the recording alone nor the wrapper alone. The two that complete carry four
+or fewer notifications after the prompt and produce no `output-delta`; the two that stall carry five
+and thirty-three and produce one. That is a lead about the transient output channel and the result
+commit, not a conclusion, and it is worth more written down than a suite narrowed to the providers
+that agree with it — which is the failure this milestone has already found twice. Owner: M6, with
+the harness kept out of the tree until the stall is diagnosed.
 
 ### M6 — the reconciled-result path has no producer, in either domain (`this commit`)
 
