@@ -359,8 +359,14 @@ live('Kimi Code chat projection live smoke', () => {
   // context meter reads. The bodies are shared with every other provider's file
   // — see `chatProjectionSurfaceRows` — because what they certify is the path
   // rather than the provider.
-  // Kimi Code reports usage over ACP, so row G applies.
-  // Never run: this machine is not authenticated with Kimi Code.
+  // Row G is **red on purpose** rather than absent: Kimi reports usage over ACP,
+  // but it sends `usage_update` *after* `session/prompt` returns, and a session
+  // notification is routed to the active run — of which there is none by then.
+  // So the first turn's usage lands inside the second turn, the last turn's is
+  // dropped, and the context meter is permanently one turn behind. Recorded in
+  // the matrix; where usage lives for a provider that reports it out of band is
+  // an owner's decision rather than a patch, and a row bent to pass would hide
+  // it.
   const surfaceRows = chatProjectionSurfaceRows({
     createHarness: async () => (await createHarness()).harness,
     report,

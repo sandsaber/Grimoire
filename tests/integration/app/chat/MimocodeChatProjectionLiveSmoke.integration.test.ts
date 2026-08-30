@@ -359,8 +359,11 @@ live('MiMoCode chat projection live smoke', () => {
   // context meter reads. The bodies are shared with every other provider's file
   // — see `chatProjectionSurfaceRows` — because what they certify is the path
   // rather than the provider.
-  // MiMoCode reports usage over ACP, so row G applies.
-  // Never run: this account cannot generate.
+  // MiMoCode reports usage over ACP, so row G applies — it reports zeros, because
+  // **this account cannot generate**: every turn ends `missing-required-result`
+  // with no tokens, and `mimo acp` answers the same way driven directly, on its
+  // default model and on the free one. All seven rows fail on that one cause,
+  // and what the run certifies is the failure surface.
   const surfaceRows = chatProjectionSurfaceRows({
     createHarness: async () => (await createHarness()).harness,
     report,

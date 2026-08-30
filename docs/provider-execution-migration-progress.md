@@ -8304,8 +8304,10 @@ ids, and Codex's own reading of a plan turn was being dropped. The tab merges it
 What still needs a person is **row 4**, which lives in the tab rather than on this path, the plan
 approval *appearing* and its three answers, and what everything else *looks* like on screen.
 
-**What is left of the matrix is what the accounts allow**, unchanged: Gemini answers about one turn
-per day before `429`, MiMoCode's account cannot generate, Kimi Code and Qwen are not authenticated.
+**What is left of the matrix is what the accounts allow**, and one of them changed: **Kimi Code is
+authenticated now** and took six of seven rows on its first real run. Gemini still answers about one
+turn per day before `429`, MiMoCode's account still cannot generate — checked twice today, on its
+default model and on the free one — and Qwen is still unauthenticated.
 Gemini's run is worth spending when the owner says the quota is free — its row B is one of the seven
 the `installInteractions` fix repaired, and it has never run since.
 
@@ -10648,6 +10650,35 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### Kimi Code answers now; MiMoCode still cannot, and Kimi's meter is a turn behind (`this commit`)
+
+- Gates: unit 8955 passed / 8955 total across 565 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Live: Kimi Code 6/7, MiMoCode 0/7.
+
+**Kimi Code is authenticated on this machine now.** On 2026-08-23 every turn answered
+`Authentication required`; today `kimi acp` completes `session/new` and answers a prompt. Its harness
+had never certified a row, and on the first real run it took six of seven: the answer as one text
+block, the stored answer under the id the surface drew it into, the permission prompt asked once and
+answered, the reload, the closed tab, both surfaces, and the queue. **Two of those rows were written
+for a provider nobody could run**, and they were right.
+
+**Row 13 is red, and the cause is timing rather than absence.** Kimi sends `usage_update` *after*
+`session/prompt` returns. Driven directly over two turns the wire reads: answer, prompt result,
+**then** usage — so the first turn's usage arrives inside the second turn's run, the last turn's is
+dropped, and the context meter is permanently one turn behind. `ManagedAcpExecutionBackend` routes a
+session notification to `activeRun`, and there is no active run at that moment; the kernel's model is
+that everything belongs to a run. Where usage should live for a provider that reports it out of band
+is an owner's decision — the render target already notes that usage is the one thing on this path
+that arrives as content and has to travel back — so it is recorded rather than patched.
+
+**MiMoCode is still the account, and it is checked rather than assumed.** Every turn ends
+`missing-required-result` with zero tokens, and `mimo acp` answers the same way driven directly — on
+its default model and on the free `mimo/mimo-auto`, set with the same `session/set_config_option`
+shape the product sends. Its seven rows fail on one cause. What the run does certify is the failure
+surface: the terminal is `failed`, the provider's own wording is what the column drew, usage arrives
+and is zero, and the queue still released the second turn only after the first was durable.
 
 ### The plan approval had nothing to fire on, and row 1 is what found it (`this commit`)
 
