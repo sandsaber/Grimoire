@@ -110,6 +110,11 @@ export interface QwenWorkspaceContext {
   deleteConversationSession(conversationId: string): Promise<void>;
   resolveSessionId(conversationId: string): string | null;
   isPendingFork(conversationId: string): boolean;
+  /**
+   * Whether this conversation's saved session was replaced by a fresh one,
+   * or `null` when this runtime is not bound to that conversation.
+   */
+  readSessionDropped(conversationId: string): boolean | null;
   dispose(): Promise<void>;
 }
 
@@ -355,9 +360,20 @@ QwenProviderSettings
       isPendingFork: conversationId => context.isPendingFork(conversationId),
       // The session id and nothing beside it, as Gemini's is: this provider
       // writes no launch state a second half of the binding could point at.
-      buildSessionPatch: input => ({
-        sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
-      }),
+      buildSessionPatch: input => {
+        const sessionDropped = context.readSessionDropped(input.conversationId);
+        return {
+          sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
+          // Written whole whenever this runtime serves the conversation, and
+          // omitted entirely when it does not: the surface replaces
+          // `providerState` rather than merging it, so an omitted opinion would
+          // leave a stale drop marker standing with no way to clear it. The
+          // only field this provider persists — see `QwenProviderState`.
+          ...(sessionDropped === null
+            ? {}
+            : { providerState: sessionDropped ? { sessionDropped: true } : {} }),
+        };
+      },
     },
   }),
 };

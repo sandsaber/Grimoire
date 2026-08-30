@@ -85,6 +85,7 @@ import {
   buildQwenPromptText,
 } from '@/providers/qwen/runtime/buildQwenPrompt';
 import { buildQwenRuntimeEnv } from '@/providers/qwen/runtime/QwenRuntimeEnvironment';
+import { getQwenState } from '@/providers/qwen/types';
 import { getVaultPath } from '@/utils/path';
 
 /** What a turn may answer with, before it is refused as too large. */
@@ -199,7 +200,10 @@ export class QwenExecution {
   private readonly workspaceHolder = new ProviderWorkspaceHolder(
     qwenProviderModule.workspace,
     () => createQwenModuleContext(this.plugin, () => null,
-      { sessionCommands: () => runtimeOnly('sessionCommands') }),
+      {
+        sessionCommands: () => runtimeOnly('sessionCommands'),
+        sessionDropped: () => runtimeOnly('sessionDropped'),
+      }),
   );
 
   constructor(
@@ -358,6 +362,10 @@ export class QwenExecution {
     let conversation: BoundConversation | null = null;
     let adapter: QwenRuntimeAdapter | undefined;
     let sessionCommands: readonly ProviderCommandDescriptor[] = [];
+    // Whether the agent no longer had this conversation's saved session. Seeded
+    // from what the conversation carries, because the drop is learned during a
+    // dispatch and the tab that draws the notice is usually a later one.
+    let sessionDropped = false;
     const ownedSessions = new Set<string>();
     const boundConversation = (): BoundConversation | null => conversation;
     // Minted once, and only used while no conversation is bound: a fallback
@@ -394,6 +402,9 @@ export class QwenExecution {
       // The session's own slash commands, which arrive as an update rather than
       // as an answer to anything. Held here so the tab can list them without a
       // second Qwen process being launched to ask.
+      // A resume that had to open a different session is what the conversation
+      // carries forward; one that succeeded is what takes the marker back off.
+      onSessionResume: outcome => { sessionDropped = outcome === 'replaced'; },
       onCommands: commands => {
         sessionCommands = commands.map(command => ({
           name: command.name,
@@ -495,9 +506,23 @@ export class QwenExecution {
           content.forgetConversation();
           sessionConfig.forgetSession();
           sessionCommands = [];
+          // Seeded only when the conversation changes. A re-sync of the same one
+          // hands back the stored object, and what this runtime learned during a
+          // dispatch is newer than what that object says.
+          sessionDropped = getQwenState(next?.providerState).sessionDropped === true;
         }
         conversation = next;
       },
+      /**
+       * Whether this conversation resumed into a session the agent had lost.
+       *
+       * Asked on every render rather than consumed, because the seam the UI
+       * draws has to be answerable again on the next paint. **Absent until
+       * 2026-08-30**, like Grok's and Kimi Code's: the session was replaced
+       * correctly and nothing could say so, which is the one thing the
+       * session-restart notice exists to prevent.
+       */
+      sessionDropped: () => sessionDropped,
       /**
        * The provider's words for a turn that never started.
        *
@@ -559,7 +584,10 @@ export class QwenExecution {
     // *this tab's* conversation, so the context has to close over the same one
     // the ports above sync.
     const contributions = qwenProviderModule.runtimePorts(
-      createQwenModuleContext(this.plugin, boundConversation, { sessionCommands: () => sessionCommands }),
+      createQwenModuleContext(this.plugin, boundConversation, {
+        sessionCommands: () => sessionCommands,
+        sessionDropped: () => sessionDropped,
+      }),
     );
 
     const runtime = new QwenRuntimeAdapter(

@@ -183,7 +183,9 @@ describe('live smoke matrix records', () => {
       // the flip. What it found before running out is in that matrix: three
       // defects, two of them shipped.
       'gemini-flip-smoke-matrix.md: 2026-08-23',
-      'grok-flip-smoke-matrix.md: 2026-08-21',
+      // Re-run on 2026-08-30 to certify the session-restart notice this provider
+      // could not draw: thirteen of thirteen.
+      'grok-flip-smoke-matrix.md: 2026-08-30',
       // **Run with an account at last**, on 2026-08-30: eleven of twelve rows,
       // three of them red for reasons that were the rows' own and one for a
       // product defect it found — the session-restart notice this fork never

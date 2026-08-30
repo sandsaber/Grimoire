@@ -32,6 +32,7 @@ describe('session binding round trip', () => {
   /** Grok's own patch builder, over the paths its workspace would report. */
   const buildSessionPatch = grokProviderModule.runtimePorts({
     readSessionPaths: () => ({ sessionDirPath: SESSION_DIR }),
+    readSessionDropped: () => null,
   } as never).history?.buildSessionPatch;
 
   function metadata(overrides: Partial<SessionMetadata> = {}): SessionMetadata {

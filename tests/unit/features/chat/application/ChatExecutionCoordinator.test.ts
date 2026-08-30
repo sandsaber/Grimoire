@@ -127,6 +127,7 @@ describe('chat execution coordinator', () => {
      */
     const buildSessionPatch = grokProviderModule.runtimePorts({
       readSessionPaths: () => ({ sessionDirPath: SESSION_DIR }),
+      readSessionDropped: () => null,
     } as never).history?.buildSessionPatch;
 
     function binding(sessionInvalidated: boolean) {

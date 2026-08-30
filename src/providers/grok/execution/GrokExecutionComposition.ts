@@ -115,7 +115,7 @@ import {
   type GrokSessionNotificationSource,
   parseGrokSessionNotification,
 } from '@/providers/grok/runtime/GrokSessionNotifications';
-import type { GrokProviderState } from '@/providers/grok/types';
+import { getGrokState, type GrokProviderState } from '@/providers/grok/types';
 import { grokChatUIConfig } from '@/providers/grok/ui/GrokChatUIConfig';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
@@ -269,7 +269,10 @@ export class GrokExecution {
   private readonly workspaceHolder = new ProviderWorkspaceHolder(
     grokProviderModule.workspace,
     () => createGrokModuleContext(this.plugin, () => null,
-      { sessionPaths: () => runtimeOnly('sessionPaths') }),
+      {
+        sessionPaths: () => runtimeOnly('sessionPaths'),
+        sessionDropped: () => runtimeOnly('sessionDropped'),
+      }),
   );
 
   constructor(
@@ -430,6 +433,10 @@ export class GrokExecution {
     // conversation is saved pointing at it.
     let sessionDirPath: string | null = null;
     let workspacePath: string | null = null;
+    // Whether the agent no longer had this conversation's saved session. Seeded
+    // from what the conversation carries, because the drop is learned during a
+    // dispatch and the tab that draws the notice is usually a later one.
+    let sessionDropped = false;
     const ownedSessions = new Set<string>();
     /**
      * Lets go of every native session this tab registered callbacks for.
@@ -488,6 +495,9 @@ export class GrokExecution {
       onCurrentMode: currentModeId => this.settle(
         sessionConfig.syncSessionModeState({ currentModeId }),
       ),
+      // A resume that had to open a different session is what the conversation
+      // carries forward; one that succeeded is what takes the marker back off.
+      onSessionResume: outcome => { sessionDropped = outcome === 'replaced'; },
       onConfigOptions: configOptions => this.settle(
         sessionConfig.syncSessionModelState({ configOptions: [...configOptions] }),
       ),
@@ -612,9 +622,24 @@ export class GrokExecution {
           sessionCommands = [];
           sessionDirPath = null;
           workspacePath = null;
+          // Seeded only when the conversation changes. A re-sync of the same one
+          // hands back the stored object, and what this runtime learned during a
+          // dispatch is newer than what that object says.
+          sessionDropped = getGrokState(next?.providerState).sessionDropped === true;
         }
         conversation = next;
       },
+      /**
+       * Whether this conversation resumed into a session the agent had lost.
+       *
+       * Asked on every render rather than consumed, because the seam the UI
+       * draws has to be answerable again on the next paint. **Absent until
+       * 2026-08-30**: `GrokProviderState` has carried a `sessionDropped` field
+       * since the legacy runtime and nothing on this path wrote or read it, so
+       * a replaced session was silent — see Kimi Code, where a live row caught
+       * the same hole.
+       */
+      sessionDropped: () => sessionDropped,
       /**
        * The provider's words for a turn that never started.
        *
@@ -676,6 +701,7 @@ export class GrokExecution {
           ...(sessionDirPath ? { sessionDirPath } : {}),
           ...(workspacePath ? { workspacePath } : {}),
         }),
+        sessionDropped: () => sessionDropped,
       }),
     );
 

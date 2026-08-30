@@ -89,5 +89,6 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
+| 2026-08-30 | `grok` acp (`grok-4.6`) | all 13 | — | Run to certify the session-restart notice, which this provider could not draw: `GrokProviderState` has carried a `sessionDropped` field since the legacy runtime and nothing on the execution path wrote or read it, so a session the agent had lost was replaced in silence. Found on Kimi Code, whose live row 9 caught it; the same four pieces are wired here, and row 9 asserts `isSessionDropped()` rather than only the replacement. Thirteen of thirteen |
 | 2026-08-20 | 1.0.5 | live: 1, 1b, 2, 5, 6, 7, 8, 9, 13, 14, 16, 18, 19, 20 | — | first live run found the resume shape this provider actually has; see the journal entry for that run |
 | 2026-08-21 | 1.0.5 | live: 1, 1b, 2, 5, 6, 7, 8, 9, 13, 14, 16, 18, 19, 20 | — | re-run after the two review passes; row 6 is the one that mattered, since a Stop now waits for the prompt ACP answers it on |

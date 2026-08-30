@@ -32,6 +32,14 @@ export interface QwenModuleContextPorts {
    * session knows what it said.
    */
   readonly sessionCommands: () => readonly ProviderCommandDescriptor[];
+  /**
+   * Whether this tab's last resume replaced the conversation's saved session.
+   *
+   * Lives on the runtime rather than in the conversation because it is learned
+   * during a dispatch; it is written into `providerState` from here so the
+   * conversation still carries it when it is next opened.
+   */
+  readonly sessionDropped: () => boolean;
 }
 
 /**
@@ -83,6 +91,16 @@ export function createQwenModuleContext(
     isPendingFork: conversationId => {
       const bound = matching(conversation, conversationId);
       return bound ? history.isPendingForkConversation(bound) : false;
+    },
+    readSessionDropped: conversationId => {
+      // `null` rather than `false` for a conversation this tab does not serve:
+      // the caller writes `providerState` whole, and "no opinion" has to be
+      // distinguishable from "not dropped" or the write would clear a marker
+      // this runtime knows nothing about.
+      if (!matching(conversation, conversationId)) {
+        return null;
+      }
+      return ports.sessionDropped();
     },
     // The open session's own, which the catalog cannot know: they arrive as an
     // update rather than as an answer to anything.

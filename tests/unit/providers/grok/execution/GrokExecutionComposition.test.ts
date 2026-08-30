@@ -625,12 +625,38 @@ describe('Grok execution composition', () => {
     // than replacing it.
     const { execution, host } = await createHarness({ sessionForgotten: true });
     const runtime = execution.createRuntime();
-    runtime.syncConversationState({ providerState: {}, sessionId: 'grok-session-forgotten' });
+    runtime.syncConversationState({ id: 'conv-1', providerState: {}, sessionId: 'grok-session-forgotten' });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
 
     expect(chunks.some(chunk => chunk.type === 'error')).toBe(false);
     expect(runtime.getSessionId()).toBe('grok-session');
+    // **And the surface can say so.** `GrokProviderState` has carried a
+    // `sessionDropped` field since the legacy runtime and nothing on this path
+    // wrote or read it, so a replaced session was silent — the same hole a live
+    // Kimi Code row found, in the same shape.
+    expect(runtime.isSessionDropped()).toBe(true);
+    expect(runtime.sessionBinding({
+      conversation: { id: 'conv-1' },
+      sessionInvalidated: false,
+    })?.providerState).toMatchObject({ sessionDropped: true });
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('carries a drop into the tab that opens the conversation next', async () => {
+    // The marker is read back on bind: the runtime that learned it is gone by
+    // the time anyone sees the thread again.
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+
+    runtime.syncConversationState({
+      id: 'conv-1',
+      providerState: { sessionDropped: true },
+      sessionId: null,
+    });
+
+    expect(runtime.isSessionDropped()).toBe(true);
     execution.dispose();
     await host.dispose();
   });

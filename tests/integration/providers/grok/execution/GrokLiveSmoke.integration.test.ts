@@ -307,6 +307,13 @@ live('Grok live smoke', () => {
     expect(errors).toEqual([]);
     expect(answerOf(chunks)).toContain('OK');
     expect(runtime.getSessionId()).not.toBe('grimoire-live-missing-session');
+    // **And the surface can say so.** Replacing the session is right; doing it
+    // silently is not, and this provider did until 2026-08-30 — the presenter
+    // had no `session-resume` branch and the composition kept no flag, so the
+    // notice that marks the end of the thread could never be drawn. Two of the
+    // six ACP providers had it; Kimi Code's live row found the hole and this is
+    // the same one.
+    expect(runtime.isSessionDropped()).toBe(true);
     await shutdown();
   });
 

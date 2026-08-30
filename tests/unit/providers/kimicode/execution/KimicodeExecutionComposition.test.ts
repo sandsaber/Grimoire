@@ -614,6 +614,51 @@ describe('Kimi Code execution composition', () => {
     await host.dispose();
   });
 
+  it('says the saved session was replaced, and carries it into the next tab', async () => {
+    // **The half this fork was missing.** Replacing a session the agent no
+    // longer has is right; doing it in silence is the failure the
+    // session-restart notice exists to prevent — the history above the composer
+    // is no longer the agent's memory, and only this seam can say so. A live row
+    // found `kimi acp` answering `Unknown sessionId`, the session replaced, and
+    // `isSessionDropped()` still `false`.
+    const { execution, host } = await createHarness({ sessionIsGone: true });
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({
+      id: 'conv-1',
+      providerState: {},
+      sessionId: 'ses-that-is-gone',
+    });
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
+
+    expect(runtime.isSessionDropped()).toBe(true);
+    // Written into the conversation, because the tab that draws the notice is
+    // usually a later one than the tab that learned this.
+    expect(runtime.sessionBinding({
+      conversation: { id: 'conv-1' },
+      sessionInvalidated: false,
+    })?.providerState).toMatchObject({ sessionDropped: true });
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('carries a drop into the tab that opens the conversation next', async () => {
+    // The marker is read back on bind: the runtime that learned it is gone by
+    // the time anyone sees the thread again.
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+
+    runtime.syncConversationState({
+      id: 'conv-1',
+      providerState: { sessionDropped: true },
+      sessionId: null,
+    });
+
+    expect(runtime.isSessionDropped()).toBe(true);
+    execution.dispose();
+    await host.dispose();
+  });
+
   it('asks the tab before a command runs, and answers the agent with what it chose', async () => {
     const { execution, host, permissions } = await createHarness({ asksPermission: true });
     const runtime = execution.createRuntime();

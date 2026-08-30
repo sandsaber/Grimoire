@@ -105,6 +105,11 @@ export interface GrokWorkspaceContext {
    * database is: Grok writes its own session log under the managed home, and a
    * session id without the directory it was written in hydrates nothing.
    */
+  /**
+   * Whether this conversation's saved session was replaced by a fresh one,
+   * or `null` when this runtime is not bound to that conversation.
+   */
+  readSessionDropped(conversationId: string): boolean | null;
   readSessionPaths(conversationId: string): {
     readonly sessionDirPath?: string;
     readonly workspacePath?: string;
@@ -353,9 +358,15 @@ GrokProviderSettings
       isPendingFork: conversationId => context.isPendingFork(conversationId),
       buildSessionPatch: input => {
         const paths = context.readSessionPaths(input.conversationId);
+        const sessionDropped = context.readSessionDropped(input.conversationId);
         const providerState = {
           ...(paths.sessionDirPath ? { sessionDirPath: paths.sessionDirPath } : {}),
           ...(paths.workspacePath ? { workspacePath: paths.workspacePath } : {}),
+          // Written whenever this runtime serves the conversation, and left out
+          // entirely when it does not: the surface replaces `providerState`
+          // rather than merging it, so an omitted opinion would leave a stale
+          // drop marker standing with no way to clear it.
+          ...(sessionDropped ? { sessionDropped: true } : {}),
         };
         return {
           sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
@@ -363,7 +374,9 @@ GrokProviderSettings
           // host's session-update builder does and for its reason: the next
           // session is written to the same directory, and the transcript
           // already there is still this conversation's.
-          ...(Object.keys(providerState).length > 0 ? { providerState } : {}),
+          ...(Object.keys(providerState).length > 0 || sessionDropped !== null
+            ? { providerState }
+            : {}),
         };
       },
     },

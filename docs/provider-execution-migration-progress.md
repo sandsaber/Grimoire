@@ -10655,6 +10655,38 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Grok and Qwen can say a session was replaced now (`this commit`)
+
+- Gates: unit 8963 passed / 8963 total across 565 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Live: Grok 13/13 and Qwen 15/16 on their provider matrices, both projection matrices 7/7 each.
+
+**Two of six ACP providers could draw the session-restart notice; five can now.** The hole Kimi Code's
+live row 9 found was in Grok and Qwen too — no `session-resume` branch in the presenter, no
+`sessionDropped` in the composition, nothing read or written — so a session the agent had lost was
+replaced correctly and silently, leaving a conversation running in a session that did not remember
+it.
+
+**What each of them needed was different, which is why this was three fixes rather than one:**
+
+- **Grok** already had the field. `GrokProviderState.sessionDropped` has been there since the legacy
+  runtime, with a comment saying it is read back on the next load, and nothing on the execution path
+  wrote or read it. The four pieces are wired to it now;
+- **Qwen persisted nothing at all** — its binding was an id and nothing else, which its own live row 8
+  asserted. It has a `QwenProviderState` with exactly one field now, and a conversation whose session
+  resumed writes it back as `{}`: the surface replaces `providerState` whole, so an omitted opinion
+  would leave a stale marker standing with no way to take it down. Row 8 says so instead of saying
+  there is no state.
+
+Three cases per provider hold it, mirrored from OpenCode's: the drop is reported, it is written into
+the conversation, and a tab that opens that conversation later reads it back. **Proven by breaking
+all three** — pointing each composition's port at `false` fails two cases per provider. And certified
+live: row 9 on each of the three now asserts `isSessionDropped()`, where before this session it
+answered `false` while the session had just been swapped underneath.
+
+**Gemini is the one left**, for the reason it always is: one turn a day. Its wiring is the same shape
+as Qwen's, and it should be done on a day the quota allows certifying it.
+
 ### Two provider matrices ran for the first time, and one found a silent session (`this commit`)
 
 - Gates: unit 8959 passed / 8959 total across 565 suites; integration 156 passed / 156 run;
@@ -14699,6 +14731,9 @@ Open obligations, each with an owner:
   also stale.** D5's read-only state has a surface of its own now: `getUnreadableConversations` feeds
   a `grimoire-history-unreadable` block in the history list, so a record this build cannot parse is
   shown as one rather than disappearing;
+- ~~**three ACP providers cannot tell a person their session was replaced.**~~ **One left: Gemini.**
+  Kimi Code's, Grok's and Qwen's are wired and certified live in the commits below; Gemini's is the
+  same shape as Qwen's and waits for a day its quota can certify it. The original entry follows:
 - **three ACP providers cannot tell a person their session was replaced.** OpenCode's and MiMoCode's
   compositions keep a `sessionDropped` flag, fed by a `session-resume` branch in their presenters and
   written into `providerState` by their session patch, so `isSessionDropped()` answers and the

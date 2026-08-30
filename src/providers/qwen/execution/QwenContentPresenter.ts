@@ -53,6 +53,13 @@ export interface QwenContentPresenterPorts {
   readonly onCost?: (cost: AcpUsageUpdate['cost']) => void;
   /** The mode the session switched to, which the user may not have chosen. */
   readonly onCurrentMode?: (modeId: string) => void;
+  /**
+   * What became of the saved session this dispatch tried to resume.
+   *
+   * `replaced` is the conversation's history ceasing to be the agent's memory,
+   * which the surface says before the user types.
+   */
+  readonly onSessionResume?: (outcome: 'resumed' | 'replaced') => void;
   /** The model, mode and config options the open session can be set to. */
   readonly onConfigOptions?: (configOptions: readonly AcpSessionConfigOption[]) => void;
   /**
@@ -176,6 +183,10 @@ export class QwenContentPresenter {
     if (content?.kind === 'session-usage') {
       this.contextUsage = content.usage ?? null;
       return this.usageChunks();
+    }
+    if (content?.kind === 'session-resume') {
+      this.ports.onSessionResume?.(content.outcome as 'resumed' | 'replaced');
+      return [];
     }
     if (content?.kind === 'turn-refused') {
       const message = content.message?.trim();

@@ -51,6 +51,7 @@ describe('Grok provider module', () => {
         sessionDirPath: '/vault/.grimoire/grok/sessions/grok-session',
         workspacePath: '/vault',
       }),
+      readSessionDropped: () => null,
       dispose: async () => undefined,
     };
   }

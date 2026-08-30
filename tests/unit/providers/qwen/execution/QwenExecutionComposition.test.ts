@@ -788,11 +788,41 @@ describe('Qwen execution composition', () => {
     // conversation pointing at a session that does not exist.
     const { execution, host } = await createHarness({ sessionIsGone: true });
     const runtime = execution.createRuntime();
-    runtime.syncConversationState({ providerState: {}, sessionId: 'ses-that-is-gone' });
+    runtime.syncConversationState({
+      id: 'conv-1',
+      providerState: {},
+      sessionId: 'ses-that-is-gone',
+    });
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'what now?' })));
 
     expect(runtime.getSessionId()).toBe('acp-session-1');
+    // **And the surface can say so.** Replacing the session is right; doing it
+    // in silence is the failure the session-restart notice exists to prevent.
+    // This provider persisted nothing at all before — its binding was an id and
+    // nothing else — so the marker is the one field `QwenProviderState` has.
+    expect(runtime.isSessionDropped()).toBe(true);
+    expect(runtime.sessionBinding({
+      conversation: { id: 'conv-1' },
+      sessionInvalidated: false,
+    })?.providerState).toMatchObject({ sessionDropped: true });
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('carries a drop into the tab that opens the conversation next', async () => {
+    // The marker is read back on bind: the runtime that learned it is gone by
+    // the time anyone sees the thread again.
+    const { execution, host } = await createHarness();
+    const runtime = execution.createRuntime();
+
+    runtime.syncConversationState({
+      id: 'conv-1',
+      providerState: { sessionDropped: true },
+      sessionId: null,
+    });
+
+    expect(runtime.isSessionDropped()).toBe(true);
     execution.dispose();
     await host.dispose();
   });

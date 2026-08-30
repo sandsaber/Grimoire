@@ -67,6 +67,13 @@ export interface GrokContentPresenterPorts {
    * is in — translated against a current mode that is no longer current.
    */
   readonly onCurrentMode?: (currentModeId: string) => void;
+  /**
+   * What became of the saved session this dispatch tried to resume.
+   *
+   * `replaced` is the conversation's history ceasing to be the agent's memory,
+   * which the surface says before the user types.
+   */
+  readonly onSessionResume?: (outcome: 'resumed' | 'replaced') => void;
   /** The options a session re-advertises, thinking levels among them. */
   readonly onConfigOptions?: (configOptions: readonly AcpSessionConfigOption[]) => void;
   /** What the vendor charged for one turn, for the plan-limit indicator. */
@@ -168,6 +175,10 @@ export class GrokContentPresenter {
     const content = payload as GrokContentPayload | null;
     if (content?.kind === 'session-config') {
       return this.presentSessionConfig(content.session);
+    }
+    if (content?.kind === 'session-resume') {
+      this.ports.onSessionResume?.(content.outcome);
+      return [];
     }
     if (content?.kind === 'turn-refused') {
       const message = content.message?.trim();
