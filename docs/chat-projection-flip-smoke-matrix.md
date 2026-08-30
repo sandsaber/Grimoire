@@ -88,8 +88,8 @@ are the production ones now, wired as `Tab.ts` wires them
 (`tests/helpers/chat/realChatColumn.ts`), and what stays doubled is Obsidian: the elements, the
 markdown renderer and the vault.
 
-It covers **rows 2, 3, 5, 7, 9, 10, 11, 12, 13 and the negative half of 14**, per provider and only
-where that provider has the thing: one `done` and one assistant bubble per turn, the stored answer
+It covers **rows 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13 and the negative half of 14**, per provider and
+only where that provider has the thing: one `done` and one assistant bubble per turn, the stored answer
 carrying the id the surface drew it into, text arriving on the column **as one block rather than one
 per delta**, a provider's own content items reaching it
 through the presenter, a cancelled turn ending as cancelled with its partial answer kept and no
@@ -97,14 +97,19 @@ process left behind, a permission prompt asked **once** and answered so the turn
 reloaded tab resuming the thread the vault kept, and no failure wording on a turn that did not fail. Each file also asserts the switch holds its provider, because a harness that
 builds the tab's end directly would otherwise keep passing after the flip was reverted.
 
-**Rows 11, 12 and 13 joined that list on 2026-08-30, and none of them ever needed a person.** They
-were left to one because the first harness had a single surface and released it at the end of a row:
-with a second surface and a tab that can be closed mid-turn, what row 11 asks is whether the kernel
-finishes a turn nobody is drawing and the barrier stores it, row 12 whether one run reaches both
-surfaces, and row 13 whether the count the context meter reads survives the save. Their bodies are
-shared by every provider's file — `chatProjectionSurfaceRows.ts` — while each `it` stays in the
-provider's own file, so a file still lists the rows it runs. What is left for a person is what the
-column *looks* like: rows 1, 4, 6 and 8, and the drawn appearance of everything above.
+**Rows 6, 8, 11, 12 and 13 joined that list on 2026-08-30, and none of them ever needed a person.**
+They were left to one because the first harness had a single surface, released it at the end of a
+row, and read nothing back but the messages. With a second surface and a tab that can be closed
+mid-turn: row 11 asks whether the kernel finishes a turn nobody is drawing and the barrier stores it,
+row 12 whether one run reaches both surfaces, row 13 whether the count the context meter reads
+survives the save, row 8 whether queued input waits for the running turn to be **durable** rather
+than merely over, and row 6's driven half — the question drawn once per column, as the provider
+composed it — costs nothing beside row 12. Their bodies are shared by every provider's file —
+`chatProjectionSurfaceRows.ts` — while each `it` stays in the provider's own file, so a file still
+lists the rows it runs.
+
+What is left for a person is **rows 1 and 4** — a plan approval and title generation, both of which
+live in the tab rather than on this path — and what everything above *looks* like on screen.
 
 **Two things a row here must not do**, both learned by doing them:
 
@@ -135,7 +140,7 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
-| 2026-08-30 | `agy`, Claude Agent SDK, `codex` app-server, `opencode` acp, `grok` acp | 2, 3, 5, 7, 9, 10, **11, 12, 13**, 14 (driven half) | — | **Three rows left the person's half.** Rows 11, 12 and 13 are driven now — a tab closed mid-turn whose answer the barrier still stores and a reopened tab still shows, one run drawn into two surfaces on one conversation, and the turn's usage on the column and in the saved conversation. Antigravity 4/4, Claude 6/6, Codex 7/7, OpenCode 6/6, Grok 6/6. Row 11 asserts that **nothing drew the ending** — the detached column was never told the turn finished — so it cannot pass for the ordinary reason. Antigravity has no row 13: print mode reports no usage at all. The rows are wired into all nine files; on Gemini, Kimi Code, MiMoCode and Qwen they have **never run**, for the account reasons already recorded, and each costs a turn. One Claude run stalled past ten minutes and was killed; every row passed on the re-run, so read it as intermittent rather than green |
+| 2026-08-30 | `agy`, Claude Agent SDK, `codex` app-server, `opencode` acp, `grok` acp | 2, 3, 5, **6**, 7, **8**, 9, 10, **11, 12, 13**, 14 (driven half) | — | **Five rows left the person's half.** Row 8 is driven too: a second message sent while a turn runs is admitted as `queued`, and at the moment it starts the vault already holds the first answer — `["user","assistant","user"]` on all five providers, which is durability rather than mere completion. Row 6's driven half rides on row 12: the question is drawn once per column, as the provider composed it, which is where a provider that echoes it back would show up. Rows 11, 12 and 13 are driven now — a tab closed mid-turn whose answer the barrier still stores and a reopened tab still shows, one run drawn into two surfaces on one conversation, and the turn's usage on the column and in the saved conversation. Antigravity 5/5, Claude 7/7, Codex 8/8, OpenCode 7/7, Grok 7/7. Row 11 asserts that **nothing drew the ending** — the detached column was never told the turn finished — so it cannot pass for the ordinary reason. Antigravity has no row 13: print mode reports no usage at all. The rows are wired into all nine files; on Gemini, Kimi Code, MiMoCode and Qwen they have **never run**, for the account reasons already recorded, and each costs a turn. One Claude run stalled past ten minutes and was killed; every row passed on the re-run, so read it as intermittent rather than green |
 | 2026-08-30 | `gemini` acp | 3, 9, 10, 14 (driven half) | 5, as this harness asserts it | Gemini's one turn of the day, spent on the row the `installInteractions` fix repaired — and **row B passed**: the permission prompt was asked once, answered, and the turn continued, which it could not do while the row called a method that no longer exists. Row C green. Row A answered `ok` and failed the new blocks assertion, which was **the assertion's fault**: Gemini drew a notice above its answer — it could not switch to auto-approve in an untrusted folder — and `StreamController` writes a notice into the open text block on purpose without adding it to the message's own `content`. The row allows for that now and the exception is pinned deterministically; it could not be re-run the same day, so **row 5 for Gemini is uncertified until the quota returns**. Rows 1, 4, 6, 8, 11, 12, 13 outstanding under the standing override |
 | 2026-08-30 | `agy`, Claude Agent SDK, `codex` app-server, `opencode` acp, `grok` acp | 2, 3, 5, 7, 9, 10, 14 (driven half) on all five | — | **The first run with a real column**, and the run the column was widened for: the block-splitting fix of 2026-08-29 was held by unit tests only, because this harness stubbed `appendText` and nothing in it read `contentBlocks`. Row 5 now asserts the answer is one text block and that every split is explained by something that displaced it. Antigravity 2/2, Claude 3/3, Codex 4/4, OpenCode 3/3, Grok 3/3. **It found three defects.** The permission row was dead on seven of the nine files — it called `setApprovalCallback`, which the seam deletion replaced with `installInteractions`, through a cast that kept compiling; it is installed by name now. And a provider whose *reasoning* arrives as `provider-content` rather than as `reasoning-text` was drawn one thinking block per delta: OpenCode eight, Grok twenty-nine. The render target closed both open blocks ahead of any payload that drew; `handleStreamChunk` already closes what each chunk displaces, and does it per chunk, so the target closes nothing now. Re-run live after the fix: one thinking block on both. And steered input was reordered on a copy — `ChatState.messages` answers with one, so the move that puts a steered question in front of the turn it joined was performed on a temporary in every real tab, and the save wrote a question that follows its own answer; Codex's row D asserts the order now, live. Gemini, Kimi Code, MiMoCode and Qwen not run — quota and accounts, unchanged since 2026-08-27 |
 | 2026-08-27 | `gemini` acp | 2, 3, 5, 9, 14 (driven half) | 10 | Gemini CLI's flip. Rows A and B green on a real turn each — the account replenishes about one at a time. Row C is red for the reason Gemini's *own* matrix already records its row 8 as `⛔ quota`: `session/load` answered `Internal error`, and the path rendered the composition's own sentence for exactly that — "Gemini could not open the session this conversation was resumed from … Starting a new chat helps only if the session itself is gone." Not a regression of this path; the same blocker one milestone earlier. Gemini persists no session directory, so its `providerState` is empty where Grok's carries one |

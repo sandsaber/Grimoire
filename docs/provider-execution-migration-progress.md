@@ -8294,10 +8294,11 @@ drawn one block per delta on every provider whose reasoning arrives as provider 
 question reordered on a copy of the message list so the vault kept it after its own answer — all three
 fixed and re-certified live. The two entries below this section have the detail.
 
-**Three more rows left the person's half the same day.** Rows 11, 12 and 13 — a tab closed mid-turn,
-two tabs on one conversation, and the turn's usage — are driven now, over a harness that can open a
-second surface, and green on all five accounts. What still needs a person is what the column *looks*
-like: rows 1, 4, 6 and 8, and the appearance of everything else.
+**Five more rows left the person's half the same day.** Rows 6, 8, 11, 12 and 13 — the question drawn
+once, queued input waiting for durability, a tab closed mid-turn, two tabs on one conversation, and
+the turn's usage — are driven now, over a harness that can open a second surface, and green on all
+five accounts. What still needs a person is **rows 1 and 4**, which live in the tab rather than on
+this path, and what everything else *looks* like on screen.
 
 **What is left of the matrix is what the accounts allow**, unchanged: Gemini answers about one turn
 per day before `429`, MiMoCode's account cannot generate, Kimi Code and Qwen are not authenticated.
@@ -10644,11 +10645,11 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
-### Three matrix rows left the person's half (`this commit`)
+### Five matrix rows left the person's half (`this commit`)
 
 - Gates: unit 8952 passed / 8952 total across 565 suites; integration 156 passed / 156 run;
   `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
-- Live: Antigravity 4/4, Claude 6/6, Codex 7/7, OpenCode 6/6, Grok 6/6 — the new rows on every
+- Live: Antigravity 5/5, Claude 7/7, Codex 8/8, OpenCode 7/7, Grok 7/7 — the new rows on every
   account this machine has.
 
 **Rows 11, 12 and 13 were a person's job because the harness had one surface**, not because they
@@ -10665,7 +10666,16 @@ first, so the two cannot drift — and the three rows are now driven:
   assistant message and not two — a second surface attaches to the run, it does not start one;
 - **row 13**: the usage the context meter reads, on the column and in the conversation the save left
   behind. Usage is the one thing on this path that arrives as *content* and has to travel back, so
-  it is also the one thing a projection could quietly drop with nothing else noticing.
+  it is also the one thing a projection could quietly drop with nothing else noticing;
+- **row 8**: a second message sent while a turn runs is admitted as `queued`, and what it waits for
+  is the first turn being **durable** rather than merely over. Read at the one moment the row is
+  about — the instant the second turn starts — the vault holds `["user","assistant","user"]` on all
+  five providers. A turn released earlier would hand the provider a transcript missing the answer it
+  is being asked to follow up on;
+- **row 6's driven half**, which costs nothing beside row 12: the question is drawn **once** per
+  column, carrying what the provider composed rather than what was typed. That is where a provider
+  echoing the question back as content would show up — Codex does, and this path filters it out as
+  turn framing.
 
 The bodies live in `chatProjectionSurfaceRows.ts` and each `it` stays in the provider's own file, so
 a file still lists the rows it runs while nine copies of a row cannot disagree about what they

@@ -45,6 +45,8 @@ export interface ChatProjectionSurfaceRows {
   twoSurfacesOneConversation(): Promise<void>;
   /** Matrix row 13, for a provider that reports usage at all. */
   usageAfterTurn(): Promise<void>;
+  /** Matrix row 8, for a provider that queues rather than steers. */
+  queuedInputWaitsForDurability(): Promise<void>;
 }
 
 const ANSWER_PROMPT = 'Reply with exactly: ok';
@@ -132,6 +134,16 @@ export function chatProjectionSurfaceRows(
       // start one.
       expect(second.column.state.messages.filter(message => message.role === 'assistant'))
         .toHaveLength(1);
+      // And row 6's driven half, which costs nothing here: the question appears
+      // **once** on each column, as the provider composed it rather than as it
+      // was typed. A provider that echoes the question back as content — Codex
+      // does — would otherwise draw it twice, and this path filters that echo
+      // out as turn framing.
+      for (const surface of [harness.column, second.column]) {
+        const questions = surface.state.messages.filter(message => message.role === 'user');
+        expect(questions).toHaveLength(1);
+        expect(questions[0]?.content).toBe(submitted.userMessage.content);
+      }
     },
 
     async usageAfterTurn() {
@@ -159,6 +171,45 @@ export function chatProjectionSurfaceRows(
       );
       expect(stored.kind === 'present' ? stored.metadata.usage?.contextTokens ?? 0 : 0)
         .toBeGreaterThan(0);
+    },
+
+    async queuedInputWaitsForDurability() {
+      // Row 8: a second message sent while a turn is running waits, and what it
+      // waits for is the first turn being **durable** rather than merely over.
+      // That is the coordinator's promise and the reason the queue exists on
+      // this path at all — a second turn that started before the first was
+      // written would hand the provider a transcript missing the answer it is
+      // about to be asked to follow up on.
+      const harness = await options.createHarness();
+      const conversationId = harness.tab.conversationId ?? '';
+      const first = await harness.tab.send({ text: slowPrompt }, userMessage(slowPrompt));
+      const second = await harness.tab.send({ text: prompt }, userMessage(prompt));
+
+      options.report('ROW H', first.ticket.admission, second.ticket.admission);
+      // The first was admitted, the second was not: one turn runs at a time.
+      expect(first.ticket.admission).toBe('started');
+      expect(second.ticket.admission).toBe('queued');
+
+      // Read the moment the second turn starts, which is the only moment this
+      // row is about: by then the first answer is in the vault.
+      await second.ticket.started;
+      const atRelease = await harness.sessions.records.read(conversationId);
+      const released = atRelease.kind === 'present' ? atRelease.metadata.messages ?? [] : [];
+      options.report('ROW H at release', JSON.stringify(released.map(message => message.role)));
+      expect(released.filter(message => message.role === 'assistant').length)
+        .toBeGreaterThanOrEqual(1);
+      expect(released.find(message => message.role === 'assistant')?.content.trim()).not.toBe('');
+
+      const completed = await second.ticket.completion;
+      await harness.tab.settled();
+      expect(completed.terminal.kind).toBe('succeeded');
+      // And the conversation reads as the two turns happened: question, answer,
+      // question, answer.
+      const stored = await harness.sessions.records.read(conversationId);
+      const messages = stored.kind === 'present' ? stored.metadata.messages ?? [] : [];
+      options.report('ROW H stored', JSON.stringify(messages.map(message => message.role)));
+      expect(messages.map(message => message.role))
+        .toEqual(['user', 'assistant', 'user', 'assistant']);
     },
   };
 }

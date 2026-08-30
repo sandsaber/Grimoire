@@ -263,4 +263,8 @@ live('Antigravity chat projection live smoke', () => {
   it('row F: draws one turn into both surfaces on the conversation', async () => {
     await surfaceRows.twoSurfacesOneConversation();
   });
+
+  it('row H: holds queued input until the running turn is durable', async () => {
+    await surfaceRows.queuedInputWaitsForDurability();
+  });
 });

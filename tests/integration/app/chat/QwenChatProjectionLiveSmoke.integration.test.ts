@@ -375,4 +375,8 @@ live('Qwen Code chat projection live smoke', () => {
   it('row G: leaves the turn\'s usage on the column and in the conversation', async () => {
     await surfaceRows.usageAfterTurn();
   });
+
+  it('row H: holds queued input until the running turn is durable', async () => {
+    await surfaceRows.queuedInputWaitsForDurability();
+  });
 });
