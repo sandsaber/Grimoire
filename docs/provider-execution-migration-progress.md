@@ -8294,11 +8294,15 @@ drawn one block per delta on every provider whose reasoning arrives as provider 
 question reordered on a copy of the message list so the vault kept it after its own answer — all three
 fixed and re-certified live. The two entries below this section have the detail.
 
-**Five more rows left the person's half the same day.** Rows 6, 8, 11, 12 and 13 — the question drawn
+**Six more rows left the person's half the same day.** Rows 6, 8, 11, 12 and 13 — the question drawn
 once, queued input waiting for durability, a tab closed mid-turn, two tabs on one conversation, and
 the turn's usage — are driven now, over a harness that can open a second surface, and green on all
-five accounts. What still needs a person is **rows 1 and 4**, which live in the tab rather than on
-this path, and what everything else *looks* like on screen.
+five accounts. **Row 1's driven half found a regression the flip carried**: Grimoire's plan approval
+had nothing to fire on, because the only rule that sets `planCompleted` is satisfied by no provider's
+ids, and Codex's own reading of a plan turn was being dropped. The tab merges it now.
+
+What still needs a person is **row 4**, which lives in the tab rather than on this path, the plan
+approval *appearing* and its three answers, and what everything else *looks* like on screen.
 
 **What is left of the matrix is what the accounts allow**, unchanged: Gemini answers about one turn
 per day before `429`, MiMoCode's account cannot generate, Kimi Code and Qwen are not authenticated.
@@ -10644,6 +10648,42 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### The plan approval had nothing to fire on, and row 1 is what found it (`this commit`)
+
+- Gates: unit 8955 passed / 8955 total across 565 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Live: Codex 9/9 including the new row I, Claude 7/7, OpenCode 7/7, Grok 7/7, Antigravity 5/5.
+
+**Driving row 1 cost one plan-mode turn and found a regression the flip carried.** The turn ended
+with the provider holding `planCompleted: true` and the completion holding `undefined`, so Grimoire's
+own plan approval never appeared — for Codex, the one provider that has it.
+
+**Why it could not fire.** On this path `planCompleted` comes from the coordinator alone, which
+derives it from a resolved interaction whose response id *contains* `plan`. No provider in the
+repository produces such an id: Claude's plan decision answers `approved`, `feedback` or `declined`,
+the ACP providers answer permission options, and Codex does not raise an interaction for a plan at
+all — it reads its own plan mode and its own plan deltas, exactly as it did before the migration,
+and reports the result on the turn metadata the surface used to read. Nothing reads that metadata on
+this path any more. The coordinator's own test asserts the rule with an id it invented
+(`plan-approve`), which is why a green suite said nothing: **a fake that no provider produces**.
+
+**The fix is at the tab's end of the path**, where the encoder and the interaction presenter are
+already read late through the runtime: the tab reads the provider's reading of the finished turn,
+once, and merges **only** the plan flag. The identities stay the kernel's — a provider's copy
+overwriting them would put a second answer to one question back into the path M5 took one out of.
+The same read is what OpenCode's per-turn session-cost backfill hangs off, so that had stopped
+happening too, and starts again with it.
+
+**Row I asserts the mechanism, not the outcome.** Its first version asserted that a plan-mode turn
+reports a plan; it passed alone and failed in a full run on identical code, because Codex reports one
+only when the model actually produces plan items. It now asserts that whatever the provider said, the
+surface heard — which is red the moment the two halves disagree and never red because a model chose
+prose. The matrix's own rule, learned again: never read the model's answer as proof of a mechanism.
+
+Three unit rows hold the merge, proven by removing it: the plan carried, the identities left alone,
+the read performed once, and a provider that throws taken as a turn with no plan rather than a failed
+turn.
 
 ### Five matrix rows left the person's half (`this commit`)
 

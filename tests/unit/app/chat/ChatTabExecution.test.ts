@@ -13,6 +13,7 @@ import { sessionInstanceId } from '@/core/execution/ExecutionIds';
 import { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
 import { DeterministicFakeBackend } from '@/core/execution/testing/DeterministicFakeBackend';
 import type { ChatTurnEncoder } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type { ChatTurnMetadata } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
 import type {
   ChatMessageOperations,
@@ -123,7 +124,11 @@ const encoder: ChatTurnEncoder = {
   encodeRequestRef: () => 'req-1',
 };
 
-async function createTab(options: { readonly encoder?: ChatTurnEncoder | null } = {}) {
+async function createTab(options: {
+  readonly encoder?: ChatTurnEncoder | null;
+  /** What the provider says about the turn that just ended, when it says anything. */
+  readonly turnMetadata?: () => ChatTurnMetadata | null;
+} = {}) {
   const storage = new TestDurableStorage();
   const now = () => 1_000;
   let ordinal = 0;
@@ -161,6 +166,7 @@ async function createTab(options: { readonly encoder?: ChatTurnEncoder | null } 
     backendId: BACKEND_ID,
     surface: drawn.binding,
     turnEncoder: () => (options.encoder === undefined ? encoder : options.encoder),
+    ...(options.turnMetadata ? { turnMetadata: options.turnMetadata } : {}),
     createConversation: async () => {
       const id = `conv-${created.length + 1}`;
       created.push(id);
@@ -314,6 +320,71 @@ describe('chat tab execution', () => {
     expect(stored.kind === 'present' ? stored.metadata.messages?.at(-1)?.content : null)
       .toBe('Nobody is reading this.');
     expect(app.tab.conversationId).toBeNull();
+    app.composition.dispose();
+  });
+
+  it('carries the provider\'s own reading of a plan into the completion', async () => {
+    // **The one fact the projection cannot derive.** Grimoire's plan approval
+    // appears when a turn reports a completed plan; the coordinator derives that
+    // from a resolved interaction whose response id names a plan, and no
+    // provider produces such an id — Claude's are `approved`, `feedback` and
+    // `declined`, and the ACP providers answer permissions. Codex reads its own
+    // plan mode and its own plan deltas, and a live plan turn on 2026-08-30
+    // ended with the provider holding `planCompleted: true` and the completion
+    // holding `undefined`, so the approval never appeared.
+    const reads: number[] = [];
+    const app = await createTab({
+      turnMetadata: () => {
+        reads.push(1);
+        return { assistantMessageId: 'provider-answer', planCompleted: true };
+      },
+    });
+    const submitted = await app.tab.send({ text: 'Plan it.' }, userMessage('msg-1', 'Plan it.'));
+    const started = await submitted.ticket.started;
+    app.backend.emit(started.runId, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+    const completed = await submitted.ticket.completion;
+
+    expect(completed.planCompleted).toBe(true);
+    // **Only the plan.** The identities are the kernel's, and a provider's copy
+    // overwriting them would put a second answer to one question back into the
+    // path the migration took one out of.
+    expect(completed.assistantMessageId).not.toBe('provider-answer');
+    // Once per turn: the read is destructive, and it carries the provider's own
+    // per-turn side effects with it.
+    expect(reads).toHaveLength(1);
+    app.composition.dispose();
+  });
+
+  it('reports no plan for a turn neither half calls one', async () => {
+    const app = await createTab({ turnMetadata: () => ({}) });
+    const submitted = await app.tab.send({ text: 'Hello.' }, userMessage('msg-1', 'Hello.'));
+    const started = await submitted.ticket.started;
+    app.backend.emit(started.runId, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+    const completed = await submitted.ticket.completion;
+
+    expect(completed.planCompleted).toBeUndefined();
+    app.composition.dispose();
+  });
+
+  it('takes a turn as planless when the provider cannot say', async () => {
+    // A provider whose reading throws is a turn with no plan, not a failed turn:
+    // the answer is already drawn and stored by the time this is read.
+    const app = await createTab({
+      turnMetadata: () => {
+        throw new Error('This runtime is gone.');
+      },
+    });
+    const submitted = await app.tab.send({ text: 'Hello.' }, userMessage('msg-1', 'Hello.'));
+    const started = await submitted.ticket.started;
+    app.backend.emit(started.runId, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+    const completed = await submitted.ticket.completion;
+
+    // The completion resolves rather than rejecting: a reader that cannot answer
+    // is not a turn that failed, and by this point the answer is drawn and
+    // stored anyway. Which terminal this fake ends on without a result is a
+    // question of its own and not what this row is about.
+    expect(completed.commandId).toBe('cmd-1');
+    expect(completed.planCompleted).toBeUndefined();
     app.composition.dispose();
   });
 });

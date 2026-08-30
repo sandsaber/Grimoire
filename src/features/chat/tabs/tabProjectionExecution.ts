@@ -122,6 +122,12 @@ export function createTabProjectionExecution(
     // the coordinator rather than driven here, because the question belongs to
     // the conversation and two tabs on one chat must not both present it.
     interactionPresenter: () => adapterOf(tab)?.surfacePorts.interactionPresenter ?? null,
+    // The provider's own reading of the turn that just ended, read through the
+    // tab for the same reason. It carries the one fact the projection cannot:
+    // whether the turn completed a plan, which is what puts the approval on
+    // screen — and Codex, the one provider that answers it, was saying so to
+    // nobody.
+    turnMetadata: () => adapterOf(tab)?.consumeTurnMetadata() ?? null,
     createConversation: async () => {
       // Whatever already bound this tab wins. Title generation creates the
       // conversation before the first turn is sent — that is where the fallback

@@ -10,6 +10,7 @@ import type { ExecutionBackendId } from '@/core/execution/ExecutionBackendDescri
 import type { RunTerminal } from '@/core/execution/ExecutionContracts';
 import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { describeRunFailure } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type { ChatTurnMetadata } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
 import type { ProviderId } from '@/core/types/provider';
 import type { ChatExecutionLifecyclePort } from '@/features/chat/application/ChatExecutionCoordinator';
@@ -53,6 +54,15 @@ export interface ChatProjectionHarness {
   /** The vault's record store, for reading back what the barrier wrote. */
   readonly sessions: SessionStorage;
   readonly tab: ChatTabExecution;
+  /**
+   * What the provider made of each finished turn, in order.
+   *
+   * The tab reads this once per turn and merges the one fact the projection
+   * cannot carry — whether a plan was completed — so a row that wants to check
+   * the surface was told what the provider said needs the provider's half kept
+   * as it went past.
+   */
+  readonly providerTurnMetadata: readonly ChatTurnMetadata[];
   /**
    * A second surface on the same conversation, over the same composition.
    *
@@ -194,6 +204,8 @@ export async function openChatProjection(
 
   /** Every surface this harness opened, so releasing it releases all of them. */
   const surfaces: ChatProjectionSurface[] = [];
+  /** What the provider said about each finished turn, in order. */
+  const providerTurnMetadata: ChatTurnMetadata[] = [];
   /** One tab's end of the path — the first, and every one a row opens after it. */
   const openSurface = async (): Promise<ChatProjectionSurface> => {
     const { binding, column } = recordingColumn(
@@ -212,6 +224,19 @@ export async function openChatProjection(
       // hangs — which is how the defect this seam exists for was first seen, and
       // would be how a fixed one still looked.
       interactionPresenter: () => options.runtime.surfacePorts.interactionPresenter ?? null,
+      // The provider's own reading of the finished turn, as
+      // `tabProjectionExecution` reads it. Without it a row about a plan turn
+      // asks the coordinator a question only the provider can answer.
+      //
+      // Kept as well as passed on, because the read is destructive and the tab
+      // is the one doing it: a row that wants to know what the surface was told
+      // has nowhere else to look, and one that consumed it again would be
+      // asking after the answer had already been taken.
+      turnMetadata: () => {
+        const metadata = options.runtime.consumeTurnMetadata();
+        providerTurnMetadata.push(metadata);
+        return metadata;
+      },
       createConversation: async () => options.conversationId,
       nextCommandId: () => `turn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     });
@@ -224,6 +249,7 @@ export async function openChatProjection(
   return {
     column,
     composition,
+    providerTurnMetadata,
     sessions,
     tab,
     openSurface,

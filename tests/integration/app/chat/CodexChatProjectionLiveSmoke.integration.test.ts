@@ -462,4 +462,42 @@ live('Codex chat projection live smoke', () => {
   it('row H: holds queued input until the running turn is durable', async () => {
     await surfaceRows.queuedInputWaitsForDurability();
   });
+
+  it('row I: reports a completed plan for a plan-mode turn', async () => {
+    // **Matrix row 1's untested half.** Grimoire's own plan approval appears
+    // after a turn only when the turn says a plan was completed, and Codex is
+    // the one provider that ever said so: it reads its own plan mode and its own
+    // plan deltas. What the matrix calls untested is exactly this — not the
+    // wiring, but whether a provider's ids reach it.
+    const { harness, runtime } = await createHarness({ permissionMode: 'plan' });
+    const { column, tab } = harness;
+    const text = 'Plan how you would add a README to this project, in at least three steps. '
+      + 'Do not write any files.';
+
+    const submitted = await tab.send({ text }, userMessage(text));
+    const completed = await submitted.ticket.completion;
+    await tab.settled();
+
+    const reading = harness.providerTurnMetadata.at(-1);
+    report(
+      'ROW I',
+      completed.terminal.kind,
+      `provider=${String(reading?.planCompleted)}`,
+      `completion=${String(completed.planCompleted)}`,
+      JSON.stringify(column.drawn.join('').slice(0, 80)),
+    );
+    expect(completed.terminal.kind).toBe('succeeded');
+    // **Whatever the provider said, the surface heard.** Not "a plan turn
+    // reports a plan": Codex reports one only when the model actually produces
+    // plan items, and a row that asserted that would be reading the model's
+    // answer as proof of a mechanism — it passed alone and failed in a full run
+    // on the same code. This holds either way, and goes red the moment the two
+    // halves disagree, which is the state this row found on 2026-08-30: the
+    // provider holding `planCompleted: true` and the completion holding
+    // `undefined`, so the approval never appeared.
+    expect(completed.planCompleted === true).toBe(reading?.planCompleted === true);
+    // The tab is the one reader, and it consumed what it read: nothing is left
+    // on the runtime for a second one, which is what keeps it once per turn.
+    expect(runtime.consumeTurnMetadata().planCompleted).toBeUndefined();
+  });
 });
