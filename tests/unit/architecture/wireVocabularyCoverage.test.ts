@@ -11,8 +11,10 @@ import { CODEX_EXECUTION_NOTIFICATION_METHODS } from '@/providers/codex/runtime/
 import { GeminiContentPresenter } from '@/providers/gemini/execution/GeminiContentPresenter';
 import { GrokContentPresenter } from '@/providers/grok/execution/GrokContentPresenter';
 import { GROK_SESSION_NOTIFICATION_METHODS } from '@/providers/grok/runtime/GrokSessionNotifications';
+import { KimicodeContentPresenter } from '@/providers/kimicode/execution/KimicodeContentPresenter';
 import { MimocodeContentPresenter } from '@/providers/mimocode/execution/MimocodeContentPresenter';
 import { OpencodeContentPresenter } from '@/providers/opencode/execution/OpencodeContentPresenter';
+import { QwenContentPresenter } from '@/providers/qwen/execution/QwenContentPresenter';
 
 /**
  * What the providers actually send, against what the code models.
@@ -105,18 +107,34 @@ const UNMODELLED_BY_PROVIDER: Readonly<Record<string, readonly string[]>> = {
   gemini: [],
   /** MiMoCode's two, both of which wave 7's content surface consumes. */
   mimocode: [],
+  /**
+   * Kimi Code's six, all drawn from once the recording had a turn in it.
+   *
+   * Its first recording was a handshake refusal, so this row measured nothing
+   * until the account was found to be authenticated on 2026-08-30 and the wire
+   * was retaken. `session_info_update` and `config_option_update` are the two
+   * the shared ACP vocabulary does not have and the fork does.
+   */
+  kimicode: [],
+  /** Qwen's four, likewise, from the recording retaken the same day. */
+  qwen: [],
 };
 
 /**
  * The providers whose recorded session-update vocabulary is replayed below.
  *
- * Kimi Code's and Qwen Code's recordings observe none — their machines are
- * not logged in, so `session/new` is refused before a turn — and Antigravity
- * speaks no ACP at all. Those are answers, and the assertion that reads this
- * list is what turns a fifth recording arriving with a vocabulary into a
- * failure rather than a silence.
+ * Six of them since 2026-08-30: Kimi Code's and Qwen's recordings used to
+ * observe no vocabulary at all, because both machines were logged out and
+ * `session/new` was refused before a turn. Both accounts answer now, both
+ * recordings were retaken against a turn, and the vocabulary they brought is
+ * replayed here rather than sitting in a fixture nothing reads. Antigravity
+ * stays off the list because it speaks no ACP at all. That is an answer, and
+ * the assertion that reads this list is what turns the next recording arriving
+ * with a vocabulary into a failure rather than a silence.
  */
-const SESSION_UPDATE_REPLAYS: readonly string[] = ['gemini', 'grok', 'mimocode', 'opencode'];
+const SESSION_UPDATE_REPLAYS: readonly string[] = [
+  'gemini', 'grok', 'kimicode', 'mimocode', 'opencode', 'qwen',
+];
 
 /**
  * Grok's vendor methods, beside the one ACP method it also speaks.
@@ -218,7 +236,13 @@ describe('wire vocabulary coverage', () => {
       .map(recording => recording.providerId)
       .sort();
 
-    expect(partial).toEqual(['kimicode', 'mimocode', 'qwen']);
+    // **Two left this list on 2026-08-30**, when both accounts turned out to be
+    // authenticated: Kimi Code's and Qwen's recordings were handshake refusals
+    // taken while they were blocked, and both were retaken against a turn that
+    // answered. MiMoCode's stays partial because its account still cannot
+    // generate — the recorder writes that limitation rather than a coverage it
+    // did not reach.
+    expect(partial).toEqual(['mimocode']);
   });
 
   it.each(recordings)('$providerId names the CLI version it was taken from', recording => {
@@ -318,6 +342,60 @@ describe('wire vocabulary coverage', () => {
     const missing = observed.filter(update => !consumed.has(update)).sort();
 
     expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.mimocode].sort());
+  });
+
+  it('records every Kimi Code session update nothing draws the surface from', () => {
+    const recording = recordings.find(entry => entry.providerId === 'kimicode');
+    const observed = recording?.sessionUpdatesObserved ?? [];
+    const consumed = new Set<string>(
+      readAcpSessionUpdates(recording).flatMap(notification => {
+        const effects: string[] = [];
+        const presenter = new KimicodeContentPresenter({
+          displayModel: () => 'model',
+          onCommands: () => effects.push('commands'),
+          onConfigOptions: () => effects.push('config'),
+          onCost: () => effects.push('cost'),
+          onCurrentMode: () => effects.push('mode'),
+          onSessionOpened: () => effects.push('session'),
+        });
+        const chunks = presenter.present({ kind: 'session-update', notification });
+        const modelled = new AcpSessionUpdateNormalizer()
+          .normalize(notification.update).type !== 'unsupported';
+        return drawsASurface(chunks, effects, modelled)
+          ? [notification.update.sessionUpdate]
+          : [];
+      }),
+    );
+    const missing = observed.filter(update => !consumed.has(update)).sort();
+
+    expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.kimicode].sort());
+  });
+
+  it('records every Qwen session update nothing draws the surface from', () => {
+    const recording = recordings.find(entry => entry.providerId === 'qwen');
+    const observed = recording?.sessionUpdatesObserved ?? [];
+    const consumed = new Set<string>(
+      readAcpSessionUpdates(recording).flatMap(notification => {
+        const effects: string[] = [];
+        const presenter = new QwenContentPresenter({
+          displayModel: () => 'model',
+          onCommands: () => effects.push('commands'),
+          onConfigOptions: () => effects.push('config'),
+          onCost: () => effects.push('cost'),
+          onCurrentMode: () => effects.push('mode'),
+          onSessionOpened: () => effects.push('session'),
+        });
+        const chunks = presenter.present({ kind: 'session-update', notification });
+        const modelled = new AcpSessionUpdateNormalizer()
+          .normalize(notification.update).type !== 'unsupported';
+        return drawsASurface(chunks, effects, modelled)
+          ? [notification.update.sessionUpdate]
+          : [];
+      }),
+    );
+    const missing = observed.filter(update => !consumed.has(update)).sort();
+
+    expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.qwen].sort());
   });
 
   it('replays every recording that observed session updates', () => {

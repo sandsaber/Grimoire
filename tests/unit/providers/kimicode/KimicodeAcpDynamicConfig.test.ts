@@ -30,18 +30,28 @@ describe('KimicodeAcpDynamicConfigApplier', () => {
     ))).toEqual(trace.cases.dynamicConfiguration);
   });
 
-  it('has no recorded session to ask what Kimi Code offers', () => {
-    // Stated rather than assumed, and asserted so it stops being true the day
-    // someone re-records on a logged-in machine: `kimi acp` refused
-    // `session/new` with "Authentication required", so nothing has ever seen
-    // this provider's config options. Every claim about them below is about the
-    // applier's behaviour, not about the CLI's.
-    expect(wire.coverage).toBe('partial');
-    expect(wire.cases).toEqual(['initialize', 'session/new']);
-    const answered = wire.exchange
-      .map(entry => (entry.message as { result?: { configOptions?: unknown } }).result)
-      .find(result => Array.isArray(result?.configOptions));
-    expect(answered).toBeUndefined();
+  it('sets the config ids the recorded session actually offers', () => {
+    // **The row above used to say the opposite**, and said so deliberately:
+    // `kimi acp` refused `session/new` with "Authentication required", nothing
+    // had ever seen this provider's config options, and the assertion was
+    // written to stop being true the day someone re-recorded on a logged-in
+    // machine. That happened on 2026-08-30. So the ids the applier sends are
+    // now checked against the ones the CLI answered with, rather than against
+    // the applier's own idea of them.
+    expect(wire.coverage).toBe('complete');
+    const offered = wire.exchange
+      .map(entry => (entry.message as {
+        result?: { configOptions?: { id?: unknown }[] };
+      }).result)
+      .find(result => Array.isArray(result?.configOptions))
+      ?.configOptions ?? [];
+
+    expect(offered.map(option => option.id)).toEqual(['model', 'thinking', 'mode']);
+    // Which is what makes the two calls in the row above real: `mode` and
+    // `model` are ids this agent has, and `thinking` is the third the applier
+    // fills when a level is asked for and the session has somewhere to put it.
+    expect(trace.cases.dynamicConfiguration.map(entry => entry.split(':')[1]))
+      .toEqual(['mode', 'model']);
   });
 
   it('drops a thinking level when the session offers nowhere to put it', async () => {

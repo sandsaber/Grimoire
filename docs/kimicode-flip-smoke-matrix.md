@@ -15,10 +15,17 @@ It starts the CLI and spends the account's tokens, so it is off unless that vari
 
 ## Read this before you read the rows
 
-**This provider cannot be certified on the machine it was built on.** `kimi 0.38.0` refuses both
-`session/new` and `session/load` with `-32000 "Authentication required"` — its own log says *no
-provider configured; complete onboarding via /login* — so no session has ever opened here and no row
-that needs an answer has ever run.
+**That blocker lifted on 2026-08-30, and the rows below have not been re-run.** `kimi 0.39.1` answers
+now, on a `zai-coding-plan` GLM model, and two things already stand on real traffic: its wire
+recording was retaken and carries a whole turn (`coverage: complete`, six session-update kinds), and
+the chat projection matrix certified **6 of 7** driven rows on it — the seventh red because Kimi
+reports usage after the prompt returns, which is recorded there. **The rows in this table still say
+what they said when nothing could run**, and each one is worth a run now.
+
+The paragraph they were written under follows. `kimi 0.38.0` refused both
+`session/new` and `session/load` with `-32000 "Authentication required"` — its own log said *no
+provider configured; complete onboarding via /login* — so no session had ever opened here and no row
+that needs an answer had ever run.
 
 The flip shipped anyway, deliberately, and this matrix was written last of the eight. That order is
 the reason it was worth writing: **the harness found a shipped defect on its first run**, in a path no

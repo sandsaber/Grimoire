@@ -82,13 +82,26 @@ describe('Qwen provider module', () => {
     expect(qwenProviderModule.capabilities.session.resume).toBe(trace.resume);
   });
 
-  it('says what its recording could not observe rather than implying it did', () => {
-    // The handshake and a refusal are the whole of it: `qwen 0.21.15` answered
-    // `session/new` with "Authentication required". Everything below about
-    // models, modes and answers stands on `QwenChatRuntime` instead.
-    expect(wire.coverage).toBe('partial');
-    expect(wire.cases).toEqual(['initialize', 'session/new']);
-    expect(wire.sessionUpdatesObserved).toEqual([]);
+  it('carries the turn its recording was retaken to hold', () => {
+    // **It used to say what it could not observe.** `qwen 0.21.15` answered
+    // `session/new` with "Authentication required", so the recording was a
+    // handshake and a refusal, and everything about models, modes and answers
+    // stood on the runtime instead. The account answers as of 2026-08-30, the
+    // wire was retaken against a real turn, and the shapes below are the
+    // provider's own rather than a sibling's adapter read sideways.
+    expect(wire.coverage).toBe('complete');
+    expect(wire.cases).toEqual([
+      'initialize',
+      'session/new',
+      'session/set_config_option',
+      'session/prompt',
+    ]);
+    expect(wire.sessionUpdatesObserved).toEqual([
+      'agent_message_chunk',
+      'agent_thought_chunk',
+      'available_commands_update',
+      'usage_update',
+    ]);
   });
 
   describe('capabilities', () => {

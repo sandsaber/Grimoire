@@ -15,9 +15,16 @@ It starts the CLI and spends the account's tokens, so it is off unless that vari
 
 ## Read this before you read the rows
 
-**This provider cannot be certified on the machine it was built on.** `qwen 0.21.15` refuses
+**That blocker lifted on 2026-08-30, and the rows below have not been re-run.** `qwen-code 0.22.3`
+answers now — authenticated against Z.AI GLM-5.2 through an OpenAI-compatible key — and two things
+already stand on real traffic: its wire recording was retaken and carries a whole turn
+(`coverage: complete`, four session-update kinds and one vendor method), and the chat projection
+matrix certified **7 of 7** driven rows on it. **The rows in this table still say what they said when
+nothing could run**, and each one is worth a run now.
+
+The paragraph they were written under follows. `qwen 0.21.15` refused
 `session/new` with *"Authentication required: Use Qwen Code CLI to authenticate first."*, so no session
-has ever opened and no row that needs an answer has ever run. Qwen flips from Kimi Code's position:
+had ever opened and no row that needs an answer had ever run. Qwen flipped from Kimi Code's position:
 wired, green against a fake agent, and never having met the real CLI past its handshake.
 
 The harness exists anyway, and it earned its keep before it could pass a single row — see below.

@@ -30,10 +30,14 @@ import { GeminiContentPresenter } from '@/providers/gemini/execution/GeminiConte
 import { GeminiExecutionBackend } from '@/providers/gemini/execution/GeminiExecutionBackend';
 import { GrokContentPresenter } from '@/providers/grok/execution/GrokContentPresenter';
 import { GrokExecutionBackend } from '@/providers/grok/execution/GrokExecutionBackend';
+import { KimicodeContentPresenter } from '@/providers/kimicode/execution/KimicodeContentPresenter';
+import { KimicodeExecutionBackend } from '@/providers/kimicode/execution/KimicodeExecutionBackend';
 import { MimocodeContentPresenter } from '@/providers/mimocode/execution/MimocodeContentPresenter';
 import { MimocodeExecutionBackend } from '@/providers/mimocode/execution/MimocodeExecutionBackend';
 import { OpencodeContentPresenter } from '@/providers/opencode/execution/OpencodeContentPresenter';
 import { OpencodeExecutionBackend } from '@/providers/opencode/execution/OpencodeExecutionBackend';
+import { QwenContentPresenter } from '@/providers/qwen/execution/QwenContentPresenter';
+import { QwenExecutionBackend } from '@/providers/qwen/execution/QwenExecutionBackend';
 
 /**
  * The sanitized recordings, run through the composition rather than read.
@@ -52,11 +56,12 @@ import { OpencodeExecutionBackend } from '@/providers/opencode/execution/Opencod
  * it goes through the real managed-ACP backend into a real lifecycle registry —
  * then through the provider's own presenter, which is what a tab draws.
  *
- * Four of the nine recordings carry a prompt exchange. Kimi Code's and Qwen
- * Code's stop at `session/new` because those machines are not logged in, and
- * Antigravity speaks no ACP; that is the same answer `wireVocabularyCoverage`
- * records for them, and the count below is asserted so a recording that grows a
- * turn is not quietly left out.
+ * **Six of the nine recordings carry a prompt exchange, since 2026-08-30.** Kimi
+ * Code's and Qwen's used to stop at `session/new` because both machines were
+ * logged out; both accounts answer now, both recordings were retaken against a
+ * turn, and the count asserted below is what made them impossible to leave out
+ * quietly. Antigravity speaks no ACP, and MiMoCode's turn returns without
+ * content — its recording carries the exchange, which is what this replays.
  */
 
 const WIRE_DIRECTORY = 'tests/fixtures/provider-traces/wire';
@@ -103,6 +108,12 @@ const SUBJECTS: readonly ReplaySubject[] = [
       .present(event),
   },
   {
+    providerId: 'kimicode',
+    createBackend: context => new KimicodeExecutionBackend(context),
+    present: event => new KimicodeContentPresenter({ displayModel: () => 'model' })
+      .present(event),
+  },
+  {
     providerId: 'mimocode',
     createBackend: context => new MimocodeExecutionBackend(context),
     present: event => new MimocodeContentPresenter({ displayModel: () => 'model' })
@@ -112,6 +123,12 @@ const SUBJECTS: readonly ReplaySubject[] = [
     providerId: 'opencode',
     createBackend: context => new OpencodeExecutionBackend(context),
     present: event => new OpencodeContentPresenter({ displayModel: () => 'model' })
+      .present(event),
+  },
+  {
+    providerId: 'qwen',
+    createBackend: context => new QwenExecutionBackend(context),
+    present: event => new QwenContentPresenter({ displayModel: () => 'model' })
       .present(event),
   },
 ];

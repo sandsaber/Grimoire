@@ -10655,6 +10655,38 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Kimi Code's and Qwen's wire recordings retaken against a turn (`this commit`)
+
+- Gates: unit 8959 passed / 8959 total across 565 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean.
+- Recorded live: `kimi 0.39.1` (27 exchanges, six session-update kinds), `qwen-code 0.22.3`
+  (24 exchanges, four kinds and one vendor method).
+
+**Both recordings were handshake refusals** — four lines each, `coverage: partial`, taken while the
+machines were logged out. Both accounts answer now, so both were retaken through the shared recorder,
+which redacts as it writes: the fixtures carry `/home/grimoire`, and `wireFixtureRedaction` passes.
+
+**Four gates moved with them, and each was a list that had to be updated in the same commit:**
+
+- `wireVocabularyCoverage` replays a recording's vocabulary through the provider's own presenter.
+  Kimi Code's and Qwen's were on the "observed nothing" side of that gate; both have rows of their own
+  now, and **every update in both is drawn from** — the two new unmodelled lists are empty, proven by
+  filling one and watching it go red;
+- `providerTraceReplay` runs a recorded exchange end to end through the real managed-ACP backend into
+  a real lifecycle registry and out through the provider's presenter. Four recordings carried a turn;
+  six do now, and the two new ones replay into a drawn turn on the first attempt;
+- Qwen's module test asserted `coverage: partial` and an empty vocabulary. It asserts the turn now;
+- Kimi Code's dynamic-config test asserted that **nothing had ever seen this provider's config
+  options**, and said in its own comment that it was written to stop being true the day someone
+  re-recorded on a logged-in machine. That day arrived: it checks the applier's `mode` and `model`
+  against the three ids the CLI actually offered — `model`, `thinking`, `mode`.
+
+**And the two provider matrices say the blocker lifted.** `docs/qwen-flip-smoke-matrix.md` and
+`docs/kimicode-flip-smoke-matrix.md` both open with "this provider cannot be certified on the machine
+it was built on"; both now say that changed on 2026-08-30, and that the rows in their tables still
+read as they did when nothing could run. Those two matrices are the largest thing this machine can
+now certify that it could not before.
+
 ### Kimi Code and Qwen answer now; MiMoCode still cannot (`this commit`)
 
 - Gates: unit 8955 passed / 8955 total across 565 suites; integration 156 passed / 156 run;
@@ -14588,12 +14620,16 @@ Open obligations, each with an owner:
   message as consumed only when something was actually produced or taken. What remains of this
   obligation is Codex's six, and they are held rather than growing. Owner: whoever gives Codex's
   plan indicators and raw response items a surface;
-- ~~**three providers still need wire recordings** — Kimi Code, Qwen, Gemini.~~ **All nine are taken.**
-  Gemini's is `complete`; Kimi Code's and Qwen's are `partial` because neither machine is
-  authenticated, and MiMoCode's because its account cannot generate — each says so in the file rather
-  than by being thin. What is still owed is the *answer* traffic those three would show, which is an
-  account rather than a recorder. The recorder that took them redacts: see the Grok entry for what the
-  first capture contained;
+- ~~**three providers still need wire recordings** — Kimi Code, Qwen, Gemini.~~ **All nine are taken,
+  and eight of them are `complete` since 2026-08-30.** Kimi Code's and Qwen's were handshake refusals
+  taken while both machines were logged out; both accounts answer now, and both recordings were
+  retaken against a turn — Kimi Code `kimi 0.39.1`, six session-update kinds, 27 exchanges; Qwen
+  `qwen 0.22.3`, four kinds and a vendor method (`qwen/notify/session/mode-update`), 24 exchanges.
+  Both vocabularies are replayed through their own presenters in `wireVocabularyCoverage.test.ts`,
+  and **every update in both is drawn from** — the two new rows are empty, proven by filling one.
+  MiMoCode's stays `partial` because its account still cannot generate, which it says in the file
+  rather than by being thin. The recorder redacts: see the Grok entry for what the first capture
+  contained;
 - ~~**the three fork auxiliary flips dropped the chat's model.**~~ **Closed in the commit below this
   entry**, in the shape the entry asked for: one commit, the same change three times, the halves still
   identical. The original entry follows: Every legacy `*AuxQueryRunner` falls
