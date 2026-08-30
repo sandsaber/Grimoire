@@ -329,6 +329,22 @@ live('Codex chat projection live smoke', () => {
     report('ROW D stored', JSON.stringify(questions.map(message => message.content.slice(0, 40))));
     expect(questions).toHaveLength(2);
     expect(questions[1]?.content).toContain('steered');
+
+    // **And the order the surface holds, because that is what gets written over
+    // the record.** The barrier writes the answer last, so the column has drawn
+    // the answer's bubble before the steered question arrives; the target moves
+    // it in front of the turn it joined. That move was a no-op in every real tab
+    // until this run — `ChatState.messages` answers with a copy, and the reorder
+    // was performed on it — which left `ConversationController.save` writing a
+    // question that follows its own answer, and the next turn reading it that
+    // way.
+    report('ROW D order', JSON.stringify(column.state.messages.map(message => message.role)));
+    expect(column.state.messages.map(message => message.role))
+      .toEqual(['user', 'user', 'assistant']);
+    await harness.saveAfterTurn();
+    const saved = await sessions.records.read(CONVERSATION_ID);
+    expect(saved.kind === 'present' ? (saved.metadata.messages ?? []).map(m => m.role) : [])
+      .toEqual(['user', 'user', 'assistant']);
   });
 
   it('row C: resumes the thread after a reload, from what the vault kept', async () => {

@@ -8289,9 +8289,10 @@ What the previous pointer asked for is done: the harness was widened before it w
 column a live turn draws into is the production `StreamController` rather than a double, and row 5
 now asserts the answer is **one text block** — whole, and split only where something displaced it.
 Five providers certified live on it: Antigravity 2/2, Claude 3/3, Codex 4/4, OpenCode 3/3, Grok 3/3.
-Two defects came out of the first run — a permission row that had been dead since the seam deletion,
-and reasoning drawn one block per delta on every provider whose reasoning arrives as provider
-content — both fixed and both re-certified live. The entry below this section has the detail.
+Three defects came out of it — a permission row that had been dead since the seam deletion, reasoning
+drawn one block per delta on every provider whose reasoning arrives as provider content, and a steered
+question reordered on a copy of the message list so the vault kept it after its own answer — all three
+fixed and re-certified live. The two entries below this section have the detail.
 
 **What is left of the matrix is what the accounts allow**, unchanged: Gemini answers about one turn
 per day before `429`, MiMoCode's account cannot generate, Kimi Code and Qwen are not authenticated.
@@ -10637,6 +10638,28 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### A message that joined a running turn was reordered on a copy (`this commit`)
+
+- Gates: unit 8951 passed / 8951 total across 565 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Live: Codex row D, the steering row, green with the order asserted — `["user","user","assistant"]`.
+
+**The third defect the real column found, and the one that needed only the cursor.** Steered input is
+the only thing that reaches a surface *during* a turn: the coordinator writes the question to the
+conversation while the run is going, the column has already drawn the answer's bubble, so appending
+puts the question after it and `ChatSurfaceRenderTarget.placeBeforeOpenTurn` moves it back in front
+of the turn it joined. It moved it by splicing the array the cursor handed it, on the stated
+reasoning that whatever else holds that array holds the same one — and `ChatState.messages` answers
+with a **copy**. So in every real tab the reorder was performed on a temporary and thrown away, and
+`ConversationController.save` then wrote `state.messages` over the record: a question that follows
+its own answer, in the vault, and handed to the next turn in that order.
+
+Only the target's own suite saw it work, because it doubles the cursor with a plain array — the
+harness did too until this session. The reordered array is written back through the cursor now,
+which is a no-op for a plain array and the whole point for `ChatState`. Codex's row D asserts the
+order the surface holds and the order the save leaves behind, live, because Codex is the only
+provider that steers.
 
 ### The smoke matrix drew into a double, and the real column found two more defects (`this commit`)
 

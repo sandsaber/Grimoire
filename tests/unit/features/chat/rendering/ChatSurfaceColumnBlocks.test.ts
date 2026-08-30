@@ -160,6 +160,39 @@ describe('the column after a turn', () => {
       .toEqual(['text', 'tool_use', 'text']);
   });
 
+  it('puts a message that joined a running turn ahead of the turn it joined', async () => {
+    // **Steered input is the only thing that does this**, and the cursor is why
+    // it is here rather than beside the target's other rows: `ChatState.messages`
+    // answers with a *copy*, so a reorder performed on what it hands back is
+    // performed on a temporary array and the tab keeps the order it had. The
+    // target's own suite doubles the cursor with a plain array, where splicing in
+    // place works — so the seam that made the reorder a no-op in every real tab
+    // was the double.
+    //
+    // What it costs: the coordinator writes the steered question to the
+    // conversation while the turn runs, so the record reads question, question,
+    // answer — and `ConversationController.save` then writes `state.messages`
+    // over it, leaving the vault holding a question that follows its own answer
+    // and handing the next turn a transcript in that order.
+    const chat = harness();
+    beginTurn(chat.target);
+    chat.setPresented([]);
+    chat.target.openTurnBlock(RUN_ID, 0, { kind: 'assistant-text', text: 'Counting: 1, 2' });
+
+    const steered: ChatMessage = {
+      id: 'user-steered',
+      role: 'user',
+      content: 'Stop counting.',
+      timestamp: 2,
+    };
+    chat.target.appendMessage(steered);
+
+    await endTurn(chat);
+
+    expect(chat.column.state.messages.map(message => message.id))
+      .toEqual(['user-steered', `assistant-${RUN_ID}`]);
+  });
+
   it('holds one thinking block for reasoning that arrived as provider content', async () => {
     // **Not every provider's reasoning arrives as a `reasoning-text` item.**
     // OpenCode's comes through `provider-content`, one payload per delta, each

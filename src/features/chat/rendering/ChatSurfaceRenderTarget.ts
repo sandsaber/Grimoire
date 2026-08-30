@@ -241,17 +241,21 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
     if (!openTurn || openTurn === message) {
       return;
     }
-    const messages = this.deps.state.messages;
+    const messages = [...this.deps.state.messages];
     const from = messages.lastIndexOf(message);
     const to = messages.indexOf(openTurn);
     if (from < 0 || to < 0 || to > from) {
       return;
     }
-    // Spliced in place rather than reassigned: whatever else is holding this
-    // array — the controller, the renderer's action buttons — is holding the
-    // same one.
     messages.splice(from, 1);
     messages.splice(to, 0, message);
+    // **Written back, not spliced in place.** The first version of this spliced
+    // what the cursor handed it, on the reasoning that whatever else holds the
+    // array holds the same one — and `ChatState.messages` answers with a *copy*,
+    // so in every real tab the reorder was performed on a temporary and thrown
+    // away. Only the target's own suite saw it work, because the cursor is a
+    // plain array there.
+    this.deps.state.messages = messages;
     // The bubble the turn is drawing into, from the content element the cursor
     // is holding. Asked through `closest` because the cursor points at the
     // content div inside the bubble, not the bubble.
