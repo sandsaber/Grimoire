@@ -42,12 +42,29 @@ import { isChatContent } from '@/features/chat/rendering/chatContentChunks';
 
 export type RecordingColumn = RealChatColumn;
 
+export interface ChatProjectionSurface {
+  readonly column: RecordingColumn;
+  readonly tab: ChatTabExecution;
+}
+
 export interface ChatProjectionHarness {
   readonly column: RecordingColumn;
   readonly composition: ChatExecutionComposition;
   /** The vault's record store, for reading back what the barrier wrote. */
   readonly sessions: SessionStorage;
   readonly tab: ChatTabExecution;
+  /**
+   * A second surface on the same conversation, over the same composition.
+   *
+   * What two tabs open on one chat are, and the shape the projection was built
+   * for: the run belongs to the conversation, not to whoever started it, so a
+   * second surface attaches to the projection and draws the same turn. Built
+   * here because it is the same assembly as the first — a copy of it in one
+   * provider's file would be a second opinion about what a surface is.
+   *
+   * Released with the harness.
+   */
+  openSurface(): Promise<ChatProjectionSurface>;
   close(): Promise<void>;
   /** The half of the surface's post-turn save this path still leaves to it. */
   saveAfterTurn(): Promise<void>;
@@ -175,39 +192,50 @@ export async function openChatProjection(
     );
   }
 
-  const { binding, column } = recordingColumn(
-    options.runtime,
-    options.providerId,
-    options.vaultPath,
-  );
-  const tab = new ChatTabExecution({
-    composition,
-    providerId: options.providerId,
-    backendId: options.backendId,
-    surface: binding,
-    turnEncoder: () => options.runtime.turnEncoder,
-    // Read through the runtime, exactly as `tabProjectionExecution` does. A
-    // harness without this is a harness where every provider that stops to ask
-    // hangs — which is how the defect this seam exists for was first seen, and
-    // would be how a fixed one still looked.
-    interactionPresenter: () => options.runtime.surfacePorts.interactionPresenter ?? null,
-    createConversation: async () => options.conversationId,
-    nextCommandId: () => `turn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-  });
-  await tab.open(options.conversationId);
+  /** Every surface this harness opened, so releasing it releases all of them. */
+  const surfaces: ChatProjectionSurface[] = [];
+  /** One tab's end of the path — the first, and every one a row opens after it. */
+  const openSurface = async (): Promise<ChatProjectionSurface> => {
+    const { binding, column } = recordingColumn(
+      options.runtime,
+      options.providerId,
+      options.vaultPath,
+    );
+    const tab = new ChatTabExecution({
+      composition,
+      providerId: options.providerId,
+      backendId: options.backendId,
+      surface: binding,
+      turnEncoder: () => options.runtime.turnEncoder,
+      // Read through the runtime, exactly as `tabProjectionExecution` does. A
+      // harness without this is a harness where every provider that stops to ask
+      // hangs — which is how the defect this seam exists for was first seen, and
+      // would be how a fixed one still looked.
+      interactionPresenter: () => options.runtime.surfacePorts.interactionPresenter ?? null,
+      createConversation: async () => options.conversationId,
+      nextCommandId: () => `turn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    });
+    await tab.open(options.conversationId);
+    surfaces.push({ column, tab });
+    return { column, tab };
+  };
+  const { column, tab } = await openSurface();
 
   return {
     column,
     composition,
     sessions,
     tab,
+    openSurface,
     close: async () => {
-      tab.detach();
+      for (const surface of surfaces) {
+        surface.tab.detach();
+        // The controller keeps a turn's timers — the silence heartbeat, a
+        // pending render frame — and a real one left running outlives the test
+        // that started it.
+        surface.column.dispose();
+      }
       composition.dispose();
-      // The controller keeps a turn's timers — the silence heartbeat, a pending
-      // render frame — and a real one left running outlives the test that
-      // started it.
-      column.dispose();
     },
     /**
      * What the surface writes *after* a turn, which the barrier does not.

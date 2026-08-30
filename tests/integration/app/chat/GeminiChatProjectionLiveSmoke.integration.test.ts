@@ -9,6 +9,7 @@ import {
   openChatProjection,
   userMessage,
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
+import { chatProjectionSurfaceRows } from '@test/integration/app/chat/chatProjectionSurfaceRows';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
@@ -350,5 +351,24 @@ live('Gemini CLI chat projection live smoke', () => {
     const afterSecond = await sessions.records.read(CONVERSATION_ID);
     expect(afterSecond.kind === 'present' ? afterSecond.metadata.sessionId : null)
       .toBe(nativeSessionRef);
+  });
+
+  // Matrix rows 11 and 12, driven rather than watched: a turn that outlives the
+  // tab that started it, and one run drawn into two surfaces. The bodies are
+  // shared with every other provider's file — see `chatProjectionSurfaceRows` —
+  // because what they certify is the path rather than the provider.
+  // Row G is not wired here: Gemini's turns report no usage on this account, and a row about the context meter would be a row about that.
+  // **Each of these spends a turn**, and this account answers about one per day.
+  const surfaceRows = chatProjectionSurfaceRows({
+    createHarness: async () => (await createHarness()).harness,
+    report,
+  });
+
+  it('row E: finishes a turn whose tab closed, and stores it', async () => {
+    await surfaceRows.tabClosedMidTurn();
+  });
+
+  it('row F: draws one turn into both surfaces on the conversation', async () => {
+    await surfaceRows.twoSurfacesOneConversation();
   });
 });

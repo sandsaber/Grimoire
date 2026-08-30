@@ -123,6 +123,12 @@ export default defineConfig([
     rules: {
       ...jestRecommended.rules,
       'eslint-comments/no-restricted-disable': 'off',
+      // A live smoke row whose body is shared still asserts — the assertions are
+      // in the shared body, one copy for nine providers, and the `it` stays in
+      // each provider's file so the matrix's rows remain readable there.
+      'jest/expect-expect': ['error', {
+        assertFunctionNames: ['expect', 'surfaceRows.*'],
+      }],
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',

@@ -8294,6 +8294,11 @@ drawn one block per delta on every provider whose reasoning arrives as provider 
 question reordered on a copy of the message list so the vault kept it after its own answer — all three
 fixed and re-certified live. The two entries below this section have the detail.
 
+**Three more rows left the person's half the same day.** Rows 11, 12 and 13 — a tab closed mid-turn,
+two tabs on one conversation, and the turn's usage — are driven now, over a harness that can open a
+second surface, and green on all five accounts. What still needs a person is what the column *looks*
+like: rows 1, 4, 6 and 8, and the appearance of everything else.
+
 **What is left of the matrix is what the accounts allow**, unchanged: Gemini answers about one turn
 per day before `429`, MiMoCode's account cannot generate, Kimi Code and Qwen are not authenticated.
 Gemini's run is worth spending when the owner says the quota is free — its row B is one of the seven
@@ -10638,6 +10643,42 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### Three matrix rows left the person's half (`this commit`)
+
+- Gates: unit 8952 passed / 8952 total across 565 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Live: Antigravity 4/4, Claude 6/6, Codex 7/7, OpenCode 6/6, Grok 6/6 — the new rows on every
+  account this machine has.
+
+**Rows 11, 12 and 13 were a person's job because the harness had one surface**, not because they
+need eyes. A tab closed mid-turn, two tabs on one conversation, and the turn's usage are all
+observable at the seam this harness already sits on; what was missing was a second surface and a
+reason to read anything back but the messages. `openSurface()` builds one — the same assembly as the
+first, so the two cannot drift — and the three rows are now driven:
+
+- **row 11**: a turn submitted, the tab detached while the provider is still answering, and the
+  answer in the vault afterwards under the conversation the run belongs to. It asserts that the
+  detached column was **never told the turn finished**, so it cannot pass for the ordinary reason,
+  and then opens a fresh surface to show the reopened tab holds what the barrier wrote;
+- **row 12**: two surfaces on one conversation, one run, drawn identically into both, with one
+  assistant message and not two — a second surface attaches to the run, it does not start one;
+- **row 13**: the usage the context meter reads, on the column and in the conversation the save left
+  behind. Usage is the one thing on this path that arrives as *content* and has to travel back, so
+  it is also the one thing a projection could quietly drop with nothing else noticing.
+
+The bodies live in `chatProjectionSurfaceRows.ts` and each `it` stays in the provider's own file, so
+a file still lists the rows it runs while nine copies of a row cannot disagree about what they
+measure. `jest/expect-expect` is configured for that shape rather than worked around.
+
+**What each provider takes is what it has**: Antigravity has no row 13, because print mode reports no
+usage at all and the row would be about `agy --print` rather than about the meter. The rows are wired
+into all nine files; on Gemini, Kimi Code, MiMoCode and Qwen they have never run, for the account
+reasons already recorded, and each costs a turn.
+
+**One Claude run stalled past ten minutes and was killed.** Every row passed on the re-run and each
+new row passes alone in about three seconds, so it is the vendor rather than the rows — recorded as
+intermittent, which is what this matrix already asks for when a provider is up and down.
 
 ### Gemini's turn of the day, and the one thing the blocks assertion had wrong (`this commit`)
 

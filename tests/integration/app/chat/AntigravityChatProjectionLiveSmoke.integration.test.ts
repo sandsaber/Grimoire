@@ -10,6 +10,7 @@ import {
   openChatProjection,
   userMessage,
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
+import { chatProjectionSurfaceRows } from '@test/integration/app/chat/chatProjectionSurfaceRows';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
@@ -239,5 +240,27 @@ live('Antigravity chat projection live smoke', () => {
       agyProcesses().length === 0 ? [] : undefined
     ));
     expect(survivors).toEqual([]);
+  });
+
+  // Matrix rows 11 and 12, driven rather than watched: a turn that outlives the
+  // tab that started it, and one run drawn into two surfaces. The bodies are
+  // shared with every other provider's file — see `chatProjectionSurfaceRows` —
+  // because what they certify is the path rather than the provider.
+  // Row 13 is not here — print mode reports no usage at all, so a row about the
+  // context meter would be a row about `agy --print`.
+  const surfaceRows = chatProjectionSurfaceRows({
+    createHarness,
+    report,
+    // Print mode answers in one delta, so the slow prompt is what gives the tab
+    // something to close on.
+    slowPrompt: 'Count from 1 to 30, one number per line, then reply with exactly: done',
+  });
+
+  it('row E: finishes a turn whose tab closed, and stores it', async () => {
+    await surfaceRows.tabClosedMidTurn();
+  });
+
+  it('row F: draws one turn into both surfaces on the conversation', async () => {
+    await surfaceRows.twoSurfacesOneConversation();
   });
 });

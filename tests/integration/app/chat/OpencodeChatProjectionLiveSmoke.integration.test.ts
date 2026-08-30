@@ -9,6 +9,7 @@ import {
   openChatProjection,
   userMessage,
 } from '@test/integration/app/chat/chatProjectionLiveHarness';
+import { chatProjectionSurfaceRows } from '@test/integration/app/chat/chatProjectionSurfaceRows';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
@@ -333,5 +334,28 @@ live('OpenCode chat projection live smoke', () => {
     const afterSecond = await sessions.records.read(CONVERSATION_ID);
     expect(afterSecond.kind === 'present' ? afterSecond.metadata.sessionId : null)
       .toBe(nativeSessionRef);
+  });
+
+  // Matrix rows 11, 12 and 13, driven rather than watched: a turn that outlives
+  // the tab that started it, one run drawn into two surfaces, and the count the
+  // context meter reads. The bodies are shared with every other provider's file
+  // — see `chatProjectionSurfaceRows` — because what they certify is the path
+  // rather than the provider.
+  // OpenCode reports usage on every turn, so row G applies.
+  const surfaceRows = chatProjectionSurfaceRows({
+    createHarness: async () => (await createHarness()).harness,
+    report,
+  });
+
+  it('row E: finishes a turn whose tab closed, and stores it', async () => {
+    await surfaceRows.tabClosedMidTurn();
+  });
+
+  it('row F: draws one turn into both surfaces on the conversation', async () => {
+    await surfaceRows.twoSurfacesOneConversation();
+  });
+
+  it('row G: leaves the turn\'s usage on the column and in the conversation', async () => {
+    await surfaceRows.usageAfterTurn();
   });
 });
