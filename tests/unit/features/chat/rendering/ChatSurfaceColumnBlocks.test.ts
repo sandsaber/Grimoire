@@ -160,6 +160,31 @@ describe('the column after a turn', () => {
       .toEqual(['text', 'tool_use', 'text']);
   });
 
+  it('draws a notice into the answer without adding it to what the answer says', async () => {
+    // **The one place the blocks and `content` legitimately differ**, found by a
+    // live Gemini row failing the "blocks say what the message says" assertion:
+    // Gemini could not switch to auto-approve in an untrusted folder and said so
+    // above its answer. The controller writes a notice into the open text block
+    // and does not add it to the message's own content, which is deliberate —
+    // the warning is Grimoire's, not the model's — so the row that reads the
+    // blocks has to allow for it, and this is why.
+    const chat = harness();
+    beginTurn(chat.target);
+
+    chat.setPresented([{ type: 'notice', level: 'warning', content: 'Auto-approve is off.' }]);
+    chat.target.openTurnBlock(RUN_ID, 0, { kind: 'provider-content', payload: {} });
+    chat.setPresented([]);
+    chat.target.openTurnBlock(RUN_ID, 1, { kind: 'assistant-text', text: 'ok' });
+
+    const answer = await endTurn(chat);
+
+    expect(chat.column.thrown).toEqual([]);
+    const drawn = chat.column.textBlocks(answer).map(block => block.content).join('');
+    expect(answer.content).toBe('ok');
+    expect(drawn).toContain('Auto-approve is off.');
+    expect(drawn).toContain('ok');
+  });
+
   it('puts a message that joined a running turn ahead of the turn it joined', async () => {
     // **Steered input is the only thing that does this**, and the cursor is why
     // it is here rather than beside the target's other rows: `ChatState.messages`

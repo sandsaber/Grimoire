@@ -10639,6 +10639,29 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Gemini's turn of the day, and the one thing the blocks assertion had wrong (`this commit`)
+
+- Gates: unit 8952 passed / 8952 total across 565 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Live: Gemini rows B and C green, row A answered and failed the new assertion.
+
+**Row B passed, which is the point of spending the turn.** It is one of the seven the
+`installInteractions` repair brought back from calling a deleted method, and it has not run since
+that deletion: the prompt was asked once, answered, and the turn continued.
+
+**Row A failed on the assertion rather than on the path.** Gemini drew a notice above its answer — it
+could not switch to auto-approve in an untrusted folder, and said so — and `StreamController` writes
+a notice **into the open text block** while deliberately leaving it out of the message's own
+`content`. The warning is Grimoire's, not the model's, so `content` is the answer and the blocks hold
+what was on screen. That is long-standing behaviour on both paths, not a regression, and it is the
+one place the two legitimately differ. The nine rows allow for it by name now, and
+`ChatSurfaceColumnBlocks.test.ts` pins it so the exception is a stated rule rather than a row that
+was loosened.
+
+**Gemini's row 5 stays uncertified until the quota returns.** The corrected assertion could not be
+re-run the same day — the account answers about one turn per replenishment — and a row nobody has
+re-run is not a row that passed.
+
 ### A message that joined a running turn was reordered on a copy (`this commit`)
 
 - Gates: unit 8951 passed / 8951 total across 565 suites; integration 156 passed / 156 run;

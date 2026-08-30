@@ -225,9 +225,16 @@ live('Codex chat projection live smoke', () => {
     // whole answer reads as no blocks at all.
     await column.closeOpenBlocks(answer);
     const textBlocks = column.textBlocks(answer);
+    const joined = textBlocks.map(block => block.content).join('');
+    const answered = answer?.content ?? '';
     report('ROW A blocks', JSON.stringify(column.blocks(answer).map(block => block.type)));
-    // Whole: the blocks say exactly what the message says.
-    expect(textBlocks.map(block => block.content).join('')).toBe(answer?.content ?? '');
+    // Whole: the blocks end with exactly what the message says. Only a notice
+    // can come before it — `StreamController` writes one into the open text
+    // block on purpose and deliberately leaves it out of the message's own
+    // content, because the warning is Grimoire's rather than the model's. Gemini
+    // drew one on a live run: it could not switch to auto-approve in an
+    // untrusted folder, and said so above its answer.
+    expect(answered ? joined.slice(-answered.length) : joined).toBe(answered);
     // And split only where something displaced the open block — a tool card, a
     // stretch of reasoning — never between two deltas of one sentence.
     expect(textBlocks.length).toBeLessThanOrEqual(
