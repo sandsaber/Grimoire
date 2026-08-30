@@ -8281,44 +8281,71 @@ Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #10
 
 ### Where the session of 2026-08-30 ended
 
-**The live matrix ran, and it was worth running.** HEAD is this commit on `providers-migration`.
-Full gate green: unit 8950 / 8950 across 565 suites, integration 156, `tsc`, `lint`,
+**Everything is committed and pushed.** HEAD `3df12f2f` on `providers-migration`, working tree clean,
+remote in step. Full gate green: unit 8963 / 8963 across 565 suites, integration 156, `tsc`, `lint`,
 `build:release`. The build is installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
 
-What the previous pointer asked for is done: the harness was widened before it was re-run, so the
-column a live turn draws into is the production `StreamController` rather than a double, and row 5
-now asserts the answer is **one text block** — whole, and split only where something displaced it.
-Five providers certified live on it: Antigravity 2/2, Claude 3/3, Codex 4/4, OpenCode 3/3, Grok 3/3.
-Three defects came out of it — a permission row that had been dead since the seam deletion, reasoning
-drawn one block per delta on every provider whose reasoning arrives as provider content, and a steered
-question reordered on a copy of the message list so the vault kept it after its own answer — all three
-fixed and re-certified live. The two entries below this section have the detail.
+**Seven commits, and the shape of the day was: run the thing, then fix what running it found.**
 
-**Six more rows left the person's half the same day.** Rows 6, 8, 11, 12 and 13 — the question drawn
-once, queued input waiting for durability, a tab closed mid-turn, two tabs on one conversation, and
-the turn's usage — are driven now, over a harness that can open a second surface, and green on all
-five accounts. **Row 1's driven half found a regression the flip carried**: Grimoire's plan approval
-had nothing to fire on, because the only rule that sets `planCompleted` is satisfied by no provider's
-ids, and Codex's own reading of a plan turn was being dropped. The tab merges it now.
+1. **The chat projection harness draws into the real column now** — the production `StreamController`
+   over a real `ChatState` and `SubagentManager`, with Obsidian doubled instead. That closed the gap
+   the previous pointer named, and found three defects in one run: a permission row dead since the
+   seam deletion (`setApprovalCallback` → `installInteractions`), reasoning cut into one block per
+   delta wherever it arrives as provider content (OpenCode 8, Grok 29), and a steered message
+   reordered on a *copy* of `ChatState.messages` so the vault kept the question after its own answer.
+2. **Six matrix rows left the person's half**: 6, 8, 11, 12, 13 and the driven half of 1. Their bodies
+   are shared in `chatProjectionSurfaceRows.ts`; each `it` stays in the provider's file.
+3. **Row 1 found the plan approval had nothing to fire on.** `planCompleted` was derived only from a
+   resolved interaction whose response id names a plan, and no provider produces such an id; Codex's
+   own reading was dropped. `ChatTabExecution` merges the provider's reading now.
+4. **Kimi Code and Qwen turned out to be authenticated.** Both were recorded as blocked a week ago;
+   asking the CLI directly (`<cli> acp` → initialize → session/new → session/prompt) is what found it.
+   MiMoCode is still blocked, checked twice — default model and the free one.
+5. **Both wire recordings were retaken** against a real turn: `coverage: complete`, replayed through
+   their presenters and end to end through their backends. Four gates moved with them.
+6. **Two provider matrices ran for the first time ever** — Kimi Code 11/12, Qwen 15/16 — and most of
+   the red was rows measuring nothing: a `.updates` wrapper the seam deletion removed (six files), a
+   process matcher that could not see `kimi-cod`, a row that approved the agent's request to leave
+   plan mode and then asserted plan mode had held, and a question answered with a key the agent never
+   offered.
+7. **The session-restart notice was missing on four of six ACP providers.** Kimi Code's live row 9
+   found it; Grok had the field and never wrote it; Qwen persisted nothing at all and now has a
+   one-field `QwenProviderState`. Three fixes, three deterministic cases each, all certified live.
 
-What still needs a person is **row 4**, which lives in the tab rather than on this path, the plan
-approval *appearing* and its three answers, and what everything else *looks* like on screen.
+**Where each provider stands, live, on this machine:**
 
-**What is left of the matrix is what the accounts allow, and two of them changed today.** **Kimi Code
-and Qwen are authenticated now**: Qwen took every row on its first real run, Kimi Code six of seven.
-**Seven of the nine providers are certified live on this path.** Gemini still answers about one turn
-per day before `429`, and MiMoCode's account still cannot generate — checked twice today, on its
-default model and on the free one.
+| Provider | Projection matrix | Provider matrix |
+|---|---|---|
+| Codex | 9/9 | not re-run today |
+| Claude | 7/7 | not re-run today |
+| OpenCode | 7/7 | 12/12 |
+| Grok | 7/7 | 13/13 |
+| Qwen | 7/7 | 15/16 |
+| Kimi Code | 6/7 | 11/12 |
+| Antigravity | 5/5 | — (print mode) |
+| Gemini | 2/3, quota | not run today |
+| MiMoCode | 0/7, account | 0/7, account |
 
-The two open per-provider items are Kimi Code's context meter, which is a turn behind because it
-reports usage outside the run, and Gemini's row 5, uncertified until the quota returns.
-Gemini's run is worth spending when the owner says the quota is free — its row B is one of the seven
-the `installInteractions` fix repaired, and it has never run since.
+**What tomorrow starts with, in the order the evidence is already gathered:**
 
-**What is still not mine to run**: launching Obsidian and looking at the column. The blocks are now
-asserted where they are stored, which is what a reopened conversation redraws from, but what the
-drawn text *looks like* is the owner's step. Conversations already saved with split blocks stay
-split — the blocks are the stored data, and both fixes change what is written from here on.
+- **Gemini, on a day its quota is free.** Three things wait on one turn each: its session-restart
+  notice, which is the last of the four unwired providers and is the same shape as Qwen's; its row 5
+  on the projection matrix, uncertified since the blocks assertion was corrected for a drawn notice;
+  and its own provider matrix, which last ran on 2026-08-23.
+- **Kimi Code's context meter, which is an owner's decision.** It sends `usage_update` *after*
+  `session/prompt` returns, and a session notification is routed to the active run — of which there is
+  none by then. So the meter is permanently one turn behind and the last turn's usage is dropped.
+  Where usage lives for a provider that reports it out of band is the question; the kernel's model is
+  that everything belongs to a run.
+- **Qwen's and Kimi Code's row 5 are the CLIs' shapes**, not defects to fix here: Qwen's usage carries
+  `{used, size}` and no per-prompt tokens, so the badge can show the window and not the cost.
+- **Codex's and Claude's provider matrices have not run since 2026-08-21**, on a day when much has
+  changed underneath them — the six `.updates` unwraps were found in files nobody had run.
+
+**What is still not mine to run**: launching Obsidian and looking at the column. Row 4, the plan
+approval *appearing* and its three answers, and the drawn appearance of everything else are the
+owner's. Conversations already saved with split blocks stay split — the blocks are the stored data,
+and this session's fixes change what is written from here on.
 
 ### Where the session of 2026-08-29 ended (third half)
 
