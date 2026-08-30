@@ -216,7 +216,10 @@ export class KimicodeExecution {
   private readonly workspaceHolder = new ProviderWorkspaceHolder(
     kimicodeProviderModule.workspace,
     () => createKimicodeModuleContext(this.plugin, () => null,
-      { databasePath: () => runtimeOnly('databasePath') }),
+      {
+        databasePath: () => runtimeOnly('databasePath'),
+        sessionDropped: () => runtimeOnly('sessionDropped'),
+      }),
   );
 
   constructor(
@@ -334,6 +337,10 @@ export class KimicodeExecution {
     // What the last launch resolved for this tab, which is what the
     // conversation is saved pointing at.
     let databasePath: string | null = null;
+    // Whether the agent no longer had this conversation's saved session. Seeded
+    // from what the conversation carries, because the drop is learned during a
+    // dispatch and the tab that draws the notice is usually a later one.
+    let sessionDropped = false;
     const ownedSessions = new Set<string>();
     let sawTurnCost = false;
     const boundConversation = (): BoundConversation | null => conversation;
@@ -375,6 +382,9 @@ export class KimicodeExecution {
       onCurrentMode: currentModeId => this.settle(
         sessionConfig.syncSessionModeState({ currentModeId }),
       ),
+      // A resume that had to open a different session is what the conversation
+      // carries forward; one that succeeded is what takes the marker back off.
+      onSessionResume: outcome => { sessionDropped = outcome === 'replaced'; },
       onSessionOpened: opening => this.settle((async () => {
         // This tab is the one that answers for a write on this session.
         ownedSessions.add(opening.sessionId);
@@ -475,9 +485,25 @@ export class KimicodeExecution {
           // Another conversation is another database as often as not, and the
           // last one's would send this turn to a session that is not in it.
           databasePath = null;
+          // Seeded only when the conversation changes. A re-sync of the same
+          // one — a tab reactivating, a settings change rebuilding the binding —
+          // hands back the stored object, and what this runtime learned during a
+          // dispatch is newer than what that object says.
+          sessionDropped = getKimicodeState(next?.providerState).sessionDropped === true;
         }
         conversation = next;
       },
+      /**
+       * Whether this conversation resumed into a session the agent had lost.
+       *
+       * Asked on every render rather than consumed, because the seam the UI
+       * draws has to be answerable again on the next paint. **Absent until
+       * 2026-08-30**: this fork carried every other half of the notice and not
+       * this one, so a live row found `kimi acp` answering `Unknown sessionId`,
+       * the session silently replaced, and nothing on screen to say the history
+       * above was no longer the agent's memory.
+       */
+      sessionDropped: () => sessionDropped,
       /**
        * The provider's words for a turn that never started.
        *
@@ -555,6 +581,7 @@ export class KimicodeExecution {
     const contributions = kimicodeProviderModule.runtimePorts(
       createKimicodeModuleContext(this.plugin, boundConversation, {
         databasePath: () => databasePath,
+        sessionDropped: () => sessionDropped,
       }),
     );
 

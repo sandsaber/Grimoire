@@ -247,7 +247,7 @@ live('Gemini live smoke', () => {
     const updates = first.runtime.sessionBinding({
       conversation,
       sessionInvalidated: false,
-    }).updates;
+    }) ?? {};
     await first.shutdown();
 
     // A different composition, a different process. The binding is an id and

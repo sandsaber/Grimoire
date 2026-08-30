@@ -48,6 +48,7 @@ describe('Kimi Code provider module', () => {
       resolveSessionId: () => 'acp-session',
       isPendingFork: () => false,
       readDatabasePath: () => '/vault/.kimicode/kimicode.db',
+      readSessionDropped: () => null,
       dispose: async () => undefined,
     };
   }

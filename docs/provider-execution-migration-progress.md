@@ -10655,6 +10655,54 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
+### Two provider matrices ran for the first time, and one found a silent session (`this commit`)
+
+- Gates: unit 8959 passed / 8959 total across 565 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Live: Kimi Code 11/12, Qwen 15/16, OpenCode 12/12 — the provider matrices, not the projection ones.
+
+**Both matrices had never run a row.** They were written for accounts that refused `session/new`, and
+they say so in their own preambles. With both accounts answering, they ran — and most of what came
+back was about the rows rather than the product, which is what a suite that has never executed looks
+like:
+
+- **rows that read the session binding through a `.updates` wrapper** the seam deletion removed. Kimi
+  Code's rows 8 and 19 and Qwen's row 8 threw on `undefined.providerState` before they could resume
+  anything. The same dead shape is in Gemini's, Grok's, MiMoCode's and OpenCode's files; all six are
+  unwrapped now, and OpenCode's row 8 passes on a real resume;
+- **a process matcher that could not see its own agent.** Kimi Code's row 6 required a command line
+  containing `kimi` *and* `acp`; the CLI renames itself to `kimi-cod` with no arguments at all, so the
+  row failed on "a process must have been there" and its "and it is gone afterwards" half had been
+  passing for the wrong reason;
+- **a row that approved what it was measuring.** Qwen's row 16 answers `allow` to every permission,
+  including `ExitPlanMode` — so the agent refused to write in plan mode, asked to leave, was told
+  *"User approved. You can now start coding"* by the row itself, and wrote the file the row then
+  asserted was absent. It refuses the plan exit now, and the mode holds;
+- **a question answered in a shape the agent could not read.** Qwen's row 21 replied
+  `{ colour: 'blue' }` to an `ask_user_question` whose header was `Colour` and whose options were
+  Violet and Cobalt. The agent said so: *"I asked, but no answer came through."* It answers by the
+  question's own header with one of its own options now, and the round trip completes.
+
+**The product defect is row 9, and it is a fork that lost half a feature.** `kimi acp` refuses an
+unknown session explicitly — `-32602 Invalid params: Unknown sessionId` — so the load is classified
+as gone and a fresh session is opened, which is correct. What was missing is everything that says so:
+`KimicodeContentPresenter` had no `session-resume` branch, the composition never kept a
+`sessionDropped` flag, the module context never read one and the session patch never wrote one. So
+`isSessionDropped()` answered `false`, the session-restart notice was never drawn, and a conversation
+carried on in a session that did not remember it — silently, which is the exact failure the notice
+exists to prevent. All four pieces are mirrored from OpenCode's now, and the same live row answers
+`true`.
+
+**Grok, Qwen and Gemini are wired the same way as Kimi Code was**: no `session-resume` branch, no
+`sessionDropped`. Two of the six ACP providers had the notice; three still do not. Recorded as a
+standing obligation rather than fixed here, because each of the three keeps its state differently and
+the fix has to be certified live per provider.
+
+**Row 5 is red on both matrices, for two different provider shapes.** Kimi Code sends `usage_update`
+after `session/prompt` returns, so no usage reaches the turn at all; Qwen sends it inside the turn but
+carries only `{used, size}`, so the badge can show the window and not what the prompt cost. Neither is
+Grimoire's to fix on its own.
+
 ### Kimi Code's and Qwen's wire recordings retaken against a turn (`this commit`)
 
 - Gates: unit 8959 passed / 8959 total across 565 suites; integration 156 passed / 156 run;
@@ -14651,6 +14699,15 @@ Open obligations, each with an owner:
   also stale.** D5's read-only state has a surface of its own now: `getUnreadableConversations` feeds
   a `grimoire-history-unreadable` block in the history list, so a record this build cannot parse is
   shown as one rather than disappearing;
+- **three ACP providers cannot tell a person their session was replaced.** OpenCode's and MiMoCode's
+  compositions keep a `sessionDropped` flag, fed by a `session-resume` branch in their presenters and
+  written into `providerState` by their session patch, so `isSessionDropped()` answers and the
+  session-restart notice is drawn before the user types. **Grok, Qwen and Gemini have none of it**, and
+  Kimi Code had none of it until 2026-08-30, when its live row 9 found the conversation silently
+  continuing in a session that did not remember it. Kimi Code's is fixed by mirroring OpenCode's four
+  pieces; the other three each keep their state differently, and each fix has to be certified live on
+  its own account — Grok and Qwen can be, Gemini has one turn a day. Owner: whoever takes the next
+  provider row;
 - **awaiting an owner decision: redo.** Recorded as D9 in the persistence decisions. Re-running a
   request is free and needs no new state; undoing a rewind cannot be built on the control store,
   because D2 forbids a second copy of a provider transcript without exception, and the file backup

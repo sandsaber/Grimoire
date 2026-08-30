@@ -234,7 +234,7 @@ live('MiMoCode live smoke', () => {
     const updates = first.runtime.sessionBinding({
       conversation,
       sessionInvalidated: false,
-    }).updates;
+    }) ?? {};
     await first.shutdown();
 
     // A different composition, a different process: the session is resumed by
@@ -363,7 +363,7 @@ live('MiMoCode live smoke', () => {
     const sessionId = runtime.getSessionId();
     const conversation: any = { id: 'conv-cost', messages: [], providerState: {}, sessionId: null };
     const providerState = runtime.sessionBinding({ conversation, sessionInvalidated: false })
-      .updates.providerState as { databasePath?: string } | undefined;
+      ?.providerState as { databasePath?: string } | undefined;
     // What MiMoCode's own database says this session cost, which is the source
     // the fallback reads when the vendor reports nothing on the wire.
     const known = await loadMimocodeSessionCost(String(sessionId), providerState);

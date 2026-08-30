@@ -47,6 +47,14 @@ export interface KimicodeContentPresenterPorts {
   /** The mode the session switched to, which the user may not have chosen. */
   readonly onCurrentMode?: (modeId: string) => void;
   /**
+   * What became of the saved session this dispatch tried to resume.
+   *
+   * `replaced` is the conversation's history ceasing to be the agent's memory,
+   * which the surface says before the user types. Absent here until
+   * 2026-08-30, where OpenCode and MiMoCode — the same fork — always had it.
+   */
+  readonly onSessionResume?: (outcome: 'resumed' | 'replaced') => void;
+  /**
    * What the session answered with when it opened: the models, the modes and
    * the config options a tab's selectors are built from.
    *
@@ -160,6 +168,10 @@ export class KimicodeContentPresenter {
     }
     if (content?.kind === 'session-config') {
       return this.presentSessionConfig(content.session);
+    }
+    if (content?.kind === 'session-resume') {
+      this.ports.onSessionResume?.(content.outcome as 'resumed' | 'replaced');
+      return [];
     }
     if (content?.kind === 'turn-refused') {
       const message = content.message?.trim();

@@ -123,6 +123,11 @@ export interface KimicodeWorkspaceContext {
    * or neither is worth saving.
    */
   readDatabasePath(conversationId: string): string | null;
+  /**
+   * Whether this conversation's saved session was replaced by a fresh one,
+   * or `null` when this runtime is not bound to that conversation.
+   */
+  readSessionDropped(conversationId: string): boolean | null;
   dispose(): Promise<void>;
 }
 
@@ -363,12 +368,24 @@ KimicodeProviderSettings
       isPendingFork: conversationId => context.isPendingFork(conversationId),
       buildSessionPatch: input => {
         const databasePath = context.readDatabasePath(input.conversationId);
+        const sessionDropped = context.readSessionDropped(input.conversationId);
         return {
           sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
-          // Kept even when the session was invalidated, which is what the
-          // legacy runtime did and for the reason it recorded: the SQLite
-          // hydrate and `KIMICODE_DB` still resolve through it.
-          ...(databasePath ? { providerState: { databasePath } } : {}),
+          // Written whole whenever this runtime serves the conversation, and
+          // omitted entirely when it does not: the surface replaces
+          // `providerState` rather than merging it, so an omitted one leaves a
+          // stale drop marker standing and there would be no way to clear it.
+          // `databasePath` is kept even when the session was invalidated, which
+          // is what the legacy runtime did and for the reason it recorded: the
+          // SQLite hydrate and `KIMICODE_DB` still resolve through it.
+          ...(sessionDropped === null
+            ? (databasePath ? { providerState: { databasePath } } : {})
+            : {
+              providerState: {
+                ...(databasePath ? { databasePath } : {}),
+                ...(sessionDropped ? { sessionDropped: true } : {}),
+              },
+            }),
         };
       },
     },

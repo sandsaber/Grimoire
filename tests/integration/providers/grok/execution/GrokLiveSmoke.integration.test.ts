@@ -259,7 +259,7 @@ live('Grok live smoke', () => {
     const updates = first.runtime.sessionBinding({
       conversation,
       sessionInvalidated: false,
-    }).updates;
+    }) ?? {};
     await first.shutdown();
 
     // A different composition, a different process: the session is resumed by
@@ -385,7 +385,7 @@ live('Grok live smoke', () => {
     const sessionId = runtime.getSessionId();
     const conversation: any = { id: 'conv-cost', messages: [], providerState: {}, sessionId: null };
     const providerState = runtime.sessionBinding({ conversation, sessionInvalidated: false })
-      .updates.providerState as GrokProviderState | undefined;
+      ?.providerState as GrokProviderState | undefined;
     // What Grok's own session log says this turn cost, which is the source the
     // fallback reads when the vendor reports nothing on the wire.
     const known = await loadGrokSessionCost(String(sessionId), providerState);

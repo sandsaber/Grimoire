@@ -250,7 +250,7 @@ live('Qwen live smoke', () => {
     const updates = first.runtime.sessionBinding({
       conversation,
       sessionInvalidated: false,
-    }).updates;
+    }) ?? {};
     await first.shutdown();
 
     // A different composition, a different process. The binding is an id and
@@ -345,7 +345,14 @@ live('Qwen live smoke', () => {
     const asked: string[] = [];
     runtime.installInteractions({ approval: async (tool: string) => {
       asked.push(tool);
-      return 'allow';
+      // **The plan-exit request is refused, and that is the row.** Answering
+      // `allow` to everything made this row assert the opposite of what it
+      // says: the agent behaved exactly as a read-only session should — it
+      // refused to write, asked to leave plan mode, was told "User approved. You
+      // can now start coding" by this very callback, and then wrote the file the
+      // row goes on to assert is absent. A row that approves leaving the mode
+      // cannot then measure the mode.
+      return /plan/i.test(tool) ? 'deny' : 'allow';
     } });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
@@ -355,8 +362,12 @@ live('Qwen live smoke', () => {
 
     report('ROW 16', JSON.stringify(asked), JSON.stringify(errorsOf(chunks)),
       JSON.stringify(summarize(chunks)));
-    // The turn ran at all, which is the half `set_mode` would have broken.
-    expect(errorsOf(chunks)).toEqual([]);
+    // **The mode reached the agent**, which is the half `set_mode` would have
+    // broken: it refused to write and asked to leave plan mode instead. Not
+    // "no errors" — a plan whose exit is refused can legitimately end a turn
+    // with nothing in it, and this row saw "The provider ended the turn without
+    // producing a result" on a run where the agent said nothing before asking.
+    expect(asked.some(tool => /plan/i.test(tool))).toBe(true);
     expect(chunks.length).toBeGreaterThan(0);
     // And it ran read-only: Plan is the mode that reads and does not write.
     expect(existsSync(join(vault, 'planned-live.txt'))).toBe(false);
@@ -390,9 +401,19 @@ live('Qwen live smoke', () => {
     // row that failed, and the report says which.
     const { runtime, shutdown } = await createHarness();
     const asked: unknown[] = [];
+    // **Answered in the agent's own terms.** The first version replied
+    // `{ colour: 'blue' }` — a key the question never carried and a value it
+    // never offered — and the agent said so: "I asked, but no answer came
+    // through." A question round trip is answered by the header it was asked
+    // under, with one of the options it offered, or it is not answered at all.
+    let chosen = '';
     runtime.installInteractions({ question: async (input: unknown) => {
       asked.push(input);
-      return { colour: 'blue' };
+      const question = (input as {
+        questions?: { header?: string; options?: { label?: string }[] }[];
+      }).questions?.[0];
+      chosen = question?.options?.[0]?.label ?? '';
+      return question?.header && chosen ? { [question.header]: chosen } : {};
     } });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
@@ -404,7 +425,8 @@ live('Qwen live smoke', () => {
       report('ROW 21 did not run: this turn did not reach for ask_user_question');
       return;
     }
-    expect(answerOf(chunks).toLowerCase()).toContain('blue');
+    expect(chosen).not.toBe('');
+    expect(answerOf(chunks).toLowerCase()).toContain(chosen.toLowerCase());
     await shutdown();
   });
 

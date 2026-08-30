@@ -184,20 +184,21 @@ describe('live smoke matrix records', () => {
       // defects, two of them shipped.
       'gemini-flip-smoke-matrix.md: 2026-08-23',
       'grok-flip-smoke-matrix.md: 2026-08-21',
-      // Run, and every row that needs an answer blocked — this CLI is not
-      // logged in here. Written last of the eight, and worth the run anyway:
-      // it found a shipped defect on a path an authenticated account never
-      // takes. A date is "when did this last run", not "did it pass".
-      'kimicode-flip-smoke-matrix.md: 2026-08-23',
+      // **Run with an account at last**, on 2026-08-30: eleven of twelve rows,
+      // three of them red for reasons that were the rows' own and one for a
+      // product defect it found — the session-restart notice this fork never
+      // wired.
+      'kimicode-flip-smoke-matrix.md: 2026-08-30',
       // Run, and mostly red — for a reason the matrix states rather than the
       // flip: that account cannot generate. A date here is "when did this last
       // run", not "did it pass".
       'mimocode-flip-smoke-matrix.md: 2026-08-22',
       'opencode-flip-smoke-matrix.md: 2026-08-21',
-      // Run, and every row blocked — the CLI is not authenticated here, so no
-      // session has ever opened. A date is "when did this last run", not "did
-      // it pass", and this run found a defect before it could pass anything.
-      'qwen-flip-smoke-matrix.md: 2026-08-23',
+      // **Run with an account at last**, on 2026-08-30: fifteen of sixteen rows,
+      // and the three reds before that were rows measuring the opposite of what
+      // they claimed — one of them approving the agent's request to leave plan
+      // mode and then asserting plan mode had held.
+      'qwen-flip-smoke-matrix.md: 2026-08-30',
     ]);
   });
 });

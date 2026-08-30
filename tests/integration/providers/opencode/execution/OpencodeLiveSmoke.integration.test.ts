@@ -229,7 +229,7 @@ live('OpenCode live smoke', () => {
     const updates = first.runtime.sessionBinding({
       conversation,
       sessionInvalidated: false,
-    }).updates;
+    }) ?? {};
     await first.shutdown();
 
     // A different composition, a different process: the session is resumed by
@@ -269,20 +269,20 @@ live('OpenCode live smoke', () => {
     const errors = chunks
       .filter((chunk): chunk is Extract<StreamChunk, { type: 'error' }> => chunk.type === 'error')
       .map(chunk => chunk.content);
-    report('ROW 9', String(runtime.getSessionId()), JSON.stringify(errors));
-    // OpenCode answers an unknown session with `Internal error: OpenCode
-    // service failure`, which says nothing about the session being missing —
-    // so the binding is kept rather than silently replaced, per the resume
-    // policy, and the turn says so in words the user can act on.
-    expect(errors).toHaveLength(1);
-    // **The agent's own reason, not just the word "session".** This row used to
-    // assert that the message mentioned a session, which the composition's own
-    // sentence does whatever the agent said — so it stayed green while an
-    // unauthenticated CLI's user was told a saved session may have gone and to
-    // start a new chat. What stopped the turn may be the session and may be the
-    // CLI, and only the agent knows which.
-    expect(errors[0]).toContain('said:');
-    expect(runtime.getSessionId()).toBe('ses_grimoire_live_missing');
+    report('ROW 9', String(runtime.getSessionId()), JSON.stringify(errors),
+      String(runtime.isSessionDropped()));
+    // **The session is replaced, and the surface is told.** OpenCode still
+    // answers an unknown session with `Internal error: OpenCode service
+    // failure`, which says nothing about a session — this row used to assert
+    // that the binding was therefore kept and the turn carried the agent's
+    // words. It is not kept any more, and for a good reason: a load that fails
+    // is followed by `session/list`, and an id the agent does not list is gone
+    // whatever its error text said. So the turn succeeds on a new session, and
+    // what stops that from being silent is the neutral seam the surface asks
+    // before the user types — not an error chunk inside the turn.
+    expect(errors).toEqual([]);
+    expect(runtime.getSessionId()).not.toBe('ses_grimoire_live_missing');
+    expect(runtime.isSessionDropped()).toBe(true);
     await shutdown();
   });
 
@@ -358,7 +358,7 @@ live('OpenCode live smoke', () => {
     const sessionId = runtime.getSessionId();
     const conversation: any = { id: 'conv-cost', messages: [], providerState: {}, sessionId: null };
     const providerState = runtime.sessionBinding({ conversation, sessionInvalidated: false })
-      .updates.providerState as { databasePath?: string } | undefined;
+      ?.providerState as { databasePath?: string } | undefined;
     // What OpenCode's own database says this session cost, which is the source
     // the fallback reads when the vendor reports nothing on the wire.
     const known = await loadOpencodeSessionCost(String(sessionId), providerState);

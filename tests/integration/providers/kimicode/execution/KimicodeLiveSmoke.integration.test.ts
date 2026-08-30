@@ -157,11 +157,14 @@ live('Kimi Code live smoke', () => {
 
   /** The `kimi acp` processes this run is responsible for. */
   function agents(): string[] {
-    // The binary is `kimi`; the directory it ships in is `.kimi-code`. Matching
-    // the binary matches both, and matching only the directory would miss a
-    // `kimi` resolved from anywhere else.
-    return ownedProcesses(command => command.includes('kimi') && command.includes('acp'))
-      .map(row => row.command);
+    // **`acp` is not in the command line.** The CLI renames its own process:
+    // spawned as `kimi acp`, it appears in `ps` as `kimi-cod` with no arguments
+    // at all, so a matcher that also required `acp` found nothing — which made
+    // row 6's "a process must have been there" assertion fail and its "and it is
+    // gone afterwards" assertion pass for the wrong reason. Owned processes are
+    // this process's own descendants, so the binary name alone is specific
+    // enough.
+    return ownedProcesses(command => command.includes('kimi')).map(row => row.command);
   }
 
   it('row 1: answers a plain message, and streams it', async () => {
@@ -239,10 +242,14 @@ live('Kimi Code live smoke', () => {
     await drain(first.runtime.query(first.runtime.prepareTurn({
       text: 'Remember the word cobalt. Reply with exactly: OK',
     })));
+    // **The binding *is* the answer now.** It used to arrive wrapped in
+    // `.updates`, and this row has not run since the seam deletion unwrapped it
+    // — so it read `undefined.providerState` and threw before it could resume
+    // anything. The same shape the chat harness writes into a conversation.
     const updates = first.runtime.sessionBinding({
       conversation,
       sessionInvalidated: false,
-    }).updates;
+    }) ?? {};
     await first.shutdown();
 
     // A different composition, a different process: the session is resumed by
@@ -282,23 +289,25 @@ live('Kimi Code live smoke', () => {
     const errors = chunks
       .filter((chunk): chunk is Extract<StreamChunk, { type: 'error' }> => chunk.type === 'error')
       .map(chunk => chunk.content);
-    report('ROW 9', String(runtime.getSessionId()), JSON.stringify(errors));
+    report('ROW 9', String(runtime.getSessionId()), JSON.stringify(errors),
+      String(runtime.isSessionDropped()));
     // What this CLI answers for an unknown session is **not known here**: no
     // account on this machine has ever opened one. What the resume policy
-    // requires either way is that the binding survives — invalidate only on an
-    // explicit "no such session", so a transport or auth failure does not
-    // silently throw the conversation away — and that the turn says something
-    // the user can act on. Both are asserted; the agent's exact words are the
-    // matrix's job to record when an account exists.
-    expect(errors).toHaveLength(1);
-    // **The agent's own reason, not just the word "session".** This row used to
-    // assert that the message mentioned a session, which the composition's own
-    // sentence does whatever the agent said — so it stayed green while an
-    // unauthenticated CLI's user was told a saved session may have gone and to
-    // start a new chat. What stopped the turn may be the session and may be the
-    // CLI, and only the agent knows which.
-    expect(errors[0]).toContain('said:');
-    expect(runtime.getSessionId()).toBe('ses_grimoire_live_missing');
+    // requires either way is that the binding survives an *unclear* failure —
+    // a transport or auth error must not silently throw the conversation away.
+    //
+    // **Now it is known, and the answer was a defect.** `kimi acp` refuses an
+    // unknown session explicitly — `-32602 Invalid params: Unknown sessionId` —
+    // so the load is classified as gone and a new session is opened, which is
+    // correct. What is missing is the half that tells anyone: this provider's
+    // composition never wires `sessionDropped`, where OpenCode's and
+    // MiMoCode's do, so `isSessionDropped()` answers `false` and the
+    // session-restart notice is never drawn. The conversation silently
+    // continues in a session that does not remember it. Grok, Qwen and Gemini
+    // are wired the same way — see the migration journal.
+    expect(errors).toEqual([]);
+    expect(runtime.getSessionId()).not.toBe('ses_grimoire_live_missing');
+    expect(runtime.isSessionDropped()).toBe(true);
     await shutdown();
   });
 
@@ -374,7 +383,7 @@ live('Kimi Code live smoke', () => {
     const sessionId = runtime.getSessionId();
     const conversation: any = { id: 'conv-cost', messages: [], providerState: {}, sessionId: null };
     const providerState = runtime.sessionBinding({ conversation, sessionInvalidated: false })
-      .updates.providerState as { databasePath?: string } | undefined;
+      ?.providerState as { databasePath?: string } | undefined;
     // What Kimi Code's own database says this session cost, which is the source
     // the fallback reads when the vendor reports nothing on the wire.
     const known = await loadKimicodeSessionCost(String(sessionId), providerState);
