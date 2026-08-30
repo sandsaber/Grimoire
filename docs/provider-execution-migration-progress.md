@@ -8304,10 +8304,14 @@ ids, and Codex's own reading of a plan turn was being dropped. The tab merges it
 What still needs a person is **row 4**, which lives in the tab rather than on this path, the plan
 approval *appearing* and its three answers, and what everything else *looks* like on screen.
 
-**What is left of the matrix is what the accounts allow**, and one of them changed: **Kimi Code is
-authenticated now** and took six of seven rows on its first real run. Gemini still answers about one
-turn per day before `429`, MiMoCode's account still cannot generate — checked twice today, on its
-default model and on the free one — and Qwen is still unauthenticated.
+**What is left of the matrix is what the accounts allow, and two of them changed today.** **Kimi Code
+and Qwen are authenticated now**: Qwen took every row on its first real run, Kimi Code six of seven.
+**Seven of the nine providers are certified live on this path.** Gemini still answers about one turn
+per day before `429`, and MiMoCode's account still cannot generate — checked twice today, on its
+default model and on the free one.
+
+The two open per-provider items are Kimi Code's context meter, which is a turn behind because it
+reports usage outside the run, and Gemini's row 5, uncertified until the quota returns.
 Gemini's run is worth spending when the owner says the quota is free — its row B is one of the seven
 the `installInteractions` fix repaired, and it has never run since.
 
@@ -10651,11 +10655,11 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
 
-### Kimi Code answers now; MiMoCode still cannot, and Kimi's meter is a turn behind (`this commit`)
+### Kimi Code and Qwen answer now; MiMoCode still cannot (`this commit`)
 
 - Gates: unit 8955 passed / 8955 total across 565 suites; integration 156 passed / 156 run;
   `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
-- Live: Kimi Code 6/7, MiMoCode 0/7.
+- Live: Qwen 7/7, Kimi Code 6/7, MiMoCode 0/7.
 
 **Kimi Code is authenticated on this machine now.** On 2026-08-23 every turn answered
 `Authentication required`; today `kimi acp` completes `session/new` and answers a prompt. Its harness
@@ -10672,6 +10676,13 @@ session notification to `activeRun`, and there is no active run at that moment; 
 that everything belongs to a run. Where usage should live for a provider that reports it out of band
 is an owner's decision — the render target already notes that usage is the one thing on this path
 that arrives as content and has to travel back — so it is recorded rather than patched.
+
+**Qwen is authenticated now as well, and took every row on its first real run** — 7/7, where
+2026-08-27 recorded `Authentication required` on all three rows it then had. Its permission row is one
+of the seven the `installInteractions` repair brought back, and it passes. **Row 13 passes here and
+not on Kimi Code, and the wire says exactly why**: Qwen sends `usage_update` before the prompt result,
+inside the run it belongs to; Kimi sends it after. Same shared row body, same path, different provider
+timing — which is the distinction the row is supposed to be able to make.
 
 **MiMoCode is still the account, and it is checked rather than assumed.** Every turn ends
 `missing-required-result` with zero tokens, and `mimo acp` answers the same way driven directly — on

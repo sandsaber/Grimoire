@@ -357,8 +357,9 @@ live('Qwen Code chat projection live smoke', () => {
   // context meter reads. The bodies are shared with every other provider's file
   // — see `chatProjectionSurfaceRows` — because what they certify is the path
   // rather than the provider.
-  // Qwen reports usage over ACP, so row G applies.
-  // Never run: this machine is not authenticated with Qwen.
+  // Qwen reports usage over ACP **inside the run it belongs to** — `usage_update`
+  // before the prompt result, where Kimi Code sends it after — so row G passes
+  // here and is red there, on the same shared body.
   const surfaceRows = chatProjectionSurfaceRows({
     createHarness: async () => (await createHarness()).harness,
     report,
