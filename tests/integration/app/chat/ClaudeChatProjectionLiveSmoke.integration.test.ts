@@ -160,6 +160,9 @@ live('Claude chat projection live smoke', () => {
       lifecycle: host.registry,
       providerId: 'claude',
       runtime,
+      // The vault the CLI is working in, so the column normalizes a written
+      // file's path against the same root the product would.
+      vaultPath: vault,
       // What `ConversationController` does when a conversation is opened. The
       // presenter's session belongs to the conversation it was told about.
       syncConversation: true,
@@ -197,6 +200,27 @@ live('Claude chat projection live smoke', () => {
     const assistants = column.state.messages.filter(message => message.role === 'assistant');
     expect(assistants).toHaveLength(1);
 
+    // Matrix row 5, at the layer the answer is stored and redrawn from: the
+    // turn is **one text block**, not one per delta. The column is the real
+    // `StreamController` now, so this reads what a reopened conversation would
+    // draw — and while the column was a double, an answer cut at every delta
+    // boundary passed this file on every provider.
+    const answer = assistants[0];
+    expect(column.thrown).toEqual([]);
+    // The surface's own last step, which is what closes the final block of an
+    // answer: `endTurn` does not, and neither does `finishTurn`. Without it a
+    // whole answer reads as no blocks at all.
+    await column.closeOpenBlocks(answer);
+    const textBlocks = column.textBlocks(answer);
+    report('ROW A blocks', JSON.stringify(column.blocks(answer).map(block => block.type)));
+    // Whole: the blocks say exactly what the message says.
+    expect(textBlocks.map(block => block.content).join('')).toBe(answer?.content ?? '');
+    // And split only where something displaced the open block — a tool card, a
+    // stretch of reasoning — never between two deltas of one sentence.
+    expect(textBlocks.length).toBeLessThanOrEqual(
+      column.blocks(answer).filter(block => block.type !== 'text').length + 1,
+    );
+
     // Matrix row 3.
     const stored = await sessions.records.read(CONVERSATION_ID);
     expect(stored.kind).toBe('present');
@@ -214,13 +238,16 @@ live('Claude chat projection live smoke', () => {
     const { harness, runtime, vault } = await createHarness({ permissionMode: 'normal' });
     const { column, tab } = harness;
     const asked: Array<{ tool: string; description: string }> = [];
-    (runtime as unknown as {
-      setApprovalCallback(
-        callback: (tool: string, input: unknown, description: string) => Promise<string>,
-      ): void;
-    }).setApprovalCallback(async (tool, _input, description) => {
-      asked.push({ description, tool });
-      return 'allow';
+    // Installed by name rather than through a cast: the seven `ChatRuntime`
+    // setters became one `installInteractions` on the adapter, and a cast to
+    // the shape the deleted `setApprovalCallback` had kept compiling long after
+    // the method was gone — this row could then only fail, and did, on every
+    // provider that has one.
+    runtime.installInteractions({
+      approval: async (tool, _input, description) => {
+        asked.push({ description, tool });
+        return 'allow';
+      },
     });
 
     const text = 'Create a file called allowed-projection.txt in the working directory '

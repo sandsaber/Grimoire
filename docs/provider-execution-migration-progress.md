@@ -8279,6 +8279,30 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #107), at the M6 gate.
 
+### Where the session of 2026-08-30 ended
+
+**The live matrix ran, and it was worth running.** HEAD is this commit on `providers-migration`.
+Full gate green: unit 8950 / 8950 across 565 suites, integration 156, `tsc`, `lint`,
+`build:release`. The build is installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
+
+What the previous pointer asked for is done: the harness was widened before it was re-run, so the
+column a live turn draws into is the production `StreamController` rather than a double, and row 5
+now asserts the answer is **one text block** — whole, and split only where something displaced it.
+Five providers certified live on it: Antigravity 2/2, Claude 3/3, Codex 4/4, OpenCode 3/3, Grok 3/3.
+Two defects came out of the first run — a permission row that had been dead since the seam deletion,
+and reasoning drawn one block per delta on every provider whose reasoning arrives as provider
+content — both fixed and both re-certified live. The entry below this section has the detail.
+
+**What is left of the matrix is what the accounts allow**, unchanged: Gemini answers about one turn
+per day before `429`, MiMoCode's account cannot generate, Kimi Code and Qwen are not authenticated.
+Gemini's run is worth spending when the owner says the quota is free — its row B is one of the seven
+the `installInteractions` fix repaired, and it has never run since.
+
+**What is still not mine to run**: launching Obsidian and looking at the column. The blocks are now
+asserted where they are stored, which is what a reopened conversation redraws from, but what the
+drawn text *looks like* is the owner's step. Conversations already saved with split blocks stay
+split — the blocks are the stored data, and both fixes change what is written from here on.
+
 ### Where the session of 2026-08-29 ended (third half)
 
 **Everything that was code is done and pushed.** HEAD `fc278650` on `providers-migration`, working
@@ -10613,6 +10637,59 @@ comes out is 2,100 lines of incremental append and 2,150 of turn acceptance, and
 `InputController` that chooses between the two paths goes with them. Then durable agents, tab-close
 ownership, the thirteen provider rows M3 handed over, registry deletion, `ApplicationRuntime` as the
 composition root, and the seam deletion.
+
+### The smoke matrix drew into a double, and the real column found two more defects (`this commit`)
+
+- Gates: unit 8950 passed / 8950 total across 565 suites; integration 156 passed / 156 run;
+  `tsc --noEmit` clean; `npm run lint` clean; `npm run build:release` clean.
+- Live: Antigravity 2/2, Claude 3/3, Codex 4/4, OpenCode 3/3, Grok 3/3 — every driven row of the
+  chat projection matrix that has an account on this machine, run before and after each fix below.
+
+**The gap the previous session left, closed.** Yesterday's block-splitting fix was held by unit tests
+at the render target and nothing else: the chat projection live harness stubbed `appendText`, so
+nothing in it ever read `contentBlocks`, and that is the same seam that hid the defect for the whole
+migration. The harness's column is the real `StreamController` now, over the real `ChatState` and the
+real `SubagentManager`, wired as `Tab.ts` wires them — `tests/helpers/chat/realChatColumn.ts` —
+recording what it is asked for on the way through. What stays doubled is Obsidian: the elements, the
+markdown renderer and the vault.
+
+Three things came with it, each because the double had been hiding the need for them:
+
+- **the last block of an answer is closed by nobody the harness was calling.** `endTurn` does not
+  close it and `finishTurn` does not either; `InputController`'s `finally` block does, and a harness
+  that saves without it stores an answer with its final block missing. `saveAfterTurn` does it now,
+  and a row that reads the blocks does it first;
+- **a failed column operation is swallowed by the render target's queue on purpose**, so a column
+  that could not draw at all would read as a provider that said nothing. The recorder keeps what
+  threw and every row asserts it is empty. It earned that immediately: the doubled vault had no
+  `adapter.list`, and Claude's write row threw out of a 200ms timer where the product would;
+- **the deterministic half is a suite of its own.** `ChatSurfaceColumnBlocks.test.ts` runs the real
+  target over the real column and asks the message what it holds, because
+  `ChatSurfaceRenderTarget.test.ts` deliberately asserts only which operations were asked for, and
+  `StreamController`'s own tests assert only what a call does. Both were right; the join was held by
+  nothing. Proven by restoring the unconditional finalize: the answer comes back as `"Hel"`,
+  `"lo! Wh"`, `"at can I do?"` — the shape the owner found in the vault.
+
+**Defect 1: the permission row was dead on seven of the nine files.** It called
+`setApprovalCallback`, one of the seven `ChatRuntime` setters the seam deletion replaced with a
+single `installInteractions`, through a cast to an ad-hoc interface — so it compiled, and could only
+fail at run time, and nothing had run it since. `structuralDeletionProgress.test.ts` records those
+setters as deleted, which is exactly what a live row could not see. Installed by name now, so the
+next deletion breaks the build instead of the run. Claude's and OpenCode's and Grok's row B pass for
+the first time since the deletion.
+
+**Defect 2: reasoning was drawn one block per delta, on every provider whose reasoning arrives as
+provider content.** Yesterday's fix taught `openTurnBlock` that each kind closes what it displaces,
+and left one blanket close behind: any payload that drew something closed both open blocks first.
+For a provider whose prose arrives as deltas that is invisible, and for a provider whose *reasoning*
+arrives as one `provider-content` per delta it is the same defect on the other channel — OpenCode
+drew **eight** thinking blocks for one stretch of reasoning, Grok **twenty-nine**, each its own
+collapsed card, and each stored that way. `handleStreamChunk` already closes what each chunk
+displaces, per chunk, by the rule for that chunk — a tool call and a progress block close the prose
+and the reasoning above them, prose closes reasoning, reasoning closes prose — so the target closes
+nothing there now. Two tests that stated the old rule as a call order were rewritten; the outcome
+they were standing in for is asserted where the column is real. Re-run live after the fix: one
+thinking block on both providers.
 
 ### A live turn cut every answer into one block per delta (`this commit`)
 

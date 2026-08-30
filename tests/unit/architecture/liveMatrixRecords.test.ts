@@ -176,7 +176,7 @@ describe('live smoke matrix records', () => {
       // Not a provider's matrix: one surface across all nine, each flipped and
       // recorded separately. The driven half only — the rows a person has to
       // watch in a vault are outstanding under the standing override.
-      'chat-projection-flip-smoke-matrix.md: 2026-08-27',
+      'chat-projection-flip-smoke-matrix.md: 2026-08-30',
       'claude-flip-smoke-matrix.md: 2026-08-21',
       'codex-flip-smoke-matrix.md: 2026-08-21',
       // Run, and mostly blocked — by the account's daily quota rather than by

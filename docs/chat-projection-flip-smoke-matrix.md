@@ -76,13 +76,22 @@ GRIMOIRE_CLAUDE_LIVE=1 NODE_OPTIONS=--experimental-vm-modules \
 
 Nothing below the composition is a fake. The backend is the one production registers, over the OS
 process runner and a real `agy`; the conversation store is `SessionStorage` over a vault adapter, so
-the barrier's write goes through the same envelope a vault in the field holds. What is doubled is
-the column — the DOM — and it records what it was asked to draw rather than answering, so an
-assertion is about what the surface was told to do.
+the barrier's write goes through the same envelope a vault in the field holds.
+
+**The column is real too, since 2026-08-30.** It used to be a double that recorded the operations it
+was asked for and performed none of them, and that made every row here a statement about what the
+surface was *told* to do — one layer above where an answer is assembled. `StreamController` is what
+turns those calls into the content blocks a conversation is stored and redrawn from, so with it
+stubbed a turn could cut an answer into one block per delta on every provider and no row would
+notice; one did, for the whole migration. The controller, the `ChatState` and the `SubagentManager`
+are the production ones now, wired as `Tab.ts` wires them
+(`tests/helpers/chat/realChatColumn.ts`), and what stays doubled is Obsidian: the elements, the
+markdown renderer and the vault.
 
 It covers **rows 2, 3, 5, 7, 9, 10 and the negative half of 14**, per provider and only where that
 provider has the thing: one `done` and one assistant bubble per turn, the stored answer carrying the
-id the surface drew it into, text arriving on the column, a provider's own content items reaching it
+id the surface drew it into, text arriving on the column **as one block rather than one per delta**,
+a provider's own content items reaching it
 through the presenter, a cancelled turn ending as cancelled with its partial answer kept and no
 process left behind, a permission prompt asked **once** and answered so the turn continues, a
 reloaded tab resuming the thread the vault kept, and no failure wording on a turn that did not fail. Each file also asserts the switch holds its provider, because a harness that
@@ -117,6 +126,7 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
+| 2026-08-30 | `agy`, Claude Agent SDK, `codex` app-server, `opencode` acp, `grok` acp | 2, 3, 5, 7, 9, 10, 14 (driven half) on all five | — | **The first run with a real column**, and the run the column was widened for: the block-splitting fix of 2026-08-29 was held by unit tests only, because this harness stubbed `appendText` and nothing in it read `contentBlocks`. Row 5 now asserts the answer is one text block and that every split is explained by something that displaced it. Antigravity 2/2, Claude 3/3, Codex 4/4, OpenCode 3/3, Grok 3/3. **It found two defects on its first run.** The permission row was dead on seven of the nine files — it called `setApprovalCallback`, which the seam deletion replaced with `installInteractions`, through a cast that kept compiling; it is installed by name now. And a provider whose *reasoning* arrives as `provider-content` rather than as `reasoning-text` was drawn one thinking block per delta: OpenCode eight, Grok twenty-nine. The render target closed both open blocks ahead of any payload that drew; `handleStreamChunk` already closes what each chunk displaces, and does it per chunk, so the target closes nothing now. Re-run live after the fix: one thinking block on both. Gemini, Kimi Code, MiMoCode and Qwen not run — quota and accounts, unchanged since 2026-08-27 |
 | 2026-08-27 | `gemini` acp | 2, 3, 5, 9, 14 (driven half) | 10 | Gemini CLI's flip. Rows A and B green on a real turn each — the account replenishes about one at a time. Row C is red for the reason Gemini's *own* matrix already records its row 8 as `⛔ quota`: `session/load` answered `Internal error`, and the path rendered the composition's own sentence for exactly that — "Gemini could not open the session this conversation was resumed from … Starting a new chat helps only if the session itself is gone." Not a regression of this path; the same blocker one milestone earlier. Gemini persists no session directory, so its `providerState` is empty where Grok's carries one |
 | 2026-08-27 | `kimi` acp | 14 (driven half) | A, B, C | Kimi Code's flip, under the standing override. Not authenticated on this machine: every turn answers `Authentication required`, and **the projection path renders those words** rather than the neutral sentence, which is the one row this run can certify. Rows A, B and C need an account |
 | 2026-08-27 | `mimo` acp | 14 (driven half) | A, B, C | MiMoCode's flip, under the standing override. This account cannot generate — every turn ends `missing-required-result`, "The provider ended the turn without producing a result", which is the wording the path drew. Rows A, B and C need an account that answers |

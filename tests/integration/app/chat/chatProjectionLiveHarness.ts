@@ -1,5 +1,5 @@
+import { createRealChatColumn, type RealChatColumn } from '@test/helpers/chat/realChatColumn';
 import { createDurableInMemoryVaultAdapter } from '@test/helpers/inMemoryVaultAdapter';
-import { createMockEl } from '@test/helpers/mockElement';
 
 import { ChatExecutionComposition } from '@/app/chat/ChatExecutionComposition';
 import { ChatTabExecution } from '@/app/chat/ChatTabExecution';
@@ -10,15 +10,10 @@ import type { ExecutionBackendId } from '@/core/execution/ExecutionBackendDescri
 import type { RunTerminal } from '@/core/execution/ExecutionContracts';
 import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { describeRunFailure } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
-import type { ChatMessage, StreamChunk } from '@/core/types';
+import type { ChatMessage } from '@/core/types';
 import type { ProviderId } from '@/core/types/provider';
 import type { ChatExecutionLifecyclePort } from '@/features/chat/application/ChatExecutionCoordinator';
 import { isChatContent } from '@/features/chat/rendering/chatContentChunks';
-import type {
-  ChatMessageOperations,
-  ChatStreamingCursor,
-  ChatStreamOperations,
-} from '@/features/chat/rendering/ChatSurfaceRenderTarget';
 
 /**
  * A tab's end of the chat projection path, over a real provider.
@@ -31,31 +26,21 @@ import type {
  *
  * Nothing here is a fake below the composition. The conversation store is
  * `SessionStorage` over a vault adapter, so the barrier's write goes through
- * the same envelope a vault in the field holds, and the column is doubled by
- * **recording** what it was asked to draw rather than by answering — an
- * assertion over it is a statement about what the surface was told to do.
+ * the same envelope a vault in the field holds.
+ *
+ * **The column is the real one now.** It used to be a double that recorded the
+ * operations it was asked for and did none of them, which made every row here a
+ * statement about what the surface was *told* to do. That is one layer above
+ * where the answer is assembled: `StreamController` is what turns those calls
+ * into the content blocks a conversation is stored and redrawn from, and with
+ * it stubbed a turn could cut an answer into one block per delta on every
+ * provider without a single row noticing. So the controller, the `ChatState`
+ * and the `SubagentManager` are the production ones, wired as `Tab.ts` wires
+ * them, and what stays doubled is Obsidian — the elements, the markdown
+ * renderer and the vault. See `tests/helpers/chat/realChatColumn.ts`.
  */
 
-export interface RecordingColumn {
-  /** Every chunk `StreamController` was handed, in order. */
-  readonly chunks: StreamChunk[];
-  /**
-   * Every time the column was told a turn had ended, and every failure said.
-   *
-   * **These were missing, and their absence made a matrix row unfalsifiable.**
-   * The render target does not send a turn's ending as a chunk — it calls
-   * `finishTurn`, and a failure `renderTurnFailure`. The fake below implemented
-   * neither, so the target's call would have thrown, and the row that checked
-   * "one turn ended" was counting a chunk type that path never delivers.
-   */
-  readonly finished: string[];
-  readonly failures: string[];
-  /** Every piece of assistant text appended to the column, in order. */
-  readonly drawn: string[];
-  /** Every piece of reasoning text appended to the column, in order. */
-  readonly thought: string[];
-  readonly state: ChatStreamingCursor;
-}
+export type RecordingColumn = RealChatColumn;
 
 export interface ChatProjectionHarness {
   readonly column: RecordingColumn;
@@ -85,6 +70,13 @@ export interface ChatProjectionHarnessOptions {
    */
   readonly vaultAdapter?: ReturnType<typeof createDurableInMemoryVaultAdapter>;
   /**
+   * The working directory the provider was launched in.
+   *
+   * The column makes a written file's path relative to it, which is the one
+   * thing the real controller asks the Obsidian vault for.
+   */
+  readonly vaultPath?: string;
+  /**
    * Whether to tell the runtime which conversation this tab is showing.
    *
    * What `ConversationController` does when a conversation is opened, and it is
@@ -95,77 +87,31 @@ export interface ChatProjectionHarnessOptions {
 }
 
 /**
- * A column that records what it was asked to draw.
+ * The tab's column, over the controller that actually draws one.
  *
  * The operations are the ones `StreamController` and `MessageRenderer` perform
- * today, in the order the render target performs them.
+ * today, in the order the render target performs them — and the first of those
+ * two is real here, so what a row reads is what the column holds rather than
+ * what it was asked for.
  */
 export function recordingColumn(
   runtime: ExecutionChatRuntimeAdapter,
   providerId: ProviderId,
+  vaultPath?: string,
 ) {
-  const chunks: StreamChunk[] = [];
-  const finished: string[] = [];
-  const failures: string[] = [];
-  const drawn: string[] = [];
-  const thought: string[] = [];
-  const element = createMockEl();
-  element.querySelector = jest.fn().mockReturnValue(createMockEl());
-  const state: ChatStreamingCursor = {
-    messages: [],
-    usage: null,
-    currentContentEl: null,
-    currentTextEl: null,
-    currentTextContent: '',
-    currentThinkingState: null,
-    addMessage(message) {
-      this.messages.push(message);
-    },
-  };
+  const column = createRealChatColumn({
+    providerId,
+    // The tab's runtime, which the controller asks for the provider a chunk
+    // belongs to and the model a usage report is against.
+    getAgentService: () => runtime,
+    ...(vaultPath ? { vaultPath } : {}),
+  });
   return {
-    chunks,
-    finished,
-    failures,
-    drawn,
-    state,
-    thought,
+    column,
     binding: {
-      state,
-      renderer: {
-        addMessage: () => element as unknown as HTMLElement,
-        renderMessages: () => element as unknown as HTMLElement,
-      } as unknown as ChatMessageOperations,
-      stream: {
-        handleStreamChunk: (chunk: StreamChunk) => {
-          chunks.push(chunk);
-          return Promise.resolve();
-        },
-        finishTurn: (message: { id: string }) => {
-          finished.push(message.id);
-          return Promise.resolve();
-        },
-        renderTurnFailure: (content: string) => {
-          failures.push(content);
-          return Promise.resolve();
-        },
-        appendText: (text: string) => {
-          drawn.push(text);
-          return Promise.resolve();
-        },
-        appendThinking: (content: string) => {
-          thought.push(content);
-          return Promise.resolve();
-        },
-        finalizeCurrentTextBlock: () => Promise.resolve(),
-        finalizeCurrentThinkingBlock: () => Promise.resolve(),
-        flushPendingToolsForPermission: () => undefined,
-        noteTurnActivity: () => undefined,
-        showThinkingIndicator: () => undefined,
-        hideThinkingIndicator: () => undefined,
-        startTurnSilenceIndicator: () => undefined,
-        pauseTurnSilenceIndicator: () => undefined,
-        stopTurnSilenceIndicator: () => undefined,
-      } as unknown as ChatStreamOperations,
+      state: column.state,
+      renderer: column.renderer,
+      stream: column.stream,
       // Read through the runtime and filtered by the same rule, because
       // `tabProjectionExecution` is what this stands in for: a copy that left
       // the filter out drew `user_message_start` into the column on the first
@@ -229,12 +175,16 @@ export async function openChatProjection(
     );
   }
 
-  const column = recordingColumn(options.runtime, options.providerId);
+  const { binding, column } = recordingColumn(
+    options.runtime,
+    options.providerId,
+    options.vaultPath,
+  );
   const tab = new ChatTabExecution({
     composition,
     providerId: options.providerId,
     backendId: options.backendId,
-    surface: column.binding,
+    surface: binding,
     turnEncoder: () => options.runtime.turnEncoder,
     // Read through the runtime, exactly as `tabProjectionExecution` does. A
     // harness without this is a harness where every provider that stops to ask
@@ -254,6 +204,10 @@ export async function openChatProjection(
     close: async () => {
       tab.detach();
       composition.dispose();
+      // The controller keeps a turn's timers — the silence heartbeat, a pending
+      // render frame — and a real one left running outlives the test that
+      // started it.
+      column.dispose();
     },
     /**
      * What the surface writes *after* a turn, which the barrier does not.
@@ -264,8 +218,14 @@ export async function openChatProjection(
      * A harness that stops at the barrier reports a conversation with no
      * session and reads like a flip that lost session resume; the first Codex
      * run did exactly that.
+     *
+     * The same `finally` block closes the open thinking and text blocks first,
+     * and it is the only thing that closes the *last* block of an answer —
+     * neither `endTurn` nor `finishTurn` does. Saving without it stores an
+     * answer missing its final block.
      */
     saveAfterTurn: async () => {
+      await column.closeOpenBlocks();
       const updates = options.runtime.sessionBinding({
         conversation: { id: options.conversationId },
         sessionInvalidated: false,

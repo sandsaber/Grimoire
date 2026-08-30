@@ -305,12 +305,14 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
         return;
       case 'provider-content': {
         const presented = this.deps.presentProviderContent(item.payload);
-        if (presented.length > 0) {
-          // Only now: a card has to land after the prose that preceded it, so
-          // the open blocks close ahead of it — and not one moment earlier.
-          this.enqueue(() => this.deps.stream.finalizeCurrentThinkingBlock(message));
-          this.enqueue(() => this.deps.stream.finalizeCurrentTextBlock(message));
-        }
+        // **Nothing closes here.** `handleStreamChunk` already closes what each
+        // chunk displaces — a tool call and a progress block close the prose and
+        // the reasoning above them, prose closes reasoning, reasoning closes
+        // prose — and it is the half that knows which. Closing both first was
+        // this bug's other face: a provider whose reasoning arrives as
+        // `provider-content` rather than as `reasoning-text` sends one payload
+        // per delta, and OpenCode drew **eight** thinking blocks for one stretch
+        // of reasoning, each its own collapsed card, on a live run.
         for (const content of presented) {
           this.enqueue(() => this.deps.stream.handleStreamChunk(content, message));
         }

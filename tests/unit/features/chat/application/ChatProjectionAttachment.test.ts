@@ -200,11 +200,11 @@ describe('chat projection attachment', () => {
       'showThinkingIndicator',
       'finalizeCurrentThinkingBlock',
       'appendText',
-      // The one place a text block closes: the tool card has to land after the
-      // prose that preceded it. Closing it before each stretch of prose is what
-      // cut an answer into one block per delta.
-      'finalizeCurrentThinkingBlock',
-      'finalizeCurrentTextBlock',
+      // **Nothing closes ahead of the card here.** The tool card does land after
+      // the prose it follows, and `handleStreamChunk` is what closes that block
+      // — by the rule for the chunk it was handed. Closing here as well cut a
+      // provider's reasoning into one block per delta, which is the same defect
+      // as cutting its prose.
       'chunk:tool_use',
       'finalizeCurrentThinkingBlock',
       'appendText',

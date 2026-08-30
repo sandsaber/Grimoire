@@ -319,9 +319,18 @@ describe('chat surface render target', () => {
     expect(chat.methods().filter(method => method === 'appendText')).toHaveLength(2);
   });
 
-  it('still closes the open text block when the payload does draw', async () => {
-    // The other half of the same rule: a payload that produces a card has to
-    // land after the prose that preceded it, so that block does close.
+  it('hands a payload to the column without closing anything first', async () => {
+    // **The other half of the same defect.** A payload that draws does displace
+    // what is open — a tool card lands after the prose it follows — but
+    // `handleStreamChunk` is what closes it, per chunk, by the rule for that
+    // chunk. Closing both here as well cut a provider whose *reasoning* arrives
+    // as `provider-content`, one payload per delta: OpenCode drew eight thinking
+    // blocks for one stretch of reasoning on a live run, because each payload
+    // closed the block the next one was about to continue.
+    //
+    // What the column then holds is asserted where the column is real, in
+    // `ChatSurfaceColumnBlocks.test.ts` — the card between two prose blocks and
+    // the reasoning in one.
     const chat = harness();
     beginTurn(chat.target);
     chat.clear();
@@ -334,8 +343,6 @@ describe('chat surface render target', () => {
     expect(chat.methods()).toEqual([
       'finalizeCurrentThinkingBlock',
       'appendText',
-      'finalizeCurrentThinkingBlock',
-      'finalizeCurrentTextBlock',
       'handleStreamChunk',
     ]);
   });

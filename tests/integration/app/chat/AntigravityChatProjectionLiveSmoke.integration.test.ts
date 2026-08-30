@@ -103,6 +103,9 @@ live('Antigravity chat projection live smoke', () => {
       lifecycle: host.registry,
       providerId: 'antigravity',
       runtime,
+      // The vault the CLI is working in, so the column normalizes a written
+      // file's path against the same root the product would.
+      vaultPath: vault,
     });
     running.push(async () => {
       await harness.close();
@@ -159,6 +162,27 @@ live('Antigravity chat projection live smoke', () => {
     const assistants = column.state.messages.filter(message => message.role === 'assistant');
     expect(assistants).toHaveLength(1);
     expect(assistants[0]?.content.trim()).not.toBe('');
+
+    // Matrix row 5, at the layer the answer is stored and redrawn from: the
+    // turn is **one text block**, not one per delta. The column is the real
+    // `StreamController` now, so this reads what a reopened conversation would
+    // draw — and while the column was a double, an answer cut at every delta
+    // boundary passed this file on every provider.
+    const answer = assistants[0];
+    expect(column.thrown).toEqual([]);
+    // The surface's own last step, which is what closes the final block of an
+    // answer: `endTurn` does not, and neither does `finishTurn`. Without it a
+    // whole answer reads as no blocks at all.
+    await column.closeOpenBlocks(answer);
+    const textBlocks = column.textBlocks(answer);
+    report('ROW A blocks', JSON.stringify(column.blocks(answer).map(block => block.type)));
+    // Whole: the blocks say exactly what the message says.
+    expect(textBlocks.map(block => block.content).join('')).toBe(answer?.content ?? '');
+    // And split only where something displaced the open block — a tool card, a
+    // stretch of reasoning — never between two deltas of one sentence.
+    expect(textBlocks.length).toBeLessThanOrEqual(
+      column.blocks(answer).filter(block => block.type !== 'text').length + 1,
+    );
 
     // Matrix row 3: what the vault holds after the barrier, read back through
     // the record store rather than from the copy the surface kept.
