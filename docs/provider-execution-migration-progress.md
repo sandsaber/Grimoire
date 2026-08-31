@@ -8281,12 +8281,29 @@ Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #10
 
 ### Where the session of 2026-08-31 ended
 
-**Everything is committed and pushed.** Working tree clean, remote in step. Full gate green:
-unit 8974 / 8974 across 566 suites, integration 156, `tsc`, `lint`, `build:release`. The build is
-installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
+**Everything is committed and pushed.** HEAD on `providers-migration`, working tree clean, remote in
+step. Full gate green: unit 8974 / 8974 across 566 suites, integration 156, `tsc`, `lint`,
+`build:release`. The build is installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
 
-**The day closed three of the four things the previous pointer left, and the fourth is still an
-owner's.**
+**Ten commits. The day closed all four things the previous pointer left, ran every matrix an account
+could pay for, and found two rows that had been passing without measuring anything.**
+
+Where every provider stands after it, live, on this machine — provider matrix first, projection
+second:
+
+| Provider | Provider matrix | Projection | The red, if any |
+|---|---|---|---|
+| Antigravity `agy 1.1.22` | 2/2 | 5/5 | — |
+| Claude `2.1.251` | 10/10 | 7/7 (2026-08-30) | — |
+| Codex `codex-cli 0.147.0` | 8/8 | 9/9 (2026-08-30) | — |
+| OpenCode `1.18.19` | 12/12 | 7/7 (2026-08-30) | — |
+| Grok `1.0.5` | 13/13 | 7/7 (2026-08-30) | — |
+| Qwen `qwen-code 0.22.3` | 15/16 | 7/7 (2026-08-30) | row 5, the CLI's `{used, size}` |
+| Kimi Code `kimi 0.39.1` | 11/12 | 6/7 (2026-08-30) | row 5, usage after the prompt returns |
+| Gemini `0.57.0` | 8/12 | 3/3 of what a turn could reach | quota, and row 15 upstream |
+| MiMoCode `mimo` | 0/7 | 0/7 | the account cannot generate |
+
+**The day closed all four things the previous pointer left, and one it did not know about.**
 
 1. **Codex's and Claude's provider matrices ran for the first time in ten days** — the interval in
    which the `ChatRuntime` seam was deleted underneath them, and in which six other files were found
@@ -8380,7 +8397,19 @@ yesterday had to say so again.
   what `liveMatrixRecords` exists to catch and could not: the gate reads the tables, so a run that
   skips the table is a run the gate cannot see.
 
-**What the next session starts with:**
+**What the next session starts with, shortest first. Everything on it needs either a turn this
+machine cannot buy today or a decision that is not mine:**
+
+1. **Gemini's wire recording against 0.57.0** — asked for and deliberately deferred; the procedure and
+   the trap are spelled out below.
+2. **Gemini's remaining rows** — projection B, C, E, F, H and provider 16, a turn each; provider 15
+   waits on the CLI itself.
+3. **Kimi Code's context meter** — an owner's decision, unchanged.
+4. **MiMoCode** — the account, checked three times.
+5. **The vault matrix** — the owner's eyes, unchanged.
+
+Nothing on that list blocks anything else, and no provider is waiting on code that is not written.
+The details of each, with what was closed today struck through:
 
 - ~~**Gemini's projection matrix row 5**~~ **closed the same evening, on the last turn the quota had**:
   the answer arrives as one text block, split only where a stretch of reasoning displaced it, and the
@@ -8421,7 +8450,11 @@ yesterday had to say so again.
 - **Kimi Code's context meter, which is an owner's decision** and is unchanged: `usage_update` arrives
   after `session/prompt` returns, a session notification is routed to the active run, and there is
   none by then. Where usage lives for a provider that reports it out of band is the question.
-- **MiMoCode is still the one account that cannot generate**, checked twice on 2026-08-30.
+- **MiMoCode is still the one account that cannot generate**, checked twice on 2026-08-30 and a third
+  time on 2026-08-31 straight at the CLI: the handshake, the 39-model catalogue, the usage update and
+  the command list all answer, and `session/prompt` returns `end_turn` with `totalTokens: 0`. It is
+  the one ACP provider where the day's shared filesystem change is unverified live, and Gemini is the
+  other — for quota rather than for the account.
 - **What is still not mine to run**: launching Obsidian and looking at the column. The drawn
   appearance of the session-restart notice — now reachable on six providers rather than five — is
   the owner's, as is row 4 and the plan approval's three answers.
