@@ -32,7 +32,7 @@ describe('provider workspace context slots', () => {
   const ports = { sessionCommands: () => [], sessionPaths: () => ({}) } as never;
 
   const WIRINGS: readonly Wiring[] = [
-    { build: p => createGeminiModuleContext(p, () => null), providerId: 'gemini' },
+    { build: p => createGeminiModuleContext(p, () => null, ports), providerId: 'gemini' },
     { build: p => createGrokModuleContext(p, () => null, ports), providerId: 'grok' },
     { build: p => createKimicodeModuleContext(p, () => null, ports), providerId: 'kimicode' },
     { build: p => createMimocodeModuleContext(p, () => null, ports), providerId: 'mimocode' },

@@ -32,7 +32,12 @@ import { getGeminiProviderSettings, updateGeminiProviderSettings } from '@/provi
 const live = process.env.GRIMOIRE_GEMINI_LIVE === '1' ? describe : describe.skip;
 
 live('Gemini live smoke', () => {
-  jest.setTimeout(300_000);
+  // Twice every sibling's, and measured rather than chosen: on 2026-08-31 a
+  // single `Reply with exactly: OK` took the whole 300 seconds and ended with no
+  // text at all, which is what this CLI's own retry backoff looks like when the
+  // day's quota is spent. The row had already reported what it went there for
+  // when the runner cut it off mid-shutdown.
+  jest.setTimeout(600_000);
 
   /** Every process this file started, released whatever the row did. */
   const running: Array<() => Promise<void>> = [];
@@ -250,9 +255,10 @@ live('Gemini live smoke', () => {
     }) ?? {};
     await first.shutdown();
 
-    // A different composition, a different process. The binding is an id and
-    // nothing else — this provider writes no state a second half could point at,
-    // which is the difference from every sibling on this transport.
+    // A different composition, a different process. The binding is an id and a
+    // marker that is usually empty — until 2026-08-31 it was the id alone, which
+    // is why this provider had nowhere to remember that a session had been
+    // replaced.
     const second = await createHarness({}, first.vault);
     second.runtime.syncConversationState({
       ...conversation,
@@ -266,7 +272,13 @@ live('Gemini live smoke', () => {
       'resumed-as:', String(second.runtime.getSessionId()),
       JSON.stringify(summarize(chunks)));
     expect(updates.sessionId).toBeTruthy();
-    expect(updates.providerState).toBeUndefined();
+    // **One field, and empty is the point.** This provider used to write no
+    // state at all — its binding was an id and nothing else, which this row
+    // asserted. It carries a session-drop marker now, and a conversation whose
+    // session resumed is written back as `{}` rather than left alone: the
+    // surface replaces `providerState` whole, so an omitted opinion would leave
+    // a stale marker standing with no way to take it down.
+    expect(updates.providerState).toEqual({});
     expect(answerOf(chunks).toLowerCase()).toContain('cobalt');
     await second.shutdown();
   });
@@ -283,14 +295,18 @@ live('Gemini live smoke', () => {
     const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'Reply with exactly: OK' })));
 
     report('ROW 9', String(runtime.getSessionId()), JSON.stringify(errorsOf(chunks)),
-      JSON.stringify(summarize(chunks)));
-    // Either outcome is correct and which one it is has never been observed for
-    // this CLI: an agent that names the session as missing lets the backend
-    // replace it, and one that answers something vaguer keeps the binding and
-    // says so in words. What must not happen is a turn that silently starts a
-    // new conversation and leaves the old one unreachable.
+      String(runtime.isSessionDropped()), JSON.stringify(summarize(chunks)));
+    // Either outcome is correct: an agent that names the session as missing lets
+    // the backend replace it, and one that answers something vaguer keeps the
+    // binding and says so in words. What must not happen is the third thing,
+    // which is what this CLI did until 2026-08-31: a turn that silently starts a
+    // new conversation and leaves the old one unreachable with nothing on screen
+    // to say so. The replacement is right; the silence was the defect, and this
+    // provider had no `session-resume` branch and no `sessionDropped` to end it
+    // with — the last of the six on this transport to get one.
     const replaced = runtime.getSessionId() !== '00000000-0000-4000-8000-000000000000';
     expect(replaced || errorsOf(chunks).length > 0).toBe(true);
+    expect(replaced ? runtime.isSessionDropped() : true).toBe(true);
     await shutdown();
   });
 

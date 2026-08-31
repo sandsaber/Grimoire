@@ -68,6 +68,7 @@ import {
   buildGeminiPromptText,
 } from '@/providers/gemini/runtime/buildGeminiPrompt';
 import { buildGeminiRuntimeEnv } from '@/providers/gemini/runtime/GeminiRuntimeEnvironment';
+import { getGeminiState } from '@/providers/gemini/types';
 import { getVaultPath } from '@/utils/path';
 
 /** What a turn may answer with, before it is refused as too large. */
@@ -144,7 +145,8 @@ export class GeminiExecution {
    */
   private readonly workspaceHolder = new ProviderWorkspaceHolder(
     geminiProviderModule.workspace,
-    () => createGeminiModuleContext(this.plugin, () => null),
+    () => createGeminiModuleContext(this.plugin, () => null,
+      { sessionDropped: () => runtimeOnly('sessionDropped') }),
   );
 
   constructor(
@@ -270,6 +272,10 @@ export class GeminiExecution {
   createRuntime(): ExecutionChatRuntimeAdapter {
     let conversation: BoundConversation | null = null;
     let adapter: GeminiRuntimeAdapter | undefined;
+    // Whether the agent no longer had this conversation's saved session. Seeded
+    // from what the conversation carries, because the drop is learned during a
+    // dispatch and the tab that draws the notice is usually a later one.
+    let sessionDropped = false;
     const ownedSessions = new Set<string>();
     const boundConversation = (): BoundConversation | null => conversation;
     // Minted once, and only used while no conversation is bound: a fallback
@@ -283,6 +289,9 @@ export class GeminiExecution {
 
     const content = new GeminiContentPresenter({
       displayModel: () => sessionConfig.getActiveDisplayModel(),
+      // A resume that had to open a different session is what the conversation
+      // carries forward; one that succeeded is what takes the marker back off.
+      onSessionResume: outcome => { sessionDropped = outcome === 'replaced'; },
       onCurrentMode: currentModeId => {
         // A switch somebody asked for — `/mode` typed into the composer, or the
         // set this turn just applied — which is the one thing that may move the
@@ -380,9 +389,24 @@ export class GeminiExecution {
           // previous one was set to says nothing about this one.
           content.forgetConversation();
           sessionConfig.forgetSession();
+          // Seeded only when the conversation changes. A re-sync of the same one
+          // hands back the stored object, and what this runtime learned during a
+          // dispatch is newer than what that object says.
+          sessionDropped = getGeminiState(next?.providerState).sessionDropped === true;
         }
         conversation = next;
       },
+      /**
+       * Whether this conversation resumed into a session the agent had lost.
+       *
+       * Asked on every render rather than consumed, because the seam the UI
+       * draws has to be answerable again on the next paint. **Absent until
+       * 2026-08-31**, and this provider was the last of the six on this
+       * transport without it: the session was replaced correctly and nothing
+       * could say so, which is the one thing the session-restart notice exists
+       * to prevent.
+       */
+      sessionDropped: () => sessionDropped,
       /**
        * The provider's words for a turn that never started.
        *
@@ -441,7 +465,8 @@ export class GeminiExecution {
     // *this tab's* conversation, so the context has to close over the same one
     // the ports above sync.
     const contributions = geminiProviderModule.runtimePorts(
-      createGeminiModuleContext(this.plugin, boundConversation),
+      createGeminiModuleContext(this.plugin, boundConversation,
+        { sessionDropped: () => sessionDropped }),
     );
 
     const runtime = new GeminiRuntimeAdapter(
@@ -770,4 +795,16 @@ class GeminiRuntimeAdapter extends ExecutionChatRuntimeAdapter {
       this.releaseTab();
     }
   }
+}
+
+/**
+ * A runtime port reached from a workspace context.
+ *
+ * Refused rather than answered: these are a tab's, and a workspace slot that
+ * asked for one would be answering from whichever tab happened to build the
+ * workspace first. Nothing does today, and this is what would happen if
+ * something started.
+ */
+function runtimeOnly(port: string): never {
+  throw new Error(`Runtime port "${port}" is not available from a workspace context.`);
 }

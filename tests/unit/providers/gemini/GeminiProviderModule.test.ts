@@ -46,6 +46,7 @@ describe('Gemini provider module', () => {
       deleteConversationSession: async () => undefined,
       resolveSessionId: () => 'acp-session',
       isPendingFork: () => false,
+      readSessionDropped: () => null,
       dispose: async () => undefined,
     };
   }
@@ -168,10 +169,12 @@ describe('Gemini provider module', () => {
       expect(features().rewind).toBeUndefined();
     });
 
-    it('saves the session id and nothing beside it', () => {
+    it('saves the session id, and says nothing about a conversation it does not serve', () => {
       // Every sibling on this transport also saves where its session lives — a
-      // database path, a managed home. Gemini writes no such state, so a patch
-      // carrying `providerState` would be inventing one.
+      // database path, a managed home. Gemini writes no such state, so the id is
+      // the whole binding. `readSessionDropped` answering `null` is a runtime
+      // that is not on this conversation, and a patch carrying `providerState`
+      // there would clear a marker it knows nothing about.
       expect(features().history?.buildSessionPatch({
         conversationId: 'conversation-1',
         sessionInvalidated: false,
@@ -182,6 +185,31 @@ describe('Gemini provider module', () => {
         sessionInvalidated: true,
         nativeSessionRef: 'acp-session',
       })).toEqual({ sessionId: null });
+    });
+
+    it('writes the drop marker whole, both when it is set and when it is not', () => {
+      // The surface replaces `providerState` rather than merging it: a resume
+      // that worked has to write the empty object, or the marker an earlier
+      // drop left standing would never come down.
+      const dropped = geminiProviderModule.runtimePorts({
+        ...createContext(),
+        readSessionDropped: () => true,
+      });
+      expect(dropped.history?.buildSessionPatch({
+        conversationId: 'conversation-1',
+        sessionInvalidated: false,
+        nativeSessionRef: 'acp-session',
+      })).toEqual({ sessionId: 'acp-session', providerState: { sessionDropped: true } });
+
+      const resumed = geminiProviderModule.runtimePorts({
+        ...createContext(),
+        readSessionDropped: () => false,
+      });
+      expect(resumed.history?.buildSessionPatch({
+        conversationId: 'conversation-1',
+        sessionInvalidated: false,
+        nativeSessionRef: 'acp-session',
+      })).toEqual({ sessionId: 'acp-session', providerState: {} });
     });
   });
 
@@ -256,9 +284,14 @@ describe('Gemini provider module', () => {
     };
 
     it('answers only about the conversation its own tab is bound to', () => {
-      const context = createGeminiModuleContext(testPlugin(), () => conversation);
+      const context = createGeminiModuleContext(testPlugin(), () => conversation,
+        { sessionDropped: () => true });
 
       expect(context.resolveSessionId('conversation-1')).toBe('acp-session');
+      expect(context.readSessionDropped('conversation-1')).toBe(true);
+      // `null`, not `false`: the caller writes `providerState` whole, so "not
+      // this tab's conversation" has to be distinguishable from "not dropped".
+      expect(context.readSessionDropped('conversation-2')).toBeNull();
       // Another tab's conversation is not this runtime's to answer for: a
       // lookup across the workspace would report a session this tab is not on.
       expect(context.resolveSessionId('conversation-2')).toBeNull();
@@ -266,7 +299,8 @@ describe('Gemini provider module', () => {
     });
 
     it('reports that there is nothing to hydrate rather than that it hydrated', async () => {
-      const context = createGeminiModuleContext(testPlugin(), () => conversation);
+      const context = createGeminiModuleContext(testPlugin(), () => conversation,
+        { sessionDropped: () => false });
 
       // `supportsNativeHistory: false`. Answering `complete` would tell the
       // surface a transcript was read back when none exists.
@@ -275,7 +309,8 @@ describe('Gemini provider module', () => {
     });
 
     it('answers a workspace slot with nothing when no workspace is registered', async () => {
-      const context = createGeminiModuleContext(testPlugin(), () => null);
+      const context = createGeminiModuleContext(testPlugin(), () => null,
+        { sessionDropped: () => false });
 
       // These threw by name until the context was wired. An unregistered
       // workspace is a provider with nothing to offer, not one that fails: the

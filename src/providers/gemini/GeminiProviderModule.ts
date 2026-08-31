@@ -103,6 +103,11 @@ export interface GeminiWorkspaceContext {
   deleteConversationSession(conversationId: string): Promise<void>;
   resolveSessionId(conversationId: string): string | null;
   isPendingFork(conversationId: string): boolean;
+  /**
+   * Whether this conversation's saved session was replaced by a fresh one,
+   * or `null` when this runtime is not bound to that conversation.
+   */
+  readSessionDropped(conversationId: string): boolean | null;
   dispose(): Promise<void>;
 }
 
@@ -358,14 +363,24 @@ GeminiProviderSettings
       deleteSession: conversationId => context.deleteConversationSession(conversationId),
       resolveSessionId: conversationId => context.resolveSessionId(conversationId),
       isPendingFork: conversationId => context.isPendingFork(conversationId),
-      // The session id and nothing beside it. Every sibling on this transport
-      // also saves where its session lives — a database path, a managed home —
-      // because a session id alone resolves to nothing there. Gemini writes no
-      // such state, so there is nothing to keep and no `providerState` to
-      // build.
-      buildSessionPatch: input => ({
-        sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
-      }),
+      // The session id, and one marker beside it. Every sibling on this
+      // transport also saves where its session lives — a database path, a
+      // managed home — because a session id alone resolves to nothing there.
+      // Gemini writes no such state, so `GeminiProviderState` has exactly the
+      // one field a replaced session needs.
+      buildSessionPatch: input => {
+        const sessionDropped = context.readSessionDropped(input.conversationId);
+        return {
+          sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
+          // Written whole whenever this runtime serves the conversation, and
+          // omitted entirely when it does not: the surface replaces
+          // `providerState` rather than merging it, so an omitted opinion would
+          // leave a stale drop marker standing with no way to clear it.
+          ...(sessionDropped === null
+            ? {}
+            : { providerState: sessionDropped ? { sessionDropped: true } : {} }),
+        };
+      },
     },
   }),
 };

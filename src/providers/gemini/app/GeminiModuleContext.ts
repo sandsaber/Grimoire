@@ -23,6 +23,25 @@ import type {
 export type GeminiBoundConversation = () => BoundConversation | null;
 
 /**
+ * What the running tab knows and the conversation does not.
+ *
+ * One port, which is the difference from every sibling's: the others also carry
+ * the launch's resolved database or managed home so the conversation can be
+ * saved pointing at it. Gemini writes no such state — a session id is the whole
+ * binding — so a dropped session is the only thing here.
+ */
+export interface GeminiModuleContextPorts {
+  /**
+   * Whether this tab's last resume replaced the conversation's saved session.
+   *
+   * Lives on the runtime rather than in the conversation because it is learned
+   * during a dispatch; it is written into `providerState` from here so the
+   * conversation still carries it when it is next opened.
+   */
+  readonly sessionDropped: () => boolean;
+}
+
+/**
  * The module's context over the running plugin, for the runtime's features.
  *
  * Only the history slots are wired. Gemini's workspace is still registered the
@@ -30,15 +49,11 @@ export type GeminiBoundConversation = () => BoundConversation | null;
  * checkpoint — so the rest throw by name rather than answering emptily, because
  * a settings surface that silently lists nothing is worse than one that fails
  * where it was wired.
- *
- * It takes no ports, which is the difference from every sibling's: the others
- * carry the launch's resolved database or managed home so the conversation can
- * be saved pointing at it. Gemini writes no such state — a session id is the
- * whole binding — so there is nothing for a port to answer.
  */
 export function createGeminiModuleContext(
   plugin: GrimoirePlugin,
   conversation: GeminiBoundConversation,
+  ports: GeminiModuleContextPorts,
 ): GeminiWorkspaceContext {
   const history = new GeminiConversationHistoryService();
   const workspace = createWorkspaceContextSlots({
@@ -76,6 +91,16 @@ export function createGeminiModuleContext(
     isPendingFork: conversationId => {
       const bound = matching(conversation, conversationId);
       return bound ? history.isPendingForkConversation(bound) : false;
+    },
+    readSessionDropped: conversationId => {
+      // `null` rather than `false` for a conversation this tab does not serve:
+      // the caller writes `providerState` whole, and "no opinion" has to be
+      // distinguishable from "not dropped" or the write would clear a marker
+      // this runtime knows nothing about.
+      if (!matching(conversation, conversationId)) {
+        return null;
+      }
+      return ports.sessionDropped();
     },
     ...workspace,
     renderSettingsTab: host => {
