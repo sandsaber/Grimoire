@@ -177,12 +177,14 @@ describe('live smoke matrix records', () => {
       // recorded separately. The driven half only — the rows a person has to
       // watch in a vault are outstanding under the standing override.
       'chat-projection-flip-smoke-matrix.md: 2026-08-30',
-      'claude-flip-smoke-matrix.md: 2026-08-21',
-      'codex-flip-smoke-matrix.md: 2026-08-21',
-      // Run, and mostly blocked — by the account's daily quota rather than by
-      // the flip. What it found before running out is in that matrix: three
-      // defects, two of them shipped.
-      'gemini-flip-smoke-matrix.md: 2026-08-23',
+      // Both re-run on 2026-08-31 after ten days in which the seam they drive was
+      // deleted underneath them: ten of ten and eight of eight, nothing to change.
+      'claude-flip-smoke-matrix.md: 2026-08-31',
+      'codex-flip-smoke-matrix.md: 2026-08-31',
+      // **Paid for at last**, on 2026-08-31: eight of twelve, seven of them rows
+      // this account had never answered. The four reds are the day's quota, this
+      // CLI sending no usage at all, and one finding half of which is upstream.
+      'gemini-flip-smoke-matrix.md: 2026-08-31',
       // Re-run on 2026-08-30 to certify the session-restart notice this provider
       // could not draw: thirteen of thirteen.
       'grok-flip-smoke-matrix.md: 2026-08-30',

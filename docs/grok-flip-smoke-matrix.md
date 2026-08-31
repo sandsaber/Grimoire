@@ -59,13 +59,13 @@ client. Rows 18–21 are what five surfaces ask when nobody is in a conversation
 ## The half that runs itself
 
 Thirteen rows are driven headlessly by
-`tests/integration/app/execution/grok/GrokLiveSmoke.integration.test.ts`,
+`tests/integration/providers/grok/execution/GrokLiveSmoke.integration.test.ts`,
 against a real `grok agent … stdio`. It is skipped unless asked for, because it starts a CLI and
 spends the account's tokens:
 
 ```bash
 GRIMOIRE_GROK_LIVE=1 node scripts/run-jest.js --selectProjects=integration \
-  --runTestsByPath tests/integration/app/execution/grok/GrokLiveSmoke.integration.test.ts
+  --runTestsByPath tests/integration/providers/grok/execution/GrokLiveSmoke.integration.test.ts
 ```
 
 Through `scripts/run-jest.js` rather than bare `npx jest`: the runner passes `--localstorage-file`,

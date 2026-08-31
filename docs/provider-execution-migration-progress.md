@@ -8279,6 +8279,86 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #107), at the M6 gate.
 
+### Where the session of 2026-08-31 ended
+
+**Everything is committed; the push is the owner's to ask for.** Working tree clean. Full gate green:
+unit 8974 / 8974 across 566 suites, integration 156, `tsc`, `lint`, `build:release`. The build is
+installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
+
+**The day closed three of the four things the previous pointer left, and the fourth is still an
+owner's.**
+
+1. **Codex's and Claude's provider matrices ran for the first time in ten days** — the interval in
+   which the `ChatRuntime` seam was deleted underneath them, and in which six other files were found
+   asserting through a `.updates` wrapper that no longer exists. Codex 8/8 (`codex-cli 0.147.0`),
+   Claude 10/10 (`2.1.251`, thirteen SDK patches later). Nothing to change in either. One thing worth
+   keeping: Claude's documented command carries `NODE_OPTIONS=--experimental-vm-modules`, and without
+   it all ten rows fail inside `beforeAll` with *A dynamic import callback was invoked without
+   --experimental-vm-modules* — which reads like a harness that rotted rather than a flag left off.
+2. **Five matrix documents pointed at a directory that no longer exists.** The live smoke files moved
+   to `tests/integration/providers/<provider>/execution/` and the run commands in Claude's, Codex's,
+   Grok's, OpenCode's and MiMoCode's matrices still said `tests/integration/app/execution/<provider>/`.
+   Fixed by path, not by rewriting the commands.
+3. **Gemini can say when its session was replaced** — the last of the six providers on this transport,
+   and the close of an obligation that has been open since Kimi Code's live row 9 found it. The shape
+   is Qwen's, because Gemini's binding is Qwen's: a session id and nothing else. It has a
+   `GeminiProviderState` with one field now, a `session-resume` branch in the presenter, a
+   `sessionDropped` port on the composition, and a `buildSessionPatch` that writes `providerState`
+   **whole** — including the empty object a successful resume leaves, because the surface replaces
+   that record rather than merging it. Three deterministic cases hold it; pointing the composition's
+   port at `false` fails two of them. **Certified live**: row 9 watched the agent lose the session,
+   the backend replace it, and `isSessionDropped()` answer `true`.
+4. **Gemini's provider matrix ran, and this time the account could pay for it**: 8 of 12, seven of the
+   eight rows never having passed before. Rows 16 and 19 are the quota running out at the end — row
+   16's turn never answered inside ten minutes, and row 19 right after it carries the vendor's own
+   sentence. The file's timeout went from five minutes to ten on the evidence of a turn that took
+   five: a row had already reported what it went there for when the runner cut it off mid-shutdown.
+5. **Row 5 is this CLI's shape, like Qwen's and Kimi Code's.** No usage chunk was produced at all, and
+   the wire recording says why: three session-update kinds, none of them usage, and no `usage` on the
+   prompt result. The badge can only show what the CLI reports.
+6. **Row 15 found a defect that was half ours**, and the half that was ours is fixed here. Gemini's
+   `write_file` tool reads the file it is about to replace; the read failed; the turn was abandoned
+   before Grimoire's permission was ever raised. Two things on our side made that answer worse than it
+   had to be, and both are shared by the six ACP providers: a request handler's error message was
+   dropped unless it was `instanceof Error` — false for anything raised in another realm, which is
+   what `node:fs` produces under Jest, so the agent was told `Internal error` about a file that simply
+   did not exist; and a missing file answered exactly like a containment refusal. A read of a missing
+   file answers `-32002 Resource not found: <path>` now — the protocol's own code, and the sentence
+   the agent's own client looks for — while every other failure keeps the internal error. That closes
+   the "indistinguishable from a containment refusal" half of an item open since 2026-08-23.
+   **The other half is upstream and the row cannot pass until it moves**: in `gemini 0.57.0`
+   `ClientSideConnection.#handleResponse` rejects with the JSON-RPC object rather than an `Error`,
+   and both `AcpFileSystemService.normalizeFileSystemError` and `isNodeError` require an `Error`
+   instance — so no client answer of any shape can be classified, and the tool stops at
+   `Error checking existing file: …`. What the fix buys is that the sentence now names the condition.
+
+**Where each provider stands, live, on this machine:**
+
+| Provider | Projection matrix | Provider matrix |
+|---|---|---|
+| Codex | 9/9 (2026-08-30) | 8/8 |
+| Claude | 7/7 (2026-08-30) | 10/10 |
+| OpenCode | 7/7 (2026-08-30) | 12/12 (2026-08-30) |
+| Grok | 7/7 (2026-08-30) | 13/13 (2026-08-30) |
+| Qwen | 7/7 (2026-08-30) | 15/16 (2026-08-30) |
+| Kimi Code | 6/7 (2026-08-30) | 11/12 (2026-08-30) |
+| Antigravity | 5/5 (2026-08-23) | — (print mode) |
+| Gemini | 2/3, quota (2026-08-30) | 8/12 |
+| MiMoCode | 0/7, account | 0/7, account |
+
+**What the next session starts with:**
+
+- **Gemini's projection matrix row 5**, still uncertified since the blocks assertion was corrected for
+  a drawn notice. It needs one turn and today's quota went to the provider matrix. Its row 15 and its
+  row 16 need a turn each too, and row 15 needs the CLI to have updated first.
+- **Kimi Code's context meter, which is an owner's decision** and is unchanged: `usage_update` arrives
+  after `session/prompt` returns, a session notification is routed to the active run, and there is
+  none by then. Where usage lives for a provider that reports it out of band is the question.
+- **MiMoCode is still the one account that cannot generate**, checked twice on 2026-08-30.
+- **What is still not mine to run**: launching Obsidian and looking at the column. The drawn
+  appearance of the session-restart notice — now reachable on six providers rather than five — is
+  the owner's, as is row 4 and the plan approval's three answers.
+
 ### Where the session of 2026-08-30 ended
 
 **Everything is committed and pushed.** HEAD `3df12f2f` on `providers-migration`, working tree clean,
@@ -14758,9 +14838,12 @@ Open obligations, each with an owner:
   also stale.** D5's read-only state has a surface of its own now: `getUnreadableConversations` feeds
   a `grimoire-history-unreadable` block in the history list, so a record this build cannot parse is
   shown as one rather than disappearing;
-- ~~**three ACP providers cannot tell a person their session was replaced.**~~ **One left: Gemini.**
-  Kimi Code's, Grok's and Qwen's are wired and certified live in the commits below; Gemini's is the
-  same shape as Qwen's and waits for a day its quota can certify it. The original entry follows:
+- ~~**three ACP providers cannot tell a person their session was replaced.**~~ **Closed on
+  2026-08-31, and all six on this transport can now.** Kimi Code's, Grok's and Qwen's were wired and
+  certified live on 2026-08-30; Gemini's is the same shape as Qwen's and was certified on its own row
+  9 the next day — the agent lost the session, the backend replaced it, and `isSessionDropped()`
+  answered `true` where the day before it would have answered `false` in silence. The original entry
+  follows:
 - **three ACP providers cannot tell a person their session was replaced.** OpenCode's and MiMoCode's
   compositions keep a `sessionDropped` flag, fed by a `session-resume` branch in their presenters and
   written into `providerState` by their session patch, so `isSessionDropped()` answers and the
@@ -14791,9 +14874,14 @@ Open obligations, each with an owner:
   could act on. Shared across the five flipped managed-ACP providers. The fix is to classify a
   protocol-level rejection apart from a transport-level failure; it is recorded rather than built
   because the account that found it has no quota left to prove a fix with today. Owner: the managed-ACP
-  backend, before the next flip. Smaller and beside it: an ACP `fs/read_text_file` for a file that does
-  not exist surfaces as a bare internal error, indistinguishable from a containment refusal, and
-  Gemini abandons its write tool rather than raising the permission request when it sees one;
+  backend, before the next flip. Smaller and beside it, and **closed on 2026-08-31 as far as it is
+  ours**: an ACP `fs/read_text_file` for a file that does not exist answered a bare internal error,
+  indistinguishable from a containment refusal — it answers `-32002 Resource not found: <path>` now,
+  and a handler's own message survives an error raised in another realm. Gemini still abandons its
+  write tool rather than raising the permission request, and that half is upstream: its ACP client
+  rejects with the JSON-RPC object rather than an `Error`, and every classifier it then reaches
+  requires an `Error` instance, so no client answer of any shape can be read. Gemini's matrix records
+  the three functions;
 - ~~**an interaction resolution has no room for an answer, and Qwen's flip waits on it.**~~
   **Closed in the commit below this entry.** `InteractionResolution` gained an opaque `payload` that
   is never persisted, the registry cancels a question caught mid-resolution rather than replaying it

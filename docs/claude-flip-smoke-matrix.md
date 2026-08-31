@@ -79,14 +79,14 @@ model makes the long rows cheaper and changes nothing they assert.
 ## The half that runs itself
 
 Ten rows are driven headlessly by
-`tests/integration/app/execution/claude/ClaudeLiveSmoke.integration.test.ts`, against the real
+`tests/integration/providers/claude/execution/ClaudeLiveSmoke.integration.test.ts`, against the real
 `@anthropic-ai/claude-agent-sdk` and the real CLI. It is skipped unless asked for, because it starts
 the CLI and spends the account's tokens:
 
 ```bash
 GRIMOIRE_CLAUDE_LIVE=1 NODE_OPTIONS=--experimental-vm-modules \
   node scripts/run-jest.js --selectProjects=integration \
-  --runTestsByPath tests/integration/app/execution/claude/ClaudeLiveSmoke.integration.test.ts
+  --runTestsByPath tests/integration/providers/claude/execution/ClaudeLiveSmoke.integration.test.ts
 ```
 
 Two flags that are not decoration. `scripts/run-jest.js` rather than bare `npx jest`, because the
@@ -129,3 +129,4 @@ here rather than by the absence of a table.
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
 | 2026-08-21 | 2.1.238 | live: 1, 2, 3, 10, 12, 19, 22, 25, 27, 28 | — | first run; built the harness the other three already had, and found two things about the SDK rather than about Grimoire — see the section above |
+| 2026-08-31 | 2.1.251 | live: 1, 2, 3, 10, 12, 19, 22, 25, 27, 28 | — | first run in ten days, on an SDK thirteen patch versions later; ten of ten with nothing to change. **The `NODE_OPTIONS` in the command above is not decoration**: run without it, every row fails inside `beforeAll` with "A dynamic import callback was invoked without --experimental-vm-modules", which reads like a harness that rotted rather than a flag that was left off. Row 27's context indicator answered from a 200k window and row 28's plan indicator from the SDK's own cost line, both live |

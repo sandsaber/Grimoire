@@ -57,13 +57,13 @@ client. Rows 17–19 are what four surfaces ask when nobody is in a conversation
 ## The half that runs itself
 
 Twelve rows are driven headlessly by
-`tests/integration/app/execution/opencode/OpencodeLiveSmoke.integration.test.ts`, against a real
+`tests/integration/providers/opencode/execution/OpencodeLiveSmoke.integration.test.ts`, against a real
 `opencode acp`. It is skipped unless asked for, because it starts a CLI and spends the account's
 tokens:
 
 ```bash
 GRIMOIRE_OPENCODE_LIVE=1 node scripts/run-jest.js --selectProjects=integration \
-  --runTestsByPath tests/integration/app/execution/opencode/OpencodeLiveSmoke.integration.test.ts
+  --runTestsByPath tests/integration/providers/opencode/execution/OpencodeLiveSmoke.integration.test.ts
 ```
 
 Through `scripts/run-jest.js` rather than bare `npx jest`: the runner passes `--localstorage-file`,

@@ -36,13 +36,13 @@ it arrives as a `thread/status/changed: systemError` and an `error` notification
 ## The half that runs itself
 
 Eight rows are driven headlessly by
-`tests/integration/app/execution/codex/CodexLiveSmoke.integration.test.ts`, against a real
+`tests/integration/providers/codex/execution/CodexLiveSmoke.integration.test.ts`, against a real
 `codex app-server`. It is skipped unless asked for, because it starts a CLI and spends the account's
 tokens:
 
 ```bash
 GRIMOIRE_CODEX_LIVE=1 node scripts/run-jest.js --selectProjects=integration \
-  --runTestsByPath tests/integration/app/execution/codex/CodexLiveSmoke.integration.test.ts
+  --runTestsByPath tests/integration/providers/codex/execution/CodexLiveSmoke.integration.test.ts
 ```
 
 Through `scripts/run-jest.js` rather than bare `npx jest`: the runner passes `--localstorage-file`,
@@ -107,3 +107,4 @@ here rather than by the absence of a table.
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
 | 2026-08-21 | 0.147.0 | live: 1, 2, 6, 8, 12, 14, 16, 21 | — | re-run after the two review passes; the shared kernel changes left every row green |
+| 2026-08-31 | codex-cli 0.147.0 | live: 1, 2, 6, 8, 12, 14, 16, 21 | — | first run in ten days, and the reason for it was that nothing had run this harness since the `ChatRuntime` seam was deleted — the same interval in which six other files were found asserting through a `.updates` wrapper that no longer exists. Eight of eight, unchanged: row 6 still gets the CLI's own "/compact does not accept arguments", row 21 still carries the vendor's 400 in its own words, and row 16 still streams the count in pieces |
