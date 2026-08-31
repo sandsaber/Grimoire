@@ -8281,7 +8281,7 @@ Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #10
 
 ### Where the session of 2026-08-31 ended
 
-**Everything is committed; the push is the owner's to ask for.** Working tree clean. Full gate green:
+**Everything is committed and pushed.** Working tree clean, remote in step. Full gate green:
 unit 8974 / 8974 across 566 suites, integration 156, `tsc`, `lint`, `build:release`. The build is
 installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
 
