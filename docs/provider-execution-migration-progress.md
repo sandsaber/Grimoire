@@ -8397,12 +8397,13 @@ yesterday had to say so again.
   fresh: the current one is 0.55.1, and its three session-update kinds are the whole evidence behind
   row 5 reading as this CLI's shape rather than as a defect. The recorder waits 30 seconds after the
   prompt, which is enough for the 15-second turns seen on 2026-08-31 and not for the five-minute ones;
-- **Qwen's live rows have to stop asking a global memory to be empty.** Rows 7 and 8 name a fixed word
-  — `violet`, `cobalt` — and the CLI files each one under `~/.qwen/memories/user/`, where the next run
-  reads it back. A per-run nonce is the fix for those two, and it is strictly stronger than what they
-  assert today: a word minted this minute cannot be answered from anything a previous run left. Row 21
-  is not fixable that way, because the options are the agent's own; what biases it is the three
-  memories already on disk, which are this harness's litter in the owner's home and are his to remove.
+- ~~**Qwen's live rows have to stop asking a global memory to be empty.**~~ **Done the same evening, on
+  the owner's word.** Rows 7 and 8 mint their word now — `grimoire` plus six random characters — so
+  nothing a previous run left can answer for them, which is what they meant to ask all along; both are
+  green live on the first attempt, in one session and across a reload. The three memories of
+  2026-08-30 were deleted from `~/.qwen/memories/` after a backup, and neither re-run wrote a new one.
+  **Row 21 was not fixable that way** — its options are the agent's own — and it needs no fix if the
+  bias is gone: it is untried since the memories were removed, and is the next Qwen turn to spend.
 - **Kimi Code's context meter, which is an owner's decision** and is unchanged: `usage_update` arrives
   after `session/prompt` returns, a session notification is routed to the active run, and there is
   none by then. Where usage lives for a provider that reports it out of band is the question.

@@ -222,10 +222,27 @@ live('Qwen live smoke', () => {
     await shutdown();
   });
 
+  /**
+   * A word minted for one row, because this CLI remembers across sessions.
+   *
+   * `qwen-code` files what it is asked to remember under `~/.qwen/memories/`,
+   * and reads it back into every later session. On 2026-08-31 this file failed
+   * two of its own rows on the three memories its 2026-08-30 run had left —
+   * `tomato`, `violet`, `cobalt` — because a fresh session already knew all
+   * three and recalled the wrong one. A word minted this minute cannot be
+   * answered from anything a previous run left, which is what these rows meant
+   * to ask all along. The prefix says whose litter it is, in the agent's own
+   * memory directory.
+   */
+  function mintedWord(): string {
+    return `grimoire${Math.random().toString(36).slice(2, 8)}`;
+  }
+
   it('row 7: continues the same session on a second turn', async () => {
     const { runtime, shutdown } = await createHarness();
+    const word = mintedWord();
     await drain(runtime.query(runtime.prepareTurn({
-      text: 'Remember the word violet. Reply with exactly: OK',
+      text: `Remember the word ${word}. Reply with exactly: OK`,
     })));
     const sessionId = runtime.getSessionId();
 
@@ -236,16 +253,17 @@ live('Qwen live smoke', () => {
     report('ROW 7', String(sessionId), JSON.stringify(summarize(chunks)));
     expect(sessionId).toBeTruthy();
     expect(runtime.getSessionId()).toBe(sessionId);
-    expect(answerOf(chunks).toLowerCase()).toContain('violet');
+    expect(answerOf(chunks).toLowerCase()).toContain(word);
     await shutdown();
   });
 
   it('row 8: resumes the conversation a fresh load was told about', async () => {
     const first = await createHarness();
+    const word = mintedWord();
     const conversation: any = { id: 'conv-live', messages: [], providerState: {}, sessionId: null };
     first.runtime.syncConversationState(conversation);
     await drain(first.runtime.query(first.runtime.prepareTurn({
-      text: 'Remember the word cobalt. Reply with exactly: OK',
+      text: `Remember the word ${word}. Reply with exactly: OK`,
     })));
     const updates = first.runtime.sessionBinding({
       conversation,
@@ -277,7 +295,7 @@ live('Qwen live smoke', () => {
     // surface replaces `providerState` whole, so an omitted opinion would leave
     // a stale marker standing with no way to take it down.
     expect(updates.providerState).toEqual({});
-    expect(answerOf(chunks).toLowerCase()).toContain('cobalt');
+    expect(answerOf(chunks).toLowerCase()).toContain(word);
     await second.shutdown();
   });
 
