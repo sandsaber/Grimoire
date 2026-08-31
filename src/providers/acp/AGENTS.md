@@ -26,6 +26,12 @@ and opens a fresh one in the same dispatch. Do **not** show a user-facing
 scares users. The conversation is told through the `sessionDropped` port, which
 draws the session-restart seam above the thread.
 | `acpApprovals.ts` | permission decision mapping |
+| `execution/AcpWorkspaceFileSystem.ts` | the vault an agent reads and writes through: containment, the line window, the write approval |
+
+A read of a file that is not there answers `-32002 Resource not found: <path>`, the protocol's own
+code, and every other failure keeps the internal error — so a missing file and a path the workspace
+refused are different answers on the wire. Agents ask this before creating a file, and Gemini CLI's
+own client tests the message for exactly that sentence.
 
 Provider runtimes should call these helpers instead of re-copying load/create/retry trees.
 

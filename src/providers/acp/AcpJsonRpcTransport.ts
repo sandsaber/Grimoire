@@ -73,6 +73,49 @@ export class JsonRpcErrorResponse extends Error {
   }
 }
 
+/**
+ * A JSON-RPC code a request handler chose, rather than the internal error every
+ * other failure answers with.
+ *
+ * Raised by the client's own handlers where the protocol has a word for what
+ * happened — a file that is not there is `-32002 Resource not found`, and an
+ * agent that reads it can go on to create the file. Without it every refusal,
+ * every missing path and every bug answer alike, and the agent has to guess.
+ */
+export class JsonRpcHandlerError extends Error {
+  constructor(
+    readonly code: number,
+    message: string,
+    readonly data?: unknown,
+  ) {
+    super(message);
+    this.name = 'JsonRpcHandlerError';
+  }
+}
+
+/**
+ * What a failed request handler answers the peer with.
+ *
+ * The message is read from anything that carries one rather than from
+ * `instanceof Error`, which is false for an error raised in another realm — the
+ * shape `node:fs` produces under Jest, and the difference between an agent
+ * being told "no such file or directory" and being told "Internal error".
+ */
+function describeHandlerFailure(error: unknown): { code: number; message: string; data?: unknown } {
+  if (error instanceof JsonRpcHandlerError) {
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.data === undefined ? {} : { data: error.data }),
+    };
+  }
+  const message = (error as { message?: unknown } | null)?.message;
+  return {
+    code: -32603,
+    message: typeof message === 'string' && message.length > 0 ? message : 'Internal error',
+  };
+}
+
 export class AcpJsonRpcTransport {
   private readonly abortController = new AbortController();
   private readonly closeListeners = new Set<(error?: Error) => void>();
@@ -382,10 +425,7 @@ export class AcpJsonRpcTransport {
       },
       (error) => {
         this.trySendRaw({
-          error: {
-            code: -32603,
-            message: error instanceof Error ? error.message : 'Internal error',
-          },
+          error: describeHandlerFailure(error),
           id: message.id,
           jsonrpc: '2.0',
         });
