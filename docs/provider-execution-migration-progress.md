@@ -8343,14 +8343,20 @@ owner's.**
 | Qwen | 7/7 (2026-08-30) | 15/16 (2026-08-30) |
 | Kimi Code | 6/7 (2026-08-30) | 11/12 (2026-08-30) |
 | Antigravity | 5/5 (2026-08-23) | — (print mode) |
-| Gemini | 2/3, quota (2026-08-30) | 8/12 |
+| Gemini | 3/3 on the rows a turn could reach | 8/12 |
 | MiMoCode | 0/7, account | 0/7, account |
 
 **What the next session starts with:**
 
-- **Gemini's projection matrix row 5**, still uncertified since the blocks assertion was corrected for
-  a drawn notice. It needs one turn and today's quota went to the provider matrix. Its row 15 and its
-  row 16 need a turn each too, and row 15 needs the CLI to have updated first.
+- ~~**Gemini's projection matrix row 5**~~ **closed the same evening, on the last turn the quota had**:
+  the answer arrives as one text block, split only where a stretch of reasoning displaced it, and the
+  stored conversation is `["user","assistant"]`. The full file was re-run straight after and got
+  `You have exhausted your daily quota on this model.` on every row — worth as much as the pass,
+  because it is what showed that **a refused turn reaches that harness through `renderTurnFailure`
+  rather than as an error chunk**: a row reading only the chunks reported a turn that failed with
+  nothing said. Gemini's rows print the drawn failure now and refuse a quota row by name. What is
+  left there is rows B, C, E, F and H, a turn each. Its provider matrix rows 15 and 16 need a turn
+  each too, and row 15 needs the CLI to have updated first.
 - **Kimi Code's context meter, which is an owner's decision** and is unchanged: `usage_update` arrives
   after `session/prompt` returns, a session notification is routed to the active run, and there is
   none by then. Where usage lives for a provider that reports it out of band is the question.

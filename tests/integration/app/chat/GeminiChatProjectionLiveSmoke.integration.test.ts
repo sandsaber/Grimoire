@@ -37,7 +37,10 @@ import { updateGeminiProviderSettings } from '@/providers/gemini/settings';
 const live = process.env.GRIMOIRE_GEMINI_LIVE === '1' ? describe : describe.skip;
 
 live('Gemini CLI chat projection live smoke', () => {
-  jest.setTimeout(300_000);
+  // Twice every sibling's, for the reason its provider matrix carries: on
+  // 2026-08-31 a single `Reply with exactly: OK` took the whole 300 seconds, and
+  // that is this CLI's own retry backoff rather than a hung process.
+  jest.setTimeout(600_000);
 
   const CONVERSATION_ID = 'conv-gemini-projection';
   const running: Array<() => Promise<void>> = [];
@@ -69,14 +72,27 @@ live('Gemini CLI chat projection live smoke', () => {
    *
    * It still fails. An unavailable vendor is not a certified row.
    */
-  function refuseVendorOutage(chunks: readonly { type: string }[]): void {
+  function refuseVendorOutage(
+    chunks: readonly { type: string }[],
+    /**
+     * What the surface drew for a turn that failed.
+     *
+     * A refused turn reaches this path through `renderTurnFailure` rather than
+     * as an error chunk, so a row that read only the chunks saw a turn fail with
+     * nothing said — which is what a quota refusal looked like on 2026-08-31.
+     */
+    failures: readonly string[] = [],
+  ): void {
     const failure = chunks.find((chunk): chunk is { type: 'error'; content: string } => (
       chunk.type === 'error'
     ));
-    if (failure && /unavailable|service failure|upstream/i.test(failure.content)) {
+    const refusal = [failure?.content, ...failures].find(content => (
+      content !== undefined && /unavailable|service failure|upstream|exhausted/i.test(content)
+    ));
+    if (refusal) {
       throw new Error(
-        `Gemini CLI could not serve this row: ${failure.content} `
-        + 'This is the vendor, not the projection path — rerun it.',
+        `Gemini CLI could not serve this row: ${refusal} `
+        + 'This is the account or the vendor, not the projection path — rerun it.',
       );
     }
   }
@@ -181,9 +197,10 @@ live('Gemini CLI chat projection live smoke', () => {
       'ROW A',
       completed.terminal.kind,
       JSON.stringify(column.chunks.map(chunk => chunk.type)),
+      JSON.stringify(column.failures),
       JSON.stringify(column.drawn.join('').slice(0, 160)),
     );
-    refuseVendorOutage(column.chunks);
+    refuseVendorOutage(column.chunks, column.failures);
     expect(completed.terminal.kind).toBe('succeeded');
     expect(column.chunks.filter(chunk => chunk.type === 'error')).toHaveLength(0);
     expect(column.drawn.join('').trim()).not.toBe('');
