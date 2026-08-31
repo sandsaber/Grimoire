@@ -169,10 +169,10 @@ describe('live smoke matrix records', () => {
     // who wants the answer reads this line rather than four documents. Update
     // it in the same commit as the run it records.
     expect(status).toEqual([
-      // The only provider whose automated half is fully green on this machine,
-      // and the last to get a matrix: its rows lived in the journal for four
-      // days, where the assertion above could not see them.
-      'antigravity-flip-smoke-matrix.md: 2026-08-23',
+      // The only provider whose automated half is fully green on this machine.
+      // Re-run on 2026-08-31 as the control for that day's shared ACP change:
+      // print mode reaches none of it, and this account never refuses.
+      'antigravity-flip-smoke-matrix.md: 2026-08-31',
       // Not a provider's matrix: one surface across all nine, each flipped and
       // recorded separately. The driven half only — the rows a person has to
       // watch in a vault are outstanding under the standing override. Gemini's
@@ -186,24 +186,30 @@ describe('live smoke matrix records', () => {
       // this account had never answered. The four reds are the day's quota, this
       // CLI sending no usage at all, and one finding half of which is upstream.
       'gemini-flip-smoke-matrix.md: 2026-08-31',
-      // Re-run on 2026-08-30 to certify the session-restart notice this provider
-      // could not draw: thirteen of thirteen.
-      'grok-flip-smoke-matrix.md: 2026-08-30',
+      // Thirteen of thirteen twice: on 2026-08-30 to certify the session-restart
+      // notice this provider could not draw, and on 2026-08-31 to check the
+      // shared ACP filesystem change under it.
+      'grok-flip-smoke-matrix.md: 2026-08-31',
       // **Run with an account at last**, on 2026-08-30: eleven of twelve rows,
       // three of them red for reasons that were the rows' own and one for a
       // product defect it found — the session-restart notice this fork never
-      // wired.
-      'kimicode-flip-smoke-matrix.md: 2026-08-30',
+      // wired. Re-run on 2026-08-31 under the shared ACP filesystem change:
+      // eleven of twelve again, the same row red for the same owner's question.
+      'kimicode-flip-smoke-matrix.md: 2026-08-31',
       // Run, and mostly red — for a reason the matrix states rather than the
       // flip: that account cannot generate. A date here is "when did this last
       // run", not "did it pass".
       'mimocode-flip-smoke-matrix.md: 2026-08-22',
-      'opencode-flip-smoke-matrix.md: 2026-08-21',
+      // Re-run on 2026-08-31 under a change to the shared ACP filesystem: twelve
+      // of twelve, and its row 15 raised the permission Gemini's cannot.
+      'opencode-flip-smoke-matrix.md: 2026-08-31',
       // **Run with an account at last**, on 2026-08-30: fifteen of sixteen rows,
       // and the three reds before that were rows measuring the opposite of what
       // they claimed — one of them approving the agent's request to leave plan
-      // mode and then asserting plan mode had held.
-      'qwen-flip-smoke-matrix.md: 2026-08-30',
+      // mode and then asserting plan mode had held. Thirteen of sixteen on
+      // 2026-08-31, where two reds are the file's own memories from the day
+      // before, kept by the CLI in the user's home.
+      'qwen-flip-smoke-matrix.md: 2026-08-31',
     ]);
   });
 });

@@ -8346,6 +8346,35 @@ owner's.**
 | Gemini | 3/3 on the rows a turn could reach | 8/12 |
 | MiMoCode | 0/7, account | 0/7, account |
 
+**The evening added a control and four re-runs, because the day's shared change is under six
+providers.** `AcpWorkspaceFileSystem` and the ACP transport are what every ACP provider answers a
+failed filesystem request through, and both changed today — so the providers that were green
+yesterday had to say so again.
+
+- **Antigravity, the control**: 2/2 on its provider matrix and 5/5 on the projection, on `agy 1.1.22`
+  — seven patch versions newer than the 1.1.15 its last record names. Print mode reaches none of the
+  changed code and this account never refuses, so a green here separates a layer regression from an
+  account.
+- **OpenCode 12/12** and **Grok 13/13**, both including the row that fails on Gemini: the permission
+  for a file that does not exist is still raised, and the refusal still stops the write.
+- **Kimi Code 11/12**, the same single red as yesterday and for the same reason — `usage_update`
+  arrives after `session/prompt` returns, which is the owner's question below, not a patch.
+- **Qwen 13/16, and two of the three reds are this harness poisoning itself.** Rows 7 and 21 both
+  answered `cobalt` where they expected `violet`, and the reason is not the flip, the day's change or
+  the account: `qwen-code` keeps memories across sessions in `~/.qwen/memories/`, and **yesterday's
+  run of that very file wrote three of them** — `tomato`, `violet`, `cobalt`, each described as *"User
+  asked to remember the word … on 2026-08-30"*. Every session since starts knowing all three, so a row
+  that asks the agent to remember a word and recall it is answered from a memory a previous run left,
+  and the colour question is answered the same way. Its rows 12/13 and 15 still raise the permission
+  and still stop on the refusal, which is where the shared change would have shown. Row 5 is the
+  `{used, size}` shape it has always had.
+- **MiMoCode, asked a third time and still blocked**: `initialize` and `session/new` answer in full —
+  capabilities, 39 models, usage update, command list — and `session/prompt` returns `end_turn` with
+  `totalTokens: 0`. Three checks across three dates now.
+- **OpenCode's 2026-08-30 run had never reached its own matrix**, only the journal, which is exactly
+  what `liveMatrixRecords` exists to catch and could not: the gate reads the tables, so a run that
+  skips the table is a run the gate cannot see.
+
 **What the next session starts with:**
 
 - ~~**Gemini's projection matrix row 5**~~ **closed the same evening, on the last turn the quota had**:
@@ -8368,6 +8397,12 @@ owner's.**
   fresh: the current one is 0.55.1, and its three session-update kinds are the whole evidence behind
   row 5 reading as this CLI's shape rather than as a defect. The recorder waits 30 seconds after the
   prompt, which is enough for the 15-second turns seen on 2026-08-31 and not for the five-minute ones;
+- **Qwen's live rows have to stop asking a global memory to be empty.** Rows 7 and 8 name a fixed word
+  — `violet`, `cobalt` — and the CLI files each one under `~/.qwen/memories/user/`, where the next run
+  reads it back. A per-run nonce is the fix for those two, and it is strictly stronger than what they
+  assert today: a word minted this minute cannot be answered from anything a previous run left. Row 21
+  is not fixable that way, because the options are the agent's own; what biases it is the three
+  memories already on disk, which are this harness's litter in the owner's home and are his to remove.
 - **Kimi Code's context meter, which is an owner's decision** and is unchanged: `usage_update` arrives
   after `session/prompt` returns, a session notification is routed to the active run, and there is
   none by then. Where usage lives for a provider that reports it out of band is the question.

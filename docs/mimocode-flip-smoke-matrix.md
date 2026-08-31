@@ -14,7 +14,11 @@ condition for the flip, not a bug report for later: the flip reverts as a single
 generate: every turn returns `end_turn` with zero tokens, and the surface shows *"The provider ended
 the turn without producing a result."* That was true of `mimo acp` **before** Grimoire was involved —
 the wire recording in `tests/fixtures/provider-traces/wire/mimocode-wire.json` was taken from the CLI
-directly and shows the same empty turn, which is why it is labelled `coverage: partial`.
+directly and shows the same empty turn, which is why it is labelled `coverage: partial`. Asked again
+on **2026-08-31**, straight at the CLI: `initialize` and `session/new` answer in full — capabilities,
+39 models, the usage update, the command list — and `session/prompt` returns
+`{"stopReason":"end_turn","usage":{"totalTokens":0,"inputTokens":0,"outputTokens":0}}`. That is the
+third check across three dates (2026-08-22, 2026-08-30, 2026-08-31), and nothing about it has moved.
 
 So every row below that needs an *answer* is unverified against MiMoCode itself. What is verified is
 everything up to the answer: the process, the handshake, the session, the resume, the model catalog,

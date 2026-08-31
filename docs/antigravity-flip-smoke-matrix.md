@@ -62,5 +62,6 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
+| 2026-08-31 | agy 1.1.22 | 1, 2 | none | eight days on and seven patch versions later, and re-run for a reason of its own: the day's work changed what every ACP client answers a failed filesystem request with, and this is the one provider on this machine whose account never refuses — so a green here separates a shared-layer regression from an account. Both rows unchanged, in fourteen seconds: the turn answers `ok`, and the cancelled turn's tree — `agy` plus the `sleep 120` it was asked to run — has no survivors. Print mode reaches none of the changed code, which is what the run says out loud |
 | 2026-08-23 | agy 1.1.15 | 1, 2 | none | run when this matrix was written, four days after the flip it records. Both rows green: a turn answers and leaves nothing running, and a cancelled turn's process tree — `agy` plus the `sleep 120` it was asked to run — is gone by the operating system's account rather than the runner's |
 | 2026-08-19 | agy 1.1.x | 1, 2 | none | wave 1, recorded in the migration journal rather than here. The CLI version was not written down at the time, which is one of the reasons this table exists |
