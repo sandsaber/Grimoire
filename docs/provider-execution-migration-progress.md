@@ -8402,8 +8402,17 @@ yesterday had to say so again.
   nothing a previous run left can answer for them, which is what they meant to ask all along; both are
   green live on the first attempt, in one session and across a reload. The three memories of
   2026-08-30 were deleted from `~/.qwen/memories/` after a backup, and neither re-run wrote a new one.
-  **Row 21 was not fixable that way** — its options are the agent's own — and it needs no fix if the
-  bias is gone: it is untried since the memories were removed, and is the next Qwen turn to spend.
+  **Row 21 was not fixable that way** — its options are the agent's own — and the turn spent on it
+  found something better than a bias: **the row had never certified anything.** It answered under a key
+  the surface never uses (the question's *header*), `mapQwenQuestionAnswers` looks answers up by the
+  question's id or its text — which is exactly what `InlineAskUserQuestion` sends — so the map arrived
+  empty, `ask_user_question` reported *No valid answers were provided.*, and the agent replied *"I
+  asked, but no answer came back … just tell me your preferred colour in text (e.g., "blue")"*. The
+  row's assertion then found `blue` in **that sentence** and went green, on 2026-08-30 as well as
+  2026-08-31. It answers the way the surface answers now and asserts on the tool result — the agent's
+  own reading of what it received must name the option and must not say *No valid answers* — and it is
+  green live. **The product was right the whole time**: the composition and the inline dialog already
+  agreed, and only the harness invented a key.
 - **Kimi Code's context meter, which is an owner's decision** and is unchanged: `usage_update` arrives
   after `session/prompt` returns, a session notification is routed to the active run, and there is
   none by then. Where usage lives for a provider that reports it out of band is the question.

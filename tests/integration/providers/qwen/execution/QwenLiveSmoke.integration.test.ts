@@ -430,19 +430,23 @@ live('Qwen live smoke', () => {
     // row that failed, and the report says which.
     const { runtime, shutdown } = await createHarness();
     const asked: unknown[] = [];
-    // **Answered in the agent's own terms.** The first version replied
-    // `{ colour: 'blue' }` — a key the question never carried and a value it
-    // never offered — and the agent said so: "I asked, but no answer came
-    // through." A question round trip is answered by the header it was asked
-    // under, with one of the options it offered, or it is not answered at all.
+    // **Answered the way the surface answers**, which is the only shape this
+    // row may use: `InlineAskUserQuestion` keys each answer by the question's
+    // own id, or by its text when it has none, and `mapQwenQuestionAnswers`
+    // turns that into the index the agent reads. Two earlier versions invented
+    // a key instead — first `{ colour: 'blue' }`, then the question's *header* —
+    // and both were dropped on the way in, so the agent answered "I asked, but
+    // no answer came back" while this row went green on the `(e.g., "blue")` in
+    // that very sentence.
     let chosen = '';
     runtime.installInteractions({ question: async (input: unknown) => {
       asked.push(input);
       const question = (input as {
-        questions?: { header?: string; options?: { label?: string }[] }[];
+        questions?: { id?: string; options?: { label?: string }[]; question?: string }[];
       }).questions?.[0];
       chosen = question?.options?.[0]?.label ?? '';
-      return question?.header && chosen ? { [question.header]: chosen } : {};
+      const key = question?.id ?? question?.question;
+      return key && chosen ? { [key]: chosen } : {};
     } });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
@@ -455,6 +459,19 @@ live('Qwen live smoke', () => {
       return;
     }
     expect(chosen).not.toBe('');
+    // **The agent's own reading of the answer, not its prose.** The tool result
+    // is where `ask_user_question` reports what it received — "User has provided
+    // the following answers: …" — and it says "No valid answers were provided."
+    // when the map it got had no key it could turn into a question index. That
+    // sentence is the failure this row exists to catch, and a text assertion
+    // cannot see it: the agent quotes colours either way.
+    const toolResults = chunks
+      .filter((chunk): chunk is Extract<StreamChunk, { type: 'tool_result' }> => (
+        chunk.type === 'tool_result'
+      ))
+      .map(chunk => String(chunk.content));
+    expect(toolResults.join('\n')).toContain(chosen);
+    expect(toolResults.join('\n')).not.toContain('No valid answers');
     expect(answerOf(chunks).toLowerCase()).toContain(chosen.toLowerCase());
     await shutdown();
   });
