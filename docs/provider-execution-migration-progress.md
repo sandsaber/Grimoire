@@ -8357,6 +8357,17 @@ owner's.**
   nothing said. Gemini's rows print the drawn failure now and refuse a quota row by name. What is
   left there is rows B, C, E, F and H, a turn each. Its provider matrix rows 15 and 16 need a turn
   each too, and row 15 needs the CLI to have updated first.
+- **Gemini's wire recording, retaken against `gemini 0.57.0`** — asked for on 2026-08-31 and
+  deliberately not run that evening, because the account had just been refused on every row of a
+  projection matrix. `recordAcpWire` rewrites the fixture **in place and unconditionally**: a capture
+  taken without quota answers `session/prompt` with an error, produces no `agent_message_chunk`, and
+  writes `coverage: partial` with limitations over a recording that is `complete` today. So: copy
+  `tests/fixtures/provider-traces/wire/gemini-wire.json` aside first, run
+  `GRIMOIRE_WIRE_RECORD=1 npm run test -- --selectProjects integration --testPathPatterns AcpWireRecording -t "Gemini"`,
+  and restore the copy unless the new file comes back `complete`. Worth taking when the quota is
+  fresh: the current one is 0.55.1, and its three session-update kinds are the whole evidence behind
+  row 5 reading as this CLI's shape rather than as a defect. The recorder waits 30 seconds after the
+  prompt, which is enough for the 15-second turns seen on 2026-08-31 and not for the five-minute ones;
 - **Kimi Code's context meter, which is an owner's decision** and is unchanged: `usage_update` arrives
   after `session/prompt` returns, a session notification is routed to the active run, and there is
   none by then. Where usage lives for a provider that reports it out of band is the question.
