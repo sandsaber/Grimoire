@@ -8358,8 +8358,13 @@ yesterday had to say so again.
 - **OpenCode 12/12** and **Grok 13/13**, both including the row that fails on Gemini: the permission
   for a file that does not exist is still raised, and the refusal still stops the write.
 - **Kimi Code 11/12**, the same single red as yesterday and for the same reason — `usage_update`
-  arrives after `session/prompt` returns, which is the owner's question below, not a patch.
-- **Qwen 13/16, and two of the three reds are this harness poisoning itself.** Rows 7 and 21 both
+  arrives after `session/prompt` returns, which is the owner's question below, not a patch. Run a
+  second time late in the evening to ask whether Qwen's memory trap had a twin here: it does not, this
+  CLI keeps sessions and **no memory store at all**, so its rows may keep naming a fixed word.
+- **Qwen closed the evening at 15/16**, the whole file re-run with its three repaired rows in it, and
+  the one red is row 5's `{used, size}` shape — this CLI's own, unchangeable from here. What the day
+  had to fix to get there follows.
+- **Qwen 13/16 on the first run, and two of the three reds were this harness poisoning itself.** Rows 7 and 21 both
   answered `cobalt` where they expected `violet`, and the reason is not the flip, the day's change or
   the account: `qwen-code` keeps memories across sessions in `~/.qwen/memories/`, and **yesterday's
   run of that very file wrote three of them** — `tomato`, `violet`, `cobalt`, each described as *"User
