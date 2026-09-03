@@ -8510,6 +8510,48 @@ the fields the protocol defines and missing the one the agent fills.
 
 Gates: unit 566 suites / 8,976 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
 
+### MiMoCode was never blocked by its account (this commit)
+
+**Twelve days, four checks, three dates, and the record said the same thing each time**: *the account
+this branch has access to cannot generate — every turn returns `end_turn` with zero tokens.* Each
+check was a real observation of `mimo acp`. The conclusion drawn from them was wrong.
+
+Asked outside ACP, one model at a time:
+
+| `mimo run -m …` | Answer |
+|---|---|
+| `xiaomi/mimo-v2.5-pro-ultraspeed` — **what an ACP session opens on** | `Error: Not supported model` |
+| `mimo/mimo-auto` — what the 2026-08-30 checks set over the wire | `Error: MiMo free API service has ended` |
+| `xiaomi/mimo-v2.5-pro` | `ok` |
+
+Both models the blocker was established on are dead, and the third had never been tried. What made a
+dead model look like a dead account is the ACP path: with the CLI's own debug logs on, the server
+says `AI_APICallError` against `token-plan-ams.xiaomimimo.com`, and what reaches the client is
+`session/prompt` answering `end_turn` with zero tokens and **no error**. Grimoire drew "The provider
+ended the turn without producing a result" because that is exactly what it was told. Nothing to fix
+on our side of that; the CLI swallows its own failure.
+
+**Live, with a model the vendor serves.** The projection matrix is **7 of 7**, from zero. The
+provider matrix is **9 of 12**, from zero — row 5 reads `contextTokens: 34559` of `1048576` and row
+19 a real spend of `$0.02 this month`. The three reds are this provider's own and are the first ones
+worth reporting rather than the account: row 7's *second* turn ends without a result where its first
+answered, row 9 draws nothing, and rows 12/13 do not complete the permitted write.
+
+**Two traps for the next person, both paid for here.** The harness setting needs the provider prefix
+— `GRIMOIRE_MIMOCODE_MODEL=mimocode:xiaomi/mimo-v2.5-pro` — because `decodeMimocodeModelId` returns
+`null` without it and the model is silently dropped, which is how the first run through the product
+failed with a working model in hand. And a `session/set_model` or `session/set_config_option` must be
+**answered before the prompt goes out**: a probe that sent both together ran the turn on the
+session's default and failed exactly as it always had.
+
+**That is the fifth reading of the same sentence today, and the count is four to one.** A recorder
+that blamed an account for a slow turn; a context meter carried as an owner's decision that was a
+seam two providers already had; a row that said "no usage on the wire" whose tokens were under
+`_meta`; and now a provider written off for twelve days over a default model. Only Qwen's row 5 was
+genuinely the vendor's shape.
+
+Gates: unit 566 suites / 8,976 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -8523,8 +8565,8 @@ Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #10
 step. Full gate green: unit 8974 / 8974 across 566 suites, integration 161, `tsc`, `lint`,
 `build:release`. The build is installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
 
-**Six commits. Three of the five items on the previous pointer are closed, and the day's shape was
-one sentence read four times: a red recorded as "the vendor's shape". Three of the four were ours.**
+**Seven commits. Four of the five items on the previous pointer are closed, and the day's shape was
+one sentence read five times: a red recorded as "the vendor's". Four of the five were ours.**
 
 1. **Gemini's wire recording is retaken against `gemini 0.57.0` and is `complete`.** The first take
    was `partial` and blamed the account; the turn was simply still running when the recorder stopped
@@ -8553,7 +8595,7 @@ recording is now against the version this machine runs and whose projection took
 | Qwen `qwen-code 0.22.3` | 16/16 | 7/7 (2026-08-30) | — |
 | Kimi Code `kimi 0.39.1` | 12/12 | 7/7 | — |
 | Gemini `0.57.0` | 9/12 | 2/6 today (A, B); C, E, F, H are the quota | row 5's window, row 15 upstream |
-| MiMoCode `mimo` | 0/7 | 0/7 | the account cannot generate, asked a fourth time |
+| MiMoCode `mimo 0.1.13` | 9/12 | 7/7 | rows 7, 9 and 12/13 — this provider's own at last |
 
 **What the next session starts with, shortest first.** The list is the previous pointer's with its
 first item struck:
@@ -8574,9 +8616,9 @@ first item struck:
 3. ~~**Kimi Code's context meter**~~ **closed.** It was never a question about where usage should
    live: `noteTurnEnded` is the seam for it, Grok's sink and Qwen's already use it, and this
    provider's had never implemented it. 12/12 and 7/7 live.
-4. **MiMoCode** — the account, now checked **four** times: on 2026-09-03 `mimo acp` again answered
-   `initialize` and `session/new` in full and returned `end_turn` with `totalTokens: 0` and no
-   assistant chunk.
+4. ~~**MiMoCode** — the account~~ **closed, and it was never the account.** The two models the
+   blocker was established on are dead; `xiaomi/mimo-v2.5-pro` answers. 9/12 and 7/7. What is left
+   are three rows that are this provider's own: row 7's second turn, row 9, and rows 12/13.
 5. **The vault matrix** — the owner's eyes, unchanged: the drawn session-restart notice on six
    providers, row 4, and the plan approval's three answers.
 

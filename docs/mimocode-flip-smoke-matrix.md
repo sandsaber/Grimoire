@@ -10,24 +10,43 @@ condition for the flip, not a bug report for later: the flip reverts as a single
 
 ## Read this before you read the rows
 
-**This matrix has a blocker the other four did not.** The account this branch has access to cannot
-generate: every turn returns `end_turn` with zero tokens, and the surface shows *"The provider ended
-the turn without producing a result."* That was true of `mimo acp` **before** Grimoire was involved —
-the wire recording in `tests/fixtures/provider-traces/wire/mimocode-wire.json` was taken from the CLI
-directly and shows the same empty turn, which is why it is labelled `coverage: partial`. Asked again
-on **2026-08-31**, straight at the CLI: `initialize` and `session/new` answer in full — capabilities,
-39 models, the usage update, the command list — and `session/prompt` returns
-`{"stopReason":"end_turn","usage":{"totalTokens":0,"inputTokens":0,"outputTokens":0}}`. That is the
-third check across three dates (2026-08-22, 2026-08-30, 2026-08-31), and nothing about it has moved.
+**The blocker this matrix carried for twelve days was never the account.** It said: *"the account
+this branch has access to cannot generate: every turn returns `end_turn` with zero tokens"*, checked
+on 2026-08-22, 2026-08-30 and 2026-08-31, and each check was a real observation. The conclusion drawn
+from them was wrong.
 
-So every row below that needs an *answer* is unverified against MiMoCode itself. What is verified is
-everything up to the answer: the process, the handshake, the session, the resume, the model catalog,
-the command list, the failure text, and the cancel. The evidence that the harness itself is sound is
-in the Record table — the same code path, run against OpenCode on the same machine, produces
-thinking, text and usage.
+On **2026-09-03** the CLI was asked outside ACP, one model at a time:
 
-**An account that generates is the one thing this matrix needs.** With it, rows 1, 2, 5, 7, 8, 12,
-13, 15 and 6 become answerable in one headless run.
+| `mimo run -m …` | Answer |
+|---|---|
+| `xiaomi/mimo-v2.5-pro-ultraspeed` — **what an ACP session opens on** | `Error: Not supported model mimo-v2.5-pro-ultraspeed` |
+| `mimo/mimo-auto` — what the 2026-08-30 checks used | `Error: MiMo free API service has ended. Sign in or configure a third-party API.` |
+| `xiaomi/mimo-v2.5-pro` | `ok` |
+
+Both models the blocker was established on are dead — one the vendor does not serve, one whose free
+tier ended — and the third had never been tried. The account generates.
+
+**What made it look like an account is the ACP path swallowing the error.** With `--print-logs
+--log-level DEBUG` the server says
+`ERROR service=llm providerID=xiaomi modelID=mimo-v2.5-pro-ultraspeed error={"name":"AI_APICallError","url":"https://token-plan-ams.xiaomimimo.com/v1/chat/completions"…}`,
+and what reaches the client is `session/prompt` answering `end_turn` with zero tokens and no error at
+all. Grimoire draws *"The provider ended the turn without producing a result."* because that is
+literally what happened; there is nothing on the wire to say why. Not ours to fix, and worth knowing
+before reading a silent turn as an account.
+
+Set the model and the same session answers: `agent_message_chunk`, `agent_thought_chunk`,
+`usage_update` and `available_commands_update`, with `totalTokens: 38318` on the prompt result. Over
+`session/set_model` and over `session/set_config_option` alike — the method the product uses works.
+**Wait for the set to be answered before prompting**: a first probe sent both together, the turn ran
+on the session's default and failed exactly as before.
+
+Run the harnesses with the model, and note the prefix — `decodeMimocodeModelId` returns `null`
+without it and the setting is silently dropped:
+
+```bash
+GRIMOIRE_MIMOCODE_LIVE=1 GRIMOIRE_MIMOCODE_MODEL=mimocode:xiaomi/mimo-v2.5-pro \
+  npm run test -- --selectProjects integration --testPathPatterns MimocodeLiveSmoke
+```
 
 ## What this one shares, and what it does not
 
@@ -110,4 +129,5 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
+| 2026-09-03 | `mimo 0.1.13` (`xiaomi/mimo-v2.5-pro`) | 1, 2, 5, 6, 8, 15, 17, 18, 19 | 7, 9, 12/13 | **The account was never the blocker.** Nine of twelve on the first run that used a model the vendor still serves — the two the blocker was established on are dead, and the one the ACP session opens on, `xiaomi/mimo-v2.5-pro-ultraspeed`, is refused by the vendor as "Not supported model". Row 5 reports `contextTokens: 34559` of `1048576`; row 19 reads a real spend, `$0.02 this month`. The three reds are this provider's own and are the first ones worth reporting: row 7's *second* turn ends without a result where its first answered, row 9 draws nothing at all, and rows 12/13 do not complete the permitted write. None had ever been reachable before |
 | 2026-08-22 | mimo 0.1.13 | live: 6, 9, 17, 18, 19 | live: 1, 2, 5, 7, 8, 12, 13, 15 | the account cannot generate: every turn ends `end_turn` with zero tokens and the surface shows "The provider ended the turn without producing a result." Not the flip — `mimo acp` answers the same way when driven directly, which is why its wire recording is `partial`. Control run: OpenCode row 1 through the same harness code on the same machine returned thinking, text and usage. What passed proves the process, the session, the resume (row 8 returned the same session id it was told), the failure text, the 16-model catalog, the 103 announced commands and the cancel |

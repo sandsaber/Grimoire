@@ -202,10 +202,12 @@ describe('live smoke matrix records', () => {
       // provider's result sink had never been given — `noteTurnEnded`, which
       // Grok's and Qwen's have.
       'kimicode-flip-smoke-matrix.md: 2026-09-03',
-      // Run, and mostly red — for a reason the matrix states rather than the
-      // flip: that account cannot generate. A date here is "when did this last
-      // run", not "did it pass".
-      'mimocode-flip-smoke-matrix.md: 2026-08-22',
+      // **The account was never the blocker.** Recorded as "cannot generate" from
+      // 2026-08-22 to 2026-08-31 and re-run on 2026-09-03 with a model the
+      // vendor still serves: nine of twelve, where it had been zero. The two
+      // models those checks used are dead, and the ACP path reports the
+      // vendor's error as an empty turn.
+      'mimocode-flip-smoke-matrix.md: 2026-09-03',
       // Re-run on 2026-08-31 under a change to the shared ACP filesystem: twelve
       // of twelve, and its row 15 raised the permission Gemini's cannot.
       'opencode-flip-smoke-matrix.md: 2026-08-31',
