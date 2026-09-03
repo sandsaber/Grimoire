@@ -8713,10 +8713,17 @@ first item struck:
 5. **The vault matrix** — the owner's eyes, unchanged: the drawn session-restart notice on six
    providers, row 4, and the plan approval's three answers.
 
-**Kimi Code is the third provider whose automated half is fully green on this machine**, after
-Antigravity and — on their own last runs — Codex, Claude, OpenCode and Grok. What is left red
-anywhere is Gemini's row 15 (upstream), Qwen's and Gemini's row 5 (their CLIs send no such number),
-Gemini's four projection rows (quota) and MiMoCode (account).
+**Seven of the nine are fully green on their automated halves** — Antigravity, Claude, Codex,
+OpenCode, Grok, Qwen and Kimi Code, the last two closed today. What is red anywhere, and nothing
+else:
+
+| Red | Whose |
+|---|---|
+| Gemini provider 5 | ours no longer — the tokens are read; it needs one turn to certify |
+| Gemini provider 15 | the CLI's, upstream |
+| Gemini projection C, E, F, H | the quota |
+| MiMoCode provider 7, 9, 12/13 | this provider's own, reachable for the first time |
+| Qwen provider 5's `inputTokens` | the CLI's, pinned rather than expected |
 
 **Run `npm ci` before any live Claude work.** The lockfile pins the agent SDK at 0.3.241 and the
 tree was running 0.3.221, where the dialog port's `null` answer is not suppressed.
