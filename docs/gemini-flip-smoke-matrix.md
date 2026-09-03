@@ -23,8 +23,9 @@ built before Qwen despite the plan's order — and the run paid for itself immed
 **Three defects were found by running it, and two of them were shipped.** They are described below
 the table, because they matter more than the rows.
 
-Recorded against **gemini 0.57.0** on 2026-08-31, Linux. The 2026-08-23 run against 0.55.1, where
-everything after row 1 was quota-blocked, is in the Record at the bottom.
+Recorded against **gemini 0.57.0** on 2026-08-31, Linux, with row 16 taken on 2026-09-03 once the
+quota that had blocked it came back. The 2026-08-23 run against 0.55.1, where everything after row 1
+was quota-blocked, is in the Record at the bottom.
 
 | # | Row | Result |
 |---|---|---|
@@ -37,14 +38,15 @@ everything after row 1 was quota-blocked, is in the Record at the bottom.
 | 9 | Says what a session the agent no longer has needs the person to do | ✅ **replaced, and it can say so** — `isSessionDropped()` answers `true` |
 | 12/13 | Asks before it writes, and writes what was allowed | ✅ asked once, wrote the file |
 | 15 | Writes nothing when the prompt is refused | ⛔ **nothing was ever asked** — the agent's write tool stops before the permission, see below |
-| 16 | Runs the turn in the mode the tab is set to | ⛔ the turn never came back inside ten minutes; the row after it found the quota gone |
+| 16 | Runs the turn in the mode the tab is set to | ✅ **2026-09-03** — planned instead of writing: it drafted `plans/planned-live.md` and left `planned-live.txt` absent |
 | 17 | Fills the model catalog from an empty vault | ✅ six models and four modes, from one reply |
 | 19 | Shows the spend when there is spend to show | ⛔ `You have exhausted your daily quota on this model.` |
 
-**Eight of twelve, and the account is what took two of the four.** Rows 16 and 19 are the day's quota
-running out — row 16's turn never answered inside the file's ten-minute limit and row 19, right
-after it, carries the vendor's own sentence for why. The other two are findings, one in this CLI and
-one in it too:
+**Nine of twelve.** Row 16 was taken on 2026-09-03 and is green: Grimoire's `plan` is not one of this
+agent's four mode ids, and what proves the translation landed is the agent behaving like a read-only
+session — it drafted a plan into `plans/planned-live.md` and never created the file it was asked for.
+Row 19 remains the day's quota running out, carrying the vendor's own sentence for why. The other two
+are findings, one in this CLI and one in it too:
 
 ### Row 5 — this CLI sends no usage, at any point in a turn
 
@@ -214,6 +216,7 @@ here rather than by the absence of a table.
 
 | Date | CLI version | Rows passed | Rows failed | Notes |
 |---|---|---|---|---|
+| 2026-09-03 | gemini 0.57.0 | live: 16 | — | **row 16 alone, and it closes the row the quota took on 2026-08-31.** Run after the day's projection matrix had already exhausted twenty free-tier requests on `gemini-3.5-flash`, so it also says the exhaustion is per model rather than per account. The turn ran read-only: `update_topic`, then a plan written to `plans/planned-live.md`, and no `planned-live.txt` — which is the half `session/set_mode` would have broken by forwarding an id this agent does not have. Rows 5 and 15 unchanged and not re-run: one is this CLI sending no usage at all, the other waits on the CLI's own `write_file` |
 | 2026-08-31 | gemini 0.57.0 | live: 1, 2, 6, 7, 8, 9, 12/13, 17 | live: 5, 15, 16, 19 | **the first run this account could pay for**: eight of twelve, and seven of the eight had never passed before. Row 9 is the one it was run for — the session-restart notice was wired for this provider the same day, the last of the six on this transport, and the row watched a session be replaced and `isSessionDropped()` answer `true`. Rows 16 and 19 are the quota running out at the end of the run, not the flip; row 5 is this CLI sending no usage at all, which its own wire recording already showed; row 15 is the agent's `write_file` tool abandoning the turn at its existence check, half ours and fixed here — a missing file answers `-32002 Resource not found` now, and a handler's message survives a cross-realm error — and half upstream, where no client answer can be classified at all. The file's timeout went to ten minutes on the evidence of a turn that took five |
 | 2026-08-23 | gemini 0.55.1 | live: 1, 6, 9, 16, 17 | live: 2, 5, 7, 8, 12/13, 15, 19 | second run, after quota replenished. **Row 1 completed end to end for the first time**, carrying both fixes the first run produced: the mode refusal no longer kills the turn, and the notice explaining it renders beside the answer. Finding 3's fix confirmed too — the tab now shows the vendor's own "You have exhausted your daily quota on this model." where it used to show a meaningless notice. The account replenishes about one turn at a time, so everything after row 1 is still quota-blocked |
 | 2026-08-23 | gemini 0.55.1 | live: 9, 16, 17, 19 | live: 1, 2, 5, 6, 7, 8, 12/13, 15 | the account's daily quota ran out partway through the first run — `session/prompt` answers `429 You have exhausted your daily quota on this model` — so every row needing an answer is unverified. Not the flip. What the run *did* find is three defects, two of them shipped and both fixed here: `session/set_mode` refuses the privileged modes in an untrusted folder and was killing every Auto-approve turn, and the shared model extractor read `id` where the wire sends `modelId`, which broke discovery for Gemini, MiMoCode and Grok. The third is recorded open above: a vendor error on the prompt becomes "could not establish whether this run completed", after a silent second attempt |

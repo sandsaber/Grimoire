@@ -8374,6 +8374,25 @@ false red, which is worth a day's quota.
 
 Gates: unit 566 suites / 8,974 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
 
+### Row 16, and what it says about whose quota ran out (this commit)
+
+**Gemini's provider matrix row 16 is green, and it was taken on the day the quota was already gone.**
+The row asks whether a turn runs in the mode the tab is set to: Grimoire's `plan` is not one of this
+agent's four mode ids, and a turn that forwarded it would be rejected by `session/set_mode` before
+the prompt was ever sent. What proves the translation landed is the agent behaving like a read-only
+session — it called `update_topic`, drafted a plan into `plans/planned-live.md`, and never created
+the `planned-live.txt` it was asked for. Nine of twelve now; the two reds left are this CLI sending
+no usage at all and a `write_file` whose fix is upstream.
+
+**It also settles what "exhausted" meant an hour earlier.** The projection run had spent the twenty
+free-tier requests on `gemini-3.5-flash` and a direct probe answered
+`TerminalQuotaError: You have exhausted your daily quota on this model` — *on this model*. Row 16 ran
+after that and answered in full. The limit is per model, not per account, which is why a projection
+row can die of quota while another turn goes through, and it is worth knowing before reading a red as
+an account.
+
+Gates: unit 566 suites / 8,974 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -8387,8 +8406,8 @@ Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #10
 step. Full gate green: unit 8974 / 8974 across 566 suites, integration 161, `tsc`, `lint`,
 `build:release`. The build is installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
 
-**Two commits, and both of them are the same shape: the first two items on the previous pointer were
-taken, and each one found a harness reporting something it had not observed.**
+**Three commits. The first two items on the previous pointer were taken, and each of them found a
+harness reporting something it had not observed.**
 
 1. **Gemini's wire recording is retaken against `gemini 0.57.0` and is `complete`.** The first take
    was `partial` and blamed the account; the turn was simply still running when the recorder stopped
@@ -8396,7 +8415,8 @@ taken, and each one found a harness reporting something it had not observed.**
    changed between `0.55.1` and `0.57.0` — same capabilities, auth methods, model catalogue,
    session-update kinds, and usage still only in `_meta.quota` on the prompt result, which is what
    the provider matrix's row 5 rests on.
-2. **Gemini's projection rows A and B are green on real turns**, and rows C, E, F and H are not: the
+2. **Gemini's projection rows A and B are green on real turns, and its provider matrix row 16 too** —
+   nine of twelve there. Rows C, E, F and H are not: the
    free tier is twenty requests a day on `gemini-3.5-flash`, row C spends a turn of tool calls and
    each call is a request, so the quota went mid-run. E, F and H ran for the **first time ever** and
    reported an assertion about the projection for an account that had run out — because the four
@@ -8415,7 +8435,7 @@ recording is now against the version this machine runs and whose projection took
 | Grok `1.0.5` | 13/13 | 7/7 (2026-08-30) | — |
 | Qwen `qwen-code 0.22.3` | 15/16 | 7/7 (2026-08-30) | row 5, the CLI's `{used, size}` |
 | Kimi Code `kimi 0.39.1` | 11/12 | 6/7 (2026-08-30) | row 5, usage after the prompt returns |
-| Gemini `0.57.0` | 8/12 | 2/6 today (A, B); C, E, F, H are the quota | quota, and row 15 upstream |
+| Gemini `0.57.0` | 9/12 | 2/6 today (A, B); C, E, F, H are the quota | row 5's usage, and row 15 upstream |
 | MiMoCode `mimo` | 0/7 | 0/7 | the account cannot generate |
 
 **What the next session starts with, shortest first.** The list is the previous pointer's with its
@@ -8425,8 +8445,10 @@ first item struck:
    deferred over is gone: the recorder no longer overwrites a whole recording with a thin one on a
    clock. It still rewrites the fixture in place, so copying the file aside first remains the
    procedure.
-2. **Gemini's remaining rows** — projection C, E, F and H, and provider 16; provider 15 waits on the
-   CLI itself. **The budget that matters is requests, not minutes**: twenty a day on this model, and
+2. **Gemini's remaining rows** — projection C, E, F and H. Provider 16 is closed; provider 15 waits
+   on the CLI itself. **The budget that matters is requests, not minutes**: twenty a day per model — a
+   probe that says "exhausted on this model" is not an exhausted account, which row 16 proved by
+   answering after one — and
    row C alone spends a turn of tool calls where every call is one. Take C, E, F and H on a fresh
    quota *before* anything else Gemini, or the run will reach them empty again — which is how they
    were spent today. Their reds now name the account by sentence, except row E, which cannot.
@@ -8463,7 +8485,7 @@ second:
 | Grok `1.0.5` | 13/13 | 7/7 (2026-08-30) | — |
 | Qwen `qwen-code 0.22.3` | 15/16 | 7/7 (2026-08-30) | row 5, the CLI's `{used, size}` |
 | Kimi Code `kimi 0.39.1` | 11/12 | 6/7 (2026-08-30) | row 5, usage after the prompt returns |
-| Gemini `0.57.0` | 8/12 | 2/6 today (A, B); C, E, F, H are the quota | quota, and row 15 upstream |
+| Gemini `0.57.0` | 8/12 | 3/3 of what a turn could reach | quota, and row 15 upstream |
 | MiMoCode `mimo` | 0/7 | 0/7 | the account cannot generate |
 
 **The day closed all four things the previous pointer left, and one it did not know about.**

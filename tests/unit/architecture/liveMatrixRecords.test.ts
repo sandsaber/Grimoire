@@ -186,9 +186,10 @@ describe('live smoke matrix records', () => {
       'claude-flip-smoke-matrix.md: 2026-08-31',
       'codex-flip-smoke-matrix.md: 2026-08-31',
       // **Paid for at last**, on 2026-08-31: eight of twelve, seven of them rows
-      // this account had never answered. The four reds are the day's quota, this
-      // CLI sending no usage at all, and one finding half of which is upstream.
-      'gemini-flip-smoke-matrix.md: 2026-08-31',
+      // this account had never answered. Row 16 was taken on 2026-09-03 once its
+      // quota came back — nine of twelve now — and the two reds left are this
+      // CLI sending no usage at all and one finding half of which is upstream.
+      'gemini-flip-smoke-matrix.md: 2026-09-03',
       // Thirteen of thirteen twice: on 2026-08-30 to certify the session-restart
       // notice this provider could not draw, and on 2026-08-31 to check the
       // shared ACP filesystem change under it.
