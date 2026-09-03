@@ -119,15 +119,16 @@ The MCP SDK range is `^1.30.0`, whose dependency contract accepts `@hono/node-se
 
 - Clean installation, the full unit suite, release-bundle verification, and `npm audit --omit=dev` are required release gates before publication.
 - A clean audit is a verified release target, not a standing claim in this document.
+- `.npmrc` sets `min-release-age=7`, so a freshly published release cannot enter the lockfile for a week. When a security fix lands inside that window, it is admitted through `lockfile-age-exceptions.json` with an `expiresAt` no later than the package's natural eligibility, never by lowering the quarantine itself.
 
 | Package | Source | In `main.js` | Locked version | Advisory range | Status |
 |---|---|---|---|---|---|
 | `@modelcontextprotocol/sdk` | Direct dependency | Verify from release bundle | 1.30.0 | Direct SDK; audit gate applies | Locked from the declared `^1.30.0` range |
 | `hono` | MCP SDK | Verify from release bundle | 4.13.0 | `<4.12.34` | Above tracked ranges |
 | `@hono/node-server` | MCP SDK | Verify from release bundle | 2.1.0 | `<2.0.5` | Narrow override to a patched release |
-| `fast-uri` | MCP SDK / AJV | Verify from release bundle | 3.1.5 | `>=3.0.0 <3.1.5` | Above tracked ranges |
+| `fast-uri` | MCP SDK / AJV | Verify from release bundle | 3.1.6 | `>=3.0.0 <=3.1.5` | Above tracked ranges |
 | `ip-address` | MCP SDK / Express rate limit | Verify from release bundle | 10.4.0 | `<=10.1.0` | Above tracked range |
-| `qs` | MCP SDK / Express | Verify from release bundle | 6.15.3 | `>=6.11.1 <=6.15.1` | Above tracked range |
+| `qs` | MCP SDK / Express | Verify from release bundle | 6.16.0 | `>=2.2.5 <6.16.0` | Above tracked range; admitted before the 7-day quarantine through a `lockfile-age-exceptions.json` entry that expires at its natural eligibility |
 | `@anthropic-ai/sdk` | Claude Agent SDK | Verify from release bundle | 0.115.0 | `>=0.79.0 <0.91.1` | Above tracked range |
 | `ws` | jsdom | Development dependency | 8.21.2 | `>=8.0.0 <8.20.1` | Development-only; above tracked range |
 | `brace-expansion` 1.x | Nested tooling dependency | Development dependency | 1.1.18 | `<1.1.18` | Development-only; patched |

@@ -48,6 +48,11 @@ import { expandAntigravityVaultSkillInvocation } from '@/providers/antigravity/r
 import { getAntigravityProviderSettings } from '@/providers/antigravity/settings';
 import { getVaultPath } from '@/utils/path';
 
+import {
+  type AntigravityImageAttachmentBundle,
+  attachAntigravityImages,
+} from '../runtime/AntigravityImageAttachments';
+
 /** Combined stdout, stderr, and recovered-transcript ceiling for one run. */
 const OUTPUT_BYTE_LIMIT = 64_000;
 
@@ -66,6 +71,17 @@ const OUTPUT_BYTE_LIMIT = 64_000;
  */
 export class AntigravityExecution {
   private readonly requests = new AntigravityRequestStore(() => opaqueId('agyreq'));
+  /**
+   * The temp files the turn now dispatching handed to `agy`.
+   *
+   * Freed when the next turn is dispatched and when this composition is
+   * disposed, which is Codex's rule for the same problem and for the same
+   * reason: the process reads these files while the turn runs, and print mode
+   * ends its process without anything here observing it. A turn's copies are
+   * user data carrying nothing diagnostic, so they never outlive the turn after
+   * them.
+   */
+  private liveAttachments: AntigravityImageAttachmentBundle | null = null;
 
   /**
    * This provider's workspace slots, built on the first question.
@@ -123,6 +139,7 @@ export class AntigravityExecution {
    * workspace, and the contract's `dispose` half is mandatory for that reason.
    */
   async dispose(): Promise<void> {
+    this.freeAttachments();
     await this.workspaceHolder.dispose();
   }
 
@@ -241,6 +258,11 @@ export class AntigravityExecution {
    * queued before a settings change must launch the CLI the user has configured
    * now, not the one configured when they pressed send.
    */
+  private freeAttachments(): void {
+    this.liveAttachments?.cleanup();
+    this.liveAttachments = null;
+  }
+
   private async resolveInvocation(requestRef: string): Promise<AntigravityInvocation> {
     const request = this.requests.resolve(requestRef);
     const plugin = this.plugin;
@@ -267,10 +289,40 @@ export class AntigravityExecution {
       level: 'debug',
       scope: 'provider.antigravity',
     });
+    // The previous turn's copies go now rather than at its end: print mode
+    // finishes its process without this composition seeing it, and the files
+    // have to outlive the read `agy` makes from them.
+    this.freeAttachments();
+    // Expanded here rather than where the request was composed: reading the
+    // vault is asynchronous and the composer is a pure text transform, and this
+    // is already the place that resolves ambient state at dispatch. Expanded
+    // *before* the attachments, so the paths land on the prompt that is sent
+    // rather than on one a later step rewrites.
+    const expanded = await expandAntigravityVaultSkillInvocation(
+      request.prompt,
+      maybeGetAntigravityWorkspaceServices(plugin)?.commandCatalog ?? null,
+    );
+    const dropped: string[] = [];
+    const attached = attachAntigravityImages(expanded, request.images ? [...request.images] : undefined, (image, error) => {
+      dropped.push(image.name);
+      plugin.recordDebugLog?.({
+        data: {
+          error: error instanceof Error ? error.message : String(error),
+          mediaType: image.mediaType,
+          name: image.name,
+          providerId: 'antigravity',
+        },
+        event: 'print.imageAttachmentFailed',
+        level: 'warn',
+        scope: 'provider.antigravity',
+      });
+    });
+    this.liveAttachments = attached;
     return {
       command,
       cliCapabilities,
       cwd: vaultPath ?? process.cwd(),
+      ...(dropped.length ? { droppedAttachments: dropped } : {}),
       ...(vaultPath ? { addDirPath: vaultPath } : {}),
       environment,
       model: request.model,
@@ -278,13 +330,7 @@ export class AntigravityExecution {
       // lives, because `agy --print` exposes no approval hook and anything short
       // of full access must be refused before a process exists.
       permissionMode: antigravityPermissionMode(plugin),
-      // Expanded here rather than where the request was composed: reading the
-      // vault is asynchronous and the composer is a pure text transform, and
-      // this is already the place that resolves ambient state at dispatch.
-      prompt: await expandAntigravityVaultSkillInvocation(
-        request.prompt,
-        maybeGetAntigravityWorkspaceServices(plugin)?.commandCatalog ?? null,
-      ),
+      prompt: attached.prompt,
     };
   }
 }
@@ -349,6 +395,7 @@ export function buildAntigravityRequest(
   return {
     prompt: buildAntigravityPrintPrompt(turn.prompt, history),
     model: selectedModel(plugin, options),
+    ...(turn.request.images?.length ? { images: [...turn.request.images] } : {}),
   };
 }
 

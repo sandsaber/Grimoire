@@ -129,4 +129,16 @@ describe('sanitizeDebugLogData', () => {
       windows: [{ label: 'Weekly', pct: 61, reset: 'Mon' }],
     });
   });
+
+  it('keeps a dialog kind readable so an unanswered dialog can be traced', () => {
+    expect(sanitizeDebugLogData({
+      dialogKind: 'permission_ask_user_question',
+      providerId: 'claude',
+      reason: 'no-question-ui',
+    })).toEqual({
+      dialogKind: 'permission_ask_user_question',
+      providerId: 'claude',
+      reason: 'no-question-ui',
+    });
+  });
 });

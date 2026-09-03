@@ -538,6 +538,7 @@
         "sizeLimit": "Bild überschreitet das Limit von {size}.",
         "unsupportedType": "Nicht unterstützter Bildtyp.",
         "attachFailed": "Bild konnte nicht angehängt werden.",
+        "notAttached": "Diese Bilder konnten nicht angehängt werden und fehlen in dieser Anfrage: {names}",
         "remove": "Bild entfernen",
         "fileNotFound": "(Datei nicht gefunden)",
         "permissionDenied": "(Berechtigung verweigert)"

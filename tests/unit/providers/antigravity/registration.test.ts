@@ -54,6 +54,25 @@ describe('Antigravity provider registration', () => {
     expect(runtime.getCapabilities().reasoningControl).toBe('none');
   });
 
+  it('advertises image attachments so the chat input accepts pasted images', () => {
+    // Written against the catalog rather than a registry: `main` asked
+    // `ProviderRegistry.createChatRuntime`, and both registries are deleted on
+    // this branch. The capability now projects from the module descriptor,
+    // where this provider declares `imageAttachments: 'grimoire'` — agy has no
+    // image flag, so Grimoire writes the temp files and names their paths in
+    // the prompt.
+    const host = new ExecutionKernelHost({
+      storage: new TestDurableStorage(),
+      scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
+    });
+    const plugin = { settings: {} } as any;
+    const runtime = new AntigravityExecution(plugin, host.registry).createRuntime();
+
+    // This flag is what gates ImageContextManager: with it false, paste and
+    // drop are refused before the runtime is ever asked.
+    expect(runtime.getCapabilities().supportsImageAttachments).toBe(true);
+  });
+
   it('creates Antigravity workspace services', async () => {
     const services = await antigravityWorkspaceRegistration.initialize({
       homeAdapter: {} as any,

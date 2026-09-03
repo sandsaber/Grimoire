@@ -133,7 +133,11 @@ const antigravityCapabilities: ProviderCapabilityDescriptor = {
     reattachment: false,
   },
   input: {
-    imageAttachments: 'unsupported',
+    // `grimoire` rather than `native`: agy has no image flag and its
+    // stream-json user event carries `content` as a plain string, so Grimoire
+    // writes each attachment to a temp file and names the absolute path in the
+    // prompt. The CLI opens it; the capability is ours.
+    imageAttachments: 'grimoire',
     instructionMode: 'unsupported',
   },
   interactions: {

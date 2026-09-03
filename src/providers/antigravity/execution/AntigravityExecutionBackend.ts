@@ -52,6 +52,15 @@ export interface AntigravityInvocation {
     readonly printTimeout: boolean;
     readonly streamJson: boolean;
   };
+  /**
+   * Images the user attached that never became a file for `agy` to open.
+   *
+   * Carried on the invocation because the writing happens at dispatch, and
+   * surfaced as content because debug logging is off by default: without it the
+   * user watches the agent answer about fewer images than they attached and
+   * reads it as the agent ignoring them.
+   */
+  readonly droppedAttachments?: readonly string[];
 }
 
 export interface AntigravityRequestResolver {
@@ -340,6 +349,12 @@ class AntigravityExecutionRun implements ExecutionRun {
         true,
       );
       return;
+    }
+    if (invocation.droppedAttachments?.length) {
+      this.emit({
+        kind: 'provider-content',
+        payload: { type: 'attachments_dropped', names: [...invocation.droppedAttachments] },
+      });
     }
     if (this.cancellation) {
       this.finish('cancelled', 'cancellation-confirmed', true);

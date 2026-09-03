@@ -538,6 +538,7 @@
         "sizeLimit": "이미지가 {size} 제한을 초과합니다.",
         "unsupportedType": "지원하지 않는 이미지 형식입니다.",
         "attachFailed": "이미지를 첨부하지 못했습니다.",
+        "notAttached": "다음 이미지를 첨부하지 못해 이번 턴에서 제외되었습니다: {names}",
         "remove": "이미지 제거",
         "fileNotFound": "(파일을 찾을 수 없음)",
         "permissionDenied": "(권한 거부됨)"

@@ -538,6 +538,7 @@
         "sizeLimit": "Image exceeds the {size} limit.",
         "unsupportedType": "Unsupported image type.",
         "attachFailed": "Failed to attach image.",
+        "notAttached": "These images could not be attached and were left out of this turn: {names}",
         "remove": "Remove image",
         "fileNotFound": "(File not found)",
         "permissionDenied": "(Permission denied)"

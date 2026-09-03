@@ -1,7 +1,23 @@
-> **Executed.** `main` was merged into `providers-migration` at the M6 gate — `dc8389d`, PR #107 —
-> and the migration journal's entry for it records what was carried, what was resolved as a deletion,
-> and the one thing recorded rather than ported. This file is kept as the method: regenerate it
-> before the next sync rather than reading these numbers as current.
+> **Executed twice.** First at the M6 gate — `dc8389d`, PR #107. Again on 2026-09-03, against
+> `origin/main` at `93a93dea`: eighteen commits, of which five touched a file this migration deleted.
+> The numbers below are the *first* sync's and are kept as the method, not as a current count —
+> regenerate them before the next one. The classification is three lines of shell:
+>
+> ```bash
+> BASE=$(git merge-base HEAD origin/main)
+> for c in $(git rev-list --reverse "$BASE"..origin/main); do
+>   for f in $(git diff-tree --no-commit-id --name-only -r "$c" -- src/); do
+>     [ -f "$f" ] && echo "live $f" \
+>       || { git cat-file -e "$BASE:$f" 2>/dev/null && echo "DELETED-HERE $f" || echo "new-on-main $f"; }
+>   done
+> done
+> ```
+>
+> What the second sync found, in one line each: Antigravity's image attachments and Claude's question
+> dialog were **ported** onto the migrated shape rather than taken; Codex's attachment-naming fix was
+> **recorded**, because `CodexTurnInput.ts` here never had the bug; the two content conflicts resolved
+> toward this branch, which had the wider path redaction and the shared `isRecord`. The journal entry
+> for that commit carries the reasoning.
 
 # Syncing `main` into `providers-migration`
 

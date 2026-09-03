@@ -1,10 +1,13 @@
 import '@/providers';
 
+import { existsSync, readFileSync } from 'node:fs';
+
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import type { PreparedChatTurn } from '@/core/runtime/types';
 import type { ChatMessage, StreamChunk } from '@/core/types';
+import type { ImageAttachment } from '@/core/types';
 import type {
   AntigravityInvocation,
   AntigravityProcessHandle,
@@ -44,13 +47,19 @@ describe('Antigravity execution composition', () => {
     };
   }
 
-  function turn(text: string): PreparedChatTurn {
+  /** One attachment, in the shape a tab hands the runtime. */
+  function image(name: string, body: string): ImageAttachment {
+    const data = Buffer.from(body).toString('base64');
+    return { data, id: `img-${name}`, mediaType: 'image/png', name, size: body.length, source: 'file' };
+  }
+
+  function turn(text: string, images?: ImageAttachment[]): PreparedChatTurn {
     return {
       isCompact: false,
       mcpMentions: new Set<string>(),
       persistedContent: text,
       prompt: text,
-      request: { text },
+      request: { text, ...(images ? { images } : {}) },
     };
   }
 
@@ -344,6 +353,41 @@ describe('Antigravity execution composition', () => {
     expect(runner.invocations[0]?.prompt).toContain('Answer with citations.');
     expect(runner.invocations[0]?.prompt).toContain('what changed?');
     expect(runner.invocations[0]?.prompt.startsWith('/researcher')).toBe(false);
+  });
+
+  it('hands an attached image to agy as a file the prompt names', async () => {
+    // **This CLI takes no image flag.** Its stream-json user event carries
+    // `content` as a plain string, so an attachment can only reach the agent as
+    // a path it is told to open — which is why the descriptor calls the
+    // capability `grimoire` rather than `native`. Asserted on the invocation
+    // and on the file, because a path in a prompt that names nothing is worse
+    // than no attachment: the agent goes looking.
+    const { runtime, runner } = await createTurnHarness(createPlugin());
+
+    await drain(runtime.query(turn('what is in this?', [image('screenshot.png', 'not really a png')])));
+
+    const prompt = runner.invocations[0]?.prompt ?? '';
+    const named = prompt.match(/\S+screenshot\.png/)?.[0];
+    expect(named).toBeTruthy();
+    expect(existsSync(named as string)).toBe(true);
+    expect(readFileSync(named as string, 'utf8')).toBe('not really a png');
+  });
+
+  it('removes the previous turn\'s attachments when the next one dispatches', async () => {
+    // Print mode ends its process without the composition seeing it, so the
+    // copies cannot go at the end of their own turn — the agent is still
+    // reading them. They go when the turn after them dispatches, which is the
+    // rule Codex's scratch directories already follow, and they are user data,
+    // so they do not wait longer than that.
+    const { runtime, runner } = await createTurnHarness(createPlugin());
+
+    await drain(runtime.query(turn('first', [image('one.png', 'one')])));
+    const first = runner.invocations[0]?.prompt.match(/\S+one\.png/)?.[0] as string;
+    expect(existsSync(first)).toBe(true);
+
+    await drain(runtime.query(turn('second')));
+
+    expect(existsSync(first)).toBe(false);
   });
 
   it('reads settings when the run dispatches, not when the turn was queued', async () => {

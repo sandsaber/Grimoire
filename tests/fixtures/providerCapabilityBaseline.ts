@@ -23,7 +23,12 @@ export const ANTIGRAVITY_PROVIDER_CAPABILITIES: Readonly<ProviderCapabilities> =
   supportsRewind: false,
   supportsFork: false,
   supportsProviderCommands: false,
-  supportsImageAttachments: false,
+  // Raised on `main` at the image-attachment feature and carried here with it:
+  // `agy` has no image flag, so Grimoire writes each attachment to a temp file
+  // and names the absolute path in the prompt. The descriptor says the same in
+  // its own language — `imageAttachments: 'grimoire'` — so this is a baseline
+  // that moved, not a divergence to declare.
+  supportsImageAttachments: true,
   supportsInstructionMode: false,
   supportsMcpTools: false,
   supportsTurnSteer: false,

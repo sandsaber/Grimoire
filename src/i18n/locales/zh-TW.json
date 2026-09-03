@@ -538,6 +538,7 @@
         "sizeLimit": "圖片超過 {size} 限制。",
         "unsupportedType": "不支援的圖片類型。",
         "attachFailed": "無法附加圖片。",
+        "notAttached": "以下圖片無法附加，未包含在本次對話中：{names}",
         "remove": "移除圖片",
         "fileNotFound": "（找不到檔案）",
         "permissionDenied": "（權限遭拒）"

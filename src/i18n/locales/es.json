@@ -538,6 +538,7 @@
         "sizeLimit": "La imagen supera el límite de {size}.",
         "unsupportedType": "Tipo de imagen no admitido.",
         "attachFailed": "No se pudo adjuntar la imagen.",
+        "notAttached": "No se pudieron adjuntar estas imágenes y quedaron fuera de este turno: {names}",
         "remove": "Quitar imagen",
         "fileNotFound": "(Archivo no encontrado)",
         "permissionDenied": "(Permiso denegado)"

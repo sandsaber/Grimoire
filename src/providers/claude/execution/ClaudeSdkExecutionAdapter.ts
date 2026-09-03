@@ -8,6 +8,7 @@ import {
 
 import type { Unsubscribe } from '@/core/execution/ExecutionContracts';
 
+import { CLAUDE_ASK_USER_QUESTION_DIALOG_KIND } from '../runtime/claudeAskUserQuestion';
 import type {
   ClaudeExecutionQuery,
   ClaudeExecutionQueryFactory,
@@ -52,6 +53,20 @@ export class ClaudeSdkExecutionQueryFactory implements ClaudeExecutionQueryFacto
     const options: Options = {
       ...resolved,
       canUseTool,
+      // Declared together, because the CLI treats an absent
+      // `supportedDialogKinds` as "this host cannot draw dialogs" and fails
+      // closed: a question then degrades to its no-dialog behaviour instead of
+      // reaching the handler below. Set here beside `canUseTool` for the same
+      // reason that one is — both are answers this query owns, and the startup
+      // options are resolved before there is a query to own them.
+      // The host-facing `UserDialogRequest` carries no tool id — the transport
+      // shape has one, the SDK does not pass it on — so the backend numbers the
+      // dialogs it cannot name.
+      onUserDialog: (request, dialogOptions) => input.onUserDialog(
+        { dialogKind: request.dialogKind, payload: request.payload },
+        { signal: dialogOptions.signal },
+      ) as ReturnType<NonNullable<Options['onUserDialog']>>,
+      supportedDialogKinds: [CLAUDE_ASK_USER_QUESTION_DIALOG_KIND],
       ...(input.nativeSessionRef ? { resume: input.nativeSessionRef } : {}),
       ...(input.resumeAt ? { resumeSessionAt: input.resumeAt } : {}),
       ...(input.forkSession ? { forkSession: true } : {}),

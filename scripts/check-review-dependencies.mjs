@@ -23,9 +23,9 @@ const advisories = [
   },
   {
     packageName: "fast-uri",
-    vulnerableRange: ">=3.0.0 <3.1.5",
-    advisory: "GHSA-q3j6-qgpj-74h6 / GHSA-v39h-62p7-jpjc / GHSA-7p8r-x3mc-p8w7",
-    isVulnerable: (version) => greaterThanOrEqual(version, "3.0.0") && lessThan(version, "3.1.5"),
+    vulnerableRange: ">=3.0.0 <=3.1.5",
+    advisory: "GHSA-q3j6-qgpj-74h6 / GHSA-v39h-62p7-jpjc / GHSA-7p8r-x3mc-p8w7 / GHSA-5jgf-p345-68v8 / GHSA-f65p-4m7j-42xc / GHSA-fph4-wmhf-6fwf / GHSA-jqff-g426-hqxp",
+    isVulnerable: (version) => greaterThanOrEqual(version, "3.0.0") && lessThanOrEqual(version, "3.1.5"),
   },
   {
     packageName: "ip-address",
@@ -58,9 +58,9 @@ const advisories = [
   },
   {
     packageName: "qs",
-    vulnerableRange: ">=6.11.1 <=6.15.1",
-    advisory: "GHSA-q8mj-m7cp-5q26",
-    isVulnerable: (version) => greaterThanOrEqual(version, "6.11.1") && lessThanOrEqual(version, "6.15.1"),
+    vulnerableRange: ">=2.2.5 <6.16.0",
+    advisory: "GHSA-q8mj-m7cp-5q26 / GHSA-4mjr-xmp4-gh2g / GHSA-x5fp-wj9c-mxmx",
+    isVulnerable: (version) => greaterThanOrEqual(version, "2.2.5") && lessThan(version, "6.16.0"),
   },
 ];
 

@@ -1,3 +1,5 @@
+import type { ImageAttachment } from '../../../core/types';
+
 /**
  * What one Antigravity print request needs, held while the kernel carries a
  * reference to it.
@@ -10,6 +12,14 @@
 export interface AntigravityRequest {
   readonly prompt: string;
   readonly model: string | null;
+  /**
+   * What the user attached, still in memory.
+   *
+   * Held rather than written here: the temp files these become are a dispatch
+   * concern, like the CLI path and the environment, and a turn that is refused
+   * before dispatch must not have left files behind for nobody to clean up.
+   */
+  readonly images?: readonly ImageAttachment[];
 }
 
 /** How many un-dispatched turns may accumulate before the oldest is dropped. */

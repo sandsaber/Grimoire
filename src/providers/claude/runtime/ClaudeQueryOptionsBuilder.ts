@@ -20,6 +20,7 @@ import {
 import {
   resolveEffortLevel,
 } from '../types/models';
+import { CLAUDE_ASK_USER_QUESTION_DIALOG_KIND } from './claudeAskUserQuestion';
 import { createCustomSpawnFunction } from './customSpawn';
 import {
   DISABLED_BUILTIN_SUBAGENTS,
@@ -36,6 +37,7 @@ export interface QueryOptionsContext {
   enhancedPath: string;
   mcpManager: McpServerManager;
   pluginManager: AppPluginManager;
+  onUserDialog?: Options['onUserDialog'];
 }
 
 export interface PersistentQueryContext extends QueryOptionsContext {
@@ -157,6 +159,7 @@ export class QueryOptionsBuilder {
       ctx.settings.permissionMode,
       ctx.canUseTool,
     );
+    QueryOptionsBuilder.applyUserDialogHandler(options, ctx.onUserDialog);
     QueryOptionsBuilder.applyThinking(options, ctx.settings, ctx.settings.model);
     options.hooks = ctx.hooks;
 
@@ -210,6 +213,7 @@ export class QueryOptionsBuilder {
       ctx.settings.permissionMode,
       ctx.canUseTool,
     );
+    QueryOptionsBuilder.applyUserDialogHandler(options, ctx.onUserDialog);
     options.hooks = ctx.hooks;
     QueryOptionsBuilder.applyThinking(options, ctx.settings, ctx.modelOverride ?? ctx.settings.model);
 
@@ -267,6 +271,21 @@ export class QueryOptionsBuilder {
     }
 
     options.permissionMode = QueryOptionsBuilder.resolveClaudeSdkPermissionMode(permissionMode);
+  }
+
+  /**
+   * Newer Claude Code versions can hand AskUserQuestion to the host through a
+   * request_user_dialog control request instead of canUseTool. The CLI fails
+   * closed on undeclared kinds, so the handler only ever runs when the kind is
+   * advertised here.
+   */
+  private static applyUserDialogHandler(
+    options: Options,
+    onUserDialog?: Options['onUserDialog'],
+  ): void {
+    if (!onUserDialog) return;
+    options.onUserDialog = onUserDialog;
+    options.supportedDialogKinds = [CLAUDE_ASK_USER_QUESTION_DIALOG_KIND];
   }
 
   private static buildBaseOptions(

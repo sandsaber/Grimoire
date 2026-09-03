@@ -220,6 +220,7 @@ function factoryInput(): ClaudeExecutionQueryFactoryInput {
     nativeSessionRef: 'native-session',
     resumeAt: 'assistant-checkpoint',
     forkSession: true,
+    onUserDialog: async () => null,
     signal: new AbortController().signal,
     canUseTool: async () => ({ behavior: 'deny', message: 'No.' }),
   };

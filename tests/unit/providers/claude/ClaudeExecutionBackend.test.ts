@@ -90,6 +90,54 @@ describe('ClaudeExecutionBackend', () => {
     expect(fixture.stored.map(entry => entry.output)).toEqual(['first result', 'second result']);
   });
 
+  it('leaves a dialog kind it never declared for the client that did', async () => {
+    // **A `request_user_dialog` this host does not draw belongs to another
+    // client on the session.** `cancelled` is a real settlement and would close
+    // that client's dialog as if the user had dismissed it, so the answer is to
+    // return nothing at all — which skips the transport write and leaves the
+    // dialog to whoever can render it, or to the CLI's own deadline.
+    const fixture = createFixture({ invocations: { first: invocation('message-1', {}) } });
+    const session = await createSession(fixture.backend, 'native-session');
+    void collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.factory.inputs.length === 1);
+    const dialog = fixture.factory.inputs[0]?.onUserDialog;
+
+    const answer = await dialog?.(
+      { dialogKind: 'refusal_fallback_prompt', payload: {} },
+      { signal: new AbortController().signal },
+    );
+
+    expect(answer).toBeNull();
+  });
+
+  it('leaves a denied question denied rather than answering it', async () => {
+    // The CLI resolves permission before it asks the host to draw, so a denial
+    // has already been decided against the tool. Answering the question would
+    // upgrade it — which is what spreading the payload's permission result into
+    // the reply used to do.
+    const fixture = createFixture({ invocations: { first: invocation('message-1', {}) } });
+    const session = await createSession(fixture.backend, 'native-session');
+    void collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.factory.inputs.length === 1);
+    const dialog = fixture.factory.inputs[0]?.onUserDialog;
+
+    const answer = await dialog?.(
+      {
+        dialogKind: 'permission_ask_user_question',
+        payload: {
+          permissionResult: { behavior: 'deny', message: 'Tool is not allowed here.' },
+          questions: [{ header: 'Pick', question: 'Which?', options: [{ label: 'A' }] }],
+        },
+      },
+      { signal: new AbortController().signal },
+    );
+
+    expect(answer).toEqual({
+      behavior: 'completed',
+      result: { behavior: 'deny', feedback: 'Tool is not allowed here.' },
+    });
+  });
+
   it('fences startup restart while a detached native task is still live', async () => {
     const fixture = createFixture({
       invocations: {

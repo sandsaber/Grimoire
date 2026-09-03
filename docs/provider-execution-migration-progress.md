@@ -8552,6 +8552,57 @@ genuinely the vendor's shape.
 
 Gates: unit 566 suites / 8,976 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
 
+### `main` synced, and the frozen-path fixes ported rather than taken (this commit)
+
+**Eighteen commits, and the decision surface was five.** `docs/provider-execution-main-sync.md` is
+the method and it was regenerated against these: the question is never whether to take a diff into a
+file this migration deleted, but whether the migrated path has the same bug. The merge resolves every
+deleted file as a deletion — five source files and three test files — and takes the rest.
+
+**Two content conflicts, both resolved toward this branch.** `DebugLogService` gained `dialogKind`
+from `main` and kept everything of ours: our `isRecord` is the shared helper rather than `main`'s
+local copy, and our path-redaction list covers Linux homes where `main`'s is still the
+macOS-and-Windows one it was before we widened it. `lockfile-age-exceptions.json` stays empty, which
+is this branch's release-hygiene decision, and `review:deps` passes with it.
+
+**Antigravity's image attachments are ported, not taken.** `main` flipped a boolean on a
+`capabilities.ts` this migration deleted; here the capability is a descriptor field, and the honest
+value is `imageAttachments: 'grimoire'` rather than `'native'` — `agy` has no image flag, so Grimoire
+writes each attachment to a temp file and names the absolute path in the prompt. The helper itself
+came across untouched. What is new is the lifetime: the copies are written when the run is
+**resolved**, beside the CLI path and the environment, and freed when the *next* turn dispatches —
+print mode ends its process without this composition seeing it, so a turn's files have to outlive its
+own end, and they are user data, so they do not outlive the turn after it. That is Codex's rule for
+the same problem. An attachment that never became a file is drawn as a notice, because debug logging
+is off by default and the user would otherwise watch the agent answer about fewer images than they
+attached.
+
+**Claude's question dialog is ported, and the migrated path was worse off than `main`'s.** Newer
+Claude Code sends `AskUserQuestion` through a `request_user_dialog` control request in auto and
+bypass modes, where `canUseTool` never sees it — and this branch had **no** `onUserDialog` and no
+`supportedDialogKinds` at all, so the CLI treated the host as unable to draw dialogs and the question
+degraded before it was asked. Both are declared now in the SDK adapter, beside `canUseTool`, for the
+same reason that one lives there: they are answers a query owns, and the startup options are resolved
+before there is a query to own them. The handler routes to **the same** `requestPermission` the tool
+path uses, so a question looks the same whichever way it arrived. Three answers are deliberately not
+settlements: an undeclared kind and a dialog with no run to own it both return `null` — `cancelled`
+is a real settlement and would close another client's dialog as if the user had dismissed it — and a
+denial stays denied, because the CLI resolved permission before it asked anyone to draw.
+
+**Codex needed nothing.** `main`'s fix reads `attachment.name` where the legacy runtime read
+`attachment.filename` and silently named every image `image-<n>`; `CodexTurnInput.ts` on this branch
+already reads `name`. Recorded rather than ported. Its launch args did come across: `--enable` aborts
+the whole app-server on a feature name the installed Codex does not know, so the config override it
+expands to is used instead.
+
+**One baseline moved and one test was rewritten.** `providerCapabilityBaseline` mirrors what the
+legacy record advertised, and `main` raised Antigravity's image flag there, so it moves with it
+rather than becoming a declared divergence. `main`'s new registration row asked
+`ProviderRegistry.createChatRuntime`; both registries are deleted here, so it asks the composition,
+which is what the rest of that file already does.
+
+Gates: unit 567 suites / 9,008 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -8565,7 +8616,9 @@ Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #10
 step. Full gate green: unit 8974 / 8974 across 566 suites, integration 161, `tsc`, `lint`,
 `build:release`. The build is installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
 
-**Seven commits. Four of the five items on the previous pointer are closed, and the day's shape was
+**Eight commits, and `main` is synced — `origin/main` at `93a93dea`, eighteen commits, merged with
+every deleted file resolved as a deletion and the frozen-path fixes ported onto the migrated shape.
+Four of the five items on the previous pointer are closed, and the day's shape was
 one sentence read five times: a red recorded as "the vendor's". Four of the five were ours.**
 
 1. **Gemini's wire recording is retaken against `gemini 0.57.0` and is `complete`.** The first take
@@ -8626,6 +8679,10 @@ first item struck:
 Antigravity and — on their own last runs — Codex, Claude, OpenCode and Grok. What is left red
 anywhere is Gemini's row 15 (upstream), Qwen's and Gemini's row 5 (their CLIs send no such number),
 Gemini's four projection rows (quota) and MiMoCode (account).
+
+**What the sync left for a person**: nothing outstanding. Antigravity's attachments and Claude's
+question dialog are wired and unit-covered, and neither has run against a real CLI — Antigravity's
+next live matrix and Claude's next question turn are where they are certified.
 
 **One thing found on the way that is nobody's milestone**: `scripts/run-jest.js` gives every jest
 worker the same `--localstorage-file`, and node's `localStorage` is SQLite, so workers contend for

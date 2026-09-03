@@ -538,6 +538,7 @@
         "sizeLimit": "L’image dépasse la limite de {size}.",
         "unsupportedType": "Type d’image non pris en charge.",
         "attachFailed": "Impossible de joindre l’image.",
+        "notAttached": "Ces images n'ont pas pu être jointes et sont absentes de ce tour : {names}",
         "remove": "Retirer l’image",
         "fileNotFound": "(Fichier introuvable)",
         "permissionDenied": "(Autorisation refusée)"

@@ -83,6 +83,8 @@ When bumping the plugin version, update `package.json`, `package-lock.json`, `ma
 Keep `CHANGELOG.md` as the source of truth for user-facing release notes. Every release bump should add a dated version section there before tagging or publishing; in-app "What's New" surfaces should read changelog content bundled into `main.js` rather than maintaining separate copy or publishing `CHANGELOG.md` as an Obsidian release asset.
 Obsidian plugin updates require the GitHub release tag to match `manifest.json.version` exactly, without a leading `v` prefix. For example, version `1.0.21` must be tagged and released as `1.0.21`, not `v1.0.21`.
 
+Publish a release by pushing the tag and nothing else. The Release workflow creates the GitHub release itself, and its `Attest release assets` step signs `main.js`, `manifest.json`, and `styles.css` before the release becomes visible. Creating the release by hand publishes it minutes before that build finishes, so Obsidian's plugin review scans assets that are not yet attested and reports `Missing GitHub artifact attestations for release assets` - which is what happened to 1.1.10. Expect that failure to look partial: `styles.css` is often byte-identical to an earlier release and its digest is already attested, so only `main.js` is flagged. A healthy release is authored by `github-actions[bot]` and its assets are uploaded no later than its publish time; both are visible in `gh api repos/<owner>/<repo>/releases/tags/<tag>`.
+
 Before a public release, Obsidian community plugin submission, or release meant for external review, also run:
 
 ```bash

@@ -27,7 +27,7 @@ const SENSITIVE_KEY_PATTERN =
   /(authorization|bearer|body|clipboard|content|cookie|env|file|header|input|key|message|note|output|password|path|prompt|request|response|secret|selection|text|token|transcript)/i;
 
 const SAFE_STRING_KEY_PATTERN =
-  /^(account|argsSummary|code|command|commandSource|cwdLabel|errorCode|errorName|errorSummary|event|homePresent|killSignal|label|launchMode|level|messageType|method|mode|modeId|model|pathEntryCount|pathHasLocalBin|phase|plan|promptLength|provider|providerId|rateLimitInfoFields|rateLimitType|reason|recordKind|reset|runtime|scope|shellPresent|signal|source|state|status|stderrPreview|stdinMode|stdioMode|usageKind|window|windowLabel)$/i;
+  /^(account|argsSummary|code|command|commandSource|cwdLabel|dialogKind|errorCode|errorName|errorSummary|event|homePresent|killSignal|label|launchMode|level|messageType|method|mode|modeId|model|pathEntryCount|pathHasLocalBin|phase|plan|promptLength|provider|providerId|rateLimitInfoFields|rateLimitType|reason|recordKind|reset|runtime|scope|shellPresent|signal|source|state|status|stderrPreview|stdinMode|stdioMode|usageKind|window|windowLabel)$/i;
 
 function padDatePart(value: number): string {
   return String(value).padStart(2, '0');

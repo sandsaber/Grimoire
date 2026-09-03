@@ -538,6 +538,7 @@
         "sizeLimit": "画像が{size}の上限を超えています。",
         "unsupportedType": "未対応の画像形式です。",
         "attachFailed": "画像を添付できませんでした。",
+        "notAttached": "次の画像を添付できなかったため、今回のやり取りには含まれていません: {names}",
         "remove": "画像を削除",
         "fileNotFound": "（ファイルが見つかりません）",
         "permissionDenied": "（権限が拒否されました）"

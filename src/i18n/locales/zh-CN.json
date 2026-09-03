@@ -538,6 +538,7 @@
         "sizeLimit": "图片超过 {size} 大小限制。",
         "unsupportedType": "不支持此图片类型。",
         "attachFailed": "附加图片失败。",
+        "notAttached": "以下图片无法附加，未包含在本次对话中：{names}",
         "remove": "移除图片",
         "fileNotFound": "（未找到文件）",
         "permissionDenied": "（权限不足）"

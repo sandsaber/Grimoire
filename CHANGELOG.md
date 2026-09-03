@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.3.1 - 2026-08-31
+
+### Fixed
+
+- Restored Codex's ability to ask you a question outside Plan mode. Codex keeps its `request_user_input` tool behind an experimental feature flag in its default collaboration mode, so a question the agent tried to ask in Safe or Auto mode was refused with `request_user_input is unavailable in Default mode` and the turn carried on with a guess instead. Grimoire now starts the Codex app-server with that feature enabled, using the configuration override rather than the `--enable` flag so that a Codex build which does not know the feature still starts instead of failing to launch at all (#110).
+- Taught Grimoire to render an AskUserQuestion that Claude Code hands over as a user dialog. Newer Claude Code builds can route the question to the host as a `request_user_dialog` control request instead of the permission callback, and Grimoire never advertised that it could display one, so the question degraded to the CLI's no-dialog behavior. It now opens in the same question UI as before: a permission the CLI already denied stays denied, and a dismissed question is reported back as a decline with its reason rather than a silent cancel (#109).
+
+## 1.3.0 - 2026-08-29
+
+### Added
+
+- Follow-ups typed while the agent is working are now queued as separate turns instead of being merged into one message. The queue is a list you can work row by row - edit, remove, or clear it - and the message at the head can be steered into the running turn instead of waiting. A held queue offers Resume.
+- Added a notice when a saved session could not be resumed. Grimoire opens a fresh session and the messages above are not in its context, which previously showed up only as the agent quietly having forgotten the conversation; the thread now ends in a marked seam naming the new session, drawn before you type rather than after a turn has been spent.
+- Added Refresh buttons for the Claude model catalog and slash-command list, so a newly installed model or command can be picked up without disabling and re-enabling the provider.
+
+### Improved
+
+- Antigravity now streams answer text and tool steps while the run is still open, instead of showing nothing until the CLI finishes. Tool cards close with the output `agy` reports, and their parameter summaries read correctly for `agy`'s PascalCase arguments.
+- Grok Build's reasoning-effort picker now offers what the session reports for the selected model, rather than a fixed list, and keeps those levels through a model switch. `xhigh` is available on the models that report it.
+- Claude's slash-command list is persisted with the configuration it was discovered under and reused on load, instead of probing a billable session on every start. A probe that finds nothing now backs off instead of retrying immediately.
+- Settled model catalogs are no longer rediscovered on a timer. They refresh when the resolved CLI path or provider configuration actually changes, or when you ask.
+
+### Fixed
+
+- Stopped a failed session resume from silently re-sending the entire conversation to the agent. A dropped session was handed the whole transcript as the next prompt, so one failed resume cost what the whole conversation costs - measured at roughly 34k tokens for a short question that needed none of it. The replacement session now starts clean, and the drop is recorded so an editor restart cannot mistake it for a first-ever message (#99).
+- Decided a lost session by asking the agent through `session/list` rather than reading the answer out of the error text. Every managed CLI reports a missing session as a generic internal error - Grok Build as `Path not found`, OpenCode and MiMoCode as a bare `Internal error` - so an expired token used to be indistinguishable from a session that was genuinely gone. Authentication and configuration failures now surface instead of silently dropping the conversation's context.
+- Fixed the message queue firing at a session that had just failed: a steered follow-up escaped the hold, the hold itself rendered nothing so there was no way to see or resume it, and cancelling a turn while resuming destroyed the queued message.
+- Stopped a queue from following you into the next conversation. Switching conversations refilled the composer and re-attached images from the conversation you had just left.
+- Kept an edited queue entry in its original position instead of moving it to the end.
+- Rendered LaTeX-delimited math (`\(...\)` and `\[...\]`) instead of leaking the delimiters into the message (#81).
+- Seeded a model catalog only under the configuration key it was discovered with, so a catalog found for one CLI path is no longer served for another (#98).
+- Seeded the Gemini, Qwen, and Codex catalogs when the CLI path resolves after startup, instead of leaving the picker empty until a restart.
+- Stopped Claude rewriting its command cache every time the slash-command dropdown opened.
+- Translated the Grok subagent Variant, Color, and Steps labels in Russian, Japanese, Korean, and Traditional Chinese. The same three fields were already translated everywhere else in settings, so those languages showed English labels on one screen and their own on another.
+
 ## 1.1.10 - 2026-08-25
 
 ### Improved

@@ -1,4 +1,5 @@
 import type { StreamChunk } from '../../../core/types';
+import { t } from '../../../i18n/i18n';
 import {
   normalizeAntigravityToolInput,
   normalizeAntigravityToolName,
@@ -23,6 +24,15 @@ export class AntigravityContentPresenter {
     const event = payload as AntigravityStreamEvent | undefined;
     if (!event || typeof event !== 'object' || !('type' in event)) {
       return [];
+    }
+    // Grimoire's own event, not `agy`'s: this provider takes images as temp
+    // files whose paths go into the prompt, and an image that never became a
+    // file has to say so where the user is looking.
+    if ((event as { type: string }).type === 'attachments_dropped') {
+      const names = (event as unknown as { names?: readonly string[] }).names ?? [];
+      return names.length
+        ? [{ type: 'notice', content: t('chat.ui.images.notAttached', { names: names.join(', ') }) }]
+        : [];
     }
     if (event.type === 'tool_start') {
       const name = normalizeAntigravityToolName(event.toolName);

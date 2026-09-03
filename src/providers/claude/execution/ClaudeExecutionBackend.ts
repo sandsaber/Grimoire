@@ -42,7 +42,12 @@ import {
   type ResultCommitOutcome,
   settleResultCommit,
 } from '@/core/execution/ResultCommit';
+import { isRecord } from '@/utils/records';
 
+import {
+  CLAUDE_ASK_USER_QUESTION_DIALOG_KIND,
+  prepareAskUserQuestionInput,
+} from '../runtime/claudeAskUserQuestion';
 import type { EffortLevel } from '../types/models';
 import { ClaudeExecutionMessageChannel } from './ClaudeExecutionMessageChannel';
 
@@ -101,6 +106,24 @@ export interface ClaudeExecutionQueryFactoryInput {
     input: Record<string, unknown>,
     options: ClaudeToolPermissionOptions,
   ) => Promise<PermissionResult>;
+  /**
+   * The CLI's other way of asking, which newer versions use for questions.
+   *
+   * `AskUserQuestion` in auto and bypass modes travels as a `request_user_dialog`
+   * control request rather than through `canUseTool`, so a host that wires only
+   * the latter never sees the question and the agent answers by guessing.
+   * Structural rather than the SDK's `OnUserDialog`, because the backend's
+   * contract is the kernel's and the SDK type belongs to the adapter that owns
+   * the query.
+   */
+  readonly onUserDialog: (
+    request: {
+      readonly dialogKind: string;
+      readonly payload: unknown;
+      readonly toolUseId?: string;
+    },
+    options: { readonly signal: AbortSignal },
+  ) => Promise<unknown>;
 }
 
 export interface ClaudeExecutionQueryFactory {
@@ -210,6 +233,19 @@ export interface ClaudeRewindBackupPort {
 }
 
 export interface ClaudeExecutionBackendContext {
+  /**
+   * Where a dialog left deliberately unanswered is written down.
+   *
+   * Optional because nothing else in this backend logs, and a backend that
+   * cannot log must still run: the record is for diagnosing a parked dialog,
+   * not for deciding one.
+   */
+  readonly recordDebugLog?: (entry: {
+    readonly data: Record<string, unknown>;
+    readonly event: string;
+    readonly level: 'debug' | 'warn' | 'error';
+    readonly scope: string;
+  }) => void;
   readonly queryFactory: ClaudeExecutionQueryFactory;
   readonly requestResolver: ClaudeExecutionRequestResolver;
   readonly interactionBridge: ClaudeInteractionBridge;
@@ -693,6 +729,8 @@ class ClaudeExecutionSession implements ExecutionSession {
   private controlTask: Promise<ClaudeRewindResult> | undefined;
   private disposalTask: Promise<void> | undefined;
   private disposed = false;
+  /** Distinguishes two dialogs the CLI asked without a tool id of their own. */
+  private userDialogSequence = 0;
 
   constructor(
     private readonly config: ExecutionSessionConfig,
@@ -1057,6 +1095,7 @@ class ClaudeExecutionSession implements ExecutionSession {
             message: 'No active Claude run owns this permission request.',
           });
       },
+      onUserDialog: (request, options) => this.answerUserDialog(request, options),
     });
     const query = await withAbortableTimeout(
       creation,
@@ -1088,6 +1127,99 @@ class ClaudeExecutionSession implements ExecutionSession {
     query.onConnectionLost(error => this.handleConnectionLost(query, generation, error));
     void this.consume(query, generation);
     this.resumeAtOverride = undefined;
+  }
+
+  /**
+   * The question the CLI asked through a dialog rather than through a tool.
+   *
+   * Newer Claude Code sends `AskUserQuestion` as a `request_user_dialog`
+   * control request in auto and bypass modes, where `canUseTool` never sees it.
+   * Both entry points end at the same place — this run's permission request —
+   * so a question looks the same whichever way it arrived, which is the whole
+   * point of routing it here rather than answering it separately.
+   *
+   * Three answers are deliberately **not** settlements. A kind Grimoire never
+   * declared belongs to another client on a multi-client session, and
+   * `cancelled` would close that client's dialog as if the user had dismissed
+   * it. A dialog with no run to own it, likewise. Both return `null`, which
+   * skips the transport write and leaves the dialog to whoever can render it
+   * or to the CLI's own deadline — and both are logged, because a parked
+   * dialog with no record reads as a stall.
+   */
+  private async answerUserDialog(
+    request: {
+      readonly dialogKind: string;
+      readonly payload: unknown;
+      readonly toolUseId?: string;
+    },
+    options: { readonly signal: AbortSignal },
+  ): Promise<unknown> {
+    if (request.dialogKind !== CLAUDE_ASK_USER_QUESTION_DIALOG_KIND) {
+      this.recordUnansweredUserDialog(request.dialogKind, 'undeclared-kind');
+      return null;
+    }
+    const payload = isRecord(request.payload) ? request.payload : {};
+    const permissionResult = isRecord(payload.permissionResult) ? payload.permissionResult : {};
+    // The CLI resolves permission before it asks the host to draw, so a denial
+    // stays denied: answering the question would upgrade a decision already
+    // made against it.
+    if (permissionResult.behavior === 'deny') {
+      const message = typeof permissionResult.message === 'string'
+        ? permissionResult.message
+        : undefined;
+      return {
+        behavior: 'completed',
+        result: { behavior: 'deny', ...(message ? { feedback: message } : {}) },
+      };
+    }
+    // Only `questions` travels in the payload; the rest of the tool input is on
+    // the permission result and has to be carried back untouched. The payload's
+    // copy comes back empty when the CLI could not parse the tool input, so an
+    // empty array falls through to the permission result rather than cancelling
+    // a question it still has.
+    const baseInput = isRecord(permissionResult.updatedInput) ? permissionResult.updatedInput : {};
+    const payloadQuestions = Array.isArray(payload.questions) ? payload.questions : null;
+    const questions = payloadQuestions?.length ? payloadQuestions : baseInput.questions;
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return { behavior: 'cancelled' };
+    }
+    const activeRun = this.activeRun;
+    if (!activeRun || activeRun.isTerminal) {
+      this.recordUnansweredUserDialog(request.dialogKind, 'no-active-run');
+      return null;
+    }
+    const input = prepareAskUserQuestionInput({ ...baseInput, questions });
+    // The dialog carries the tool call's own id where the CLI has one. Where it
+    // does not, a counter: `requestId` is what this backend dedupes in-flight
+    // permissions by, so two dialogs sharing one would answer each other.
+    const toolUseId = request.toolUseId ?? `dialog-${this.userDialogSequence += 1}`;
+    const answered = await activeRun.requestPermission('AskUserQuestion', input, {
+      requestId: toolUseId,
+      signal: options.signal,
+      toolUseId,
+    });
+    if (answered.behavior === 'allow') {
+      return {
+        behavior: 'completed',
+        result: { behavior: 'allow', updatedInput: answered.updatedInput ?? input },
+      };
+    }
+    // A dismissal is a refusal to answer, not a silent cancel: the agent is
+    // told so it can carry on rather than wait for a dialog nobody will settle.
+    const feedback = typeof answered.message === 'string' && answered.message
+      ? answered.message
+      : 'User declined to answer.';
+    return { behavior: 'completed', result: { behavior: 'deny', feedback } };
+  }
+
+  /** A dialog left unanswered on purpose, recorded so it is not read as a stall. */
+  private recordUnansweredUserDialog(dialogKind: string, reason: string): void {
+    this.context.recordDebugLog?.({
+      data: { dialogKind, providerId: 'claude', reason },
+      event: 'user_dialog.unanswered',
+      level: 'warn',
+      scope: 'claude.dialog',
+    });
   }
 
   private resolveSessionIntent(intent: ClaudeSessionIntent | undefined): ClaudeSessionIntent {

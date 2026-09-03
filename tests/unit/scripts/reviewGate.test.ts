@@ -69,7 +69,12 @@ describe('Obsidian review gate', () => {
     expect(dependencyGate).toContain('GHSA-8j4g-w8fx-2239');
     expect(dependencyGate).toContain('lessThan(version, "4.12.34")');
     expect(dependencyGate).toContain('GHSA-7p8r-x3mc-p8w7');
-    expect(dependencyGate).toContain('lessThan(version, "3.1.5")');
+    // 3.1.5 moved from the first patched release to the last vulnerable one
+    // when the September 2026 fast-uri advisories landed.
+    expect(dependencyGate).toContain('GHSA-jqff-g426-hqxp');
+    expect(dependencyGate).toContain('lessThanOrEqual(version, "3.1.5")');
+    expect(dependencyGate).toContain('GHSA-4mjr-xmp4-gh2g');
+    expect(dependencyGate).toContain('lessThan(version, "6.16.0")');
     expect(dependencyGate).toContain('GHSA-rgw5-rvv9-x895');
     expect(dependencyGate).toContain('lessThan(version, "1.1.18")');
     expect(dependencyGate).toContain('lessThan(version, "2.1.4")');
@@ -83,6 +88,8 @@ describe('Obsidian review gate', () => {
       'node_modules/@hono/node-server': { version: '2.0.4' },
       'node_modules/brace-expansion': { version: '5.0.8' },
       'node_modules/example/node_modules/brace-expansion': { version: '1.1.17' },
+      'node_modules/fast-uri': { version: '3.1.5' },
+      'node_modules/qs': { version: '6.15.3' },
     });
 
     expect(result.status).toBe(1);
@@ -90,6 +97,8 @@ describe('Obsidian review gate', () => {
     expect(result.stderr).toContain('@hono/node-server@2.0.4');
     expect(result.stderr).toContain('brace-expansion@5.0.8');
     expect(result.stderr).toContain('brace-expansion@1.1.17');
+    expect(result.stderr).toContain('fast-uri@3.1.5');
+    expect(result.stderr).toContain('qs@6.15.3');
   });
 
   it('accepts patched hoisted, scoped, and nested lockfile packages', () => {
@@ -97,7 +106,8 @@ describe('Obsidian review gate', () => {
       '': { version: '1.0.0' },
       'node_modules/hono': { version: '4.12.34' },
       'node_modules/@hono/node-server': { version: '2.0.5' },
-      'node_modules/fast-uri': { version: '3.1.5' },
+      'node_modules/fast-uri': { version: '3.1.6' },
+      'node_modules/qs': { version: '6.16.0' },
       'node_modules/brace-expansion': { version: '5.0.9' },
       'node_modules/example/node_modules/brace-expansion': { version: '1.1.18' },
     });
