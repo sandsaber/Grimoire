@@ -104,6 +104,16 @@ describe('Kimi Code execution composition', () => {
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
     sessionLoadRefusal?: string;
+    /**
+     * This CLI's own order, taken from `kimicode-wire.json` field by field.
+     *
+     * The recording is unambiguous: seq 26 is the answer to `session/prompt`
+     * and seq 27 is the `usage_update`. The result carries **no** `usage`, and
+     * the update carries `{used, size}` and no `cost` — where the shape above
+     * sends a window mid-turn with a price on it, which is Qwen's order and
+     * nobody's payload.
+     */
+    usageAfterPromptResult?: boolean;
   } = {}): {
     factory: ManagedAcpClientFactory;
     startupRefs: string[];
@@ -231,15 +241,17 @@ describe('Kimi Code execution composition', () => {
                 content: [{ type: 'content', content: { type: 'text', text: 'note body' } }],
               },
             });
-            notify?.({
-              sessionId: 'acp-session-1',
-              update: {
-                sessionUpdate: 'usage_update',
-                used: 16_384,
-                size: 262_144,
-                cost: { amount: 0.25, currency: 'USD' },
-              },
-            });
+            if (!options.usageAfterPromptResult) {
+              notify?.({
+                sessionId: 'acp-session-1',
+                update: {
+                  sessionUpdate: 'usage_update',
+                  used: 16_384,
+                  size: 262_144,
+                  cost: { amount: 0.25, currency: 'USD' },
+                },
+              });
+            }
             notify?.({
               sessionId: 'acp-session-1',
               update: {
@@ -250,6 +262,21 @@ describe('Kimi Code execution composition', () => {
                 content: { type: 'text', text: 'the answer' },
               },
             });
+            if (options.usageAfterPromptResult) {
+              // Not the same tick, and not zero: a frame after the response is
+              // a separate read off the pipe, and a delay of zero would be
+              // satisfied by any seam that merely yields once — which is how
+              // the first version of this row passed with the wait set to 0ms
+              // and proved nothing about the bound. The number models "a later
+              // read", not a measured gap.
+              setTimeout(() => {
+                notify?.({
+                  sessionId: 'acp-session-1',
+                  update: { sessionUpdate: 'usage_update', used: 25_242, size: 1_000_000 },
+                });
+              }, 25);
+              return { stopReason: 'end_turn' };
+            }
             return {
               stopReason: 'end_turn',
               usage: { inputTokens: 15_940, outputTokens: 4, totalTokens: 16_979 },
@@ -288,6 +315,7 @@ describe('Kimi Code execution composition', () => {
     sessionIsGone?: boolean;
     sessionLoadFails?: boolean;
     sessionLoadRefusal?: string;
+    usageAfterPromptResult?: boolean;
   } = {}): Promise<{
     execution: KimicodeExecution;
     host: ExecutionKernelHost;
@@ -454,6 +482,48 @@ describe('Kimi Code execution composition', () => {
     // The answer itself stays on the kernel's channel; a second copy here
     // prints every sentence twice.
     expect(chunks.some(chunk => chunk.type === 'text')).toBe(false);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('takes the context window from a usage update that arrives after the prompt returned', async () => {
+    // **This CLI's order, and the whole of why its context meter lagged.**
+    // `usage_update` is the frame *after* the answer to `session/prompt`, so by
+    // the time it lands the run that earned it has ended — and the kernel
+    // attributes a session notification to the live run, of which there is
+    // none. `noteTurnEnded` is the seam built for this: the provider's last
+    // look at the turn, before any terminal, which is where Qwen asks for a
+    // window ACP never sends it and Grok reads a cost only its log has. This
+    // provider's sink had no `noteTurnEnded` at all — the one provider whose
+    // window is late was the one never given the seam for it.
+    const { execution, host, events } = await createHarness({ usageAfterPromptResult: true });
+    const presenter = new KimicodeContentPresenter({
+      displayModel: () => 'anthropic/claude-sonnet-4',
+    });
+
+    const requestRef = execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'what now?' }],
+    });
+    await host.registry.startRun(SESSION_ID, {
+      runId: RUN_ID,
+      owner: OWNER,
+      requestRef,
+      resultExpectation: 'required',
+    });
+    await settle(host, events);
+
+    const chunks = events.flatMap(({ event }) => (
+      event.kind === 'provider-content' ? [...presenter.present(event.payload)] : []
+    ));
+    // The turn's *own* stream carries it, which is what "reaches the turn that
+    // earned it" means — not the next run's, and not nowhere. Asserted on the
+    // wire's numbers rather than on a badge, because a badge is drawn from this.
+    expect(chunks.filter(chunk => chunk.type === 'usage').at(-1)).toEqual(
+      expect.objectContaining({
+        sessionId: 'acp-session-1',
+        usage: expect.objectContaining({ contextWindow: 1_000_000, contextTokens: 25_242 }),
+      }),
+    );
     execution.dispose();
     await host.dispose();
   });

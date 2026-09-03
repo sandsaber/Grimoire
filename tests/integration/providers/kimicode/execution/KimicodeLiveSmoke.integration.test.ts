@@ -208,10 +208,19 @@ live('Kimi Code live smoke', () => {
       .filter((chunk): chunk is Extract<StreamChunk, { type: 'usage' }> => chunk.type === 'usage')
       .at(-1);
     report('ROW 5', JSON.stringify(usage?.usage));
-    // The window comes from an update while the turn runs; the prompt's own
-    // tokens come from the answer. The badge needs the pair.
+    // **The window arrives, and it took the seam Grok and Qwen already had.**
+    // This CLI sends `usage_update` in the frame *after* the answer to
+    // `session/prompt`, so the run that earned it had already ended and the
+    // kernel — which gives a session notification to the live run — had nobody
+    // to hand it to. `noteTurnEnded` is where the turn waits for it now.
     expect(usage?.usage.contextWindow).toBeGreaterThan(0);
-    expect(usage?.usage.inputTokens).toBeGreaterThan(0);
+    expect(usage?.usage.contextTokens).toBeGreaterThan(0);
+    // **And the prompt's own tokens are not on this wire at all**, which the
+    // recording says plainly: `kimicode-wire.json` answers `session/prompt`
+    // with `{stopReason: 'end_turn'}` and nothing else. Pinned rather than
+    // asserted away — a row that expected them was measuring the vendor, and a
+    // row that ignored them would not notice the vendor changing its mind.
+    expect(usage?.usage.inputTokens).toBe(0);
     await shutdown();
   });
 

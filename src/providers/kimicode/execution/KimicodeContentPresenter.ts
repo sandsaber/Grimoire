@@ -42,6 +42,15 @@ export interface KimicodeContentPresenterPorts {
   readonly onCommands?: (commands: readonly SlashCommand[]) => void;
   /** The model, mode and effort the open session can be set to. */
   readonly onConfigOptions?: (configOptions: readonly AcpSessionConfigOption[]) => void;
+  /**
+   * How full the context is, said the moment it arrives.
+   *
+   * This CLI sends `usage_update` in the frame *after* the answer to
+   * `session/prompt` — seq 26 and 27 of its own recording — so the turn that
+   * earned the window has to be told to wait for it. `noteTurnEnded` does the
+   * waiting; this is how it learns the wait is over.
+   */
+  readonly onContextUsage?: (sessionId: string | undefined) => void;
   /** What the vendor charged, for the plan-limit indicator. */
   readonly onCost?: (cost: AcpUsageUpdate['cost']) => void;
   /** The mode the session switched to, which the user may not have chosen. */
@@ -228,6 +237,7 @@ export class KimicodeContentPresenter {
       case 'usage':
         this.contextUsage = normalized.usage;
         this.ports.onCost?.(normalized.usage.cost ?? null);
+        this.ports.onContextUsage?.(this.sessionId);
         return this.usageChunks();
       default:
         return [];

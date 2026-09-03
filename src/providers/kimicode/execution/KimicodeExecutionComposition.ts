@@ -122,6 +122,18 @@ const AUXILIARY_TIMEOUT_MS = 60_000;
 const METADATA_DATABASE = ':memory:';
 
 /**
+ * How long a turn waits for the window that describes it.
+ *
+ * `kimicode-wire.json` puts `usage_update` in the frame straight after the
+ * answer to `session/prompt`, on the same stdio stream — a gap measured in
+ * microseconds, not milliseconds. This is three orders of magnitude over that,
+ * so it is a bound rather than a delay: it is paid in full only by a CLI that
+ * stopped sending the update at all, and then it costs one turn 400ms rather
+ * than hanging it.
+ */
+const CONTEXT_USAGE_WAIT_MS = 400;
+
+/**
  * Kimi Code chat execution, assembled from the running plugin.
  *
  * **Flipped.** `registration.ts` points `createRuntime` here, `main.ts`
@@ -201,6 +213,15 @@ export class KimicodeExecution {
   private readonly writeApprovers = new Map<string, () => ApprovalCallback | undefined>();
 
   private readonly presenters = new Set<KimicodeInteractionPresenter>();
+  /**
+   * Who is waiting for a context window, by the session it belongs to.
+   *
+   * The sink waits at `noteTurnEnded` and a presenter reports the arrival, and
+   * the two are built in different methods on this object — `createBackend` and
+   * `createRuntime` — so the meeting point is here. Keyed by session because a
+   * composition serves every tab and a window belongs to one of them.
+   */
+  private readonly contextUsageWaiters = new Map<string, Set<() => void>>();
   private readonly disposers: Array<() => void> = [];
 
   private backend: KimicodeExecutionBackend | undefined;
@@ -265,7 +286,9 @@ export class KimicodeExecution {
         resolve: dynamicRef => this.requests.resolveDynamic(dynamicRef),
       }),
       interactionBridge: this.interactions,
-      resultSink: new KimicodeProjectionResultSink(),
+      resultSink: new KimicodeProjectionResultSink({
+        awaitContextUsage: sessionId => this.awaitContextUsage(sessionId),
+      }),
       reconciler: {
         // A turn that answered the cancel it was sent is a turn known to
         // have stopped, and ACP delivers that answer on the prompt itself.
@@ -403,6 +426,7 @@ export class KimicodeExecution {
           modes: opening.modes ?? null,
         });
       })()),
+      onContextUsage: sessionId => this.settleContextUsage(sessionId),
       onCost: cost => {
         // Only a cost that was actually recorded counts as one: Kimi Code sends
         // a usage update every turn for the context badge, usually with no cost
@@ -766,6 +790,43 @@ export class KimicodeExecution {
    * records the difference from the session total, so reading it twice for one
    * session counts nothing twice.
    */
+  /**
+   * Gives this turn's own `usage_update` the moment it needs to arrive.
+   *
+   * Bounded, and the bound is generous by three orders of magnitude: the update
+   * is the frame after the prompt result on the same stdio stream, so it is
+   * usually parsed before this is even called. What the bound buys is that a
+   * CLI which stops sending one costs a turn 400ms once, rather than hanging
+   * it — and a turn is never failed for a badge.
+   */
+  private awaitContextUsage(sessionId: string): Promise<void> {
+    return new Promise<void>(resolve => {
+      const waiters = this.contextUsageWaiters.get(sessionId) ?? new Set<() => void>();
+      this.contextUsageWaiters.set(sessionId, waiters);
+      let settled = false;
+      const done = (): void => {
+        if (settled) return;
+        settled = true;
+        waiters.delete(done);
+        if (waiters.size === 0) this.contextUsageWaiters.delete(sessionId);
+        window.clearTimeout(timer);
+        resolve();
+      };
+      // The window's timers, as everything else in this file uses: a popout is
+      // a different global, and a handle minted on one cannot be cleared on the
+      // other.
+      const timer = window.setTimeout(done, CONTEXT_USAGE_WAIT_MS);
+      waiters.add(done);
+    });
+  }
+
+  private settleContextUsage(sessionId: string | undefined): void {
+    if (!sessionId) return;
+    for (const waiter of [...this.contextUsageWaiters.get(sessionId) ?? []]) {
+      waiter();
+    }
+  }
+
   private async recordSessionCost(
     sessionId: string | undefined,
     databasePath: string | null,

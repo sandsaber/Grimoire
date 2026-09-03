@@ -8393,6 +8393,57 @@ an account.
 
 Gates: unit 566 suites / 8,974 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
 
+### The meter was not an owner's question, it was a seam nobody gave this provider (this commit)
+
+**Kimi Code's context meter has been carried as "an owner's decision" since 2026-08-30** — where
+should usage live for a provider that reports it out of band? It was never that question. The seam
+for it already existed, two providers already use it, and the one provider whose window arrives late
+was the one that had never been given it.
+
+`noteTurnEnded` is the backend's last look at a turn, *before any terminal*, and its own comment says
+why it exists: "what it finds reaches the turn that earned it rather than the next one".
+`GrokProjectionResultSink` reads a cost only the session log has there; `QwenProjectionResultSink`
+asks for a window ACP never sends it. `KimicodeProjectionResultSink` implemented no `noteTurnEnded`
+at all.
+
+**The recordings scoped the fix to one provider, exactly.** `usage_update` follows the answer to
+`session/prompt` only in `kimicode-wire.json` — seq 27 against seq 26. MiMoCode's is 9 against 10,
+Qwen's 23 against 24, and Grok and Gemini send none at all. So the kernel's rule that a session
+notification belongs to the live run did not have to change; one provider had to wait for its own
+frame.
+
+The sink waits there now, the presenter says when the window landed, and the composition is where
+the two meet — the sink is built in `createBackend` and the presenter in `createRuntime`, so the
+waiters are keyed by session on the object that owns both. The bound is 400ms against a frame that
+arrives on the same stdio stream microseconds later: a bound, not a delay, paid in full only by a CLI
+that stopped sending the update.
+
+**The first version of the test passed with that bound set to zero.** The fake's notification was on
+a zero-delay timer, so any seam that yielded a single tick satisfied it — it proved the seam was
+called and nothing about the wait. The fake's delay is non-zero now: at 0ms the row is red, at 400ms
+green. The fake was taught the recorded order while it was open, because it had been sending Qwen's:
+a window *mid-turn*, with a price on it, and a prompt result carrying `usage`. This CLI sends the
+window after the result, as `{used, size}`, with no cost, and answers the prompt with
+`{stopReason: end_turn}` and nothing else.
+
+**Live, both matrices.** The provider matrix is **12 of 12** in eighty seconds, where it has been 11
+of 12 since it first ran with an account — and every row in that run carries a `usage` chunk, not
+only row 5. The projection matrix is **7 of 7**: row 13's `contextTokens: 25344` of `1000000` is on
+the column *and* in the stored conversation after the save.
+
+**Half of row 5 is this CLI and stays that way.** Its prompt result has no `usage`, so the prompt's
+own tokens are zero. The row pins that with `toBe(0)` rather than dropping the assertion: a row that
+expected them was measuring the vendor, and a row that ignored them would not notice the vendor
+changing its mind.
+
+**And the shape of getting here is worth keeping.** The question was put to the owner as four
+options, the owner chose one — route idle notifications to the session — and the seam was found while
+implementing it. The option list had been built from the mechanism rather than from the codebase, so
+it missed the thing built for this exact problem two providers ago. The owner was told and chose
+again. A blocker recorded as a decision is worth re-reading before it is acted on.
+
+Gates: unit 566 suites / 8,975 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -8406,8 +8457,8 @@ Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #10
 step. Full gate green: unit 8974 / 8974 across 566 suites, integration 161, `tsc`, `lint`,
 `build:release`. The build is installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
 
-**Three commits. The first two items on the previous pointer were taken, and each of them found a
-harness reporting something it had not observed.**
+**Four commits. Three of the five items on the previous pointer are closed, and each one of them
+found something reporting what it had not observed.**
 
 1. **Gemini's wire recording is retaken against `gemini 0.57.0` and is `complete`.** The first take
    was `partial` and blamed the account; the turn was simply still running when the recorder stopped
@@ -8434,9 +8485,9 @@ recording is now against the version this machine runs and whose projection took
 | OpenCode `1.18.19` | 12/12 | 7/7 (2026-08-30) | — |
 | Grok `1.0.5` | 13/13 | 7/7 (2026-08-30) | — |
 | Qwen `qwen-code 0.22.3` | 15/16 | 7/7 (2026-08-30) | row 5, the CLI's `{used, size}` |
-| Kimi Code `kimi 0.39.1` | 11/12 | 6/7 (2026-08-30) | row 5, usage after the prompt returns |
+| Kimi Code `kimi 0.39.1` | 12/12 | 7/7 | — |
 | Gemini `0.57.0` | 9/12 | 2/6 today (A, B); C, E, F, H are the quota | row 5's usage, and row 15 upstream |
-| MiMoCode `mimo` | 0/7 | 0/7 | the account cannot generate |
+| MiMoCode `mimo` | 0/7 | 0/7 | the account cannot generate, asked a fourth time |
 
 **What the next session starts with, shortest first.** The list is the previous pointer's with its
 first item struck:
@@ -8448,16 +8499,25 @@ first item struck:
 2. **Gemini's remaining rows** — projection C, E, F and H. Provider 16 is closed; provider 15 waits
    on the CLI itself. **The budget that matters is requests, not minutes**: twenty a day per model — a
    probe that says "exhausted on this model" is not an exhausted account, which row 16 proved by
-   answering after one — and
+   answering after one. **And do not probe a trickling quota**: once exhausted it comes back about a
+   turn at a time, so the probe eats the turn the row was going to use — that is how row F was spent
+   on 2026-09-03. Run the row; the row is the probe. Also
    row C alone spends a turn of tool calls where every call is one. Take C, E, F and H on a fresh
    quota *before* anything else Gemini, or the run will reach them empty again — which is how they
    were spent today. Their reds now name the account by sentence, except row E, which cannot.
-3. **Kimi Code's context meter** — an owner's decision, unchanged: `usage_update` arrives after
-   `session/prompt` returns, and where usage lives for a provider that reports it out of band is the
-   question.
-4. **MiMoCode** — the account, checked three times.
+3. ~~**Kimi Code's context meter**~~ **closed.** It was never a question about where usage should
+   live: `noteTurnEnded` is the seam for it, Grok's sink and Qwen's already use it, and this
+   provider's had never implemented it. 12/12 and 7/7 live.
+4. **MiMoCode** — the account, now checked **four** times: on 2026-09-03 `mimo acp` again answered
+   `initialize` and `session/new` in full and returned `end_turn` with `totalTokens: 0` and no
+   assistant chunk.
 5. **The vault matrix** — the owner's eyes, unchanged: the drawn session-restart notice on six
    providers, row 4, and the plan approval's three answers.
+
+**Kimi Code is the third provider whose automated half is fully green on this machine**, after
+Antigravity and — on their own last runs — Codex, Claude, OpenCode and Grok. What is left red
+anywhere is Gemini's row 15 (upstream), Qwen's and Gemini's row 5 (their CLIs send no such number),
+Gemini's four projection rows (quota) and MiMoCode (account).
 
 **One thing found on the way that is nobody's milestone**: `scripts/run-jest.js` gives every jest
 worker the same `--localstorage-file`, and node's `localStorage` is SQLite, so workers contend for

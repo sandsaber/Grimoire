@@ -197,9 +197,11 @@ describe('live smoke matrix records', () => {
       // **Run with an account at last**, on 2026-08-30: eleven of twelve rows,
       // three of them red for reasons that were the rows' own and one for a
       // product defect it found — the session-restart notice this fork never
-      // wired. Re-run on 2026-08-31 under the shared ACP filesystem change:
-      // eleven of twelve again, the same row red for the same owner's question.
-      'kimicode-flip-smoke-matrix.md: 2026-08-31',
+      // wired. **Twelve of twelve on 2026-09-03**: row 5's context window was
+      // not an owner's question about where usage lives but a seam this
+      // provider's result sink had never been given — `noteTurnEnded`, which
+      // Grok's and Qwen's have.
+      'kimicode-flip-smoke-matrix.md: 2026-09-03',
       // Run, and mostly red — for a reason the matrix states rather than the
       // flip: that account cannot generate. A date here is "when did this last
       // run", not "did it pass".
