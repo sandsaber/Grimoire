@@ -39,8 +39,11 @@ const live = process.env.GRIMOIRE_GEMINI_LIVE === '1' ? describe : describe.skip
 live('Gemini CLI chat projection live smoke', () => {
   // Twice every sibling's, for the reason its provider matrix carries: on
   // 2026-08-31 a single `Reply with exactly: OK` took the whole 300 seconds, and
-  // that is this CLI's own retry backoff rather than a hung process.
-  jest.setTimeout(600_000);
+  // that is this CLI's own retry backoff rather than a hung process. Measured
+  // again at the wire on 2026-09-03: 339 seconds for the same prompt. Ten
+  // minutes covers a one-turn row at that pace and **not** rows C and H, which
+  // spend two turns each — so the bound is three times a sibling's, not twice.
+  jest.setTimeout(1_800_000);
 
   const CONVERSATION_ID = 'conv-gemini-projection';
   const running: Array<() => Promise<void>> = [];
@@ -81,7 +84,7 @@ live('Gemini CLI chat projection live smoke', () => {
      * as an error chunk, so a row that read only the chunks saw a turn fail with
      * nothing said — which is what a quota refusal looked like on 2026-08-31.
      */
-    failures: readonly string[] = [],
+    failures: readonly string[],
   ): void {
     const failure = chunks.find((chunk): chunk is { type: 'error'; content: string } => (
       chunk.type === 'error'
@@ -276,9 +279,14 @@ live('Gemini CLI chat projection live smoke', () => {
     // Bounded, and the bound is the point: before the coordinator attached a
     // presenter, a turn that asked simply stopped, and a suite timeout reports
     // that as "the test took too long" rather than as nobody answering.
+    // **The bound has to sit above this CLI's own backoff, not below it.** Every
+    // sibling waits 120 seconds; a Gemini turn was measured at 300 on 2026-08-31
+    // and 339 on 2026-09-03, so the sibling's bound would report "nobody
+    // answered" about a turn that was still being retried — the same mistake the
+    // wire recorder made, in the same week, on the same CLI.
     const ended = await Promise.race([
       submitted.ticket.completion.then(() => 'ended' as const),
-      new Promise<'waiting'>(resolve => { setTimeout(() => resolve('waiting'), 120_000); }),
+      new Promise<'waiting'>(resolve => { setTimeout(() => resolve('waiting'), 480_000); }),
     ]);
     await tab.settled();
 
@@ -287,7 +295,7 @@ live('Gemini CLI chat projection live smoke', () => {
         ? `${chunk.type}:${String(chunk.content).slice(0, 200)}`
         : chunk.type
     ))));
-    refuseVendorOutage(column.chunks);
+    refuseVendorOutage(column.chunks, column.failures);
     expect(ended).toBe('ended');
     // Matrix row 9, over ACP's own permission channel rather than an SDK
     // callback — the same seam, the transport five more providers share.
@@ -359,7 +367,7 @@ live('Gemini CLI chat projection live smoke', () => {
           ? `${chunk.type}:${String(chunk.content).slice(0, 200)}`
           : chunk.type
       ))));
-    refuseVendorOutage(column.chunks);
+    refuseVendorOutage(column.chunks, column.failures);
     expect(completed.terminal.kind).toBe('succeeded');
     expect(column.drawn.join('').toLowerCase()).toContain('tomato');
     // Still the one session, not a second: an agent that answered from a fresh
@@ -378,6 +386,7 @@ live('Gemini CLI chat projection live smoke', () => {
   // **Each of these spends a turn**, and this account answers about one per day.
   const surfaceRows = chatProjectionSurfaceRows({
     createHarness: async () => (await createHarness()).harness,
+    refuseVendorOutage,
     report,
   });
 

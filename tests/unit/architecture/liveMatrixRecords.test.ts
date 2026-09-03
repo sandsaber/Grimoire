@@ -175,9 +175,12 @@ describe('live smoke matrix records', () => {
       'antigravity-flip-smoke-matrix.md: 2026-08-31',
       // Not a provider's matrix: one surface across all nine, each flipped and
       // recorded separately. The driven half only — the rows a person has to
-      // watch in a vault are outstanding under the standing override. Gemini's
-      // row 5 closed it on 2026-08-31, on the last turn its quota had.
-      'chat-projection-flip-smoke-matrix.md: 2026-08-31',
+      // watch in a vault are outstanding under the standing override. On
+      // 2026-09-03 Gemini's rows E, F and H ran for the first time and found the
+      // hole this file cannot see: they reported an assertion about the
+      // projection for an account that had run out of quota, because the four
+      // shared rows never called their provider's `refuseVendorOutage`.
+      'chat-projection-flip-smoke-matrix.md: 2026-09-03',
       // Both re-run on 2026-08-31 after ten days in which the seam they drive was
       // deleted underneath them: ten of ten and eight of eight, nothing to change.
       'claude-flip-smoke-matrix.md: 2026-08-31',

@@ -70,13 +70,28 @@ live('Qwen Code chat projection live smoke', () => {
    *
    * It still fails. An unavailable vendor is not a certified row.
    */
-  function refuseVendorOutage(chunks: readonly { type: string }[]): void {
-    const failure = chunks.find((chunk): chunk is { type: 'error'; content: string } => (
+  function refuseVendorOutage(
+    chunks: readonly { type: string }[],
+    /**
+     * What the surface drew for a turn that failed.
+     *
+     * A refused turn reaches this path through `renderTurnFailure` rather than
+     * as an error chunk, so a guard given only the chunks sees a turn fail with
+     * nothing said. Found on Gemini on 2026-08-31 and fixed there alone; the
+     * same path serves every provider here, and on 2026-09-03 the four shared
+     * rows cost a run by reporting an account outage as an assertion about the
+     * projection.
+     */
+    failures: readonly string[],
+  ): void {
+    const chunkFailure = chunks.find((chunk): chunk is { type: 'error'; content: string } => (
       chunk.type === 'error'
     ));
-    if (failure && /unavailable|service failure|upstream/i.test(failure.content)) {
+    const failure = [chunkFailure?.content, ...failures]
+      .find((content): content is string => content !== undefined);
+    if (failure && /unavailable|service failure|upstream/i.test(failure)) {
       throw new Error(
-        `Qwen Code could not serve this row: ${failure.content} `
+        `Qwen Code could not serve this row: ${failure} `
         + 'This is the vendor, not the projection path — rerun it.',
       );
     }
@@ -184,7 +199,7 @@ live('Qwen Code chat projection live smoke', () => {
       JSON.stringify(column.chunks.map(chunk => chunk.type)),
       JSON.stringify(column.drawn.join('').slice(0, 160)),
     );
-    refuseVendorOutage(column.chunks);
+    refuseVendorOutage(column.chunks, column.failures);
     expect(completed.terminal.kind).toBe('succeeded');
     expect(column.chunks.filter(chunk => chunk.type === 'error')).toHaveLength(0);
     expect(column.drawn.join('').trim()).not.toBe('');
@@ -271,7 +286,7 @@ live('Qwen Code chat projection live smoke', () => {
         ? `${chunk.type}:${String(chunk.content).slice(0, 200)}`
         : chunk.type
     ))));
-    refuseVendorOutage(column.chunks);
+    refuseVendorOutage(column.chunks, column.failures);
     expect(ended).toBe('ended');
     // Matrix row 9, over ACP's own permission channel rather than an SDK
     // callback — the same seam, the transport five more providers share.
@@ -341,7 +356,7 @@ live('Qwen Code chat projection live smoke', () => {
           ? `${chunk.type}:${String(chunk.content).slice(0, 200)}`
           : chunk.type
       ))));
-    refuseVendorOutage(column.chunks);
+    refuseVendorOutage(column.chunks, column.failures);
     expect(completed.terminal.kind).toBe('succeeded');
     expect(column.drawn.join('').toLowerCase()).toContain('tomato');
     // Still the one session, not a second: an agent that answered from a fresh
@@ -362,6 +377,7 @@ live('Qwen Code chat projection live smoke', () => {
   // here and is red there, on the same shared body.
   const surfaceRows = chatProjectionSurfaceRows({
     createHarness: async () => (await createHarness()).harness,
+    refuseVendorOutage,
     report,
   });
 

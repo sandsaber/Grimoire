@@ -36,6 +36,21 @@ export interface ChatProjectionSurfaceRowOptions {
    * over before `detach` is reached, and the row would certify nothing.
    */
   readonly slowPrompt?: string;
+  /**
+   * The provider's own check that a red row is the vendor rather than this path.
+   *
+   * Every provider file has one and only its own rows called it, so a run these
+   * four rows were in could report an assertion about the projection when what
+   * had actually happened was an account running out. That is what Gemini's run
+   * of 2026-09-03 did on all four: the quota went mid-run, rows E, F and H drew
+   * nothing at all, and the output named no reason. **A refusal arrives through
+   * `renderTurnFailure`, not as an error chunk**, so the failures have to be
+   * handed over beside the chunks — a guard given only the chunks sees nothing.
+   */
+  refuseVendorOutage?(
+    chunks: readonly { type: string }[],
+    failures: readonly string[],
+  ): void;
 }
 
 export interface ChatProjectionSurfaceRows {
@@ -76,6 +91,14 @@ export function chatProjectionSurfaceRows(
 
       options.report('ROW E', completed.terminal.kind, JSON.stringify(conversationId),
         JSON.stringify(harness.column.finished));
+      // **This is the one row where the guard can find nothing, and the reason
+      // is the row itself**: the tab was detached before the turn ended, so
+      // nothing drew the failure — which is exactly what the row asserts two
+      // lines down. A refusal's words are consumed by `describeFailure` when
+      // something renders them, and here nothing does. Proven on 2026-09-03: an
+      // exhausted Gemini account was named by rows B, C, F and H and was silent
+      // here. A red row E whose siblings name an outage is that outage.
+      options.refuseVendorOutage?.(harness.column.chunks, harness.column.failures);
       expect(completed.terminal.kind).toBe('succeeded');
       // **Nobody drew the ending**, which is what stops this row passing for the
       // ordinary reason: the tab was detached before the turn reached one, so
@@ -121,6 +144,7 @@ export function chatProjectionSurfaceRows(
         JSON.stringify(harness.column.drawn.join('').slice(0, 60)),
         JSON.stringify(second.column.drawn.join('').slice(0, 60)),
       );
+      options.refuseVendorOutage?.(harness.column.chunks, harness.column.failures);
       expect(completed.terminal.kind).toBe('succeeded');
       // Both columns were told the same turn ended, once each.
       expect(harness.column.finished).toHaveLength(1);
@@ -158,6 +182,7 @@ export function chatProjectionSurfaceRows(
       await harness.tab.settled();
 
       options.report('ROW G', JSON.stringify(harness.column.state.usage));
+      options.refuseVendorOutage?.(harness.column.chunks, harness.column.failures);
       const usage = harness.column.state.usage;
       expect(usage).not.toBeNull();
       // A number the meter can draw, rather than a shape that merely exists.
@@ -196,6 +221,7 @@ export function chatProjectionSurfaceRows(
       const atRelease = await harness.sessions.records.read(conversationId);
       const released = atRelease.kind === 'present' ? atRelease.metadata.messages ?? [] : [];
       options.report('ROW H at release', JSON.stringify(released.map(message => message.role)));
+      options.refuseVendorOutage?.(harness.column.chunks, harness.column.failures);
       expect(released.filter(message => message.role === 'assistant').length)
         .toBeGreaterThanOrEqual(1);
       expect(released.find(message => message.role === 'assistant')?.content.trim()).not.toBe('');

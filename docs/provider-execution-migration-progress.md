@@ -8327,6 +8327,53 @@ chased.
 
 Gates: unit 566 suites / 8,974 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
 
+### The rows that had never run found a guard nobody had called (this commit)
+
+**Gemini's four outstanding projection rows were taken, and two of them are green.** Row A and row B
+each on a real turn: one answer drawn once and stored as `["user","assistant"]`, and a permission
+asked exactly once — `printf yes > allowed-projection.txt` — answered, with the file on disk to prove
+the turn continued. Rows C, E, F and H are not, and the reason is the account.
+
+**The free tier is twenty requests a day on `gemini-3.5-flash`, and a row is not a request.** Row C
+spends a turn of tool calls and every call is its own request, so the quota went in the middle of the
+run rather than at the end of it. That much is the account and was always going to happen on some
+run.
+
+**What is not the account is what the rows then said.** Rows E, F and H — running for the first time
+ever on this provider — drew nothing at all and reported `expected "succeeded", received "failed"`.
+An assertion about the projection path, for an account that had run out. `refuseVendorOutage` exists
+in six provider files precisely so that cannot happen, and it could not fire in any of the three:
+**the four shared rows never called it.** Their bodies live in `chatProjectionSurfaceRows.ts` and
+took a harness and a reporter, and nothing else.
+
+**And the guard the five siblings had was half-blind anyway.** On 2026-08-31 Gemini's own guard learnt
+that a refused turn reaches this path through `renderTurnFailure` rather than as an error chunk — a
+guard reading only the chunks sees a turn fail with nothing said. That fix went into Gemini's file and
+stopped there. OpenCode's, Grok's, Qwen's, Kimi Code's and MiMoCode's still read the chunks alone, and
+seventeen of the eighteen call sites across all six files passed the chunks only. A guard over a
+subset reads exactly like a guard over everything.
+
+So the guard is a shared-row option now, each provider hands its own in, `failures` is a **required**
+parameter rather than a defaulted one — a call site that forgets it should not compile — and all
+seventeen call sites pass it.
+
+**Proven by re-running against the exhausted account, which costs nothing.** Rows B, C, F and H name
+it: *"Gemini CLI could not serve this row: You have exhausted your daily quota on this model. This is
+the account or the vendor, not the projection path — rerun it."* **Row E is silent, and always will
+be**: it detaches the tab before the turn ends, so nothing draws the failure and the refusal's words
+are consumed unrendered — which is precisely what the row asserts two lines further down. That limit
+is written into the row rather than worked around.
+
+**Two bounds were raised before the run, and neither of them mattered.** This CLI's turn was measured
+at 300 seconds on 2026-08-31 and 339 at the wire this morning, while rows C and H spend two turns
+each against a ten-minute suite bound, and row B raced a 120-second timer that would have reported
+"nobody answered" about a turn still being retried. Both were raised — the suite to thirty minutes,
+row B's race to eight. Today's turns then came back in seconds and the whole file ran in 102. The
+measurement stands and so do the bounds; a raised bound cannot produce a false pass, only spare a
+false red, which is worth a day's quota.
+
+Gates: unit 566 suites / 8,974 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -8340,18 +8387,24 @@ Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #10
 step. Full gate green: unit 8974 / 8974 across 566 suites, integration 161, `tsc`, `lint`,
 `build:release`. The build is installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
 
-**One commit, and it closed the first item on the previous pointer — but not before that item
-found the recorder writing a claim it could not observe.**
+**Two commits, and both of them are the same shape: the first two items on the previous pointer were
+taken, and each one found a harness reporting something it had not observed.**
 
-Gemini's wire recording is retaken against `gemini 0.57.0` and is `complete`. The first take was
-`partial` and blamed the account; the turn was simply still running when the recorder stopped waiting
-after thirty seconds. Given ten minutes it answered in **339**. Nothing on this transport changed
-between `0.55.1` and `0.57.0` — same capabilities, auth methods, model catalogue, session-update
-kinds, and usage still only in `_meta.quota` on the prompt result, which is what the provider
-matrix's row 5 rests on.
+1. **Gemini's wire recording is retaken against `gemini 0.57.0` and is `complete`.** The first take
+   was `partial` and blamed the account; the turn was simply still running when the recorder stopped
+   waiting after thirty seconds. Given ten minutes it answered in **339**. Nothing on this transport
+   changed between `0.55.1` and `0.57.0` — same capabilities, auth methods, model catalogue,
+   session-update kinds, and usage still only in `_meta.quota` on the prompt result, which is what
+   the provider matrix's row 5 rests on.
+2. **Gemini's projection rows A and B are green on real turns**, and rows C, E, F and H are not: the
+   free tier is twenty requests a day on `gemini-3.5-flash`, row C spends a turn of tool calls and
+   each call is a request, so the quota went mid-run. E, F and H ran for the **first time ever** and
+   reported an assertion about the projection for an account that had run out — because the four
+   shared rows never called `refuseVendorOutage`, and five of the six providers' guards could not
+   have seen the refusal anyway. Fixed and proven against the exhausted account.
 
-Where every provider stands, live, on this machine — unchanged from 2026-08-31 except that Gemini's
-recording is now against the version this machine runs:
+Where every provider stands, live, on this machine — unchanged from 2026-08-31 except Gemini, whose
+recording is now against the version this machine runs and whose projection took two more rows:
 
 | Provider | Provider matrix | Projection | The red, if any |
 |---|---|---|---|
@@ -8362,7 +8415,7 @@ recording is now against the version this machine runs:
 | Grok `1.0.5` | 13/13 | 7/7 (2026-08-30) | — |
 | Qwen `qwen-code 0.22.3` | 15/16 | 7/7 (2026-08-30) | row 5, the CLI's `{used, size}` |
 | Kimi Code `kimi 0.39.1` | 11/12 | 6/7 (2026-08-30) | row 5, usage after the prompt returns |
-| Gemini `0.57.0` | 8/12 | 3/3 of what a turn could reach | quota, and row 15 upstream |
+| Gemini `0.57.0` | 8/12 | 2/6 today (A, B); C, E, F, H are the quota | quota, and row 15 upstream |
 | MiMoCode `mimo` | 0/7 | 0/7 | the account cannot generate |
 
 **What the next session starts with, shortest first.** The list is the previous pointer's with its
@@ -8372,9 +8425,11 @@ first item struck:
    deferred over is gone: the recorder no longer overwrites a whole recording with a thin one on a
    clock. It still rewrites the fixture in place, so copying the file aside first remains the
    procedure.
-2. **Gemini's remaining rows** — projection B, C, E, F, H and provider 16, a turn each; provider 15
-   waits on the CLI itself. **Budget them at five minutes a turn rather than one**: that is what this
-   session measured, and it is why a ten-minute row timeout was not generous.
+2. **Gemini's remaining rows** — projection C, E, F and H, and provider 16; provider 15 waits on the
+   CLI itself. **The budget that matters is requests, not minutes**: twenty a day on this model, and
+   row C alone spends a turn of tool calls where every call is one. Take C, E, F and H on a fresh
+   quota *before* anything else Gemini, or the run will reach them empty again — which is how they
+   were spent today. Their reds now name the account by sentence, except row E, which cannot.
 3. **Kimi Code's context meter** — an owner's decision, unchanged: `usage_update` arrives after
    `session/prompt` returns, and where usage lives for a provider that reports it out of band is the
    question.
@@ -8408,7 +8463,7 @@ second:
 | Grok `1.0.5` | 13/13 | 7/7 (2026-08-30) | — |
 | Qwen `qwen-code 0.22.3` | 15/16 | 7/7 (2026-08-30) | row 5, the CLI's `{used, size}` |
 | Kimi Code `kimi 0.39.1` | 11/12 | 6/7 (2026-08-30) | row 5, usage after the prompt returns |
-| Gemini `0.57.0` | 8/12 | 3/3 of what a turn could reach | quota, and row 15 upstream |
+| Gemini `0.57.0` | 8/12 | 2/6 today (A, B); C, E, F, H are the quota | quota, and row 15 upstream |
 | MiMoCode `mimo` | 0/7 | 0/7 | the account cannot generate |
 
 **The day closed all four things the previous pointer left, and one it did not know about.**
