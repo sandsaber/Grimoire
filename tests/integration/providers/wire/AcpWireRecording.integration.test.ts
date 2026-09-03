@@ -17,7 +17,10 @@ import { recordAcpWire } from '@test/helpers/recordAcpWire';
 const record = process.env.GRIMOIRE_WIRE_RECORD === '1' ? describe : describe.skip;
 
 record('ACP wire recordings', () => {
-  jest.setTimeout(180_000);
+  // A row is one handshake plus one turn, and the turn's own bound is ten
+  // minutes: a Gemini turn has really taken five, and a run that cut one off
+  // wrote down that the account could not generate.
+  jest.setTimeout(900_000);
 
   it('records what MiMoCode answers', async () => {
     const recording = await recordAcpWire({

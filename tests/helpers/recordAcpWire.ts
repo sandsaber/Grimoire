@@ -24,7 +24,37 @@ export interface AcpWireRecordingOptions {
   readonly args: readonly string[];
   /** How the transport reads in the fixture, for whoever opens it later. */
   readonly transport: string;
+  /** Where the recording lands. Defaults to the provider's checked-in fixture. */
+  readonly fixturePath?: string;
+  /** Overridden by tests, which drive a CLI that answers immediately. */
+  readonly timings?: Partial<AcpWireRecordingTimings>;
 }
+
+/** How long the recorder waits at each step of the exchange. */
+export interface AcpWireRecordingTimings {
+  /** After `initialize`, before opening a session. */
+  readonly handshakeMs: number;
+  /** After `session/new`, which is when a CLI pushes its command list. */
+  readonly sessionMs: number;
+  /** After `session/set_config_option`. */
+  readonly configMs: number;
+  /** The longest a turn is given to answer before the recorder stops waiting. */
+  readonly turnMs: number;
+  /** After the turn's own result, for whatever trails it. */
+  readonly graceMs: number;
+}
+
+const DEFAULT_TIMINGS: AcpWireRecordingTimings = {
+  handshakeMs: 3_000,
+  sessionMs: 6_000,
+  configMs: 2_000,
+  // A turn is bounded, not slept through: five minutes is a length Gemini has
+  // really taken, and the matrices moved to ten for it.
+  turnMs: 600_000,
+  // Kimi Code sends its `usage_update` after `session/prompt` returns, so
+  // stopping at the result would drop the one frame that row is about.
+  graceMs: 5_000,
+};
 
 /** One line on the wire, in the shape every recording already uses. */
 interface Exchange {
@@ -72,6 +102,33 @@ function settle(milliseconds: number): Promise<void> {
   });
 }
 
+/** How often the recorder looks for an answer it is waiting on. */
+const POLL_MS = 100;
+
+/**
+ * Waits for the agent's answer to one request, and says whether it arrived.
+ *
+ * A flat sleep was both too long and too short: it overpaid for a turn that
+ * answered in fifteen seconds and cut off one that took five minutes — and
+ * what it then wrote down about the turn it had cut off was that the account
+ * could not generate. Whether the answer came is the recording's own evidence
+ * for which of those two it is looking at.
+ */
+async function awaitResponse(
+  exchanges: readonly Exchange[],
+  id: number,
+  capMs: number,
+): Promise<boolean> {
+  const deadline = Date.now() + capMs;
+  const arrived = (): boolean => exchanges.some(
+    exchange => exchange.direction === 'server->client' && exchange.message.id === id,
+  );
+  while (!arrived() && Date.now() < deadline) {
+    await settle(Math.min(POLL_MS, Math.max(0, deadline - Date.now())));
+  }
+  return arrived();
+}
+
 /**
  * Drives the CLI through a handshake and a turn, and writes what it answered.
  *
@@ -81,6 +138,7 @@ function settle(milliseconds: number): Promise<void> {
 export async function recordAcpWire(
   options: AcpWireRecordingOptions,
 ): Promise<Record<string, unknown>> {
+  const timings = { ...DEFAULT_TIMINGS, ...options.timings };
   const vault = mkdtempSync(join(tmpdir(), `grimoire-${options.providerId}-wire-`));
   mkdirSync(vault, { recursive: true });
   writeFileSync(join(vault, 'Note.md'), '# Note\n\nThe vault has one note in it.\n');
@@ -129,9 +187,9 @@ export async function recordAcpWire(
       clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } },
     },
   });
-  await settle(3_000);
+  await settle(timings.handshakeMs);
   send({ jsonrpc: '2.0', id: 2, method: 'session/new', params: { cwd: vault, mcpServers: [] } });
-  await settle(6_000);
+  await settle(timings.sessionMs);
 
   const sessionId = exchanges
     .map(({ message }) => (message.result as { sessionId?: unknown } | undefined)?.sessionId)
@@ -154,8 +212,9 @@ export async function recordAcpWire(
       method: 'session/set_config_option',
       params: { sessionId, configId: configOption.id, value: configOption.currentValue },
     });
-    await settle(2_000);
+    await settle(timings.configMs);
   }
+  let turnReturned = false;
   if (sessionId) {
     send({
       jsonrpc: '2.0',
@@ -166,7 +225,8 @@ export async function recordAcpWire(
         prompt: [{ type: 'text', text: 'Reply with exactly: ok' }],
       },
     });
-    await settle(30_000);
+    turnReturned = await awaitResponse(exchanges, 4, timings.turnMs);
+    await settle(timings.graceMs);
   }
 
   child.stdin.end();
@@ -230,20 +290,34 @@ export async function recordAcpWire(
     exchange: exchanges,
   };
   if (!answered) {
-    recording.limitations = [
-      // The turn's own outcome, not any error the recording happens to contain:
-      // a refused handshake and a turn that returned empty are different
-      // limitations, and reporting the first for the second misdescribes what
-      // was captured.
-      sessionId
-        ? 'The turn returned without assistant content: this account cannot generate.'
-        : `The CLI refused to open a session: "${refusal ?? 'no reason given'}". `
-          + 'That is a real shape a flip meets.',
-      'The handshake is evidence; the prompt traffic still needs an account that generates.',
-    ];
+    // The turn's own outcome, not any error the recording happens to contain:
+    // a refused handshake, a turn that came back empty, and a turn still
+    // running when the recorder gave up are three different limitations, and
+    // reporting any of them for another misdescribes what was captured. The
+    // third is the one this file used to get wrong, and it is the one nobody
+    // reading the fixture later could have checked.
+    if (!sessionId) {
+      recording.limitations = [
+        `The CLI refused to open a session: "${refusal ?? 'no reason given'}". `
+        + 'That is a real shape a flip meets.',
+        'The handshake is evidence; the prompt traffic still needs an account that generates.',
+      ];
+    } else if (turnReturned) {
+      recording.limitations = [
+        'The turn returned without assistant content: this account cannot generate.',
+        'The handshake is evidence; the prompt traffic still needs an account that generates.',
+      ];
+    } else {
+      recording.limitations = [
+        'The turn had not answered when the recorder stopped waiting, after '
+        + `${Math.round(timings.turnMs / 1_000)} seconds. `
+        + 'What the prompt would have produced is unrecorded, and unknown.',
+        'The handshake is evidence; the turn needs a longer wait than this recording gave it.',
+      ];
+    }
   }
 
-  const fixture = resolve(
+  const fixture = options.fixturePath ?? resolve(
     process.cwd(),
     `tests/fixtures/provider-traces/wire/${options.providerId}-wire.json`,
   );

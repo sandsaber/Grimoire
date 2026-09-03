@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "providerId": "gemini",
   "kind": "wire-recording",
-  "recordedAgainst": "gemini 0.55.1",
+  "recordedAgainst": "gemini 0.57.0",
   "transport": "stdio JSON-RPC 2.0 (`gemini --acp`)",
   "coverage": "complete",
   "cases": [
@@ -82,7 +82,7 @@
           "agentInfo": {
             "name": "gemini-cli",
             "title": "Gemini CLI",
-            "version": "0.55.1"
+            "version": "0.57.0"
           },
           "agentCapabilities": {
             "loadSession": true,
@@ -107,7 +107,7 @@
         "id": 2,
         "method": "session/new",
         "params": {
-          "cwd": "/tmp/grimoire-gemini-wire-OImArI",
+          "cwd": "/tmp/grimoire-gemini-wire-3xjtwH",
           "mcpServers": []
         }
       }
@@ -119,7 +119,7 @@
         "jsonrpc": "2.0",
         "id": 2,
         "result": {
-          "sessionId": "480a790b-0ed2-423a-9ff1-fda99be6fb62",
+          "sessionId": "259c0539-a434-4d71-9e5c-525e8b42fd3b",
           "modes": {
             "availableModes": [
               {
@@ -185,7 +185,7 @@
         "jsonrpc": "2.0",
         "method": "session/update",
         "params": {
-          "sessionId": "480a790b-0ed2-423a-9ff1-fda99be6fb62",
+          "sessionId": "259c0539-a434-4d71-9e5c-525e8b42fd3b",
           "update": {
             "sessionUpdate": "available_commands_update",
             "availableCommands": [
@@ -282,7 +282,7 @@
         "id": 4,
         "method": "session/prompt",
         "params": {
-          "sessionId": "480a790b-0ed2-423a-9ff1-fda99be6fb62",
+          "sessionId": "259c0539-a434-4d71-9e5c-525e8b42fd3b",
           "prompt": [
             {
               "type": "text",
@@ -299,12 +299,12 @@
         "jsonrpc": "2.0",
         "method": "session/update",
         "params": {
-          "sessionId": "480a790b-0ed2-423a-9ff1-fda99be6fb62",
+          "sessionId": "259c0539-a434-4d71-9e5c-525e8b42fd3b",
           "update": {
             "sessionUpdate": "agent_thought_chunk",
             "content": {
               "type": "text",
-              "text": "**Confirming My Approach**\nI've got it, my primary focus is to confirm my initial approach. I am now aware that I need to call `update_topic` immediately. I've also noted the crucial caveat … (elided)"
+              "text": "**Analyzing Instructions**\nI'm currently dissecting the prompt. I see a command for a short \"ok\" response, but I'm checking for any conflicting or additional requirements. Specifically, I'm … (elided)"
             }
           }
         }
@@ -317,12 +317,12 @@
         "jsonrpc": "2.0",
         "method": "session/update",
         "params": {
-          "sessionId": "480a790b-0ed2-423a-9ff1-fda99be6fb62",
+          "sessionId": "259c0539-a434-4d71-9e5c-525e8b42fd3b",
           "update": {
             "sessionUpdate": "agent_thought_chunk",
             "content": {
               "type": "text",
-              "text": "**Clarifying Initial Response**\nI'm now wrestling with the conflict: \"Always call `update_topic` in your first turn\" versus \"NEVER use it for simple tasks.\" This is a tricky edge case. I'm l… (elided)"
+              "text": "**Reconciling Contradictions**\nI've hit a potential snag. The instructions explicitly say to always call `update_topic` initially, *except* for simple tasks. The user's prompt is a very simp… (elided)"
             }
           }
         }
@@ -335,25 +335,7 @@
         "jsonrpc": "2.0",
         "method": "session/update",
         "params": {
-          "sessionId": "480a790b-0ed2-423a-9ff1-fda99be6fb62",
-          "update": {
-            "sessionUpdate": "agent_thought_chunk",
-            "content": {
-              "type": "text",
-              "text": "**Refining Usage Criteria**\nI've re-examined the exception rule again and it's clear: calling `update_topic` here would be wrong as this is an isolated task and the rule states to NEVER use … (elided)"
-            }
-          }
-        }
-      }
-    },
-    {
-      "seq": 10,
-      "direction": "server->client",
-      "message": {
-        "jsonrpc": "2.0",
-        "method": "session/update",
-        "params": {
-          "sessionId": "480a790b-0ed2-423a-9ff1-fda99be6fb62",
+          "sessionId": "259c0539-a434-4d71-9e5c-525e8b42fd3b",
           "update": {
             "sessionUpdate": "agent_message_chunk",
             "content": {
@@ -365,7 +347,7 @@
       }
     },
     {
-      "seq": 11,
+      "seq": 10,
       "direction": "server->client",
       "message": {
         "jsonrpc": "2.0",
@@ -375,14 +357,14 @@
           "_meta": {
             "quota": {
               "token_count": {
-                "input_tokens": 16570,
+                "input_tokens": 16571,
                 "output_tokens": 1
               },
               "model_usage": [
                 {
                   "model": "gemini-3.5-flash",
                   "token_count": {
-                    "input_tokens": 16570,
+                    "input_tokens": 16571,
                     "output_tokens": 1
                   }
                 }

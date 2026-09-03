@@ -8272,12 +8272,120 @@ text. That is now what the matrix's row 3 says, instead of implying the two writ
 
 Gates: unit 535 suites / 8,438 tests, integration 5 / 156, typecheck, `eslint`, `build:release`.
 
+### The recorder called a slow turn a dead account (this commit)
+
+**The Gemini wire recording was the first thing on the pointer, and the first take of it wrote a
+falsehood into the fixture.** It came back `coverage: partial` and said why: *"The turn returned
+without assistant content: this account cannot generate."* The capture underneath that sentence holds
+no frame at all after `session/prompt` — no result, no error, not a chunk. `recordAcpWire` slept a
+flat thirty seconds and walked away while the turn was still running, and then wrote down, as the
+fixture's own account of itself, a fact it had no way to observe. A recording is read later by
+someone who was not there; that is the whole reason it is taken.
+
+**Retaken with a bounded wait, the same account answered the same prompt.** `complete`, against
+`gemini 0.57.0`, three session-update kinds, `stopReason: end_turn`. The turn took **339 seconds** —
+five and a half minutes for *Reply with exactly: ok*. Thirty seconds could never have seen it, and
+nothing in a thirty-second window can tell a slow turn from a dead one.
+
+**So the wait is on the turn's own answer now, not on a clock.** The recorder waits for the response
+to `session/prompt`, bounded at ten minutes — the length the live matrices moved to on this same
+evidence, after a Gemini turn really took five — and settles five seconds past it, because Kimi
+Code's `usage_update` arrives *after* the result and stopping at the result would drop the one frame
+that row is about. A turn that answers ends the wait rather than being slept through: the new file's
+own rows dropped from 23 seconds to 8.7.
+
+**And a turn has three outcomes, which the fixture now keeps apart**: a CLI that refused to open a
+session, a turn that came back empty, and a turn that had not answered when the recorder gave up.
+Only the middle one is an account that cannot generate. The third says how long it waited and that
+what the prompt would have produced is unknown.
+
+**None of that classification had ever been under test.** The only test above the recorder is gated
+off behind `GRIMOIRE_WIRE_RECORD=1`, because taking a recording spends a real account's turn, and it
+asserts that *something* came back. Five rows drive the real recorder against a fake ACP CLI that
+answers, returns empty, or stops dead on demand — two of them failed before this fix, and they are
+the two sentences above.
+
+**Every checked-in fixture was then read for that sentence, and one carries it.** `mimocode-wire.json`
+says the account cannot generate, and it earns it: the recording holds the response to id 4, with
+`stopReason: end_turn` and `totalTokens: 0`. The turn returned. The new classification writes exactly
+the same thing there, which is the check that this change separated two cases rather than renaming
+one.
+
+**What the retake itself bought is a negative, and it is worth having.** Nothing on this transport
+moved between `0.55.1` and `0.57.0`: the same `agentCapabilities`, the same four auth methods, the
+same six models with the same current one, the same three session-update kinds, and usage still
+reported nowhere but `_meta.quota` on the prompt result. That last is the whole evidence behind the
+provider matrix's row 5 reading as this CLI's shape rather than as a defect of ours, and it is now
+taken against the version this machine runs.
+
+**One integration run failed once, and did not fail again.** `database is locked` at suite load,
+attributed to `clearMocksOnScope`. Twelve runs after it passed — six with the new suite present and
+six with it moved out of the tree. `scripts/run-jest.js` hands every worker the same
+`--localstorage-file`, and node's `localStorage` is SQLite: workers contend for one database file.
+That is a flake in the harness rather than in anything here, and it is written down rather than
+chased.
+
+Gates: unit 566 suites / 8,974 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
 overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #107), at the M6 gate.
+
+### Where the session of 2026-09-03 ended
+
+**Everything is committed and pushed.** HEAD on `providers-migration`, working tree clean, remote in
+step. Full gate green: unit 8974 / 8974 across 566 suites, integration 161, `tsc`, `lint`,
+`build:release`. The build is installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
+
+**One commit, and it closed the first item on the previous pointer — but not before that item
+found the recorder writing a claim it could not observe.**
+
+Gemini's wire recording is retaken against `gemini 0.57.0` and is `complete`. The first take was
+`partial` and blamed the account; the turn was simply still running when the recorder stopped waiting
+after thirty seconds. Given ten minutes it answered in **339**. Nothing on this transport changed
+between `0.55.1` and `0.57.0` — same capabilities, auth methods, model catalogue, session-update
+kinds, and usage still only in `_meta.quota` on the prompt result, which is what the provider
+matrix's row 5 rests on.
+
+Where every provider stands, live, on this machine — unchanged from 2026-08-31 except that Gemini's
+recording is now against the version this machine runs:
+
+| Provider | Provider matrix | Projection | The red, if any |
+|---|---|---|---|
+| Antigravity `agy 1.1.22` | 2/2 | 5/5 | — |
+| Claude `2.1.251` | 10/10 | 7/7 (2026-08-30) | — |
+| Codex `codex-cli 0.147.0` | 8/8 | 9/9 (2026-08-30) | — |
+| OpenCode `1.18.19` | 12/12 | 7/7 (2026-08-30) | — |
+| Grok `1.0.5` | 13/13 | 7/7 (2026-08-30) | — |
+| Qwen `qwen-code 0.22.3` | 15/16 | 7/7 (2026-08-30) | row 5, the CLI's `{used, size}` |
+| Kimi Code `kimi 0.39.1` | 11/12 | 6/7 (2026-08-30) | row 5, usage after the prompt returns |
+| Gemini `0.57.0` | 8/12 | 3/3 of what a turn could reach | quota, and row 15 upstream |
+| MiMoCode `mimo` | 0/7 | 0/7 | the account cannot generate |
+
+**What the next session starts with, shortest first.** The list is the previous pointer's with its
+first item struck:
+
+1. ~~**Gemini's wire recording against 0.57.0**~~ **taken this session, `complete`.** The trap it was
+   deferred over is gone: the recorder no longer overwrites a whole recording with a thin one on a
+   clock. It still rewrites the fixture in place, so copying the file aside first remains the
+   procedure.
+2. **Gemini's remaining rows** — projection B, C, E, F, H and provider 16, a turn each; provider 15
+   waits on the CLI itself. **Budget them at five minutes a turn rather than one**: that is what this
+   session measured, and it is why a ten-minute row timeout was not generous.
+3. **Kimi Code's context meter** — an owner's decision, unchanged: `usage_update` arrives after
+   `session/prompt` returns, and where usage lives for a provider that reports it out of band is the
+   question.
+4. **MiMoCode** — the account, checked three times.
+5. **The vault matrix** — the owner's eyes, unchanged: the drawn session-restart notice on six
+   providers, row 4, and the plan approval's three answers.
+
+**One thing found on the way that is nobody's milestone**: `scripts/run-jest.js` gives every jest
+worker the same `--localstorage-file`, and node's `localStorage` is SQLite, so workers contend for
+one database. It surfaced once as `database is locked` at suite load and did not reproduce in twelve
+runs. Written down, not chased.
 
 ### Where the session of 2026-08-31 ended
 
