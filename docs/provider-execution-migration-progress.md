@@ -8444,6 +8444,46 @@ again. A blocker recorded as a decision is worth re-reading before it is acted o
 
 Gates: unit 566 suites / 8,975 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
 
+### "No usage on the wire at all" was reading two fields and missing the third (this commit)
+
+**Gemini's live row 5 has been recorded as this CLI's own shape since 2026-08-31**, and the reasoning
+was checkable: the recording holds three session-update kinds and none of them is usage, and the
+prompt result carries no `usage`. Both fields ACP *defines* are empty. The conclusion drawn from that
+— *"nothing to fix here; the row records the shape"* — did not follow.
+
+Every recorded Gemini prompt result, on `0.55.1` and again on the `0.57.0` recording taken this
+morning, answers with the numbers under `_meta`:
+`{"quota": {"token_count": {"input_tokens": 16571, "output_tokens": 1}, "model_usage": [...]}}`.
+
+**`AcpPromptResponse` had no `_meta` field**, so nothing in the repository could have looked for it.
+A field the protocol model does not carry is a field nobody reads, and the evidence for "the CLI
+sends nothing" was assembled by reading the two fields the model did carry. The slot is typed now —
+described but not interpreted, since what a vendor writes under its own key is that vendor's
+business — and Gemini's presenter reads its own.
+
+**The row that holds it is driven by the recording, not by a shape typed into a test.** It finds the
+prompt result in `gemini-wire.json`, feeds it to the real presenter, and asserts the badge carries
+the numbers that file holds — so a later recording that stops carrying the block turns the row red
+instead of leaving a stale constant passing. Proven by breaking: without the read it fails, with it
+it passes. The suite next door had a row called *"completes the usage with the tokens the prompt
+itself cost"* which fed the presenter a `usage` field this CLI has never sent — a test of the shared
+builder wearing Gemini's name, and part of why nobody looked.
+
+**Half of row 5 stays red and stays the CLI's**: nothing on this wire says how big the context
+window is, so what the turn spent is the only reading available, and it is published as
+`contextWindowIsAuthoritative: false` rather than dressed as a measurement. The live row cannot be
+certified today — the day's quota went to the projection matrix — so the matrix keeps it red and
+says what changed underneath it.
+
+**Grok's recording carries the same kind of block** and is not touched here: `_meta` on its prompt
+result holds `totalTokens`, `inputTokens`, `outputTokens`, `cachedReadTokens` and a reasoning count,
+while its own `usage_update` is absent from the wire entirely. Its matrix is 13/13 because its sink
+reads a cost out of the session log at `noteTurnEnded` instead. Worth knowing; not worth changing a
+green row for without a reason. Qwen's `_meta` is `qwen.branchPoint`, not usage, so its row 5 really
+is its CLI's shape.
+
+Gates: unit 566 suites / 8,976 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -8457,8 +8497,9 @@ Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #10
 step. Full gate green: unit 8974 / 8974 across 566 suites, integration 161, `tsc`, `lint`,
 `build:release`. The build is installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
 
-**Four commits. Three of the five items on the previous pointer are closed, and each one of them
-found something reporting what it had not observed.**
+**Five commits. Three of the five items on the previous pointer are closed, and every one of them
+found something reporting what it had not observed — twice, a red recorded as "the vendor's shape"
+that was ours.**
 
 1. **Gemini's wire recording is retaken against `gemini 0.57.0` and is `complete`.** The first take
    was `partial` and blamed the account; the turn was simply still running when the recorder stopped
@@ -8486,7 +8527,7 @@ recording is now against the version this machine runs and whose projection took
 | Grok `1.0.5` | 13/13 | 7/7 (2026-08-30) | — |
 | Qwen `qwen-code 0.22.3` | 15/16 | 7/7 (2026-08-30) | row 5, the CLI's `{used, size}` |
 | Kimi Code `kimi 0.39.1` | 12/12 | 7/7 | — |
-| Gemini `0.57.0` | 9/12 | 2/6 today (A, B); C, E, F, H are the quota | row 5's usage, and row 15 upstream |
+| Gemini `0.57.0` | 9/12 | 2/6 today (A, B); C, E, F, H are the quota | row 5's window, row 15 upstream |
 | MiMoCode `mimo` | 0/7 | 0/7 | the account cannot generate, asked a fourth time |
 
 **What the next session starts with, shortest first.** The list is the previous pointer's with its
@@ -8496,8 +8537,8 @@ first item struck:
    deferred over is gone: the recorder no longer overwrites a whole recording with a thin one on a
    clock. It still rewrites the fixture in place, so copying the file aside first remains the
    procedure.
-2. **Gemini's remaining rows** — projection C, E, F and H. Provider 16 is closed; provider 15 waits
-   on the CLI itself. **The budget that matters is requests, not minutes**: twenty a day per model — a
+2. **Gemini's remaining rows** — projection C, E, F and H, and provider **5**, whose tokens are read
+   now and need a turn to certify. Provider 16 is closed; provider 15 waits on the CLI itself. **The budget that matters is requests, not minutes**: twenty a day per model — a
    probe that says "exhausted on this model" is not an exhausted account, which row 16 proved by
    answering after one. **And do not probe a trickling quota**: once exhausted it comes back about a
    turn at a time, so the probe eats the turn the row was going to use — that is how row F was spent

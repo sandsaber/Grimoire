@@ -1,3 +1,5 @@
+import wireRecording from '@test/fixtures/provider-traces/wire/gemini-wire.json';
+
 import { TOOL_READ } from '@/core/tools/toolNames';
 import type {
   AcpNewSessionResponse,
@@ -171,6 +173,46 @@ describe('Gemini content presenter', () => {
         contextTokens: 4_096,
         contextWindow: 1_048_576,
         inputTokens: 3_900,
+        model: 'gemini:gemini-2.5-pro',
+      }),
+    }));
+  });
+
+  it('takes the tokens the prompt cost from the quota this CLI reports beside the answer', () => {
+    // **Driven by the recording rather than by a shape typed here.** This CLI
+    // sends no `usage_update` in a turn and no `usage` on the result, so both
+    // fields ACP defines are empty and the numbers sit under `_meta.quota` —
+    // which is why the live row about usage was recorded as "no usage on the
+    // wire at all, the CLI's shape, not a defect here". It was ours. Read out
+    // of `gemini-wire.json` so it follows the CLI: if a later recording stops
+    // carrying the block, this says so instead of passing on a stale constant.
+    const { presenter } = createPresenter();
+    // Read loosely on purpose: a JSON import is typed as the exact literal it
+    // happens to hold, and a predicate written against that describes this
+    // recording rather than the protocol.
+    const answer = (wireRecording.exchange as ReadonlyArray<{
+      direction: string;
+      message: { result?: { stopReason?: string; _meta?: unknown } };
+    }>)
+      .filter(entry => entry.direction === 'server->client')
+      .map(entry => entry.message.result)
+      .find(result => typeof result?.stopReason === 'string');
+    const counts = (answer?._meta as {
+      quota?: { token_count?: { input_tokens?: number; output_tokens?: number } };
+    } | undefined)?.quota?.token_count;
+    expect(counts?.input_tokens).toBeGreaterThan(0);
+
+    const chunks = presenter.present(promptResult(answer as unknown as AcpPromptResponse));
+
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'usage',
+      usage: expect.objectContaining({
+        inputTokens: counts?.input_tokens,
+        // Nothing on this wire says how big the window is, so what the turn
+        // spent is the only reading there is — and it is marked as the
+        // approximation it is rather than dressed as a measurement.
+        contextTokens: (counts?.input_tokens ?? 0) + (counts?.output_tokens ?? 0),
+        contextWindowIsAuthoritative: false,
         model: 'gemini:gemini-2.5-pro',
       }),
     }));

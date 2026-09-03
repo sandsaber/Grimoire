@@ -248,8 +248,10 @@ export class GeminiContentPresenter {
   /**
    * The answer to `session/prompt`, which is where the turn's own tokens are.
    *
-   * The window update arrives while the turn is still running, so it knows how
-   * full the context is and nothing about what this prompt cost.
+   * And for this CLI it is the *only* place they are: it sends no
+   * `usage_update` in a turn and no `usage` on the result, so the two fields
+   * ACP defines are both empty and the numbers sit under `_meta.quota`
+   * instead.
    */
   private presentPromptResult(response: AcpPromptResponse | undefined): readonly StreamChunk[] {
     if (!response) {
@@ -259,7 +261,7 @@ export class GeminiContentPresenter {
     if (userMessageId) {
       this.metadata = { ...this.metadata, userMessageId };
     }
-    this.promptUsage = response.usage ?? null;
+    this.promptUsage = response.usage ?? geminiQuotaUsage(response) ?? null;
     return this.usageChunks();
   }
 
@@ -306,3 +308,33 @@ const PERMISSION_LABELS: Readonly<Record<'normal' | 'full_access' | 'plan', stri
   full_access: 'Auto-approve',
   plan: 'Plan',
 };
+
+
+/**
+ * The tokens a turn cost, read out of this CLI's own `_meta`.
+ *
+ * Taken from `gemini-wire.json` field for field — `_meta.quota.token_count`
+ * with `input_tokens` and `output_tokens`, and a `model_usage` array beside it
+ * saying the same per model. Snake case, because it is the vendor's payload
+ * rather than the protocol's, and no total: the agent reports the two halves
+ * and leaves the addition to whoever needs it.
+ *
+ * Absent on an older CLI, an error result, or a turn that produced nothing, and
+ * every one of those answers `null` — a badge without a number, never a wrong
+ * one.
+ */
+function geminiQuotaUsage(response: AcpPromptResponse): AcpUsage | null {
+  const quota = (response._meta as { quota?: unknown } | null | undefined)?.quota;
+  const counts = (quota as { token_count?: unknown } | null | undefined)?.token_count as
+    { input_tokens?: unknown; output_tokens?: unknown } | null | undefined;
+  const inputTokens = typeof counts?.input_tokens === 'number' ? counts.input_tokens : null;
+  const outputTokens = typeof counts?.output_tokens === 'number' ? counts.output_tokens : null;
+  if (inputTokens === null && outputTokens === null) {
+    return null;
+  }
+  return {
+    inputTokens: inputTokens ?? 0,
+    outputTokens: outputTokens ?? 0,
+    totalTokens: (inputTokens ?? 0) + (outputTokens ?? 0),
+  };
+}

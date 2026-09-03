@@ -31,7 +31,7 @@ was quota-blocked, is in the Record at the bottom.
 |---|---|---|
 | 1 | Answers a plain message, and streams it | ✅ answered `OK`, with the refusal notice beside it |
 | 2 | Shows a tool call and its result | ✅ **first time ever** — read the note, then its content |
-| 5 | Reports the context window and the tokens the prompt cost | ⛔ **no usage on the wire at all** — the CLI's shape, not a defect here |
+| 5 | Reports the context window and the tokens the prompt cost | ⛔ **the tokens were on the wire and unread** — `_meta.quota`, read since 2026-09-03; awaiting a turn to certify. The window is genuinely absent |
 | 6 | Cancels a running turn and leaves no agent behind | ✅ cancelled, no agent left |
 | 7 | Continues the same session on a second turn | ✅ remembered `violet` in the same session |
 | 8 | Resumes the conversation a fresh load was told about | ✅ resumed in a second process, and the drop marker is written back empty |
@@ -48,15 +48,36 @@ session — it drafted a plan into `plans/planned-live.md` and never created the
 Row 19 remains the day's quota running out, carrying the vendor's own sentence for why. The other two
 are findings, one in this CLI and one in it too:
 
-### Row 5 — this CLI sends no usage, at any point in a turn
+### Row 5 — half of it was ours, and the recording said so all along
 
-The row asked for the pair the badge needs: the context window from an update while the turn runs,
-the prompt's tokens from the answer. It got **neither** — no `usage` chunk was produced at all. That
-is not the path dropping one: `tests/fixtures/provider-traces/wire/gemini-wire.json` records the
-whole vocabulary this CLI speaks, and it is three kinds — `agent_message_chunk`,
-`agent_thought_chunk`, `available_commands_update`. There is no usage update in it and no `usage`
-on the prompt result. Qwen's and Kimi Code's row 5 are the same class of answer: what the CLI
-reports is what the badge can show. Nothing to fix here; the row records the shape.
+The row asks for the pair the badge needs: the context window from an update while the turn runs,
+the prompt's tokens from the answer. It got neither, and this document concluded *"nothing to fix
+here; the row records the shape."* **Half of that was wrong.**
+
+What was true is what it checked: `tests/fixtures/provider-traces/wire/gemini-wire.json` holds three
+session-update kinds — `agent_message_chunk`, `agent_thought_chunk`, `available_commands_update` —
+so there is no usage update, and the prompt result carries no `usage`. Both fields ACP *defines* are
+empty. The conclusion drawn from that was that the CLI reports nothing.
+
+It reports it under `_meta`. Every recorded prompt result, on 0.55.1 and again on 0.57.0, answers:
+
+```json
+{"stopReason": "end_turn",
+ "_meta": {"quota": {"token_count": {"input_tokens": 16571, "output_tokens": 1},
+                     "model_usage": [{"model": "gemini-3.5-flash", "token_count": {…}}]}}}
+```
+
+`AcpPromptResponse` had no `_meta` field at all, so nothing in the repository could look for it — a
+field the model does not know is a field nobody reads. The slot is typed now and this provider reads
+its own key; the unit row that holds it is driven by the recording rather than by a shape typed into
+a test, so it follows the CLI instead of a constant.
+
+**The window half is genuinely absent** and stays that way: nothing on this wire says how big the
+context is, so what the turn spent is the only reading there is, and it is marked
+`contextWindowIsAuthoritative: false` rather than dressed as a measurement. Qwen answers the same
+question with a vendor method; whether this CLI has one is unknown.
+
+Red until a turn certifies it: the day's quota went to the projection matrix.
 
 ### Row 15 — the agent's write tool stops at the existence check
 

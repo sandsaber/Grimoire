@@ -318,6 +318,16 @@ export interface AcpUsage {
 }
 
 export interface AcpPromptResponse {
+  /**
+   * ACP's extension slot, which is where some agents put the turn's tokens.
+   *
+   * Not interpreted here — what a vendor writes under its own key is that
+   * vendor's business, and a provider reads its own. Typed because it was
+   * absent, and a field the model does not know is a field nobody looks for:
+   * Gemini answers every prompt with `_meta.quota.token_count` and its live row
+   * about usage was recorded as "no usage on the wire at all".
+   */
+  _meta?: Record<string, unknown> | null;
   stopReason: AcpStopReason;
   usage?: AcpUsage | null;
   userMessageId?: string | null;
