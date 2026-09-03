@@ -72,16 +72,19 @@ const OUTPUT_BYTE_LIMIT = 64_000;
 export class AntigravityExecution {
   private readonly requests = new AntigravityRequestStore(() => opaqueId('agyreq'));
   /**
-   * The temp files the turn now dispatching handed to `agy`.
+   * The temp files each tab's currently dispatched turn handed to `agy`, by tab.
    *
-   * Freed when the next turn is dispatched and when this composition is
-   * disposed, which is Codex's rule for the same problem and for the same
-   * reason: the process reads these files while the turn runs, and print mode
-   * ends its process without anything here observing it. A turn's copies are
-   * user data carrying nothing diagnostic, so they never outlive the turn after
-   * them.
+   * Freed when *that tab* dispatches its next turn, and all of them on dispose:
+   * Codex's rule for the same problem and for the same reason. The process
+   * reads these files while the turn runs and print mode ends its process
+   * without anything here observing it, so a turn's copies have to outlive its
+   * own end — and they are user data, so they do not outlive the turn after it.
+   *
+   * **Keyed, because this object is one per plugin and a runtime is one per
+   * tab.** A single slot let a second tab's dispatch delete the files a first
+   * tab's live `agy` was still reading.
    */
-  private liveAttachments: AntigravityImageAttachmentBundle | null = null;
+  private readonly liveAttachments = new Map<string, AntigravityImageAttachmentBundle>();
 
   /**
    * This provider's workspace slots, built on the first question.
@@ -199,7 +202,7 @@ export class AntigravityExecution {
         };
       },
       encodeRequestRef: (turn, history?: ChatMessage[], options?: ChatRuntimeQueryOptions) => (
-        this.requests.reference(buildAntigravityRequest(plugin, turn, history, options))
+        this.requests.reference(buildAntigravityRequest(plugin, agyTab, turn, history, options))
       ),
       // Print mode has no provider-native session, which is what the legacy
       // runtime reported too — it returned null and wrote `sessionId: null`.
@@ -258,9 +261,14 @@ export class AntigravityExecution {
    * queued before a settings change must launch the CLI the user has configured
    * now, not the one configured when they pressed send.
    */
-  private freeAttachments(): void {
-    this.liveAttachments?.cleanup();
-    this.liveAttachments = null;
+  private freeAttachments(owner?: string): void {
+    if (owner === undefined) {
+      for (const bundle of this.liveAttachments.values()) bundle.cleanup();
+      this.liveAttachments.clear();
+      return;
+    }
+    this.liveAttachments.get(owner)?.cleanup();
+    this.liveAttachments.delete(owner);
   }
 
   private async resolveInvocation(requestRef: string): Promise<AntigravityInvocation> {
@@ -292,7 +300,7 @@ export class AntigravityExecution {
     // The previous turn's copies go now rather than at its end: print mode
     // finishes its process without this composition seeing it, and the files
     // have to outlive the read `agy` makes from them.
-    this.freeAttachments();
+    this.freeAttachments(request.owner);
     // Expanded here rather than where the request was composed: reading the
     // vault is asynchronous and the composer is a pure text transform, and this
     // is already the place that resolves ambient state at dispatch. Expanded
@@ -317,7 +325,7 @@ export class AntigravityExecution {
         scope: 'provider.antigravity',
       });
     });
-    this.liveAttachments = attached;
+    this.liveAttachments.set(request.owner, attached);
     return {
       command,
       cliCapabilities,
@@ -388,11 +396,13 @@ function antigravityPermissionMode(plugin: GrimoirePlugin): string {
 /** What one turn decides, before it becomes an opaque reference. */
 export function buildAntigravityRequest(
   plugin: GrimoirePlugin,
+  owner: string,
   turn: PreparedChatTurn,
   history?: ChatMessage[],
   options?: ChatRuntimeQueryOptions,
 ): AntigravityRequest {
   return {
+    owner,
     prompt: buildAntigravityPrintPrompt(turn.prompt, history),
     model: selectedModel(plugin, options),
     ...(turn.request.images?.length ? { images: [...turn.request.images] } : {}),

@@ -59,11 +59,28 @@ export class ClaudeSdkExecutionQueryFactory implements ClaudeExecutionQueryFacto
       // reaching the handler below. Set here beside `canUseTool` for the same
       // reason that one is — both are answers this query owns, and the startup
       // options are resolved before there is a query to own them.
-      // The host-facing `UserDialogRequest` carries no tool id — the transport
-      // shape has one, the SDK does not pass it on — so the backend numbers the
-      // dialogs it cannot name.
+      // The tool call's own id, forwarded so the backend can recognise a dialog
+      // it has already opened: the CLI re-delivers one under a fresh control
+      // request id after a reconnect, and without this every delivery looks new
+      // and draws a second question card for one tool call. Spelled `toolUseID`
+      // by the SDK, which is how an earlier reading of this concluded the field
+      // did not exist.
+      //
+      // **The cast is load-bearing and says so.** `UserDialogResult` is
+      // `{behavior:'completed', result}` or `{behavior:'cancelled'}` and names
+      // no `null`, while the protocol's own rule for a dialog kind this host
+      // never declared is to leave the request *unanswered* — `cancelled` is a
+      // settlement, and on a multi-client session it closes the other client's
+      // dialog as if the user had dismissed it. `null` is how that is spelled:
+      // it skips the transport write. Shipped the same way on `main`; the type
+      // is narrower than the contract, so the widening happens here, once,
+      // rather than being spread through the handler.
       onUserDialog: (request, dialogOptions) => input.onUserDialog(
-        { dialogKind: request.dialogKind, payload: request.payload },
+        {
+          dialogKind: request.dialogKind,
+          payload: request.payload,
+          ...(request.toolUseID ? { toolUseId: request.toolUseID } : {}),
+        },
         { signal: dialogOptions.signal },
       ) as ReturnType<NonNullable<Options['onUserDialog']>>,
       supportedDialogKinds: [CLAUDE_ASK_USER_QUESTION_DIALOG_KIND],

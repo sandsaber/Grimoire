@@ -20,6 +20,15 @@ export interface AntigravityRequest {
    * before dispatch must not have left files behind for nobody to clean up.
    */
   readonly images?: readonly ImageAttachment[];
+  /**
+   * Which tab queued this turn.
+   *
+   * The attachments a turn writes are freed when *that tab* dispatches its
+   * next turn, so the composition — which serves every tab — has to be told
+   * whose they are. Without it a second tab's turn deletes the files a first
+   * tab's `agy` is still reading, which no sequential test can see.
+   */
+  readonly owner: string;
 }
 
 /** How many un-dispatched turns may accumulate before the oldest is dropped. */

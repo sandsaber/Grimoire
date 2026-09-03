@@ -103,6 +103,7 @@ describe('Antigravity execution composition', () => {
   async function createTurnHarness(plugin: any): Promise<{
     runtime: ReturnType<AntigravityExecution['createRuntime']>;
     runner: FakeRunner;
+    execution: AntigravityExecution;
   }> {
     const host = new ExecutionKernelHost({
       storage: new TestDurableStorage(),
@@ -118,7 +119,7 @@ describe('Antigravity execution composition', () => {
     const runner = new FakeRunner();
     host.registerBackend({ backend: execution.createBackend(runner) });
     await host.start();
-    return { runtime: execution.createRuntime(), runner };
+    return { execution, runtime: execution.createRuntime(), runner };
   }
 
   async function waitFor(condition: () => boolean): Promise<void> {
@@ -390,6 +391,25 @@ describe('Antigravity execution composition', () => {
     expect(existsSync(first)).toBe(false);
   });
 
+  it('keeps one tab\'s attachments while another tab takes a turn', async () => {
+    // **The rule is per tab, and a sequential test cannot tell.** One
+    // `AntigravityExecution` is built per plugin load while `createRuntime()`
+    // is called per tab, so a single slot for the live attachments let a second
+    // tab's dispatch delete the files a first tab's `agy` was still reading —
+    // the agent then reports the path does not exist, which reads as Grimoire
+    // attaching nothing.
+    const { execution, runtime, runner } = await createTurnHarness(createPlugin());
+    const second = execution.createRuntime();
+
+    await drain(runtime.query(turn('first', [image('kept.png', 'still needed')])));
+    const kept = runner.invocations[0]?.prompt.match(/\S+kept\.png/)?.[0] as string;
+    expect(existsSync(kept)).toBe(true);
+
+    await drain(second.query(turn('another tab entirely')));
+
+    expect(existsSync(kept)).toBe(true);
+  });
+
   it('reads settings when the run dispatches, not when the turn was queued', async () => {
     // The store holds only what the turn decided. A CLI path captured at send
     // time would launch what the user had configured then, which is the bug
@@ -443,7 +463,7 @@ describe('Antigravity execution composition', () => {
   it('falls back to the first visible model when the turn selected none', () => {
     const plugin = createPlugin();
 
-    expect(buildAntigravityRequest(plugin, turn('go')).model).toBe('Gemini 3.5 Flash (Medium)');
+    expect(buildAntigravityRequest(plugin, 'tab-1', turn('go')).model).toBe('Gemini 3.5 Flash (Medium)');
   });
 });
 
@@ -459,9 +479,9 @@ describe('Antigravity request store', () => {
     let ordinal = 0;
     const store = new AntigravityRequestStore(() => `agyreq-${++ordinal}`);
 
-    const reference = store.reference({ prompt: 'hello', model: null });
+    const reference = store.reference({ model: null, owner: 'tab-1', prompt: 'hello' });
 
-    expect(store.resolve(reference)).toEqual({ prompt: 'hello', model: null });
+    expect(store.resolve(reference)).toEqual({ model: null, owner: 'tab-1', prompt: 'hello' });
     expect(() => store.resolve(reference)).toThrow('unknown');
     expect(store.pendingCount).toBe(0);
   });
@@ -470,14 +490,14 @@ describe('Antigravity request store', () => {
     let ordinal = 0;
     const store = new AntigravityRequestStore(() => `agyreq-${++ordinal}`, 2);
 
-    const first = store.reference({ prompt: 'one', model: null });
-    store.reference({ prompt: 'two', model: null });
-    const third = store.reference({ prompt: 'three', model: null });
+    const first = store.reference({ model: null, owner: 'tab-1', prompt: 'one' });
+    store.reference({ model: null, owner: 'tab-1', prompt: 'two' });
+    const third = store.reference({ model: null, owner: 'tab-1', prompt: 'three' });
 
     expect(store.pendingCount).toBe(2);
     // The evicted reference resolves to nothing, which the backend turns into
     // `pre-dispatch-rejected` — the honest answer for a turn it cannot launch.
     expect(() => store.resolve(first)).toThrow('unknown');
-    expect(store.resolve(third)).toEqual({ prompt: 'three', model: null });
+    expect(store.resolve(third)).toEqual({ model: null, owner: 'tab-1', prompt: 'three' });
   });
 });

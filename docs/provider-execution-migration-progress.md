@@ -8603,6 +8603,44 @@ which is what the rest of that file already does.
 
 Gates: unit 567 suites / 9,008 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
 
+### The review of the sync, and the four things it found (this commit)
+
+**A review of the merge commit found four, and every one held.** Recorded because three of them are
+the same mistake in different clothes: a rule copied from the provider that already solved the
+problem, without the part of it that made the rule work.
+
+1. **A single attachment slot on an object that serves every tab.** `AntigravityExecution` is built
+   once per plugin load; `createRuntime()` is called once per tab. Codex's rule — free a turn's
+   scratch files when the *next* turn dispatches — is keyed by tab there, and this port kept the rule
+   and dropped the key. So a second tab's dispatch deleted the files a first tab's live `agy` was
+   still reading, and the agent reported a path that did not exist, which reads as Grimoire attaching
+   nothing. Keyed by the tab id the runtime already mints. **No sequential test could see it**, which
+   is why the row that holds it now opens a second runtime.
+2. **The SDK does pass the tool id on, and the comment said it did not.** `UserDialogRequest` declares
+   `toolUseID` — capital `ID`, which is how an earlier reading of this concluded the field was absent
+   and settled for a counter. Every dialog therefore took the synthetic fallback, and a dialog the CLI
+   re-delivers under a fresh control request id would have drawn a second question card for one tool
+   call. Forwarded now; the counter stays for the deliveries that genuinely carry no id.
+3. **The parked-dialog record was a no-op.** `recordDebugLog` is optional on the backend context and
+   the production composition never supplied it, so both deliberate non-answers wrote nothing — which
+   is exactly the "a parked dialog with no record reads as a stall" outcome the comment says the
+   logging prevents. A guarantee written in a doc comment and declared optional in the type is a
+   guarantee nobody keeps.
+4. **The provider's `AGENTS.md` described `main`'s lifetime, not this one.** It said the temp
+   directory goes "on every exit — success, failure and cancel" and that "the files are gone when the
+   turn ends". Neither is true here, and the difference is not a detail: a user who attaches an image,
+   reads the answer and never sends another Antigravity turn leaves the decoded copy in `os.tmpdir()`
+   until the plugin unloads, and a force-quit leaves it there. The doc says that now.
+
+**And one operational fact worth more than the four**: `node_modules` held `@anthropic-ai/claude-agent-sdk`
+**0.3.221** while the lockfile the merge brought pins **0.3.241** — and returning `null` from
+`onUserDialog` is suppressed only in the latter. Every gate in the merge commit therefore ran against
+a version where the dialog port's central behaviour does not exist. `npm ci` first; the gates below
+are the ones that ran after it, and `suppressControlResponse` is in the bundle.
+
+Gates: unit 567 suites / 9,009 tests, integration 6 / 161, typecheck, `eslint`, `build:release`,
+all after `npm ci`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -8616,7 +8654,7 @@ Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #10
 step. Full gate green: unit 8974 / 8974 across 566 suites, integration 161, `tsc`, `lint`,
 `build:release`. The build is installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
 
-**Eight commits, and `main` is synced — `origin/main` at `93a93dea`, eighteen commits, merged with
+**Nine commits, and `main` is synced — `origin/main` at `93a93dea`, eighteen commits, merged with
 every deleted file resolved as a deletion and the frozen-path fixes ported onto the migrated shape.
 Four of the five items on the previous pointer are closed, and the day's shape was
 one sentence read five times: a red recorded as "the vendor's". Four of the five were ours.**
@@ -8679,6 +8717,9 @@ first item struck:
 Antigravity and — on their own last runs — Codex, Claude, OpenCode and Grok. What is left red
 anywhere is Gemini's row 15 (upstream), Qwen's and Gemini's row 5 (their CLIs send no such number),
 Gemini's four projection rows (quota) and MiMoCode (account).
+
+**Run `npm ci` before any live Claude work.** The lockfile pins the agent SDK at 0.3.241 and the
+tree was running 0.3.221, where the dialog port's `null` answer is not suppressed.
 
 **What the sync left for a person**: nothing outstanding. Antigravity's attachments and Claude's
 question dialog are wired and unit-covered, and neither has run against a real CLI — Antigravity's

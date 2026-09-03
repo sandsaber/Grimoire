@@ -205,6 +205,11 @@ export class ClaudeExecution {
   ): ClaudeExecutionBackend {
     const queryFactory: ClaudeExecutionQueryFactory = this.createQueryFactory(queryFunction);
     const context: ClaudeExecutionBackendContext = {
+      // Wired, because the guarantee is written down: a dialog left unanswered
+      // on purpose has to leave a record, or it reads as a stall to whoever
+      // finds the turn stopped. Optional on the context and therefore easy to
+      // declare and never supply, which is what it was.
+      recordDebugLog: entry => this.plugin.recordDebugLog(entry),
       queryFactory,
       requestResolver: this.requests,
       interactionBridge: this.interactions,
