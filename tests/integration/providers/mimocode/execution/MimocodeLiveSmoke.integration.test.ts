@@ -274,20 +274,24 @@ live('MiMoCode live smoke', () => {
     const errors = chunks
       .filter((chunk): chunk is Extract<StreamChunk, { type: 'error' }> => chunk.type === 'error')
       .map(chunk => chunk.content);
-    report('ROW 9', String(runtime.getSessionId()), JSON.stringify(errors));
-    // MiMoCode answers an unknown session with `Internal error: MiMoCode
-    // service failure`, which says nothing about the session being missing —
-    // so the binding is kept rather than silently replaced, per the resume
-    // policy, and the turn says so in words the user can act on.
-    expect(errors).toHaveLength(1);
-    // **The agent's own reason, not just the word "session".** This row used to
-    // assert that the message mentioned a session, which the composition's own
-    // sentence does whatever the agent said — so it stayed green while an
-    // unauthenticated CLI's user was told a saved session may have gone and to
-    // start a new chat. What stopped the turn may be the session and may be the
-    // CLI, and only the agent knows which.
-    expect(errors[0]).toContain('said:');
-    expect(runtime.getSessionId()).toBe('ses_grimoire_live_missing');
+    // The chunks as well as the errors: a row that reports only its errors
+    // cannot say what a turn did when it produced none, which is exactly the
+    // state this row reached once the account started generating.
+    report('ROW 9', String(runtime.getSessionId()), JSON.stringify(errors),
+      String(runtime.isSessionDropped()), JSON.stringify(summarize(chunks)));
+    // **The session is replaced, and the surface is told** — mirrored from
+    // OpenCode's row, which this fork's had drifted from because nobody could
+    // run it. It used to assert one error carrying the agent's own words, which
+    // is what an unknown session got while `mimo acp` answered
+    // `Internal error: MiMoCode service failure`: a refusal naming no session,
+    // so the resume policy kept the binding. With an account that generates,
+    // the load that fails is followed by `session/list`, an id the agent does
+    // not list is gone whatever its error text said, and the turn simply
+    // succeeds on a fresh one. What keeps that from being silent is the neutral
+    // seam the surface asks before the user types, not an error inside the turn.
+    expect(errors).toEqual([]);
+    expect(runtime.getSessionId()).not.toBe('ses_grimoire_live_missing');
+    expect(runtime.isSessionDropped()).toBe(true);
     await shutdown();
   });
 
@@ -300,7 +304,15 @@ live('MiMoCode live smoke', () => {
     } });
 
     const chunks = await drain(runtime.query(runtime.prepareTurn({
-      text: 'Create a file called allowed-live.txt in the working directory containing '
+      // **Named absolutely, and this provider is the reason.** OpenCode's twin
+      // row says "in the working directory" and lands in the session's cwd;
+      // `mimo 0.1.13` resolves that phrase to the user's *home* — proven
+      // outside Grimoire entirely, where `mimo run` in a fresh temp cwd asks
+      // for `external_directory (/home/m5/*)` for the same sentence. Left
+      // relative, this row certifies that CLI's path resolution instead of the
+      // permission it is named for: the prompt was asked and allowed, the write
+      // succeeded, and the file was simply somewhere else.
+      text: `Create the file ${join(vault, 'allowed-live.txt')} containing `
         + 'the word yes, then reply with exactly: done',
     })));
 

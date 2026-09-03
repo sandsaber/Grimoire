@@ -8641,6 +8641,53 @@ are the ones that ran after it, and `suppressControlResponse` is in the bundle.
 Gates: unit 567 suites / 9,009 tests, integration 6 / 161, typecheck, `eslint`, `build:release`,
 all after `npm ci`.
 
+### CI, and the two MiMoCode rows that were measuring something else (this commit)
+
+**CI had failed on every push since the merge, at the same step every time**, and the cause was the
+sync's own conflict resolution. `qs@6.16.0` was published on 2026-08-29 and `check:lockfile-age`
+requires seven days, so it is ineligible until 2026-09-05. The bump came from `main` and so did its
+exception — an entry naming the two advisories it fixes and expiring at the package's *natural*
+eligibility rather than at a date someone picked. Resolving `lockfile-age-exceptions.json` toward
+this branch, which had emptied it as release hygiene, dropped the exception for the very dependency
+the same merge brought. Right for the other forty-two, which expired in early August; wrong for the
+one live entry. Green on `c3d8c03`.
+
+**The review said `review:deps` passes with the empty file, and it does.** That is
+`check-review-dependencies.mjs` — a different gate from `check:lockfile-age`, and reading one as
+cover for the other is how this shipped. The repository's documented local gate contains neither, so
+the four steps CI runs and it does not are now the ones to run before pushing a dependency change:
+`check:lockfile-age`, `npm audit`, `npm audit --omit=dev`, `npm audit signatures`.
+
+**MiMoCode is eleven of twelve, and the two rows that closed were both measuring something other
+than what they are named for.**
+
+Rows 12/13 asked for a file "in the working directory". Everything the row exists to certify already
+worked: the permission was asked, it was allowed, the agent wrote the file and replied `done`. It
+wrote it into the user's home, because `mimo 0.1.13` resolves that phrase there — proven outside
+Grimoire entirely, where `mimo run` in a fresh temp cwd asks for `external_directory (/home/m5/*)`
+for the same sentence and writes exactly where told when the path is absolute. The row names the path
+absolutely now. **OpenCode's twin keeps the relative phrasing**, which is the exception `AGENTS.md`
+allows: the two mirror each other unless the CLIs intentionally differ, and here they do.
+
+Row 9 had drifted from that same twin. OpenCode's was rewritten when a failed `session/load` learnt
+to ask `session/list` — an id the agent does not list is gone whatever its error text said — so the
+session is replaced, the turn succeeds on a fresh one, and the surface is told through
+`isSessionDropped()` rather than through an error inside the turn. MiMoCode's still asserted the old
+behaviour, one error carrying the agent's words, and nobody could see the drift because the account
+could not generate. Mirrored, and green live. Its report prints the chunks now as well as the errors:
+a row that reports only its errors cannot say what a turn did when it produced none, which is exactly
+the state it reached the day the account started working.
+
+**Row 7 is the one left, and the CLI is not the reason.** Driven straight at `mimo acp`, two turns on
+one session both answer — with and without the model re-applied between them the way the product
+re-applies it on every dispatch. The empty second turn appears only through the product path, so what
+it sends on a second turn is where to look. Worth noting from the probe: the agent answers the second
+turn with *"you didn't ask me to remember any word"* while `cachedReadTokens` says the context did
+travel, which is a separate thread and this CLI's own.
+
+Gates: unit 567 suites / 9,009 tests, integration 6 / 161, typecheck, `eslint`, `build:release`, plus
+the four CI-only steps above.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -8686,7 +8733,7 @@ recording is now against the version this machine runs and whose projection took
 | Qwen `qwen-code 0.22.3` | 16/16 | 7/7 (2026-08-30) | — |
 | Kimi Code `kimi 0.39.1` | 12/12 | 7/7 | — |
 | Gemini `0.57.0` | 9/12 | 2/6 today (A, B); C, E, F, H are the quota | row 5's window, row 15 upstream |
-| MiMoCode `mimo 0.1.13` | 9/12 | 7/7 | rows 7, 9 and 12/13 — this provider's own at last |
+| MiMoCode `mimo 0.1.13` | 11/12 | 7/7 | row 7, and the CLI answers it fine |
 
 **What the next session starts with, shortest first.** The list is the previous pointer's with its
 first item struck:
@@ -8708,8 +8755,10 @@ first item struck:
    live: `noteTurnEnded` is the seam for it, Grok's sink and Qwen's already use it, and this
    provider's had never implemented it. 12/12 and 7/7 live.
 4. ~~**MiMoCode** — the account~~ **closed, and it was never the account.** The two models the
-   blocker was established on are dead; `xiaomi/mimo-v2.5-pro` answers. 9/12 and 7/7. What is left
-   are three rows that are this provider's own: row 7's second turn, row 9, and rows 12/13.
+   blocker was established on are dead; `xiaomi/mimo-v2.5-pro` answers. **11/12 and 7/7.** What is
+   left is **row 7**: a second turn on one session comes back without a result through the product,
+   while `mimo acp` driven directly answers both turns — with and without the model re-applied
+   between them. What the product sends on a second turn is where to look.
 5. **The vault matrix** — the owner's eyes, unchanged: the drawn session-restart notice on six
    providers, row 4, and the plan approval's three answers.
 
@@ -8722,8 +8771,12 @@ else:
 | Gemini provider 5 | ours no longer — the tokens are read; it needs one turn to certify |
 | Gemini provider 15 | the CLI's, upstream |
 | Gemini projection C, E, F, H | the quota |
-| MiMoCode provider 7, 9, 12/13 | this provider's own, reachable for the first time |
+| MiMoCode provider 7 | ours to find: the CLI answers two turns on one session |
 | Qwen provider 5's `inputTokens` | the CLI's, pinned rather than expected |
+
+**Run the four CI-only steps before pushing a dependency change**: `check:lockfile-age`,
+`npm audit`, `npm audit --omit=dev`, `npm audit signatures`. None is in this repository's documented
+local gate, and the first of them failed CI on every push after the sync.
 
 **Run `npm ci` before any live Claude work.** The lockfile pins the agent SDK at 0.3.241 and the
 tree was running 0.3.221, where the dialog port's `null` answer is not suppressed.
