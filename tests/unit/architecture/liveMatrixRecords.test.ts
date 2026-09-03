@@ -214,8 +214,10 @@ describe('live smoke matrix records', () => {
       // they claimed — one of them approving the agent's request to leave plan
       // mode and then asserting plan mode had held. Thirteen of sixteen on
       // 2026-08-31, where two reds are the file's own memories from the day
-      // before, kept by the CLI in the user's home.
-      'qwen-flip-smoke-matrix.md: 2026-08-31',
+      // before, kept by the CLI in the user's home. **Sixteen of sixteen on
+      // 2026-09-03**: row 5's window was always real and its `inputTokens` is a
+      // number this CLI does not send, which the row pins rather than expects.
+      'qwen-flip-smoke-matrix.md: 2026-09-03',
     ]);
   });
 });

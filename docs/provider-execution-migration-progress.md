@@ -8484,6 +8484,32 @@ is its CLI's shape.
 
 Gates: unit 566 suites / 8,976 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
 
+### Qwen's row 5, and the fourth reading of the same sentence (this commit)
+
+**Qwen's provider matrix is sixteen of sixteen, the first full green it has had.** Row 5 had been
+carried as "the CLI's `{used, size}` shape", and half of that was right for the wrong reason.
+
+The window half was never in doubt and never broken: `qwen-wire.json` seq 23 is
+`{used: 28101, size: 1000000}`, sent while the turn runs, and this provider's sink asks
+`qwen/status/session/context_usage` at `noteTurnEnded` for the parent window besides. Live it read
+`contextTokens: 30163` of `1000000`. The red was the other half — `inputTokens` — and this CLI does
+not send it: seq 24 answers `{stopReason: end_turn}` with a `_meta` carrying `qwen.branchPoint`, a
+checkpoint rather than a count. Pinned with `toBe(0)`, so the row speaks up if the vendor changes its
+mind rather than passing on an assertion nobody reads.
+
+**That is the fourth time today the same sentence was re-read, and the tally is three to one.** A
+recorder that wrote "this account cannot generate" about a turn still running; a context meter
+carried as an owner's decision that was a seam two providers already had; a row recorded as "no usage
+on the wire at all" whose tokens were on the wire under `_meta`. Those three were ours. This one is
+genuinely the CLI's — and it is the same shape as Kimi Code's remaining half, and the exact opposite
+of Gemini's.
+
+What made the difference every time was the same thing: the recording was read again, field by field,
+instead of the conclusion drawn from it. Three of the four conclusions had been assembled by reading
+the fields the protocol defines and missing the one the agent fills.
+
+Gates: unit 566 suites / 8,976 tests, integration 6 / 161, typecheck, `eslint`, `build:release`.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
@@ -8497,9 +8523,8 @@ Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #10
 step. Full gate green: unit 8974 / 8974 across 566 suites, integration 161, `tsc`, `lint`,
 `build:release`. The build is installed in the test vault (`OBSIDIAN_VAULT`, plugin version 1.1.10).
 
-**Five commits. Three of the five items on the previous pointer are closed, and every one of them
-found something reporting what it had not observed — twice, a red recorded as "the vendor's shape"
-that was ours.**
+**Six commits. Three of the five items on the previous pointer are closed, and the day's shape was
+one sentence read four times: a red recorded as "the vendor's shape". Three of the four were ours.**
 
 1. **Gemini's wire recording is retaken against `gemini 0.57.0` and is `complete`.** The first take
    was `partial` and blamed the account; the turn was simply still running when the recorder stopped
@@ -8525,7 +8550,7 @@ recording is now against the version this machine runs and whose projection took
 | Codex `codex-cli 0.147.0` | 8/8 | 9/9 (2026-08-30) | — |
 | OpenCode `1.18.19` | 12/12 | 7/7 (2026-08-30) | — |
 | Grok `1.0.5` | 13/13 | 7/7 (2026-08-30) | — |
-| Qwen `qwen-code 0.22.3` | 15/16 | 7/7 (2026-08-30) | row 5, the CLI's `{used, size}` |
+| Qwen `qwen-code 0.22.3` | 16/16 | 7/7 (2026-08-30) | — |
 | Kimi Code `kimi 0.39.1` | 12/12 | 7/7 | — |
 | Gemini `0.57.0` | 9/12 | 2/6 today (A, B); C, E, F, H are the quota | row 5's window, row 15 upstream |
 | MiMoCode `mimo` | 0/7 | 0/7 | the account cannot generate, asked a fourth time |

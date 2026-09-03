@@ -213,12 +213,20 @@ live('Qwen live smoke', () => {
       .filter((chunk): chunk is Extract<StreamChunk, { type: 'usage' }> => chunk.type === 'usage')
       .at(-1);
     report('ROW 5', JSON.stringify(usage?.usage ?? null));
-    // The window comes from an update while the turn runs; the prompt's own
-    // tokens come from the answer. The badge needs the pair — and the wire
-    // recording never reached a usage update, so this row is the first time
-    // anything has observed one from this CLI.
+    // **The window arrives, and it is the half this CLI answers.**
+    // `qwen-wire.json` seq 23 is `{used: 28101, size: 1000000}`, sent while the
+    // turn runs, and the sink asks `qwen/status/session/context_usage` at
+    // `noteTurnEnded` for the parent window besides.
     expect(usage?.usage.contextWindow).toBeGreaterThan(0);
-    expect(usage?.usage.inputTokens).toBeGreaterThan(0);
+    expect(usage?.usage.contextTokens).toBeGreaterThan(0);
+    // **And the prompt's own tokens are not on this wire.** Seq 24 answers
+    // `{stopReason: end_turn}` with a `_meta` carrying `qwen.branchPoint` — a
+    // checkpoint, not a count. Whether this CLI has a vendor method for them
+    // the way it has one for the window is unknown; what is known is what it
+    // sends. Pinned rather than asserted away, so the row speaks up if that
+    // changes — the same shape Kimi Code's row 5 records, and the opposite of
+    // Gemini's, whose tokens *were* on the wire under `_meta` and unread.
+    expect(usage?.usage.inputTokens).toBe(0);
     await shutdown();
   });
 
