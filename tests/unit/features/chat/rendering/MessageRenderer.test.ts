@@ -2218,11 +2218,20 @@ describe('MessageRenderer', () => {
         const keydownHandlers = docListeners.get('keydown');
         expect(keydownHandlers).toBeDefined();
         expect(keydownHandlers!.length).toBeGreaterThan(0);
-        keydownHandlers![0]({ key: 'Escape' });
+        const event = { key: 'Escape', preventDefault: jest.fn(), stopPropagation: jest.fn() };
+        keydownHandlers![0](event);
 
         expect(removeSpy).toHaveBeenCalled();
+        // Escape belongs to the overlay alone: the view scope's own handler
+        // cancels the streaming turn, so the key must not travel any further.
+        expect(event.preventDefault).toHaveBeenCalled();
+        expect(event.stopPropagation).toHaveBeenCalled();
         // After close, the keydown handler should be removed
-        expect(document.removeEventListener).toHaveBeenCalledWith('keydown', expect.any(Function));
+        expect(document.removeEventListener).toHaveBeenCalledWith(
+          'keydown',
+          expect.any(Function),
+          true,
+        );
       } finally {
         (globalThis as any).document = origDocument;
       }

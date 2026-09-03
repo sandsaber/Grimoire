@@ -3,6 +3,7 @@ import * as path from 'path';
 
 import type { ImageAttachment, ImageMediaType } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
+import { registerOpenImageViewer } from './imageViewerStack';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
@@ -360,14 +361,24 @@ export class ImageContextManager {
     });
     closeBtn.setText('\u00D7');
 
+    // Escape closes the viewer and must not also cancel the streaming turn.
+    // This listener is only one of the two ways that happens: the chat's own
+    // Escape handlers consult the viewer stack before cancelling, so the turn
+    // survives whichever listener the browser reaches first.
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        close();
+      if (e.key !== 'Escape') {
+        return;
       }
+      e.preventDefault();
+      e.stopPropagation();
+      close();
     };
 
+    const unregisterViewer = registerOpenImageViewer(() => close());
+
     const close = () => {
-      ownerDocument.removeEventListener('keydown', handleEsc);
+      unregisterViewer();
+      ownerDocument.removeEventListener('keydown', handleEsc, true);
       overlay.remove();
       if (this.fullImageClose === close) {
         this.fullImageClose = null;
@@ -379,7 +390,7 @@ export class ImageContextManager {
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) close();
     });
-    ownerDocument.addEventListener('keydown', handleEsc);
+    ownerDocument.addEventListener('keydown', handleEsc, true);
   }
 
   private generateId(): string {

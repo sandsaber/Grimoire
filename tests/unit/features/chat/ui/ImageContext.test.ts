@@ -789,12 +789,39 @@ describe('ImageContextManager - Private Helpers', () => {
       const image = createImageAttachment();
       manager['showFullImage'](image);
 
-      expect(addEventSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
+      // Capture phase: Obsidian's own document keydown listener is registered
+      // when the app boots, so a bubble-phase handler added now would run after
+      // the view scope has already acted on Escape.
+      expect(addEventSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true);
 
       const escHandler = addEventSpy.mock.calls[0][1];
-      escHandler({ key: 'Escape' });
+      escHandler({ key: 'Escape', preventDefault: jest.fn(), stopPropagation: jest.fn() });
 
-      expect(removeEventSpy).toHaveBeenCalledWith('keydown', escHandler);
+      expect(removeEventSpy).toHaveBeenCalledWith('keydown', escHandler, true);
+    });
+
+    it('should consume Escape so it does not reach the chat and cancel the turn', () => {
+      const image = createImageAttachment();
+      manager['showFullImage'](image);
+
+      const escHandler = addEventSpy.mock.calls[0][1];
+      const event = { key: 'Escape', preventDefault: jest.fn(), stopPropagation: jest.fn() };
+      escHandler(event);
+
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(event.stopPropagation).toHaveBeenCalled();
+    });
+
+    it('should leave other keys alone', () => {
+      const image = createImageAttachment();
+      manager['showFullImage'](image);
+
+      const escHandler = addEventSpy.mock.calls[0][1];
+      const event = { key: 'a', preventDefault: jest.fn(), stopPropagation: jest.fn() };
+      escHandler(event);
+
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      expect(removeEventSpy).not.toHaveBeenCalled();
     });
 
     it('should close modal when clicking on overlay background', () => {

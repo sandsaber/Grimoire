@@ -22,6 +22,7 @@ import {
   normalizeLatexDelimiters,
 } from '../../../utils/markdownMath';
 import { findRewindContext } from '../rewind';
+import { registerOpenImageViewer } from '../ui/imageViewerStack';
 import { renderVaultSearchSources } from '../ui/VaultSearchSources';
 import { getAssistantResponseProviderLabel } from '../utils/assistantResponseMetadata';
 import { localizeReasoningLevel } from '../utils/reasoningDisplay';
@@ -945,14 +946,23 @@ export class MessageRenderer {
     const closeBtn = modal.createDiv({ cls: 'grimoire-image-modal-close' });
     closeBtn.setText('\u00D7');
 
+    // See the same handler in ImageContext: closing the viewer must not cost
+    // the user the streaming turn, which the viewer stack guarantees no
+    // matter which Escape listener the browser reaches first.
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        close();
+      if (e.key !== 'Escape') {
+        return;
       }
+      e.preventDefault();
+      e.stopPropagation();
+      close();
     };
 
+    const unregisterViewer = registerOpenImageViewer(() => close());
+
     const close = () => {
-      ownerDocument.removeEventListener('keydown', handleEsc);
+      unregisterViewer();
+      ownerDocument.removeEventListener('keydown', handleEsc, true);
       overlay.remove();
     };
 
@@ -960,7 +970,7 @@ export class MessageRenderer {
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) close();
     });
-    ownerDocument.addEventListener('keydown', handleEsc);
+    ownerDocument.addEventListener('keydown', handleEsc, true);
   }
 
   /**
