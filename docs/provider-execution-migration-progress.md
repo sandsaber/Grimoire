@@ -8728,6 +8728,38 @@ overrides it.**
 
 Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #107), at the M6 gate.
 
+### Where the session of 2026-09-04 ended
+
+**Two things landed that are not migration work, and both are now project rules.**
+
+**Tests speak English** (`f07a4c9`). Seventeen test files carried Russian as ordinary sample data, and
+one production comment quoted a Russian answer out of a vault. Shapes are untouched; only the
+human-language payload moved. What deliberately stays non-English is what is under test: assertions
+that read a locale back after `setLocale`, and the non-ASCII handling rows where the bytes are the
+point. `tests/fixtures/provider-traces/wire/*.json` is untouched — a translated recording is no
+longer one.
+
+**Nordic, the design system** (merged from `design/nordic-minimal`). A visual system written entirely
+in Obsidian's own variables, so the plugin follows the user's theme and accent.
+[`docs/design-system.md`](design-system.md) is canonical; the rules are in the root `AGENTS.md`
+Design System section and `src/style/AGENTS.md`. **Read those before touching any surface's
+appearance.** Six defects it found, each a class rather than an instance: a token read in three rules
+and defined nowhere; dark-only literal colours in scrollbars, hovers, menus and backdrops; a
+light-mode override that existed to repair one of them; a second design system inside the settings
+sheet; nineteen clickable spans no keyboard could reach, one a modal offering a choice that could
+only be declined; and **the accent, which was not the user's on thirty-two surfaces** — Obsidian
+defines no accent RGB triple, so `--grimoire-brand-rgb` always resolved to its fallback violet.
+Fifteen rules across `designSystem.test.ts` and `themeAdaptation.test.ts` hold it, each proved by
+being broken. A specimen renders the system at
+<https://claude.ai/code/artifact/4856c3ff-b400-49c8-afcf-57ff24ab7e32>.
+
+**What this changes for migration work:** nothing in the execution path, and one habit. A stylesheet
+edit now has gates that fail on a literal colour, size, weight, radius, spacing value or duration.
+`npm run test -- --selectProjects unit` covers them.
+
+**Still unpushed at the end of this session**: both of the above. `origin/providers-migration` is
+behind by them.
+
 ### Where the session of 2026-09-03 ended
 
 **Everything is committed and pushed.** HEAD on `providers-migration`, working tree clean, remote in
