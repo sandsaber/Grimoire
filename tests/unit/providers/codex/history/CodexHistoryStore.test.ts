@@ -1214,7 +1214,7 @@ describe('CodexHistoryStore', () => {
             content: [{
               type: 'output_text',
               text: [
-                'Готово: создал Marine Life/Морские_ежи (Sea_Urchins).md.',
+                'Done: created Marine Life/Sea_urchins (Echinoidea).md.',
                 'MEMORY.md:77-100|note=[Obsidian vault note style and short Russian workflow] 019e97fa-4949-7c11-a3bb-540145b5d1d2',
               ].join('\n'),
             }],
@@ -1226,7 +1226,7 @@ describe('CodexHistoryStore', () => {
           payload: {
             type: 'agent_message',
             message: [
-              'Еще добавил обратные ссылки.',
+              'Also added the backlinks.',
               '<oai-mem-citation>',
               '<citation_entries>',
               'MEMORY.md:77-100|note=[Obsidian vault note style and short Russian workflow]',
@@ -1245,8 +1245,8 @@ describe('CodexHistoryStore', () => {
       expect(messages[1]).toMatchObject({
         role: 'assistant',
         content: [
-          'Готово: создал Marine Life/Морские_ежи (Sea_Urchins).md.',
-          'Еще добавил обратные ссылки.',
+          'Done: created Marine Life/Sea_urchins (Echinoidea).md.',
+          'Also added the backlinks.',
         ].join('\n\n'),
       });
       expect(messages[1].content).not.toContain('MEMORY.md');

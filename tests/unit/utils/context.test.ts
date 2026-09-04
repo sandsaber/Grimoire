@@ -294,7 +294,7 @@ describe('extractUserQuery', () => {
     });
 
     it('extracts text from user_query tags without a closing tag', () => {
-      expect(extractUserQuery('<user_query>\nнтык тык')).toBe('нтык тык');
+      expect(extractUserQuery('<user_query>\npoke poke')).toBe('poke poke');
     });
 
     it('extracts text from closed user_query tags and drops leading user_info', () => {

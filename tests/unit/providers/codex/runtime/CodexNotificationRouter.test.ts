@@ -48,10 +48,10 @@ describe('CodexNotificationRouter', () => {
         threadId: 't1',
         turnId: 'turn1',
         itemId: 'msg1',
-        delta: 'Готово: создал заметку.\nMEMORY.md:77-100|note=[Obsidian vault note style and short Russian workflow] 019e97fa-4949-7c11-a3bb-540145b5d1d2\n',
+        delta: 'Done: created the note.\nMEMORY.md:77-100|note=[Obsidian vault note style and short Russian workflow] 019e97fa-4949-7c11-a3bb-540145b5d1d2\n',
       });
 
-      expect(chunks).toEqual([{ type: 'text', content: 'Готово: создал заметку.\n' }]);
+      expect(chunks).toEqual([{ type: 'text', content: 'Done: created the note.\n' }]);
     });
 
     it('does not emit Codex memory citation blocks from completed assistant text', () => {
@@ -123,7 +123,7 @@ describe('CodexNotificationRouter', () => {
         threadId: 't1',
         turnId: 'turn1',
         itemId: 'stream-msg',
-        delta: 'Кратко: это небольшой тематический Obsidian-вальт.\n\n- Объём: 32 markdown-ноты.\n',
+        delta: 'In short: this is a small themed Obsidian vault.\n\n- Size: 32 markdown notes.\n',
       });
 
       router.handleNotification('item/completed', {
@@ -132,7 +132,7 @@ describe('CodexNotificationRouter', () => {
         item: {
           type: 'agentMessage',
           id: 'completed-msg',
-          text: 'Кратко: это небольшой тематический Obsidian-вальт.\n\n- Объём: 32 markdown-ноты.\n',
+          text: 'In short: this is a small themed Obsidian vault.\n\n- Size: 32 markdown notes.\n',
           phase: 'completed',
           memoryCitation: null,
         },
@@ -141,7 +141,7 @@ describe('CodexNotificationRouter', () => {
       expect(chunks.filter(chunk => chunk.type === 'text')).toEqual([
         {
           type: 'text',
-          content: 'Кратко: это небольшой тематический Obsidian-вальт.\n\n- Объём: 32 markdown-ноты.\n',
+          content: 'In short: this is a small themed Obsidian vault.\n\n- Size: 32 markdown notes.\n',
         },
       ]);
     });

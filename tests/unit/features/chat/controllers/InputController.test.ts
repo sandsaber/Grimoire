@@ -2923,7 +2923,7 @@ describe('InputController - Message Queue', () => {
       const toolEl = createMockEl();
       toolEl.addClass('grimoire-tool-step is-running');
       const toolHeaderEl = toolEl.createDiv({ cls: 'grimoire-tool-header' });
-      toolHeaderEl.createSpan({ cls: 'grimoire-tool-summary', text: 'grep -ril "рыб" ~/vault --include="*.md"' });
+      toolHeaderEl.createSpan({ cls: 'grimoire-tool-summary', text: 'grep -ril "fish" ~/vault --include="*.md"' });
       const toolResultEl = toolHeaderEl.createSpan({ cls: 'grimoire-tool-result' });
       deps.state.toolCallElements.set('bash-1', toolEl as HTMLElement);
 
@@ -2933,7 +2933,7 @@ describe('InputController - Message Queue', () => {
 
       const approvalPromise = controller.handleApprovalRequest(
         'bash',
-        { command: 'grep -ril "рыб" ~/vault --include="*.md"' },
+        { command: 'grep -ril "fish" ~/vault --include="*.md"' },
         'Recursive case-insensitive search across ~/vault. Reads file contents; makes no changes.',
       );
 
@@ -2950,8 +2950,8 @@ describe('InputController - Message Queue', () => {
       expect(cardEl).not.toBeNull();
       expect(cardEl?.querySelector('.grimoire-permission-title')?.textContent).toBe('Permission required');
       expect(cardEl?.querySelector('.grimoire-permission-tool-label')?.textContent)
-        .toBe('grep · рыб, vault');
-      expect(cardEl?.querySelector('.grimoire-permission-command-code')?.textContent).toContain('grep -ril "рыб"');
+        .toBe('grep · fish, vault');
+      expect(cardEl?.querySelector('.grimoire-permission-command-code')?.textContent).toContain('grep -ril "fish"');
 
       const allowButton = composerEl.querySelector('.grimoire-permission-button--allow');
       expect(allowButton).not.toBeNull();
@@ -2999,7 +2999,7 @@ describe('InputController - Message Queue', () => {
 
       await expect(controller.handleApprovalRequest(
         'mcp__obsidian__obsidian_simple_search',
-        { query: 'рыбы' },
+        { query: 'fishes' },
         'Search Obsidian vault',
       )).resolves.toBe('allow');
 

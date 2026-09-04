@@ -84,8 +84,8 @@ describe('GrokNativeTranscriptRecovery', () => {
 
   it('recovers the answer Grok stored for the running session', async () => {
     const history = [
-      historyLine({ type: 'user', content: [{ type: 'text', text: 'вопрос' }] }),
-      historyLine({ type: 'assistant', content: 'ответ из истории Grok' }),
+      historyLine({ type: 'user', content: [{ type: 'text', text: 'question' }] }),
+      historyLine({ type: 'assistant', content: 'the answer from Grok history' }),
     ].join('');
 
     await withGrokSession('session-1', history, async (workspacePath) => {
@@ -93,7 +93,7 @@ describe('GrokNativeTranscriptRecovery', () => {
         nativeSessionRef: 'session-1',
         workspacePath,
         maxBytes: 64_000,
-      })).resolves.toBe('ответ из истории Grok');
+      })).resolves.toBe('the answer from Grok history');
     });
   });
 

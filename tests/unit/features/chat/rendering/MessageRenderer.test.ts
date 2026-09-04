@@ -1158,8 +1158,8 @@ describe('MessageRenderer', () => {
       content: '',
       timestamp: Date.now(),
       toolCalls: [
-        { id: 'grep-1', name: 'Grep', input: { pattern: 'рыба' }, status: 'completed' } as any,
-        { id: 'grep-2', name: 'Grep', input: { pattern: 'рыбалка' }, status: 'completed' } as any,
+        { id: 'grep-1', name: 'Grep', input: { pattern: 'fish' }, status: 'completed' } as any,
+        { id: 'grep-2', name: 'Grep', input: { pattern: 'fishing' }, status: 'completed' } as any,
       ],
       contentBlocks: [
         { type: 'tool_use', toolId: 'grep-1' } as any,
@@ -1721,7 +1721,7 @@ describe('MessageRenderer', () => {
     const { renderer } = createRenderer();
     const el = createMockEl();
 
-    await renderer.renderContent(el, 'See [[Marine Life/Акулы (Sharks).md]]');
+    await renderer.renderContent(el, 'See [[Marine Life/Sharks (Selachii).md]]');
 
     expect(processFileLinks).toHaveBeenCalledWith(expect.anything(), el);
   });
@@ -1771,20 +1771,20 @@ describe('MessageRenderer', () => {
     await renderer.renderContent(
       el,
       [
-        'connectivity — роль узла в графе:',
-        '| Тип | Кол-во | Значение |',
+        'connectivity — the node role in the graph:',
+        '| Kind | Count | Meaning |',
         '|-----|--------|----------|',
-        '| hub | 3 | Центральные узлы |',
+        '| hub | 3 | Central nodes |',
       ].join('\n')
     );
 
     expect(MarkdownRenderer.renderMarkdown).toHaveBeenCalledWith(
       [
-        'connectivity — роль узла в графе:',
+        'connectivity — the node role in the graph:',
         '',
-        '| Тип | Кол-во | Значение |',
+        '| Kind | Count | Meaning |',
         '|-----|--------|----------|',
-        '| hub | 3 | Центральные узлы |',
+        '| hub | 3 | Central nodes |',
       ].join('\n'),
       el,
       '',

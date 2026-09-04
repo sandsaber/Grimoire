@@ -94,17 +94,17 @@ describe('mapOpencodeMessages', () => {
           {
             id: 'part-user',
             text: [
-              'User: раз раз?',
+              'User: ping ping?',
               '',
-              'Assistant: Готов!',
+              'Assistant: Ready!',
               '',
               '[Thinking: 1 block(s), 5.6s total]',
               '',
-              'User: расскажи коротко, посмотри линки',
+              'User: summarize briefly, check the links',
               '',
-              'Assistant: ## Заметка Marine Life/Акулы (Sharks).md',
+              'Assistant: ## Note Marine Life/Sharks (Selachii).md',
               '',
-              '**Содержимое** — структурированный обзор акул.',
+              '**Contents** — a structured overview of sharks.',
             ].join('\n'),
             type: 'text',
           },
@@ -115,7 +115,7 @@ describe('mapOpencodeMessages', () => {
     expect(messages).toEqual([
       {
         assistantMessageId: undefined,
-        content: 'расскажи коротко, посмотри линки',
+        content: 'summarize briefly, check the links',
         id: 'msg-user',
         role: 'user',
         timestamp: 1_000,

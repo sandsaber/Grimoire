@@ -34,7 +34,7 @@ function extractDisplayText(fullMatch: string, linkPath: string): string {
 describe('wikilink pattern matching', () => {
   describe('processable wikilink detection', () => {
     it('detects plain wikilinks that need chat post-processing', () => {
-      expect(hasProcessableWikilink('See [[Marine Life/Акулы (Sharks).md]]')).toBe(true);
+      expect(hasProcessableWikilink('See [[Marine Life/Sharks (Selachii).md]]')).toBe(true);
       expect(hasProcessableWikilink('Alias [[note#section|Section]]')).toBe(true);
     });
 

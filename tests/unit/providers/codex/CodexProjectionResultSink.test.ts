@@ -67,7 +67,7 @@ describe('Codex projection result sink', () => {
     // store refuses is a run that cannot record its own result.
     const sink = new CodexProjectionResultSink();
 
-    for (const key of ['code reviewer', '../escape', 'агент', '🤖', 'x'.repeat(400)]) {
+    for (const key of ['code reviewer', '../escape', 'agent-\u00e9\u00e7', '🤖', 'x'.repeat(400)]) {
       const result = await commit(sink, { key });
       expect(() => decodeRunRecordWith(result)).not.toThrow();
     }

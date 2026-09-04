@@ -748,11 +748,11 @@ describe('StreamController - Text Content', () => {
       deps.state.currentContentEl = createMockEl();
 
       await controller.handleStreamChunk(
-        { type: 'tool_use', id: 'grep-1', name: 'Grep', input: { pattern: 'рыба' } },
+        { type: 'tool_use', id: 'grep-1', name: 'Grep', input: { pattern: 'fish' } },
         msg
       );
       await controller.handleStreamChunk(
-        { type: 'tool_use', id: 'grep-2', name: 'Grep', input: { pattern: 'рыбалка' } },
+        { type: 'tool_use', id: 'grep-2', name: 'Grep', input: { pattern: 'fishing' } },
         msg
       );
 

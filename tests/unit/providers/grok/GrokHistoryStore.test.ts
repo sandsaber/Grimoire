@@ -158,11 +158,11 @@ describe('parseGrokChatHistoryJsonl', () => {
         type: 'user',
       }),
       JSON.stringify({
-        content: [{ text: '<user_query>\nнтык тык', type: 'text' }],
+        content: [{ text: '<user_query>\npoke poke', type: 'text' }],
         type: 'user',
       }),
       JSON.stringify({
-        content: 'Тык-тык — на связи.',
+        content: 'Poke-poke — online.',
         type: 'assistant',
       }),
     ].join('\n'));
@@ -170,7 +170,7 @@ describe('parseGrokChatHistoryJsonl', () => {
     expect(messages).toEqual([
       {
         assistantMessageId: undefined,
-        content: 'нтык тык',
+        content: 'poke poke',
         id: 'grok-user-2',
         role: 'user',
         timestamp: 2_000,
@@ -178,9 +178,9 @@ describe('parseGrokChatHistoryJsonl', () => {
       },
       {
         assistantMessageId: 'grok-assistant-3',
-        content: 'Тык-тык — на связи.',
+        content: 'Poke-poke — online.',
         contentBlocks: [
-          { content: 'Тык-тык — на связи.', type: 'text' },
+          { content: 'Poke-poke — online.', type: 'text' },
         ],
         id: 'grok-assistant-3',
         role: 'assistant',
@@ -205,13 +205,13 @@ describe('parseGrokChatHistoryJsonl', () => {
     })).toBeNull();
 
     expect(normalizeImportedGrokUserMessage({
-      content: '<user_query>\nнтык тык',
+      content: '<user_query>\npoke poke',
       id: 'u2',
       role: 'user',
       timestamp: 1,
     })).toEqual({
-      content: 'нтык тык',
-      displayContent: 'нтык тык',
+      content: 'poke poke',
+      displayContent: 'poke poke',
       id: 'u2',
       role: 'user',
       timestamp: 1,

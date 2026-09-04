@@ -8688,6 +8688,39 @@ travel, which is a separate thread and this CLI's own.
 Gates: unit 567 suites / 9,009 tests, integration 6 / 161, typecheck, `eslint`, `build:release`, plus
 the four CI-only steps above.
 
+### Tests speak English, except where the language is the subject (this commit)
+
+**Seventeen test files carried Russian as ordinary sample data**, and one production comment quoted a
+Russian answer out of a vault. The repository rule is English for documentation and product copy, and
+it reaches sample strings too: a fixture that greps for a Russian stem measures nothing that one
+grepping for `fish` does not.
+
+What moved: the four ACP history stores (OpenCode, MiMoCode, Kimi Code, Grok), Codex's history store
+and its notification router, the message and tool-call renderers, `StreamController`,
+`InputController`, the mention dropdown, `FileContextManager`, `RuntimeContextActivity`, `context`
+and `fileLink`. Shapes are untouched — only the human-language payload inside them.
+
+**What deliberately stays non-English, because it is the thing under test.** Two kinds, and neither
+is a leftover:
+
+- localization assertions, which read a locale back: `main.test.ts`'s ribbon and command names after
+  `setLocale('ru')`, `greetings`, `InputToolbar`, `InlineOrchestratorPlan`, `InlinePermissionRequest`,
+  `NavigationSidebar`'s zh labels, the `ru` fixture in `GrimoireSettings.test.ts`, and
+  `getLocaleDisplayName('ru')`;
+- non-ASCII handling, where the bytes are the point: UTF-8 chunk splitting, Windows argv quoting,
+  Antigravity's attachment filenames and its CJK model labels, unicode vault paths, slash-command
+  descriptions, and CJK search normalization.
+
+`tests/fixtures/provider-traces/wire/*.json` is untouched on purpose: those are recordings, the wire
+gate replays them, and a translated recording is no longer one.
+
+**Proved rather than assumed.** `InputController.test.ts:2953` asserts `'grep · fish, vault'`
+exactly; asking it for `'grep · trout, vault'` fails with the summariser's own answer, so the string
+travels from production rather than echoing back the input.
+
+Gates: unit 567 suites / 9,009 tests, integration 161, typecheck, `eslint`, `build:release`, and
+`main.js` and `styles.css` unchanged by the comment edit.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it

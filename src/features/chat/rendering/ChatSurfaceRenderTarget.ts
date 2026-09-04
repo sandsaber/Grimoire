@@ -291,8 +291,8 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
     // message, so a `provider-content` lands between two deltas on every turn
     // and stops the merge; most of those payloads draw nothing. Closing the
     // text block for one of them cut the answer at the delta boundary: the
-    // vault held `content` as "Привет! Чем могу…" and `contentBlocks` as
-    // "Прив", "ет! Ч" and the rest, each its own block with its own copy
+    // vault held `content` as "Hello! How can I…" and `contentBlocks` as
+    // "Hell", "o! How" and the rest, each its own block with its own copy
     // button. So each kind closes what it actually displaces, and a payload
     // closes nothing until it is known to draw.
     this.open = { runId, index, kind: item.kind };
