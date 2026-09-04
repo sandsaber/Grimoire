@@ -26,7 +26,7 @@ describe('nav-sidebar.css', () => {
 
     expect(directory).toContain('background: var(--background-secondary)');
     expect(directory).toContain('border: 1px solid var(--background-modifier-border)');
-    expect(directory).toContain('box-shadow: 0 10px 30px');
+    expect(directory).toContain('box-shadow: var(--grimoire-lift-2)');
   });
 
   it('keeps the outline button visible and accents it while open', () => {
@@ -34,7 +34,7 @@ describe('nav-sidebar.css', () => {
 
     expect(getRule(css, '.grimoire-nav-btn-directory')).toContain('opacity: 0.48');
     expect(getRule(css, '.grimoire-nav-btn-directory[aria-expanded="true"]')).toContain(
-      'color: var(--interactive-accent)',
+      'color: var(--grimoire-accent)',
     );
   });
 
@@ -43,7 +43,7 @@ describe('nav-sidebar.css', () => {
 
     expect(getRule(css, '.grimoire-nav-directory-item')).toContain('grid-template-columns: 30px minmax(0, 1fr)');
     expect(getRule(css, '.grimoire-nav-directory-item.is-active .grimoire-nav-directory-number')).toContain(
-      'color: var(--interactive-accent)',
+      'color: var(--grimoire-accent)',
     );
   });
 

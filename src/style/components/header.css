@@ -39,7 +39,7 @@
   border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   color: var(--text-faint);
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease), border-color var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-header-btn:hover {

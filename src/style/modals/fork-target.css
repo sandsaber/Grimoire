@@ -10,10 +10,10 @@
 
 .grimoire-fork-target-option {
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   cursor: pointer;
   color: var(--text-normal);
-  font-size: 14px;
+  font-size: var(--grimoire-text-l);
 }
 
 .grimoire-fork-target-option:hover {

@@ -10,8 +10,8 @@
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
+  border-radius: var(--grimoire-radius-2);
+  box-shadow: var(--grimoire-lift-1);
   z-index: 1000;
   max-height: 400px;
   overflow: hidden;
@@ -23,8 +23,8 @@
 
 .grimoire-resume-header {
   padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-semibold);
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -40,7 +40,7 @@
   padding: 16px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-resume-item {
@@ -50,7 +50,7 @@
   padding: 8px 12px;
   cursor: pointer;
   border-bottom: 1px solid var(--background-modifier-border);
-  transition: background 0.1s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-resume-item:last-child {
@@ -64,7 +64,7 @@
 
 .grimoire-resume-item.current {
   background: var(--background-secondary);
-  border-inline-start: 2px solid var(--interactive-accent);
+  border-inline-start: 2px solid var(--grimoire-accent);
   padding-inline-start: 10px;
 }
 
@@ -81,7 +81,7 @@
 }
 
 .grimoire-resume-item.current .grimoire-resume-item-icon {
-  color: var(--interactive-accent);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-resume-item-content {
@@ -90,8 +90,8 @@
 }
 
 .grimoire-resume-item-title {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--grimoire-text-m);
+  font-weight: var(--grimoire-weight-medium);
   color: var(--text-normal);
   white-space: nowrap;
   overflow: hidden;
@@ -99,7 +99,7 @@
 }
 
 .grimoire-resume-item-date {
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   color: var(--text-faint);
   margin-top: 2px;
 }
@@ -115,5 +115,5 @@
 
 .grimoire-resume-list::-webkit-scrollbar-thumb {
   background: var(--background-modifier-border);
-  border-radius: 3px;
+  border-radius: var(--grimoire-radius-1);
 }

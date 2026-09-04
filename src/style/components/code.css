@@ -10,21 +10,15 @@
 .grimoire-code-wrapper pre,
 .grimoire-message-content pre {
   max-width: 100%;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--code-background, var(--background-primary-alt));
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   overflow-x: auto;
   margin: 0;
 }
 
 .grimoire-message-content :not(pre) > code {
   overflow-wrap: anywhere;
-}
-
-/* Light mode: use a lighter background so hljs comment colors stay readable */
-body.theme-light .grimoire-code-wrapper pre,
-body.theme-light .grimoire-message-content pre {
-  background: rgba(0, 0, 0, 0.08);
 }
 
 /* Code blocks without language - wrap content */
@@ -41,7 +35,7 @@ body.theme-light .grimoire-message-content pre {
 
 .grimoire-message-content code {
   font-family: var(--font-monospace);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
 }
 
 /* Clickable language label - positioned outside scroll area */
@@ -50,14 +44,14 @@ body.theme-light .grimoire-message-content pre {
   top: 6px;
   inset-inline-end: 6px;
   padding: 2px 8px;
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   font-family: var(--font-monospace);
   color: var(--text-faint);
   background: var(--background-primary);
-  border-radius: 3px;
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   z-index: 2;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color var(--grimoire-duration) var(--grimoire-ease), background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-code-wrapper .grimoire-code-lang-label:hover {
@@ -76,14 +70,14 @@ body.theme-light .grimoire-message-content pre {
   top: 6px;
   inset-inline-end: 6px;
   padding: 4px 8px;
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   background: var(--background-primary);
   border: none;
   color: var(--text-muted);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
-  border-radius: 3px;
+  transition: opacity var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease), background var(--grimoire-duration) var(--grimoire-ease);
+  border-radius: var(--grimoire-radius-1);
   z-index: 2;
 }
 

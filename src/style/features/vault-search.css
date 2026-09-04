@@ -10,7 +10,7 @@
 
 .grimoire-vault-search-source {
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   padding: 2px 6px;
   background: var(--background-secondary);
   color: var(--text-normal);

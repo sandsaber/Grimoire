@@ -12,7 +12,7 @@
   height: auto;
   border-radius: var(--radius-s);
   cursor: pointer;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--grimoire-duration-slow) var(--grimoire-ease);
 }
 
 .grimoire-message-content img,

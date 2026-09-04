@@ -9,10 +9,8 @@
   margin-top: 8px;
   padding: 8px 10px;
   border: 1px solid var(--grimoire-workbench-border);
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(var(--grimoire-brand-rgb), 0.055), transparent 50%),
-    var(--grimoire-workbench-surface);
+  border-radius: var(--grimoire-radius-2);
+  background: var(--grimoire-workbench-surface);
 }
 
 /* Todo Section */
@@ -27,8 +25,8 @@
   gap: 8px;
   padding: 3px 4px;
   cursor: pointer;
-  border-radius: 6px;
-  transition: background 0.15s ease;
+  border-radius: var(--grimoire-radius-2);
+  transition: background var(--grimoire-duration) var(--grimoire-ease);
   overflow: hidden;
 }
 
@@ -37,7 +35,7 @@
 }
 
 .grimoire-status-panel-header:focus-visible {
-  outline: 2px solid var(--interactive-accent);
+  outline: 2px solid var(--grimoire-accent);
   outline-offset: 2px;
 }
 
@@ -55,15 +53,15 @@
 
 .grimoire-status-panel-label {
   font-family: var(--font-monospace);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-medium);
   color: var(--text-normal);
 }
 
 .grimoire-status-panel-current {
   flex: 1;
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   color: var(--grimoire-workbench-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -109,7 +107,7 @@
 
 .grimoire-todo-list-container .grimoire-todo-text {
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   line-height: 1.4;
   flex: 1;
   padding-left: 12px;
@@ -169,7 +167,7 @@
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
   color: var(--text-muted);
 }
 
@@ -230,7 +228,7 @@
   align-items: center;
   gap: 8px;
   padding: 4px 6px;
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-workbench-surface-raised);
   overflow: hidden;
 }
@@ -243,7 +241,7 @@
 }
 
 .grimoire-agent-card--running .grimoire-agent-card-icon {
-  color: var(--interactive-accent);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-agent-card--failed .grimoire-agent-card-icon {

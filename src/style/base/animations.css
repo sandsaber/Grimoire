@@ -29,11 +29,11 @@
 @keyframes mcp-glow {
   0%,
   100% {
-    filter: drop-shadow(0 0 2px rgba(124, 58, 237, 0.4));
+    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--grimoire-brand) 40%, transparent));
   }
 
   50% {
-    filter: drop-shadow(0 0 8px rgba(124, 58, 237, 0.9));
+    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--grimoire-brand) 90%, transparent));
   }
 }
 

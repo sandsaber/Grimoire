@@ -27,7 +27,7 @@
 .grimoire-write-edit-icon {
   width: 16px;
   height: 16px;
-  color: var(--text-accent);
+  color: var(--grimoire-accent-text);
   flex-shrink: 0;
 }
 
@@ -39,8 +39,8 @@
 /* Two-part header: name (fixed) + summary (flexible) */
 .grimoire-write-edit-name {
   font-family: var(--font-monospace);
-  font-size: 13px;
-  font-weight: 400;
+  font-size: var(--grimoire-text-m);
+  font-weight: var(--grimoire-weight-normal);
   color: var(--text-normal);
   white-space: nowrap;
   flex-shrink: 0;
@@ -48,7 +48,7 @@
 
 .grimoire-write-edit-summary {
   font-family: var(--font-monospace);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -59,7 +59,7 @@
 
 .grimoire-write-edit-stats {
   font-family: var(--font-monospace);
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   flex-shrink: 0;
 }
 
@@ -110,7 +110,7 @@
 .grimoire-write-edit-diff {
   flex: 1;
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   line-height: 1.5;
   background: transparent;
   max-height: 300px;
@@ -123,7 +123,7 @@
 .grimoire-write-edit-error,
 .grimoire-write-edit-done-text {
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   color: var(--text-muted);
 }
 
@@ -156,7 +156,7 @@
 }
 
 .grimoire-diff-insert {
-  background: rgba(80, 200, 80, 0.25);
+  background: color-mix(in srgb, var(--color-green) 25%, transparent);
   color: var(--text-normal);
 }
 
@@ -173,7 +173,7 @@
   border-top: 1px dashed var(--background-modifier-border);
   border-bottom: 1px dashed var(--background-modifier-border);
   margin: 8px 0;
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
 }
 
 .grimoire-diff-no-changes {

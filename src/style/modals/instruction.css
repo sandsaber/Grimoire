@@ -10,8 +10,8 @@
 }
 
 .grimoire-instruction-label {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-medium);
   color: var(--text-muted);
   margin-bottom: 6px;
 }
@@ -19,8 +19,8 @@
 .grimoire-instruction-original {
   padding: 10px 12px;
   background: var(--background-secondary);
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: var(--grimoire-radius-2);
+  font-size: var(--grimoire-text-m);
   color: var(--text-muted);
   font-style: italic;
   white-space: pre-wrap;
@@ -30,8 +30,8 @@
   padding: 12px;
   background: var(--background-primary-alt);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: var(--grimoire-radius-2);
+  font-size: var(--grimoire-text-l);
   color: var(--text-normal);
   line-height: 1.5;
   white-space: pre-wrap;
@@ -41,8 +41,8 @@
   padding: 12px;
   background: var(--background-primary-alt);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: var(--grimoire-radius-2);
+  font-size: var(--grimoire-text-l);
   color: var(--text-normal);
   line-height: 1.5;
   white-space: pre-wrap;
@@ -55,10 +55,10 @@
 .grimoire-instruction-edit-textarea {
   width: 100%;
   padding: 10px 12px;
-  font-size: 14px;
+  font-size: var(--grimoire-text-l);
   line-height: 1.5;
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   background: var(--background-primary);
   color: var(--text-normal);
   resize: vertical;
@@ -67,16 +67,16 @@
 
 .grimoire-instruction-edit-textarea:focus {
   outline: none;
-  border-color: var(--interactive-accent);
+  border-color: var(--grimoire-accent);
 }
 
 .grimoire-instruction-response-textarea {
   width: 100%;
   padding: 10px 12px;
-  font-size: 14px;
+  font-size: var(--grimoire-text-l);
   line-height: 1.5;
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   background: var(--background-primary);
   color: var(--text-normal);
   resize: vertical;
@@ -85,7 +85,7 @@
 
 .grimoire-instruction-response-textarea:focus {
   outline: none;
-  border-color: var(--interactive-accent);
+  border-color: var(--grimoire-accent);
 }
 
 .grimoire-instruction-buttons {
@@ -97,11 +97,11 @@
 
 .grimoire-instruction-btn {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   cursor: pointer;
-  font-weight: 500;
+  font-weight: var(--grimoire-weight-medium);
 }
 
 .grimoire-instruction-reject-btn {
@@ -123,7 +123,7 @@
 }
 
 .grimoire-instruction-accept-btn {
-  background: var(--interactive-accent);
+  background: var(--grimoire-accent);
   color: var(--text-on-accent);
 }
 
@@ -145,7 +145,7 @@
   width: 18px;
   height: 18px;
   border: 2px solid var(--background-modifier-border);
-  border-top-color: var(--interactive-accent);
+  border-top-color: var(--grimoire-accent);
   border-radius: 50%;
   animation: grimoire-spin 0.8s linear infinite;
 }

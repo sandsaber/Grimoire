@@ -21,7 +21,7 @@
   gap: 8px;
   padding: 8px 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
   background: color-mix(
     in srgb,
     var(--setting-items-background, var(--background-secondary)) 82%,
@@ -29,7 +29,7 @@
   );
   color: var(--text-normal);
   cursor: pointer;
-  transition: background-color 0.14s ease;
+  transition: background-color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-settings-provider-card:hover {
@@ -42,11 +42,11 @@
 
 .grimoire-settings-provider-card--active {
   border: 0;
-  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-primary));
+  background: color-mix(in srgb, var(--grimoire-accent) 18%, var(--background-primary));
 }
 
 .grimoire-settings-provider-card--active:hover {
-  background: color-mix(in srgb, var(--interactive-accent) 13%, var(--background-primary));
+  background: color-mix(in srgb, var(--grimoire-accent) 13%, var(--background-primary));
 }
 
 .grimoire-settings-provider-card-copy {
@@ -66,8 +66,8 @@
 .grimoire-settings-provider-card-name {
   overflow: hidden;
   color: var(--text-normal);
-  font-size: 12.5px;
-  font-weight: 650;
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -75,7 +75,7 @@
 .grimoire-settings-provider-card-meta {
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: var(--grimoire-text-2xs);
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -94,7 +94,7 @@
   max-width: none;
   padding: 12px 0 18px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
   background: transparent;
 }
 
@@ -103,7 +103,7 @@
   box-sizing: border-box;
   width: 100%;
   max-width: none;
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
 }
 
 .grimoire-settings-segmented-nav {
@@ -112,7 +112,7 @@
   gap: 4px;
   margin-bottom: 12px;
   padding: 3px;
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
   background: var(--background-secondary);
 }
 
@@ -120,7 +120,7 @@
   height: auto;
   padding: 5px 12px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   background: transparent;
   box-shadow: none;
   color: var(--text-muted);
@@ -134,7 +134,7 @@
 
 .grimoire-settings-segmented-nav button.is-active {
   background: var(--background-primary);
-  box-shadow: var(--shadow-s);
+  box-shadow: var(--grimoire-lift-1);
   color: var(--text-normal);
 }
 
@@ -232,7 +232,7 @@
   color: var(--text-faint);
   font-family: var(--font-interface);
   font-size: var(--font-ui-smaller);
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1.35;
 }
 
@@ -284,7 +284,7 @@
   height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   background: transparent;
   box-shadow: none;
   color: var(--text-muted);
@@ -329,7 +329,7 @@
 
 .grimoire-settings-about-copy {
   padding: 14px 16px;
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
   background: var(--background-secondary);
   color: var(--text-muted);
   line-height: 1.6;
@@ -352,7 +352,7 @@
   min-height: 180px;
   padding: 14px 16px 16px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--grimoire-radius-3);
   background: transparent;
 }
 
@@ -363,7 +363,7 @@
   margin-bottom: 4px;
   padding: 10px 12px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
   background: var(--background-primary);
 }
 

@@ -10,8 +10,8 @@
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
+  border-radius: var(--grimoire-radius-2);
+  box-shadow: var(--grimoire-lift-1);
   z-index: 1000;
   max-height: 250px;
   overflow-y: auto;
@@ -37,7 +37,7 @@
   gap: 8px;
   padding: 8px 12px;
   cursor: pointer;
-  transition: background 0.1s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-mention-item:hover,
@@ -58,7 +58,7 @@
 }
 
 .grimoire-mention-path {
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   color: var(--text-normal);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -69,7 +69,7 @@
   padding: 12px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
 }
 
 /* Scrollbar for mention dropdown */
@@ -83,12 +83,12 @@
 
 .grimoire-mention-dropdown::-webkit-scrollbar-thumb {
   background: var(--background-modifier-border);
-  border-radius: 3px;
+  border-radius: var(--grimoire-radius-1);
 }
 
 /* MCP items in @-mention dropdown */
 .grimoire-mention-item.mcp-server .grimoire-mention-icon {
-  color: var(--interactive-accent);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-mention-item.vault-folder .grimoire-mention-icon {
@@ -104,9 +104,9 @@
 }
 
 .grimoire-mention-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--interactive-accent);
+  font-size: var(--grimoire-text-m);
+  font-weight: var(--grimoire-weight-medium);
+  color: var(--grimoire-accent);
 }
 
 /* Context file items in @-mention dropdown */
@@ -134,7 +134,7 @@
 
 .grimoire-mention-name-folder {
   color: var(--text-normal);
-  font-weight: 500;
+  font-weight: var(--grimoire-weight-medium);
 }
 
 .grimoire-mention-name-context {
@@ -148,7 +148,7 @@
 
 .grimoire-mention-name-agent-folder {
   color: var(--link-color);
-  font-weight: 600;
+  font-weight: var(--grimoire-weight-semibold);
 }
 
 /* Agent items in @-mention dropdown (inside @Agents/) */
@@ -166,12 +166,12 @@
 
 .grimoire-mention-item.agent .grimoire-mention-name-agent {
   color: var(--text-normal);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   flex-shrink: 0;
 }
 
 .grimoire-mention-item.agent .grimoire-mention-agent-desc {
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -181,7 +181,7 @@
 
 .grimoire-container--chat-window .grimoire-file-chip {
   max-width: min(220px, 100%);
-  border-radius: 5px;
+  border-radius: var(--grimoire-radius-1);
 }
 
 .grimoire-container--chat-window .grimoire-file-chip-name,
@@ -212,8 +212,8 @@
 
 .grimoire-context-section-title {
   color: var(--text-normal);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--grimoire-text-m);
+  font-weight: var(--grimoire-weight-bold);
 }
 
 .grimoire-context-file-row {
@@ -242,13 +242,13 @@
 }
 
 .grimoire-note-memory-card:hover .grimoire-context-file-title {
-  color: var(--text-accent);
+  color: var(--grimoire-accent-text);
 }
 
 .grimoire-note-memory-card:focus-visible {
-  outline: 1px solid var(--interactive-accent);
+  outline: 1px solid var(--grimoire-accent);
   outline-offset: 3px;
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
 }
 
 .grimoire-context-file-body {
@@ -269,14 +269,14 @@
 
 .grimoire-context-file-title {
   color: var(--text-normal);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--grimoire-text-m);
+  font-weight: var(--grimoire-weight-bold);
   line-height: 1.35;
 }
 
 .grimoire-context-file-path {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   line-height: 1.35;
 }
 
@@ -284,12 +284,12 @@
 .grimoire-context-file-status,
 .grimoire-context-file-method {
   flex-shrink: 0;
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
   padding: 2px 6px;
   background: var(--background-modifier-hover);
   color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--grimoire-text-2xs);
+  font-weight: var(--grimoire-weight-bold);
   letter-spacing: 0;
   line-height: 1.4;
   text-transform: uppercase;

@@ -14,7 +14,7 @@
 }
 
 .grimoire-thinking-label-text {
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   color: var(--text-muted);
 }
 
@@ -22,18 +22,18 @@
   position: relative;
   display: flex;
   align-items: center;
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
   z-index: 1;
 }
 
 /* Current selection (visible when collapsed) */
 .grimoire-thinking-current {
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   color: var(--grimoire-brand);
-  font-weight: 500;
+  font-weight: var(--grimoire-weight-medium);
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--grimoire-radius-1);
   white-space: nowrap;
   background: transparent;
 }
@@ -49,11 +49,11 @@
   gap: 2px;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
   padding: 4px;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.15s ease, visibility 0.15s ease;
+  transition: opacity var(--grimoire-duration) var(--grimoire-ease), visibility var(--grimoire-duration) var(--grimoire-ease);
   z-index: 100;
 }
 
@@ -69,11 +69,11 @@
 
 .grimoire-thinking-gear {
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   color: var(--text-muted);
   cursor: pointer;
-  border-radius: 3px;
-  transition: background 0.1s ease, color 0.1s ease;
+  border-radius: var(--grimoire-radius-1);
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
   white-space: nowrap;
 }
 
@@ -85,7 +85,7 @@
 .grimoire-thinking-gear.selected {
   background: rgba(var(--grimoire-brand-rgb), 0.15);
   color: var(--grimoire-brand);
-  font-weight: 500;
+  font-weight: var(--grimoire-weight-medium);
 }
 
 .grimoire-container--chat-window .grimoire-thinking-selector {
@@ -118,8 +118,8 @@
   background: var(--grimoire-raise);
   color: var(--grimoire-workbench-muted);
   font-family: var(--font-monospace);
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -145,7 +145,7 @@
   border-color: var(--background-modifier-border);
   border-radius: var(--grimoire-radius-2);
   background: var(--background-primary);
-  box-shadow: var(--shadow-s, 0 6px 18px rgba(0, 0, 0, 0.22));
+  box-shadow: var(--grimoire-lift-1);
   z-index: 10004;
   animation: grimoire-pop 0.14s ease-out;
 }
@@ -156,12 +156,12 @@
   min-height: 28px;
   padding: 0 8px;
   border-radius: var(--grimoire-radius-1);
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
 }
 
 .grimoire-container--chat-window .grimoire-thinking-gear.selected {
   background: var(--grimoire-accent-soft);
   color: var(--grimoire-accent-text);
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
 }

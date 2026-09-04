@@ -18,7 +18,7 @@
 .grimoire-mcp-label {
   font-size: var(--font-ui-small);
   color: var(--text-muted);
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-mcp-add-container {
@@ -34,8 +34,8 @@
   min-width: 180px;
   background-color: var(--modal-background, var(--background-primary));
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border-radius: var(--grimoire-radius-2);
+  box-shadow: var(--grimoire-lift-1);
   z-index: 100;
   overflow: hidden;
 }
@@ -50,7 +50,7 @@
   gap: 8px;
   padding: 8px 12px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   color: var(--text-normal);
 }
 
@@ -73,9 +73,9 @@
   padding: 16px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   background: var(--background-secondary);
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
 }
 
 .grimoire-mcp-list {
@@ -90,8 +90,8 @@
   gap: 12px;
   padding: 14px 16px;
   background: var(--background-secondary);
-  border-radius: 8px;
-  transition: background 0.15s ease;
+  border-radius: var(--grimoire-radius-2);
+  transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-mcp-item:hover {
@@ -131,29 +131,29 @@
 }
 
 .grimoire-mcp-name {
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-mcp-type-badge {
-  font-size: 10px;
+  font-size: var(--grimoire-text-2xs);
   padding: 2px 6px;
   background: var(--background-modifier-border);
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
   color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .grimoire-mcp-context-saving-badge {
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   padding: 2px 6px;
-  background: var(--interactive-accent);
+  background: var(--grimoire-accent);
   color: var(--text-on-accent);
-  border-radius: 4px;
-  font-weight: 400;
+  border-radius: var(--grimoire-radius-1);
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-mcp-preview {
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   color: var(--text-muted);
   margin-top: 4px;
   overflow: hidden;
@@ -176,10 +176,10 @@
   padding: 0;
   border: none;
   background: transparent;
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   color: var(--text-muted);
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-mcp-action-btn:hover {

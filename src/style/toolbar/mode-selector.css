@@ -8,14 +8,14 @@
 }
 
 .grimoire-mode-label {
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   color: var(--text-muted);
   min-width: 32px;
 }
 
 .grimoire-mode-label.active {
   color: var(--grimoire-brand);
-  font-weight: 600;
+  font-weight: var(--grimoire-weight-semibold);
 }
 
 .grimoire-container--chat-window .grimoire-mode-selector {
@@ -40,7 +40,7 @@
   background: var(--grimoire-raise);
   color: var(--grimoire-workbench-muted);
   font-family: var(--font-monospace);
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;

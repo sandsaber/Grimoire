@@ -10,8 +10,8 @@
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
+  border-radius: var(--grimoire-radius-2);
+  box-shadow: var(--grimoire-lift-1);
   z-index: 1000;
   max-height: 300px;
   overflow-y: auto;
@@ -34,7 +34,7 @@
 .grimoire-slash-item {
   padding: 8px 12px;
   cursor: pointer;
-  transition: background 0.1s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease);
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
@@ -48,20 +48,20 @@
 }
 
 .grimoire-slash-name {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-medium);
   color: var(--text-normal);
   font-family: var(--font-monospace);
 }
 
 .grimoire-slash-hint {
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   color: var(--text-muted);
   margin-left: 8px;
 }
 
 .grimoire-slash-desc {
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   color: var(--text-muted);
   margin-top: 2px;
   overflow: hidden;
@@ -73,7 +73,7 @@
   padding: 16px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
 }
 
 /* Scrollbar */
@@ -87,5 +87,5 @@
 
 .grimoire-slash-dropdown::-webkit-scrollbar-thumb {
   background: var(--background-modifier-border);
-  border-radius: 3px;
+  border-radius: var(--grimoire-radius-1);
 }

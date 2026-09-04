@@ -8,7 +8,7 @@
   margin: 12px 0;
   padding: 12px;
   background: var(--background-secondary);
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
 }
 
 .grimoire-mcp-type-fields .setting-item {
@@ -38,16 +38,16 @@
   min-height: 50px;
   resize: vertical;
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   padding: 8px;
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
 }
 
 .grimoire-mcp-cmd-textarea:focus,
 .grimoire-mcp-env-textarea:focus {
-  border-color: var(--interactive-accent);
+  border-color: var(--grimoire-accent);
   outline: none;
 }
 
@@ -99,7 +99,7 @@
   gap: 10px;
   padding: 12px;
   background: var(--background-secondary);
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   margin-bottom: 12px;
 }
 
@@ -122,16 +122,16 @@
 }
 
 .grimoire-mcp-test-text {
-  font-weight: 500;
+  font-weight: var(--grimoire-weight-medium);
 }
 
 .grimoire-mcp-test-error {
   padding: 10px 12px;
   background: rgba(var(--color-red-rgb), 0.1);
   border: 1px solid var(--text-error);
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   color: var(--text-error);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   margin-bottom: 12px;
 }
 
@@ -140,8 +140,8 @@
 }
 
 .grimoire-mcp-test-tools-header {
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: var(--grimoire-weight-semibold);
+  font-size: var(--grimoire-text-m);
   margin-bottom: 8px;
   color: var(--text-muted);
 }
@@ -157,7 +157,7 @@
 .grimoire-mcp-test-tool {
   padding: 10px 12px;
   background: var(--background-secondary);
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
 }
 
 .grimoire-mcp-test-tool-header {
@@ -178,8 +178,8 @@
 }
 
 .grimoire-mcp-test-tool-name {
-  font-weight: 500;
-  font-size: 13px;
+  font-weight: var(--grimoire-weight-medium);
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-mcp-test-tool-toggle {
@@ -215,7 +215,7 @@
 }
 
 .grimoire-mcp-test-tool-desc {
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   color: var(--text-muted);
   margin-top: 4px;
   display: -webkit-box;
@@ -228,9 +228,9 @@
   padding: 16px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   background: var(--background-secondary);
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   margin-bottom: 16px;
 }
 

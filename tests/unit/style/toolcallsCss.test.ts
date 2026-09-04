@@ -58,7 +58,7 @@ describe('toolcalls.css', () => {
 
     const buttonRule = getRule(css, '.grimoire-tool-show-all');
     expect(buttonRule).toContain('cursor: pointer');
-    expect(buttonRule).toContain('border-radius: 999px');
+    expect(buttonRule).toContain('border-radius: var(--grimoire-radius-pill)');
     expect(buttonRule).toContain('padding: 7px 11px');
   });
 });

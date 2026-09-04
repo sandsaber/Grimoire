@@ -4,29 +4,6 @@
    provides compact geometry and Grimoire-specific layout.
    ============================================================ */
 
-/* ── Obsidian accent and settings-local tokens ── */
-.grimoire-settings {
-  --grimoire-brand: var(--interactive-accent, var(--color-accent));
-  --grimoire-brand-rgb: var(--interactive-accent-rgb, var(--color-accent-rgb, 127, 95, 217));
-
-  /* Geometry tokens from the prototype */
-  --gs-r1: 6px;
-  --gs-r2: 9px;
-  --gs-r3: 13px;
-  --gs-pill: 999px;
-
-  /* Provider identity hues */
-  --gs-dot-claude: #d97757;
-  --gs-dot-codex: #19c37d;
-  --gs-dot-qwen: #615ced;
-  --gs-dot-antigravity: #5b8def;
-  --gs-dot-gemini: #669df6;
-  --gs-dot-opencode: #e0b341;
-  --gs-dot-mimocode: #ff6a00;
-  --gs-dot-kimicode: #7c3aed;
-  --gs-dot-grok: var(--text-faint);
-}
-
 /* ── Layout: centered single column ── */
 .grimoire-settings {
   max-width: 880px;
@@ -147,7 +124,7 @@
   width: 18px;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.14s ease;
+  transition: opacity var(--grimoire-duration) var(--grimoire-ease);
   z-index: 1;
 }
 
@@ -192,7 +169,7 @@
   white-space: nowrap;
   cursor: pointer;
   box-shadow: none;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color var(--grimoire-duration) var(--grimoire-ease), border-color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-settings-tabs-viewport > .grimoire-settings-tab:hover {
@@ -207,7 +184,7 @@
 
 .grimoire-settings-tabs-viewport > .grimoire-settings-tab--active,
 .grimoire-settings-tabs-viewport > .grimoire-settings-tab--active:hover {
-  border-bottom-color: var(--interactive-accent);
+  border-bottom-color: var(--grimoire-accent);
   background: transparent;
   color: var(--text-normal);
 }
@@ -217,7 +194,7 @@
   width: 4px;
   height: 4px;
   margin-left: 4px;
-  border-radius: var(--gs-pill);
+  border-radius: var(--grimoire-radius-pill);
   background: var(--text-faint);
   vertical-align: 1px;
 }
@@ -247,12 +224,12 @@
 
 .grimoire-settings .setting-item-description code {
   padding: 1.5px 5px;
-  border-radius: 5px;
+  border-radius: var(--grimoire-radius-1);
   background: var(--background-modifier-form-field);
   color: var(--grimoire-brand);
   font-family: var(--font-monospace);
-  font-size: 11.5px;
-  font-weight: 400;
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
 }
 
 /* Stacked rows (textareas) — label on top, control full width below */
@@ -283,7 +260,7 @@
   height: 30px;
   min-width: 180px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-settings .setting-item-control input::placeholder {
@@ -295,7 +272,7 @@
   height: 30px;
   min-width: 124px;
   padding-block: 0;
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   cursor: pointer;
 }
 
@@ -305,7 +282,7 @@
   min-height: 72px;
   padding: 8px 10px;
   font-family: var(--font-monospace);
-  font-size: 12.5px;
+  font-size: var(--grimoire-text-s);
   line-height: 1.5;
   resize: vertical;
 }
@@ -325,8 +302,8 @@
   margin-left: 12px;
   color: var(--text-muted);
   font-family: var(--font-monospace);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-medium);
   text-align: right;
 }
 
@@ -335,20 +312,20 @@
   margin: 14px 0 4px;
   padding: 13px 15px;
   border: 1px solid rgba(var(--grimoire-brand-rgb), 0.42);
-  border-radius: var(--gs-r2);
+  border-radius: var(--grimoire-radius-2);
   background: rgba(var(--grimoire-brand-rgb), 0.07);
 }
 
 .grimoire-provider-disabled-notice p {
   margin: 0;
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: var(--grimoire-text-s);
   line-height: 1.5;
 }
 
 .grimoire-provider-disabled-notice strong {
   color: var(--grimoire-brand);
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
 }
 
 /* ============================================================
@@ -369,14 +346,14 @@
   margin-top: 0;
   padding: 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
   background: var(--background-secondary);
   color: var(--text-normal);
   cursor: pointer;
   text-align: left;
   white-space: normal;
   box-shadow: none;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-adv-toggle:hover {
@@ -401,7 +378,7 @@
   border: none;
   background: transparent;
   color: var(--text-muted);
-  transition: transform 0.18s ease, color 0.15s ease;
+  transition: transform var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-adv-chevron svg {
@@ -423,14 +400,14 @@
 
 .grimoire-adv-title {
   color: var(--text-normal);
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: var(--grimoire-text-m);
+  font-weight: var(--grimoire-weight-semibold);
   line-height: 1.25;
 }
 
 .grimoire-adv-summary {
   color: var(--text-faint);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   line-height: 1.35;
 }
 
@@ -440,8 +417,8 @@
   border: none;
   background: transparent;
   color: var(--text-faint);
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
 }
 
@@ -450,7 +427,7 @@
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
-  transition: grid-template-rows 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.24s ease;
+  transition: grid-template-rows var(--grimoire-duration-slow) var(--grimoire-ease), opacity var(--grimoire-duration-slow) var(--grimoire-ease);
 }
 
 .grimoire-adv-wrap.is-open {
@@ -500,10 +477,10 @@
   gap: 8px;
   padding: 7px 10px;
   border: none;
-  border-radius: var(--gs-r1);
+  border-radius: var(--grimoire-radius-1);
   background: transparent;
   cursor: pointer;
-  transition: background 0.14s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-hotkey-item:hover {
@@ -512,18 +489,18 @@
 
 .grimoire-hotkey-name {
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: var(--grimoire-text-s);
 }
 
 .grimoire-hotkey-badge {
   padding: 2px 6px;
-  border-radius: 5px;
+  border-radius: var(--grimoire-radius-1);
   background: var(--background-modifier-form-field);
   box-shadow: inset 0 0 0 1px var(--background-modifier-border-hover);
   color: var(--text-normal);
   font-family: var(--font-monospace);
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
   white-space: nowrap;
 }
 
@@ -544,7 +521,7 @@
 .grimoire-mcp-settings-desc p {
   margin: 0 0 6px;
   color: var(--text-faint);
-  font-size: 12.5px;
+  font-size: var(--grimoire-text-s);
   line-height: 1.45;
 }
 
@@ -558,10 +535,10 @@
   padding: 0;
   border: none;
   background: transparent;
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   color: var(--text-muted);
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-settings-action-btn:hover {
@@ -661,7 +638,7 @@
 .grimoire-sp-label {
   font-size: var(--font-ui-small);
   color: var(--text-muted);
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-sp-header-actions {
@@ -674,7 +651,7 @@
   text-align: center;
   color: var(--text-muted);
   background: var(--background-secondary);
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   margin-top: 8px;
 }
 
@@ -691,7 +668,7 @@
   justify-content: space-between;
   padding: 14px 16px;
   background: var(--background-secondary);
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
 }
 
 .grimoire-sp-item:hover {
@@ -710,13 +687,13 @@
 }
 
 .grimoire-sp-item-name {
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
   font-family: var(--font-monospace);
   color: var(--text-normal);
 }
 
 .grimoire-sp-item-desc {
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   color: var(--text-muted);
   margin-top: 2px;
 }
@@ -730,7 +707,7 @@
 
 .grimoire-sp-advanced-section {
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
   padding: 0 12px;
   margin: 8px 0;
 }
@@ -740,7 +717,7 @@
   padding: 8px 0;
   font-size: var(--font-ui-small);
   color: var(--text-muted);
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-sp-advanced-section[open] .grimoire-sp-advanced-summary {
@@ -755,10 +732,10 @@
 .grimoire-sp-content-area {
   width: 100%;
   font-family: var(--font-monospace);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   padding: 8px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
   background: var(--background-primary);
   color: var(--text-normal);
   resize: vertical;

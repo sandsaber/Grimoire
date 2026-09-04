@@ -17,7 +17,7 @@ describe('rename-tab.css', () => {
     expect(getRule(css, '.grimoire-rename-tab-modal')).toContain('width: min(520px, calc(100vw - 32px))');
     expect(getRule(css, '.grimoire-rename-tab-field')).toContain('position: relative');
     expect(getRule(css, '.grimoire-rename-tab-field:focus-within')).toContain(
-      'border-color: var(--interactive-accent)',
+      'border-color: var(--grimoire-accent)',
     );
     expect(getRule(css, '.grimoire-rename-tab-footer')).toContain('justify-content: space-between');
   });

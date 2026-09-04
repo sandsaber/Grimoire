@@ -154,7 +154,7 @@ describe('messages.css', () => {
     const assistantCopiedRule = getExactRule(css, '.grimoire-text-copy-btn.copied');
     const userCopiedRule = getExactRule(css, '.grimoire-user-msg-actions span.copied');
 
-    expect(assistantCopiedRule).toContain('color: var(--text-accent)');
+    expect(assistantCopiedRule).toContain('color: var(--grimoire-accent-text)');
     expect(assistantCopiedRule).not.toContain('width: auto');
     expect(assistantCopiedRule).not.toContain('min-width');
     expect(userCopiedRule).not.toContain('font-size');

@@ -34,7 +34,7 @@
 .grimoire-subagent-icon {
   display: flex;
   align-items: center;
-  color: var(--interactive-accent);
+  color: var(--grimoire-accent);
   flex-shrink: 0;
 }
 
@@ -46,8 +46,8 @@
 .grimoire-subagent-label {
   flex: 1;
   font-family: var(--font-monospace);
-  font-size: 13px;
-  font-weight: 400;
+  font-size: var(--grimoire-text-m);
+  font-weight: var(--grimoire-weight-normal);
   color: var(--text-normal);
 }
 
@@ -63,7 +63,7 @@
 }
 
 .grimoire-subagent-status.status-running {
-  color: var(--text-accent);
+  color: var(--grimoire-accent-text);
 }
 
 .grimoire-subagent-status.status-completed {
@@ -92,7 +92,7 @@
   cursor: pointer;
   user-select: none;
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   color: var(--text-muted);
   padding: 2px 0;
 }
@@ -113,7 +113,7 @@
 .grimoire-subagent-prompt-text,
 .grimoire-subagent-result-output {
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   line-height: 1.4;
   color: var(--text-muted);
   white-space: pre-wrap;
@@ -151,7 +151,7 @@
 .grimoire-subagent-tool-icon {
   display: flex;
   align-items: center;
-  color: var(--text-accent);
+  color: var(--grimoire-accent-text);
   flex-shrink: 0;
 }
 
@@ -162,7 +162,7 @@
 
 .grimoire-subagent-tool-name {
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   color: var(--text-normal);
   white-space: nowrap;
   flex-shrink: 0;
@@ -170,7 +170,7 @@
 
 .grimoire-subagent-tool-summary {
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -191,7 +191,7 @@
 }
 
 .grimoire-subagent-tool-status.status-running {
-  color: var(--text-accent);
+  color: var(--grimoire-accent-text);
 }
 
 .grimoire-subagent-tool-status.status-completed {
@@ -211,12 +211,12 @@
   color: var(--text-faint);
   font-style: italic;
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   padding: 2px 0;
 }
 
 .grimoire-subagent-status-text {
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   font-family: var(--font-monospace);
   color: var(--text-muted);
   margin-inline-start: auto;
@@ -224,7 +224,7 @@
 }
 
 .grimoire-subagent-list.async .grimoire-subagent-icon {
-  color: var(--interactive-accent);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-subagent-list.async.pending .grimoire-subagent-status-text {
@@ -232,7 +232,7 @@
 }
 
 .grimoire-subagent-list.async.running .grimoire-subagent-status-text {
-  color: var(--text-accent);
+  color: var(--grimoire-accent-text);
 }
 
 .grimoire-subagent-list.async.awaiting .grimoire-subagent-status-text {

@@ -12,13 +12,13 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 12px;
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   color: var(--text-faint);
 }
 
 .grimoire-grok-model-picker-summary-value {
   color: var(--text-normal);
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
 }
 
 /* Selected models block */
@@ -28,7 +28,7 @@
   gap: 10px;
   padding: 14px 16px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
   background: var(--background-secondary);
 }
 
@@ -40,8 +40,8 @@
 }
 
 .grimoire-grok-model-picker-selected-label {
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-faint);
@@ -49,14 +49,14 @@
 
 .grimoire-grok-model-picker-selected-clear {
   padding: 4px 10px;
-  font-size: 11.5px;
-  font-weight: 400;
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
   color: var(--text-muted);
   background: transparent;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--gs-r1, 6px);
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-grok-model-picker-selected-clear:hover {
@@ -77,7 +77,7 @@
   padding: 10px 12px;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--gs-r1, 6px);
+  border-radius: var(--grimoire-radius-1);
 }
 
 .grimoire-grok-model-picker-selected-row--unavailable {
@@ -101,9 +101,9 @@
 }
 
 .grimoire-grok-model-picker-selected-badge {
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   padding: 1px 7px;
-  border-radius: var(--gs-pill, 999px);
+  border-radius: var(--grimoire-radius-pill);
   background: var(--background-modifier-hover);
   color: var(--text-muted);
   text-transform: uppercase;
@@ -112,14 +112,14 @@
 
 .grimoire-grok-model-picker-selected-name {
   color: var(--text-normal);
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .grimoire-grok-model-picker-selected-id {
-  font-size: 11.5px;
+  font-size: var(--grimoire-text-xs);
   color: var(--text-faint);
   font-family: var(--font-monospace);
   overflow: hidden;
@@ -128,7 +128,7 @@
 }
 
 .grimoire-grok-model-picker-selected-unavailable {
-  font-size: 11.5px;
+  font-size: var(--grimoire-text-xs);
   color: var(--text-muted);
   font-style: italic;
 }
@@ -145,15 +145,15 @@
   height: 30px;
   padding: 0 10px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--gs-r1, 6px);
+  border-radius: var(--grimoire-radius-1);
   background: var(--background-primary);
   color: var(--text-normal);
-  font-size: 12.5px;
+  font-size: var(--grimoire-text-s);
 }
 
 .grimoire-grok-model-picker-selected-alias:focus {
   outline: none;
-  border-color: var(--interactive-accent);
+  border-color: var(--grimoire-accent);
 }
 
 .grimoire-grok-model-picker-selected-remove {
@@ -165,12 +165,12 @@
   padding: 0;
   border: none;
   background: transparent;
-  border-radius: var(--gs-r1, 6px);
+  border-radius: var(--grimoire-radius-1);
   color: var(--text-faint);
   cursor: pointer;
   line-height: 1;
-  font-size: 16px;
-  transition: background 0.14s ease, color 0.14s ease;
+  font-size: var(--grimoire-text-xl);
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-grok-model-picker-selected-remove:hover {
@@ -185,7 +185,7 @@
   gap: 12px;
   padding: 14px 16px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
   background: var(--background-secondary);
 }
 
@@ -208,10 +208,10 @@
   display: inline-flex;
   width: 18px;
   justify-content: center;
-  font-size: 16px;
+  font-size: var(--grimoire-text-xl);
   color: var(--text-muted);
   line-height: 1;
-  transition: transform 0.18s ease;
+  transition: transform var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-grok-model-picker-catalog[open] .grimoire-grok-model-picker-catalog-caret {
@@ -221,13 +221,13 @@
 
 .grimoire-grok-model-picker-catalog-title {
   color: var(--text-normal);
-  font-weight: 400;
-  font-size: 13px;
+  font-weight: var(--grimoire-weight-normal);
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-grok-model-picker-catalog-count {
   margin-left: auto;
-  font-size: 11.5px;
+  font-size: var(--grimoire-text-xs);
   color: var(--text-faint);
 }
 
@@ -246,10 +246,10 @@
   height: 34px;
   padding: 0 12px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--gs-r1, 6px);
+  border-radius: var(--grimoire-radius-1);
   background: var(--background-primary);
   color: var(--text-normal);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-grok-model-picker-search::placeholder {
@@ -258,17 +258,17 @@
 
 .grimoire-grok-model-picker-search:focus {
   outline: none;
-  border-color: var(--interactive-accent);
+  border-color: var(--grimoire-accent);
 }
 
 .grimoire-grok-model-picker-provider {
   height: 34px;
   padding: 0 30px 0 12px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--gs-r1, 6px);
+  border-radius: var(--grimoire-radius-1);
   background-color: var(--background-primary);
   color: var(--text-normal);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   cursor: pointer;
   appearance: none;
   background-image:
@@ -281,7 +281,7 @@
 
 .grimoire-grok-model-picker-provider:focus {
   outline: none;
-  border-color: var(--interactive-accent);
+  border-color: var(--grimoire-accent);
 }
 
 /* Model list → .oc-list / .oc-item */
@@ -289,7 +289,7 @@
   display: flex;
   flex-direction: column;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--gs-r2, 9px);
+  border-radius: var(--grimoire-radius-2);
   background: var(--background-primary);
   max-height: 360px;
   overflow-y: auto;
@@ -302,7 +302,7 @@
   padding: 12px 14px;
   border-top: 1px solid var(--background-modifier-border);
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-grok-model-picker-row:first-child {
@@ -341,17 +341,17 @@
 .grimoire-grok-model-picker-row-name {
   color: var(--text-normal);
   font-family: var(--font-monospace);
-  font-weight: 400;
-  font-size: 13px;
+  font-weight: var(--grimoire-weight-normal);
+  font-size: var(--grimoire-text-m);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .grimoire-grok-model-picker-row-badge {
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   padding: 1px 7px;
-  border-radius: var(--gs-pill, 999px);
+  border-radius: var(--grimoire-radius-pill);
   background: var(--background-modifier-hover);
   color: var(--text-muted);
   text-transform: uppercase;
@@ -364,7 +364,7 @@
 }
 
 .grimoire-grok-model-picker-row-meta {
-  font-size: 11.5px;
+  font-size: var(--grimoire-text-xs);
   color: var(--text-faint);
   font-family: var(--font-monospace);
   overflow: hidden;
@@ -373,7 +373,7 @@
 }
 
 .grimoire-grok-model-picker-row-desc {
-  font-size: 11.5px;
+  font-size: var(--grimoire-text-xs);
   color: var(--text-muted);
 }
 
@@ -381,5 +381,5 @@
   padding: 26px 16px;
   text-align: center;
   color: var(--text-faint);
-  font-size: 12.5px;
+  font-size: var(--grimoire-text-s);
 }

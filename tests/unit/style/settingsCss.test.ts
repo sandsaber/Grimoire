@@ -70,7 +70,7 @@ describe('settings base CSS', () => {
     expect(tabRule).toContain('font-size: var(--font-ui-small)');
     expect(tabRule).toContain('font-weight: var(--font-medium)');
 
-    expect(activeRule).toContain('border-bottom-color: var(--interactive-accent)');
+    expect(activeRule).toContain('border-bottom-color: var(--grimoire-accent)');
     expect(activeRule).toContain('background: transparent');
     expect(activeRule).toContain('color: var(--text-normal)');
     expect(activeRule).not.toContain('font-weight: 600');
@@ -112,8 +112,8 @@ describe('settings base CSS', () => {
     expect(cardRule).toContain('var(--setting-items-background, var(--background-secondary)) 82%');
     expect(hoverRule).toContain('var(--setting-items-background, var(--background-secondary)) 78%');
     expect(activeRule).toContain('border: 0');
-    expect(activeRule).toContain('var(--interactive-accent) 18%');
-    expect(activeHoverRule).toContain('var(--interactive-accent) 13%');
+    expect(activeRule).toContain('var(--grimoire-accent) 18%');
+    expect(activeHoverRule).toContain('var(--grimoire-accent) 13%');
     expect(metaRule).toContain('color: var(--text-muted)');
   });
 
@@ -148,7 +148,7 @@ describe('settings base CSS', () => {
       'border: 1px solid var(--background-modifier-border)',
     );
     expect(providerDetailsRule).not.toContain('background-secondary');
-    expect(settingRule).toContain('border-radius: 8px');
+    expect(settingRule).toContain('border-radius: var(--grimoire-radius-2)');
   });
 
   it('keeps workspace modal content wrappers transparent while preserving their setting cards', () => {
@@ -166,7 +166,7 @@ describe('settings base CSS', () => {
     expect(workspaceContentRule).toContain('border: 0');
     expect(workspaceContentRule).toContain('background: transparent');
     expect(workspaceContentRule).not.toContain('background-secondary');
-    expect(settingRule).toContain('border-radius: 8px');
+    expect(settingRule).toContain('border-radius: var(--grimoire-radius-2)');
     expect(settingRule).toContain('background: var(--background-primary)');
   });
 

@@ -15,8 +15,8 @@
   margin: 8px 2px 7px;
   color: var(--text-faint);
   font-family: var(--font-monospace);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-bold);
   letter-spacing: 0.13em;
   line-height: 1.2;
   text-transform: uppercase;
@@ -28,15 +28,15 @@
   align-items: center;
   min-width: 0;
   border: 1px solid var(--background-modifier-border);
-  border-radius: 9px;
+  border-radius: var(--grimoire-radius-2);
   background: var(--background-primary);
-  box-shadow: 0 0 0 3px transparent;
-  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+  box-shadow: 0 0 0 2px transparent;
+  transition: border-color var(--grimoire-duration) var(--grimoire-ease), box-shadow var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-rename-tab-field:focus-within {
-  border-color: var(--interactive-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  border-color: var(--grimoire-accent);
+  box-shadow: var(--grimoire-focus-ring);
 }
 
 .grimoire-rename-tab-input {
@@ -70,7 +70,7 @@ button.grimoire-rename-tab-reset {
   height: 30px;
   padding: 6px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--grimoire-radius-2);
   background: transparent;
   box-shadow: none;
   color: var(--text-muted);
@@ -99,8 +99,8 @@ button.grimoire-rename-tab-reset svg {
 .grimoire-rename-tab-counter {
   color: var(--text-faint);
   font-family: var(--font-monospace);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-semibold);
   line-height: 1.2;
 }
 

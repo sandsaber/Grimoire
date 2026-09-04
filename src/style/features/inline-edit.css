@@ -5,7 +5,7 @@
 .cm-line .grimoire-selection-highlight,
 .grimoire-selection-highlight {
   background: var(--text-selection);
-  border-radius: 2px;
+  border-radius: var(--grimoire-radius-1);
   padding: 3px 0;
   margin: -3px 0;
 }
@@ -48,7 +48,7 @@
   border-width: 1px;
   border-style: solid;
   border-color: var(--background-modifier-border);
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
   background: transparent;
   color: var(--text-normal);
   font-family: var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif);
@@ -92,7 +92,7 @@
   border-width: 1px;
   border-style: solid;
   border-color: var(--background-modifier-border);
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
   font-family: var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif);
   font-size: var(--font-ui-small, 13px);
   line-height: 1.4;
@@ -112,14 +112,14 @@
 
 /* Deleted text - red strikethrough */
 .grimoire-diff-del {
-  background: rgba(255, 80, 80, 0.2);
+  background: color-mix(in srgb, var(--color-red) 22%, transparent);
   text-decoration: line-through;
   color: var(--text-muted);
 }
 
 /* Inserted text - green background */
 .grimoire-diff-ins {
-  background: rgba(80, 200, 80, 0.2);
+  background: color-mix(in srgb, var(--color-green) 22%, transparent);
 }
 
 /* Accept/Reject buttons inline with diff */
@@ -136,7 +136,7 @@
   background: none;
   box-shadow: none;
   outline: none;
-  font-size: 16px;
+  font-size: var(--grimoire-text-xl);
   cursor: pointer;
 }
 
