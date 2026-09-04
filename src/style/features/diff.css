@@ -1,23 +1,23 @@
 /* Write/Edit Diff Block - Subagent style */
 .grimoire-write-edit-block {
-  margin: 4px 0;
+  margin: var(--grimoire-space-2) 0;
   background: transparent;
   overflow: hidden;
 }
 
 .grimoire-text-block+.grimoire-write-edit-block {
-  margin-top: 8px;
+  margin-top: var(--grimoire-space-4);
 }
 
 .grimoire-write-edit-block+.grimoire-text-block {
-  margin-top: 8px;
+  margin-top: var(--grimoire-space-4);
 }
 
 .grimoire-write-edit-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 0;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-2) 0;
   cursor: pointer;
   user-select: none;
   background: transparent;
@@ -27,7 +27,7 @@
 .grimoire-write-edit-icon {
   width: 16px;
   height: 16px;
-  color: var(--text-accent);
+  color: var(--grimoire-accent-text);
   flex-shrink: 0;
 }
 
@@ -39,8 +39,8 @@
 /* Two-part header: name (fixed) + summary (flexible) */
 .grimoire-write-edit-name {
   font-family: var(--font-monospace);
-  font-size: 13px;
-  font-weight: 400;
+  font-size: var(--grimoire-text-m);
+  font-weight: var(--grimoire-weight-normal);
   color: var(--text-normal);
   white-space: nowrap;
   flex-shrink: 0;
@@ -48,7 +48,7 @@
 
 .grimoire-write-edit-summary {
   font-family: var(--font-monospace);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -59,7 +59,7 @@
 
 .grimoire-write-edit-stats {
   font-family: var(--font-monospace);
-  font-size: 11px;
+  font-size: var(--grimoire-text-xs);
   flex-shrink: 0;
 }
 
@@ -69,7 +69,7 @@
 
 .grimoire-write-edit-stats .removed {
   color: var(--color-red);
-  margin-left: 4px;
+  margin-left: var(--grimoire-space-2);
 }
 
 .grimoire-write-edit-status {
@@ -110,7 +110,7 @@
 .grimoire-write-edit-diff {
   flex: 1;
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   line-height: 1.5;
   background: transparent;
   max-height: 300px;
@@ -123,7 +123,7 @@
 .grimoire-write-edit-error,
 .grimoire-write-edit-done-text {
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   color: var(--text-muted);
 }
 
@@ -133,7 +133,7 @@
 
 /* Diff line styling */
 .grimoire-diff-hunk {
-  margin-bottom: 4px;
+  margin-bottom: var(--grimoire-space-2);
 }
 
 .grimoire-diff-line {
@@ -156,7 +156,7 @@
 }
 
 .grimoire-diff-insert {
-  background: rgba(80, 200, 80, 0.25);
+  background: color-mix(in srgb, var(--color-green) 25%, transparent);
   color: var(--text-normal);
 }
 
@@ -168,16 +168,16 @@
 .grimoire-diff-separator {
   color: var(--text-muted);
   text-align: center;
-  padding: 4px 0;
+  padding: var(--grimoire-space-2) 0;
   font-style: italic;
   border-top: 1px dashed var(--background-modifier-border);
   border-bottom: 1px dashed var(--background-modifier-border);
-  margin: 8px 0;
-  font-size: 11px;
+  margin: var(--grimoire-space-4) 0;
+  font-size: var(--grimoire-text-xs);
 }
 
 .grimoire-diff-no-changes {
   color: var(--text-muted);
   font-style: italic;
-  padding: 8px;
+  padding: var(--grimoire-space-4);
 }

@@ -10,11 +10,11 @@
   z-index: 24;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--grimoire-space-2);
   opacity: 0;
   pointer-events: none;
   transform: translateY(-50%);
-  transition: opacity 0.16s ease;
+  transition: opacity var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-nav-sidebar.visible {
@@ -37,11 +37,11 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: 50%;
   background: var(--background-primary);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--grimoire-lift-1);
   color: var(--text-muted);
   cursor: pointer;
   opacity: 0.16;
-  transition: background 0.14s ease, color 0.14s ease, opacity 0.14s ease, transform 0.14s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease), opacity var(--grimoire-duration) var(--grimoire-ease), transform var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-nav-btn-directory {
@@ -63,13 +63,13 @@
 }
 
 .grimoire-nav-btn:focus-visible {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
+  box-shadow: var(--grimoire-focus-ring);
 }
 
 .grimoire-nav-btn-directory[aria-expanded="true"] {
-  border-color: color-mix(in srgb, var(--interactive-accent) 42%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-primary));
-  color: var(--interactive-accent);
+  border-color: color-mix(in srgb, var(--grimoire-accent) 42%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--grimoire-accent) 18%, var(--background-primary));
+  color: var(--grimoire-accent);
   opacity: 1;
 }
 
@@ -79,11 +79,11 @@
 }
 
 .grimoire-nav-btn-top {
-  margin-bottom: 3px;
+  margin-bottom: var(--grimoire-space-1);
 }
 
 .grimoire-nav-btn-bottom {
-  margin-top: 3px;
+  margin-top: var(--grimoire-space-1);
 }
 
 .grimoire-nav-directory {
@@ -96,20 +96,20 @@
   box-sizing: border-box;
   width: min(280px, calc(100% - 56px));
   max-height: min(420px, calc(100% - 32px));
-  padding: 10px 12px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 12px;
+  border-radius: var(--grimoire-radius-3);
   background: var(--background-secondary);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--grimoire-lift-2);
   transform: translateY(-50%);
 }
 
 .grimoire-nav-directory-title {
-  padding: 2px 6px 8px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-3) var(--grimoire-space-4);
   color: var(--text-muted);
   font-family: var(--font-monospace);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-bold);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -118,7 +118,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  gap: 2px;
+  gap: var(--grimoire-space-1);
   overflow-y: auto;
 }
 
@@ -128,8 +128,8 @@
   align-items: center;
   overflow: hidden;
   min-height: 30px;
-  padding: 3px 6px;
-  border-radius: 7px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-3);
+  border-radius: var(--grimoire-radius-2);
   color: var(--text-muted);
   cursor: pointer;
   font-size: var(--font-ui-small);
@@ -149,13 +149,13 @@
 .grimoire-nav-directory-number {
   color: var(--text-faint);
   font-family: var(--font-monospace);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-bold);
   letter-spacing: 0.04em;
 }
 
 .grimoire-nav-directory-item.is-active .grimoire-nav-directory-number {
-  color: var(--interactive-accent);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-nav-directory-label {
@@ -165,7 +165,7 @@
 }
 
 .grimoire-nav-directory-empty {
-  padding: 8px;
+  padding: var(--grimoire-space-4);
   color: var(--text-muted);
   font-size: var(--font-ui-small);
   line-height: 1.35;

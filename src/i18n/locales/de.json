@@ -19,7 +19,8 @@
     "disabled": "Deaktiviert",
     "platform": "Plattform",
     "refresh": "Aktualisieren",
-    "rewind": "Zurückspulen"
+    "rewind": "Zurückspulen",
+    "close": "Schließen"
   },
   "chat": {
     "rewind": {
@@ -421,7 +422,10 @@
         "errorLabel": "Fehler",
         "queuedPrefix": "In Warteschlange",
         "steeringPrefix": "Steuerung",
-        "newChatTitle": "Neuer Chat"
+        "newChatTitle": "Neuer Chat",
+        "closeImage": "Bild schließen",
+        "viewFullImage": "Bild in voller Größe anzeigen",
+        "copyCode": "Code kopieren"
       },
       "errors": {
         "generic": "Fehler: {message}",

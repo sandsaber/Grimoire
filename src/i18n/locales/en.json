@@ -19,7 +19,8 @@
     "disabled": "Disabled",
     "platform": "Platform",
     "refresh": "Refresh",
-    "rewind": "Rewind"
+    "rewind": "Rewind",
+    "close": "Close"
   },
   "chat": {
     "rewind": {
@@ -421,7 +422,10 @@
         "errorLabel": "Error",
         "queuedPrefix": "Queued",
         "steeringPrefix": "Steering",
-        "newChatTitle": "New Chat"
+        "newChatTitle": "New Chat",
+        "closeImage": "Close image",
+        "viewFullImage": "View full-size image",
+        "copyCode": "Copy code"
       },
       "errors": {
         "generic": "Error: {message}",

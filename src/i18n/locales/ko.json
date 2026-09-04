@@ -19,7 +19,8 @@
     "disabled": "비활성화",
     "platform": "플랫폼",
     "refresh": "새로고침",
-    "rewind": "되감기"
+    "rewind": "되감기",
+    "close": "닫기"
   },
   "chat": {
     "rewind": {
@@ -421,7 +422,10 @@
         "errorLabel": "오류",
         "queuedPrefix": "대기 중",
         "steeringPrefix": "조정 중",
-        "newChatTitle": "새 채팅"
+        "newChatTitle": "새 채팅",
+        "closeImage": "이미지 닫기",
+        "viewFullImage": "원본 크기 이미지 보기",
+        "copyCode": "코드 복사"
       },
       "errors": {
         "generic": "오류: {message}",

@@ -98,7 +98,7 @@ describe('messages.css', () => {
     expect(textBlockRule).toContain('box-sizing: border-box');
     expect(textBlockRule).toContain('padding-inline-end: var(--grimoire-text-block-inline-end-buffer)');
     expect(renderedMarkdownRule).toContain('box-sizing: border-box');
-    expect(renderedMarkdownRule).toContain('padding-inline-end: var(--grimoire-text-block-inline-end-buffer, 28px)');
+    expect(renderedMarkdownRule).toContain('padding-inline-end: var(--grimoire-text-block-inline-end-buffer, var(--grimoire-space-8))');
     expect(copyButtonRule).toContain('inset-inline-end: 12px');
     expect(copyButtonRule).toContain('width: 24px');
     expect(copyButtonRule).toContain('height: 24px');
@@ -134,7 +134,7 @@ describe('messages.css', () => {
     );
     const userActionsRule = getExactRule(css, '.grimoire-user-msg-actions');
 
-    expect(userBubbleRule).toContain('margin-bottom: 18px');
+    expect(userBubbleRule).toContain('margin-bottom: var(--grimoire-space-6)');
     expect(userActionsRule).toContain('bottom: -24px');
   });
 
@@ -154,7 +154,7 @@ describe('messages.css', () => {
     const assistantCopiedRule = getExactRule(css, '.grimoire-text-copy-btn.copied');
     const userCopiedRule = getExactRule(css, '.grimoire-user-msg-actions span.copied');
 
-    expect(assistantCopiedRule).toContain('color: var(--text-accent)');
+    expect(assistantCopiedRule).toContain('color: var(--grimoire-accent-text)');
     expect(assistantCopiedRule).not.toContain('width: auto');
     expect(assistantCopiedRule).not.toContain('min-width');
     expect(userCopiedRule).not.toContain('font-size');
@@ -169,8 +169,8 @@ describe('messages.css', () => {
     );
     const completionRule = getRule(css, '.grimoire-text-block--with-completion-time');
 
-    expect(contentRule).toContain('gap: 5px');
-    expect(completionRule).toContain('padding-bottom: 24px');
+    expect(contentRule).toContain('gap: var(--grimoire-space-2)');
+    expect(completionRule).toContain('padding-bottom: var(--grimoire-space-8)');
     expect(css).toContain('.grimoire-message-completion-time');
   });
 
@@ -182,7 +182,7 @@ describe('messages.css', () => {
       '.grimoire-text-block > .grimoire-message-completion-time'
     );
 
-    expect(metadataRule).toContain('margin-bottom: 4px');
+    expect(metadataRule).toContain('margin-bottom: var(--grimoire-space-2)');
     expect(completionRule).toContain('inset-inline-start: 32px');
     expect(completionRule).toContain('pointer-events: auto');
     expect(completionRule).not.toContain('inset-inline-end: 42px');
@@ -216,7 +216,7 @@ describe('messages.css', () => {
     const headerRule = getExactRule(readHeaderCss(), '.grimoire-header');
     const panelTabsRule = getExactRule(readTabsCss(), '.grimoire-panel-tabs');
 
-    expect(windowRule).toContain('--grimoire-window-padding-x: 7px');
+    expect(windowRule).toContain('--grimoire-window-padding-x: var(--grimoire-space-3)');
     expect(chatScrollRule).toContain('var(--grimoire-window-padding-x)');
     expect(composerRule).toContain('var(--grimoire-window-padding-x)');
     expect(headerRule).toContain('var(--grimoire-window-padding-x)');

@@ -19,7 +19,8 @@
     "disabled": "無効",
     "platform": "プラットフォーム",
     "refresh": "更新",
-    "rewind": "巻き戻し"
+    "rewind": "巻き戻し",
+    "close": "閉じる"
   },
   "chat": {
     "rewind": {
@@ -421,7 +422,10 @@
         "errorLabel": "エラー",
         "queuedPrefix": "待機中",
         "steeringPrefix": "誘導中",
-        "newChatTitle": "新しいチャット"
+        "newChatTitle": "新しいチャット",
+        "closeImage": "画像を閉じる",
+        "viewFullImage": "原寸大の画像を表示",
+        "copyCode": "コードをコピー"
       },
       "errors": {
         "generic": "エラー: {message}",

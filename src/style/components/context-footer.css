@@ -5,18 +5,18 @@
   height: 26px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 11px 0 8px;
+  gap: var(--grimoire-space-3);
+  padding: 0 var(--grimoire-space-5) 0 var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-raise);
   color: var(--grimoire-workbench-muted);
   cursor: default;
   font-family: var(--font-monospace);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-semibold);
   line-height: 1;
   outline: 0;
-  transition: background 0.14s ease, color 0.14s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-context-meter:hover,
@@ -36,7 +36,7 @@
     calc(var(--grimoire-context-meter-pct, 0) * 3.6deg),
     var(--grimoire-line-3) 0
   );
-  transition: background 0.2s ease;
+  transition: background var(--grimoire-duration-slow) var(--grimoire-ease);
 }
 
 .grimoire-context-meter-ring::after {

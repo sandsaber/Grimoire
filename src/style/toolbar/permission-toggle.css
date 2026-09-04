@@ -26,14 +26,14 @@
   height: 28px;
   min-width: 0;
   overflow: hidden;
-  padding: 0 9px;
+  padding: 0 var(--grimoire-space-4);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-raise);
   color: var(--grimoire-workbench-muted);
   font-family: var(--font-monospace);
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -61,16 +61,16 @@
   flex-direction: column;
   box-sizing: border-box;
   min-width: 92px;
-  gap: 2px;
-  padding: 4px;
+  gap: var(--grimoire-space-1);
+  padding: var(--grimoire-space-2);
   overflow: hidden;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-2);
   background: var(--background-primary);
-  box-shadow: var(--shadow-s, 0 6px 18px rgba(0, 0, 0, 0.22));
+  box-shadow: var(--grimoire-lift-1);
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.15s ease, visibility 0.15s ease;
+  transition: opacity var(--grimoire-duration) var(--grimoire-ease), visibility var(--grimoire-duration) var(--grimoire-ease);
   z-index: 10004;
 }
 
@@ -84,11 +84,11 @@
   display: flex;
   align-items: center;
   min-height: 28px;
-  padding: 0 8px;
+  padding: 0 var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-1);
   color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;

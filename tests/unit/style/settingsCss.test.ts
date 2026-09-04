@@ -50,7 +50,7 @@ describe('settings base CSS', () => {
   it('keeps the official gap between the tab bar and the first setting', () => {
     const tabsRule = getRule(readSettingsCss(), '.grimoire-settings-tabs');
 
-    expect(tabsRule).toContain('margin-bottom: 16px');
+    expect(tabsRule).toContain('margin-bottom: var(--grimoire-space-6)');
   });
 
   it('uses the compact Codian tab dimensions with an accent underline', () => {
@@ -60,7 +60,7 @@ describe('settings base CSS', () => {
 
     expect(tabRule).toContain('height: auto');
     expect(tabRule).toContain('min-height: 0');
-    expect(tabRule).toContain('padding: 8px 16px');
+    expect(tabRule).toContain('padding: var(--grimoire-space-4) var(--grimoire-space-6)');
     expect(tabRule).toContain('flex: 0 0 auto');
     expect(tabRule).toContain('border: 0');
     expect(tabRule).toContain('border-bottom: 4px solid transparent');
@@ -70,7 +70,7 @@ describe('settings base CSS', () => {
     expect(tabRule).toContain('font-size: var(--font-ui-small)');
     expect(tabRule).toContain('font-weight: var(--font-medium)');
 
-    expect(activeRule).toContain('border-bottom-color: var(--interactive-accent)');
+    expect(activeRule).toContain('border-bottom-color: var(--grimoire-accent)');
     expect(activeRule).toContain('background: transparent');
     expect(activeRule).toContain('color: var(--text-normal)');
     expect(activeRule).not.toContain('font-weight: 600');
@@ -87,17 +87,17 @@ describe('settings base CSS', () => {
 
     expect(viewportRule).toContain('overflow-x: auto');
     expect(viewportRule).toContain('justify-content: flex-start');
-    expect(viewportRule).toContain('gap: 2px');
+    expect(viewportRule).toContain('gap: var(--grimoire-space-1)');
     expect(viewportRule).toContain('padding: 0');
     expect(tabRule).toContain('flex: 0 0 auto');
     expect(tabRule).toContain('min-width: max-content');
-    expect(tabRule).toContain('padding: 8px 16px');
+    expect(tabRule).toContain('padding: var(--grimoire-space-4) var(--grimoire-space-6)');
     expect(scrollButtonRule).toContain('width: 26px');
     expect(scrollButtonRule).toContain('height: auto');
     expect(scrollButtonRule).toContain('min-height: 0');
     expect(overflowingScrollButtonRule).toContain('display: inline-flex');
-    expect(previousScrollButtonRule).toContain('margin-inline-end: 4px');
-    expect(nextScrollButtonRule).toContain('margin-inline-start: 4px');
+    expect(previousScrollButtonRule).toContain('margin-inline-end: var(--grimoire-space-2)');
+    expect(nextScrollButtonRule).toContain('margin-inline-start: var(--grimoire-space-2)');
   });
 
   it('uses borderless provider cards with muted copy and blue selected states', () => {
@@ -112,8 +112,8 @@ describe('settings base CSS', () => {
     expect(cardRule).toContain('var(--setting-items-background, var(--background-secondary)) 82%');
     expect(hoverRule).toContain('var(--setting-items-background, var(--background-secondary)) 78%');
     expect(activeRule).toContain('border: 0');
-    expect(activeRule).toContain('var(--interactive-accent) 18%');
-    expect(activeHoverRule).toContain('var(--interactive-accent) 13%');
+    expect(activeRule).toContain('var(--grimoire-accent) 18%');
+    expect(activeHoverRule).toContain('var(--grimoire-accent) 13%');
     expect(metaRule).toContain('color: var(--text-muted)');
   });
 
@@ -122,8 +122,8 @@ describe('settings base CSS', () => {
     const gridRule = getRule(css, '.grimoire-settings-provider-grid');
     const hintRule = getRule(css, '.grimoire-settings-provider-hint');
 
-    expect(gridRule).toContain('margin: 2px 0 8px');
-    expect(hintRule).toContain('margin: 0 0 2px');
+    expect(gridRule).toContain('margin: var(--grimoire-space-1) 0 var(--grimoire-space-4)');
+    expect(hintRule).toContain('margin: 0 0 var(--grimoire-space-1)');
     expect(hintRule).toContain('color: var(--text-faint)');
     expect(hintRule).toContain('font-size: var(--font-ui-small)');
   });
@@ -141,14 +141,14 @@ describe('settings base CSS', () => {
     expect(providerDetailsRule).toContain('box-sizing: border-box');
     expect(providerDetailsRule).toContain('width: 100%');
     expect(providerDetailsRule).toContain('max-width: none');
-    expect(providerDetailsRule).toContain('padding: 12px 0 18px');
+    expect(providerDetailsRule).toContain('padding: var(--grimoire-space-5) 0 var(--grimoire-space-6)');
     expect(providerDetailsRule).toContain('border: 0');
     expect(providerDetailsRule).toContain('background: transparent');
     expect(providerDetailsRule).not.toContain(
       'border: 1px solid var(--background-modifier-border)',
     );
     expect(providerDetailsRule).not.toContain('background-secondary');
-    expect(settingRule).toContain('border-radius: 8px');
+    expect(settingRule).toContain('border-radius: var(--grimoire-radius-2)');
   });
 
   it('keeps workspace modal content wrappers transparent while preserving their setting cards', () => {
@@ -162,11 +162,11 @@ describe('settings base CSS', () => {
     );
 
     expect(workspaceContentRule).toContain('min-height: 180px');
-    expect(workspaceContentRule).toContain('padding: 14px 16px 16px');
+    expect(workspaceContentRule).toContain('padding: var(--grimoire-space-5) var(--grimoire-space-6) var(--grimoire-space-6)');
     expect(workspaceContentRule).toContain('border: 0');
     expect(workspaceContentRule).toContain('background: transparent');
     expect(workspaceContentRule).not.toContain('background-secondary');
-    expect(settingRule).toContain('border-radius: 8px');
+    expect(settingRule).toContain('border-radius: var(--grimoire-radius-2)');
     expect(settingRule).toContain('background: var(--background-primary)');
   });
 

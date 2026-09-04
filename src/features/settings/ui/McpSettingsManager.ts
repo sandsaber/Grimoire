@@ -1,6 +1,8 @@
 import type { App } from 'obsidian';
 import { Notice, setIcon } from 'obsidian';
 
+import { asActivatable, markDecorative } from '@/shared/components/activatable';
+
 import { tryParseClipboardConfig } from '../../../core/mcp/McpConfigParser';
 import { testMcpServer } from '../../../core/mcp/McpTester';
 import type { AppMcpStorage } from '../../../core/providers/types';
@@ -65,26 +67,27 @@ export class McpSettingsManager {
 
     const dropdown = addContainer.createDiv({ cls: 'grimoire-mcp-add-dropdown' });
 
-    const stdioOption = dropdown.createDiv({ cls: 'grimoire-mcp-add-option' });
-    setIcon(stdioOption.createSpan({ cls: 'grimoire-mcp-add-option-icon' }), 'terminal');
-    stdioOption.createSpan({ text: t('settings.mcp.addStdio') });
-    stdioOption.addEventListener('click', () => {
+    // Icon plus label, because each of these is a choice with a consequence:
+    // the icon speeds re-finding it, the word is what makes the choice. The
+    // icon is decoration beside its own label, so it is not announced twice.
+    const addOption = (icon: string, label: string, onActivate: () => void): void => {
+      const option = dropdown.createDiv({ cls: 'grimoire-mcp-add-option' });
+      const iconEl = option.createSpan({ cls: 'grimoire-mcp-add-option-icon' });
+      setIcon(iconEl, icon);
+      markDecorative(iconEl);
+      option.createSpan({ text: label });
+      asActivatable(option, { label, onActivate });
+    };
+
+    addOption('terminal', t('settings.mcp.addStdio'), () => {
       this.closeAddDropdown(dropdown);
       this.openModal(null, 'stdio');
     });
-
-    const httpOption = dropdown.createDiv({ cls: 'grimoire-mcp-add-option' });
-    setIcon(httpOption.createSpan({ cls: 'grimoire-mcp-add-option-icon' }), 'globe');
-    httpOption.createSpan({ text: t('settings.mcp.addRemote') });
-    httpOption.addEventListener('click', () => {
+    addOption('globe', t('settings.mcp.addRemote'), () => {
       this.closeAddDropdown(dropdown);
       this.openModal(null, 'http');
     });
-
-    const importOption = dropdown.createDiv({ cls: 'grimoire-mcp-add-option' });
-    setIcon(importOption.createSpan({ cls: 'grimoire-mcp-add-option-icon' }), 'clipboard-paste');
-    importOption.createSpan({ text: t('settings.mcp.importClipboard') });
-    importOption.addEventListener('click', () => {
+    addOption('clipboard-paste', t('settings.mcp.importClipboard'), () => {
       this.closeAddDropdown(dropdown);
       void this.importFromClipboard();
     });
