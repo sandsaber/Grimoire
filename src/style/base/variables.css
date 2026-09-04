@@ -20,7 +20,13 @@
 body {
   /* Accent — the user's, never ours. */
   --grimoire-brand: var(--interactive-accent, var(--color-accent));
-  --grimoire-brand-rgb: var(--interactive-accent-rgb, var(--color-accent-rgb, 127, 95, 217));
+  /*
+   * Kept only for the provider marks below, which are real triples. Obsidian
+   * defines --color-<hue>-rgb for its palette but no accent triple at all, so
+   * every `rgba(var(--grimoire-brand-rgb), …)` in this plugin resolved to the
+   * fallback — a fixed violet — on thirty-two surfaces, whatever accent the
+   * user had chosen. Those read `color-mix(… var(--grimoire-brand) …)` now.
+   */
   --grimoire-accent: var(--grimoire-brand);
   --grimoire-accent-hover: var(--interactive-accent-hover, var(--grimoire-brand));
   --grimoire-accent-text: var(--text-accent, var(--grimoire-brand));

@@ -319,7 +319,7 @@
 
 .grimoire-grok-model-picker-row input[type="checkbox"] {
   margin-top: var(--grimoire-space-1);
-  accent-color: rgb(var(--grimoire-brand-rgb));
+  accent-color: var(--grimoire-brand);
 }
 
 .grimoire-grok-model-picker-row-text {

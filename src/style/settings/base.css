@@ -294,7 +294,7 @@
 /* Sliders → .slider (violet accent) */
 .grimoire-settings .setting-item-control input[type="range"].slider {
   width: 148px;
-  accent-color: rgb(var(--grimoire-brand-rgb));
+  accent-color: var(--grimoire-brand);
 }
 
 .grimoire-settings .grimoire-slider-value {
@@ -311,9 +311,9 @@
 .grimoire-provider-disabled-notice {
   margin: var(--grimoire-space-5) 0 var(--grimoire-space-2);
   padding: var(--grimoire-space-5) var(--grimoire-space-6);
-  border: 1px solid rgba(var(--grimoire-brand-rgb), 0.42);
+  border: 1px solid color-mix(in srgb, var(--grimoire-brand) 42%, transparent);
   border-radius: var(--grimoire-radius-2);
-  background: rgba(var(--grimoire-brand-rgb), 0.07);
+  background: color-mix(in srgb, var(--grimoire-brand) 7%, transparent);
 }
 
 .grimoire-provider-disabled-notice p {
@@ -744,7 +744,7 @@
 
 .grimoire-sp-content-area:focus {
   outline: none;
-  border-color: rgb(var(--grimoire-brand-rgb));
+  border-color: var(--grimoire-brand);
 }
 
 .grimoire-sp-modal-buttons {

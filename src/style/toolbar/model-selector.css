@@ -638,7 +638,7 @@
 }
 
 .grimoire-model-option.selected {
-  background: rgba(var(--grimoire-brand-rgb), 0.15);
+  background: color-mix(in srgb, var(--grimoire-brand) 15%, transparent);
   color: var(--grimoire-brand);
   font-weight: var(--grimoire-weight-normal);
 }
@@ -730,7 +730,7 @@
 
 .grimoire-model-catalog-loading::before {
   animation: grimoire-model-spin 0.8s linear infinite;
-  border: 2px solid rgba(var(--grimoire-brand-rgb), 0.2);
+  border: 2px solid color-mix(in srgb, var(--grimoire-brand) 20%, transparent);
   border-top-color: var(--grimoire-brand);
   border-radius: 50%;
   content: '';

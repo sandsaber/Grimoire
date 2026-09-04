@@ -439,9 +439,9 @@
   align-items: center;
   justify-content: center;
   padding: 0 var(--grimoire-space-3);
-  border: 1px solid rgba(var(--grimoire-brand-rgb), 0.46);
+  border: 1px solid color-mix(in srgb, var(--grimoire-brand) 46%, transparent);
   border-radius: var(--grimoire-radius-1);
-  background: rgba(var(--grimoire-brand-rgb), 0.13);
+  background: color-mix(in srgb, var(--grimoire-brand) 13%, transparent);
   color: var(--text-normal);
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-bold);

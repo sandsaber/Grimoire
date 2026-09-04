@@ -111,7 +111,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(var(--grimoire-brand-rgb), 0.08);
+  background: color-mix(in srgb, var(--grimoire-brand) 8%, transparent);
   border: 2px dashed var(--grimoire-brand);
   border-radius: var(--grimoire-radius-2);
   display: none;

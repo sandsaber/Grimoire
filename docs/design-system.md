@@ -124,6 +124,32 @@ because each one is a class, not an instance.
   of them went through a decision about how much accent a surface may show. They read the token now,
   which is what makes "the accent is a line, not a fill" enforceable instead of aspirational.
 - **A violet glow was hardcoded** in an animation, in a plugin whose accent is the user's choice.
+- **And the accent itself was not the user's on thirty-two surfaces.** `--grimoire-brand-rgb` read
+  `var(--interactive-accent-rgb, var(--color-accent-rgb, 127, 95, 217))`. Obsidian defines
+  `--color-<hue>-rgb` for its palette but **no accent triple at all**, so every
+  `rgba(var(--grimoire-brand-rgb), …)` resolved to that fallback — a fixed violet — whatever accent
+  the user had picked. Those read `color-mix(in srgb, var(--grimoire-brand) N%, transparent)` now.
+  The fallback is what hid it: the value looked considered and was frozen.
+
+## The adaptation is proved, not asserted
+
+`tests/unit/style/themeAdaptation.test.ts` resolves the whole token layer against Obsidian's own
+variables — the transitive closure of what Grimoire depends on, taken from the root tables in the
+`app.css` inside `obsidian-1.13.7.asar` and checked in as `tests/fixtures/obsidian/theme-tokens.json`.
+It holds that every token resolves to a real value on both themes, that the two themes are drawn from
+different ground, that changing `--accent-h` moves every accent-derived token, that provider marks do
+not move, and that type follows the reader's font size.
+
+Two things that rule learnt about itself, both by being broken on purpose:
+
+- **selecting the accent tokens by what they are made of was a hole.** A token pinned to a literal
+  stops referencing the accent, so the filter dropped it from the list exactly when it broke — the
+  injected `--grimoire-accent-text: #7f5fd9` passed. Selection is by name now, with the one token
+  that must not move (`--grimoire-accent-contrast`, Obsidian's `--text-on-accent`) excluded by name
+  and with its reason;
+- **a fallback hides a missing dependency**, so the dependency rule reads the token layer's text
+  rather than its resolution. Injecting `var(--interactive-accent-rgb, …)` — the shipped defect —
+  fails it.
 
 Scale, before and after: 15 font sizes to a 7-step ladder that scales with the reader's own setting;
 13 font weights to 4; 12 radii to 3 plus two shapes; 16 interaction durations to 1; 123 shadows to a

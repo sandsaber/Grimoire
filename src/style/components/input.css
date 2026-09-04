@@ -55,10 +55,10 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-input-wrapper:focus-within {
-  border-color: rgba(var(--grimoire-brand-rgb), 0.45);
+  border-color: color-mix(in srgb, var(--grimoire-brand) 45%, transparent);
   box-shadow:
-    inset 0 1px 0 rgba(var(--grimoire-brand-rgb), 0.12),
-    0 0 0 1px rgba(var(--grimoire-brand-rgb), 0.12);
+    inset 0 1px 0 color-mix(in srgb, var(--grimoire-brand) 12%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--grimoire-brand) 12%, transparent);
 }
 
 /* Context row (file chip start, selection indicator end) - inside input wrapper at top */
@@ -162,7 +162,7 @@ body.grimoire-dragging-ns {
   padding: var(--grimoire-space-2) var(--grimoire-space-3) var(--grimoire-space-3) var(--grimoire-space-3);
   gap: var(--grimoire-space-2);
   min-width: 0;
-  border-top: 1px solid rgba(var(--grimoire-brand-rgb), 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--grimoire-brand) 8%, transparent);
 }
 
 /* File indicator (attached files) */
@@ -177,8 +177,8 @@ body.grimoire-dragging-ns {
   align-items: center;
   gap: var(--grimoire-space-2);
   padding: var(--grimoire-space-1) var(--grimoire-space-3) var(--grimoire-space-1) var(--grimoire-space-4);
-  background: rgba(var(--grimoire-brand-rgb), 0.07);
-  border: 1px solid rgba(var(--grimoire-brand-rgb), 0.18);
+  background: color-mix(in srgb, var(--grimoire-brand) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--grimoire-brand) 18%, transparent);
   border-radius: var(--grimoire-radius-3);
   font-size: var(--grimoire-text-s);
   line-height: 1;
@@ -225,7 +225,7 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-file-chip:hover {
-  background: rgba(var(--grimoire-brand-rgb), 0.12);
+  background: color-mix(in srgb, var(--grimoire-brand) 12%, transparent);
 }
 
 .grimoire-external-file-indicator {
@@ -240,8 +240,8 @@ body.grimoire-dragging-ns {
   align-items: center;
   gap: var(--grimoire-space-2);
   padding: var(--grimoire-space-1) var(--grimoire-space-3) var(--grimoire-space-1) var(--grimoire-space-4);
-  background: rgba(var(--grimoire-brand-rgb), 0.05);
-  border: 1px solid rgba(var(--grimoire-brand-rgb), 0.28);
+  background: color-mix(in srgb, var(--grimoire-brand) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--grimoire-brand) 28%, transparent);
   border-radius: var(--grimoire-radius-3);
   color: var(--text-normal);
   font-size: var(--grimoire-text-s);
@@ -348,12 +348,12 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-relevant-note:hover {
-  background: rgba(var(--grimoire-brand-rgb), 0.1);
+  background: color-mix(in srgb, var(--grimoire-brand) 10%, transparent);
   color: var(--text-normal);
 }
 
 .grimoire-relevant-note:active {
-  background: rgba(var(--grimoire-brand-rgb), 0.14);
+  background: color-mix(in srgb, var(--grimoire-brand) 14%, transparent);
 }
 
 .grimoire-relevant-notes-more {
@@ -679,7 +679,7 @@ body.grimoire-dragging-ns {
 
 .grimoire-container--chat-window button.grimoire-send-button:hover {
   border: 0;
-  background: rgba(var(--grimoire-brand-rgb), 0.22);
+  background: color-mix(in srgb, var(--grimoire-brand) 22%, transparent);
   color: var(--grimoire-accent-text);
   filter: none;
 }

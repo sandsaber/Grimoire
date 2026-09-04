@@ -11,7 +11,7 @@
   display: grid;
   gap: var(--grimoire-space-4);
   padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  border: 1px solid rgba(var(--grimoire-brand-rgb), 0.22);
+  border: 1px solid color-mix(in srgb, var(--grimoire-brand) 22%, transparent);
   border-radius: var(--grimoire-radius-2);
   background: color-mix(in srgb, var(--grimoire-workbench-surface) 92%, var(--grimoire-brand));
   box-shadow: var(--grimoire-lift-0);

@@ -83,7 +83,7 @@
 }
 
 .grimoire-thinking-gear.selected {
-  background: rgba(var(--grimoire-brand-rgb), 0.15);
+  background: color-mix(in srgb, var(--grimoire-brand) 15%, transparent);
   color: var(--grimoire-brand);
   font-weight: var(--grimoire-weight-medium);
 }

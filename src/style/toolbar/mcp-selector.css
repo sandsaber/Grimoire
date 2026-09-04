@@ -157,7 +157,7 @@
 }
 
 .grimoire-mcp-selector-item.enabled {
-  background: rgba(var(--grimoire-brand-rgb), 0.1);
+  background: color-mix(in srgb, var(--grimoire-brand) 10%, transparent);
 }
 
 .grimoire-mcp-selector-check {
@@ -172,7 +172,7 @@
 }
 
 .grimoire-mcp-selector-item.enabled .grimoire-mcp-selector-check {
-  background: rgba(var(--grimoire-brand-rgb), 0.2);
+  background: color-mix(in srgb, var(--grimoire-brand) 20%, transparent);
   border-color: var(--grimoire-brand);
 }
 
@@ -203,7 +203,7 @@
   font-weight: var(--grimoire-weight-semibold);
   padding: 1px var(--grimoire-space-2);
   border-radius: var(--grimoire-radius-1);
-  background: rgba(var(--grimoire-brand-rgb), 0.2);
+  background: color-mix(in srgb, var(--grimoire-brand) 20%, transparent);
   color: var(--grimoire-brand);
   flex-shrink: 0;
   margin-left: auto;
