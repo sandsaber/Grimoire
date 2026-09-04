@@ -1,5 +1,7 @@
 import { type App, Modal } from 'obsidian';
 
+import { asActivatable } from '@/shared/components/activatable';
+
 import { t } from '../../i18n/i18n';
 
 export type ForkTarget = 'new-tab' | 'current-tab';
@@ -31,10 +33,15 @@ class ForkTargetModal extends Modal {
 
   private createOption(container: HTMLElement, target: ForkTarget, label: string): void {
     const item = container.createDiv({ cls: 'grimoire-fork-target-option', text: label });
-    item.addEventListener('click', () => {
-      this.resolved = true;
-      this.resolve(target);
-      this.close();
+    // This modal offers a choice and had no way to make it without a mouse:
+    // the only key it answered was Escape, which declines.
+    asActivatable(item, {
+      label,
+      onActivate: () => {
+        this.resolved = true;
+        this.resolve(target);
+        this.close();
+      },
     });
   }
 

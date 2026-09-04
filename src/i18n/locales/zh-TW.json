@@ -19,7 +19,8 @@
     "disabled": "已禁用",
     "platform": "平台",
     "refresh": "重新整理",
-    "rewind": "回退"
+    "rewind": "回退",
+    "close": "關閉"
   },
   "chat": {
     "rewind": {
@@ -421,7 +422,10 @@
         "errorLabel": "錯誤",
         "queuedPrefix": "已排隊",
         "steeringPrefix": "引導中",
-        "newChatTitle": "新增對話"
+        "newChatTitle": "新增對話",
+        "closeImage": "關閉圖片",
+        "viewFullImage": "檢視原圖",
+        "copyCode": "複製程式碼"
       },
       "errors": {
         "generic": "錯誤：{message}",

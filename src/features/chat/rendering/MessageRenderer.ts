@@ -1,6 +1,8 @@
 import type { App, Component } from 'obsidian';
 import { MarkdownRenderer, Menu, Notice, setIcon, setTooltip, TFile } from 'obsidian';
 
+import { asActivatable } from '@/shared/components/activatable';
+
 import type { ProviderHistoryHydration } from '../../../core/providers/ProviderModule';
 import { DEFAULT_CHAT_PROVIDER_ID, type ProviderCapabilities } from '../../../core/providers/types';
 import type { ChatRewindMode } from '../../../core/runtime/types';
@@ -968,6 +970,12 @@ export class MessageRenderer {
 
     const closeBtn = modal.createDiv({ cls: 'grimoire-image-modal-close' });
     closeBtn.setText('\u00D7');
+    // A multiplication sign is a shape, not a name: without one this control
+    // announces as nothing and cannot be reached without a mouse.
+    asActivatable(closeBtn, {
+      label: t('chat.ui.messages.closeImage'),
+      onActivate: () => close(),
+    });
 
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -980,7 +988,6 @@ export class MessageRenderer {
       overlay.remove();
     };
 
-    closeBtn.addEventListener('click', close);
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) close();
     });
@@ -1055,7 +1062,11 @@ export class MessageRenderer {
               text: match[1],
             });
             wrapper.appendChild(label);
-            label.addEventListener('click', () => {
+            // The label reads as the language and acts as a copy button, so the
+            // word on it is not the name of what it does.
+            asActivatable(label, {
+              label: t('chat.ui.messages.copyCode'),
+              onActivate: () => {
               runRendererAction(async () => {
                 const originalLabel = match[1];
                 if (!originalLabel) return;
@@ -1068,6 +1079,7 @@ export class MessageRenderer {
                   // Clipboard API may fail in non-secure contexts
                 }
               });
+              },
             });
           }
         }

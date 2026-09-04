@@ -53,7 +53,7 @@ describe('chat toolbar selector CSS', () => {
     }
     for (const declaration of [
       'min-height: 28px',
-      'padding: 0 8px',
+      'padding: 0 var(--grimoire-space-4)',
       'border-radius: var(--grimoire-radius-1)',
       'font-weight: var(--grimoire-weight-normal)',
     ]) {

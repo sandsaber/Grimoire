@@ -3,12 +3,12 @@
 .grimoire-settings-provider-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin: 2px 0 8px;
+  gap: var(--grimoire-space-4);
+  margin: var(--grimoire-space-1) 0 var(--grimoire-space-4);
 }
 
 .grimoire-settings-provider-hint {
-  margin: 0 0 2px;
+  margin: 0 0 var(--grimoire-space-1);
   color: var(--text-faint);
   font-size: var(--font-ui-small);
 }
@@ -18,8 +18,8 @@
   align-items: center;
   justify-content: space-between;
   min-width: 0;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-4) var(--grimoire-space-4);
   border: 0;
   border-radius: var(--grimoire-radius-2);
   background: color-mix(
@@ -54,7 +54,7 @@
   flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
-  gap: 3px;
+  gap: var(--grimoire-space-1);
 }
 
 .grimoire-settings-provider-card-title {
@@ -92,7 +92,7 @@
   box-sizing: border-box;
   width: 100%;
   max-width: none;
-  padding: 12px 0 18px;
+  padding: var(--grimoire-space-5) 0 var(--grimoire-space-6);
   border: 0;
   border-radius: var(--grimoire-radius-2);
   background: transparent;
@@ -109,16 +109,16 @@
 .grimoire-settings-segmented-nav {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 12px;
-  padding: 3px;
+  gap: var(--grimoire-space-2);
+  margin-bottom: var(--grimoire-space-5);
+  padding: var(--grimoire-space-1);
   border-radius: var(--grimoire-radius-2);
   background: var(--background-secondary);
 }
 
 .grimoire-settings-segmented-nav button {
   height: auto;
-  padding: 5px 12px;
+  padding: var(--grimoire-space-2) var(--grimoire-space-5);
   border: 0;
   border-radius: var(--grimoire-radius-2);
   background: transparent;
@@ -142,9 +142,9 @@
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
-  gap: 20px;
-  margin: 0 0 8px;
-  padding: 0 0 10px;
+  gap: var(--grimoire-space-7);
+  margin: 0 0 var(--grimoire-space-4);
+  padding: 0 0 var(--grimoire-space-4);
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
@@ -152,7 +152,7 @@
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-settings-resource-search {
@@ -162,7 +162,7 @@
 
 .grimoire-settings-resource-manage {
   height: 32px;
-  padding-inline: 13px;
+  padding-inline: var(--grimoire-space-5);
   white-space: nowrap;
 }
 
@@ -176,8 +176,8 @@
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.8fr) minmax(0, 1fr) 76px;
   align-items: center;
   min-width: 0;
-  gap: 12px;
-  padding: 9px 6px;
+  gap: var(--grimoire-space-5);
+  padding: var(--grimoire-space-4) var(--grimoire-space-3);
   border-bottom: 1px solid var(--background-modifier-border);
   background: transparent;
 }
@@ -187,8 +187,8 @@
 }
 
 .grimoire-settings-resource-row.is-header {
-  padding-top: 5px;
-  padding-bottom: 7px;
+  padding-top: var(--grimoire-space-2);
+  padding-bottom: var(--grimoire-space-3);
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
 }
@@ -197,7 +197,7 @@
   display: flex;
   align-items: flex-start;
   min-width: 0;
-  gap: 8px;
+  gap: var(--grimoire-space-4);
   overflow: hidden;
   font-family: var(--font-monospace);
   text-overflow: ellipsis;
@@ -209,7 +209,7 @@
   flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
-  gap: 2px;
+  gap: var(--grimoire-space-1);
 }
 
 .grimoire-settings-resource-name-title,
@@ -240,7 +240,7 @@
   flex: 0 0 auto;
   width: 8px;
   height: 8px;
-  margin-top: 5px;
+  margin-top: var(--grimoire-space-2);
   border-radius: 50%;
   background: var(--text-faint);
 }
@@ -272,7 +272,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-settings-resource-edit,
@@ -312,7 +312,7 @@
 
 .grimoire-settings-resource-loading,
 .grimoire-settings-hub-empty {
-  padding: 26px 12px;
+  padding: var(--grimoire-space-8) var(--grimoire-space-5);
   text-align: center;
 }
 
@@ -323,12 +323,12 @@
 .grimoire-settings-about {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--grimoire-space-5);
   max-width: 720px;
 }
 
 .grimoire-settings-about-copy {
-  padding: 14px 16px;
+  padding: var(--grimoire-space-5) var(--grimoire-space-6);
   border-radius: var(--grimoire-radius-2);
   background: var(--background-secondary);
   color: var(--text-muted);
@@ -345,12 +345,12 @@
 }
 
 .grimoire-workspace-manager-providers {
-  margin-bottom: 14px;
+  margin-bottom: var(--grimoire-space-5);
 }
 
 .grimoire-settings-workspace-modal-content {
   min-height: 180px;
-  padding: 14px 16px 16px;
+  padding: var(--grimoire-space-5) var(--grimoire-space-6) var(--grimoire-space-6);
   border: 0;
   border-radius: var(--grimoire-radius-3);
   background: transparent;
@@ -360,8 +360,8 @@
 .grimoire-settings-workspace-modal-content > .grimoire-workspace-provider-section > .setting-item:not(.setting-item-heading),
 .grimoire-settings-workspace-modal-content > .grimoire-workspace-provider-section details .setting-item:not(.setting-item-heading),
 .grimoire-settings-workspace-modal-content details .setting-item:not(.setting-item-heading) {
-  margin-bottom: 4px;
-  padding: 10px 12px;
+  margin-bottom: var(--grimoire-space-2);
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   border: 0;
   border-radius: var(--grimoire-radius-2);
   background: var(--background-primary);
@@ -464,6 +464,6 @@
   }
 
   .grimoire-settings-workspace-modal-content {
-    padding-inline: 10px;
+    padding-inline: var(--grimoire-space-4);
   }
 }

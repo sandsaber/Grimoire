@@ -5,7 +5,7 @@
   bottom: 100%;
   left: 0;
   right: 0;
-  margin-bottom: 4px;
+  margin-bottom: var(--grimoire-space-2);
   background: var(--background-secondary);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -32,7 +32,7 @@
 }
 
 .grimoire-slash-item {
-  padding: 8px 12px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease);
   border-bottom: 1px solid var(--background-modifier-border);
@@ -57,20 +57,20 @@
 .grimoire-slash-hint {
   font-size: var(--grimoire-text-s);
   color: var(--text-muted);
-  margin-left: 8px;
+  margin-left: var(--grimoire-space-4);
 }
 
 .grimoire-slash-desc {
   font-size: var(--grimoire-text-xs);
   color: var(--text-muted);
-  margin-top: 2px;
+  margin-top: var(--grimoire-space-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .grimoire-slash-empty {
-  padding: 16px;
+  padding: var(--grimoire-space-6);
   text-align: center;
   color: var(--text-muted);
   font-size: var(--grimoire-text-m);

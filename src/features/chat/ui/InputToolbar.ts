@@ -2,6 +2,8 @@ import { Notice, setIcon, setTooltip } from 'obsidian';
 import * as os from 'os';
 import * as path from 'path';
 
+import { asActivatable } from '@/shared/components/activatable';
+
 import type { ProjectWorkspace } from '../../../core/context/types';
 import type {
   ProviderChatUiContribution,
@@ -1779,20 +1781,22 @@ export class ExternalContextSelector {
           lockBtn.addClass('locked');
         }
         setIcon(lockBtn, isPersistent ? 'lock' : 'unlock');
-        lockBtn.setAttribute('title', isPersistent
+        const lockLabel = isPersistent
           ? t('chat.ui.externalContext.makeSessionOnly')
-          : t('chat.ui.externalContext.makePersistent'));
-        lockBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.togglePersistence(pathStr);
+          : t('chat.ui.externalContext.makePersistent');
+        lockBtn.setAttribute('title', lockLabel);
+        asActivatable(lockBtn, {
+          label: lockLabel,
+          onActivate: () => this.togglePersistence(pathStr),
         });
 
         const removeBtn = itemEl.createSpan({ cls: 'grimoire-external-context-remove' });
         setIcon(removeBtn, 'x');
-        removeBtn.setAttribute('title', t('chat.ui.externalContext.removePath'));
-        removeBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.removePath(pathStr);
+        const removeLabel = t('chat.ui.externalContext.removePath');
+        removeBtn.setAttribute('title', removeLabel);
+        asActivatable(removeBtn, {
+          label: removeLabel,
+          onActivate: () => this.removePath(pathStr),
         });
       }
     }

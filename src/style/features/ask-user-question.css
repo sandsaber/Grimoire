@@ -38,8 +38,8 @@
 .grimoire-ask-head {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 12px 13px 11px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-5) var(--grimoire-space-5) var(--grimoire-space-5);
   border-bottom: 1px solid var(--grimoire-line);
 }
 
@@ -63,7 +63,7 @@
 
 .grimoire-ask-title-block {
   display: grid;
-  gap: 2px;
+  gap: var(--grimoire-space-1);
   min-width: 0;
 }
 
@@ -85,9 +85,9 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--grimoire-space-3);
   height: 24px;
-  padding: 0 10px;
+  padding: 0 var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-pill);
   background: var(--grimoire-raise-2);
   color: var(--grimoire-workbench-muted);
@@ -156,9 +156,9 @@
 /* ── Body (scrollable question stack) ── */
 
 .grimoire-ask-body {
-  padding: 13px;
+  padding: var(--grimoire-space-5);
   display: grid;
-  gap: 16px;
+  gap: var(--grimoire-space-6);
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb-bg, var(--grimoire-line-2)) transparent;
@@ -168,13 +168,13 @@
 
 .grimoire-ask-qblock {
   display: grid;
-  gap: 9px;
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-ask-q-top {
   display: flex;
   align-items: baseline;
-  gap: 9px;
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-ask-q-num {
@@ -201,21 +201,21 @@
   font-weight: var(--grimoire-weight-semibold);
   text-transform: uppercase;
   color: var(--text-faint);
-  padding-top: 2px;
+  padding-top: var(--grimoire-space-1);
 }
 
 /* ── Options (radio / checkbox rows) ── */
 
 .grimoire-ask-opts {
   display: grid;
-  gap: 6px;
+  gap: var(--grimoire-space-3);
 }
 
 .grimoire-ask-opt {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 11px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-raise);
   box-shadow: inset 0 0 0 1px var(--grimoire-line);
@@ -308,7 +308,7 @@
   min-height: 38px;
   max-height: 80px;
   resize: none;
-  padding: 9px 11px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   border: 0;
   outline: 0;
   border-radius: var(--grimoire-radius-2);
@@ -334,8 +334,8 @@
 .grimoire-ask-actions {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 11px 13px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-5) var(--grimoire-space-5);
   border-top: 1px solid var(--grimoire-line);
 }
 
@@ -345,14 +345,14 @@
 
 .grimoire-ask-btn {
   height: 32px;
-  padding: 0 14px;
+  padding: 0 var(--grimoire-space-5);
   border: 0;
   border-radius: var(--grimoire-radius-1);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-medium);
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--grimoire-space-3);
   transition:
     background var(--grimoire-duration) var(--grimoire-ease),
     color var(--grimoire-duration) var(--grimoire-ease),
@@ -410,7 +410,7 @@
 
 .grimoire-tool-io-qa {
   display: grid;
-  gap: 7px;
+  gap: var(--grimoire-space-3);
 }
 
 .grimoire-tool-io-qa-q {
@@ -424,11 +424,11 @@
   font-weight: var(--grimoire-weight-medium);
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-tool-io-qa-tag {
-  padding: 2px 8px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-pill);
   background: var(--grimoire-accent-soft);
   color: var(--grimoire-accent-text);
@@ -481,8 +481,8 @@
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
   align-items: center;
-  gap: 8px 10px;
-  padding: 13px 13px 11px;
+  gap: var(--grimoire-space-4) var(--grimoire-space-4);
+  padding: var(--grimoire-space-5) var(--grimoire-space-5) var(--grimoire-space-5);
   border-bottom: 1px solid var(--grimoire-line);
   background: color-mix(in srgb, var(--grimoire-raise) 58%, transparent);
 }
@@ -508,7 +508,7 @@
 .grimoire-permission-title-block {
   display: grid;
   min-width: 0;
-  gap: 2px;
+  gap: var(--grimoire-space-1);
 }
 
 .grimoire-permission-title {
@@ -536,10 +536,10 @@
   grid-column: 2;
   justify-self: start;
   align-items: center;
-  gap: 5px;
+  gap: var(--grimoire-space-2);
   min-height: 22px;
   max-width: 100%;
-  padding: 4px 9px;
+  padding: var(--grimoire-space-2) var(--grimoire-space-4);
   overflow: hidden;
   border-radius: var(--grimoire-radius-pill);
   background: var(--grimoire-sink);
@@ -562,8 +562,8 @@
   display: grid;
   min-height: 0;
   max-height: min(42vh, 300px);
-  gap: 8px;
-  padding: 11px 13px 12px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-5) var(--grimoire-space-5) var(--grimoire-space-5);
   overflow: hidden auto;
   scrollbar-width: thin;
   scrollbar-color: var(--grimoire-line-3) transparent;
@@ -575,8 +575,8 @@
   align-items: start;
   min-width: 0;
   max-height: min(28vh, 190px);
-  gap: 8px;
-  padding: 10px 11px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   overflow: auto;
   border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
@@ -587,7 +587,7 @@
 }
 
 .grimoire-permission-dollar {
-  margin-top: 2px;
+  margin-top: var(--grimoire-space-1);
   color: var(--grimoire-accent-text);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-s);
@@ -608,7 +608,7 @@
 
 .grimoire-permission-target {
   display: block;
-  padding: 8px 10px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-4);
   overflow-wrap: anywhere;
   border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
@@ -643,7 +643,7 @@
   min-height: 0;
   max-height: min(38vh, 250px);
   gap: 0;
-  padding: 5px 8px 7px;
+  padding: var(--grimoire-space-2) var(--grimoire-space-4) var(--grimoire-space-3);
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--grimoire-line-3) transparent;
@@ -655,11 +655,11 @@
   align-items: center;
   justify-content: flex-start;
   box-sizing: border-box;
-  gap: 9px;
+  gap: var(--grimoire-space-4);
   width: 100%;
   height: 34px;
   min-width: 0;
-  padding: 0 8px;
+  padding: 0 var(--grimoire-space-4);
   border: 0;
   border-radius: var(--grimoire-radius-1);
   background-color: transparent;
@@ -738,7 +738,7 @@
 
 .grimoire-permission-actions > .grimoire-permission-button--reject {
   position: relative;
-  margin-top: 7px;
+  margin-top: var(--grimoire-space-3);
   color: var(--grimoire-workbench-faint);
 }
 

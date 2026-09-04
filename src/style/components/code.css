@@ -3,7 +3,7 @@
   position: relative;
   min-width: 0;
   max-width: 100%;
-  margin: 8px 0;
+  margin: var(--grimoire-space-4) 0;
 }
 
 /* Code blocks in chat messages */
@@ -11,7 +11,7 @@
 .grimoire-message-content pre {
   max-width: 100%;
   background: var(--code-background, var(--background-primary-alt));
-  padding: 8px 12px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   border-radius: var(--grimoire-radius-2);
   overflow-x: auto;
   margin: 0;
@@ -30,7 +30,7 @@
 
 /* Unwrapped pre still needs margin */
 .grimoire-message-content>pre {
-  margin: 8px 0;
+  margin: var(--grimoire-space-4) 0;
 }
 
 .grimoire-message-content code {
@@ -43,7 +43,7 @@
   position: absolute;
   top: 6px;
   inset-inline-end: 6px;
-  padding: 2px 8px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-4);
   font-size: var(--grimoire-text-s);
   font-family: var(--font-monospace);
   color: var(--text-faint);
@@ -69,7 +69,7 @@
   position: absolute;
   top: 6px;
   inset-inline-end: 6px;
-  padding: 4px 8px;
+  padding: var(--grimoire-space-2) var(--grimoire-space-4);
   font-size: var(--grimoire-text-xs);
   background: var(--background-primary);
   border: none;

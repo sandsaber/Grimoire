@@ -1,6 +1,6 @@
 .grimoire-whats-new-host {
   flex: 0 0 auto;
-  padding: 8px var(--grimoire-window-padding-x) 0;
+  padding: var(--grimoire-space-4) var(--grimoire-window-padding-x) 0;
 }
 
 .grimoire-whats-new-host:empty {
@@ -9,8 +9,8 @@
 
 .grimoire-whats-new-card {
   display: grid;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   border: 1px solid rgba(var(--grimoire-brand-rgb), 0.22);
   border-radius: var(--grimoire-radius-2);
   background: color-mix(in srgb, var(--grimoire-workbench-surface) 92%, var(--grimoire-brand));
@@ -21,7 +21,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 10px;
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-whats-new-card-title-block {
@@ -37,7 +37,7 @@
 }
 
 .grimoire-whats-new-card-summary {
-  margin-top: 2px;
+  margin-top: var(--grimoire-space-1);
   color: var(--grimoire-workbench-muted);
   font-size: var(--grimoire-text-xs);
   line-height: 1.3;
@@ -59,7 +59,7 @@
 .grimoire-whats-new-card-dismiss {
   flex: 0 0 auto;
   min-height: 26px;
-  padding: 0 9px;
+  padding: 0 var(--grimoire-space-4);
   border: 1px solid var(--grimoire-workbench-border);
   border-radius: var(--grimoire-radius-2);
   background: transparent;
@@ -77,12 +77,12 @@
 
 .grimoire-whats-new-card-list {
   display: grid;
-  gap: 8px;
+  gap: var(--grimoire-space-4);
   min-height: 0;
   max-height: min(48vh, 440px);
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  padding-inline-end: 4px;
+  padding-inline-end: var(--grimoire-space-2);
   scrollbar-gutter: stable;
   scrollbar-width: thin;
 }
@@ -98,7 +98,7 @@
 
 .grimoire-whats-new-card-section {
   display: grid;
-  gap: 4px;
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-whats-new-card-section-title {
@@ -112,9 +112,9 @@
 
 .grimoire-whats-new-card-items {
   display: grid;
-  gap: 3px;
+  gap: var(--grimoire-space-1);
   margin: 0;
-  padding-left: 18px;
+  padding-left: var(--grimoire-space-6);
   color: var(--text-muted);
   font-size: var(--grimoire-text-s);
   line-height: 1.35;

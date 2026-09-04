@@ -3,7 +3,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  margin-left: 8px;
+  margin-left: var(--grimoire-space-4);
 }
 
 .grimoire-mcp-selector-icon-wrapper {
@@ -59,7 +59,7 @@
   left: 50%;
   transform: translateX(-50%);
   bottom: 100%;
-  margin-bottom: 4px;
+  margin-bottom: var(--grimoire-space-2);
   min-width: 200px;
   max-width: 280px;
   background: var(--background-secondary);
@@ -89,7 +89,7 @@
 }
 
 .grimoire-mcp-selector-header {
-  padding: 10px 12px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-semibold);
   color: var(--text-muted);
@@ -102,7 +102,7 @@
 }
 
 .grimoire-mcp-selector-empty {
-  padding: 16px 12px;
+  padding: var(--grimoire-space-6) var(--grimoire-space-5);
   text-align: center;
   color: var(--text-muted);
   font-size: var(--grimoire-text-s);
@@ -146,8 +146,8 @@
 .grimoire-mcp-selector-item {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  gap: 8px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  gap: var(--grimoire-space-4);
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
@@ -185,7 +185,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: var(--grimoire-space-3);
   flex: 1;
   overflow: hidden;
 }
@@ -201,7 +201,7 @@
 .grimoire-mcp-selector-cs-badge {
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-semibold);
-  padding: 1px 4px;
+  padding: 1px var(--grimoire-space-2);
   border-radius: var(--grimoire-radius-1);
   background: rgba(var(--grimoire-brand-rgb), 0.2);
   color: var(--grimoire-brand);

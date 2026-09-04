@@ -52,6 +52,20 @@ Icons carry recognition; words carry meaning. The rule that follows from that:
 - Icons come from Obsidian's bundled Lucide set via `setIcon()`, at `--icon-s`/`--icon-m` with the
   host's stroke width, so they weigh the same as every native icon beside them.
 
+**An icon-only control must still be a control.** `asActivatable` in
+`src/shared/components/activatable.ts` gives a non-button element the role, the accessible name, the
+tab stop and the Enter/Space handling a button has, and the marker class the focus ring hangs on.
+`markDecorative` hides an icon that sits beside its own label, because a Lucide glyph otherwise
+announces as its file name. Both exist because the pattern was written by hand in twenty-four places
+and missing in nineteen — including a fork-target modal that offered a choice the keyboard could not
+make, where the only key it answered was Escape, which declines.
+
+A row inside a list the container navigates with the arrow keys passes `inTabOrder: false`: it takes
+the name and the role and leaves the tab order to its container. Rows that already have a visible
+label and a container-level focus model — the inline plan and question lists — are left alone: a
+`role="button"` on a row a listbox owns would describe it wrongly, and a wrong role is worse than
+none.
+
 ## Tokens
 
 Grimoire tokens are a semantic layer over Obsidian's. Feature CSS reads the Grimoire token; only

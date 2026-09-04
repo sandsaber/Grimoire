@@ -3,7 +3,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  margin-left: 8px;
+  margin-left: var(--grimoire-space-4);
 }
 
 .grimoire-external-context-icon-wrapper {
@@ -59,7 +59,7 @@
   left: 50%;
   transform: translateX(-50%);
   bottom: 100%;
-  margin-bottom: 4px;
+  margin-bottom: var(--grimoire-space-2);
   min-width: 260px;
   max-width: 320px;
   background: var(--background-secondary);
@@ -78,7 +78,7 @@
 }
 
 .grimoire-external-context-header {
-  padding: 10px 12px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-semibold);
   color: var(--text-muted);
@@ -91,7 +91,7 @@
 }
 
 .grimoire-external-context-empty {
-  padding: 16px 12px;
+  padding: var(--grimoire-space-6) var(--grimoire-space-5);
   text-align: center;
   color: var(--text-muted);
   font-size: var(--grimoire-text-s);
@@ -101,8 +101,8 @@
 .grimoire-external-context-item {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  gap: 8px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  gap: var(--grimoire-space-4);
   border-bottom: 1px solid var(--background-modifier-border-focus);
 }
 

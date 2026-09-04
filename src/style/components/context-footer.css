@@ -5,8 +5,8 @@
   height: 26px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 11px 0 8px;
+  gap: var(--grimoire-space-3);
+  padding: 0 var(--grimoire-space-5) 0 var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-raise);
   color: var(--grimoire-workbench-muted);

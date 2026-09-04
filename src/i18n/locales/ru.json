@@ -19,7 +19,8 @@
     "disabled": "Отключено",
     "platform": "Платформа",
     "refresh": "Обновить",
-    "rewind": "Откатить"
+    "rewind": "Откатить",
+    "close": "Закрыть"
   },
   "chat": {
     "rewind": {
@@ -421,7 +422,10 @@
         "errorLabel": "Ошибка",
         "queuedPrefix": "В очереди",
         "steeringPrefix": "Корректировка",
-        "newChatTitle": "Новый чат"
+        "newChatTitle": "Новый чат",
+        "closeImage": "Закрыть изображение",
+        "viewFullImage": "Открыть изображение целиком",
+        "copyCode": "Скопировать код"
       },
       "errors": {
         "generic": "Ошибка: {message}",

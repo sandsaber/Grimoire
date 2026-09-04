@@ -2,7 +2,7 @@
 .grimoire-thinking-selector {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--grimoire-space-3);
 }
 
 /* Effort / budget container (shared layout) */
@@ -10,7 +10,7 @@
 .grimoire-thinking-budget {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--grimoire-space-3);
 }
 
 .grimoire-thinking-label-text {
@@ -28,7 +28,7 @@
 
 /* Current selection (visible when collapsed) */
 .grimoire-thinking-current {
-  padding: 3px 8px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-4);
   font-size: var(--grimoire-text-xs);
   color: var(--grimoire-brand);
   font-weight: var(--grimoire-weight-medium);
@@ -46,11 +46,11 @@
   margin-bottom: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--grimoire-space-1);
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-1);
-  padding: 4px;
+  padding: var(--grimoire-space-2);
   opacity: 0;
   visibility: hidden;
   transition: opacity var(--grimoire-duration) var(--grimoire-ease), visibility var(--grimoire-duration) var(--grimoire-ease);
@@ -68,7 +68,7 @@
 }
 
 .grimoire-thinking-gear {
-  padding: 3px 8px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-4);
   font-size: var(--grimoire-text-xs);
   color: var(--text-muted);
   cursor: pointer;
@@ -112,7 +112,7 @@
   box-sizing: border-box;
   height: 28px;
   overflow: hidden;
-  padding: 0 9px;
+  padding: 0 var(--grimoire-space-4);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-raise);
@@ -154,7 +154,7 @@
   display: flex;
   align-items: center;
   min-height: 28px;
-  padding: 0 8px;
+  padding: 0 var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-1);
   font-weight: var(--grimoire-weight-normal);
   line-height: 1;

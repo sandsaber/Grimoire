@@ -109,6 +109,28 @@ describe('Nordic design system', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('spaces on one ladder', () => {
+    // Twenty-seven spacing values were in use, ten of them off any grid. Below
+    // the ladder's top rung a spacing value is a step in the rhythm and must be
+    // a token; above it the number is layout, and stays a number.
+    const offGrid: string[] = [];
+    const SPACING = /\b(padding|margin|gap|row-gap|column-gap)(-[a-z]+)*\s*:\s*([^;{}]+);/g;
+    for (const file of MODULE_FILES) {
+      const lines = read(file).split(/\r?\n/);
+      lines.forEach((line, index) => {
+        for (const declaration of line.matchAll(SPACING)) {
+          for (const value of declaration[3].matchAll(/(?<![\w.-])([0-9]+)px/g)) {
+            if (Number(value[1]) > 1 && Number(value[1]) < 32) {
+              offGrid.push(`${file}:${index + 1} ${line.trim()}`);
+            }
+          }
+        }
+      });
+    }
+
+    expect(offGrid).toEqual([]);
+  });
+
   it('moves at one speed on one curve', () => {
     // Sixteen interaction durations between 0.06s and 0.32s were doing the same
     // job. A transition may still name a longer time when the duration is the

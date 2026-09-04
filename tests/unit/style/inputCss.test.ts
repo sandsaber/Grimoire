@@ -44,7 +44,7 @@ describe('input.css', () => {
     const css = readInputCss();
     const contextRule = getRule(css, '.grimoire-container--chat-window .grimoire-context-row');
 
-    expect(contextRule).toContain('padding: 0 2px 5px');
+    expect(contextRule).toContain('padding: 0 var(--grimoire-space-1) var(--grimoire-space-2)');
   });
 
   it('uses a borderless soft-accent send button with a deeper hover surface', () => {

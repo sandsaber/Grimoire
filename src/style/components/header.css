@@ -4,7 +4,7 @@
   display: flex;
   align-items: center;
   min-height: 46px;
-  padding: 11px var(--grimoire-window-padding-x) 9px;
+  padding: var(--grimoire-space-5) var(--grimoire-window-padding-x) var(--grimoire-space-4);
   border-bottom: 0;
   background: var(--grimoire-panel);
 }
@@ -13,20 +13,20 @@
 .grimoire-header-actions {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--grimoire-space-3);
   flex-shrink: 0;
   margin-inline-start: auto;
 }
 
 .grimoire-header-actions-slot {
   align-self: stretch;
-  padding-left: 8px;
+  padding-left: var(--grimoire-space-4);
   border-left: 0;
 }
 
 .grimoire-header .grimoire-tab-bar-container {
   display: flex;
-  gap: 4px;
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-header-btn {

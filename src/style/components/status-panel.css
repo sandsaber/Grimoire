@@ -2,12 +2,12 @@
 
 .grimoire-status-panel-container {
   flex-shrink: 0;
-  padding: 0 2px;
+  padding: 0 var(--grimoire-space-1);
 }
 
 .grimoire-status-panel {
-  margin-top: 8px;
-  padding: 8px 10px;
+  margin-top: var(--grimoire-space-4);
+  padding: var(--grimoire-space-4) var(--grimoire-space-4);
   border: 1px solid var(--grimoire-workbench-border);
   border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-workbench-surface);
@@ -22,8 +22,8 @@
 .grimoire-status-panel-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 3px 4px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-1) var(--grimoire-space-2);
   cursor: pointer;
   border-radius: var(--grimoire-radius-2);
   transition: background var(--grimoire-duration) var(--grimoire-ease);
@@ -84,7 +84,7 @@
 }
 
 .grimoire-status-panel-content {
-  padding: 4px 0 0 0;
+  padding: var(--grimoire-space-2) 0 0 0;
 }
 
 /* Individual todo item - shared by status panel and inline tool via .grimoire-todo-list-container */
@@ -110,7 +110,7 @@
   font-size: var(--grimoire-text-s);
   line-height: 1.4;
   flex: 1;
-  padding-left: 12px;
+  padding-left: var(--grimoire-space-5);
 }
 
 .grimoire-todo-list-container .grimoire-todo-pending .grimoire-todo-status-icon {
@@ -148,17 +148,17 @@
 /* Bash Output Section */
 
 .grimoire-status-panel-bash {
-  margin-bottom: 6px;
+  margin-bottom: var(--grimoire-space-3);
 }
 
 .grimoire-status-panel-bash-header {
-  padding: 3px 4px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-2);
 }
 
 .grimoire-status-panel-bash-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--grimoire-space-3);
 }
 
 .grimoire-status-panel-bash-action {
@@ -177,14 +177,14 @@
 }
 
 .grimoire-status-panel-bash-content {
-  padding-top: 4px;
+  padding-top: var(--grimoire-space-2);
   max-height: min(40vh, 320px);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 .grimoire-status-panel-bash-entry {
-  margin: 4px 0;
+  margin: var(--grimoire-space-2) 0;
 }
 
 .grimoire-status-panel-bash-entry .grimoire-tool-icon svg {
@@ -213,21 +213,21 @@
  */
 
 .grimoire-status-panel-agents {
-  margin-top: 6px;
+  margin-top: var(--grimoire-space-3);
 }
 
 .grimoire-agent-card-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 2px 4px 0;
+  gap: var(--grimoire-space-2);
+  padding: var(--grimoire-space-1) var(--grimoire-space-2) 0;
 }
 
 .grimoire-agent-card {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 6px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-2) var(--grimoire-space-3);
   border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-workbench-surface-raised);
   overflow: hidden;

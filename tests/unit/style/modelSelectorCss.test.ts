@@ -37,7 +37,7 @@ describe('model-selector.css', () => {
     expect(searchRule).toContain('height: 34px');
     expect(searchRule).toContain('min-height: 34px');
     expect(searchRule).toContain('max-height: 34px');
-    expect(searchRule).toContain('padding: 0 9px');
+    expect(searchRule).toContain('padding: 0 var(--grimoire-space-4)');
   });
 
   it('frames the model search container so it does not bleed past the dropdown edges', () => {
@@ -108,8 +108,8 @@ describe('model-selector.css', () => {
     const labelRule = getRule(css, '.grimoire-plan-usage-badge-label');
     const meterRule = getRule(css, '.grimoire-plan-usage-badge-meter');
 
-    expect(badgeRule).toContain('gap: 5px');
-    expect(badgeRule).toContain('padding: 0 6px');
+    expect(badgeRule).toContain('gap: var(--grimoire-space-2)');
+    expect(badgeRule).toContain('padding: 0 var(--grimoire-space-3)');
     expect(labelRule).toContain('display: none');
     expect(meterRule).toContain('width: 18px');
     expect(css).not.toContain('.grimoire-plan-usage-badge-tip');

@@ -5,11 +5,11 @@
 }
 
 .grimoire-whats-new-modal .modal-content {
-  padding-bottom: 18px;
+  padding-bottom: var(--grimoire-space-6);
 }
 
 .grimoire-whats-new-summary {
-  margin: 0 0 14px;
+  margin: 0 0 var(--grimoire-space-5);
   color: var(--text-muted);
   font-size: var(--grimoire-text-m);
 }
@@ -17,19 +17,19 @@
 .grimoire-whats-new-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--grimoire-space-5);
+  margin-bottom: var(--grimoire-space-6);
 }
 
 .grimoire-whats-new-section {
-  padding: 12px;
+  padding: var(--grimoire-space-5);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-2);
   background: var(--background-secondary);
 }
 
 .grimoire-whats-new-section h3 {
-  margin: 0 0 8px;
+  margin: 0 0 var(--grimoire-space-4);
   color: var(--text-normal);
   font-size: var(--grimoire-text-l);
   font-weight: var(--grimoire-weight-semibold);
@@ -37,11 +37,11 @@
 
 .grimoire-whats-new-section ul {
   margin: 0;
-  padding-left: 20px;
+  padding-left: var(--grimoire-space-7);
 }
 
 .grimoire-whats-new-section li {
-  margin: 4px 0;
+  margin: var(--grimoire-space-2) 0;
   color: var(--text-normal);
   font-size: var(--grimoire-text-m);
   line-height: 1.45;
@@ -49,7 +49,7 @@
 
 .grimoire-whats-new-link {
   display: inline-flex;
-  margin-bottom: 12px;
+  margin-bottom: var(--grimoire-space-5);
   color: var(--grimoire-accent-text);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-semibold);

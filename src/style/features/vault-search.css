@@ -2,8 +2,8 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
+  gap: var(--grimoire-space-3);
+  margin-top: var(--grimoire-space-3);
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
 }
@@ -11,7 +11,7 @@
 .grimoire-vault-search-source {
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-2);
-  padding: 2px 6px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-3);
   background: var(--background-secondary);
   color: var(--text-normal);
 }

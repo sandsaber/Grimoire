@@ -4,17 +4,17 @@
 .grimoire-image-preview {
   display: none;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 0;
-  margin-bottom: 4px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-4) 0;
+  margin-bottom: var(--grimoire-space-2);
 }
 
 /* Individual image preview chip */
 .grimoire-image-chip {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-3) var(--grimoire-space-4);
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-2);
@@ -129,7 +129,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: var(--grimoire-space-2);
   color: var(--grimoire-brand);
 }
 
@@ -148,10 +148,10 @@
 .grimoire-message-images {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--grimoire-space-3);
   justify-content: flex-end;
-  margin-bottom: 6px;
-  padding-right: 4px;
+  margin-bottom: var(--grimoire-space-3);
+  padding-right: var(--grimoire-space-2);
 }
 
 /* Individual image in message - standardized size */

@@ -25,7 +25,7 @@ describe('rename-tab.css', () => {
   it('reserves input space for the reset control', () => {
     const css = readCss();
 
-    expect(getRule(css, '.grimoire-rename-tab-input')).toContain('padding: 0 42px 0 12px');
+    expect(getRule(css, '.grimoire-rename-tab-input')).toContain('padding: 0 40px 0 var(--grimoire-space-5)');
     expect(getRule(css, 'button.grimoire-rename-tab-reset')).toContain('position: absolute');
   });
 });

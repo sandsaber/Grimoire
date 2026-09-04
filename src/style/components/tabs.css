@@ -2,13 +2,13 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 5px;
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-tab-badges {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--grimoire-space-2);
   max-width: 100%;
   min-width: 0;
   overflow: auto hidden;
@@ -67,7 +67,7 @@
 .grimoire-tab-badge-streaming,
 .grimoire-tab-badge-attention {
   width: 38px;
-  gap: 5px;
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-tab-badge-streaming .grimoire-tab-activity-dot,
@@ -138,7 +138,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: var(--grimoire-space-3);
   pointer-events: none;
 }
 
@@ -148,7 +148,7 @@
   align-items: center;
   max-width: min(420px, 100%);
   overflow: hidden;
-  padding: 9px 12px 11px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5) var(--grimoire-space-5);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-2);
   background: var(--background-secondary);
@@ -172,7 +172,7 @@
 button.grimoire-tab-close-toast-undo {
   flex: 0 0 auto;
   min-height: 0;
-  padding: 0 3px;
+  padding: 0 var(--grimoire-space-1);
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -207,8 +207,8 @@ button.grimoire-tab-close-toast-undo:focus-visible {
 .grimoire-panel-tabs {
   display: flex;
   align-items: center;
-  gap: 2px;
-  margin: 0 var(--grimoire-window-padding-x) 2px;
+  gap: var(--grimoire-space-1);
+  margin: 0 var(--grimoire-window-padding-x) var(--grimoire-space-1);
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -225,7 +225,7 @@ button.grimoire-tab-close-toast-undo:focus-visible {
   min-width: 0;
   height: 26px;
   overflow: visible;
-  padding: 0 11px;
+  padding: 0 var(--grimoire-space-5);
   border: 0;
   border-radius: 0;
   background: transparent;

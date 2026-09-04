@@ -6,7 +6,7 @@
 .grimoire-selection-highlight {
   background: var(--text-selection);
   border-radius: var(--grimoire-radius-1);
-  padding: 3px 0;
+  padding: var(--grimoire-space-1) 0;
   margin: -3px 0;
 }
 
@@ -28,7 +28,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 2px 0;
+  padding: var(--grimoire-space-1) 0;
   background: transparent;
 }
 
@@ -43,8 +43,8 @@
 /* Input - fully transparent */
 .grimoire-inline-input {
   width: 100%;
-  padding: 4px 8px;
-  padding-inline-end: 30px;
+  padding: var(--grimoire-space-2) var(--grimoire-space-4);
+  padding-inline-end: 32px;
   border-width: 1px;
   border-style: solid;
   border-color: var(--background-modifier-border);
@@ -86,8 +86,8 @@
 
 /* Agent reply - shown when agent asks clarifying question */
 .grimoire-inline-agent-reply {
-  padding: 8px;
-  margin-bottom: 4px;
+  padding: var(--grimoire-space-4);
+  margin-bottom: var(--grimoire-space-2);
   background: transparent;
   border-width: 1px;
   border-style: solid;
@@ -125,13 +125,13 @@
 /* Accept/Reject buttons inline with diff */
 .grimoire-inline-diff-buttons {
   display: inline-flex;
-  gap: 8px;
-  margin-inline-start: 6px;
+  gap: var(--grimoire-space-4);
+  margin-inline-start: var(--grimoire-space-3);
   background: none;
 }
 
 .grimoire-inline-diff-btn {
-  padding: 4px 6px;
+  padding: var(--grimoire-space-2) var(--grimoire-space-3);
   border: none;
   background: none;
   box-shadow: none;

@@ -19,7 +19,8 @@
     "disabled": "Désactivé",
     "platform": "Plateforme",
     "refresh": "Actualiser",
-    "rewind": "Rembobiner"
+    "rewind": "Rembobiner",
+    "close": "Fermer"
   },
   "chat": {
     "rewind": {
@@ -421,7 +422,10 @@
         "errorLabel": "Erreur",
         "queuedPrefix": "En file d'attente",
         "steeringPrefix": "Pilotage",
-        "newChatTitle": "Nouveau chat"
+        "newChatTitle": "Nouveau chat",
+        "closeImage": "Fermer l'image",
+        "viewFullImage": "Afficher l'image en taille réelle",
+        "copyCode": "Copier le code"
       },
       "errors": {
         "generic": "Erreur : {message}",

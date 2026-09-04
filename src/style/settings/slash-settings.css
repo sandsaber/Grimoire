@@ -8,7 +8,7 @@
 
 .grimoire-slash-item-badge {
   font-size: var(--grimoire-text-2xs);
-  padding: 2px 6px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-3);
   background: var(--background-modifier-border);
   border-radius: var(--grimoire-radius-1);
   color: var(--text-muted);

@@ -4,7 +4,7 @@
   align-items: center;
   align-self: center;
   flex: 1 1 auto;
-  gap: 7px;
+  gap: var(--grimoire-space-3);
   min-width: 0;
   max-width: min(520px, 50vw);
   overflow: hidden;
@@ -24,8 +24,8 @@
   min-width: 0;
   max-width: 132px;
   height: 28px;
-  gap: 7px;
-  padding: 0 10px 0 9px;
+  gap: var(--grimoire-space-3);
+  padding: 0 var(--grimoire-space-4) 0 var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   color: var(--grimoire-brand);
@@ -98,10 +98,10 @@
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: 5px;
+  gap: var(--grimoire-space-2);
   height: 28px;
   min-width: 0;
-  padding: 0 6px;
+  padding: 0 var(--grimoire-space-3);
   border: 0;
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-raise);
@@ -159,7 +159,7 @@
 }
 
 .grimoire-plan-usage-badge--spend {
-  gap: 6px;
+  gap: var(--grimoire-space-3);
 }
 
 .grimoire-plan-usage-badge--spend .grimoire-plan-usage-badge-value {
@@ -227,14 +227,14 @@
   margin-bottom: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--grimoire-space-1);
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-1);
   box-shadow: var(--grimoire-lift-1);
   z-index: 1000;
   width: max-content;
-  padding: 4px;
+  padding: var(--grimoire-space-2);
   opacity: 0;
   visibility: hidden;
   transition: opacity var(--grimoire-duration) var(--grimoire-ease), visibility var(--grimoire-duration) var(--grimoire-ease);
@@ -258,8 +258,8 @@
   overflow-x: hidden;
   overscroll-behavior: contain;
   margin-bottom: 0;
-  padding: 5px;
-  gap: 2px;
+  padding: var(--grimoire-space-2);
+  gap: var(--grimoire-space-1);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-2);
   background: var(--background-primary);
@@ -292,12 +292,12 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   box-sizing: border-box;
-  gap: 8px;
+  gap: var(--grimoire-space-4);
   height: 34px;
   min-height: 34px;
   max-height: 34px;
   margin: 0;
-  padding: 0 9px;
+  padding: 0 var(--grimoire-space-4);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-2);
   background: var(--background-secondary);
@@ -356,7 +356,7 @@
 
 .grimoire-model-group-section {
   display: grid;
-  gap: 2px;
+  gap: var(--grimoire-space-1);
 }
 
 .grimoire-model-dropdown button.grimoire-model-group {
@@ -365,9 +365,9 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--grimoire-space-4);
   min-height: 28px;
-  padding: 4px 7px;
+  padding: var(--grimoire-space-2) var(--grimoire-space-3);
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -468,7 +468,7 @@
 
 .grimoire-model-group-options {
   display: none;
-  gap: 2px;
+  gap: var(--grimoire-space-1);
 }
 
 .grimoire-model-group-section.is-open .grimoire-model-group-options {
@@ -477,9 +477,9 @@
 
 .grimoire-plan-usage-readout {
   display: grid;
-  gap: 7px;
-  margin: 3px 0 5px;
-  padding: 9px 10px;
+  gap: var(--grimoire-space-3);
+  margin: var(--grimoire-space-1) 0 var(--grimoire-space-2);
+  padding: var(--grimoire-space-4) var(--grimoire-space-4);
   border: 1px solid var(--grimoire-line-3);
   border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-raise);
@@ -498,7 +498,7 @@
 
 .grimoire-plan-usage-readout-header {
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-plan-usage-readout-plan,
@@ -530,7 +530,7 @@
 
 .grimoire-plan-usage-readout-row {
   grid-template-columns: 58px minmax(74px, 1fr) auto auto;
-  gap: 8px;
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-plan-usage-readout-label {
@@ -573,7 +573,7 @@
 }
 
 .grimoire-plan-usage-readout--spend {
-  gap: 4px;
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-plan-usage-readout-spend {
@@ -596,8 +596,8 @@
 .grimoire-model-option {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 8px;
+  gap: var(--grimoire-space-2);
+  padding: var(--grimoire-space-2) var(--grimoire-space-4);
   cursor: pointer;
   font-size: var(--grimoire-text-s);
   color: var(--text-muted);
@@ -648,7 +648,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   min-height: 38px;
-  padding: 5px 8px 5px 22px;
+  padding: var(--grimoire-space-2) var(--grimoire-space-4) var(--grimoire-space-2) var(--grimoire-space-7);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-1);
   color: var(--grimoire-workbench-muted);
@@ -668,7 +668,7 @@
 
 .grimoire-container--chat-window .grimoire-model-option-copy {
   grid-column: 1;
-  gap: 2px;
+  gap: var(--grimoire-space-1);
 }
 
 .grimoire-container--chat-window .grimoire-model-option-label {
@@ -702,7 +702,7 @@
 
 .grimoire-model-empty,
 .grimoire-model-loading {
-  padding: 12px 8px;
+  padding: var(--grimoire-space-5) var(--grimoire-space-4);
   text-align: center;
   color: var(--text-faint);
   font-size: var(--grimoire-text-s);
@@ -716,15 +716,15 @@
 .grimoire-model-catalog-loading {
   align-items: center;
   display: flex;
-  gap: 8px;
+  gap: var(--grimoire-space-4);
   justify-content: flex-start;
-  padding: 8px 12px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   text-align: left;
 }
 
 .grimoire-model-catalog-error {
   color: var(--text-muted);
-  padding: 8px 12px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   text-align: left;
 }
 

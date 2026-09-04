@@ -42,7 +42,7 @@
   position: relative;
   display: flex;
   align-items: stretch;
-  margin-bottom: 16px;
+  margin-bottom: var(--grimoire-space-6);
   padding: 0;
   border-bottom: 1px solid var(--background-modifier-border);
 }
@@ -53,7 +53,7 @@
   align-items: stretch;
   justify-content: flex-start;
   min-width: 0;
-  gap: 2px;
+  gap: var(--grimoire-space-1);
   padding: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -75,7 +75,7 @@
   height: auto;
   min-height: 0;
   margin: 0 0 -1px;
-  padding: 8px 0;
+  padding: var(--grimoire-space-4) 0;
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;
@@ -91,11 +91,11 @@
 }
 
 .grimoire-settings-tab-scroll--previous {
-  margin-inline-end: 4px;
+  margin-inline-end: var(--grimoire-space-2);
 }
 
 .grimoire-settings-tab-scroll--next {
-  margin-inline-start: 4px;
+  margin-inline-start: var(--grimoire-space-2);
 }
 
 .grimoire-settings-tab-scroll:disabled {
@@ -157,7 +157,7 @@
   min-height: 0;
   flex: 0 0 auto;
   margin: 0 0 -1px;
-  padding: 8px 16px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-6);
   border: 0;
   border-bottom: 4px solid transparent;
   border-radius: 0;
@@ -193,7 +193,7 @@
   display: inline-block;
   width: 4px;
   height: 4px;
-  margin-left: 4px;
+  margin-left: var(--grimoire-space-2);
   border-radius: var(--grimoire-radius-pill);
   background: var(--text-faint);
   vertical-align: 1px;
@@ -223,7 +223,7 @@
  */
 
 .grimoire-settings .setting-item-description code {
-  padding: 1.5px 5px;
+  padding: 1.5px var(--grimoire-space-2);
   border-radius: var(--grimoire-radius-1);
   background: var(--background-modifier-form-field);
   color: var(--grimoire-brand);
@@ -236,7 +236,7 @@
 .grimoire-settings .setting-item.grimoire-settings-textarea-row {
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-settings .setting-item.grimoire-settings-textarea-row .setting-item-control {
@@ -259,7 +259,7 @@
 .grimoire-settings .setting-item-control input:not([type]) {
   height: 30px;
   min-width: 180px;
-  padding: 0 10px;
+  padding: 0 var(--grimoire-space-4);
   font-size: var(--grimoire-text-m);
 }
 
@@ -280,7 +280,7 @@
 .grimoire-settings .setting-item-control textarea {
   width: 100%;
   min-height: 72px;
-  padding: 8px 10px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-4);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-s);
   line-height: 1.5;
@@ -299,7 +299,7 @@
 
 .grimoire-settings .grimoire-slider-value {
   min-width: 16px;
-  margin-left: 12px;
+  margin-left: var(--grimoire-space-5);
   color: var(--text-muted);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-s);
@@ -309,8 +309,8 @@
 
 /* ── Provider-disabled notice → .note-card ── */
 .grimoire-provider-disabled-notice {
-  margin: 14px 0 4px;
-  padding: 13px 15px;
+  margin: var(--grimoire-space-5) 0 var(--grimoire-space-2);
+  padding: var(--grimoire-space-5) var(--grimoire-space-6);
   border: 1px solid rgba(var(--grimoire-brand-rgb), 0.42);
   border-radius: var(--grimoire-radius-2);
   background: rgba(var(--grimoire-brand-rgb), 0.07);
@@ -332,7 +332,7 @@
    Advanced disclosure → .adv / .adv-toggle / .adv-wrap / .adv-body
    ============================================================ */
 .grimoire-adv {
-  margin-top: 14px;
+  margin-top: var(--grimoire-space-5);
   padding-top: 0;
   border-top: 0;
 }
@@ -342,9 +342,9 @@
   align-items: center;
   width: 100%;
   height: auto;
-  gap: 8px;
+  gap: var(--grimoire-space-4);
   margin-top: 0;
-  padding: 12px;
+  padding: var(--grimoire-space-5);
   border: none;
   border-radius: var(--grimoire-radius-2);
   background: var(--background-secondary);
@@ -395,7 +395,7 @@
   display: grid;
   flex: 1 1 auto;
   min-width: 0;
-  gap: 2px;
+  gap: var(--grimoire-space-1);
 }
 
 .grimoire-adv-title {
@@ -446,7 +446,7 @@
 }
 
 .grimoire-adv-body {
-  margin-top: 4px;
+  margin-top: var(--grimoire-space-2);
   padding: 0;
   border: none;
   border-radius: 0;
@@ -466,16 +466,16 @@
 .grimoire-hotkey-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px 12px;
-  padding: 6px 0 4px;
+  gap: var(--grimoire-space-2) var(--grimoire-space-5);
+  padding: var(--grimoire-space-3) 0 var(--grimoire-space-2);
 }
 
 .grimoire-hotkey-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-3) var(--grimoire-space-4);
   border: none;
   border-radius: var(--grimoire-radius-1);
   background: transparent;
@@ -493,7 +493,7 @@
 }
 
 .grimoire-hotkey-badge {
-  padding: 2px 6px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-3);
   border-radius: var(--grimoire-radius-1);
   background: var(--background-modifier-form-field);
   box-shadow: inset 0 0 0 1px var(--background-modifier-border-hover);
@@ -514,12 +514,12 @@
 .grimoire-sp-settings-desc,
 .grimoire-mcp-settings-desc,
 .grimoire-approved-desc {
-  padding: 0 2px;
+  padding: 0 var(--grimoire-space-1);
 }
 
 .grimoire-sp-settings-desc p,
 .grimoire-mcp-settings-desc p {
-  margin: 0 0 6px;
+  margin: 0 0 var(--grimoire-space-3);
   color: var(--text-faint);
   font-size: var(--grimoire-text-s);
   line-height: 1.45;
@@ -595,21 +595,21 @@
 
 .grimoire-project-workspaces-list {
   display: grid;
-  gap: 8px;
+  gap: var(--grimoire-space-4);
   margin: 0;
 }
 
 .grimoire-project-workspace-item {
   display: grid;
   gap: 0;
-  margin: 0 0 4px;
+  margin: 0 0 var(--grimoire-space-2);
   padding: 0;
   border: 0;
   background: transparent;
 }
 
 .grimoire-settings .grimoire-project-workspace-item .setting-item {
-  margin-bottom: 4px;
+  margin-bottom: var(--grimoire-space-2);
 }
 
 .grimoire-settings .grimoire-project-workspace-delete-row .setting-item-name {
@@ -631,8 +631,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  padding: 0 2px;
+  margin-bottom: var(--grimoire-space-5);
+  padding: 0 var(--grimoire-space-1);
 }
 
 .grimoire-sp-label {
@@ -643,30 +643,30 @@
 
 .grimoire-sp-header-actions {
   display: flex;
-  gap: 4px;
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-sp-empty-state {
-  padding: 20px;
+  padding: var(--grimoire-space-7);
   text-align: center;
   color: var(--text-muted);
   background: var(--background-secondary);
   border-radius: var(--grimoire-radius-2);
-  margin-top: 8px;
+  margin-top: var(--grimoire-space-4);
 }
 
 .grimoire-sp-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 10px;
+  gap: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-4);
 }
 
 .grimoire-sp-item {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 14px 16px;
+  padding: var(--grimoire-space-5) var(--grimoire-space-6);
   background: var(--background-secondary);
   border-radius: var(--grimoire-radius-2);
 }
@@ -683,7 +683,7 @@
 .grimoire-sp-item-header {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-sp-item-name {
@@ -695,33 +695,33 @@
 .grimoire-sp-item-desc {
   font-size: var(--grimoire-text-m);
   color: var(--text-muted);
-  margin-top: 2px;
+  margin-top: var(--grimoire-space-1);
 }
 
 .grimoire-sp-item-actions {
   display: flex;
-  gap: 4px;
-  margin-left: 16px;
+  gap: var(--grimoire-space-2);
+  margin-left: var(--grimoire-space-6);
   flex-shrink: 0;
 }
 
 .grimoire-sp-advanced-section {
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-2);
-  padding: 0 12px;
-  margin: 8px 0;
+  padding: 0 var(--grimoire-space-5);
+  margin: var(--grimoire-space-4) 0;
 }
 
 .grimoire-sp-advanced-summary {
   cursor: pointer;
-  padding: 8px 0;
+  padding: var(--grimoire-space-4) 0;
   font-size: var(--font-ui-small);
   color: var(--text-muted);
   font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-sp-advanced-section[open] .grimoire-sp-advanced-summary {
-  margin-bottom: 4px;
+  margin-bottom: var(--grimoire-space-2);
 }
 
 .grimoire-sp-modal .modal-content {
@@ -733,13 +733,13 @@
   width: 100%;
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-m);
-  padding: 8px;
+  padding: var(--grimoire-space-4);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-1);
   background: var(--background-primary);
   color: var(--text-normal);
   resize: vertical;
-  margin-top: 8px;
+  margin-top: var(--grimoire-space-4);
 }
 
 .grimoire-sp-content-area:focus {
@@ -749,7 +749,7 @@
 
 .grimoire-sp-modal-buttons {
   display: flex;
-  gap: 8px;
-  margin-top: 16px;
+  gap: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-6);
   justify-content: flex-end;
 }

@@ -33,6 +33,16 @@
   outline-offset: 2px;
 }
 
+/*
+ * Every control `asActivatable` creates, present and future. The lists above
+ * predate it and are kept for the controls that are still native buttons.
+ */
+.grimoire-activatable:focus-visible {
+  outline: 2px solid var(--grimoire-accent);
+  outline-offset: 2px;
+  border-radius: var(--grimoire-radius-1);
+}
+
 /* outline + negative offset + border-radius */
 .grimoire-history-item-content:focus-visible {
   outline: 2px solid var(--grimoire-accent);

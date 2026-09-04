@@ -1,7 +1,7 @@
 /* Input area */
 .grimoire-input-container {
   position: relative;
-  padding: 10px 0 0 0;
+  padding: var(--grimoire-space-4) 0 0 0;
 }
 
 /* Resize handle at the top edge of the input wrapper. */
@@ -68,8 +68,8 @@ body.grimoire-dragging-ns {
   align-items: flex-start;
   justify-content: flex-start;
   flex-shrink: 0;
-  padding: 8px 10px 0 10px;
-  gap: 8px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-4) 0 var(--grimoire-space-4);
+  gap: var(--grimoire-space-4);
 }
 
 /* Show context row when it has visible content */
@@ -82,7 +82,7 @@ body.grimoire-dragging-ns {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 0 7px 0;
+  padding: 0 0 var(--grimoire-space-3) 0;
   min-height: 0;
 }
 
@@ -111,7 +111,7 @@ body.grimoire-dragging-ns {
   opacity: 0.9;
   pointer-events: none;
   white-space: nowrap;
-  padding: 5px 6px;
+  padding: var(--grimoire-space-2) var(--grimoire-space-3);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-1);
   margin-inline-start: auto;
@@ -128,7 +128,7 @@ body.grimoire-dragging-ns {
   min-height: var(--grimoire-textarea-min-height, 60px);
   max-height: var(--grimoire-textarea-max-height, none);
   resize: none;
-  padding: 10px 11px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   border: none;
   border-radius: var(--grimoire-radius-2);
   background: transparent;
@@ -159,8 +159,8 @@ body.grimoire-dragging-ns {
   align-items: center;
   justify-content: flex-start;
   flex-shrink: 0;
-  padding: 5px 7px 7px 7px;
-  gap: 4px;
+  padding: var(--grimoire-space-2) var(--grimoire-space-3) var(--grimoire-space-3) var(--grimoire-space-3);
+  gap: var(--grimoire-space-2);
   min-width: 0;
   border-top: 1px solid rgba(var(--grimoire-brand-rgb), 0.08);
 }
@@ -169,14 +169,14 @@ body.grimoire-dragging-ns {
 .grimoire-file-indicator {
   display: none;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--grimoire-space-3);
 }
 
 .grimoire-file-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 6px 3px 8px;
+  gap: var(--grimoire-space-2);
+  padding: var(--grimoire-space-1) var(--grimoire-space-3) var(--grimoire-space-1) var(--grimoire-space-4);
   background: rgba(var(--grimoire-brand-rgb), 0.07);
   border: 1px solid rgba(var(--grimoire-brand-rgb), 0.18);
   border-radius: var(--grimoire-radius-3);
@@ -231,15 +231,15 @@ body.grimoire-dragging-ns {
 .grimoire-external-file-indicator {
   display: none;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--grimoire-space-3);
   min-width: 0;
 }
 
 .grimoire-external-file-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 6px 3px 8px;
+  gap: var(--grimoire-space-2);
+  padding: var(--grimoire-space-1) var(--grimoire-space-3) var(--grimoire-space-1) var(--grimoire-space-4);
   background: rgba(var(--grimoire-brand-rgb), 0.05);
   border: 1px solid rgba(var(--grimoire-brand-rgb), 0.28);
   border-radius: var(--grimoire-radius-3);
@@ -304,7 +304,7 @@ body.grimoire-dragging-ns {
 .grimoire-relevant-notes {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--grimoire-space-1);
   width: auto;
   min-width: 0;
   max-width: 100%;
@@ -331,7 +331,7 @@ body.grimoire-dragging-ns {
   min-width: 0;
   max-width: 88px;
   height: 20px;
-  padding: 0 6px;
+  padding: 0 var(--grimoire-space-3);
   border: 0;
   border-radius: var(--grimoire-radius-1);
   background: transparent;
@@ -360,7 +360,7 @@ body.grimoire-dragging-ns {
   display: inline-flex;
   align-items: center;
   height: 20px;
-  padding: 0 4px;
+  padding: 0 var(--grimoire-space-2);
   color: var(--grimoire-workbench-faint);
   font-size: var(--grimoire-text-xs);
   line-height: 1;
@@ -376,15 +376,15 @@ body.grimoire-dragging-ns {
   font-size: var(--grimoire-text-s);
   color: var(--text-muted);
   font-style: normal;
-  gap: 4px;
-  padding: 0 2px 8px 2px;
+  gap: var(--grimoire-space-2);
+  padding: 0 var(--grimoire-space-1) var(--grimoire-space-4) var(--grimoire-space-1);
 }
 
 .grimoire-queue-indicator-header,
 .grimoire-queue-indicator-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--grimoire-space-4);
   min-width: 0;
 }
 
@@ -406,12 +406,12 @@ body.grimoire-dragging-ns {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-queue-indicator-action {
   flex: 0 0 auto;
-  padding: 1px 8px;
+  padding: 1px var(--grimoire-space-4);
   border: 0;
   background: transparent;
   color: var(--grimoire-accent);
@@ -478,8 +478,8 @@ body.grimoire-dragging-ns {
   container-type: inline-size;
   width: 100%;
   margin: 0;
-  gap: 7px;
-  padding: 8px;
+  gap: var(--grimoire-space-3);
+  padding: var(--grimoire-space-4);
   border: 0;
   border-radius: var(--grimoire-radius-3);
   background: var(--grimoire-sink);
@@ -500,7 +500,7 @@ body.grimoire-dragging-ns {
    Mirrors the composer frame: neutral line at rest, accent border on focus. */
 .grimoire-input-queue-row.grimoire-visible-flex + .grimoire-input-wrapper {
   border-top: 1px solid var(--grimoire-line-2);
-  padding-top: 8px;
+  padding-top: var(--grimoire-space-4);
 }
 
 .grimoire-input-queue-row.grimoire-visible-flex + .grimoire-input-wrapper:focus-within {
@@ -508,7 +508,7 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-container--chat-window .grimoire-input-nav-row {
-  padding: 0 0 6px;
+  padding: 0 0 var(--grimoire-space-3);
 }
 
 .grimoire-container--chat-window.grimoire-container--header-mode .grimoire-input-nav-row,
@@ -532,14 +532,14 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-container--chat-window .grimoire-context-row {
-  padding: 0 2px 5px;
-  gap: 5px;
+  padding: 0 var(--grimoire-space-1) var(--grimoire-space-2);
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-container--chat-window .grimoire-input {
   min-height: var(--grimoire-textarea-min-height, 46px);
   max-height: var(--grimoire-textarea-max-height, none);
-  padding: 3px 2px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-1);
   border-radius: 0;
   font-size: var(--grimoire-text-m);
 }
@@ -548,7 +548,7 @@ body.grimoire-dragging-ns {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 5px;
+  gap: var(--grimoire-space-2);
   width: 100%;
   min-height: 28px;
   padding: 0;
@@ -571,14 +571,14 @@ body.grimoire-dragging-ns {
 
 .grimoire-container--chat-window .grimoire-input-toolbar-model-row {
   display: flex;
-  gap: 5px;
+  gap: var(--grimoire-space-2);
   overflow: visible;
 }
 
 .grimoire-container--chat-window .grimoire-input-toolbar-actions-row {
-  gap: 5px;
+  gap: var(--grimoire-space-2);
   flex-wrap: nowrap;
-  row-gap: 5px;
+  row-gap: var(--grimoire-space-2);
 }
 
 .grimoire-container--chat-window .grimoire-input-toolbar-config-actions {
@@ -587,7 +587,7 @@ body.grimoire-dragging-ns {
   flex-wrap: nowrap;
   align-items: center;
   min-width: 0;
-  gap: 5px;
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-container--chat-window .grimoire-model-context-stack {
@@ -621,7 +621,7 @@ body.grimoire-dragging-ns {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 5px;
+  gap: var(--grimoire-space-2);
   margin-inline-start: auto;
 }
 
@@ -665,7 +665,7 @@ body.grimoire-dragging-ns {
   flex: 0 0 auto;
   justify-self: end;
   height: 28px;
-  padding: 0 9px;
+  padding: 0 var(--grimoire-space-4);
   border: 0;
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-accent-soft);

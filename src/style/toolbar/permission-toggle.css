@@ -26,7 +26,7 @@
   height: 28px;
   min-width: 0;
   overflow: hidden;
-  padding: 0 9px;
+  padding: 0 var(--grimoire-space-4);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-raise);
@@ -61,8 +61,8 @@
   flex-direction: column;
   box-sizing: border-box;
   min-width: 92px;
-  gap: 2px;
-  padding: 4px;
+  gap: var(--grimoire-space-1);
+  padding: var(--grimoire-space-2);
   overflow: hidden;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-2);
@@ -84,7 +84,7 @@
   display: flex;
   align-items: center;
   min-height: 28px;
-  padding: 0 8px;
+  padding: 0 var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-1);
   color: var(--text-muted);
   font-size: var(--grimoire-text-xs);

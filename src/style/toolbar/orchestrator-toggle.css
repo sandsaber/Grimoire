@@ -2,7 +2,7 @@
 .grimoire-orchestrator-toggle {
   display: flex;
   align-items: center;
-  padding-left: 2px;
+  padding-left: var(--grimoire-space-1);
 }
 
 .grimoire-orchestrator-button {

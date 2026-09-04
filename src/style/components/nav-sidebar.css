@@ -10,7 +10,7 @@
   z-index: 24;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--grimoire-space-2);
   opacity: 0;
   pointer-events: none;
   transform: translateY(-50%);
@@ -79,11 +79,11 @@
 }
 
 .grimoire-nav-btn-top {
-  margin-bottom: 3px;
+  margin-bottom: var(--grimoire-space-1);
 }
 
 .grimoire-nav-btn-bottom {
-  margin-top: 3px;
+  margin-top: var(--grimoire-space-1);
 }
 
 .grimoire-nav-directory {
@@ -96,7 +96,7 @@
   box-sizing: border-box;
   width: min(280px, calc(100% - 56px));
   max-height: min(420px, calc(100% - 32px));
-  padding: 10px 12px;
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-3);
   background: var(--background-secondary);
@@ -105,7 +105,7 @@
 }
 
 .grimoire-nav-directory-title {
-  padding: 2px 6px 8px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-3) var(--grimoire-space-4);
   color: var(--text-muted);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-xs);
@@ -118,7 +118,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  gap: 2px;
+  gap: var(--grimoire-space-1);
   overflow-y: auto;
 }
 
@@ -128,7 +128,7 @@
   align-items: center;
   overflow: hidden;
   min-height: 30px;
-  padding: 3px 6px;
+  padding: var(--grimoire-space-1) var(--grimoire-space-3);
   border-radius: var(--grimoire-radius-2);
   color: var(--text-muted);
   cursor: pointer;
@@ -165,7 +165,7 @@
 }
 
 .grimoire-nav-directory-empty {
-  padding: 8px;
+  padding: var(--grimoire-space-4);
   color: var(--text-muted);
   font-size: var(--font-ui-small);
   line-height: 1.35;
