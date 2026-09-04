@@ -131,6 +131,14 @@ because each one is a class, not an instance.
   the user had picked. Those read `color-mix(in srgb, var(--grimoire-brand) N%, transparent)` now.
   The fallback is what hid it: the value looked considered and was frozen.
 
+## A specimen you can move
+
+The system renders itself at
+<https://claude.ai/code/artifact/4856c3ff-b400-49c8-afcf-57ff24ab7e32> — every plate on that page is
+built out of these tokens, and the strip at the top writes `--accent-h/s/l` and the theme exactly the
+way Obsidian's Appearance pane does. Nothing on it names a colour, so moving the accent moves the
+whole page. Obsidian cannot be screenshotted from a terminal; this is how the design is looked at.
+
 ## The adaptation is proved, not asserted
 
 `tests/unit/style/themeAdaptation.test.ts` resolves the whole token layer against Obsidian's own

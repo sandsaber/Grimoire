@@ -160,6 +160,38 @@ describe('theme adaptation', () => {
     expect(dark['--grimoire-provider-claude']).toBe('#d97757');
   });
 
+  it('lands each type step where the literal it replaced stood', () => {
+    // The ladder replaced fifteen literals between 8.5px and 20px. Being
+    // relative is only half the job: at Obsidian's own defaults each step has
+    // to arrive where its literals were, or the sweep quietly resized the whole
+    // plugin. An earlier base assumed --font-ui-small was 15px when the host's
+    // `body` table sets 13px, which shrank every string by an eighth.
+    const resolved = resolveAll('dark');
+    // Innermost-first, because a step is a calc over the base, which is itself
+    // a calc once anything upstream is. Evaluating one level answers NaN, which
+    // fails the assertion without naming the size that went wrong.
+    const px = (name: string): number => {
+      let value = resolved[name];
+      const innermost = /calc\(([^()]*)\)/;
+      while (innermost.test(value)) {
+        value = value.replace(innermost, (_, expression: string) =>
+          String(expression.split('*').reduce(
+            (product: number, part: string) => product * Number.parseFloat(part.trim()),
+            1,
+          )));
+      }
+      return Number.parseFloat(value);
+    };
+
+    expect(px('--grimoire-text-2xs')).toBeCloseTo(10, 0);
+    expect(px('--grimoire-text-xs')).toBeCloseTo(11, 0);
+    expect(px('--grimoire-text-s')).toBeCloseTo(12, 0);
+    expect(px('--grimoire-text-m')).toBeCloseTo(13, 0);
+    expect(px('--grimoire-text-l')).toBeCloseTo(14, 0);
+    expect(px('--grimoire-text-xl')).toBeCloseTo(16, 0);
+    expect(px('--grimoire-text-2xl')).toBeCloseTo(20, 0);
+  });
+
   it('scales type with the reader rather than pinning it', () => {
     const normal = resolveAll('dark');
     const larger = resolveAll('dark', { '--font-ui-small': '20px' });

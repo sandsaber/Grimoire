@@ -103,7 +103,14 @@ body {
    * calc()s these from. A literal px size ignores a reader who set their
    * interface larger, which is an accessibility regression, not a style.
    */
-  --grimoire-text-base: calc(var(--font-ui-small, 13px) * 0.87);
+  /*
+   * The base is Obsidian's own --font-ui-small, which its `body` table sets to
+   * 13px — the size this plugin's body text has always been. An earlier draft
+   * multiplied it by 0.87 on the assumption that the token was 15px, which
+   * would have shrunk every string in the plugin by an eighth. Read the file,
+   * not the memory of it.
+   */
+  --grimoire-text-base: var(--font-ui-small, 13px);
   --grimoire-text-2xs: calc(var(--grimoire-text-base) * 0.77);
   --grimoire-text-xs: calc(var(--grimoire-text-base) * 0.85);
   --grimoire-text-s: calc(var(--grimoire-text-base) * 0.92);
