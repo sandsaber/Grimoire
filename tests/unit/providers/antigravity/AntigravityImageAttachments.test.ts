@@ -96,6 +96,30 @@ describe('attachAntigravityImages', () => {
     }
   });
 
+  it('skips an attachment whose bytes were never restored', () => {
+    // An empty `data` decodes to zero bytes, and agy would be handed a
+    // zero-byte file described as a screenshot.
+    const bundle = attachAntigravityImages('Read this', [
+      createImage({ data: '', name: 'lost.png' }),
+      createImage({ id: 'img-2', name: 'photo.png' }),
+    ]);
+
+    try {
+      expect(bundle.paths).toHaveLength(1);
+      expect(bundle.paths[0]).toContain('photo.png');
+    } finally {
+      bundle.cleanup();
+    }
+  });
+
+  it('writes nothing at all when no attachment has bytes', () => {
+    const bundle = attachAntigravityImages('Read this', [createImage({ data: '' })]);
+
+    expect(bundle.paths).toEqual([]);
+    expect(bundle.directory).toBeNull();
+    expect(bundle.prompt).toBe('Read this');
+  });
+
   it('keeps the turn alive when one attachment cannot be written', () => {
     const failing = jest
       .spyOn(fs, 'writeFileSync')
