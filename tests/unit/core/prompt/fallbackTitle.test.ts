@@ -1,4 +1,5 @@
 import { buildFallbackTitle } from '@/core/prompt/fallbackTitle';
+import { MAX_TITLE_LENGTH } from '@/core/prompt/titleLength';
 import { appendContextFiles, appendCurrentNote } from '@/utils/context';
 
 describe('buildFallbackTitle', () => {
@@ -13,7 +14,7 @@ describe('buildFallbackTitle', () => {
   it('truncates on a word boundary instead of mid-word', () => {
     const message = 'do you know how to run commands such as search inside our shared notes workspace';
 
-    const title = buildFallbackTitle(message);
+    const title = buildFallbackTitle(message, { maxLength: 50 });
 
     expect(title.endsWith('...')).toBe(true);
     expect(title.length).toBeLessThanOrEqual(50);
@@ -41,7 +42,7 @@ describe('buildFallbackTitle', () => {
       'review the work that was done on reducing the running costs',
     ].join('\n');
 
-    expect(buildFallbackTitle(message)).toBe('review the work that was done on reducing the...');
+    expect(buildFallbackTitle(message, { maxLength: 50 })).toBe('review the work that was done on reducing the...');
   });
 
   it('skips a leading self-closing image tag', () => {
@@ -59,7 +60,7 @@ describe('buildFallbackTitle', () => {
   it('falls back to a hard cut when a word boundary would discard most of the title', () => {
     const message = 'Read docs/exports/2026-08-26-handoff-summary-and-continue';
 
-    expect(buildFallbackTitle(message)).toBe('Read docs/exports/2026-08-26-handoff-summary-an...');
+    expect(buildFallbackTitle(message, { maxLength: 50 })).toBe('Read docs/exports/2026-08-26-handoff-summary-an...');
   });
 
   it('disambiguates a title that already exists', () => {
@@ -78,9 +79,9 @@ describe('buildFallbackTitle', () => {
 
   it('keeps the disambiguated title within the length limit', () => {
     const message = 'Read docs/exports/2026-08-26-handoff-summary-and-continue';
-    const first = buildFallbackTitle(message);
+    const first = buildFallbackTitle(message, { maxLength: 50 });
 
-    const second = buildFallbackTitle(message, { existingTitles: [first] });
+    const second = buildFallbackTitle(message, { existingTitles: [first], maxLength: 50 });
 
     expect(second.length).toBeLessThanOrEqual(50);
     expect(second.endsWith(' 2')).toBe(true);
@@ -135,7 +136,7 @@ describe('buildFallbackTitle', () => {
     it('keeps a message that is nothing but markup', () => {
       const message = '<button onclick="go()">Click me here please</button>';
 
-      expect(buildFallbackTitle(message)).toBe('<button onclick="go()">Click me here...');
+      expect(buildFallbackTitle(message, { maxLength: 50 })).toBe('<button onclick="go()">Click me here...');
     });
 
     it('skips only the outermost block when the same tag nests', () => {
@@ -174,10 +175,28 @@ describe('buildFallbackTitle', () => {
 
   describe('astral characters', () => {
     it('never cuts a surrogate pair in half', () => {
-      const title = buildFallbackTitle('🎉'.repeat(60));
+      const title = buildFallbackTitle('🎉'.repeat(60), { maxLength: 50 });
 
       expect(title.length).toBeLessThanOrEqual(50);
       expect(title).not.toMatch(/[\uD800-\uDBFF]$|[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
     });
+  });
+});
+
+describe('buildFallbackTitle default budget', () => {
+  it('uses the shared 100-character budget, not a stricter one of its own', () => {
+    const message = 'Диагностика ошибки 500 Internal server error Claude Code при запуске сессии в хранилище';
+
+    expect(buildFallbackTitle(message)).toBe(message);
+  });
+
+  it('still cuts on a word boundary once the shared budget is exceeded', () => {
+    const message = `${'word '.repeat(40)}tail`;
+
+    const title = buildFallbackTitle(message);
+
+    expect(title.length).toBeLessThanOrEqual(MAX_TITLE_LENGTH);
+    expect(title.endsWith('...')).toBe(true);
+    expect(title.endsWith('wor...')).toBe(false);
   });
 });

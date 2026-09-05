@@ -215,8 +215,8 @@ describe('TitleGenerationService', () => {
       });
     });
 
-    it('should truncate titles longer than 50 characters', async () => {
-      const longTitle = 'A'.repeat(60);
+    it('should truncate titles longer than the shared title budget', async () => {
+      const longTitle = 'A'.repeat(200);
       setMockMessages([
         { type: 'system', subtype: 'init', session_id: 'test-session' },
         {
@@ -233,7 +233,7 @@ describe('TitleGenerationService', () => {
 
       expect(callback).toHaveBeenCalledWith('conv-123', {
         success: true,
-        title: 'A'.repeat(47) + '...',
+        title: 'A'.repeat(97) + '...',
       });
     });
 

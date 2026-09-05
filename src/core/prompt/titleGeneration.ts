@@ -1,13 +1,17 @@
 import { getLocaleInfo } from '../../i18n/constants';
 import { getLocale } from '../../i18n/i18n';
 import type { Locale } from '../../i18n/types';
+import {
+  MAX_TITLE_LENGTH,
+  TITLE_PROMPT_TARGET_LENGTH,
+  truncateTitleOnWordBoundary,
+} from './titleLength';
 
 const MAX_TITLE_INPUT_LENGTH = 500;
-const MAX_TITLE_LENGTH = 50;
 
 export const TITLE_GENERATION_SYSTEM_PROMPT = `You are a specialist in summarizing user intent.
 
-**Task**: Generate a **concise, descriptive title** (max 50 chars) summarizing the user's task/request.
+**Task**: Generate a **concise, descriptive title** (max ${TITLE_PROMPT_TARGET_LENGTH} chars) summarizing the user's task/request.
 
 **Rules**:
 1.  **Format**: Sentence case. No periods/quotes.
@@ -113,9 +117,7 @@ export function parseTitleGenerationResponse(responseText: string): string | nul
 
   title = title.replace(/[.!?:;,]+$/, '').trim();
 
-  if (title.length > MAX_TITLE_LENGTH) {
-    title = `${title.slice(0, MAX_TITLE_LENGTH - 3)}...`;
-  }
+  title = truncateTitleOnWordBoundary(title, MAX_TITLE_LENGTH);
 
   return title || null;
 }

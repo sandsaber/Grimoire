@@ -380,9 +380,11 @@ describe('ConversationController', () => {
     });
 
     it('cuts on a word boundary rather than mid-word', () => {
-      const message = 'do you know how to run commands such as search inside our shared notes workspace';
+      const message = 'do you know how to run commands such as search inside our shared notes workspace '
+        + 'and report what the indexer found in the vault';
 
-      expect(controller.generateFallbackTitle(message)).toBe('do you know how to run commands such as...');
+      expect(controller.generateFallbackTitle(message))
+        .toBe('do you know how to run commands such as search inside our shared notes workspace and report...');
     });
 
     it('disambiguates against titles already present in the history', () => {
@@ -1579,11 +1581,11 @@ describe('ConversationController - Title Generation', () => {
       expect(title).toBe('How do I set up React');
     });
 
-    it('should truncate long titles to 50 chars', () => {
-      const longMessage = 'A'.repeat(100);
+    it('should truncate long titles to the shared title budget', () => {
+      const longMessage = 'A'.repeat(200);
       const title = controller.generateFallbackTitle(longMessage);
 
-      expect(title.length).toBeLessThanOrEqual(53); // 50 + '...'
+      expect(title.length).toBeLessThanOrEqual(100);
       expect(title).toContain('...');
     });
 
