@@ -1,5 +1,6 @@
 import { Notice } from 'obsidian';
 
+import { truncateTitleOnWordBoundary } from '../../../core/prompt/titleLength';
 import { getOpaqueProviderState } from '../../../core/providers/getOpaqueProviderState';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
@@ -857,13 +858,10 @@ export class TabManager implements TabManagerInterface {
   }
 
   private buildForkTitle(sourceTitle: string, forkAtUserMessage?: number): string {
-    const MAX_TITLE_LENGTH = 50;
     const forkSuffix = forkAtUserMessage ? ` (#${forkAtUserMessage})` : '';
     const forkPrefix = 'Fork: ';
-    const maxSourceLength = MAX_TITLE_LENGTH - forkPrefix.length - forkSuffix.length;
-    const truncatedSource = sourceTitle.length > maxSourceLength
-      ? sourceTitle.slice(0, maxSourceLength - 1) + '…'
-      : sourceTitle;
+    const maxSourceLength = MAX_TAB_TITLE_LENGTH - forkPrefix.length - forkSuffix.length;
+    const truncatedSource = truncateTitleOnWordBoundary(sourceTitle, maxSourceLength);
     let title = forkPrefix + truncatedSource + forkSuffix;
 
     const existingTitles = new Set(this.plugin.getConversationList().map(c => c.title));

@@ -1,25 +1,23 @@
 import { extractUserQuery } from '../../utils/context';
+import {
+  MAX_TITLE_LENGTH,
+  trimDanglingSurrogate,
+  trimTitleNoise,
+  truncateTitleOnWordBoundary,
+} from './titleLength';
 
-const DEFAULT_MAX_TITLE_LENGTH = 50;
-const ELLIPSIS = '...';
+const DEFAULT_MAX_TITLE_LENGTH = MAX_TITLE_LENGTH;
 /** Below this length a first sentence carries too little signal to stand alone as a title. */
 const MIN_SIGNAL_LENGTH = 12;
-/**
- * A word-boundary cut is preferred, but only while it keeps a useful share of the
- * budget. Messages that open with one very long token (a path, a URL) would other-
- * wise collapse to a single word.
- */
-const MIN_WORD_CUT_RATIO = 0.3;
 /**
  * A first message can carry a pasted file. Only its opening can ever reach a title,
  * so every scan below runs over a bounded prefix instead of the whole paste.
  */
 const SCAN_LIMIT = 4096;
-const NOISE_CHAR = /[\s.,;:!?—–-]/;
 const TAG_NAME = /^[A-Za-z_][\w.:-]*/;
 
 export interface FallbackTitleOptions {
-  /** Maximum length of the returned title. Defaults to 50. */
+  /** Maximum length of the returned title. Defaults to the shared title budget. */
   maxLength?: number;
   /** Titles already in use; a matching title gets a numeric discriminator. */
   existingTitles?: Iterable<string>;
@@ -44,7 +42,7 @@ export function buildFallbackTitle(
   }
 
   const sentence = selectFirstMeaningfulSentence(text);
-  const truncated = truncateOnWordBoundary(collapseWhitespace(sentence), maxLength);
+  const truncated = truncateTitleOnWordBoundary(collapseWhitespace(sentence), maxLength);
 
   return disambiguate(truncated, options.existingTitles, maxLength);
 }
@@ -192,13 +190,13 @@ function selectFirstMeaningfulSentence(text: string): string {
       continue;
     }
 
-    const candidate = trimNoise(text.slice(0, index));
+    const candidate = trimTitleNoise(text.slice(0, index));
     if (candidate.length >= MIN_SIGNAL_LENGTH) {
       return candidate;
     }
   }
 
-  return trimNoise(text);
+  return trimTitleNoise(text);
 }
 
 function isSentenceEnd(text: string, index: number): boolean {
@@ -222,46 +220,10 @@ function isDigit(char: string | undefined): boolean {
   return char !== undefined && char >= '0' && char <= '9';
 }
 
-/** Trailing punctuation and whitespace, trimmed one character at a time so that no
- * amount of it can make the scan super-linear. */
-function trimNoise(text: string): string {
-  let end = text.length;
-  while (end > 0 && NOISE_CHAR.test(text[end - 1])) {
-    end -= 1;
-  }
-
-  return text.slice(0, end);
-}
-
 /** Titles are single-line: they are stored as metadata and a rename input would drop
  * the breaks anyway, gluing the surrounding words together. */
 function collapseWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
-}
-
-function truncateOnWordBoundary(text: string, maxLength: number): string {
-  if (text.length <= maxLength) {
-    return text;
-  }
-  if (maxLength <= ELLIPSIS.length) {
-    return trimDanglingSurrogate(text.slice(0, maxLength));
-  }
-
-  const hardCut = trimDanglingSurrogate(text.slice(0, maxLength - ELLIPSIS.length)).trimEnd();
-  const lastSpace = hardCut.lastIndexOf(' ');
-  const wordCut = lastSpace > 0 ? trimNoise(hardCut.slice(0, lastSpace)) : '';
-
-  if (wordCut.length >= maxLength * MIN_WORD_CUT_RATIO) {
-    return `${wordCut}${ELLIPSIS}`;
-  }
-
-  return `${hardCut}${ELLIPSIS}`;
-}
-
-/** A cut must not leave the leading half of a surrogate pair behind. */
-function trimDanglingSurrogate(text: string): string {
-  const last = text.charCodeAt(text.length - 1);
-  return last >= 0xd800 && last <= 0xdbff ? text.slice(0, -1) : text;
 }
 
 function disambiguate(
