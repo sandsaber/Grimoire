@@ -5,6 +5,7 @@ import { Menu, Notice } from 'obsidian';
 
 import { ConversationController, type ConversationControllerDeps } from '@/features/chat/controllers/ConversationController';
 import { ChatState } from '@/features/chat/state/ChatState';
+import { t } from '@/i18n/i18n';
 import { confirm } from '@/shared/modals/ConfirmModal';
 
 jest.mock('@/shared/modals/ConfirmModal', () => ({
@@ -49,6 +50,7 @@ function createMockDeps(overrides: Partial<ConversationControllerDeps> = {}): Co
       getConversationById: jest.fn().mockResolvedValue(null),
       getConversationSync: jest.fn().mockReturnValue(null),
       getConversationList: jest.fn().mockReturnValue([]),
+      getConversationTitles: jest.fn().mockReturnValue([]),
       findEmptyConversation: jest.fn().mockResolvedValue(null),
       updateConversation: jest.fn().mockResolvedValue(undefined),
       renameConversation: jest.fn().mockResolvedValue(undefined),
@@ -367,6 +369,49 @@ describe('ConversationController', () => {
       // Second call should not add another greeting
       controller.initializeWelcome();
       expect(createDivSpy).toHaveBeenCalledTimes(1); // Still 1, not 2
+    });
+  });
+
+  describe('generateFallbackTitle', () => {
+    it('skips leading context blocks injected by the host', () => {
+      const message = '<git_status>\nclean\n</git_status>\n\nupdate the changelog entry';
+
+      expect(controller.generateFallbackTitle(message)).toBe('update the changelog entry');
+    });
+
+    it('cuts on a word boundary rather than mid-word', () => {
+      const message = 'do you know how to run commands such as search inside our shared notes workspace '
+        + 'and report what the indexer found in the vault';
+
+      expect(controller.generateFallbackTitle(message))
+        .toBe('do you know how to run commands such as search inside our shared notes workspace and report...');
+    });
+
+    it('disambiguates against titles already present in the history', () => {
+      (deps.plugin.getConversationTitles as jest.Mock).mockReturnValue(['check the build log']);
+
+      expect(controller.generateFallbackTitle('check the build log')).toBe('check the build log 2');
+    });
+
+    it('uses the generic conversation label when the message is only context', () => {
+      const message = '<git_status>\nThis is the git status at the start of the conversation.\n</git_status>';
+
+      expect(controller.generateFallbackTitle(message)).toBe(t('chat.ui.view.conversation'));
+    });
+
+    it('disambiguates the generic label as well', () => {
+      (deps.plugin.getConversationTitles as jest.Mock).mockReturnValue([t('chat.ui.view.conversation')]);
+
+      expect(controller.generateFallbackTitle('<git_status>\nx\n</git_status>'))
+        .toBe(`${t('chat.ui.view.conversation')} 2`);
+    });
+
+    it('keeps working when the history is unavailable', () => {
+      (deps.plugin.getConversationTitles as jest.Mock).mockImplementation(() => {
+        throw new Error('storage offline');
+      });
+
+      expect(controller.generateFallbackTitle('check the build log')).toBe('check the build log');
     });
   });
 
@@ -1536,11 +1581,11 @@ describe('ConversationController - Title Generation', () => {
       expect(title).toBe('How do I set up React');
     });
 
-    it('should truncate long titles to 50 chars', () => {
-      const longMessage = 'A'.repeat(100);
+    it('should truncate long titles to the shared title budget', () => {
+      const longMessage = 'A'.repeat(200);
       const title = controller.generateFallbackTitle(longMessage);
 
-      expect(title.length).toBeLessThanOrEqual(53); // 50 + '...'
+      expect(title.length).toBeLessThanOrEqual(100);
       expect(title).toContain('...');
     });
 

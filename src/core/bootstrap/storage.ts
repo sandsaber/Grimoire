@@ -1,3 +1,4 @@
+import type { AttachmentStore } from '../attachments/AttachmentStore';
 import type { AppSessionStorage, AppTabManagerState } from '../providers/types';
 import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
 
@@ -16,5 +17,7 @@ export interface SharedAppStorage {
   setTabManagerState(state: AppTabManagerState): Promise<void>;
   getTabManagerState(): Promise<AppTabManagerState | null>;
   sessions: AppSessionStorage;
+  /** Attachment bytes, shared by every provider and addressed by content. */
+  attachments: AttachmentStore;
   getAdapter(): VaultFileAdapter;
 }

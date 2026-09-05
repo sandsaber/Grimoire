@@ -3373,7 +3373,7 @@ describe('TabManager - buildForkTitle', () => {
     const manager = createManager({ plugin });
     await manager.createTab();
 
-    const longTitle = 'A'.repeat(100);
+    const longTitle = 'A'.repeat(200);
     await manager.forkToNewTab({
       messages: [],
       sourceSessionId: 'session-1',
@@ -3383,10 +3383,36 @@ describe('TabManager - buildForkTitle', () => {
     });
 
     const updateCall = mockUpdateConversation.mock.calls[0][1];
-    expect(updateCall.title.length).toBeLessThanOrEqual(50);
-    expect(updateCall.title).toContain('…');
+    expect(updateCall.title.length).toBeLessThanOrEqual(100);
+    // The shared truncation marks a cut the same way wherever it happens, so a
+    // fork no longer ends in its own private ellipsis character.
+    expect(updateCall.title).toContain('...');
     expect(updateCall.title).toContain('Fork: ');
     expect(updateCall.title).toContain('(#1)');
+  });
+
+  it('should cut a forked title on a word boundary', async () => {
+    const source = 'Diagnose the failing deployment pipeline and its cascading effects on the staging environment today';
+    const { plugin, mockUpdateConversation } = setupTitleTest();
+    const manager = createManager({ plugin });
+    await manager.createTab();
+
+    await manager.forkToNewTab({
+      messages: [],
+      sourceSessionId: 'session-1',
+      resumeAt: 'asst-uuid-1',
+      sourceTitle: source,
+      forkAtUserMessage: 1,
+    });
+
+    const updateCall = mockUpdateConversation.mock.calls[0][1];
+    const kept = (updateCall.title as string).slice('Fork: '.length).replace('... (#1)', '');
+
+    expect(updateCall.title.length).toBeLessThanOrEqual(100);
+    // The kept text is a whole-word prefix of the source: the next character
+    // the cut dropped was a space, not the middle of a word.
+    expect(source.startsWith(kept)).toBe(true);
+    expect(source[kept.length]).toBe(' ');
   });
 
   it('should deduplicate title when same fork title exists', async () => {

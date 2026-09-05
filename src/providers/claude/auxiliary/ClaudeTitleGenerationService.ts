@@ -1,4 +1,8 @@
-import { TITLE_GENERATION_SYSTEM_PROMPT } from '../../../core/prompt/titleGeneration';
+import {
+  buildTitleGenerationPrompt,
+  buildTitleGenerationSystemPrompt,
+  parseTitleGenerationResponse,
+} from '../../../core/prompt/titleGeneration';
 import type {
   TitleGenerationCallback,
   TitleGenerationResult,
@@ -32,13 +36,12 @@ export class TitleGenerationService {
     const abortController = new AbortController();
     this.activeGenerations.set(conversationId, abortController);
 
-    const truncatedUser = this.truncateText(userMessage, 500);
-    const prompt = `User's request:\n"""\n${truncatedUser}\n"""\n\nGenerate a title for this conversation:`;
+    const prompt = buildTitleGenerationPrompt(userMessage);
 
     try {
       const result = await runColdStartQuery({
         plugin: this.plugin,
-        systemPrompt: TITLE_GENERATION_SYSTEM_PROMPT,
+        systemPrompt: buildTitleGenerationSystemPrompt(),
         tools: [],
         model: this.resolveTitleModel(),
         thinking: { disabled: true },
@@ -46,7 +49,7 @@ export class TitleGenerationService {
         abortController,
       }, prompt);
 
-      const title = this.parseTitle(result.text);
+      const title = parseTitleGenerationResponse(result.text);
       if (title) {
         await this.safeCallback(callback, conversationId, { success: true, title });
       } else {
@@ -86,32 +89,6 @@ export class TitleGenerationService {
       envVars.ANTHROPIC_DEFAULT_HAIKU_MODEL ||
       'claude-haiku-4-5'
     );
-  }
-
-  private truncateText(text: string, maxLength: number): string {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
-  }
-
-  private parseTitle(responseText: string): string | null {
-    const trimmed = responseText.trim();
-    if (!trimmed) return null;
-
-    let title = trimmed;
-    if (
-      (title.startsWith('"') && title.endsWith('"')) ||
-      (title.startsWith("'") && title.endsWith("'"))
-    ) {
-      title = title.slice(1, -1);
-    }
-
-    title = title.replace(/[.!?:;,]+$/, '');
-
-    if (title.length > 50) {
-      title = title.substring(0, 47) + '...';
-    }
-
-    return title || null;
   }
 
   private async safeCallback(

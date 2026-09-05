@@ -163,13 +163,47 @@ function ensureTaskToolCall(
   return taskToolCall;
 }
 
+/**
+ * The identifiers under which a message can be recognised again.
+ *
+ * A message reaches the merge from two namespaces: Grimoire's own `msg-…` ids,
+ * and the transcript's uuids. The same exchange therefore arrives under two
+ * different `id`s, and only the SDK-side identifiers tie them together - a user
+ * message's transcript uuid is its `userMessageId`, and both copies of an
+ * assistant message carry the same `assistantMessageId`.
+ */
+function messageIdentities(message: ChatMessage): string[] {
+  const identities = [message.id];
+  if (message.userMessageId) {
+    identities.push(message.userMessageId);
+  }
+  if (message.assistantMessageId) {
+    identities.push(message.assistantMessageId);
+  }
+
+  return identities;
+}
+
+/**
+ * Keeps the first copy of each message.
+ *
+ * Order matters: the conversation's own messages come first, so the surviving
+ * copy is the one the UI already refers to by id for rewind and fork, and the
+ * one whose attachments point at the store.
+ *
+ * Matching on identifiers rather than on content is deliberate - a repeated
+ * prompt is a legitimately distinct message, not a duplicate.
+ */
 function dedupeMessages(messages: ChatMessage[]): ChatMessage[] {
   const seen = new Set<string>();
   const result: ChatMessage[] = [];
 
   for (const message of messages) {
-    if (seen.has(message.id)) continue;
-    seen.add(message.id);
+    const identities = messageIdentities(message);
+    if (identities.some(identity => seen.has(identity))) continue;
+    for (const identity of identities) {
+      seen.add(identity);
+    }
     result.push(message);
   }
 
