@@ -847,7 +847,7 @@
     },
     "refreshModels": {
       "name": "刷新模型",
-      "desc": "向 Claude Code 请求当前模型列表。否则 Grimoire 仅在 CLI 或其环境变化时重新检查。",
+      "desc": "向 {provider} 请求当前模型列表。否则 Grimoire 仅在 CLI 或其环境变化时重新检查。",
       "button": "刷新",
       "done": "模型列表已刷新：共 {count} 个模型。"
     },

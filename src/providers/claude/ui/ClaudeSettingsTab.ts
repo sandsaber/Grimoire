@@ -171,7 +171,7 @@ export const claudeSettingsTabRenderer: ProviderSettingsTabRenderer = {
     // example after a CLI upgrade that Grimoire's binary fingerprint missed.
     new Setting(container)
       .setName(t('settings.refreshModels.name'))
-      .setDesc(t('settings.refreshModels.desc'))
+      .setDesc(t('settings.refreshModels.desc', { provider: 'Claude Code' }))
       .addButton((button) => {
         button
           .setButtonText(t('settings.refreshModels.button'))

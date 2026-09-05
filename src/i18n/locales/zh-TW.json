@@ -847,7 +847,7 @@
     },
     "refreshModels": {
       "name": "重新整理模型",
-      "desc": "向 Claude Code 請求目前的模型清單。否則 Grimoire 僅在 CLI 或其環境變更時重新檢查。",
+      "desc": "向 {provider} 請求目前的模型清單。否則 Grimoire 僅在 CLI 或其環境變更時重新檢查。",
       "button": "重新整理",
       "done": "模型清單已重新整理：共 {count} 個模型。"
     },
