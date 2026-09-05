@@ -236,4 +236,30 @@ model = "qwen2.5-coder-32k:7b"
       rawId: 'grok-0.7',
     });
   });
+
+  it('lets a config.toml override win over the cached entry for the same model', () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'grimoire-grok-override-'));
+    const managedHome = path.join(tempRoot, 'managed');
+    fs.mkdirSync(managedHome, { recursive: true });
+    fs.writeFileSync(path.join(managedHome, 'models_cache.json'), JSON.stringify({
+      models: { 'grok-4.6': { info: { id: 'grok-4.6', name: 'Grok 4.6' } } },
+    }));
+    // Grok resolves `[model.*]` above the prefetched cloud catalog, so an override of a
+    // frontier model has to reach the picker as the user wrote it.
+    fs.writeFileSync(path.join(managedHome, 'config.toml'), [
+      '[model."grok-4.6"]',
+      'base_url = "https://gateway.example/v1"',
+      'name = "Grok 4.6 (corp gateway)"',
+      '',
+    ].join('\n'));
+
+    const catalog = readGrokNativeModelCatalog({
+      env: { GROK_HOME: managedHome },
+      managedGrokHomePath: managedHome,
+    });
+
+    expect(catalog.models.filter((model) => model.rawId === 'grok-4.6')).toEqual([
+      { label: 'Grok 4.6 (corp gateway)', rawId: 'grok-4.6' },
+    ]);
+  });
 });

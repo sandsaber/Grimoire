@@ -94,15 +94,18 @@ export function readGrokNativeModelCatalog(params: {
 } = {}): GrokNativeModelCatalog {
   const env = params.env ?? process.env;
   const models: GrokDiscoveredModel[] = [];
-  for (const cachePath of resolveGrokModelsCachePaths(params)) {
-    models.push(...readGrokModelsCacheFile(cachePath).models);
-  }
-  // The cloud-sourced models_cache.json never contains locally defined models
-  // (`[model."grok-0.7"]` in config.toml). Without merging them here the runtime
-  // catalog drops the user's local Ollama slot on every ensureReady and the
-  // selected model silently falls back to the frontier default.
+  // Config-declared models come first because `mergeGrokDiscoveredModels` keeps the
+  // first entry for a rawId, and the CLI resolves models in that same order: a
+  // `[model."<id>"]` table outranks the prefetched cloud catalog, which outranks the
+  // built-in defaults. The cloud-sourced models_cache.json never contains locally
+  // defined models at all, so without this the runtime catalog drops the user's local
+  // Ollama slot on every ensureReady and the selected model silently falls back to the
+  // frontier default.
   for (const configPath of resolveGrokConfigPaths(params)) {
     models.push(...readGrokConfigModelDefinitionsFile(configPath));
+  }
+  for (const cachePath of resolveGrokModelsCachePaths(params)) {
+    models.push(...readGrokModelsCacheFile(cachePath).models);
   }
 
   const configuredDefault = readGrokConfigDefaultModel(
