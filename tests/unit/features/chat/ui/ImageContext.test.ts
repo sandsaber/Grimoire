@@ -1,8 +1,10 @@
 import { createMockEl } from '@test/helpers/mockElement';
 import { Notice } from 'obsidian';
 
+import * as prepareImage from '@/core/attachments/prepareImage';
 import type { ImageAttachment } from '@/core/types';
 import { ImageContextManager } from '@/features/chat/ui/ImageContext';
+import { resetOpenImageViewers } from '@/features/chat/ui/imageViewerStack';
 
 jest.mock('obsidian', () => ({
   Notice: jest.fn(),
@@ -761,6 +763,7 @@ describe('ImageContextManager - Private Helpers', () => {
     let removeEventSpy: jest.Mock;
 
     beforeEach(() => {
+      resetOpenImageViewers();
       overlayEl = createMockEl();
       addEventSpy = jest.fn();
       removeEventSpy = jest.fn();
@@ -789,12 +792,39 @@ describe('ImageContextManager - Private Helpers', () => {
       const image = createImageAttachment();
       manager['showFullImage'](image);
 
-      expect(addEventSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
+      // Capture phase: Obsidian's own document keydown listener is registered
+      // when the app boots, so a bubble-phase handler added now would run after
+      // the view scope has already acted on Escape.
+      expect(addEventSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true);
 
       const escHandler = addEventSpy.mock.calls[0][1];
-      escHandler({ key: 'Escape' });
+      escHandler({ key: 'Escape', preventDefault: jest.fn(), stopImmediatePropagation: jest.fn() });
 
-      expect(removeEventSpy).toHaveBeenCalledWith('keydown', escHandler);
+      expect(removeEventSpy).toHaveBeenCalledWith('keydown', escHandler, true);
+    });
+
+    it('should consume Escape so it does not reach the chat and cancel the turn', () => {
+      const image = createImageAttachment();
+      manager['showFullImage'](image);
+
+      const escHandler = addEventSpy.mock.calls[0][1];
+      const event = { key: 'Escape', preventDefault: jest.fn(), stopImmediatePropagation: jest.fn() };
+      escHandler(event);
+
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(event.stopImmediatePropagation).toHaveBeenCalled();
+    });
+
+    it('should leave other keys alone', () => {
+      const image = createImageAttachment();
+      manager['showFullImage'](image);
+
+      const escHandler = addEventSpy.mock.calls[0][1];
+      const event = { key: 'a', preventDefault: jest.fn(), stopImmediatePropagation: jest.fn() };
+      escHandler(event);
+
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      expect(removeEventSpy).not.toHaveBeenCalled();
     });
 
     it('should close modal when clicking on overlay background', () => {
@@ -810,21 +840,93 @@ describe('ImageContextManager - Private Helpers', () => {
     });
   });
 
-  describe('fileToBase64', () => {
-    it('should convert file to base64 string', async () => {
-      const textEncoder = new TextEncoder();
-      const bytes = textEncoder.encode('hello');
-      const mockBuffer = bytes.buffer;
-      const file = {
-        arrayBuffer: jest.fn().mockResolvedValue(mockBuffer),
-      } as unknown as File;
+  describe('buildAttachment', () => {
+    const fileOf = (text: string, name = 'shot.png'): File => ({
+      name,
+      size: text.length,
+      arrayBuffer: jest.fn().mockResolvedValue(new TextEncoder().encode(text).buffer),
+    } as unknown as File);
 
-      const result = await manager['fileToBase64'](file);
-      expect(typeof result).toBe('string');
-      expect(result.length).toBeGreaterThan(0);
-      // Verify it's valid base64
-      const decoded = Buffer.from(result, 'base64').toString();
-      expect(decoded).toBe('hello');
+    const managerWithStore = (put: jest.Mock): any => new ImageContextManager(
+      createContainerWithInputWrapper().container,
+      createMockTextArea(),
+      createMockCallbacks(),
+      undefined,
+      { put } as any,
+    );
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('base64-encodes the bytes when no attachment store is wired', async () => {
+      const attachment = await manager['buildAttachment'](fileOf('hello'), 'image/png', 'paste');
+
+      expect(Buffer.from(attachment.data, 'base64').toString()).toBe('hello');
+      expect(attachment.hash).toBeUndefined();
+      expect(attachment.mediaType).toBe('image/png');
+    });
+
+    it('stores the bytes and keeps only a reference when a store is wired', async () => {
+      const put = jest.fn().mockResolvedValue({ hash: 'a'.repeat(64), size: 5 });
+      const stored = managerWithStore(put);
+
+      const attachment = await stored['buildAttachment'](fileOf('hello'), 'image/png', 'paste');
+
+      expect(put).toHaveBeenCalledTimes(1);
+      expect(attachment.hash).toBe('a'.repeat(64));
+      expect(attachment.size).toBe(5);
+      expect(Buffer.from(attachment.data, 'base64').toString()).toBe('hello');
+    });
+
+    it('refuses an image scaling could not bring under the limit', async () => {
+      const put = jest.fn();
+      const stored = managerWithStore(put);
+      jest.spyOn(prepareImage, 'prepareImageForStore').mockResolvedValue({
+        bytes: new ArrayBuffer(6 * 1024 * 1024),
+        mediaType: 'image/gif',
+        rescaled: false,
+      });
+
+      const attachment = await stored['buildAttachment'](fileOf('x', 'huge.gif'), 'image/gif', 'drop');
+
+      expect(attachment).toBeNull();
+      expect(put).not.toHaveBeenCalled();
+    });
+
+    it('accepts a heavy source once scaling has shrunk it', async () => {
+      const put = jest.fn().mockResolvedValue({ hash: 'c'.repeat(64), size: 300 });
+      const stored = managerWithStore(put);
+      jest.spyOn(prepareImage, 'prepareImageForStore').mockResolvedValue({
+        bytes: new ArrayBuffer(300),
+        mediaType: 'image/webp',
+        width: 2000,
+        height: 1125,
+        rescaled: true,
+      });
+
+      const attachment = await stored['buildAttachment'](fileOf('x', 'shot.png'), 'image/png', 'drop');
+
+      expect(attachment).not.toBeNull();
+      expect(attachment!.size).toBe(300);
+    });
+
+    it('renames the attachment when the re-encode changed its format', async () => {
+      const put = jest.fn().mockResolvedValue({ hash: 'b'.repeat(64), size: 3 });
+      const stored = managerWithStore(put);
+      jest.spyOn(prepareImage, 'prepareImageForStore').mockResolvedValue({
+        bytes: new TextEncoder().encode('abc').buffer,
+        mediaType: 'image/webp',
+        width: 2000,
+        height: 1125,
+        rescaled: true,
+      });
+
+      const attachment = await stored['buildAttachment'](fileOf('x', 'screen.png'), 'image/png', 'drop');
+
+      expect(attachment.name).toBe('screen.webp');
+      expect(attachment.mediaType).toBe('image/webp');
+      expect(attachment.width).toBe(2000);
     });
   });
 });

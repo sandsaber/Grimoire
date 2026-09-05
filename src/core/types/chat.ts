@@ -20,8 +20,16 @@ export interface ImageAttachment {
   id: string;
   name: string;
   mediaType: ImageMediaType;
-  /** Base64 encoded image data - single source of truth. */
+  /**
+   * Base64 encoded image data.
+   *
+   * When `hash` is set the store holds the bytes and this is only an in-memory
+   * copy - it is dropped from session metadata and refilled on demand, so a
+   * caller that has just loaded a conversation must not assume it is present.
+   */
   data: string;
+  /** Content hash of the stored bytes, when the attachment store holds them. */
+  hash?: string;
   width?: number;
   height?: number;
   size: number;

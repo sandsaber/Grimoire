@@ -50,6 +50,7 @@ import { SubagentManager } from '../services/SubagentManager';
 import { ChatState } from '../state/ChatState';
 import { BangBashModeManager as BangBashModeManagerClass } from '../ui/BangBashModeManager';
 import { RuntimeContextActivityView } from '../ui/context/RuntimeContextActivity';
+import { closeTopmostImageViewer } from '../ui/imageViewerStack';
 import { createInputToolbar } from '../ui/InputToolbar';
 import { InstructionModeManager as InstructionModeManagerClass } from '../ui/InstructionModeManager';
 import { NavigationSidebar } from '../ui/NavigationSidebar';
@@ -1545,10 +1546,17 @@ export function wireTabInputEvents(tab: TabData, plugin: GrimoirePlugin): void {
     }
 
     // Check !e.isComposing for IME support (Chinese, Japanese, Korean, etc.)
-    if (e.key === 'Escape' && !e.isComposing && state.isStreaming) {
-      e.preventDefault();
-      controllers.inputController?.cancelStreaming();
-      return;
+    if (e.key === 'Escape' && !e.isComposing) {
+      // An open image viewer owns Escape until it is closed.
+      if (closeTopmostImageViewer()) {
+        e.preventDefault();
+        return;
+      }
+      if (state.isStreaming) {
+        e.preventDefault();
+        controllers.inputController?.cancelStreaming();
+        return;
+      }
     }
 
     if (shouldSendMessageFromEnterKey(e, plugin.settings)) {
