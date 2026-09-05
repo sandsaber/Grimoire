@@ -106,4 +106,73 @@ describe('prepareGrokLaunchArtifacts', () => {
     expect(second.launchKey).not.toBe(first.launchKey);
     await expect(fs.readFile(copiedConfigPath, 'utf8')).resolves.toContain('model = "changed"');
   });
+
+  it('copies a config that decides nothing Grimoire owns byte for byte', async () => {
+    const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'grimoire-grok-verbatim-'));
+    const sourceConfigPath = path.join(tmpRoot, '.grimoire', 'grok', 'config.toml');
+    const source = '# my local slot\n[model.grok-local]\nmodel = "local"\n';
+    await fs.mkdir(path.dirname(sourceConfigPath), { recursive: true });
+    await fs.writeFile(sourceConfigPath, source, 'utf8');
+
+    await prepareGrokLaunchArtifacts({
+      artifactsSubdir: 'grok/auxiliary/title-gen',
+      permissionMode: 'plan',
+      settings: { customPrompt: '', mediaFolder: '', userName: '', vaultPath: tmpRoot },
+      workspaceRoot: tmpRoot,
+    });
+
+    const copiedConfigPath = path.join(tmpRoot, '.grimoire', 'grok', 'auxiliary', 'title-gen', 'config.toml');
+    await expect(fs.readFile(copiedConfigPath, 'utf8')).resolves.toBe(source);
+  });
+
+  it('drops the permission keys Grimoire decides for the auxiliary launch', async () => {
+    const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'grimoire-grok-permission-'));
+    const sourceConfigPath = path.join(tmpRoot, '.grimoire', 'grok', 'config.toml');
+    await fs.mkdir(path.dirname(sourceConfigPath), { recursive: true });
+    await fs.writeFile(sourceConfigPath, [
+      '[ui]',
+      'permission_mode = "always-approve"',
+      'yolo = true',
+      'max_thoughts_width = 120',
+      '',
+      '[model.grok-local]',
+      'model = "local"',
+      '',
+    ].join('\n'), 'utf8');
+
+    await prepareGrokLaunchArtifacts({
+      artifactsSubdir: 'grok/auxiliary/title-gen',
+      permissionMode: 'plan',
+      settings: { customPrompt: '', mediaFolder: '', userName: '', vaultPath: tmpRoot },
+      workspaceRoot: tmpRoot,
+    });
+
+    const copiedConfigPath = path.join(tmpRoot, '.grimoire', 'grok', 'auxiliary', 'title-gen', 'config.toml');
+    const copied = await fs.readFile(copiedConfigPath, 'utf8');
+    // Grok resolves config.toml above managed_config.toml, so these two would decide the
+    // auxiliary's permission mode instead of the plan/ask mode it was launched with.
+    expect(copied).not.toContain('permission_mode');
+    expect(copied).not.toContain('yolo');
+    // Everything the copy exists for survives.
+    expect(copied).toContain('[model.grok-local]');
+    expect(copied).toContain('max_thoughts_width');
+  });
+
+  it('skips a config Grok itself could not parse', async () => {
+    const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'grimoire-grok-broken-'));
+    const sourceConfigPath = path.join(tmpRoot, '.grimoire', 'grok', 'config.toml');
+    await fs.mkdir(path.dirname(sourceConfigPath), { recursive: true });
+    await fs.writeFile(sourceConfigPath, 'this is not = valid toml [[[', 'utf8');
+
+    const result = await prepareGrokLaunchArtifacts({
+      artifactsSubdir: 'grok/auxiliary/title-gen',
+      permissionMode: 'plan',
+      settings: { customPrompt: '', mediaFolder: '', userName: '', vaultPath: tmpRoot },
+      workspaceRoot: tmpRoot,
+    });
+
+    const copiedConfigPath = path.join(tmpRoot, '.grimoire', 'grok', 'auxiliary', 'title-gen', 'config.toml');
+    await expect(fs.readFile(copiedConfigPath, 'utf8')).rejects.toThrow();
+    expect(result.launchKey).not.toContain('valid toml');
+  });
 });
