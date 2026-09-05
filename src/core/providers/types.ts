@@ -579,7 +579,12 @@ export interface TitleGenerationService {
     userMessage: string,
     callback: TitleGenerationCallback
   ): Promise<void>;
-  cancel(): void;
+  /**
+   * Aborts the generation for `conversationId`, or every active generation when no id is
+   * given. A tab's service is shared by every conversation that tab has opened, so a caller
+   * that started one generation must be able to stop that one alone.
+   */
+  cancel(conversationId?: string): void;
 }
 
 // -- Instruction refinement --

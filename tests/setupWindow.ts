@@ -104,6 +104,46 @@ function installObsidianDomHelpers(): void {
       return this;
     };
   }
+
+  installObsidianGlobalFactories();
+}
+
+/**
+ * Obsidian declares `createFragment`/`createSpan`/`createDiv` as globals, and the repo's
+ * lint rules require using them over raw DOM calls. jsdom provides neither, so code that
+ * follows those rules is untestable without these stubs.
+ */
+function installObsidianGlobalFactories(): void {
+  if (typeof document === 'undefined') return;
+
+  const globals = globalThis as unknown as Record<string, unknown>;
+
+  // An own property, because `Window.prototype.createFragment` above is reachable as a
+  // bare global but loses its `this` when called that way.
+  if (!Object.getOwnPropertyDescriptor(globalThis, 'createFragment')) {
+    globals.createFragment = function createFragment(
+      callback?: (fragment: DocumentFragment) => void,
+    ): DocumentFragment {
+      const fragment = document.createDocumentFragment();
+      callback?.(fragment);
+      return fragment;
+    };
+  }
+
+  for (const [name, tagName] of [['createSpan', 'span'], ['createDiv', 'div']] as const) {
+    if (Object.getOwnPropertyDescriptor(globalThis, name)) continue;
+    globals[name] = function createDetachedEl(
+      options?: { cls?: string; text?: string; attr?: Record<string, string> },
+    ): HTMLElement {
+      const element = document.createElement(tagName);
+      if (options?.cls) element.setAttribute('class', options.cls);
+      if (options?.text !== undefined) element.textContent = options.text;
+      for (const [attribute, value] of Object.entries(options?.attr ?? {})) {
+        element.setAttribute(attribute, value);
+      }
+      return element;
+    };
+  }
 }
 
 ensureGlobalTimers();

@@ -2915,3 +2915,237 @@ describe('ConversationController - session restart notice', () => {
     expect(deps.renderer.renderSessionRestartNotice).not.toHaveBeenCalled();
   });
 });
+
+describe('ConversationController title suggestion', () => {
+  function conversationWithUserMessage(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'conv-1',
+      title: 'New Chat',
+      messages: [
+        { id: 'm1', role: 'user', content: 'how do I dry PETG?', timestamp: 1 },
+      ],
+      sessionId: null,
+      createdAt: 1,
+      updatedAt: 1,
+      ...overrides,
+    };
+  }
+
+  function createTitleHarness(options: {
+    conversation?: any;
+    enabled?: boolean;
+    service?: any;
+  } = {}) {
+    const conversation = options.conversation === undefined
+      ? conversationWithUserMessage()
+      : options.conversation;
+    const service = options.service === undefined
+      ? {
+          generateTitle: jest.fn(async (_id: string, _msg: string, cb: any) => {
+            await cb('conv-1', { success: true, title: 'Drying PETG' });
+          }),
+          cancel: jest.fn(),
+        }
+      : options.service;
+    const deps = createMockDeps({
+      getTitleGenerationService: () => service,
+    });
+    deps.plugin.settings.enableAutoTitleGeneration = options.enabled ?? true;
+    (deps.plugin.getConversationById as jest.Mock).mockResolvedValue(conversation);
+    (deps.plugin.getConversationSync as jest.Mock).mockReturnValue(conversation);
+    const controller = new ConversationController(deps);
+    return { controller, deps, service };
+  }
+
+  it('reports availability from the setting', () => {
+    expect(createTitleHarness({ enabled: true }).controller.isAutoTitleEnabled()).toBe(true);
+    expect(createTitleHarness({ enabled: false }).controller.isAutoTitleEnabled()).toBe(false);
+  });
+
+  it('can suggest only with a conversation that has a user message and a service', () => {
+    expect(createTitleHarness().controller.canSuggestTitle('conv-1')).toBe(true);
+    expect(createTitleHarness().controller.canSuggestTitle(null)).toBe(false);
+    expect(createTitleHarness({ enabled: false }).controller.canSuggestTitle('conv-1')).toBe(false);
+    expect(createTitleHarness({ service: null }).controller.canSuggestTitle('conv-1')).toBe(false);
+    expect(
+      createTitleHarness({ conversation: conversationWithUserMessage({ messages: [] }) })
+        .controller.canSuggestTitle('conv-1'),
+    ).toBe(false);
+    expect(
+      createTitleHarness({
+        conversation: conversationWithUserMessage({
+          messages: [{ id: 'm1', role: 'assistant', content: 'hi', timestamp: 1 }],
+        }),
+      }).controller.canSuggestTitle('conv-1'),
+    ).toBe(false);
+  });
+
+  it('returns the generated title without touching the conversation', async () => {
+    const { controller, deps, service } = createTitleHarness();
+
+    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({
+      ok: true,
+      title: 'Drying PETG',
+    });
+    expect(service.generateTitle).toHaveBeenCalledWith('conv-1', 'how do I dry PETG?', expect.any(Function));
+    expect(deps.plugin.renameConversation).not.toHaveBeenCalled();
+    expect(deps.plugin.updateConversation).not.toHaveBeenCalled();
+  });
+
+  it('prefers displayContent over raw content as the prompt', async () => {
+    const { controller, service } = createTitleHarness({
+      conversation: conversationWithUserMessage({
+        messages: [{ id: 'm1', role: 'user', content: 'raw', displayContent: 'shown', timestamp: 1 }],
+      }),
+    });
+
+    await controller.suggestTitle('conv-1');
+
+    expect(service.generateTitle).toHaveBeenCalledWith('conv-1', 'shown', expect.any(Function));
+  });
+
+  it('reports why a suggestion is impossible', async () => {
+    await expect(createTitleHarness({ enabled: false }).controller.suggestTitle('conv-1'))
+      .resolves.toEqual({ ok: false, reason: 'disabled' });
+    await expect(createTitleHarness({ conversation: null }).controller.suggestTitle('conv-1'))
+      .resolves.toEqual({ ok: false, reason: 'no-messages' });
+    await expect(
+      createTitleHarness({ conversation: conversationWithUserMessage({ messages: [] }) })
+        .controller.suggestTitle('conv-1'),
+    ).resolves.toEqual({ ok: false, reason: 'no-messages' });
+    await expect(createTitleHarness({ service: null }).controller.suggestTitle('conv-1'))
+      .resolves.toEqual({ ok: false, reason: 'no-service' });
+  });
+
+  it('maps a failed provider result to failed', async () => {
+    const { controller } = createTitleHarness({
+      service: {
+        generateTitle: jest.fn(async (_id: string, _msg: string, cb: any) => {
+          await cb('conv-1', { success: false, error: 'boom' });
+        }),
+        cancel: jest.fn(),
+      },
+    });
+
+    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: false, reason: 'failed' });
+  });
+
+  it('maps a thrown provider error to failed instead of rejecting', async () => {
+    const { controller } = createTitleHarness({
+      service: {
+        generateTitle: jest.fn().mockRejectedValue(new Error('network down')),
+        cancel: jest.fn(),
+      },
+    });
+
+    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: false, reason: 'failed' });
+  });
+
+  it('maps a provider that never calls back to failed', async () => {
+    const { controller } = createTitleHarness({
+      service: {
+        generateTitle: jest.fn().mockResolvedValue(undefined),
+        cancel: jest.fn(),
+      },
+    });
+
+    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: false, reason: 'failed' });
+  });
+
+  it('resolves once even if the provider calls back twice', async () => {
+    const { controller } = createTitleHarness({
+      service: {
+        generateTitle: jest.fn(async (_id: string, _msg: string, cb: any) => {
+          await cb('conv-1', { success: true, title: 'First' });
+          await cb('conv-1', { success: true, title: 'Second' });
+        }),
+        cancel: jest.fn(),
+      },
+    });
+
+    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: true, title: 'First' });
+  });
+
+  it('cancels only the conversation it was asked about', () => {
+    const { controller, service } = createTitleHarness();
+
+    controller.cancelTitleSuggestion('conv-1');
+
+    expect(service.cancel).toHaveBeenCalledWith('conv-1');
+  });
+
+  it('cancelling without a service does not throw', () => {
+    const { controller } = createTitleHarness({ service: null });
+
+    expect(() => controller.cancelTitleSuggestion('conv-1')).not.toThrow();
+  });
+});
+
+describe('ConversationController.regenerateTitle', () => {
+  function createRegenerateHarness(options: {
+    result?: any;
+    titleDuringGeneration?: string;
+    enabled?: boolean;
+  } = {}) {
+    const conversation = {
+      id: 'conv-1',
+      title: 'New Chat',
+      messages: [{ id: 'm1', role: 'user', content: 'how do I dry PETG?', timestamp: 1 }],
+      sessionId: null,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const service = {
+      generateTitle: jest.fn(async (_id: string, _msg: string, cb: any) => {
+        if (options.titleDuringGeneration !== undefined) {
+          conversation.title = options.titleDuringGeneration;
+        }
+        await cb('conv-1', options.result ?? { success: true, title: 'Drying PETG' });
+      }),
+      cancel: jest.fn(),
+    };
+    const deps = createMockDeps({ getTitleGenerationService: () => service });
+    deps.plugin.settings.enableAutoTitleGeneration = options.enabled ?? true;
+    (deps.plugin.getConversationById as jest.Mock).mockResolvedValue(conversation);
+    (deps.plugin.getConversationSync as jest.Mock).mockReturnValue(conversation);
+    const controller = new ConversationController(deps);
+    return { controller, deps, conversation };
+  }
+
+  it('saves the generated title and marks the generation successful', async () => {
+    const { controller, deps } = createRegenerateHarness();
+
+    await controller.regenerateTitle('conv-1');
+
+    expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', { titleGenerationStatus: 'pending' });
+    expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'Drying PETG');
+    expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', { titleGenerationStatus: 'success' });
+  });
+
+  it('marks a failed generation without renaming', async () => {
+    const { controller, deps } = createRegenerateHarness({ result: { success: false, error: 'boom' } });
+
+    await controller.regenerateTitle('conv-1');
+
+    expect(deps.plugin.renameConversation).not.toHaveBeenCalled();
+    expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', { titleGenerationStatus: 'failed' });
+  });
+
+  it('keeps a title the user changed during generation', async () => {
+    const { controller, deps } = createRegenerateHarness({ titleDuringGeneration: 'Manual name' });
+
+    await controller.regenerateTitle('conv-1');
+
+    expect(deps.plugin.renameConversation).not.toHaveBeenCalled();
+    expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', { titleGenerationStatus: undefined });
+  });
+
+  it('does nothing when auto title generation is disabled', async () => {
+    const { controller, deps } = createRegenerateHarness({ enabled: false });
+
+    await controller.regenerateTitle('conv-1');
+
+    expect(deps.plugin.updateConversation).not.toHaveBeenCalled();
+    expect(deps.plugin.renameConversation).not.toHaveBeenCalled();
+  });
+});

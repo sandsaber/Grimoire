@@ -68,7 +68,16 @@ export class QueryBackedTitleGenerationService implements TitleGenerationService
     }
   }
 
-  cancel(): void {
+  cancel(conversationId?: string): void {
+    if (conversationId !== undefined) {
+      const active = this.activeGenerations.get(conversationId);
+      if (!active) return;
+      active.abortController.abort();
+      active.runner.reset();
+      this.activeGenerations.delete(conversationId);
+      return;
+    }
+
     for (const active of this.activeGenerations.values()) {
       active.abortController.abort();
       active.runner.reset();

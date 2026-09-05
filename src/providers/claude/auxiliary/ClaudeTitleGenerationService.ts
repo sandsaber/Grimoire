@@ -66,7 +66,15 @@ export class TitleGenerationService {
     }
   }
 
-  cancel(): void {
+  cancel(conversationId?: string): void {
+    if (conversationId !== undefined) {
+      const controller = this.activeGenerations.get(conversationId);
+      if (!controller) return;
+      controller.abort();
+      this.activeGenerations.delete(conversationId);
+      return;
+    }
+
     for (const controller of this.activeGenerations.values()) {
       controller.abort();
     }

@@ -1,20 +1,35 @@
-import { type App, Modal, setIcon, setTooltip } from 'obsidian';
+import { type App, Modal, Notice, setIcon, setTooltip } from 'obsidian';
 
 import { t } from '../../../i18n/i18n';
+import type { ConversationController } from '../controllers/ConversationController';
 import { MAX_TAB_TITLE_LENGTH } from '../tabs/types';
 
-export function requestTabRename(app: App, currentTitle: string): Promise<string | null> {
+export interface TabRenameAutoSource {
+  controller: ConversationController;
+  conversationId: string;
+}
+
+export function requestTabRename(
+  app: App,
+  currentTitle: string,
+  autoSource?: TabRenameAutoSource | null,
+): Promise<string | null> {
   return new Promise((resolve) => {
-    new RenameTabModal(app, currentTitle, resolve).open();
+    new RenameTabModal(app, currentTitle, autoSource ?? null, resolve).open();
   });
 }
 
-class RenameTabModal extends Modal {
+/** Exported for tests: the Obsidian mock's `open()` does not invoke `onOpen()`. */
+export class RenameTabModal extends Modal {
   private resolved = false;
+  private closed = false;
+  private generating = false;
+  private generationToken = 0;
 
   constructor(
     app: App,
     private readonly currentTitle: string,
+    private readonly autoSource: TabRenameAutoSource | null,
     private readonly resolveResult: (title: string | null) => void,
   ) {
     super(app);
@@ -44,6 +59,8 @@ class RenameTabModal extends Modal {
     });
     input.value = this.currentTitle.slice(0, MAX_TAB_TITLE_LENGTH);
 
+    const suggestButton = this.createSuggestButton(field);
+
     const resetButton = field.createEl('button', {
       cls: 'grimoire-rename-tab-reset',
       attr: {
@@ -71,7 +88,7 @@ class RenameTabModal extends Modal {
     const updateState = () => {
       const remaining = Math.max(0, MAX_TAB_TITLE_LENGTH - input.value.length);
       counter.setText(t('chat.ui.tabs.charactersLeft', { count: remaining }));
-      saveButton.disabled = input.value.trim().length === 0;
+      saveButton.disabled = this.generating || input.value.trim().length === 0;
     };
     const restoreCurrentTitle = () => {
       input.value = this.currentTitle.slice(0, MAX_TAB_TITLE_LENGTH);
@@ -91,11 +108,74 @@ class RenameTabModal extends Modal {
       if (!saveButton.disabled) this.submit(input.value);
     });
 
+    if (suggestButton) {
+      suggestButton.addEventListener('click', () => {
+        const source = this.autoSource;
+        if (!source || suggestButton.disabled || this.generating) return;
+
+        this.generating = true;
+        const token = ++this.generationToken;
+
+        input.disabled = true;
+        suggestButton.disabled = true;
+        suggestButton.addClass('is-loading');
+        setIcon(suggestButton, 'loader-2');
+        setTooltip(suggestButton, t('chat.ui.tabs.autoRenaming'), { placement: 'top' });
+        updateState();
+
+        void source.controller.suggestTitle(source.conversationId)
+          .then((suggestion) => {
+            if (this.closed || token !== this.generationToken) return;
+            if (suggestion.ok) {
+              input.value = suggestion.title.slice(0, MAX_TAB_TITLE_LENGTH);
+            } else {
+              new Notice(t('chat.ui.tabs.autoRenameFailed'));
+            }
+          })
+          .finally(() => {
+            if (token !== this.generationToken) return;
+            this.generating = false;
+            if (this.closed) return;
+            input.disabled = false;
+            suggestButton.disabled = false;
+            suggestButton.removeClass('is-loading');
+            setIcon(suggestButton, 'sparkles');
+            setTooltip(suggestButton, t('chat.ui.tabs.autoRename'), { placement: 'top' });
+            updateState();
+            input.focus();
+            input.select();
+          });
+      });
+    }
+
     updateState();
     window.setTimeout(() => {
       input.focus();
       input.select();
     }, 0);
+  }
+
+  /** Renders the auto-rename control, or nothing when the feature cannot apply here. */
+  private createSuggestButton(field: HTMLElement): HTMLButtonElement | null {
+    const source = this.autoSource;
+    if (!source || !source.controller.isAutoTitleEnabled()) return null;
+
+    const available = source.controller.canSuggestTitle(source.conversationId);
+    const button = field.createEl('button', {
+      cls: 'grimoire-rename-tab-suggest',
+      attr: {
+        type: 'button',
+        'aria-label': t('chat.ui.tabs.autoRename'),
+      },
+    });
+    button.disabled = !available;
+    setIcon(button, 'sparkles');
+    setTooltip(
+      button,
+      available ? t('chat.ui.tabs.autoRename') : t('chat.ui.tabs.autoRenameNeedsMessage'),
+      { placement: 'top' },
+    );
+    return button;
   }
 
   private submit(title: string): void {
@@ -105,6 +185,14 @@ class RenameTabModal extends Modal {
   }
 
   onClose(): void {
+    this.closed = true;
+    // Only our own generation, and only while it is still running: the tab's title service
+    // is shared, so an unscoped cancel here would abort a generation this dialog never
+    // started — the auto-title of the conversation the tab was on before, say.
+    if (this.generating && this.autoSource) {
+      this.autoSource.controller.cancelTitleSuggestion(this.autoSource.conversationId);
+      this.generating = false;
+    }
     if (!this.resolved) this.resolveResult(null);
     this.contentEl.empty();
   }

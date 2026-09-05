@@ -26,7 +26,9 @@
   position: relative;
   display: flex;
   align-items: center;
+  gap: 4px;
   min-width: 0;
+  padding-right: 7px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 9px;
   background: var(--background-primary);
@@ -39,12 +41,17 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 20%, transparent);
 }
 
+/*
+ * The controls are flex siblings rather than absolutely positioned overlays: Chromium
+ * paints an input's overflowing text across its own padding box, so reserving room with
+ * `padding-right` alone lets a long title run underneath the buttons.
+ */
 .grimoire-rename-tab-input {
   box-sizing: border-box;
-  width: 100%;
+  flex: 1 1 auto;
   height: 42px;
   min-width: 0;
-  padding: 0 42px 0 12px;
+  padding: 0 4px 0 12px;
   border: 0;
   border-radius: inherit;
   background: transparent;
@@ -61,8 +68,7 @@
 }
 
 button.grimoire-rename-tab-reset {
-  position: absolute;
-  right: 7px;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -84,6 +90,48 @@ button.grimoire-rename-tab-reset:focus-visible {
 }
 
 button.grimoire-rename-tab-reset svg {
+  width: 16px;
+  height: 16px;
+}
+
+button.grimoire-rename-tab-suggest {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+}
+
+button.grimoire-rename-tab-suggest:hover:not(:disabled),
+button.grimoire-rename-tab-suggest:focus-visible:not(:disabled) {
+  background: var(--background-modifier-hover);
+  box-shadow: none;
+  color: var(--text-normal);
+}
+
+button.grimoire-rename-tab-suggest:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.grimoire-rename-tab-suggest.is-loading svg {
+  animation: grimoire-rename-tab-spin 0.9s linear infinite;
+}
+
+@keyframes grimoire-rename-tab-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+button.grimoire-rename-tab-suggest svg {
   width: 16px;
   height: 16px;
 }
