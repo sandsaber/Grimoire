@@ -7,7 +7,7 @@ describe('titleGeneration', () => {
   });
 
   it('includes the max character constraint', () => {
-    expect(TITLE_GENERATION_SYSTEM_PROMPT).toContain('max 100 chars');
+    expect(TITLE_GENERATION_SYSTEM_PROMPT).toContain('max 50 chars');
   });
 
   it('instructs to start with a strong verb', () => {

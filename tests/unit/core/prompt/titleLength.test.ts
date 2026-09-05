@@ -2,7 +2,7 @@ import {
   parseTitleGenerationResponse,
   TITLE_GENERATION_SYSTEM_PROMPT,
 } from '@/core/prompt/titleGeneration';
-import { MAX_TITLE_LENGTH, truncateTitleOnWordBoundary } from '@/core/prompt/titleLength';
+import { MAX_TITLE_LENGTH, TITLE_PROMPT_TARGET_LENGTH, truncateTitleOnWordBoundary } from '@/core/prompt/titleLength';
 
 describe('title length budget', () => {
   it('gives every title source the same budget as a tab title', () => {
@@ -45,9 +45,20 @@ describe('title length budget', () => {
 });
 
 describe('generated titles use the shared budget', () => {
-  it('asks the model for the shared budget, not a stricter one', () => {
-    expect(TITLE_GENERATION_SYSTEM_PROMPT).toContain(`max ${MAX_TITLE_LENGTH} chars`);
-    expect(TITLE_GENERATION_SYSTEM_PROMPT).not.toContain('max 50 chars');
+  it('asks the model for a concise title, not for the whole budget', () => {
+    // The budget is a safety net against mutilation, not a target: asking for
+    // it would make every generated title twice as long for no gain, since a
+    // tab and a history row ellipsise it anyway.
+    expect(TITLE_GENERATION_SYSTEM_PROMPT).toContain(`max ${TITLE_PROMPT_TARGET_LENGTH} chars`);
+    expect(TITLE_PROMPT_TARGET_LENGTH).toBeLessThan(MAX_TITLE_LENGTH);
+  });
+
+  it('keeps a model answer that overshoots the asked-for length', () => {
+    // Weaker models ignore the instruction regularly; the budget is what stops
+    // the answer being cut mid-word.
+    const overshoot = 'Diagnose the failing deployment pipeline and its cascading effects on staging';
+
+    expect(parseTitleGenerationResponse(overshoot)).toBe(overshoot);
   });
 
   it('keeps a model title that fits the shared budget whole', () => {

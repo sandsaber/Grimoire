@@ -1,5 +1,10 @@
 import { extractUserQuery } from '../../utils/context';
-import { MAX_TITLE_LENGTH, trimDanglingSurrogate, truncateTitleOnWordBoundary } from './titleLength';
+import {
+  MAX_TITLE_LENGTH,
+  trimDanglingSurrogate,
+  trimTitleNoise,
+  truncateTitleOnWordBoundary,
+} from './titleLength';
 
 const DEFAULT_MAX_TITLE_LENGTH = MAX_TITLE_LENGTH;
 /** Below this length a first sentence carries too little signal to stand alone as a title. */
@@ -9,7 +14,6 @@ const MIN_SIGNAL_LENGTH = 12;
  * so every scan below runs over a bounded prefix instead of the whole paste.
  */
 const SCAN_LIMIT = 4096;
-const NOISE_CHAR = /[\s.,;:!?—–-]/;
 const TAG_NAME = /^[A-Za-z_][\w.:-]*/;
 
 export interface FallbackTitleOptions {
@@ -38,7 +42,7 @@ export function buildFallbackTitle(
   }
 
   const sentence = selectFirstMeaningfulSentence(text);
-  const truncated = truncateTitleOnWordBoundary(collapseWhitespace(sentence), maxLength, trimNoise);
+  const truncated = truncateTitleOnWordBoundary(collapseWhitespace(sentence), maxLength);
 
   return disambiguate(truncated, options.existingTitles, maxLength);
 }
@@ -186,13 +190,13 @@ function selectFirstMeaningfulSentence(text: string): string {
       continue;
     }
 
-    const candidate = trimNoise(text.slice(0, index));
+    const candidate = trimTitleNoise(text.slice(0, index));
     if (candidate.length >= MIN_SIGNAL_LENGTH) {
       return candidate;
     }
   }
 
-  return trimNoise(text);
+  return trimTitleNoise(text);
 }
 
 function isSentenceEnd(text: string, index: number): boolean {
@@ -214,17 +218,6 @@ function isSentenceEnd(text: string, index: number): boolean {
 
 function isDigit(char: string | undefined): boolean {
   return char !== undefined && char >= '0' && char <= '9';
-}
-
-/** Trailing punctuation and whitespace, trimmed one character at a time so that no
- * amount of it can make the scan super-linear. */
-function trimNoise(text: string): string {
-  let end = text.length;
-  while (end > 0 && NOISE_CHAR.test(text[end - 1])) {
-    end -= 1;
-  }
-
-  return text.slice(0, end);
 }
 
 /** Titles are single-line: they are stored as metadata and a rename input would drop

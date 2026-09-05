@@ -1,10 +1,14 @@
-import { MAX_TITLE_LENGTH, truncateTitleOnWordBoundary } from './titleLength';
+import {
+  MAX_TITLE_LENGTH,
+  TITLE_PROMPT_TARGET_LENGTH,
+  truncateTitleOnWordBoundary,
+} from './titleLength';
 
 const MAX_TITLE_INPUT_LENGTH = 500;
 
 export const TITLE_GENERATION_SYSTEM_PROMPT = `You are a specialist in summarizing user intent.
 
-**Task**: Generate a **concise, descriptive title** (max ${MAX_TITLE_LENGTH} chars) summarizing the user's task/request.
+**Task**: Generate a **concise, descriptive title** (max ${TITLE_PROMPT_TARGET_LENGTH} chars) summarizing the user's task/request.
 
 **Rules**:
 1.  **Format**: Sentence case. No periods/quotes.
