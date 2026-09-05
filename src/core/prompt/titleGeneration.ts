@@ -1,4 +1,4 @@
-import { SUPPORTED_LOCALES } from '../../i18n/constants';
+import { getLocaleInfo } from '../../i18n/constants';
 import { getLocale } from '../../i18n/i18n';
 import type { Locale } from '../../i18n/types';
 
@@ -22,8 +22,7 @@ export const TITLE_GENERATION_SYSTEM_PROMPT = `You are a specialist in summarizi
  * Falls back to English for unknown locales.
  */
 export function resolveTitleLanguageName(locale: Locale = getLocale()): string {
-  return SUPPORTED_LOCALES.find((entry) => entry.code === locale)?.englishName
-    ?? 'English';
+  return getLocaleInfo(locale)?.englishName ?? 'English';
 }
 
 /**
@@ -51,13 +50,19 @@ export function buildTitleGenerationPrompt(userMessage: string): string {
 // conversational preamble / markdown heading. Strip those before using the text.
 const TITLE_NOISE_PREFIXES: readonly RegExp[] = [
   /^\s*(?:#{1,6}\s+|>\s+|[-*•]\s+)/,
-  /^\s*(?:(?:here(?:'s| is)|this is)\s+(?:a|the)\s+)?(?:(?:auto[-\s]?)?generated|suggested|proposed|conversation|chat)?\s*(?:title|name|заголовок|название|тема)\s*[:：\-–—]\s*/i,
+  /^\s*(?:(?:here(?:'s| is)|this is)\s+(?:a|the|your|my|one)\s+)?(?:(?:auto[-\s]?)?generated|suggested|proposed|conversation|chat)?\s*(?:title|name|заголовок|название|тема)\s*[:：\-–—]\s*/i,
   /^\s*(?:auto[-\s]?)?generated\s*[:：\-–—]\s*/i,
 ];
 
+/**
+ * One pass per prefix that can stack ahead of the title (`## Generated title:`
+ * is already three), plus one that finds nothing and ends the loop.
+ */
+const MAX_NOISE_STRIP_PASSES = TITLE_NOISE_PREFIXES.length + 1;
+
 function stripTitleNoise(text: string): string {
   let out = text.trim();
-  for (let pass = 0; pass < 4; pass += 1) {
+  for (let pass = 0; pass < MAX_NOISE_STRIP_PASSES; pass += 1) {
     let changed = false;
     for (const pattern of TITLE_NOISE_PREFIXES) {
       const next = out.replace(pattern, '');
@@ -73,16 +78,27 @@ function stripTitleNoise(text: string): string {
   return out;
 }
 
+/**
+ * A line that only announces the title, such as `Here is your title:`.
+ *
+ * Stripping cannot recognise every phrasing a model invents, and taking the
+ * first line on its own would then promote the announcement over the title
+ * below it - losing the answer entirely, where before it at least survived
+ * inside the text.
+ */
+function isLabelOnlyLine(line: string): boolean {
+  return /[:：]$/.test(line) && line.length <= 60;
+}
+
 export function parseTitleGenerationResponse(responseText: string): string | null {
   const stripped = stripTitleNoise(responseText);
   if (!stripped) {
     return null;
   }
 
-  const firstLine = stripped
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find(Boolean);
+  const lines = stripped.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const firstLine = lines.find((line, index) => !(isLabelOnlyLine(line) && index < lines.length - 1))
+    ?? lines[0];
   if (!firstLine) {
     return null;
   }

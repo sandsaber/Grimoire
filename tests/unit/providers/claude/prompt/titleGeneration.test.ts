@@ -85,5 +85,31 @@ describe('titleGeneration', () => {
       expect(parseTitleGenerationResponse('   ')).toBeNull();
       expect(parseTitleGenerationResponse('Title:')).toBeNull();
     });
+
+    it('strips a preamble whatever determiner it uses', () => {
+      expect(parseTitleGenerationResponse('Here is your title: Fix the parser')).toBe('Fix the parser');
+      expect(parseTitleGenerationResponse('Here is my title: Fix the parser')).toBe('Fix the parser');
+      expect(parseTitleGenerationResponse('Here is the title: Fix the parser')).toBe('Fix the parser');
+    });
+
+    it('skips an announcement that sits on its own line', () => {
+      // Stripping cannot know every phrasing; taking the first line regardless
+      // would promote the announcement and lose the title under it.
+      expect(parseTitleGenerationResponse('Here is your suggestion:\nFix the parser'))
+        .toBe('Fix the parser');
+    });
+
+    it('keeps a title that merely ends in a colon when it is all there is', () => {
+      expect(parseTitleGenerationResponse('Debugging:')).toBe('Debugging');
+    });
+
+    it('does not skip a colon line long enough to be a title in its own right', () => {
+      const long = 'Diagnose the failing deployment pipeline and its cascading effects:';
+
+      const title = parseTitleGenerationResponse(`${long}\nsecond line`);
+
+      expect(title).toMatch(/^Diagnose the failing deployment/);
+      expect(title).not.toBe('second line');
+    });
   });
 });
