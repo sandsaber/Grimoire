@@ -3,7 +3,7 @@ import * as path from 'path';
 
 import type { ImageAttachment, ImageMediaType } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
-import { registerOpenImageViewer } from './imageViewerStack';
+import { closeTopmostImageViewer, registerOpenImageViewer } from './imageViewerStack';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
@@ -362,16 +362,16 @@ export class ImageContextManager {
     closeBtn.setText('\u00D7');
 
     // Escape closes the viewer and must not also cancel the streaming turn.
-    // This listener is only one of the two ways that happens: the chat's own
-    // Escape handlers consult the viewer stack before cancelling, so the turn
-    // survives whichever listener the browser reaches first.
+    // The stack, not this listener, decides which viewer closes: every viewer
+    // registers one of these on the same document, and `stopImmediatePropagation`
+    // keeps the siblings from closing a second viewer on one key press.
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') {
         return;
       }
       e.preventDefault();
-      e.stopPropagation();
-      close();
+      e.stopImmediatePropagation();
+      closeTopmostImageViewer();
     };
 
     const unregisterViewer = registerOpenImageViewer(() => close());

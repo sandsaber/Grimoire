@@ -3,6 +3,7 @@ import { Notice } from 'obsidian';
 
 import type { ImageAttachment } from '@/core/types';
 import { ImageContextManager } from '@/features/chat/ui/ImageContext';
+import { resetOpenImageViewers } from '@/features/chat/ui/imageViewerStack';
 
 jest.mock('obsidian', () => ({
   Notice: jest.fn(),
@@ -761,6 +762,7 @@ describe('ImageContextManager - Private Helpers', () => {
     let removeEventSpy: jest.Mock;
 
     beforeEach(() => {
+      resetOpenImageViewers();
       overlayEl = createMockEl();
       addEventSpy = jest.fn();
       removeEventSpy = jest.fn();
@@ -795,7 +797,7 @@ describe('ImageContextManager - Private Helpers', () => {
       expect(addEventSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true);
 
       const escHandler = addEventSpy.mock.calls[0][1];
-      escHandler({ key: 'Escape', preventDefault: jest.fn(), stopPropagation: jest.fn() });
+      escHandler({ key: 'Escape', preventDefault: jest.fn(), stopImmediatePropagation: jest.fn() });
 
       expect(removeEventSpy).toHaveBeenCalledWith('keydown', escHandler, true);
     });
@@ -805,11 +807,11 @@ describe('ImageContextManager - Private Helpers', () => {
       manager['showFullImage'](image);
 
       const escHandler = addEventSpy.mock.calls[0][1];
-      const event = { key: 'Escape', preventDefault: jest.fn(), stopPropagation: jest.fn() };
+      const event = { key: 'Escape', preventDefault: jest.fn(), stopImmediatePropagation: jest.fn() };
       escHandler(event);
 
       expect(event.preventDefault).toHaveBeenCalled();
-      expect(event.stopPropagation).toHaveBeenCalled();
+      expect(event.stopImmediatePropagation).toHaveBeenCalled();
     });
 
     it('should leave other keys alone', () => {
@@ -817,7 +819,7 @@ describe('ImageContextManager - Private Helpers', () => {
       manager['showFullImage'](image);
 
       const escHandler = addEventSpy.mock.calls[0][1];
-      const event = { key: 'a', preventDefault: jest.fn(), stopPropagation: jest.fn() };
+      const event = { key: 'a', preventDefault: jest.fn(), stopImmediatePropagation: jest.fn() };
       escHandler(event);
 
       expect(event.preventDefault).not.toHaveBeenCalled();

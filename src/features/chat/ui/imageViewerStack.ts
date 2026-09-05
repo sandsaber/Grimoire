@@ -9,12 +9,11 @@
  * the app boots and which this plugin does not control.
  *
  * Racing that listener is the wrong shape of solution: whoever wins is a
- * property of registration order rather than of what the key means. So the
- * cancel paths ask this module instead. An open viewer is registered here,
- * and every Escape handler that would cancel a turn closes the topmost viewer
- * first and stops. The outcome no longer depends on which listener runs
- * first: if the viewer's own listener wins it closes and consumes the key,
- * and if the cancel path wins it closes the viewer and declines to cancel.
+ * property of registration order rather than of what the key means. So every
+ * Escape handler - the viewers' own included - asks this module instead. The
+ * outcome no longer depends on which listener runs first: whoever gets there
+ * closes the topmost viewer, and a cancel path that finds one open declines
+ * to cancel.
  *
  * The stack, rather than a single slot, keeps nesting honest - Escape closes
  * one viewer at a time, in reverse order of opening.
@@ -38,11 +37,6 @@ export function registerOpenImageViewer(close: CloseViewer): () => void {
   };
 }
 
-/** True when at least one full-size viewer is open. */
-export function hasOpenImageViewer(): boolean {
-  return openViewers.length > 0;
-}
-
 /**
  * Closes the most recently opened viewer.
  *
@@ -50,11 +44,16 @@ export function hasOpenImageViewer(): boolean {
  * spoken for - do not also cancel the turn".
  */
 export function closeTopmostImageViewer(): boolean {
-  const close = openViewers[openViewers.length - 1];
+  // Popped before closing so that a `close` which fails to unregister itself
+  // cannot leave a dead entry behind - one would swallow every later Escape,
+  // and the turn could no longer be cancelled at all. The viewer's own
+  // unregister looks the entry up by identity and finds nothing, so removing
+  // it here drops no other viewer.
+  const close = openViewers.pop();
   if (!close) {
     return false;
   }
-  // `close` unregisters itself; popping here too would drop a second viewer.
+
   close();
   return true;
 }
