@@ -1,5 +1,6 @@
 import { Notice } from 'obsidian';
 
+import { hydrateImages } from '../../../core/attachments/hydrateImages';
 import {
   type BuiltInCommand,
   detectBuiltInCommand,
@@ -423,6 +424,12 @@ export class InputController {
     // SDK handles expansion, $ARGUMENTS, @file references, and frontmatter options
     const images = imageOverride ?? imageContextManager?.getAttachedImages() ?? [];
     const imagesForMessage = images.length > 0 ? [...images] : undefined;
+    // A resend or a queued turn carries attachments straight off an existing
+    // message, whose bytes are left out of session metadata. The provider is
+    // about to write them to a file for the CLI, so refill them first.
+    if (plugin.storage?.attachments) {
+      await hydrateImages(imagesForMessage, plugin.storage.attachments);
+    }
     const isCompact = /^\/compact(\s|$)/i.test(content);
     plugin.recordDebugLog?.({
       data: {

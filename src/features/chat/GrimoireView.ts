@@ -27,6 +27,7 @@ import { TabBar } from './tabs/TabBar';
 import { TabManager } from './tabs/TabManager';
 import type { ClosedTabSnapshot, TabData, TabId } from './tabs/types';
 import { normalizeMaxTabs } from './tabs/types';
+import { closeTopmostImageViewer } from './ui/imageViewerStack';
 import { ContextUsageMeter, getNextPermissionMode } from './ui/InputToolbar';
 import { requestTabRename } from './ui/RenameTabModal';
 import { buildAssistantResponseMetadata } from './utils/assistantResponseMetadata';
@@ -966,6 +967,11 @@ export class GrimoireView extends ItemView {
     this.scope.register([], 'Escape', (e: KeyboardEvent) => {
       if (e.isComposing) return;
       if (!e.defaultPrevented) {
+        // A full-size image spoken for this Escape: closing it must not also
+        // cost the user the turn that is streaming behind it.
+        if (closeTopmostImageViewer()) {
+          return false;
+        }
         const activeTab = this.tabManager?.getActiveTab();
         if (activeTab?.state.isStreaming) {
           activeTab.controllers.inputController?.cancelStreaming();

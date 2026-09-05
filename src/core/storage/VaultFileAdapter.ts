@@ -40,6 +40,23 @@ export class VaultFileAdapter {
     await this.writeQueue;
   }
 
+  async readBinary(path: string): Promise<ArrayBuffer> {
+    return this.app.vault.adapter.readBinary(path);
+  }
+
+  async writeBinary(path: string, data: ArrayBuffer): Promise<void> {
+    await this.ensureParentFolder(path);
+    await this.app.vault.adapter.writeBinary(path, data);
+  }
+
+  /**
+   * A URL the renderer can put in an `img` src. Lets a stored attachment be
+   * displayed without decoding it into a data URI first.
+   */
+  getResourcePath(path: string): string {
+    return this.app.vault.adapter.getResourcePath(path);
+  }
+
   async delete(path: string): Promise<void> {
     if (await this.exists(path)) {
       await this.app.vault.adapter.remove(path);

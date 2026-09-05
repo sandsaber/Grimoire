@@ -82,8 +82,8 @@ export interface MockElement {
     };
     activeElement?: any;
     body?: any;
-    addEventListener?: (event: string, handler: (...args: any[]) => void) => void;
-    removeEventListener?: (event: string, handler: (...args: any[]) => void) => void;
+    addEventListener?: (event: string, handler: (...args: any[]) => void, options?: any) => void;
+    removeEventListener?: (event: string, handler: (...args: any[]) => void, options?: any) => void;
     dispatchEvent?: (eventOrType: string | { type: string; [key: string]: any }) => void;
     createElement: (tagName: string) => MockElement;
     createElementNS: (namespace: string, tagName: string) => MockElement;
@@ -218,20 +218,24 @@ export function createMockEl(tag = 'div'): any {
     get body() {
       return currentDocument()?.body ?? createMockEl('body');
     },
-    addEventListener(event: string, handler: (...args: any[]) => void) {
+    // `options` is forwarded rather than dropped: capture-phase registration
+    // is the difference between a handler that sees a key first and one that
+    // sees it after the app has acted on it, and a helper that swallows the
+    // argument makes that difference invisible to every test.
+    addEventListener(event: string, handler: (...args: any[]) => void, options?: any) {
       const document = currentDocument();
       if (document?.addEventListener) {
-        document.addEventListener(event, handler);
+        document.addEventListener(event, handler, options);
         return;
       }
       const handlers = documentEventListeners.get(event) ?? [];
       handlers.push(handler);
       documentEventListeners.set(event, handlers);
     },
-    removeEventListener(event: string, handler: (...args: any[]) => void) {
+    removeEventListener(event: string, handler: (...args: any[]) => void, options?: any) {
       const document = currentDocument();
       if (document?.removeEventListener) {
-        document.removeEventListener(event, handler);
+        document.removeEventListener(event, handler, options);
         return;
       }
       const handlers = documentEventListeners.get(event) ?? [];
