@@ -879,6 +879,38 @@ describe('ImageContextManager - Private Helpers', () => {
       expect(Buffer.from(attachment.data, 'base64').toString()).toBe('hello');
     });
 
+    it('refuses an image scaling could not bring under the limit', async () => {
+      const put = jest.fn();
+      const stored = managerWithStore(put);
+      jest.spyOn(prepareImage, 'prepareImageForStore').mockResolvedValue({
+        bytes: new ArrayBuffer(6 * 1024 * 1024),
+        mediaType: 'image/gif',
+        rescaled: false,
+      });
+
+      const attachment = await stored['buildAttachment'](fileOf('x', 'huge.gif'), 'image/gif', 'drop');
+
+      expect(attachment).toBeNull();
+      expect(put).not.toHaveBeenCalled();
+    });
+
+    it('accepts a heavy source once scaling has shrunk it', async () => {
+      const put = jest.fn().mockResolvedValue({ hash: 'c'.repeat(64), size: 300 });
+      const stored = managerWithStore(put);
+      jest.spyOn(prepareImage, 'prepareImageForStore').mockResolvedValue({
+        bytes: new ArrayBuffer(300),
+        mediaType: 'image/webp',
+        width: 2000,
+        height: 1125,
+        rescaled: true,
+      });
+
+      const attachment = await stored['buildAttachment'](fileOf('x', 'shot.png'), 'image/png', 'drop');
+
+      expect(attachment).not.toBeNull();
+      expect(attachment!.size).toBe(300);
+    });
+
     it('renames the attachment when the re-encode changed its format', async () => {
       const put = jest.fn().mockResolvedValue({ hash: 'b'.repeat(64), size: 3 });
       const stored = managerWithStore(put);

@@ -1590,6 +1590,24 @@ describe('CodexChatRuntime', () => {
       );
     });
 
+    it('skips an attachment whose bytes were never restored', async () => {
+      // An empty `data` decodes to zero bytes, and Codex would be handed a
+      // zero-byte file described as an image.
+      const turn = createTurn('describe this');
+      turn.request.images = [
+        { id: 'img1', name: 'lost.png', data: '', mediaType: 'image/png', size: 0, source: 'file' as const },
+      ];
+
+      await collectChunks(runtime.query(turn));
+
+      const turnStartCall = findCall('turn/start');
+      const input = turnStartCall[1].input;
+      expect(input.some((item: Record<string, unknown>) => item.type === 'localImage')).toBe(false);
+      expect(input).toEqual(
+        expect.arrayContaining([expect.objectContaining({ type: 'text', text: 'describe this' })]),
+      );
+    });
+
     it('cleans up temporary image files after the turn completes', async () => {
       const turn = createTurn('describe this');
       turn.request.images = [

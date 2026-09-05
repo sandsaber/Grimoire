@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../types';
+import type { ChatMessage, ImageAttachment } from '../types';
 import type { AttachmentStore } from './AttachmentStore';
 
 /**
@@ -17,15 +17,23 @@ export async function hydrateImageAttachments(
   store: AttachmentStore,
 ): Promise<void> {
   for (const message of messages ?? []) {
-    for (const image of message.images ?? []) {
-      if (!image.hash || image.data) {
-        continue;
-      }
+    await hydrateImages(message.images, store);
+  }
+}
 
-      const bytes = await store.read(image.hash, image.mediaType);
-      if (bytes) {
-        image.data = Buffer.from(bytes).toString('base64');
-      }
+/** Refills one batch of attachments - the images of a turn about to be sent. */
+export async function hydrateImages(
+  images: ImageAttachment[] | undefined,
+  store: AttachmentStore,
+): Promise<void> {
+  for (const image of images ?? []) {
+    if (!image.hash || image.data) {
+      continue;
+    }
+
+    const bytes = await store.read(image.hash, image.mediaType);
+    if (bytes) {
+      image.data = Buffer.from(bytes).toString('base64');
     }
   }
 }

@@ -1,5 +1,9 @@
 import type { AttachmentStore } from '@/core/attachments/AttachmentStore';
-import { collectReferencedHashes, hydrateImageAttachments } from '@/core/attachments/hydrateImages';
+import {
+  collectReferencedHashes,
+  hydrateImageAttachments,
+  hydrateImages,
+} from '@/core/attachments/hydrateImages';
 import type { ChatMessage } from '@/core/types';
 
 const HASH = 'a'.repeat(64);
@@ -69,6 +73,24 @@ describe('hydrateImageAttachments', () => {
     const store = { read: jest.fn() } as unknown as AttachmentStore;
 
     await expect(hydrateImageAttachments(undefined, store)).resolves.toBeUndefined();
+  });
+});
+
+describe('hydrateImages', () => {
+  it('refills the attachments of a turn before a provider writes them to disk', async () => {
+    const store = { read: jest.fn().mockResolvedValue(bytesOf('bytes')) } as unknown as AttachmentStore;
+    const images = messageWithImage({ hash: HASH }).images!;
+
+    await hydrateImages(images, store);
+
+    expect(Buffer.from(images[0].data, 'base64').toString()).toBe('bytes');
+  });
+
+  it('tolerates a turn with no attachments', async () => {
+    const store = { read: jest.fn() } as unknown as AttachmentStore;
+
+    await expect(hydrateImages(undefined, store)).resolves.toBeUndefined();
+    expect(store.read).not.toHaveBeenCalled();
   });
 });
 

@@ -7,7 +7,16 @@ import type { ImageAttachment, ImageMediaType } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
 import { closeTopmostImageViewer, registerOpenImageViewer } from './imageViewerStack';
 
+/** Largest attachment that may be stored and sent. */
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+/**
+ * Largest file worth opening at all.
+ *
+ * Scaling happens before the stored size is judged, so a 15 MB screenshot is
+ * now fine - it becomes a few hundred kilobytes. This cap only keeps a file
+ * that could never help from being read into memory to find that out.
+ */
+const MAX_SOURCE_IMAGE_SIZE = 25 * 1024 * 1024;
 
 const IMAGE_EXTENSIONS: Record<string, ImageMediaType> = {
   '.jpg': 'image/jpeg',
@@ -243,8 +252,8 @@ export class ImageContextManager {
       return false;
     }
 
-    if (file.size > MAX_IMAGE_SIZE) {
-      this.notifyImageError(t('chat.ui.images.sizeLimit', { size: this.formatSize(MAX_IMAGE_SIZE) }));
+    if (file.size > MAX_SOURCE_IMAGE_SIZE) {
+      this.notifyImageError(t('chat.ui.images.sizeLimit', { size: this.formatSize(MAX_SOURCE_IMAGE_SIZE) }));
       return false;
     }
 
@@ -256,6 +265,12 @@ export class ImageContextManager {
 
     try {
       const attachment = await this.buildAttachment(file, mediaType, source);
+      if (!attachment) {
+        // Scaling could not bring it under the limit - a format we must not
+        // re-encode, or an image whose pixels are simply that heavy.
+        this.notifyImageError(t('chat.ui.images.sizeLimit', { size: this.formatSize(MAX_IMAGE_SIZE) }));
+        return false;
+      }
 
       this.attachedImages.set(attachment.id, attachment);
       this.updateImagePreview();
@@ -278,10 +293,13 @@ export class ImageContextManager {
     file: File,
     mediaType: ImageMediaType,
     source: 'paste' | 'drop',
-  ): Promise<ImageAttachment> {
+  ): Promise<ImageAttachment | null> {
     const name = file.name || `image-${Date.now()}.${mediaType.split('/')[1]}`;
 
     if (!this.attachments) {
+      if (file.size > MAX_IMAGE_SIZE) {
+        return null;
+      }
       const bytes = await file.arrayBuffer();
       return {
         id: this.generateId(),
@@ -294,6 +312,10 @@ export class ImageContextManager {
     }
 
     const prepared = await prepareImageForStore(await file.arrayBuffer(), mediaType);
+    if (prepared.bytes.byteLength > MAX_IMAGE_SIZE) {
+      return null;
+    }
+
     const stored = await this.attachments.put(prepared.bytes, prepared.mediaType);
 
     return {
