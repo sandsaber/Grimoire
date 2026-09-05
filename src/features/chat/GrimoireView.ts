@@ -2,6 +2,7 @@ import type { EventRef, WorkspaceLeaf } from 'obsidian';
 import { ItemView, Menu, Notice, Platform, Scope, setTooltip } from 'obsidian';
 
 import { GRIMOIRE_CHANGELOG_URL } from '../../app/changelog/source';
+import { truncateTitleOnWordBoundary } from '../../core/prompt/titleLength';
 import { getHiddenProviderCommandSet } from '../../core/providers/commands/hiddenCommands';
 import { ProviderRegistry } from '../../core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
@@ -83,11 +84,14 @@ export const MAX_TAB_MENU_HEADING_LENGTH = 40;
 /**
  * A shortened heading must still surface the whole name: two tabs can share the first
  * `MAX_TAB_MENU_HEADING_LENGTH` characters and would otherwise be indistinguishable here.
+ *
+ * The cut goes through the shared title truncation so a heading ends the way every other
+ * shortened title does — on a word boundary, never on half a surrogate pair.
  */
 export function buildTabMenuHeading(title: string): string | DocumentFragment {
   if (title.length <= MAX_TAB_MENU_HEADING_LENGTH) return title;
 
-  const shortened = title.slice(0, MAX_TAB_MENU_HEADING_LENGTH - 1) + '…';
+  const shortened = truncateTitleOnWordBoundary(title, MAX_TAB_MENU_HEADING_LENGTH);
   return createFragment((fragment) => {
     const span = createSpan({ text: shortened, attr: { 'aria-label': title } });
     setTooltip(span, title, { placement: 'top' });
