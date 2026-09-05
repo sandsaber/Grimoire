@@ -1,6 +1,7 @@
 import { createMockEl } from '@test/helpers/mockElement';
 import { Notice } from 'obsidian';
 
+import * as prepareImage from '@/core/attachments/prepareImage';
 import type { ImageAttachment } from '@/core/types';
 import { ImageContextManager } from '@/features/chat/ui/ImageContext';
 import { resetOpenImageViewers } from '@/features/chat/ui/imageViewerStack';
@@ -839,21 +840,61 @@ describe('ImageContextManager - Private Helpers', () => {
     });
   });
 
-  describe('fileToBase64', () => {
-    it('should convert file to base64 string', async () => {
-      const textEncoder = new TextEncoder();
-      const bytes = textEncoder.encode('hello');
-      const mockBuffer = bytes.buffer;
-      const file = {
-        arrayBuffer: jest.fn().mockResolvedValue(mockBuffer),
-      } as unknown as File;
+  describe('buildAttachment', () => {
+    const fileOf = (text: string, name = 'shot.png'): File => ({
+      name,
+      size: text.length,
+      arrayBuffer: jest.fn().mockResolvedValue(new TextEncoder().encode(text).buffer),
+    } as unknown as File);
 
-      const result = await manager['fileToBase64'](file);
-      expect(typeof result).toBe('string');
-      expect(result.length).toBeGreaterThan(0);
-      // Verify it's valid base64
-      const decoded = Buffer.from(result, 'base64').toString();
-      expect(decoded).toBe('hello');
+    const managerWithStore = (put: jest.Mock): any => new ImageContextManager(
+      createContainerWithInputWrapper().container,
+      createMockTextArea(),
+      createMockCallbacks(),
+      undefined,
+      { put } as any,
+    );
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('base64-encodes the bytes when no attachment store is wired', async () => {
+      const attachment = await manager['buildAttachment'](fileOf('hello'), 'image/png', 'paste');
+
+      expect(Buffer.from(attachment.data, 'base64').toString()).toBe('hello');
+      expect(attachment.hash).toBeUndefined();
+      expect(attachment.mediaType).toBe('image/png');
+    });
+
+    it('stores the bytes and keeps only a reference when a store is wired', async () => {
+      const put = jest.fn().mockResolvedValue({ hash: 'a'.repeat(64), size: 5 });
+      const stored = managerWithStore(put);
+
+      const attachment = await stored['buildAttachment'](fileOf('hello'), 'image/png', 'paste');
+
+      expect(put).toHaveBeenCalledTimes(1);
+      expect(attachment.hash).toBe('a'.repeat(64));
+      expect(attachment.size).toBe(5);
+      expect(Buffer.from(attachment.data, 'base64').toString()).toBe('hello');
+    });
+
+    it('renames the attachment when the re-encode changed its format', async () => {
+      const put = jest.fn().mockResolvedValue({ hash: 'b'.repeat(64), size: 3 });
+      const stored = managerWithStore(put);
+      jest.spyOn(prepareImage, 'prepareImageForStore').mockResolvedValue({
+        bytes: new TextEncoder().encode('abc').buffer,
+        mediaType: 'image/webp',
+        width: 2000,
+        height: 1125,
+        rescaled: true,
+      });
+
+      const attachment = await stored['buildAttachment'](fileOf('x', 'screen.png'), 'image/png', 'drop');
+
+      expect(attachment.name).toBe('screen.webp');
+      expect(attachment.mediaType).toBe('image/webp');
+      expect(attachment.width).toBe(2000);
     });
   });
 });

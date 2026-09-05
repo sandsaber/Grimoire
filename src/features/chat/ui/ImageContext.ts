@@ -1,6 +1,8 @@
 import { Notice } from 'obsidian';
 import * as path from 'path';
 
+import type { AttachmentStore } from '../../../core/attachments/AttachmentStore';
+import { prepareImageForStore } from '../../../core/attachments/prepareImage';
 import type { ImageAttachment, ImageMediaType } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
 import { closeTopmostImageViewer, registerOpenImageViewer } from './imageViewerStack';
@@ -36,13 +38,16 @@ export class ImageContextManager {
   private attachedImages: Map<string, ImageAttachment> = new Map();
   private enabled = true;
   private fullImageClose: (() => void) | null = null;
+  private readonly attachments: AttachmentStore | null;
 
   constructor(
     containerEl: HTMLElement,
     inputEl: HTMLTextAreaElement,
     callbacks: ImageContextCallbacks,
-    previewContainerEl?: HTMLElement
+    previewContainerEl?: HTMLElement,
+    attachments?: AttachmentStore,
   ) {
+    this.attachments = attachments ?? null;
     this.containerEl = containerEl;
     this.previewContainerEl = previewContainerEl ?? containerEl;
     this.inputEl = inputEl;
@@ -250,16 +255,7 @@ export class ImageContextManager {
     }
 
     try {
-      const base64 = await this.fileToBase64(file);
-
-      const attachment: ImageAttachment = {
-        id: this.generateId(),
-        name: file.name || `image-${Date.now()}.${mediaType.split('/')[1]}`,
-        mediaType,
-        data: base64,
-        size: file.size,
-        source,
-      };
+      const attachment = await this.buildAttachment(file, mediaType, source);
 
       this.attachedImages.set(attachment.id, attachment);
       this.updateImagePreview();
@@ -271,10 +267,46 @@ export class ImageContextManager {
     }
   }
 
-  private async fileToBase64(file: File): Promise<string> {
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    return buffer.toString('base64');
+  /**
+   * Scales the image down to what a provider will actually look at, hands the
+   * bytes to the store, and keeps only a reference plus an in-memory copy.
+   *
+   * Without a store - the shape the unit tests construct - the attachment keeps
+   * the original bytes and behaves as it always did.
+   */
+  private async buildAttachment(
+    file: File,
+    mediaType: ImageMediaType,
+    source: 'paste' | 'drop',
+  ): Promise<ImageAttachment> {
+    const name = file.name || `image-${Date.now()}.${mediaType.split('/')[1]}`;
+
+    if (!this.attachments) {
+      const bytes = await file.arrayBuffer();
+      return {
+        id: this.generateId(),
+        name,
+        mediaType,
+        data: Buffer.from(bytes).toString('base64'),
+        size: file.size,
+        source,
+      };
+    }
+
+    const prepared = await prepareImageForStore(await file.arrayBuffer(), mediaType);
+    const stored = await this.attachments.put(prepared.bytes, prepared.mediaType);
+
+    return {
+      id: this.generateId(),
+      name: prepared.rescaled ? renameForMediaType(name, prepared.mediaType) : name,
+      mediaType: prepared.mediaType,
+      data: Buffer.from(prepared.bytes).toString('base64'),
+      hash: stored.hash,
+      size: stored.size,
+      width: prepared.width,
+      height: prepared.height,
+      source,
+    };
   }
 
   // ============================================
@@ -422,4 +454,11 @@ export class ImageContextManager {
     }
     new Notice(userMessage);
   }
+}
+
+/** Keeps the displayed file name honest when a re-encode changed the format. */
+function renameForMediaType(name: string, mediaType: ImageMediaType): string {
+  const extension = mediaType.split('/')[1];
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? `${name.slice(0, dot)}.${extension}` : `${name}.${extension}`;
 }

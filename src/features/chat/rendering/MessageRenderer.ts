@@ -930,7 +930,7 @@ export class MessageRenderer {
    * Shows full-size image in modal overlay.
    */
   showFullImage(image: ImageAttachment): void {
-    const dataUri = `data:${image.mediaType};base64,${image.data}`;
+    const dataUri = this.imageSrc(image);
 
     const ownerDocument = this.messagesEl.ownerDocument ?? window.document;
     const overlay = ownerDocument.body.createDiv({ cls: 'grimoire-image-modal-overlay' });
@@ -977,8 +977,23 @@ export class MessageRenderer {
    * Sets image src from attachment data.
    */
   setImageSrc(imgEl: HTMLImageElement, image: ImageAttachment): void {
-    const dataUri = `data:${image.mediaType};base64,${image.data}`;
-    imgEl.setAttribute('src', dataUri);
+    imgEl.setAttribute('src', this.imageSrc(image));
+  }
+
+  /**
+   * Prefers the stored file over a data URI: the browser then caches one URL
+   * instead of the renderer rebuilding a megabyte of base64 on every click,
+   * and the image still resolves when the in-memory copy was never refilled.
+   */
+  private imageSrc(image: ImageAttachment): string {
+    if (image.hash) {
+      const stored = this.plugin.storage?.attachments?.resourcePath(image.hash, image.mediaType);
+      if (stored) {
+        return stored;
+      }
+    }
+
+    return `data:${image.mediaType};base64,${image.data}`;
   }
 
   // ============================================
