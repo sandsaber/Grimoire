@@ -1,10 +1,22 @@
 import { Notice } from 'obsidian';
 import * as path from 'path';
 
+import type { AttachmentStore } from '../../../core/attachments/AttachmentStore';
+import { prepareImageForStore } from '../../../core/attachments/prepareImage';
 import type { ImageAttachment, ImageMediaType } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
+import { closeTopmostImageViewer, registerOpenImageViewer } from './imageViewerStack';
 
+/** Largest attachment that may be stored and sent. */
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+/**
+ * Largest file worth opening at all.
+ *
+ * Scaling happens before the stored size is judged, so a 15 MB screenshot is
+ * now fine - it becomes a few hundred kilobytes. This cap only keeps a file
+ * that could never help from being read into memory to find that out.
+ */
+const MAX_SOURCE_IMAGE_SIZE = 25 * 1024 * 1024;
 
 const IMAGE_EXTENSIONS: Record<string, ImageMediaType> = {
   '.jpg': 'image/jpeg',
@@ -35,13 +47,16 @@ export class ImageContextManager {
   private attachedImages: Map<string, ImageAttachment> = new Map();
   private enabled = true;
   private fullImageClose: (() => void) | null = null;
+  private readonly attachments: AttachmentStore | null;
 
   constructor(
     containerEl: HTMLElement,
     inputEl: HTMLTextAreaElement,
     callbacks: ImageContextCallbacks,
-    previewContainerEl?: HTMLElement
+    previewContainerEl?: HTMLElement,
+    attachments?: AttachmentStore,
   ) {
+    this.attachments = attachments ?? null;
     this.containerEl = containerEl;
     this.previewContainerEl = previewContainerEl ?? containerEl;
     this.inputEl = inputEl;
@@ -237,8 +252,8 @@ export class ImageContextManager {
       return false;
     }
 
-    if (file.size > MAX_IMAGE_SIZE) {
-      this.notifyImageError(t('chat.ui.images.sizeLimit', { size: this.formatSize(MAX_IMAGE_SIZE) }));
+    if (file.size > MAX_SOURCE_IMAGE_SIZE) {
+      this.notifyImageError(t('chat.ui.images.sizeLimit', { size: this.formatSize(MAX_SOURCE_IMAGE_SIZE) }));
       return false;
     }
 
@@ -249,16 +264,13 @@ export class ImageContextManager {
     }
 
     try {
-      const base64 = await this.fileToBase64(file);
-
-      const attachment: ImageAttachment = {
-        id: this.generateId(),
-        name: file.name || `image-${Date.now()}.${mediaType.split('/')[1]}`,
-        mediaType,
-        data: base64,
-        size: file.size,
-        source,
-      };
+      const attachment = await this.buildAttachment(file, mediaType, source);
+      if (!attachment) {
+        // Scaling could not bring it under the limit - a format we must not
+        // re-encode, or an image whose pixels are simply that heavy.
+        this.notifyImageError(t('chat.ui.images.sizeLimit', { size: this.formatSize(MAX_IMAGE_SIZE) }));
+        return false;
+      }
 
       this.attachedImages.set(attachment.id, attachment);
       this.updateImagePreview();
@@ -270,10 +282,53 @@ export class ImageContextManager {
     }
   }
 
-  private async fileToBase64(file: File): Promise<string> {
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    return buffer.toString('base64');
+  /**
+   * Scales the image down to what a provider will actually look at, hands the
+   * bytes to the store, and keeps only a reference plus an in-memory copy.
+   *
+   * Without a store - the shape the unit tests construct - the attachment keeps
+   * the original bytes and behaves as it always did.
+   */
+  private async buildAttachment(
+    file: File,
+    mediaType: ImageMediaType,
+    source: 'paste' | 'drop',
+  ): Promise<ImageAttachment | null> {
+    const name = file.name || `image-${Date.now()}.${mediaType.split('/')[1]}`;
+
+    if (!this.attachments) {
+      if (file.size > MAX_IMAGE_SIZE) {
+        return null;
+      }
+      const bytes = await file.arrayBuffer();
+      return {
+        id: this.generateId(),
+        name,
+        mediaType,
+        data: Buffer.from(bytes).toString('base64'),
+        size: file.size,
+        source,
+      };
+    }
+
+    const prepared = await prepareImageForStore(await file.arrayBuffer(), mediaType);
+    if (prepared.bytes.byteLength > MAX_IMAGE_SIZE) {
+      return null;
+    }
+
+    const stored = await this.attachments.put(prepared.bytes, prepared.mediaType);
+
+    return {
+      id: this.generateId(),
+      name: prepared.rescaled ? renameForMediaType(name, prepared.mediaType) : name,
+      mediaType: prepared.mediaType,
+      data: Buffer.from(prepared.bytes).toString('base64'),
+      hash: stored.hash,
+      size: stored.size,
+      width: prepared.width,
+      height: prepared.height,
+      source,
+    };
   }
 
   // ============================================
@@ -360,14 +415,24 @@ export class ImageContextManager {
     });
     closeBtn.setText('\u00D7');
 
+    // Escape closes the viewer and must not also cancel the streaming turn.
+    // The stack, not this listener, decides which viewer closes: every viewer
+    // registers one of these on the same document, and `stopImmediatePropagation`
+    // keeps the siblings from closing a second viewer on one key press.
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        close();
+      if (e.key !== 'Escape') {
+        return;
       }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeTopmostImageViewer();
     };
 
+    const unregisterViewer = registerOpenImageViewer(() => close());
+
     const close = () => {
-      ownerDocument.removeEventListener('keydown', handleEsc);
+      unregisterViewer();
+      ownerDocument.removeEventListener('keydown', handleEsc, true);
       overlay.remove();
       if (this.fullImageClose === close) {
         this.fullImageClose = null;
@@ -379,7 +444,7 @@ export class ImageContextManager {
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) close();
     });
-    ownerDocument.addEventListener('keydown', handleEsc);
+    ownerDocument.addEventListener('keydown', handleEsc, true);
   }
 
   private generateId(): string {
@@ -411,4 +476,11 @@ export class ImageContextManager {
     }
     new Notice(userMessage);
   }
+}
+
+/** Keeps the displayed file name honest when a re-encode changed the format. */
+function renameForMediaType(name: string, mediaType: ImageMediaType): string {
+  const extension = mediaType.split('/')[1];
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? `${name.slice(0, dot)}.${extension}` : `${name}.${extension}`;
 }
