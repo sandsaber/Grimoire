@@ -130,7 +130,7 @@ describe('RenameTabModal auto-rename control', () => {
     suggestBtn?.click();
     (modal as any).close();
 
-    expect(controller.cancelTitleSuggestion).toHaveBeenCalled();
+    expect(controller.cancelTitleSuggestion).toHaveBeenCalledWith('conv-1');
     expect(resolveResult).toHaveBeenCalledWith(null);
 
     release({ ok: true, title: 'Too late' });
@@ -138,5 +138,25 @@ describe('RenameTabModal auto-rename control', () => {
     await Promise.resolve();
 
     expect(input?.value).toBe('Keep me');
+  });
+
+  it('cancels nothing when it has no generation of its own running', async () => {
+    const controller = createController();
+    const { modal, suggestBtn } = openModal(controller);
+
+    // Never generated at all.
+    (modal as any).close();
+    expect(controller.cancelTitleSuggestion).not.toHaveBeenCalled();
+
+    // Generated, finished, then closed: the tab's service is shared, so cancelling here
+    // would abort whatever generation is running by then, not this dialog's.
+    const second = openModal(controller);
+    second.suggestBtn?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    (second.modal as any).close();
+
+    expect(suggestBtn).not.toBeNull();
+    expect(controller.cancelTitleSuggestion).not.toHaveBeenCalled();
   });
 });

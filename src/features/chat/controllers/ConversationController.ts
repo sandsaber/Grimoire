@@ -1245,9 +1245,12 @@ export class ConversationController {
     return this.resolveTitleSource(this.deps.plugin.getConversationSync(conversationId)).ok;
   }
 
-  /** Forwards cancellation to the active provider's title service. */
-  cancelTitleSuggestion(): void {
-    this.deps.getTitleGenerationService()?.cancel();
+  /**
+   * Forwards cancellation to the active provider's title service, scoped to one
+   * conversation so a caller cannot abort a generation it did not start.
+   */
+  cancelTitleSuggestion(conversationId: string): void {
+    this.deps.getTitleGenerationService()?.cancel(conversationId);
   }
 
   /**

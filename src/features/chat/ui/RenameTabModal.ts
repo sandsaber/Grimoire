@@ -23,6 +23,7 @@ export function requestTabRename(
 export class RenameTabModal extends Modal {
   private resolved = false;
   private closed = false;
+  private generating = false;
   private generationToken = 0;
 
   constructor(
@@ -84,11 +85,10 @@ export class RenameTabModal extends Modal {
       attr: { type: 'submit' },
     });
 
-    let generating = false;
     const updateState = () => {
       const remaining = Math.max(0, MAX_TAB_TITLE_LENGTH - input.value.length);
       counter.setText(t('chat.ui.tabs.charactersLeft', { count: remaining }));
-      saveButton.disabled = generating || input.value.trim().length === 0;
+      saveButton.disabled = this.generating || input.value.trim().length === 0;
     };
     const restoreCurrentTitle = () => {
       input.value = this.currentTitle.slice(0, MAX_TAB_TITLE_LENGTH);
@@ -111,9 +111,9 @@ export class RenameTabModal extends Modal {
     if (suggestButton) {
       suggestButton.addEventListener('click', () => {
         const source = this.autoSource;
-        if (!source || suggestButton.disabled || generating) return;
+        if (!source || suggestButton.disabled || this.generating) return;
 
-        generating = true;
+        this.generating = true;
         const token = ++this.generationToken;
 
         input.disabled = true;
@@ -133,8 +133,9 @@ export class RenameTabModal extends Modal {
             }
           })
           .finally(() => {
-            if (this.closed || token !== this.generationToken) return;
-            generating = false;
+            if (token !== this.generationToken) return;
+            this.generating = false;
+            if (this.closed) return;
             input.disabled = false;
             suggestButton.disabled = false;
             suggestButton.removeClass('is-loading');
@@ -185,8 +186,12 @@ export class RenameTabModal extends Modal {
 
   onClose(): void {
     this.closed = true;
-    if (this.generationToken > 0) {
-      this.autoSource?.controller.cancelTitleSuggestion();
+    // Only our own generation, and only while it is still running: the tab's title service
+    // is shared, so an unscoped cancel here would abort a generation this dialog never
+    // started — the auto-title of the conversation the tab was on before, say.
+    if (this.generating && this.autoSource) {
+      this.autoSource.controller.cancelTitleSuggestion(this.autoSource.conversationId);
+      this.generating = false;
     }
     if (!this.resolved) this.resolveResult(null);
     this.contentEl.empty();

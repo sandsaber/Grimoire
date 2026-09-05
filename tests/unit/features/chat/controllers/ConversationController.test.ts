@@ -3066,18 +3066,18 @@ describe('ConversationController title suggestion', () => {
     await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: true, title: 'First' });
   });
 
-  it('cancels through the title service', () => {
+  it('cancels only the conversation it was asked about', () => {
     const { controller, service } = createTitleHarness();
 
-    controller.cancelTitleSuggestion();
+    controller.cancelTitleSuggestion('conv-1');
 
-    expect(service.cancel).toHaveBeenCalled();
+    expect(service.cancel).toHaveBeenCalledWith('conv-1');
   });
 
   it('cancelling without a service does not throw', () => {
     const { controller } = createTitleHarness({ service: null });
 
-    expect(() => controller.cancelTitleSuggestion()).not.toThrow();
+    expect(() => controller.cancelTitleSuggestion('conv-1')).not.toThrow();
   });
 });
 
