@@ -1,5 +1,6 @@
 import { Menu, Notice, setIcon, setTooltip } from 'obsidian';
 
+import { buildFallbackTitle } from '../../../core/prompt/fallbackTitle';
 import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import type { ProviderId, TitleGenerationService } from '../../../core/providers/types';
 import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
@@ -1201,10 +1202,25 @@ export class ConversationController {
 
   /** Generates a fallback title from the first message (used when AI fails). */
   generateFallbackTitle(firstMessage: string): string {
-    const firstSentence = firstMessage.split(/[.!?\n]/)[0].trim();
-    const autoTitle = firstSentence.substring(0, 50);
-    const suffix = firstSentence.length > 50 ? '...' : '';
-    return `${autoTitle}${suffix}`;
+    const existingTitles = this.collectExistingTitles();
+    const title = buildFallbackTitle(firstMessage, { existingTitles });
+    if (title) {
+      return title;
+    }
+
+    // Nothing but host context blocks: keep a stable, localised label rather than
+    // leaving the conversation nameless in the history list.
+    return buildFallbackTitle(t('chat.ui.view.conversation'), { existingTitles });
+  }
+
+  /** Titles already in use, so a new conversation does not duplicate one of them. */
+  private collectExistingTitles(): string[] {
+    try {
+      return this.deps.plugin.getConversationTitles()
+        .filter((title): title is string => typeof title === 'string');
+    } catch {
+      return [];
+    }
   }
 
   /** Regenerates AI title for a conversation. */

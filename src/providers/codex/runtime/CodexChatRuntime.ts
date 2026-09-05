@@ -1381,7 +1381,9 @@ export class CodexChatRuntime implements ChatRuntime {
         tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'grimoire-codex-images-'));
         for (let i = 0; i < images.length; i++) {
           const img = images[i];
-          if (!img.mediaType.startsWith('image/')) continue;
+          // No bytes means no attachment: writing `Buffer.from('', 'base64')`
+          // would hand Codex a zero-byte file as though it were an image.
+          if (!img.mediaType.startsWith('image/') || !img.data) continue;
 
           const filename = toAttachmentFilename(img, i);
           const filePath = path.join(tempDir, `${i + 1}-${filename}`);

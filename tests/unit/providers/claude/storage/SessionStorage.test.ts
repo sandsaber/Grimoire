@@ -272,6 +272,54 @@ describe('SessionStorage', () => {
     });
   });
 
+  describe('toSessionMetadata - attachment bytes', () => {
+    const conversationWithImage = (hash?: string): Conversation => ({
+      id: 'conv-images',
+      providerId: 'claude',
+      title: 'Screenshot',
+      createdAt: 1,
+      updatedAt: 2,
+      sessionId: null,
+      messages: [{
+        id: 'm1',
+        role: 'user',
+        content: 'look',
+        timestamp: 3,
+        images: [{
+          id: 'img-1',
+          name: 'shot.webp',
+          mediaType: 'image/webp',
+          data: 'YmFzZTY0',
+          size: 6,
+          source: 'paste',
+          ...(hash ? { hash } : {}),
+        }],
+      }],
+    } as unknown as Conversation);
+
+    it('leaves out bytes the attachment store already holds', () => {
+      const metadata = storage.toSessionMetadata(conversationWithImage('a'.repeat(64)));
+
+      const image = metadata.messages![0].images![0];
+      expect(image.data).toBe('');
+      expect(image.hash).toBe('a'.repeat(64));
+    });
+
+    it('keeps the bytes of an attachment nothing else holds', () => {
+      const metadata = storage.toSessionMetadata(conversationWithImage());
+
+      expect(metadata.messages![0].images![0].data).toBe('YmFzZTY0');
+    });
+
+    it('does not empty the conversation still in memory', () => {
+      const conversation = conversationWithImage('b'.repeat(64));
+
+      storage.toSessionMetadata(conversation);
+
+      expect(conversation.messages[0].images![0].data).toBe('YmFzZTY0');
+    });
+  });
+
   describe('toSessionMetadata - round trip', () => {
     it('round-trips providerState through save and load', async () => {
       const conversation: Conversation = {
