@@ -755,6 +755,85 @@ describe('ModelSelector', () => {
     );
   });
 
+  it('keeps a bracketed qualifier whole when it contains a slash of its own', () => {
+    const uiConfig = createMockUIConfig();
+    const model = 'qwen3.7-plus(openai)';
+    uiConfig.getModelOptions.mockReturnValue([
+      {
+        value: model,
+        // Qwen's own naming: the plan is bracketed and the slash belongs to it.
+        label: '[ModelStudio Token Plan for Global/Intl] qwen3.7-plus',
+        group: 'Qwen Code',
+      },
+    ]);
+    callbacks.getUIConfig.mockReturnValue(uiConfig);
+
+    selector.renderOptions();
+
+    const copy = parentEl.querySelector('.grimoire-model-option')
+      ?.querySelector('.grimoire-model-option-copy');
+
+    expect(copy?.querySelector('.grimoire-model-option-label')?.textContent)
+      .toBe('qwen3.7-plus');
+    expect(copy?.querySelector('.grimoire-model-option-detail')?.textContent)
+      .toBe('ModelStudio Token Plan for Global/Intl');
+  });
+
+  it('reads a leading bracketed qualifier as the source of the model', () => {
+    const uiConfig = createMockUIConfig();
+    uiConfig.getModelOptions.mockReturnValue([
+      { value: 'GLM-5.2(openai)', label: '[Z.AI] GLM-5.2', group: 'Qwen Code' },
+    ]);
+    callbacks.getUIConfig.mockReturnValue(uiConfig);
+
+    selector.renderOptions();
+
+    const copy = parentEl.querySelector('.grimoire-model-option')
+      ?.querySelector('.grimoire-model-option-copy');
+
+    expect(copy?.querySelector('.grimoire-model-option-label')?.textContent).toBe('GLM-5.2');
+    expect(copy?.querySelector('.grimoire-model-option-detail')?.textContent).toBe('Z.AI');
+  });
+
+  it('leaves a bracket that is not a leading qualifier alone', () => {
+    const uiConfig = createMockUIConfig();
+    uiConfig.getModelOptions.mockReturnValue([
+      { value: 'opus[1m]', label: 'Opus (1M context)', group: 'Claude Code' },
+      { value: 'bare', label: '[unnamed]', group: 'Claude Code' },
+    ]);
+    callbacks.getUIConfig.mockReturnValue(uiConfig);
+
+    selector.renderOptions();
+
+    const labels = (Array.from<any>(parentEl.querySelectorAll('.grimoire-model-option-label')))
+      .map(el => el.textContent);
+    expect(labels).toEqual(['Opus (1M context)', '[unnamed]']);
+  });
+
+  it('shows the model name alone on the collapsed button', () => {
+    const uiConfig = createMockUIConfig();
+    const model = 'qwen3.7-plus(openai)';
+    uiConfig.getModelOptions.mockReturnValue([
+      {
+        value: model,
+        label: '[ModelStudio Token Plan for Global/Intl] qwen3.7-plus',
+        group: 'Qwen Code',
+      },
+    ]);
+    callbacks.getUIConfig.mockReturnValue(uiConfig);
+    callbacks.getSettings.mockReturnValue({
+      model,
+      thinkingBudget: 'low',
+      effortLevel: 'high',
+      serviceTier: 'default',
+      permissionMode: 'normal',
+    });
+
+    selector.updateDisplay();
+
+    expect(parentEl.querySelector('.grimoire-model-label')?.textContent).toBe('qwen3.7-plus');
+  });
+
   it('should not render group separators when models have no group field', () => {
     selector.renderOptions();
 
