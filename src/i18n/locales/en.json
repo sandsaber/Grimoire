@@ -847,7 +847,7 @@
     },
     "refreshModels": {
       "name": "Refresh models",
-      "desc": "Ask Claude Code for its current model list. Grimoire otherwise re-checks only when the CLI or its environment changes.",
+      "desc": "Ask {provider} for its current model list. Grimoire otherwise re-checks only when the CLI or its environment changes.",
       "button": "Refresh",
       "done": "Model list refreshed: {count} models."
     },

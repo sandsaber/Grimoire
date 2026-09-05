@@ -847,7 +847,7 @@
     },
     "refreshModels": {
       "name": "모델 새로 고침",
-      "desc": "Claude Code에 현재 모델 목록을 요청합니다. 그 외에는 CLI나 환경이 바뀔 때만 Grimoire가 다시 확인합니다.",
+      "desc": "{provider}에 현재 모델 목록을 요청합니다. 그 외에는 CLI나 환경이 바뀔 때만 Grimoire가 다시 확인합니다.",
       "button": "새로 고침",
       "done": "모델 목록을 새로 고쳤습니다: 모델 {count}개."
     },

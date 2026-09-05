@@ -847,7 +847,7 @@
     },
     "refreshModels": {
       "name": "Atualizar modelos",
-      "desc": "Pede ao Claude Code a lista de modelos atual. Caso contrário, o Grimoire só verifica novamente quando a CLI ou o ambiente muda.",
+      "desc": "Pede ao {provider} a lista de modelos atual. Caso contrário, o Grimoire só verifica novamente quando a CLI ou o ambiente muda.",
       "button": "Atualizar",
       "done": "Lista de modelos atualizada: {count} modelos."
     },

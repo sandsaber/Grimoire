@@ -8,6 +8,7 @@ const mockGetHostnameKey = jest.fn(() => 'host-a');
 const mockRenderEnvironmentSettingsSection = jest.fn();
 const mockSaveSettings = jest.fn().mockResolvedValue(undefined);
 const mockBroadcastToAllTabs = jest.fn().mockResolvedValue(undefined);
+const mockRefreshModels = jest.fn().mockResolvedValue(true);
 
 jest.mock('fs');
 jest.mock('@/core/providers/ProviderSettingsCoordinator', () => ({
@@ -34,6 +35,7 @@ jest.mock('obsidian', () => {
     public textAreaComponents: MockTextAreaComponent[] = [];
     public dropdownComponents: MockDropdownComponent[] = [];
     public toggleComponents: MockToggleComponent[] = [];
+    public buttonComponents: MockButtonComponent[] = [];
     public settingEl = {
       style: {},
       toggleClass: jest.fn(),
@@ -87,9 +89,17 @@ jest.mock('obsidian', () => {
       callback(component);
       return this;
     }
+
+    addButton(callback: (button: MockButtonComponent) => void) {
+      const component = createButtonComponent();
+      this.buttonComponents.push(component);
+      callback(component);
+      return this;
+    }
   }
 
   return {
+    Notice: jest.fn(),
     Setting: MockSetting,
   };
 });
@@ -101,6 +111,10 @@ jest.mock('@/features/settings/ui/EnvironmentSettingsSection', () => ({
 jest.mock('@/providers/codex/app/CodexWorkspaceServices', () => ({
   getCodexWorkspaceServices: jest.fn(() => ({
     commandCatalog: null,
+    modelCatalog: {
+      isAvailable: () => true,
+      refreshModels: (...args: unknown[]) => mockRefreshModels(...args),
+    },
     subagentStorage: {},
     refreshAgentMentions: jest.fn(),
   })),
@@ -115,13 +129,14 @@ jest.mock('@/providers/codex/ui/CodexSubagentSettings', () => ({
 }));
 
 jest.mock('@/i18n/i18n', () => ({
-  t: (key: string) => ({
+  t: (key: string, params?: Record<string, string | number>) => ({
     'settings.providerTabs.codex.installationMethod.name': 'Installation method',
     'settings.providerTabs.codex.wslDistro.name': 'WSL distro override',
     'settings.providerTabs.codex.cliPath.name': 'Codex CLI path',
     'settings.providerTabs.codex.cliPath.desc': 'Custom path to the local Codex CLI. Leave empty for auto-detection from PATH.',
     'settings.providerTabs.codex.customModels.name': 'Custom models',
-  } as Record<string, string>)[key] ?? key,
+  } as Record<string, string>)[key]
+    ?? (params ? `${key}:${JSON.stringify(params)}` : key),
 }));
 
 jest.mock('@/utils/env', () => ({
@@ -159,6 +174,15 @@ interface MockToggleComponent {
   onChange: jest.MockedFunction<(callback: (value: boolean) => Promise<void> | void) => MockToggleComponent>;
 }
 
+interface MockButtonComponent {
+  disabled: boolean;
+  text: string;
+  onClickCallback: (() => Promise<void> | void) | null;
+  setButtonText: jest.MockedFunction<(value: string) => MockButtonComponent>;
+  setDisabled: jest.MockedFunction<(value: boolean) => MockButtonComponent>;
+  onClick: jest.MockedFunction<(callback: () => Promise<void> | void) => MockButtonComponent>;
+}
+
 const createdSettings: Array<{
   name: string;
   desc: string;
@@ -167,6 +191,7 @@ const createdSettings: Array<{
   textAreaComponents: MockTextAreaComponent[];
   dropdownComponents: MockDropdownComponent[];
   toggleComponents: MockToggleComponent[];
+  buttonComponents: MockButtonComponent[];
 }> = [];
 
 interface MockInputEl {
@@ -247,6 +272,27 @@ function createDropdownComponent(): MockDropdownComponent {
   });
   component.onChange = jest.fn((callback: (value: string) => Promise<void> | void) => {
     component.onChangeCallback = callback;
+    return component;
+  });
+
+  return component;
+}
+
+function createButtonComponent(): MockButtonComponent {
+  const component = {} as MockButtonComponent;
+  component.disabled = false;
+  component.text = '';
+  component.onClickCallback = null;
+  component.setButtonText = jest.fn((value: string) => {
+    component.text = value;
+    return component;
+  });
+  component.setDisabled = jest.fn((value: boolean) => {
+    component.disabled = value;
+    return component;
+  });
+  component.onClick = jest.fn((callback: () => Promise<void> | void) => {
+    component.onClickCallback = callback;
     return component;
   });
 
@@ -591,5 +637,84 @@ describe('CodexSettingsTab', () => {
       codex: DEFAULT_CODEX_PRIMARY_MODEL,
     });
     expect(mockSaveSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets the user ask the app-server for its current model list', async () => {
+    const { Notice } = await import('obsidian');
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    const plugin = createPlugin({
+      providerConfigs: {
+        codex: {
+          ...DEFAULT_CODEX_PROVIDER_SETTINGS,
+          enabled: true,
+          customModels: 'my-custom-model',
+          discoveredModels: [
+            { id: 'gpt-6-astra', label: 'GPT-6-Astra', isDefault: true },
+            { id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol' },
+          ],
+        },
+      },
+    });
+    const context = createContext(plugin);
+
+    codexSettingsTabRenderer.render(createContainer(), context);
+
+    const refreshSetting = findSetting('settings.refreshModels.name');
+    expect(refreshSetting.desc).toBe('settings.refreshModels.desc:{"provider":"Codex"}');
+    const button = refreshSetting.buttonComponents[0];
+    expect(button.text).toBe('settings.refreshModels.button');
+
+    await button.onClickCallback?.();
+
+    // Background picker refreshes never force; this button is the one explicit path.
+    expect(mockRefreshModels).toHaveBeenCalledWith({
+      force: true,
+      plugin,
+      settings: plugin.settings,
+    });
+    expect(context.refreshModelSelectors).toHaveBeenCalledTimes(1);
+    expect(Notice).toHaveBeenCalledWith('settings.refreshModels.done:{"count":2}');
+    expect(button.setDisabled).toHaveBeenLastCalledWith(false);
+  });
+
+  it('warns and re-enables the button when a refresh finds nothing', async () => {
+    const { Notice } = await import('obsidian');
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    const plugin = createPlugin();
+    const context = createContext(plugin);
+
+    codexSettingsTabRenderer.render(createContainer(), context);
+    const button = findSetting('settings.refreshModels.name').buttonComponents[0];
+
+    await button.onClickCallback?.();
+
+    expect(Notice).toHaveBeenCalledWith('settings.provider.loadModelsFailed');
+    expect(context.refreshModelSelectors).not.toHaveBeenCalled();
+    expect(button.setDisabled).toHaveBeenLastCalledWith(false);
+  });
+
+  it('moves the selection off a model the refresh retired', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    const plugin = createPlugin({
+      model: 'gpt-5.6-terra',
+      providerConfigs: {
+        codex: {
+          ...DEFAULT_CODEX_PROVIDER_SETTINGS,
+          enabled: true,
+          customModels: '',
+          // The release the user upgraded to no longer offers gpt-5.6-terra.
+          discoveredModels: [{ id: 'gpt-6-astra', label: 'GPT-6-Astra', isDefault: true }],
+        },
+      },
+    });
+    const context = createContext(plugin);
+
+    codexSettingsTabRenderer.render(createContainer(), context);
+    const button = findSetting('settings.refreshModels.name').buttonComponents[0];
+
+    await button.onClickCallback?.();
+
+    expect(plugin.settings.model).toBe('gpt-6-astra');
+    expect(mockSaveSettings).toHaveBeenCalled();
   });
 });
