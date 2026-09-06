@@ -25,7 +25,7 @@
 
 .grimoire-silent-turn-status {
   align-items: center;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   display: flex;
   font-size: var(--grimoire-text-m);
   gap: var(--grimoire-space-6);

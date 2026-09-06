@@ -12,10 +12,10 @@
   padding: var(--grimoire-space-8) var(--grimoire-space-12);
   border-radius: var(--grimoire-radius-2);
   cursor: pointer;
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-l);
 }
 
 .grimoire-fork-target-option:hover {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }

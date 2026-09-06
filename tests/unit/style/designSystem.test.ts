@@ -186,6 +186,31 @@ describe('Nordic design system', () => {
     expect(unscoped).toEqual([]);
   });
 
+  it('leaves every Obsidian variable to the token layer', () => {
+    // The rule the whole system rests on, and it was true of the accent only:
+    // 476 declarations across 40 sheets read --text-muted, --background-primary
+    // and their family directly, so "swap the token layer" was a claim the
+    // stylesheets could not honour. A reference that carries its own fallback
+    // is a stack rather than a dependency and stays readable.
+    const HOST_TOKEN = /var\(\s*(--(?:background|text|interactive|color|font|size|radius|shadow|line-height|icon|scrollbar|code|input|prompt|tab|nav|checkbox|toggle|slider|divider|indentation|blockquote|embed|callout|graph|table|list|hr|bold|italic|link|highlight|mermaid|canvas|swatch|search|titlebar|ribbon|status-bar|file-explorer|metadata|inline-title|heading|h[1-6]|cursor|collapse|vault|mobile|modal|dialog|dragging|layer|pdf|footnote|math|dataview|setting)[a-z0-9-]*)\s*\)/;
+    // Obsidian's own settings-row variables are the exception, and the reason
+    // is the rule next door: a settings surface must look native, so matching
+    // the host's row geometry means reading the host's numbers for it.
+    const NATIVE_SETTINGS_ROW = /^--setting-items-/;
+    const leaks: string[] = [];
+    for (const file of MODULE_FILES) {
+      const lines = read(file).split(/\r?\n/);
+      lines.forEach((line, index) => {
+        const match = HOST_TOKEN.exec(line);
+        if (match && !NATIVE_SETTINGS_ROW.test(match[1])) {
+          leaks.push(`${file}:${index + 1} ${match[1]}`);
+        }
+      });
+    }
+
+    expect(leaks).toEqual([]);
+  });
+
   it('reads the user accent in one place, so every surface follows it together', () => {
     // The accent is the one colour the user picks, and it reached 65 rules
     // directly before this. Host tokens with no Grimoire equivalent — the

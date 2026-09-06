@@ -4,7 +4,7 @@
 .markdown-source-view.mod-cm6 .cm-line .grimoire-selection-highlight,
 .cm-line .grimoire-selection-highlight,
 .grimoire-selection-highlight {
-  background: var(--text-selection);
+  background: var(--grimoire-selection);
   border-radius: var(--grimoire-radius-1);
   padding: var(--grimoire-space-2) 0;
   margin: -3px 0;
@@ -12,7 +12,7 @@
 
 /* Preview mode selection highlight via CSS Custom Highlight API */
 ::highlight(grimoire-selection) {
-  background: var(--text-selection);
+  background: var(--grimoire-selection);
 }
 
 /* CM6 widget container - ensure transparent background */
@@ -47,12 +47,12 @@
   padding-inline-end: 32px;
   border-width: 1px;
   border-style: solid;
-  border-color: var(--background-modifier-border);
+  border-color: var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
   background: transparent;
-  color: var(--text-normal);
-  font-family: var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif);
-  font-size: var(--font-ui-small, 13px);
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-face);
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-inline-input:focus,
@@ -62,7 +62,7 @@
 }
 
 .grimoire-inline-input::placeholder {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-inline-input:disabled {
@@ -77,7 +77,7 @@
   width: 14px;
   height: 14px;
   margin-top: -7px;
-  border: 2px solid var(--background-modifier-border);
+  border: 2px solid var(--grimoire-line);
   border-top-color: var(--grimoire-accent);
   border-radius: 50%;
   box-sizing: border-box;
@@ -91,12 +91,12 @@
   background: transparent;
   border-width: 1px;
   border-style: solid;
-  border-color: var(--background-modifier-border);
+  border-color: var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
-  font-family: var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif);
-  font-size: var(--font-ui-small, 13px);
+  font-family: var(--grimoire-face);
+  font-size: var(--grimoire-text-m);
   line-height: 1.4;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   white-space: pre-wrap;
   word-wrap: break-word;
 }
@@ -114,7 +114,7 @@
 .grimoire-diff-del {
   background: color-mix(in srgb, var(--grimoire-error) 22%, transparent);
   text-decoration: line-through;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 /* Inserted text - green background */

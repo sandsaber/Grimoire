@@ -24,7 +24,7 @@
   width: 24px;
   height: 3px;
   border-radius: var(--grimoire-radius-1);
-  background: var(--background-modifier-border);
+  background: var(--grimoire-line);
   opacity: 0;
   transition: opacity var(--grimoire-duration) var(--grimoire-ease);
 }
@@ -297,7 +297,7 @@ body.grimoire-dragging-ns {
 
 .grimoire-relevant-note:hover {
   background: color-mix(in srgb, var(--grimoire-accent) 10%, transparent);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-relevant-note:active {
@@ -322,7 +322,7 @@ body.grimoire-dragging-ns {
   flex-direction: column;
   align-items: stretch;
   font-size: var(--grimoire-text-s);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-style: normal;
   gap: var(--grimoire-space-4);
   padding: 0 var(--grimoire-space-2) var(--grimoire-space-8) var(--grimoire-space-2);
@@ -338,7 +338,7 @@ body.grimoire-dragging-ns {
 
 .grimoire-queue-indicator-index {
   flex: 0 0 auto;
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   font-variant-numeric: tabular-nums;
 }
 
@@ -372,7 +372,7 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-queue-indicator-action[disabled] {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   cursor: default;
   text-decoration: none;
 }
@@ -388,13 +388,13 @@ body.grimoire-dragging-ns {
   border: 0;
   border-radius: var(--grimoire-radius-1);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   cursor: pointer;
 }
 
 .grimoire-queue-indicator-icon-action:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-queue-indicator-icon-action svg {
@@ -402,21 +402,21 @@ body.grimoire-dragging-ns {
   height: 14px;
 }
 
-/* Obsidian blue border when instruction mode is active */
-.grimoire-input-instruction-mode {
-  border-color: var(--color-blue);
-  box-shadow: 0 0 0 1px var(--color-blue);
-}
-
-/* Obsidian pink/purple border when bash mode is active */
+/*
+ * A composer mode moves the card's own line to the accent — the same line that
+ * moves on focus, one step further. It used to be Obsidian's blue for one mode
+ * and its pink for the other, which is two hues the system does not have and
+ * two states told by colour alone. Bash mode also sets its input in monospace
+ * and both modes change the placeholder, so the mode is readable without it.
+ */
+.grimoire-input-instruction-mode,
 .grimoire-input-bang-bash-mode {
-  border-color: var(--color-pink, var(--color-purple));
-  box-shadow: 0 0 0 1px var(--color-pink, var(--color-purple));
+  border-color: var(--grimoire-accent-line);
 }
 
 /* Monospace input while in bash mode */
 .grimoire-input-wrapper.grimoire-input-bang-bash-mode .grimoire-input {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
 }
 
 .grimoire-container--chat-window .grimoire-composer-shell {

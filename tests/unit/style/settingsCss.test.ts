@@ -21,7 +21,7 @@ describe('settings base CSS', () => {
     expect(getRule(css, '.grimoire-settings .setting-item-heading')).toBe('');
     expect(getRule(css, '.grimoire-settings .setting-item-heading:first-child')).toBe('');
     expect(getRule(css, '.grimoire-adv-body .setting-item-heading:first-child')).toBe('');
-    expect(css).not.toContain('border-top: 1px solid var(--background-modifier-border)');
+    expect(css).not.toContain('border-top: 1px solid var(--grimoire-line)');
   });
 
   it('isolates the custom settings page from Obsidian declarative group styling', () => {
@@ -66,13 +66,13 @@ describe('settings base CSS', () => {
     expect(tabRule).toContain('border-bottom: 4px solid transparent');
     expect(tabRule).toContain('border-radius: 0');
     expect(tabRule).toContain('background: transparent');
-    expect(tabRule).toContain('color: var(--text-muted)');
-    expect(tabRule).toContain('font-size: var(--font-ui-small)');
-    expect(tabRule).toContain('font-weight: var(--font-medium)');
+    expect(tabRule).toContain('color: var(--grimoire-ink-muted)');
+    expect(tabRule).toContain('font-size: var(--grimoire-text-m)');
+    expect(tabRule).toContain('font-weight: var(--grimoire-weight-medium)');
 
     expect(activeRule).toContain('border-bottom-color: var(--grimoire-accent)');
     expect(activeRule).toContain('background: transparent');
-    expect(activeRule).toContain('color: var(--text-normal)');
+    expect(activeRule).toContain('color: var(--grimoire-ink)');
     expect(activeRule).not.toContain('font-weight: 600');
   });
 
@@ -109,12 +109,12 @@ describe('settings base CSS', () => {
     const metaRule = getRule(css, '.grimoire-settings-provider-card-meta');
 
     expect(cardRule).toContain('border: 0');
-    expect(cardRule).toContain('var(--setting-items-background, var(--background-secondary)) 82%');
-    expect(hoverRule).toContain('var(--setting-items-background, var(--background-secondary)) 78%');
+    expect(cardRule).toContain('var(--setting-items-background, var(--grimoire-plane)) 82%');
+    expect(hoverRule).toContain('var(--setting-items-background, var(--grimoire-plane)) 78%');
     expect(activeRule).toContain('border: 0');
     expect(activeRule).toContain('var(--grimoire-accent) 18%');
     expect(activeHoverRule).toContain('var(--grimoire-accent) 13%');
-    expect(metaRule).toContain('color: var(--text-muted)');
+    expect(metaRule).toContain('color: var(--grimoire-ink-muted)');
   });
 
   it('styles the provider selection hint as compact muted UI copy', () => {
@@ -124,8 +124,8 @@ describe('settings base CSS', () => {
 
     expect(gridRule).toContain('margin: var(--grimoire-space-2) 0 var(--grimoire-space-8)');
     expect(hintRule).toContain('margin: 0 0 var(--grimoire-space-2)');
-    expect(hintRule).toContain('color: var(--text-faint)');
-    expect(hintRule).toContain('font-size: var(--font-ui-small)');
+    expect(hintRule).toContain('color: var(--grimoire-ink-faint)');
+    expect(hintRule).toContain('font-size: var(--grimoire-text-m)');
   });
 
   it('keeps provider settings panel wrappers transparent while preserving setting cards', () => {
@@ -145,7 +145,7 @@ describe('settings base CSS', () => {
     expect(providerDetailsRule).toContain('border: 0');
     expect(providerDetailsRule).toContain('background: transparent');
     expect(providerDetailsRule).not.toContain(
-      'border: 1px solid var(--background-modifier-border)',
+      'border: 1px solid var(--grimoire-line)',
     );
     expect(providerDetailsRule).not.toContain('background-secondary');
     expect(settingRule).toContain('border-radius: var(--grimoire-radius-2)');
@@ -167,7 +167,7 @@ describe('settings base CSS', () => {
     expect(workspaceContentRule).toContain('background: transparent');
     expect(workspaceContentRule).not.toContain('background-secondary');
     expect(settingRule).toContain('border-radius: var(--grimoire-radius-2)');
-    expect(settingRule).toContain('background: var(--background-primary)');
+    expect(settingRule).toContain('background: var(--grimoire-ground)');
   });
 
   it('keeps workspace provider sections as normal flow containers for Obsidian CSS review', () => {

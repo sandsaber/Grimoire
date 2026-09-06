@@ -45,7 +45,7 @@ describe('chat toolbar selector CSS', () => {
     for (const declaration of [
       'min-width: 92px',
       'border-radius: var(--grimoire-radius-2)',
-      'background: var(--background-primary)',
+      'background: var(--grimoire-ground)',
       'box-shadow: var(--grimoire-lift-1)',
     ]) {
       expect(thinkingMenu).toContain(declaration);

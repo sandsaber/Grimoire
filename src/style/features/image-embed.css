@@ -10,7 +10,7 @@
 .grimoire-embedded-image img {
   max-width: 100%;
   height: auto;
-  border-radius: var(--radius-s);
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   transition: opacity var(--grimoire-duration-slow) var(--grimoire-ease);
 }
@@ -47,9 +47,9 @@
 
 /* Fallback when image file not found */
 .grimoire-embedded-image-fallback {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-style: italic;
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
   padding: 0.1em 0.4em;
-  border-radius: var(--radius-s);
+  border-radius: var(--grimoire-radius-1);
 }

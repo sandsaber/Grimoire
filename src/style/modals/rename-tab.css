@@ -13,8 +13,8 @@
 
 .grimoire-rename-tab-label {
   margin: var(--grimoire-space-8) var(--grimoire-space-2) var(--grimoire-space-6);
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-bold);
   letter-spacing: 0.13em;
@@ -29,9 +29,9 @@
   gap: var(--grimoire-space-4);
   min-width: 0;
   padding-right: var(--grimoire-space-6);
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-primary);
+  background: var(--grimoire-ground);
   box-shadow: 0 0 0 2px transparent;
   transition: border-color var(--grimoire-duration) var(--grimoire-ease), box-shadow var(--grimoire-duration) var(--grimoire-ease);
 }
@@ -56,7 +56,7 @@
   border-radius: inherit;
   background: transparent;
   box-shadow: none;
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font: inherit;
   line-height: 1;
 }
@@ -79,14 +79,14 @@ button.grimoire-rename-tab-reset {
   border-radius: var(--grimoire-radius-2);
   background: transparent;
   box-shadow: none;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 button.grimoire-rename-tab-reset:hover,
 button.grimoire-rename-tab-reset:focus-visible {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
   box-shadow: none;
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 button.grimoire-rename-tab-reset svg {
@@ -106,14 +106,14 @@ button.grimoire-rename-tab-suggest {
   border-radius: var(--grimoire-radius-2);
   background: transparent;
   box-shadow: none;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 button.grimoire-rename-tab-suggest:hover:not(:disabled),
 button.grimoire-rename-tab-suggest:focus-visible:not(:disabled) {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
   box-shadow: none;
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 button.grimoire-rename-tab-suggest:disabled {
@@ -139,8 +139,8 @@ button.grimoire-rename-tab-suggest svg {
 }
 
 .grimoire-rename-tab-counter {
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-semibold);
   line-height: 1.2;

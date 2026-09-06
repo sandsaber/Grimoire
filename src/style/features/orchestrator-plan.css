@@ -5,8 +5,8 @@
   container-type: inline-size;
   width: 100%;
   margin: var(--grimoire-space-8) 0 var(--grimoire-space-12);
-  color: var(--text-normal);
-  font-family: var(--font-interface);
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-face);
   font-size: var(--grimoire-text-s);
 }
 
@@ -27,7 +27,7 @@
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-accent-wash);
   color: var(--grimoire-accent-text);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-bold);
   letter-spacing: 0.08em;
@@ -74,7 +74,7 @@
 .grimoire-orchestrator-plan-eyebrow {
   margin-bottom: var(--grimoire-space-6);
   color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-bold);
   letter-spacing: 0.16em;
@@ -84,7 +84,7 @@
 
 .grimoire-orchestrator-plan-title {
   overflow: hidden;
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-l);
   font-weight: var(--grimoire-weight-semibold);
   line-height: 1.2;
@@ -98,7 +98,7 @@
   flex: 0 0 auto;
   gap: var(--grimoire-space-8);
   color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-bold);
   white-space: nowrap;
@@ -173,7 +173,7 @@ button.grimoire-orchestrator-plan-task-toggle:hover {
 button.grimoire-orchestrator-plan-task-toggle.is-selected {
   border-color: var(--grimoire-accent);
   background: var(--grimoire-accent);
-  color: var(--text-on-accent);
+  color: var(--grimoire-accent-contrast);
 }
 
 button.grimoire-orchestrator-plan-task-toggle:focus-visible {
@@ -193,7 +193,7 @@ button.grimoire-orchestrator-plan-task-toggle:focus-visible {
 
 .grimoire-orchestrator-plan-task-description {
   overflow: hidden;
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-semibold);
   line-height: 1.35;
@@ -216,7 +216,7 @@ button.grimoire-orchestrator-plan-task-toggle:focus-visible {
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-raise);
   color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -225,7 +225,7 @@ button.grimoire-orchestrator-plan-task-toggle:focus-visible {
 
 .grimoire-orchestrator-plan-task-mode {
   color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-bold);
   letter-spacing: 0.08em;
@@ -241,7 +241,7 @@ button.grimoire-orchestrator-plan-task-toggle:focus-visible {
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-raise);
   color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-bold);
 }
@@ -282,7 +282,7 @@ button.grimoire-orchestrator-plan-task-toggle:focus-visible {
 .grimoire-orchestrator-plan-footnote {
   max-width: 210px;
   color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-bold);
   line-height: 1.4;
@@ -317,7 +317,7 @@ button.grimoire-orchestrator-plan-spawn-button {
   gap: var(--grimoire-space-8);
   border-color: var(--grimoire-accent);
   background: var(--grimoire-accent);
-  color: var(--text-on-accent);
+  color: var(--grimoire-accent-contrast);
 }
 
 .grimoire-orchestrator-plan-spawn-count {
@@ -329,7 +329,7 @@ button.grimoire-orchestrator-plan-spawn-button {
   padding: 0 var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-line-2);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
 }
 

@@ -36,7 +36,7 @@ describe('tabs.css', () => {
     expect(getRule(css, '.grimoire-tab-close-toast-progress'))
       .toContain('animation: grimoire-tab-close-toast-countdown 6s linear forwards');
     expect(getRule(css, '.grimoire-tab-close-toast-separator'))
-      .toContain('color: var(--text-muted)');
+      .toContain('color: var(--grimoire-ink-muted)');
   });
 
   it('draws a panel segment as a glyph, and the active one as a wash and a word', () => {

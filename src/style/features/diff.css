@@ -38,18 +38,18 @@
 
 /* Two-part header: name (fixed) + summary (flexible) */
 .grimoire-write-edit-name {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-normal);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .grimoire-write-edit-summary {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-m);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -58,7 +58,7 @@
 }
 
 .grimoire-write-edit-stats {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   flex-shrink: 0;
 }
@@ -129,9 +129,9 @@
 .grimoire-write-edit-binary,
 .grimoire-write-edit-error,
 .grimoire-write-edit-done-text {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-write-edit-error {
@@ -190,18 +190,18 @@
 
 /* Hunk separator */
 .grimoire-diff-separator {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   text-align: center;
   padding: var(--grimoire-space-4) 0;
   font-style: italic;
-  border-top: 1px dashed var(--background-modifier-border);
-  border-bottom: 1px dashed var(--background-modifier-border);
+  border-top: 1px dashed var(--grimoire-line);
+  border-bottom: 1px dashed var(--grimoire-line);
   margin: var(--grimoire-space-8) 0;
   font-size: var(--grimoire-text-xs);
 }
 
 .grimoire-diff-no-changes {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-style: italic;
   padding: var(--grimoire-space-8);
 }

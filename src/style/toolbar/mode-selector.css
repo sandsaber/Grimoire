@@ -9,7 +9,7 @@
 
 .grimoire-mode-label {
   font-size: var(--grimoire-text-xs);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   min-width: 32px;
 }
 
@@ -39,7 +39,7 @@
   border-radius: var(--grimoire-radius-2);
   background: none;
   color: var(--grimoire-workbench-muted);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   line-height: 1;
   text-overflow: ellipsis;
@@ -55,7 +55,7 @@
 
 .grimoire-container--chat-window .grimoire-mode-label:not(.active):hover {
   background: var(--grimoire-hover);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-container--chat-window .grimoire-mode-selector .grimoire-toggle-switch {

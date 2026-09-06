@@ -14,11 +14,11 @@
   align-items: center;
   gap: var(--grimoire-space-6) var(--grimoire-space-12);
   font-size: var(--grimoire-text-s);
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-kimicode-model-picker-summary-value {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-weight: var(--grimoire-weight-normal);
 }
 
@@ -30,7 +30,7 @@
   padding: var(--grimoire-space-12) var(--grimoire-space-16);
   border: none;
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
 }
 
 .grimoire-kimicode-model-picker-selected-header {
@@ -45,24 +45,24 @@
   font-weight: var(--grimoire-weight-normal);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-kimicode-model-picker-selected-clear {
   padding: var(--grimoire-space-4) var(--grimoire-space-8);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-normal);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   background: transparent;
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-kimicode-model-picker-selected-clear:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-kimicode-model-picker-selected-rows {
@@ -76,8 +76,8 @@
   align-items: center;
   gap: var(--grimoire-space-12);
   padding: var(--grimoire-space-8) var(--grimoire-space-12);
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
+  background: var(--grimoire-ground);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
 }
 
@@ -105,14 +105,14 @@
   font-size: var(--grimoire-text-xs);
   padding: 1px var(--grimoire-space-6);
   border-radius: var(--grimoire-radius-pill);
-  background: var(--background-modifier-hover);
-  color: var(--text-muted);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .grimoire-kimicode-model-picker-selected-name {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-weight: var(--grimoire-weight-normal);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -121,8 +121,8 @@
 
 .grimoire-kimicode-model-picker-selected-id {
   font-size: var(--grimoire-text-xs);
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -130,7 +130,7 @@
 
 .grimoire-kimicode-model-picker-selected-unavailable {
   font-size: var(--grimoire-text-xs);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-style: italic;
 }
 
@@ -145,10 +145,10 @@
   width: 180px;
   height: 30px;
   padding: 0 var(--grimoire-space-8);
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
-  background: var(--background-primary);
-  color: var(--text-normal);
+  background: var(--grimoire-ground);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-s);
 }
 
@@ -167,7 +167,7 @@
   border: none;
   background: transparent;
   border-radius: var(--grimoire-radius-1);
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   cursor: pointer;
   line-height: 1;
   font-size: var(--grimoire-text-l);
@@ -175,8 +175,8 @@
 }
 
 .grimoire-kimicode-model-picker-selected-remove:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 /* Catalog (collapsible) */
@@ -187,7 +187,7 @@
   padding: var(--grimoire-space-12) var(--grimoire-space-16);
   border: none;
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
 }
 
 .grimoire-kimicode-model-picker-catalog-summary {
@@ -210,18 +210,18 @@
   width: 18px;
   justify-content: center;
   font-size: var(--grimoire-text-l);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   line-height: 1;
   transition: transform var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-kimicode-model-picker-catalog[open] .grimoire-kimicode-model-picker-catalog-caret {
   transform: rotate(90deg);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-kimicode-model-picker-catalog-title {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-weight: var(--grimoire-weight-normal);
   font-size: var(--grimoire-text-m);
 }
@@ -229,7 +229,7 @@
 .grimoire-kimicode-model-picker-catalog-count {
   margin-left: auto;
   font-size: var(--grimoire-text-xs);
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 /* Search + provider filter row → .oc-head */
@@ -246,15 +246,15 @@
   min-width: 180px;
   height: 34px;
   padding: 0 var(--grimoire-space-12);
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
-  background: var(--background-primary);
-  color: var(--text-normal);
+  background: var(--grimoire-ground);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
 }
 
 .grimoire-kimicode-model-picker-search::placeholder {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-kimicode-model-picker-search:focus {
@@ -265,16 +265,16 @@
 .grimoire-kimicode-model-picker-provider {
   height: 34px;
   padding: 0 32px 0 var(--grimoire-space-12);
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
-  background-color: var(--background-primary);
-  color: var(--text-normal);
+  background-color: var(--grimoire-ground);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   cursor: pointer;
   appearance: none;
   background-image:
-    linear-gradient(45deg, transparent 50%, var(--text-faint) 50%),
-    linear-gradient(135deg, var(--text-faint) 50%, transparent 50%);
+    linear-gradient(45deg, transparent 50%, var(--grimoire-ink-faint) 50%),
+    linear-gradient(135deg, var(--grimoire-ink-faint) 50%, transparent 50%);
   background-position: calc(100% - 15px) 15px, calc(100% - 10px) 15px;
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
@@ -289,9 +289,9 @@
 .grimoire-kimicode-model-picker-list {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-primary);
+  background: var(--grimoire-ground);
   max-height: 360px;
   overflow-y: auto;
 }
@@ -301,7 +301,7 @@
   align-items: flex-start;
   gap: var(--grimoire-space-12);
   padding: var(--grimoire-space-12) var(--grimoire-space-12);
-  border-top: 1px solid var(--background-modifier-border);
+  border-top: 1px solid var(--grimoire-line);
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
@@ -311,11 +311,11 @@
 }
 
 .grimoire-kimicode-model-picker-row:hover {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-kimicode-model-picker-row--selected {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-kimicode-model-picker-row input[type="checkbox"] {
@@ -340,8 +340,8 @@
 }
 
 .grimoire-kimicode-model-picker-row-name {
-  color: var(--text-normal);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-mono);
   font-weight: var(--grimoire-weight-normal);
   font-size: var(--grimoire-text-m);
   overflow: hidden;
@@ -353,21 +353,21 @@
   font-size: var(--grimoire-text-xs);
   padding: 1px var(--grimoire-space-6);
   border-radius: var(--grimoire-radius-pill);
-  background: var(--background-modifier-hover);
-  color: var(--text-muted);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .grimoire-kimicode-model-picker-row-badge--unavailable {
-  background: var(--background-modifier-error);
-  color: var(--text-on-accent);
+  background: var(--grimoire-error-ground);
+  color: var(--grimoire-accent-contrast);
 }
 
 .grimoire-kimicode-model-picker-row-meta {
   font-size: var(--grimoire-text-xs);
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -375,12 +375,12 @@
 
 .grimoire-kimicode-model-picker-row-desc {
   font-size: var(--grimoire-text-xs);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-kimicode-model-picker-empty {
   padding: var(--grimoire-space-24) var(--grimoire-space-16);
   text-align: center;
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   font-size: var(--grimoire-text-s);
 }

@@ -114,13 +114,13 @@
 }
 
 .grimoire-bound-status-meta {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-bound-status-meta::before {
   content: "·";
   margin-right: var(--grimoire-space-6);
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-container--chat-window .grimoire-message {
@@ -250,7 +250,7 @@
 }
 
 .grimoire-interrupted-hint {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 /*
@@ -264,14 +264,14 @@
 .grimoire-history-notice {
   display: flex;
   justify-content: center;
-  padding: var(--size-4-2) var(--size-4-3);
-  margin-bottom: var(--size-4-2);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
+  margin-bottom: var(--grimoire-space-8);
 }
 
 .grimoire-history-notice-text {
   max-width: 60ch;
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
   text-align: center;
   text-wrap: pretty;
 }
@@ -317,7 +317,7 @@
   padding: var(--grimoire-space-4);
   border: none;
   border-radius: var(--grimoire-radius-1);
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   cursor: pointer;
   opacity: 1;
   transition: color var(--grimoire-duration) var(--grimoire-ease);
@@ -334,7 +334,7 @@
 }
 
 .grimoire-text-copy-btn:hover {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-text-copy-btn.copied {
@@ -342,8 +342,8 @@
 }
 
 .grimoire-message-completion-time {
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
   font-variant-numeric: tabular-nums;
   font-weight: var(--grimoire-weight-normal);
@@ -386,7 +386,7 @@
 }
 
 .grimoire-container--chat-window .grimoire-message-content p {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-message-content p:last-child {
@@ -423,7 +423,7 @@
 .grimoire-message-content blockquote {
   margin: var(--grimoire-space-8) 0;
   padding-inline-start: var(--grimoire-space-12);
-  border-inline-start: 2px solid var(--background-modifier-border);
+  border-inline-start: 2px solid var(--grimoire-line);
 }
 
 /* Full-width tables */
@@ -446,7 +446,7 @@
 
 .grimoire-message-content th,
 .grimoire-message-content td {
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--grimoire-line);
   padding: var(--grimoire-space-6) var(--grimoire-space-8);
   text-align: start;
   overflow-wrap: normal;
@@ -486,7 +486,7 @@
 }
 
 .grimoire-baked-duration {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-medium);
   font-style: italic;
@@ -538,7 +538,7 @@
 
 .grimoire-user-msg-actions .grimoire-message-completion-time {
   cursor: default;
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 /* Compact boundary indicator */
@@ -554,11 +554,11 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--background-modifier-border);
+  background: var(--grimoire-line);
 }
 
 .grimoire-compact-boundary-label {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-xs);
   white-space: nowrap;
 }
@@ -569,7 +569,7 @@
 }
 
 .grimoire-session-restart-notice-hint {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-s);
   line-height: 1.5;
   padding: 0 var(--grimoire-space-4);

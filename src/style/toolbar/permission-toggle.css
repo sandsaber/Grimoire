@@ -31,7 +31,7 @@
   border-radius: var(--grimoire-radius-2);
   background: none;
   color: var(--grimoire-workbench-muted);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-normal);
   line-height: 1;
@@ -42,7 +42,7 @@
 
 .grimoire-permission-label:hover {
   background: var(--grimoire-hover);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-permission-label.active,
@@ -64,9 +64,9 @@
   gap: var(--grimoire-space-2);
   padding: var(--grimoire-space-4);
   overflow: hidden;
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-primary);
+  background: var(--grimoire-ground);
   box-shadow: var(--grimoire-lift-1);
   opacity: 0;
   visibility: hidden;
@@ -85,7 +85,7 @@
   min-height: var(--grimoire-hit-l);
   padding: 0 var(--grimoire-space-8);
   border-radius: var(--grimoire-radius-1);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-normal);
   line-height: 1;
@@ -94,8 +94,8 @@
 }
 
 .grimoire-permission-option:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-permission-option.selected {

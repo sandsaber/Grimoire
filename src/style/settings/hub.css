@@ -9,8 +9,8 @@
 
 .grimoire-settings-provider-hint {
   margin: 0 0 var(--grimoire-space-2);
-  color: var(--text-faint);
-  font-size: var(--font-ui-small);
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-settings-provider-card {
@@ -24,10 +24,10 @@
   border-radius: var(--grimoire-radius-2);
   background: color-mix(
     in srgb,
-    var(--setting-items-background, var(--background-secondary)) 82%,
-    var(--background-secondary-alt, var(--background-secondary))
+    var(--setting-items-background, var(--grimoire-plane)) 82%,
+    var(--grimoire-plane)
   );
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   cursor: pointer;
   transition: background-color var(--grimoire-duration) var(--grimoire-ease);
 }
@@ -35,18 +35,18 @@
 .grimoire-settings-provider-card:hover {
   background: color-mix(
     in srgb,
-    var(--setting-items-background, var(--background-secondary)) 78%,
-    var(--background-primary)
+    var(--setting-items-background, var(--grimoire-plane)) 78%,
+    var(--grimoire-ground)
   );
 }
 
 .grimoire-settings-provider-card--active {
   border: 0;
-  background: color-mix(in srgb, var(--grimoire-accent) 18%, var(--background-primary));
+  background: color-mix(in srgb, var(--grimoire-accent) 18%, var(--grimoire-ground));
 }
 
 .grimoire-settings-provider-card--active:hover {
-  background: color-mix(in srgb, var(--grimoire-accent) 13%, var(--background-primary));
+  background: color-mix(in srgb, var(--grimoire-accent) 13%, var(--grimoire-ground));
 }
 
 .grimoire-settings-provider-card-copy {
@@ -65,7 +65,7 @@
 
 .grimoire-settings-provider-card-name {
   overflow: hidden;
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-semibold);
   text-overflow: ellipsis;
@@ -74,7 +74,7 @@
 
 .grimoire-settings-provider-card-meta {
   overflow: hidden;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-2xs);
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -113,7 +113,7 @@
   margin-bottom: var(--grimoire-space-12);
   padding: var(--grimoire-space-2);
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
 }
 
 .grimoire-settings-segmented-nav button {
@@ -123,19 +123,19 @@
   border-radius: var(--grimoire-radius-2);
   background: transparent;
   box-shadow: none;
-  color: var(--text-muted);
-  font-size: var(--font-ui-small);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-settings-segmented-nav button:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-settings-segmented-nav button.is-active {
-  background: var(--background-primary);
+  background: var(--grimoire-ground);
   box-shadow: var(--grimoire-lift-1);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-settings-resource-toolbar {
@@ -145,7 +145,7 @@
   gap: var(--grimoire-space-20);
   margin: 0 0 var(--grimoire-space-8);
   padding: 0 0 var(--grimoire-space-8);
-  border-bottom: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--grimoire-line);
 }
 
 .grimoire-settings-resource-toolbar-actions {
@@ -178,19 +178,19 @@
   min-width: 0;
   gap: var(--grimoire-space-12);
   padding: var(--grimoire-space-8) var(--grimoire-space-6);
-  border-bottom: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--grimoire-line);
   background: transparent;
 }
 
 .grimoire-settings-resource-row:not(.is-header):hover {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-settings-resource-row.is-header {
   padding-top: var(--grimoire-space-4);
   padding-bottom: var(--grimoire-space-6);
-  color: var(--text-faint);
-  font-size: var(--font-ui-smaller);
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-s);
 }
 
 .grimoire-settings-resource-name {
@@ -199,7 +199,7 @@
   min-width: 0;
   gap: var(--grimoire-space-8);
   overflow: hidden;
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -223,15 +223,15 @@
 }
 
 .grimoire-settings-resource-name-title {
-  color: var(--text-normal);
-  font-family: var(--font-monospace);
-  font-weight: var(--font-semibold);
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-mono);
+  font-weight: var(--grimoire-weight-semibold);
 }
 
 .grimoire-settings-resource-description {
-  color: var(--text-faint);
-  font-family: var(--font-interface);
-  font-size: var(--font-ui-smaller);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-face);
+  font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-normal);
   line-height: 1.35;
 }
@@ -242,7 +242,7 @@
   height: 8px;
   margin-top: var(--grimoire-space-4);
   border-radius: 50%;
-  background: var(--text-faint);
+  background: var(--grimoire-ink-faint);
 }
 
 .grimoire-settings-resource-dot.is-available,
@@ -255,17 +255,17 @@
 }
 
 .grimoire-settings-resource-dot.is-native {
-  background: var(--color-blue);
+  background: var(--grimoire-accent);
 }
 
 .grimoire-settings-resource-source {
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
-  font-size: var(--font-ui-smaller);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-s);
 }
 
 .grimoire-settings-resource-provider {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-settings-resource-actions {
@@ -287,16 +287,16 @@
   border-radius: var(--grimoire-radius-2);
   background: transparent;
   box-shadow: none;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-settings-resource-edit:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-settings-resource-delete:hover:not(:disabled) {
-  background: var(--background-modifier-error-hover);
+  background: var(--grimoire-error-ground-hover);
   color: var(--grimoire-error);
 }
 
@@ -306,8 +306,8 @@
 
 .grimoire-settings-resource-readonly,
 .grimoire-settings-resource-loading {
-  color: var(--text-faint);
-  font-size: var(--font-ui-smaller);
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-s);
 }
 
 .grimoire-settings-resource-loading,
@@ -317,7 +317,7 @@
 }
 
 .grimoire-settings-hub-empty {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-settings-about {
@@ -330,8 +330,8 @@
 .grimoire-settings-about-copy {
   padding: var(--grimoire-space-12) var(--grimoire-space-16);
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-secondary);
-  color: var(--text-muted);
+  background: var(--grimoire-plane);
+  color: var(--grimoire-ink-muted);
   line-height: 1.6;
 }
 
@@ -364,7 +364,7 @@
   padding: var(--grimoire-space-8) var(--grimoire-space-12);
   border: 0;
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-primary);
+  background: var(--grimoire-ground);
 }
 
 .grimoire-settings-workspace-modal-content textarea,

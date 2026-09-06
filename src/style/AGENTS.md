@@ -42,7 +42,8 @@ grown apart before that moved.
 | Accent | `--grimoire-accent`, `--grimoire-accent-text`, `--grimoire-accent-line` (40%), `--grimoire-accent-wash` (12%), `--grimoire-accent-wash-weak` (8%), `--grimoire-focus-ring` | `--interactive-accent`, `--text-accent`, a hex, an `rgba()` triple |
 | Ground | `--grimoire-ground`, `--grimoire-plane`, `--grimoire-hover`, `--grimoire-field` | `rgba(255, 255, 255, …)`, `color-mix(… #000)` |
 | Line | `--grimoire-line`, `--grimoire-line-2`, `--grimoire-line-3` | a literal border colour |
-| Ink | `--grimoire-ink`, `--grimoire-ink-muted`, `--grimoire-ink-faint`, `--grimoire-ink-ghost` | a literal text colour |
+| Ink | `--grimoire-ink`, `--grimoire-ink-muted`, `--grimoire-ink-faint`, `--grimoire-ink-ghost` | a literal text colour, `--text-normal`, `--text-muted` |
+| Face | `--grimoire-face`, `--grimoire-mono` | `--font-interface`, `--font-monospace` |
 | Space | `--grimoire-space-<n>`, named by the value: 2, 4, 6, 8, 10, 12, 14, 16, 20, 22, 24, 40 | any padding/margin/gap px below 32 |
 | Size | `--grimoire-header-h` 40, `--grimoire-hit-s/m/l` 24/26/28, `--grimoire-chip-h` 24, `--grimoire-tool-row-h` 26, `--grimoire-segment-h` 26, `--grimoire-list-row-h` 34 | a one-off control height |
 | Radius | `--grimoire-radius-1/2/3`, `--grimoire-radius-pill`, `--grimoire-radius-circle` | a px radius |
@@ -66,7 +67,12 @@ Rules the gates hold, in `tests/unit/style/designSystem.test.ts` and `themeAdapt
 8. the layer depends on no Obsidian variable the app does not define, resolves on both themes, and
    each type step lands where the literal it replaced stood;
 9. provider identity is a glyph in ink — no `--grimoire-provider-*`, and no rule selected by
-   `[data-provider=…]`, because a rule selected by provider id exists to paint that provider.
+   `[data-provider=…]`, because a rule selected by provider id exists to paint that provider;
+10. no module sheet reads an Obsidian variable at all. The rule was true of the accent only, and
+    476 declarations across 40 sheets read `--text-muted`, `--background-primary` and their family
+    directly — so "swap the token layer" was a claim the stylesheets could not honour. The one
+    exception is `--setting-items-*`, because matching the host's settings-row geometry means
+    reading the host's numbers for it.
 
 **Prove a new rule by breaking it.** Copy the file to the scratchpad in the same command that injects
 the defect, watch the gate fail, then restore from the copy — never `git checkout`, which discards the

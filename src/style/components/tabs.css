@@ -128,12 +128,12 @@
   max-width: min(420px, 100%);
   overflow: hidden;
   padding: var(--grimoire-space-8) var(--grimoire-space-12) var(--grimoire-space-12);
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
   box-shadow: var(--grimoire-lift-2);
-  color: var(--text-normal);
-  font-size: var(--font-ui-small);
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-m);
   pointer-events: auto;
 }
 
@@ -145,7 +145,7 @@
 
 .grimoire-tab-close-toast-separator {
   flex: 0 0 auto;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 button.grimoire-tab-close-toast-undo {

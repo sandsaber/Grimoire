@@ -52,15 +52,15 @@
 }
 
 .grimoire-status-panel-label {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-medium);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-status-panel-current {
   flex: 1;
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
   color: var(--grimoire-workbench-muted);
   overflow: hidden;
@@ -106,7 +106,7 @@
 }
 
 .grimoire-todo-list-container .grimoire-todo-text {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
   line-height: 1.4;
   flex: 1;
@@ -114,7 +114,7 @@
 }
 
 .grimoire-todo-list-container .grimoire-todo-pending .grimoire-todo-status-icon {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-todo-list-container .grimoire-todo-pending .grimoire-todo-status-icon svg {
@@ -122,7 +122,7 @@
 }
 
 .grimoire-todo-list-container .grimoire-todo-pending .grimoire-todo-text {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-todo-list-container .grimoire-todo-in_progress .grimoire-todo-status-icon {
@@ -134,7 +134,7 @@
 }
 
 .grimoire-todo-list-container .grimoire-todo-in_progress .grimoire-todo-text {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-todo-list-container .grimoire-todo-completed .grimoire-todo-status-icon {
@@ -142,7 +142,7 @@
 }
 
 .grimoire-todo-list-container .grimoire-todo-completed .grimoire-todo-text {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 /* Bash Output Section */
@@ -168,12 +168,12 @@
   width: 22px;
   height: 22px;
   border-radius: var(--grimoire-radius-1);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-status-panel-bash-action:hover {
   background: var(--grimoire-workbench-surface-raised);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-status-panel-bash-content {
@@ -237,7 +237,7 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-agent-card--running .grimoire-agent-card-icon {
@@ -254,11 +254,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--font-ui-smaller);
+  font-size: var(--grimoire-text-s);
 }
 
 .grimoire-agent-card-state {
   flex-shrink: 0;
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
 }

@@ -55,6 +55,9 @@ body {
   --grimoire-field: var(--background-modifier-form-field);
   --grimoire-sink: var(--grimoire-field);
   --grimoire-code: var(--code-background);
+  /* The scrim behind a lightbox, and the reader's own selection colour. */
+  --grimoire-cover: var(--background-modifier-cover);
+  --grimoire-selection: var(--text-selection);
 
   /* Line — the system's main structural device. */
   --grimoire-line: var(--background-modifier-border);
@@ -133,6 +136,8 @@ body {
   --grimoire-text-m: var(--font-ui-small, 13px);
   --grimoire-text-l: var(--font-ui-medium, 15px);
   --grimoire-text-xl: var(--font-ui-large, 20px);
+  /* The host's interface face, and its monospace. Nothing here names a family. */
+  --grimoire-face: var(--font-interface);
   --grimoire-mono: var(--font-monospace);
   /*
    * Inline code is the one size stated relative to its own line rather than to
@@ -186,5 +191,8 @@ body {
   --grimoire-error: var(--text-error, var(--color-red));
   --grimoire-error-line: color-mix(in srgb, var(--grimoire-error) 40%, transparent);
   --grimoire-error-wash: color-mix(in srgb, var(--grimoire-error) 12%, transparent);
+  /* The host's own destructive ground, for a control that removes something. */
+  --grimoire-error-ground: var(--background-modifier-error);
+  --grimoire-error-ground-hover: var(--background-modifier-error-hover);
   --grimoire-compact: var(--color-cyan, var(--interactive-accent));
 }

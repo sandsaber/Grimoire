@@ -20,7 +20,7 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-progress-icon svg {
@@ -48,16 +48,16 @@
 }
 
 .grimoire-progress-meta {
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
   font-variant-numeric: tabular-nums;
 }
 
 .grimoire-progress-content {
   margin-top: var(--grimoire-space-2);
   padding-inline-start: var(--grimoire-space-20);
-  color: var(--text-normal);
-  font-size: var(--font-ui-small);
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-m);
   line-height: 1.5;
 }
 
@@ -77,8 +77,8 @@
   display: flex;
   align-items: flex-start;
   gap: var(--grimoire-space-6);
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
   line-height: 1.4;
 }
 
@@ -92,7 +92,7 @@
 }
 
 .grimoire-progress-item--in_progress {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-progress-item--completed .grimoire-progress-item-label {
@@ -107,8 +107,8 @@
 }
 
 .grimoire-text-block--commentary {
-  color: var(--text-muted);
-  font-size: var(--font-ui-small);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-m);
 }
 
 @media (prefers-reduced-motion: reduce) {

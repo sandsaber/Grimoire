@@ -26,8 +26,8 @@
 }
 
 .grimoire-settings-root-group .grimoire-settings .setting-item:not(.setting-item-heading) {
-  margin-bottom: var(--size-4-2);
-  padding: var(--size-4-4);
+  margin-bottom: var(--grimoire-space-8);
+  padding: var(--grimoire-space-16);
   border: var(--setting-items-border-width) solid var(--setting-items-border-color);
   border-radius: var(--setting-items-radius);
   background-color: var(--setting-items-background);
@@ -44,7 +44,7 @@
   align-items: stretch;
   margin-bottom: var(--grimoire-space-16);
   padding: 0;
-  border-bottom: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--grimoire-line);
 }
 
 .grimoire-settings-tabs-viewport {
@@ -80,7 +80,7 @@
   border-bottom: 2px solid transparent;
   border-radius: 0;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   cursor: pointer;
   box-shadow: none;
   z-index: 2;
@@ -99,19 +99,19 @@
 }
 
 .grimoire-settings-tab-scroll:disabled {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   cursor: default;
   opacity: 0.45;
 }
 
 .grimoire-settings-tab-scroll:not(:disabled):hover,
 .grimoire-settings-tab-scroll:focus-visible {
-  color: var(--text-normal);
-  background: var(--background-modifier-hover);
+  color: var(--grimoire-ink);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-settings-tab-scroll:focus-visible {
-  outline: 2px solid var(--background-modifier-border-focus);
+  outline: 2px solid var(--grimoire-line-3);
   outline-offset: -2px;
 }
 
@@ -130,12 +130,12 @@
 
 .grimoire-settings-tabs.is-overflowing::before {
   inset-inline-start: 28px;
-  background: linear-gradient(to right, var(--settings-background, var(--background-primary)), transparent);
+  background: linear-gradient(to right, var(--settings-background, var(--grimoire-ground)), transparent);
 }
 
 .grimoire-settings-tabs.is-overflowing::after {
   inset-inline-end: 28px;
-  background: linear-gradient(to left, var(--settings-background, var(--background-primary)), transparent);
+  background: linear-gradient(to left, var(--settings-background, var(--grimoire-ground)), transparent);
 }
 
 .grimoire-settings-tabs.can-scroll-prev::before,
@@ -162,9 +162,9 @@
   border-bottom: 4px solid transparent;
   border-radius: 0;
   background: transparent;
-  color: var(--text-muted);
-  font-size: var(--font-ui-small);
-  font-weight: var(--font-medium);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-m);
+  font-weight: var(--grimoire-weight-medium);
   line-height: 1.2;
   white-space: nowrap;
   cursor: pointer;
@@ -173,12 +173,12 @@
 }
 
 .grimoire-settings-tabs-viewport > .grimoire-settings-tab:hover {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   background: transparent;
 }
 
 .grimoire-settings-tabs-viewport > .grimoire-settings-tab:focus-visible {
-  outline: 2px solid var(--background-modifier-border-focus);
+  outline: 2px solid var(--grimoire-line-3);
   outline-offset: -3px;
 }
 
@@ -186,7 +186,7 @@
 .grimoire-settings-tabs-viewport > .grimoire-settings-tab--active:hover {
   border-bottom-color: var(--grimoire-accent);
   background: transparent;
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-settings-tab-status {
@@ -195,7 +195,7 @@
   height: 4px;
   margin-left: var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-pill);
-  background: var(--text-faint);
+  background: var(--grimoire-ink-faint);
   vertical-align: 1px;
 }
 
@@ -225,9 +225,9 @@
 .grimoire-settings .setting-item-description code {
   padding: 1.5px var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-1);
-  background: var(--background-modifier-form-field);
+  background: var(--grimoire-field);
   color: var(--grimoire-accent);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-normal);
 }
@@ -264,7 +264,7 @@
 }
 
 .grimoire-settings .setting-item-control input::placeholder {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 /* Dropdowns → select.field with a custom chevron */
@@ -281,14 +281,14 @@
   width: 100%;
   min-height: 72px;
   padding: var(--grimoire-space-8) var(--grimoire-space-8);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
   line-height: 1.5;
   resize: vertical;
 }
 
 .grimoire-settings .setting-item-control textarea::placeholder {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 /* Sliders → .slider (violet accent) */
@@ -300,8 +300,8 @@
 .grimoire-settings .grimoire-slider-value {
   min-width: 16px;
   margin-left: var(--grimoire-space-12);
-  color: var(--text-muted);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-muted);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-medium);
   text-align: right;
@@ -318,7 +318,7 @@
 
 .grimoire-provider-disabled-notice p {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-s);
   line-height: 1.5;
 }
@@ -347,8 +347,8 @@
   padding: var(--grimoire-space-12);
   border: none;
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-secondary);
-  color: var(--text-normal);
+  background: var(--grimoire-plane);
+  color: var(--grimoire-ink);
   cursor: pointer;
   text-align: left;
   white-space: normal;
@@ -357,15 +357,15 @@
 }
 
 .grimoire-adv-toggle:hover {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-adv-toggle.is-open {
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
 }
 
 .grimoire-adv-toggle.is-open:hover {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-adv-chevron {
@@ -377,7 +377,7 @@
   justify-content: center;
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   transition: transform var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
@@ -388,7 +388,7 @@
 
 .grimoire-adv-toggle.is-open .grimoire-adv-chevron {
   transform: rotate(90deg);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-adv-copy {
@@ -399,14 +399,14 @@
 }
 
 .grimoire-adv-title {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-semibold);
   line-height: 1.25;
 }
 
 .grimoire-adv-summary {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   font-size: var(--grimoire-text-s);
   line-height: 1.35;
 }
@@ -416,7 +416,7 @@
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-normal);
   line-height: 1;
@@ -484,21 +484,21 @@
 }
 
 .grimoire-hotkey-item:hover {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-hotkey-name {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-s);
 }
 
 .grimoire-hotkey-badge {
   padding: var(--grimoire-space-2) var(--grimoire-space-6);
   border-radius: var(--grimoire-radius-1);
-  background: var(--background-modifier-form-field);
-  box-shadow: inset 0 0 0 1px var(--background-modifier-border-hover);
-  color: var(--text-normal);
-  font-family: var(--font-monospace);
+  background: var(--grimoire-field);
+  box-shadow: inset 0 0 0 1px var(--grimoire-line-2);
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-normal);
   white-space: nowrap;
@@ -520,7 +520,7 @@
 .grimoire-sp-settings-desc p,
 .grimoire-mcp-settings-desc p {
   margin: 0 0 var(--grimoire-space-6);
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   font-size: var(--grimoire-text-s);
   line-height: 1.45;
 }
@@ -537,13 +537,13 @@
   background: transparent;
   border-radius: var(--grimoire-radius-1);
   cursor: pointer;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-settings-action-btn:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-settings-action-btn svg {
@@ -556,7 +556,7 @@
 }
 
 .grimoire-setting-validation {
-  font-size: var(--font-ui-smaller);
+  font-size: var(--grimoire-text-s);
   margin-top: -0.25em;
   margin-bottom: 0.5em;
 }
@@ -613,7 +613,7 @@
 }
 
 .grimoire-settings .grimoire-project-workspace-delete-row .setting-item-name {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 @media (max-width: 720px) {
@@ -636,8 +636,8 @@
 }
 
 .grimoire-sp-label {
-  font-size: var(--font-ui-small);
-  color: var(--text-muted);
+  font-size: var(--grimoire-text-m);
+  color: var(--grimoire-ink-muted);
   font-weight: var(--grimoire-weight-normal);
 }
 
@@ -649,8 +649,8 @@
 .grimoire-sp-empty-state {
   padding: var(--grimoire-space-20);
   text-align: center;
-  color: var(--text-muted);
-  background: var(--background-secondary);
+  color: var(--grimoire-ink-muted);
+  background: var(--grimoire-plane);
   border-radius: var(--grimoire-radius-2);
   margin-top: var(--grimoire-space-8);
 }
@@ -667,12 +667,12 @@
   align-items: flex-start;
   justify-content: space-between;
   padding: var(--grimoire-space-12) var(--grimoire-space-16);
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
   border-radius: var(--grimoire-radius-2);
 }
 
 .grimoire-sp-item:hover {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-sp-info {
@@ -688,13 +688,13 @@
 
 .grimoire-sp-item-name {
   font-weight: var(--grimoire-weight-normal);
-  font-family: var(--font-monospace);
-  color: var(--text-normal);
+  font-family: var(--grimoire-mono);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-sp-item-desc {
   font-size: var(--grimoire-text-m);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   margin-top: var(--grimoire-space-2);
 }
 
@@ -706,7 +706,7 @@
 }
 
 .grimoire-sp-advanced-section {
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
   padding: 0 var(--grimoire-space-12);
   margin: var(--grimoire-space-8) 0;
@@ -715,8 +715,8 @@
 .grimoire-sp-advanced-summary {
   cursor: pointer;
   padding: var(--grimoire-space-8) 0;
-  font-size: var(--font-ui-small);
-  color: var(--text-muted);
+  font-size: var(--grimoire-text-m);
+  color: var(--grimoire-ink-muted);
   font-weight: var(--grimoire-weight-normal);
 }
 
@@ -731,13 +731,13 @@
 
 .grimoire-sp-content-area {
   width: 100%;
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-m);
   padding: var(--grimoire-space-8);
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
-  background: var(--background-primary);
-  color: var(--text-normal);
+  background: var(--grimoire-ground);
+  color: var(--grimoire-ink);
   resize: vertical;
   margin-top: var(--grimoire-space-8);
 }

@@ -29,7 +29,7 @@
 }
 
 .grimoire-whats-new-card-title {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-semibold);
   letter-spacing: 0;
@@ -63,7 +63,7 @@
   border: 1px solid var(--grimoire-workbench-border);
   border-radius: var(--grimoire-radius-2);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-semibold);
   cursor: pointer;
@@ -72,7 +72,7 @@
 .grimoire-whats-new-card-dismiss:hover {
   border-color: var(--grimoire-workbench-border-strong);
   background: var(--grimoire-workbench-surface-raised);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-whats-new-card-list {
@@ -103,7 +103,7 @@
 
 .grimoire-whats-new-card-section-title {
   color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-semibold);
   letter-spacing: 0;
@@ -115,7 +115,7 @@
   gap: var(--grimoire-space-2);
   margin: 0;
   padding-left: var(--grimoire-space-16);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-s);
   line-height: 1.35;
 }

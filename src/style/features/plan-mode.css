@@ -17,7 +17,7 @@
   background: var(--grimoire-ground);
   box-shadow: var(--grimoire-lift-0);
   color: var(--grimoire-ink);
-  font-family: var(--font-interface);
+  font-family: var(--grimoire-face);
   font-size: var(--grimoire-text-s);
 }
 
@@ -75,7 +75,7 @@
 }
 
 .grimoire-plan-title {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-semibold);
   line-height: 1.2;
@@ -101,7 +101,7 @@
   border-radius: var(--grimoire-radius-pill);
   background: var(--grimoire-raise-2);
   color: var(--grimoire-workbench-muted);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-semibold);
   line-height: 1;
@@ -122,7 +122,7 @@
   border: 0;
   border-radius: var(--grimoire-radius-1);
   background: transparent;
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   cursor: pointer;
   transition:
     background var(--grimoire-duration) var(--grimoire-ease),
@@ -133,7 +133,7 @@
 .grimoire-plan-collapse-toggle:hover,
 .grimoire-plan-collapse-toggle:focus-visible {
   background: var(--grimoire-raise-2);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-plan-collapse-toggle:active {
@@ -156,12 +156,12 @@
   border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-raise);
   box-shadow: inset 0 0 0 1px var(--grimoire-line);
-  color: var(--text-muted);
-  font-family: var(--font-interface);
+  color: var(--grimoire-ink-muted);
+  font-family: var(--grimoire-face);
   font-size: var(--grimoire-text-s);
   line-height: 1.55;
   scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb-bg, var(--grimoire-line-2)) transparent;
+  scrollbar-color: var(--grimoire-line-2) transparent;
 }
 
 .grimoire-plan-content-preview::-webkit-scrollbar {
@@ -186,7 +186,7 @@
 .grimoire-plan-content-preview h3,
 .grimoire-plan-content-preview h4 {
   margin: var(--grimoire-space-8) 0 var(--grimoire-space-6);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-semibold);
   line-height: 1.35;
@@ -209,12 +209,12 @@
 
 .grimoire-plan-content-preview li {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-plan-content-preview code {
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-medium);
 }
@@ -227,13 +227,13 @@
 .grimoire-plan-content-text {
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   line-height: 1.55;
 }
 
 .grimoire-plan-read-error {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 /* Permissions list */
@@ -246,7 +246,7 @@
 
 .grimoire-plan-permissions-label {
   color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-semibold);
 }
@@ -256,7 +256,7 @@
   gap: var(--grimoire-space-4);
   margin: 0;
   padding-left: var(--grimoire-space-16);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   line-height: 1.5;
 }
 
@@ -333,7 +333,7 @@
 .grimoire-plan-approval-inline .grimoire-ask-item-label {
   flex: 1 1 auto;
   color: var(--grimoire-ink);
-  font-family: var(--font-interface);
+  font-family: var(--grimoire-face);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-normal);
   line-height: 1.25;
@@ -346,14 +346,14 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--text-normal);
-  font-family: var(--font-interface);
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-face);
   font-size: var(--grimoire-text-s);
   line-height: 1;
 }
 
 .grimoire-plan-approval-inline .grimoire-ask-custom-text::placeholder {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-plan-approval-inline .grimoire-ask-hints {

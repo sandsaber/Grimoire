@@ -13,14 +13,14 @@
 }
 
 .grimoire-context-limits-label {
-  font-size: var(--font-ui-small);
-  color: var(--text-muted);
+  font-size: var(--grimoire-text-m);
+  color: var(--grimoire-ink-muted);
   font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-context-limits-desc {
-  font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
+  font-size: var(--grimoire-text-s);
+  color: var(--grimoire-ink-muted);
   padding: 0 var(--grimoire-space-12);
   margin-bottom: var(--grimoire-space-8);
 }
@@ -37,19 +37,19 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--grimoire-space-12) var(--grimoire-space-16);
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
   border-radius: var(--grimoire-radius-2);
   transition: background-color var(--grimoire-duration-slow) var(--grimoire-ease);
 }
 
 .grimoire-context-limits-item:hover {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-context-limits-model {
-  font-family: var(--font-monospace);
-  font-size: var(--font-ui-small);
-  color: var(--text-normal);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-m);
+  color: var(--grimoire-ink);
   flex: 1;
   min-width: 0;
   word-break: break-all;
@@ -66,11 +66,11 @@
 .grimoire-context-alias-input {
   width: 180px;
   padding: var(--grimoire-space-4) var(--grimoire-space-8);
-  font-size: var(--font-ui-small);
-  border: 1px solid var(--background-modifier-border);
+  font-size: var(--grimoire-text-m);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
-  background: var(--background-primary);
-  color: var(--text-normal);
+  background: var(--grimoire-ground);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-context-alias-input:focus {
@@ -81,11 +81,11 @@
 .grimoire-context-limits-input {
   width: 80px;
   padding: var(--grimoire-space-4) var(--grimoire-space-8);
-  font-size: var(--font-ui-small);
-  border: 1px solid var(--background-modifier-border);
+  font-size: var(--grimoire-text-m);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
-  background: var(--background-primary);
-  color: var(--text-normal);
+  background: var(--grimoire-ground);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-context-limits-input:focus {
@@ -98,7 +98,7 @@
 }
 
 .grimoire-context-limit-validation {
-  font-size: var(--font-ui-smaller);
+  font-size: var(--grimoire-text-s);
   color: var(--grimoire-error);
   margin-left: var(--grimoire-space-4);
 }
@@ -118,16 +118,16 @@
 }
 
 .grimoire-snippet-label {
-  font-size: var(--font-ui-small);
-  color: var(--text-muted);
+  font-size: var(--grimoire-text-m);
+  color: var(--grimoire-ink-muted);
   font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-snippet-empty {
   padding: var(--grimoire-space-20);
   text-align: center;
-  color: var(--text-muted);
-  background: var(--background-secondary);
+  color: var(--grimoire-ink-muted);
+  background: var(--grimoire-plane);
   border-radius: var(--grimoire-radius-2);
   margin-top: var(--grimoire-space-8);
 }
@@ -144,13 +144,13 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--grimoire-space-12) var(--grimoire-space-16);
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
   border-radius: var(--grimoire-radius-2);
   transition: background-color var(--grimoire-duration-slow) var(--grimoire-ease);
 }
 
 .grimoire-snippet-item:hover {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-snippet-info {
@@ -166,7 +166,7 @@
 
 .grimoire-snippet-description {
   font-size: var(--grimoire-text-m);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-snippet-actions {
@@ -214,7 +214,7 @@
 .grimoire-env-snippet-control textarea {
   width: 100%;
   min-width: 100%;
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
   resize: vertical;
 }
@@ -236,17 +236,17 @@
 }
 
 .grimoire-cancel-btn {
-  background: var(--background-modifier-border);
-  color: var(--text-normal);
+  background: var(--grimoire-line);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-cancel-btn:hover {
-  background: var(--background-modifier-border-hover);
+  background: var(--grimoire-line-2);
 }
 
 .grimoire-save-btn {
   background: var(--grimoire-accent);
-  color: var(--text-on-accent);
+  color: var(--grimoire-accent-contrast);
 }
 
 .grimoire-save-btn:hover {
@@ -270,8 +270,8 @@
 }
 
 .grimoire-snippet-limit-model {
-  font-family: var(--font-monospace);
-  font-size: var(--font-ui-small);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-snippet-limit-spacer {

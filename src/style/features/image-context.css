@@ -15,8 +15,8 @@
   align-items: center;
   gap: var(--grimoire-space-8);
   padding: var(--grimoire-space-6) var(--grimoire-space-8);
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
+  background: var(--grimoire-ground);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
   max-width: 200px;
 }
@@ -51,7 +51,7 @@
 
 .grimoire-image-name {
   font-size: var(--grimoire-text-s);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -59,7 +59,7 @@
 
 .grimoire-image-size {
   font-size: var(--grimoire-text-2xs);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 /* Remove button */
@@ -82,7 +82,7 @@
   left: 50%;
   width: 10px;
   height: 2px;
-  background: var(--text-muted);
+  background: var(--grimoire-ink-muted);
   border-radius: var(--grimoire-radius-1);
   transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
@@ -96,12 +96,12 @@
 }
 
 .grimoire-image-remove:hover {
-  background: var(--background-modifier-error);
+  background: var(--grimoire-error-ground);
 }
 
 .grimoire-image-remove:hover::before,
 .grimoire-image-remove:hover::after {
-  background: var(--text-on-accent);
+  background: var(--grimoire-accent-contrast);
 }
 
 /* Drop overlay - inside input wrapper */
@@ -162,8 +162,8 @@
   overflow: hidden;
   cursor: pointer;
   transition: transform var(--grimoire-duration) var(--grimoire-ease), box-shadow var(--grimoire-duration) var(--grimoire-ease);
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
+  background: var(--grimoire-plane);
+  border: 1px solid var(--grimoire-line);
 }
 
 .grimoire-message-image:hover {

@@ -118,7 +118,11 @@ function closure(seeds, table) {
       continue;
     }
     reached.set(name, value);
-    for (const reference of value.matchAll(/var\(\s*(--[a-z0-9-]+)/g)) {
+    for (const reference of value.matchAll(/var\(\s*(--[a-z0-9-]+)\s*([,)])/g)) {
+      // A reference that carries its own fallback cannot fail, so it is not a
+      // dependency: Obsidian's own --font-interface names four candidates and
+      // defines two of them, which is a font stack rather than a hole.
+      if (reference[2] === ',') continue;
       queue.push(reference[1]);
     }
   }

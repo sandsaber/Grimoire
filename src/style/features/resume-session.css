@@ -6,10 +6,10 @@
   left: 0;
   right: 0;
   margin-bottom: var(--grimoire-space-4);
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
   box-shadow: var(--grimoire-lift-1);
   z-index: 1000;
@@ -25,10 +25,10 @@
   padding: var(--grimoire-space-8) var(--grimoire-space-12);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-semibold);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--grimoire-line);
 }
 
 .grimoire-resume-list {
@@ -39,7 +39,7 @@
 .grimoire-resume-empty {
   padding: var(--grimoire-space-16);
   text-align: center;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-m);
 }
 
@@ -49,7 +49,7 @@
   gap: var(--grimoire-space-8);
   padding: var(--grimoire-space-8) var(--grimoire-space-12);
   cursor: pointer;
-  border-bottom: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--grimoire-line);
   transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
 
@@ -59,11 +59,11 @@
 
 .grimoire-resume-item:hover,
 .grimoire-resume-item.selected {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-resume-item.current {
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
   border-inline-start: 2px solid var(--grimoire-accent);
   padding-inline-start: var(--grimoire-space-8);
 }
@@ -71,7 +71,7 @@
 .grimoire-resume-item-icon {
   display: flex;
   align-items: center;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   flex-shrink: 0;
 }
 
@@ -92,7 +92,7 @@
 .grimoire-resume-item-title {
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-medium);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -100,7 +100,7 @@
 
 .grimoire-resume-item-date {
   font-size: var(--grimoire-text-xs);
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   margin-top: var(--grimoire-space-2);
 }
 
@@ -114,6 +114,6 @@
 }
 
 .grimoire-resume-list::-webkit-scrollbar-thumb {
-  background: var(--background-modifier-border);
+  background: var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
 }
