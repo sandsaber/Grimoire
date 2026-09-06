@@ -27,6 +27,8 @@
   <sub>Habla con agentes CLI locales en el mismo workspace de Obsidian donde viven tus notas.</sub>
 </p>
 
+> **Aviso: la 2.0 está en marcha.** La próxima versión mayor lleva Grimoire a una arquitectura de ejecución basada en proveedores, donde un único núcleo dirige cada CLI y registra exactamente un resultado por turno, y trae un rediseño que sigue el tema y el color de acento de tu bóveda. Se desarrolla en la rama `providers-migration` y todavía no forma parte de ninguna versión publicada. Las conversaciones, los ajustes y los archivos de los proveedores se conservan sin cambios.
+
 Grimoire lleva asistentes CLI agentic a Obsidian. Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build y Qwen Code viven en un solo panel lateral: leen tus notas, editan archivos, ejecutan comandos, llaman tools y conservan session history contra tu vault real. Nada pasa por un servidor de Grimoire. No hay telemetry, hosted backend ni proxy entre tú y tu provider.
 
 Está diseñado para quienes ya trabajan en Obsidian y quieren ayuda de IA que se sienta como parte del vault: contexto local, archivos locales, un provider elegido a propósito y usage/cost visibles dentro de la interfaz.

@@ -27,6 +27,8 @@
   <sub>在笔记所在的同一 Obsidian 工作区中，与本地 CLI 代理对话。</sub>
 </p>
 
+> **提示：2.0 正在开发中。** 下一个大版本将把 Grimoire 迁移到以提供商为基础的执行架构：由一个内核驱动每个 CLI，并为每一轮精确记录一个结果；同时带来跟随仓库主题与强调色的全新设计。相关工作在 `providers-migration` 分支进行，尚未进入任何已发布版本。对话、设置和提供商文件将原样保留。
+
 Grimoire 将智能体 CLI 助手带入 Obsidian。Claude Code、Codex、Antigravity CLI、Gemini CLI（旧版）、OpenCode、MiMoCode、Kimi Code、Grok Build 和 Qwen Code 都位于同一个侧边栏中；它们可以读取笔记、编辑文件、执行命令、调用工具，并将会话历史保存在你的真实仓库中。任何内容都不会经由 Grimoire 服务器传输：没有遥测、没有托管后端，也没有处在中间的代理服务器。
 
 Grimoire 面向已经使用 Obsidian 工作，并希望 AI 助手像仓库的一部分那样运作的用户：上下文留在本地、文件留在本地、供应商由你明确选择，用量也真正可见。

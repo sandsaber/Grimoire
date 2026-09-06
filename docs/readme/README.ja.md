@@ -27,6 +27,8 @@
   <sub>ノートがある同じ Obsidian workspace で、ローカル CLI エージェントと会話できます。</sub>
 </p>
 
+> **お知らせ: 2.0 を開発中です。** 次のメジャーリリースでは、Grimoire はプロバイダー基盤の実行アーキテクチャに移行します。単一のカーネルが各 CLI を駆動し、ターンごとにちょうど一つの結果を記録します。あわせて、保管庫のテーマとアクセントカラーに従う新しいデザインになります。作業は `providers-migration` ブランチで進めており、公開リリースにはまだ含まれていません。会話、設定、プロバイダーのファイルはそのまま引き継がれます。
+
 Grimoire は agentic CLI アシスタントを Obsidian に組み込みます。Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code がひとつのサイドパネルに入り、ノートを読み、ファイルを編集し、コマンドを実行し、ツールを呼び出し、実際の vault に紐づいた session history を保持します。Grimoire のサーバーは介在しません。Telemetry も hosted backend も、あなたと provider の間に入る proxy もありません。
 
 Grimoire は、すでに Obsidian で作業している人のために作られています。ローカル context、ローカル files、意図して選ぶ provider、そして UI 上で確認できる usage と cost を重視しています。
