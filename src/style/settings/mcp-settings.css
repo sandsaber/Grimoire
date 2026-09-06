@@ -111,7 +111,7 @@
 }
 
 .grimoire-mcp-status-enabled {
-  background: var(--color-green);
+  background: var(--grimoire-ok);
 }
 
 .grimoire-mcp-status-disabled {
@@ -193,5 +193,5 @@
 }
 
 .grimoire-mcp-delete-btn:hover {
-  color: var(--text-error);
+  color: var(--grimoire-error);
 }

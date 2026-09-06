@@ -16,6 +16,7 @@ import { extractToolResultContent } from '../../../core/tools/toolResultContent'
 import type { ChatMessage, ImageAttachment, SubagentInfo, ToolCallInfo } from '../../../core/types';
 import { getLocale, t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
+import { createProviderIconSvg } from '../../../shared/icons';
 import { scheduleAnimationFrame } from '../../../utils/animationFrame';
 import { formatDurationMmSs } from '../../../utils/date';
 import { hasProcessableWikilink, processFileLinks, registerFileLinkHandler } from '../../../utils/fileLink';
@@ -27,7 +28,7 @@ import {
 import { findRewindContext } from '../rewind';
 import { closeTopmostImageViewer, registerOpenImageViewer } from '../ui/imageViewerStack';
 import { renderVaultSearchSources } from '../ui/VaultSearchSources';
-import { getAssistantResponseProviderLabel } from '../utils/assistantResponseMetadata';
+import { getAssistantResponseProviderIcon, getAssistantResponseProviderLabel } from '../utils/assistantResponseMetadata';
 import { localizeReasoningLevel } from '../utils/reasoningDisplay';
 import { InlineOrchestratorPlan } from './InlineOrchestratorPlan';
 import { renderStoredProgressBlock } from './ProgressBlockRenderer';
@@ -510,11 +511,17 @@ export class MessageRenderer {
       return;
     }
 
-    const headerEl = contentEl.createDiv({
-      cls: 'grimoire-assistant-response-meta',
-      attr: { 'data-provider': providerId },
-    });
-    headerEl.createSpan({ cls: 'grimoire-assistant-response-dot' });
+    const headerEl = contentEl.createDiv({ cls: 'grimoire-assistant-response-meta' });
+    const icon = getAssistantResponseProviderIcon(providerId);
+    if (icon) {
+      const mark = createProviderIconSvg(icon, {
+        className: 'grimoire-assistant-response-mark',
+        height: 11,
+        ownerDocument: headerEl.ownerDocument,
+        width: 11,
+      });
+      headerEl.appendChild(mark);
+    }
     parts.forEach((part, index) => {
       if (index > 0) {
         headerEl.createSpan({ cls: 'grimoire-assistant-response-separator', text: '\u00B7' });

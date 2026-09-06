@@ -21,7 +21,9 @@ describe('toolcalls.css', () => {
     expect(toolRule).toContain('width: calc(100% - 44px)');
     expect(toolRule).toContain('max-width: calc(100% - 44px)');
     expect(toolRule).toContain('justify-self: start');
-    expect(headerRule).toContain('padding: var(--grimoire-space-4) var(--grimoire-space-8) var(--grimoire-space-4) 0');
+    // A step is one line tall and pads nothing: its height is the row.
+    expect(headerRule).toContain('height: var(--grimoire-tool-row-h)');
+    expect(headerRule).toContain('padding: 0');
     expect(contentRule).toContain('margin: 1px 0 var(--grimoire-space-4)');
     expect(contentRule).toContain('max-width: 100%');
     expect(contentRule).toContain('max-height: min(52vh, 520px)');

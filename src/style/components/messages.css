@@ -38,17 +38,22 @@
   min-height: 200px;
 }
 
+/*
+ * An empty tab says one line and draws nothing. It was a bordered card on an
+ * accent wash, which is a lot of surface for a sentence nobody asked for.
+ */
 .grimoire-welcome-greeting {
-  max-width: 30rem;
-  padding: var(--grimoire-space-8) var(--grimoire-space-12);
-  border: 1px solid var(--grimoire-workbench-border);
-  border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-accent-wash);
-  color: var(--text-muted);
+  max-width: 28ch;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-l);
-  font-weight: var(--grimoire-weight-medium);
+  font-weight: var(--grimoire-weight-normal);
   letter-spacing: 0;
-  line-height: 1.35;
+  line-height: var(--grimoire-leading-body);
+  text-wrap: pretty;
 }
 
 .grimoire-message {
@@ -120,7 +125,7 @@
 
 .grimoire-container--chat-window .grimoire-message {
   display: grid;
-  gap: var(--grimoire-space-8);
+  gap: var(--grimoire-space-10);
   min-width: 0;
   padding: 0;
   border-radius: 0;
@@ -146,19 +151,27 @@
   content: "Grimoire";
 }
 
+/*
+ * What the reader wrote: a plane, not a coloured card.
+ *
+ * It was an accent wash inside an accent border, right-aligned at 86% — a
+ * shape that spent the user's accent on the one thing in the transcript that
+ * needs no emphasis, because they wrote it. Ground says "this is yours"
+ * quietly enough to read the answer beside it.
+ */
 .grimoire-message-user {
   position: relative;
-  background: var(--grimoire-accent-wash);
-  border: 1px solid var(--grimoire-accent-line);
-  align-self: flex-end;
-  max-width: 86%;
-  padding: var(--grimoire-space-8) var(--grimoire-space-12);
-  border-radius: var(--grimoire-radius-3) var(--grimoire-radius-3) 4px var(--grimoire-radius-3);
+  background: var(--grimoire-plane);
+  border: 0;
+  align-self: stretch;
+  max-width: 100%;
+  padding: var(--grimoire-space-10) var(--grimoire-space-12);
+  border-radius: var(--grimoire-radius-2);
 }
 
-/* Reserve room for the date/action row positioned below the question bubble. */
+/* Reserve room for the time/action row positioned below the question. */
 .grimoire-container--chat-window .grimoire-message-user {
-  margin-bottom: var(--grimoire-space-16);
+  margin-bottom: var(--grimoire-space-24);
 }
 
 /* Text selection in user messages - visible highlight */
@@ -181,7 +194,7 @@
 .grimoire-message-content {
   min-width: 0;
   max-width: 100%;
-  line-height: 1.48;
+  line-height: var(--grimoire-leading-body);
   user-select: text;
   -webkit-user-select: text;
   unicode-bidi: plaintext; /* Proper BiDi text handling for mixed RTL/LTR */
@@ -189,29 +202,34 @@
 
 .grimoire-container--chat-window .grimoire-message-assistant .grimoire-message-content {
   display: grid;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
 }
 
+/*
+ * Who answered, on what, at what effort. A caption, not a heading: it was set
+ * uppercase, tracked and semibold, which is the weight of a section title on
+ * three words of provenance.
+ */
 .grimoire-assistant-response-meta {
   display: flex;
   align-items: center;
   gap: var(--grimoire-space-8);
   margin-bottom: var(--grimoire-space-4);
-  color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
-  letter-spacing: 0.12em;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
+  letter-spacing: 0;
   line-height: 1;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
-.grimoire-assistant-response-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-ink-muted);
+/* The vendor's own mark, in ink. */
+.grimoire-assistant-response-mark {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
   flex: 0 0 auto;
+  color: var(--grimoire-ink-muted);
 }
 
 
@@ -474,13 +492,19 @@
   font-style: italic;
 }
 
-/* Action buttons toolbar below user messages */
+/*
+ * What can be done to a turn, under it and to the right: copy, rewind, fork.
+ *
+ * The controls hold their space at rest and change only colour and ground on
+ * hover, so revealing them never moves the text above.
+ */
 .grimoire-user-msg-actions {
   position: absolute;
-  bottom: -24px;
+  bottom: calc(-1 * var(--grimoire-hit-s));
   right: 0;
   display: flex;
-  gap: var(--grimoire-space-12);
+  align-items: center;
+  gap: var(--grimoire-space-2);
   opacity: 1;
   z-index: 1;
 }
@@ -490,17 +514,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-faint);
-  transition: color var(--grimoire-duration) var(--grimoire-ease);
+  width: var(--grimoire-hit-s);
+  height: var(--grimoire-hit-s);
+  border-radius: var(--grimoire-radius-1);
+  color: var(--grimoire-ink-faint);
+  transition: color var(--grimoire-duration) var(--grimoire-ease), background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-user-msg-actions span svg {
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-user-msg-actions span:hover {
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-user-msg-actions span.copied {
@@ -548,7 +577,7 @@
 }
 
 .grimoire-container--chat-window .grimoire-messages {
-  gap: var(--grimoire-space-12);
+  gap: var(--grimoire-space-20);
   padding: 0;
 }
 
@@ -568,10 +597,10 @@
 }
 
 .grimoire-container--chat-window .grimoire-message-user {
-  max-width: 86%;
-  align-self: flex-end;
-  padding: var(--grimoire-space-8) var(--grimoire-space-12);
-  border-radius: var(--grimoire-radius-3) var(--grimoire-radius-3) 4px var(--grimoire-radius-3);
+  max-width: 100%;
+  align-self: stretch;
+  padding: var(--grimoire-space-10) var(--grimoire-space-12);
+  border-radius: var(--grimoire-radius-2);
 }
 
 .grimoire-container--chat-window .grimoire-message-assistant {

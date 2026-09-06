@@ -36,7 +36,7 @@
 
 .grimoire-progress-block--completed .grimoire-progress-icon,
 .grimoire-progress-item--completed .grimoire-progress-item-icon {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-progress-block--waiting .grimoire-progress-icon {
@@ -44,7 +44,7 @@
 }
 
 .grimoire-progress-block--blocked .grimoire-progress-icon {
-  color: var(--color-orange);
+  color: var(--grimoire-warn);
 }
 
 .grimoire-progress-meta {

@@ -7,12 +7,19 @@
 }
 
 /* Code blocks in chat messages */
+/*
+ * Code sits on the host's own code ground at the control radius, because a
+ * fenced block is a block of text rather than a surface: it encloses nothing
+ * and floats over nothing.
+ */
 .grimoire-code-wrapper pre,
 .grimoire-message-content pre {
   max-width: 100%;
-  background: var(--code-background, var(--background-primary-alt));
-  padding: var(--grimoire-space-8) var(--grimoire-space-12);
-  border-radius: var(--grimoire-radius-2);
+  background: var(--grimoire-code);
+  padding: var(--grimoire-space-8) var(--grimoire-space-10);
+  border-radius: var(--grimoire-radius-1);
+  font-size: var(--grimoire-text-xs);
+  line-height: var(--grimoire-leading-code);
   overflow-x: auto;
   margin: 0;
 }
@@ -33,9 +40,20 @@
   margin: var(--grimoire-space-8) 0;
 }
 
+/*
+ * Inline code is set relative to the line it sits in, so it stays a word in a
+ * sentence rather than a fragment at a fixed size the sentence has to make room
+ * for.
+ */
 .grimoire-message-content code {
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-m);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-inline-code);
+}
+
+.grimoire-message-content :not(pre) > code {
+  padding: 1px var(--grimoire-space-4);
+  border-radius: var(--grimoire-radius-1);
+  background: var(--grimoire-code);
 }
 
 /* Clickable language label - positioned outside scroll area */
@@ -46,8 +64,8 @@
   padding: var(--grimoire-space-2) var(--grimoire-space-8);
   font-size: var(--grimoire-text-s);
   font-family: var(--font-monospace);
-  color: var(--text-faint);
-  background: var(--background-primary);
+  color: var(--grimoire-ink-faint);
+  background: var(--grimoire-ground);
   border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   z-index: 2;
@@ -55,8 +73,8 @@
 }
 
 .grimoire-code-wrapper .grimoire-code-lang-label:hover {
-  color: var(--text-normal);
-  background: var(--background-modifier-hover);
+  color: var(--grimoire-ink);
+  background: var(--grimoire-hover);
 }
 
 /* Hide default copy button when language label exists */
@@ -71,9 +89,9 @@
   inset-inline-end: 6px;
   padding: var(--grimoire-space-4) var(--grimoire-space-8);
   font-size: var(--grimoire-text-xs);
-  background: var(--background-primary);
+  background: var(--grimoire-ground);
   border: none;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   cursor: pointer;
   opacity: 0;
   transition: opacity var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease), background var(--grimoire-duration) var(--grimoire-ease);
@@ -93,6 +111,6 @@
 }
 
 .grimoire-code-wrapper .copy-code-button:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }

@@ -80,7 +80,7 @@
 }
 
 .grimoire-status-panel-status.status-completed {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-status-panel-content {
@@ -138,7 +138,7 @@
 }
 
 .grimoire-todo-list-container .grimoire-todo-completed .grimoire-todo-status-icon {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-todo-list-container .grimoire-todo-completed .grimoire-todo-text {
@@ -245,7 +245,7 @@
 }
 
 .grimoire-agent-card--failed .grimoire-agent-card-icon {
-  color: var(--text-error);
+  color: var(--grimoire-error);
 }
 
 .grimoire-agent-card-label {

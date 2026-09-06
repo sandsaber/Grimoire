@@ -247,11 +247,11 @@
 
 .grimoire-settings-resource-dot.is-available,
 .grimoire-settings-resource-dot.is-connected {
-  background: var(--color-green);
+  background: var(--grimoire-ok);
 }
 
 .grimoire-settings-resource-dot.is-readonly {
-  background: var(--color-orange);
+  background: var(--grimoire-warn);
 }
 
 .grimoire-settings-resource-dot.is-native {
@@ -297,7 +297,7 @@
 
 .grimoire-settings-resource-delete:hover:not(:disabled) {
   background: var(--background-modifier-error-hover);
-  color: var(--text-error);
+  color: var(--grimoire-error);
 }
 
 .grimoire-settings-resource-delete:disabled {

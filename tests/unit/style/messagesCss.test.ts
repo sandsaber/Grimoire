@@ -134,8 +134,8 @@ describe('messages.css', () => {
     );
     const userActionsRule = getExactRule(css, '.grimoire-user-msg-actions');
 
-    expect(userBubbleRule).toContain('margin-bottom: var(--grimoire-space-16)');
-    expect(userActionsRule).toContain('bottom: -24px');
+    expect(userBubbleRule).toContain('margin-bottom: var(--grimoire-space-24)');
+    expect(userActionsRule).toContain('bottom: calc(-1 * var(--grimoire-hit-s))');
   });
 
   it('keeps message dates and copy controls visible without requiring hover', () => {
@@ -169,7 +169,7 @@ describe('messages.css', () => {
     );
     const completionRule = getRule(css, '.grimoire-text-block--with-completion-time');
 
-    expect(contentRule).toContain('gap: var(--grimoire-space-4)');
+    expect(contentRule).toContain('gap: var(--grimoire-space-8)');
     expect(completionRule).toContain('padding-bottom: var(--grimoire-space-24)');
     expect(css).toContain('.grimoire-message-completion-time');
   });
@@ -219,7 +219,8 @@ describe('messages.css', () => {
     // 12px is the gutter the design draws every column against; the header
     // insets its own left edge to the same line.
     expect(windowRule).toContain('--grimoire-window-padding-x: var(--grimoire-space-12)');
-    expect(chatScrollRule).toContain('var(--grimoire-window-padding-x)');
+    // The transcript is inset one step further than the chrome around it.
+    expect(chatScrollRule).toContain('padding: var(--grimoire-space-16) var(--grimoire-space-16) var(--grimoire-space-8)');
     expect(composerRule).toContain('var(--grimoire-window-padding-x)');
     expect(headerRule).toContain('var(--grimoire-space-12)');
     expect(panelSwitchRule).toContain('var(--grimoire-window-padding-x)');

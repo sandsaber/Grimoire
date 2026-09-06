@@ -304,9 +304,9 @@
 }
 
 .grimoire-context-file-status-loaded {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-context-file-status-failed {
-  color: var(--text-error);
+  color: var(--grimoire-error);
 }

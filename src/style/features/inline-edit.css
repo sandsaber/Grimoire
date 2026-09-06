@@ -112,14 +112,14 @@
 
 /* Deleted text - red strikethrough */
 .grimoire-diff-del {
-  background: color-mix(in srgb, var(--color-red) 22%, transparent);
+  background: color-mix(in srgb, var(--grimoire-error) 22%, transparent);
   text-decoration: line-through;
   color: var(--text-muted);
 }
 
 /* Inserted text - green background */
 .grimoire-diff-ins {
-  background: color-mix(in srgb, var(--color-green) 22%, transparent);
+  background: color-mix(in srgb, var(--grimoire-ok) 22%, transparent);
 }
 
 /* Accept/Reject buttons inline with diff */
@@ -141,9 +141,9 @@
 }
 
 .grimoire-inline-diff-btn.reject {
-  color: var(--color-red);
+  color: var(--grimoire-error);
 }
 
 .grimoire-inline-diff-btn.accept {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }

@@ -67,11 +67,11 @@
 }
 
 .grimoire-subagent-status.status-completed {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-subagent-status.status-error {
-  color: var(--color-red);
+  color: var(--grimoire-error);
 }
 
 .grimoire-subagent-content {
@@ -195,12 +195,12 @@
 }
 
 .grimoire-subagent-tool-status.status-completed {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-subagent-tool-status.status-error,
 .grimoire-subagent-tool-status.status-blocked {
-  color: var(--color-red);
+  color: var(--grimoire-error);
 }
 
 .grimoire-subagent-tool-content {
@@ -236,17 +236,17 @@
 }
 
 .grimoire-subagent-list.async.awaiting .grimoire-subagent-status-text {
-  color: var(--color-yellow);
+  color: var(--grimoire-warn);
 }
 
 .grimoire-subagent-list.async.completed .grimoire-subagent-status-text {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-subagent-list.async.error .grimoire-subagent-status-text {
-  color: var(--color-red);
+  color: var(--grimoire-error);
 }
 
 .grimoire-subagent-list.async.orphaned .grimoire-subagent-status-text {
-  color: var(--color-orange);
+  color: var(--grimoire-warn);
 }

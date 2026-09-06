@@ -64,7 +64,7 @@
 .grimoire-chat-scroll {
   min-height: 0;
   overflow: hidden auto;
-  padding: var(--grimoire-space-6) var(--grimoire-window-padding-x) var(--grimoire-space-12);
+  padding: var(--grimoire-space-16) var(--grimoire-space-16) var(--grimoire-space-8);
   scrollbar-width: thin;
   scrollbar-color: var(--grimoire-line-3) transparent;
 }

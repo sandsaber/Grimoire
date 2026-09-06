@@ -64,11 +64,11 @@
 }
 
 .grimoire-write-edit-stats .added {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-write-edit-stats .removed {
-  color: var(--color-red);
+  color: var(--grimoire-error);
   margin-left: var(--grimoire-space-4);
 }
 
@@ -89,12 +89,12 @@
 }
 
 .grimoire-write-edit-status.status-completed {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-write-edit-status.status-error,
 .grimoire-write-edit-status.status-blocked {
-  color: var(--color-red);
+  color: var(--grimoire-error);
 }
 
 .grimoire-write-edit-content {
@@ -107,15 +107,22 @@
   display: flex;
 }
 
+/*
+ * The diff block. It sits inline under the step that made the edit, on the
+ * code ground, and a long line truncates rather than wrapping: a wrapped diff
+ * line stops being a line, which is the only thing a diff is made of.
+ */
 .grimoire-write-edit-diff {
   flex: 1;
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-s);
-  line-height: 1.5;
-  background: transparent;
+  padding: var(--grimoire-space-8) var(--grimoire-space-10);
+  border-radius: var(--grimoire-radius-1);
+  background: var(--grimoire-code);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  line-height: var(--grimoire-leading-code);
   max-height: 300px;
   overflow-y: auto;
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .grimoire-write-edit-loading,
@@ -128,7 +135,7 @@
 }
 
 .grimoire-write-edit-error {
-  color: var(--color-red);
+  color: var(--grimoire-error);
 }
 
 /* Diff line styling */
@@ -138,30 +145,47 @@
 
 .grimoire-diff-line {
   display: flex;
-  white-space: pre-wrap;
-  word-break: break-all;
+  gap: var(--grimoire-space-10);
 }
 
+/*
+ * The sign is the only coloured thing in the block. A full-width tinted band
+ * behind every added line reads as a highlight the reader did not ask for, and
+ * on a light theme it is a second background competing with the code ground.
+ */
 .grimoire-diff-prefix {
   flex-shrink: 0;
-  width: 16px;
-  text-align: center;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-faint);
   user-select: none;
 }
 
 .grimoire-diff-text {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grimoire-diff-insert {
-  background: color-mix(in srgb, var(--color-green) 25%, transparent);
-  color: var(--text-normal);
+  background: none;
+  color: var(--grimoire-ink);
 }
 
 .grimoire-diff-insert .grimoire-diff-prefix {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
+}
+
+/* What is going away is struck through and receding, not painted red. */
+.grimoire-diff-delete {
+  background: none;
+  color: var(--grimoire-ink-faint);
+  text-decoration: line-through;
+}
+
+.grimoire-diff-delete .grimoire-diff-prefix {
+  color: var(--grimoire-error);
+  text-decoration: none;
 }
 
 /* Hunk separator */

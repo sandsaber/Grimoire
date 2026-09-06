@@ -108,19 +108,24 @@
 }
 
 .grimoire-tool-status.status-running {
-  color: var(--grimoire-accent-text);
+  color: var(--grimoire-accent);
 }
 
+/*
+ * A completed step's check is the accent, not green. Green would be a second
+ * meaning for a colour that already means "added" in a diff, and success here
+ * is not news — the row's result says what happened.
+ */
 .grimoire-tool-status.status-completed {
-  color: var(--color-green);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-tool-status.status-error {
-  color: var(--color-red);
+  color: var(--grimoire-error);
 }
 
 .grimoire-tool-status.status-blocked {
-  color: var(--color-orange);
+  color: var(--grimoire-warn);
 }
 
 /* Tool call content - border style (like thinking block) */
@@ -319,75 +324,112 @@
 }
 
 /* Redesigned chat activity trace */
+/*
+ * A run of tool steps, drawn against a single hairline.
+ *
+ * The rule is a pseudo-element rather than a border so a step can extend it up
+ * through the gap above when it follows another step: the run reads as one
+ * line without the renderer having to wrap the steps in a box, which it cannot
+ * do while they arrive one at a time from a stream. Its 6px offset puts it
+ * under the centre of the provider mark on the meta line above.
+ */
 .grimoire-tool-step {
+  position: relative;
   display: grid;
-  gap: 1px;
-  margin: 1px 0;
+  gap: var(--grimoire-space-2);
+  margin: 0;
+  padding-left: var(--grimoire-space-20);
+}
+
+.grimoire-tool-step::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--grimoire-space-6);
+  width: 1px;
+  background: var(--grimoire-line);
+}
+
+.grimoire-tool-step + .grimoire-tool-step::before {
+  top: calc(-1 * var(--grimoire-space-8));
 }
 
 .grimoire-tool-step > .grimoire-tool-header {
   display: grid;
-  grid-template-columns: 26px auto minmax(0, 1fr) auto auto;
+  grid-template-columns: var(--grimoire-icon-m) auto minmax(0, 1fr) auto auto;
   align-items: center;
+  height: var(--grimoire-tool-row-h);
   gap: var(--grimoire-space-8);
-  min-height: 34px;
-  padding: var(--grimoire-space-4) var(--grimoire-space-8) var(--grimoire-space-4) 0;
-  border-radius: var(--grimoire-radius-2);
+  padding: 0;
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   overflow: hidden;
   transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-tool-step > .grimoire-tool-header:hover {
-  background: var(--grimoire-raise-2);
+  background: none;
   opacity: 1;
 }
 
+/*
+ * The tool's glyph, bare. It was a 26px tinted tile — a second surface inside
+ * a row that is already one line tall — and the tile was doing the job the
+ * accent does here on its own.
+ */
 .grimoire-tool-step .grimoire-tool-icon-tile {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-raise-2);
-  color: var(--grimoire-workbench-muted);
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-accent);
 }
 
 .grimoire-tool-step .grimoire-tool-icon-tile svg {
-  width: 15px;
-  height: 15px;
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-tool-step.is-running .grimoire-tool-icon-tile {
-  background: var(--grimoire-accent-wash);
-  color: var(--grimoire-accent-text);
-  box-shadow: inset 0 0 0 1px var(--grimoire-accent-line);
+  background: none;
+  color: var(--grimoire-accent);
+  box-shadow: none;
 }
 
+/* A failure is the one thing in a step that changes colour, and it says why. */
 .grimoire-tool-step.is-error .grimoire-tool-icon-tile,
 .grimoire-tool-step.is-blocked .grimoire-tool-icon-tile {
-  background: color-mix(in srgb, var(--grimoire-error) 12%, transparent);
+  background: none;
   color: var(--grimoire-error);
 }
 
 .grimoire-tool-step .grimoire-tool-name {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
+  font-family: var(--font-interface);
   font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-medium);
+  font-weight: var(--grimoire-weight-semibold);
 }
 
+/* What the tool was pointed at: a path, an id, a pattern — machine text. */
 .grimoire-tool-step .grimoire-tool-summary {
-  color: var(--grimoire-workbench-faint);
+  color: var(--grimoire-ink-muted);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-medium);
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-tool-result {
   grid-column: 4;
-  color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
+  letter-spacing: 0;
   line-height: 1;
   white-space: nowrap;
 }
@@ -398,9 +440,9 @@
 
 .grimoire-tool-step.is-awaiting .grimoire-tool-result {
   color: var(--grimoire-accent-text);
-  font-size: var(--grimoire-text-2xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--grimoire-text-xs);
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .grimoire-tool-step.is-awaiting .grimoire-tool-spinner {
@@ -409,9 +451,19 @@
 
 .grimoire-tool-step .grimoire-tool-status {
   grid-column: 5;
-  min-width: 15px;
+  min-width: var(--grimoire-icon-s);
   justify-content: center;
   margin-left: 0;
+}
+
+.grimoire-tool-step .grimoire-tool-status svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+}
+
+/* A check is a hairline at 1.75 and reads as a smudge; it is the one heavier stroke. */
+.grimoire-tool-step .grimoire-tool-status.status-completed svg {
+  stroke-width: var(--grimoire-stroke-check);
 }
 
 .grimoire-tool-group > .grimoire-tool-group-header {

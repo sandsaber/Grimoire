@@ -94,12 +94,12 @@
 }
 
 .grimoire-context-limits-input.grimoire-input-error {
-  border-color: var(--text-error);
+  border-color: var(--grimoire-error);
 }
 
 .grimoire-context-limit-validation {
   font-size: var(--font-ui-smaller);
-  color: var(--text-error);
+  color: var(--grimoire-error);
   margin-left: var(--grimoire-space-4);
 }
 

@@ -134,6 +134,12 @@ body {
   --grimoire-text-l: var(--font-ui-medium, 15px);
   --grimoire-text-xl: var(--font-ui-large, 20px);
   --grimoire-mono: var(--font-monospace);
+  /*
+   * Inline code is the one size stated relative to its own line rather than to
+   * the ladder: a fragment inside a sentence has to match the sentence it is
+   * in, and monospace at the same nominal size always reads larger.
+   */
+  --grimoire-text-inline-code: 0.92em;
   /* Four weights, down from the thirteen the stylesheets had grown. */
   --grimoire-weight-normal: var(--font-normal, 400);
   --grimoire-weight-medium: var(--font-medium, 500);

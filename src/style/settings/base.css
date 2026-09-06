@@ -200,7 +200,7 @@
 }
 
 .grimoire-settings-tab-status.is-enabled {
-  background: var(--color-green);
+  background: var(--grimoire-ok);
 }
 
 .grimoire-settings-tab-content {
@@ -552,7 +552,7 @@
 }
 
 .grimoire-settings-delete-btn:hover {
-  color: var(--text-error);
+  color: var(--grimoire-error);
 }
 
 .grimoire-setting-validation {
@@ -562,11 +562,11 @@
 }
 
 .grimoire-setting-validation-error {
-  color: var(--text-error);
+  color: var(--grimoire-error);
 }
 
 .grimoire-setting-validation-warning {
-  color: var(--text-warning);
+  color: var(--grimoire-warn);
 }
 
 .grimoire-settings-cli-path-input {
@@ -575,7 +575,7 @@
 
 .grimoire-settings-cli-path-input.grimoire-input-error,
 .grimoire-settings .grimoire-input-error {
-  box-shadow: inset 0 0 0 1px var(--text-error);
+  box-shadow: inset 0 0 0 1px var(--grimoire-error);
 }
 
 /* ── Context-engine + project-workspace settings (advanced) ── */

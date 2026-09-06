@@ -55,7 +55,7 @@
   border: 0;
   border-radius: var(--grimoire-radius-1);
   background: transparent;
-  color: var(--text-error);
+  color: var(--grimoire-error);
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-semibold);
   line-height: 1;
@@ -64,8 +64,8 @@
 }
 
 .grimoire-history-delete-all:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--text-error) 14%, transparent);
-  color: var(--text-error-hover, var(--text-error));
+  background: color-mix(in srgb, var(--grimoire-error) 14%, transparent);
+  color: var(--grimoire-error);
 }
 
 .grimoire-history-delete-all:disabled {
@@ -321,8 +321,8 @@
 }
 
 .grimoire-delete-btn:hover {
-  background: color-mix(in srgb, var(--color-red) 16%, transparent);
-  color: var(--color-red);
+  background: color-mix(in srgb, var(--grimoire-error) 16%, transparent);
+  color: var(--grimoire-error);
 }
 
 .grimoire-rename-input {
